@@ -28,12 +28,15 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /** Bean Validation contract tests for the personal inventory write DTOs. */
 class PersonalInventoryItemRequestValidationTest {
+
+  private static final UUID LOCATION = UUID.fromString("0c000001-0000-4000-8000-000000000001");
 
   private static ValidatorFactory factory;
   private static Validator validator;
@@ -54,8 +57,7 @@ class PersonalInventoryItemRequestValidationTest {
   @Test
   void validCreateRequestShouldHaveNoViolations() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
+        new PersonalInventoryItemCreateRequest("Medkit", "first aid", LOCATION, 3);
 
     assertTrue(validator.validate(req).isEmpty());
   }
@@ -63,8 +65,7 @@ class PersonalInventoryItemRequestValidationTest {
   @Test
   void blankNameShouldBeRejected() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            "  ", null, 1, PersonalInventoryLocationType.CITY, 1);
+        new PersonalInventoryItemCreateRequest("  ", null, LOCATION, 1);
 
     Set<ConstraintViolation<PersonalInventoryItemCreateRequest>> violations =
         validator.validate(req);
@@ -77,8 +78,7 @@ class PersonalInventoryItemRequestValidationTest {
   void overlongNameShouldBeRejected() {
     String tooLong = "x".repeat(121);
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            tooLong, null, 1, PersonalInventoryLocationType.CITY, 1);
+        new PersonalInventoryItemCreateRequest(tooLong, null, LOCATION, 1);
 
     assertFalse(validator.validate(req).isEmpty());
   }
@@ -87,8 +87,7 @@ class PersonalInventoryItemRequestValidationTest {
   void overlongNoteShouldBeRejected() {
     String tooLong = "x".repeat(2001);
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            "ok", tooLong, 1, PersonalInventoryLocationType.CITY, 1);
+        new PersonalInventoryItemCreateRequest("ok", tooLong, LOCATION, 1);
 
     assertFalse(validator.validate(req).isEmpty());
   }
@@ -96,8 +95,7 @@ class PersonalInventoryItemRequestValidationTest {
   @Test
   void quantityBelowOneShouldBeRejected() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            "ok", null, 1, PersonalInventoryLocationType.CITY, 0);
+        new PersonalInventoryItemCreateRequest("ok", null, LOCATION, 0);
 
     Set<ConstraintViolation<PersonalInventoryItemCreateRequest>> violations =
         validator.validate(req);
@@ -108,21 +106,28 @@ class PersonalInventoryItemRequestValidationTest {
   }
 
   @Test
-  void missingLocationFieldsShouldBeRejected() {
+  void aCreateWithoutALocationShouldBeRejected() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest("ok", null, null, null, 1);
+        new PersonalInventoryItemCreateRequest("ok", null, null, 1);
 
     Set<ConstraintViolation<PersonalInventoryItemCreateRequest>> violations =
         validator.validate(req);
 
-    assertEquals(2, violations.size());
+    assertEquals(1, violations.size());
+  }
+
+  @Test
+  void anUpdateWithoutALocationIsValidForAnItemWhosePlaceNoLongerResolves() {
+    PersonalInventoryItemUpdateRequest req =
+        new PersonalInventoryItemUpdateRequest("ok", null, null, 1, 0L);
+
+    assertTrue(validator.validate(req).isEmpty());
   }
 
   @Test
   void updateRequestRequiresVersion() {
     PersonalInventoryItemUpdateRequest req =
-        new PersonalInventoryItemUpdateRequest(
-            "ok", null, 1, PersonalInventoryLocationType.CITY, 1, null);
+        new PersonalInventoryItemUpdateRequest("ok", null, LOCATION, 1, null);
 
     Set<ConstraintViolation<PersonalInventoryItemUpdateRequest>> violations =
         validator.validate(req);
@@ -133,8 +138,7 @@ class PersonalInventoryItemRequestValidationTest {
   @Test
   void validUpdateRequestShouldPass() {
     PersonalInventoryItemUpdateRequest req =
-        new PersonalInventoryItemUpdateRequest(
-            "ok", null, 1, PersonalInventoryLocationType.CITY, 1, 0L);
+        new PersonalInventoryItemUpdateRequest("ok", null, LOCATION, 1, 0L);
 
     assertTrue(validator.validate(req).isEmpty());
   }

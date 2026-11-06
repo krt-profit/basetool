@@ -87,16 +87,14 @@ class P4kCatalogueStreamTest {
     byte[] zstd = liveSizedZstd();
     System.gc();
     long before = liveHeap();
-    LiveHeapSampler sampler;
-    P4kCatalogue catalogue;
-    try (InputStream in = P4kCompression.openDecompressed(zstd, 1_000_000_000L)) {
-      sampler = new LiveHeapSampler(in);
-      catalogue = reader.read(sampler);
-    }
+    try (LiveHeapSampler sampler =
+        new LiveHeapSampler(P4kCompression.openDecompressed(zstd, 1_000_000_000L))) {
+      P4kCatalogue catalogue = reader.read(sampler);
 
-    assertThat(catalogue.items()).hasSize(8);
-    assertThat(sampler.bytesRead).isGreaterThan(LIVE_SIZE_BYTES - 1024);
-    assertThat(sampler.peakLiveHeap - before).isLessThan(LIVE_SIZE_BYTES / 8);
+      assertThat(catalogue.items()).hasSize(8);
+      assertThat(sampler.bytesRead).isGreaterThan(LIVE_SIZE_BYTES - 1024);
+      assertThat(sampler.peakLiveHeap - before).isLessThan(LIVE_SIZE_BYTES / 8);
+    }
   }
 
   /**

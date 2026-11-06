@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserRankRangeResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
@@ -230,7 +229,6 @@ public class MemberManagementController {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
-      model.addAttribute("memberRankRange", loadRankRange(id));
 
       try {
         List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);
@@ -307,23 +305,6 @@ public class MemberManagementController {
   }
 
   /**
-   * Reads the member's rank range for the hint under the rank select; a failed read hides the hint
-   * and never blocks the page.
-   *
-   * @param id the member
-   * @return the range, or {@code null} when it could not be read
-   */
-  @Nullable
-  private UserRankRangeResponse loadRankRange(@NotNull UUID id) {
-    try {
-      return identityClient.userRankRange(id);
-    } catch (BackendServiceException ex) {
-      log.debug("Failed to load the rank range for the member-edit page", ex);
-      return null;
-    }
-  }
-
-  /**
    * Saves member edits; a validation failure re-renders the form, success redirects to the profile
    * for {@code source=profile} and to the member list otherwise.
    *
@@ -354,11 +335,7 @@ public class MemberManagementController {
       }
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateMember", id, e);
-      if (isRankOutsideRoleRange(e)) {
-        redirectAttributes.addFlashAttribute("errorToast", "error.member.rank.outsideRoleRange");
-      } else {
-        redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
-      }
+      redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
       return "redirect:/members/"
           + id
           + "/edit"
@@ -408,15 +385,6 @@ public class MemberManagementController {
       body.put("version", currentUserVersion(id, form.version()));
       return ResponseEntity.ok(body);
     } catch (BackendServiceException e) {
-      if (isRankOutsideRoleRange(e)) {
-        log.warn(
-            "AJAX member update refused: status={}, code={}",
-            e.getStatusCode(),
-            e.getProblemCode());
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of("rank", rankRefusalMessage(e, locale)));
-      }
       return relayBackendError("AJAX member update failed", e);
     }
   }
@@ -470,35 +438,6 @@ public class MemberManagementController {
       log.warn("Could not re-read the user-row version of user {}; assuming the next one", id, e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
-  }
-
-  /**
-   * Tells whether the backend refused the save because the rank does not fit the member's stored
-   * Keycloak role (REQ-ROLE-007).
-   *
-   * @param e the backend failure
-   * @return {@code true} for the {@code RANK_OUTSIDE_ROLE_RANGE} refusal
-   */
-  private static boolean isRankOutsideRoleRange(@NotNull BackendServiceException e) {
-    return BackendServiceException.CODE_RANK_OUTSIDE_ROLE_RANGE.equals(e.getProblemCode());
-  }
-
-  /**
-   * The rank field's message for a role-range refusal: the backend's localized, role-specific
-   * detail, or the frontend's generic rank message when the detail is missing.
-   *
-   * @param e the {@code RANK_OUTSIDE_ROLE_RANGE} failure
-   * @param locale the request locale
-   * @return the message shown under the rank field
-   */
-  @NotNull
-  private String rankRefusalMessage(@NotNull BackendServiceException e, @NotNull Locale locale) {
-    String detail = e.getProblemDetail();
-    if (detail != null && !detail.isBlank()) {
-      return detail;
-    }
-    return messageSource.getMessage(
-        "error.member.rank.outsideRoleRange", null, "error.member.rank.outsideRoleRange", locale);
   }
 
   /**

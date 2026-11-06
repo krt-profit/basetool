@@ -582,7 +582,8 @@ designation on the job-type reference data. `JobType` carries a `isMissionLead` 
 job type may hold it (DB-enforced by a partial unique index, V200) and only a `MISSION`-archetype
 **leadership** role may be designated. The flag is set on the job-type admin page (`/admin/mission-data`);
 re-designating moves it (the service clears the previous holder, and rejects a non-MISSION/non-leadership
-designation with 400).
+designation with 400). A create or update that omits `isLeadershipRole` or `isMissionLead` (an
+unchecked checkbox on the admin form) sets that flag to false; it never fails the save.
 
 **Single Einsatzleiter per mission.** A mission may have only **one** Einsatzleiter: assigning the
 designated mission-lead `plannedMissionJobType` to a second participant is rejected with **HTTP 409**

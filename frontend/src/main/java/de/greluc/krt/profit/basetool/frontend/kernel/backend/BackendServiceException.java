@@ -85,13 +85,6 @@ public class BackendServiceException extends RuntimeException {
   public static final String CODE_MISSION_PARTICIPANT_REQUIRED = "MISSION_PARTICIPANT_REQUIRED";
 
   /**
-   * Problem code of the {@code 400} the backend answers when a member rank does not fit the
-   * member's stored Keycloak role (REQ-ROLE-007). The member-edit handlers branch on it to name the
-   * rank field instead of their generic failure message.
-   */
-  public static final String CODE_RANK_OUTSIDE_ROLE_RANGE = "RANK_OUTSIDE_ROLE_RANGE";
-
-  /**
    * Problem code of the {@code 409} the backend answers when a leadership seat is given to a user
    * without {@code KRT Member} (REQ-SEC-015). Form handlers branch on it so the refusal is not
    * shown as a concurrency conflict.

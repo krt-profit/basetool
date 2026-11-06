@@ -116,8 +116,7 @@ public final class NoStoreApiScopes {
           "/api/v1/squadrons/**",
           "/api/v1/star-systems/**",
           "/api/v1/terminals/**",
-          "/api/v1/terms/document",
-          "/api/v1/uex/**");
+          "/api/v1/terms/document");
 
   /** The surface the classification is about. */
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");

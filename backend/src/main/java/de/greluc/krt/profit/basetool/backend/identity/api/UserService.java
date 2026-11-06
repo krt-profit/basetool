@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -76,11 +75,16 @@ public class UserService {
   /** The i18n key of the refusal when another account already answers to the handle. */
   private static final String RSI_HANDLE_TAKEN = "error.user.rsiHandle.taken";
 
+  /** The lowest member rank (REQ-ROLE-007). */
+  private static final int LOWEST_RANK = 1;
+
+  /** The highest member rank (REQ-ROLE-007). */
+  private static final int HIGHEST_RANK = 20;
+
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
-  private final OfficerReachDirectory officerReachDirectory;
   private final CallerUserProjection callerUserProjection;
   private final AuditRecorder auditRecorder;
 
@@ -139,16 +143,15 @@ public class UserService {
 
   /**
    * Updates a user's rank, description, display name and join date. The version is checked when
-   * non-null; a {@code null} version (admin override) skips it. Rank must lie in the account's
-   * range (admin 1–20, officer reach 1–12, {@code KRT Member} 13–20, REQ-ROLE-007); {@code
-   * joinDate} may be cleared with {@code null}, the other fields change only when supplied. A rank
-   * that differs from the stored one records {@link AuditEventType#MEMBER_RANK_CHANGED} in the same
-   * transaction (REQ-AUDIT-001).
+   * non-null; a {@code null} version (admin override) skips it. Rank may be any value 1–20,
+   * independent of the account's roles and leadership seats (REQ-ROLE-007); {@code joinDate} may be
+   * cleared with {@code null}, the other fields change only when supplied. A rank that differs from
+   * the stored one records {@link AuditEventType#MEMBER_RANK_CHANGED} in the same transaction
+   * (REQ-AUDIT-001).
    *
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
-   * @throws IllegalArgumentException when a role holder's rank lies outside 1–20
-   * @throws RankOutsideRoleRangeException when the rank does not fit the account's range
+   * @throws IllegalArgumentException when the rank lies outside 1–20
    */
   @Transactional
   @NotNull
@@ -164,7 +167,7 @@ public class UserService {
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
 
     if (rank != null) {
-      requireRankFitsRange(user, rank);
+      requireRankInScale(rank);
       Integer previousRank = user.getRank();
       if (!rank.equals(previousRank)) {
         user.setRank(rank);
@@ -188,70 +191,14 @@ public class UserService {
   }
 
   /**
-   * Returns the member-rank range of the account (REQ-ROLE-007): an admin holds 1–20, an account
-   * with officer reach 1–12, any other {@code KRT Member} 13–20; an account with none of these has
-   * no range.
+   * Checks that the rank lies in the member-rank scale (REQ-ROLE-007).
    *
-   * @param id the account
-   * @return the range, empty when the account is not range-checked
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the user is unknown
-   */
-  @NotNull
-  public Optional<RankRange> findRankRange(@NotNull UUID id) {
-    return rankRangeOf(Entities.require(userRepository.findById(id), "User not found"));
-  }
-
-  /**
-   * Derives the rank range from the account's stored roles and its officer reach.
-   *
-   * @param user the account whose roles and seats decide the range
-   * @return the range, empty when the account holds neither a role nor a seat that sets one
-   */
-  @NotNull
-  private Optional<RankRange> rankRangeOf(@NotNull User user) {
-    if (hasStoredRole(user, Roles.ADMIN)) {
-      return Optional.of(RankRange.admin());
-    }
-    if (officerReachDirectory.holdsOfficerReach(user.getId())) {
-      return Optional.of(RankRange.leadershipSeat());
-    }
-    if (hasStoredRole(user, Roles.KRT_MEMBER)) {
-      return Optional.of(RankRange.krtMember());
-    }
-    return Optional.empty();
-  }
-
-  /**
-   * Whether the account's stored roles contain the role, matched by stable role code.
-   *
-   * @param user the account
-   * @param roleCode the stable role code
-   * @return {@code true} iff the account holds the role
-   */
-  private static boolean hasStoredRole(@NotNull User user, @NotNull String roleCode) {
-    return user.getRoles().stream().anyMatch(r -> roleCode.equalsIgnoreCase(r.getCode()));
-  }
-
-  /**
-   * Checks the rank against the account's range (REQ-ROLE-007); an account without a range is not
-   * checked.
-   *
-   * @param user the account whose roles and seats decide the range
    * @param rank the requested rank
-   * @throws IllegalArgumentException when a ranged account's rank lies outside 1–20
-   * @throws RankOutsideRoleRangeException when the rank lies in 1–20 but outside the account's
-   *     range
+   * @throws IllegalArgumentException when the rank lies outside 1–20
    */
-  private void requireRankFitsRange(@NotNull User user, int rank) {
-    RankRange range = rankRangeOf(user).orElse(null);
-    if (range == null) {
-      return;
-    }
-    if (rank < RankRange.LOWEST_RANK || rank > RankRange.HIGHEST_RANK) {
+  private static void requireRankInScale(int rank) {
+    if (rank < LOWEST_RANK || rank > HIGHEST_RANK) {
       throw new IllegalArgumentException("Rank must be 1-20");
-    }
-    if (!range.contains(rank)) {
-      throw RankOutsideRoleRangeException.outside(range);
     }
   }
 

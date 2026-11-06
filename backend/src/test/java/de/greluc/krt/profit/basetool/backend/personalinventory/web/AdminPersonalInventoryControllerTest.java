@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.personalinventory.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationOption;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import java.time.Instant;
 import java.util.List;
@@ -67,7 +69,7 @@ class AdminPersonalInventoryControllerTest {
   @Test
   void createForUserShouldUsePathSubAsOwner() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest("x", null, 1, PersonalInventoryLocationType.CITY, 1);
+        new PersonalInventoryItemCreateRequest("x", null, UUID.randomUUID(), 1);
     when(service.createForUser(TARGET, req)).thenReturn(sampleResponse());
 
     controller.createForUser(TARGET, req);
@@ -79,8 +81,7 @@ class AdminPersonalInventoryControllerTest {
   void updateForUserShouldDelegateById() {
     UUID id = UUID.randomUUID();
     PersonalInventoryItemUpdateRequest req =
-        new PersonalInventoryItemUpdateRequest(
-            "x", null, 1, PersonalInventoryLocationType.CITY, 1, 0L);
+        new PersonalInventoryItemUpdateRequest("x", null, UUID.randomUUID(), 1, 0L);
     when(service.updateForUser(id, req)).thenReturn(sampleResponse());
 
     controller.updateForUser(id, req);
@@ -97,12 +98,25 @@ class AdminPersonalInventoryControllerTest {
     verify(service).deleteForUser(id);
   }
 
+  @Test
+  void locationsForUserShouldSearchThePathUsersSelectableLocations() {
+    List<PersonalInventoryLocationOption> options = List.of(sampleOption());
+    when(service.searchLocations(TARGET, "lor", 30)).thenReturn(options);
+
+    assertSame(options, controller.searchSelectableLocationsForUser(TARGET, "lor", 30));
+  }
+
+  private static PersonalInventoryLocationOption sampleOption() {
+    return new PersonalInventoryLocationOption(
+        UUID.randomUUID(), PersonalInventoryLocationType.CITY, "Lorville", "Stanton", "Hurston");
+  }
+
   private static PersonalInventoryItemResponse sampleResponse() {
     return new PersonalInventoryItemResponse(
         UUID.randomUUID(),
         "x",
         null,
-        1,
+        UUID.randomUUID(),
         PersonalInventoryLocationType.CITY,
         "Lorville",
         1,

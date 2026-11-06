@@ -23,15 +23,19 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /**
  * Write DTO for creating a personal inventory entry. The location display name is NOT accepted from
- * the client; the server resolves it from the local UEX City/Space-Station mirror and persists a
- * snapshot to keep the entry renderable offline.
+ * the client; the server takes it from the referenced {@code location} row and persists a snapshot.
+ *
+ * @param name the item name
+ * @param note an optional free-text note
+ * @param locationId the {@code location.id} of a place the owner may pick (REQ-P4K-039)
+ * @param quantity the count, at least one
  */
 public record PersonalInventoryItemCreateRequest(
     @NotBlank @Size(max = 120) String name,
     @Size(max = 2000) String note,
-    @NotNull Integer locationUexId,
-    @NotNull PersonalInventoryLocationType locationType,
+    @NotNull UUID locationId,
     @NotNull @Min(1) Integer quantity) {}

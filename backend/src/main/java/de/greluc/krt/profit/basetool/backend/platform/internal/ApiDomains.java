@@ -166,7 +166,6 @@ public final class ApiDomains {
           Map.entry("TerminalController", "catalogue"),
           Map.entry("TermsController", "identity"),
           Map.entry("TermsDocumentController", "identity"),
-          Map.entry("UexLocationController", "catalogue"),
           Map.entry("UserController", "identity"),
           Map.entry("UserProfileController", "identity"));
 

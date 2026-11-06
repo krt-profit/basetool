@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,9 +29,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
-import de.greluc.krt.profit.basetool.backend.identity.api.OfficerReachDirectory;
-import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
-import de.greluc.krt.profit.basetool.backend.identity.api.RankRange;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -49,6 +45,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -66,116 +64,52 @@ class UserServiceRankTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MembershipOperations membershipOperations;
-  @Mock private OfficerReachDirectory officerReachDirectory;
   @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private UserService userService;
 
-  @Test
-  void updateUserAttributes_WithReach_RankAbove12_IsRefusedNamingTheLeadershipSeat() {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 5, 12, 13, 20})
+  void updateUserAttributes_KrtMember_TakesAnyRankFrom1To20(int rank) {
     UUID id = UUID.randomUUID();
     User user = userWith(id, 8, Roles.KRT_MEMBER);
-    when(officerReachDirectory.holdsOfficerReach(id)).thenReturn(true);
 
-    RankOutsideRoleRangeException thrown =
-        assertThrows(
-            RankOutsideRoleRangeException.class,
-            () -> userService.updateUserAttributes(id, 13, null, null, 0L, null));
+    userService.updateUserAttributes(id, rank, null, null, 0L, null);
 
-    assertEquals("RANK_OUTSIDE_ROLE_RANGE", thrown.code());
-    assertEquals("LEADERSHIP_SEAT", thrown.getRole());
-    assertEquals(12, thrown.getMaxRank());
-    assertEquals("problem.rank_outside_role_range.leadership_seat.detail", thrown.getMessage());
-    assertEquals(8, user.getRank());
-    verify(userRepository, never()).save(any());
+    assertEquals(rank, user.getRank());
   }
 
   @Test
-  void updateUserAttributes_WithReach_Rank5_Passes() {
+  void updateUserAttributes_AccountWithoutRole_TakesAnyRankFrom1To20() {
     UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.KRT_MEMBER);
-    when(officerReachDirectory.holdsOfficerReach(id)).thenReturn(true);
+    User user = userWith(id, null);
 
-    userService.updateUserAttributes(id, 5, null, null, 0L, null);
+    userService.updateUserAttributes(id, 3, null, null, 0L, null);
+
+    assertEquals(3, user.getRank());
   }
 
   @Test
-  void updateUserAttributes_KrtMemberWithoutReach_Rank5_IsRefusedNamingKrtMember() {
+  void updateUserAttributes_Admin_TakesAnyRankFrom1To20() {
     UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.KRT_MEMBER);
+    User user = userWith(id, null, Roles.ADMIN);
 
-    RankOutsideRoleRangeException thrown =
-        assertThrows(
-            RankOutsideRoleRangeException.class,
-            () -> userService.updateUserAttributes(id, 5, null, null, 0L, null));
+    userService.updateUserAttributes(id, 17, null, null, 0L, null);
 
-    assertEquals(Roles.KRT_MEMBER, thrown.getRole());
-    assertEquals(13, thrown.getMinRank());
-    assertEquals("problem.rank_outside_role_range.krt_member.detail", thrown.getMessage());
+    assertEquals(17, user.getRank());
   }
 
-  @Test
-  void updateUserAttributes_KrtMemberWithoutReach_Rank15_Passes() {
+  @ParameterizedTest
+  @ValueSource(ints = {0, 21})
+  void updateUserAttributes_RankOutside1To20_IsRejectedForEveryAccount(int rank) {
     UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.KRT_MEMBER);
-
-    userService.updateUserAttributes(id, 15, null, null, 0L, null);
-  }
-
-  @Test
-  void updateUserAttributes_Admin_AnyRankFrom1To20_Passes() {
-    UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.ADMIN);
-
-    userService.updateUserAttributes(id, 1, null, null, 0L, null);
-    userService.updateUserAttributes(id, 20, null, null, 0L, null);
-  }
-
-  @Test
-  void updateUserAttributes_AdminWithSeat_StaysOnTheAdminRange() {
-    UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.ADMIN, Roles.KRT_MEMBER);
-
-    userService.updateUserAttributes(id, 18, null, null, 0L, null);
-  }
-
-  @Test
-  void updateUserAttributes_RankOutside1To20_IsRejectedForEveryRange() {
-    UUID id = UUID.randomUUID();
-    userWith(id, null, Roles.KRT_MEMBER);
+    User user = userWith(id, 8);
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> userService.updateUserAttributes(id, 21, null, null, 0L, null));
+        () -> userService.updateUserAttributes(id, rank, null, null, 0L, null));
+    assertEquals(8, user.getRank());
     verify(userRepository, never()).save(any());
-  }
-
-  @Test
-  void updateUserAttributes_AccountWithoutRoleOrSeat_IsNotRangeChecked() {
-    UUID id = UUID.randomUUID();
-    userWith(id, null);
-
-    userService.updateUserAttributes(id, 3, null, null, 0L, null);
-  }
-
-  @Test
-  void findRankRange_FollowsAdminThenSeatThenKrtMember() {
-    UUID admin = UUID.randomUUID();
-    userWith(admin, null, Roles.ADMIN);
-    assertEquals(RankRange.Basis.ADMIN, userService.findRankRange(admin).orElseThrow().basis());
-
-    UUID lead = UUID.randomUUID();
-    userWith(lead, null, Roles.KRT_MEMBER);
-    when(officerReachDirectory.holdsOfficerReach(lead)).thenReturn(true);
-    assertEquals(RankRange.leadershipSeat(), userService.findRankRange(lead).orElseThrow());
-
-    UUID member = UUID.randomUUID();
-    userWith(member, null, Roles.KRT_MEMBER);
-    assertEquals(RankRange.krtMember(), userService.findRankRange(member).orElseThrow());
-
-    UUID nobody = UUID.randomUUID();
-    userWith(nobody, null);
-    assertTrue(userService.findRankRange(nobody).isEmpty());
   }
 
   private User userWith(UUID id, Integer rank, String... roleCodes) {

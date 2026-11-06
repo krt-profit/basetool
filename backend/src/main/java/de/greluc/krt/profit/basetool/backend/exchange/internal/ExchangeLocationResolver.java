@@ -58,7 +58,8 @@ public class ExchangeLocationResolver {
       }
     }
     if (ref.name() != null) {
-      return locationRepository.findFirstByNameAndHiddenFalseOrderByIdAsc(ref.name());
+      return locationRepository.findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(
+          ref.name());
     }
     return Optional.empty();
   }

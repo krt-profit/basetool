@@ -168,7 +168,7 @@ class PersonalInventoryPageControllerMvcTest {
             UUID.randomUUID(),
             "Medpen",
             "note",
-            1001,
+            UUID.randomUUID(),
             PersonalInventoryLocationType.CITY,
             "Lorville",
             3,
@@ -210,12 +210,12 @@ class PersonalInventoryPageControllerMvcTest {
 
   @Test
   @WithMockUser
-  void uexSearch_passesMultiWordQueryAsUriVariable() throws Exception {
+  void locationSearch_passesMultiWordQueryAsUriVariable() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     mockMvc
-        .perform(get("/personal-inventory/uex-search").param("q", "Port Olisar"))
+        .perform(get("/personal-inventory/location-search").param("q", "Port Olisar"))
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();
@@ -227,13 +227,13 @@ class PersonalInventoryPageControllerMvcTest {
 
   @Test
   @WithMockUser
-  void uexSearch_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
+  void locationSearch_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
     String term = "Müller Hütte";
     mockMvc
-        .perform(get("/personal-inventory/uex-search").param("q", term))
+        .perform(get("/personal-inventory/location-search").param("q", term))
         .andExpect(status().isOk());
 
     ArgumentCaptor<String> uriCaptor = ArgumentCaptor.captor();

@@ -31,33 +31,39 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
  *
  * <p>The {@code ownerUserId} is intentionally never copied to/from the response DTO: it is an
  * internal isolation key (see AGENTS.md "MULTI-USER DATA ISOLATION") and must not leak to clients.
+ * The location is resolved and set by the service, never mapped from a request.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface PersonalInventoryItemMapper {
 
   /**
    * Maps a {@link PersonalInventoryItem} to its response DTO; the persisted {@code
-   * locationNameSnapshot} is surfaced as {@code locationName} so the client never sees the internal
-   * naming.
+   * locationNameSnapshot} is surfaced as {@code locationName} and the location's kind is derived
+   * from its city or station link without loading either.
    */
   @Mapping(target = "locationName", source = "locationNameSnapshot")
+  @Mapping(target = "locationId", source = "location.id")
+  @Mapping(
+      target = "locationType",
+      expression = "java(PersonalInventoryLocationType.of(entity.getLocation()))")
   PersonalInventoryItemResponse toResponse(PersonalInventoryItem entity);
 
   /**
    * Builds a new {@link PersonalInventoryItem} from the create-request. {@code ownerUserId} is
-   * assigned by the service from the JWT sub claim; the location name snapshot is set by the
-   * service after a UEX lookup, never by the client.
+   * assigned by the service from the JWT sub claim; the location and its name snapshot are set by
+   * the service after the selectable-location check, never by the client.
    */
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "ownerUserId", ignore = true)
+  @Mapping(target = "location", ignore = true)
   @Mapping(target = "locationNameSnapshot", ignore = true)
   PersonalInventoryItem toEntity(PersonalInventoryItemCreateRequest request);
 
   /**
    * Applies an update request to an already-managed entity. {@code id}, {@code ownerUserId}, {@code
-   * version}, {@code createdAt} and {@code locationNameSnapshot} are excluded: version is owned by
-   * JPA optimistic locking; the location name snapshot must be set by the service after a
-   * successful UEX lookup.
+   * version}, {@code createdAt}, the location and {@code locationNameSnapshot} are excluded:
+   * version is owned by JPA optimistic locking; the location and its snapshot are set by the
+   * service after the selectable-location check.
    */
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
   @Mapping(target = "id", ignore = true)
@@ -65,6 +71,7 @@ public interface PersonalInventoryItemMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "ownerUserId", ignore = true)
+  @Mapping(target = "location", ignore = true)
   @Mapping(target = "locationNameSnapshot", ignore = true)
   void updateEntity(
       @MappingTarget PersonalInventoryItem entity, PersonalInventoryItemUpdateRequest request);

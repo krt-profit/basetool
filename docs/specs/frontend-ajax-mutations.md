@@ -1712,10 +1712,12 @@ cloning a **live** row must switch to an inert `<template>`/options-template sou
 ARIA ids, no native select left to re-enhance).
 
 **Bespoke pickers with a browse-everything mode.** One picker predates the `krt-searchable-select`
-standard and stays bespoke: the personal-inventory (Mein Inventar) **UEX location typeahead**
-(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/uex-search` →
-`GET /api/v1/uex/locations/search`). It searches server-side like the converted pickers — typing
-narrows the query and every UEX city / space station stays reachable — **but** it also renders on
+standard and stays bespoke: the personal-inventory (Mein Inventar) **location typeahead**
+(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/location-search` →
+`GET /api/v1/personal-inventory/locations`, the admin page through
+`/admin/personal-inventory/{userSub}/location-search`). It searches server-side like the converted
+pickers — typing narrows the query and every location the owner may pick stays reachable
+(REQ-P4K-039) — **but** it also renders on
 empty-query focus, a "browse everything" mode that returns up to the backend clamp (2000 rows). In
 that one mode "type a narrower term" cannot recover a hidden tail because the user has typed
 nothing, so the no-silent-truncation rule is honoured differently: when a response **fills** the

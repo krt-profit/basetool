@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.ingest;
 
 import static com.tngtech.archunit.base.DescribedPredicate.describe;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.belongTo;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.belongToAnyOf;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAnyPackage;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +49,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestOperations;
-import org.springframework.web.client.RestTemplate;
 
 /**
  * Structural rules of the gateway's concern packages (REQ-INGEST-013, REQ-INGEST-014): every class
@@ -109,13 +110,20 @@ class ConcernPackageRulesTest {
   /** The fewest classes in the Redis concerns that touch Redis today. */
   private static final int REDIS_USER_FLOOR = 6;
 
+  /**
+   * Spring's {@code RestTemplate}, named rather than imported because Spring Framework 7.1
+   * deprecates it for removal; the rule keeps rejecting it for as long as it exists.
+   */
+  private static final String REST_TEMPLATE = "org.springframework.web.client.RestTemplate";
+
   /** An outbound HTTP client type: anything that can open a connection to another host. */
   private static final DescribedPredicate<JavaClass> OUTBOUND_HTTP =
       resideInAnyPackage(
               "java.net.http..",
               "org.springframework.http.client..",
               "org.springframework.web.reactive.function.client..")
-          .or(belongToAnyOf(RestClient.class, RestTemplate.class, RestOperations.class))
+          .or(belongToAnyOf(RestClient.class, RestOperations.class))
+          .or(belongTo(name(REST_TEMPLATE)))
           .or(assignableTo(URLConnection.class))
           .as("an outbound HTTP client type");
 
@@ -197,6 +205,18 @@ class ConcernPackageRulesTest {
     assertThatThrownBy(() -> outboundHttpOnlyInRelay().check(fixture))
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining(PlantedOutboundCaller.class.getSimpleName());
+  }
+
+  @Test
+  void theOutboundRuleSelectsRestTemplateByItsName() {
+    JavaClass restTemplate =
+        new ClassFileImporter()
+            .importPackages(REST_TEMPLATE.substring(0, REST_TEMPLATE.lastIndexOf('.')))
+            .get(REST_TEMPLATE);
+
+    assertThat(OUTBOUND_HTTP.test(restTemplate))
+        .as("the outbound rule selects " + REST_TEMPLATE)
+        .isTrue();
   }
 
   @Test

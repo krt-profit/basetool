@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -36,15 +39,18 @@ class PersonalInventoryItemMapperTest {
   @Test
   void shouldMapEntityToResponseAndExposeSnapshotAsLocationName() {
     UUID id = UUID.randomUUID();
+    Location lorville = new Location();
+    lorville.setId(UUID.randomUUID());
+    lorville.setName("Lorville");
+    lorville.setCity(new City());
     PersonalInventoryItem entity =
         PersonalInventoryItem.builder()
             .id(id)
             .ownerUserId(UUID.fromString("12312312-3123-4123-8123-123123123123"))
             .name("Medkit")
             .note("First aid")
-            .locationUexId(42)
-            .locationType(PersonalInventoryLocationType.CITY)
-            .locationNameSnapshot("Lorville")
+            .location(lorville)
+            .locationNameSnapshot("Lorville (snapshot)")
             .quantity(3)
             .build();
     entity.setVersion(7L);
@@ -58,10 +64,10 @@ class PersonalInventoryItemMapperTest {
     assertEquals(id, response.id());
     assertEquals("Medkit", response.name());
     assertEquals("First aid", response.note());
-    assertEquals(42, response.locationUexId());
+    assertEquals(lorville.getId(), response.locationId());
     assertEquals(PersonalInventoryLocationType.CITY, response.locationType());
     assertEquals(
-        "Lorville",
+        "Lorville (snapshot)",
         response.locationName(),
         "locationNameSnapshot must be exposed under the simpler 'locationName' DTO field");
     assertEquals(3, response.quantity());
@@ -71,50 +77,62 @@ class PersonalInventoryItemMapperTest {
   }
 
   @Test
-  void toEntityShouldNotPopulateOwnerOrSnapshot() {
+  void anItemWhosePlaceNoLongerResolvesMapsWithoutLocationIdOrType() {
+    PersonalInventoryItem entity =
+        PersonalInventoryItem.builder()
+            .name("Relic")
+            .locationNameSnapshot("Vanished Outpost")
+            .quantity(1)
+            .build();
+
+    PersonalInventoryItemResponse response = mapper.toResponse(entity);
+
+    assertNull(response.locationId());
+    assertNull(response.locationType());
+    assertEquals("Vanished Outpost", response.locationName());
+  }
+
+  @Test
+  void toEntityShouldNotPopulateOwnerLocationOrSnapshot() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest(
-            "Ammo", null, 10, PersonalInventoryLocationType.SPACE_STATION, 200);
+        new PersonalInventoryItemCreateRequest("Ammo", null, UUID.randomUUID(), 200);
 
     PersonalInventoryItem entity = mapper.toEntity(req);
 
     assertNotNull(entity);
     assertEquals("Ammo", entity.getName());
-    assertEquals(PersonalInventoryLocationType.SPACE_STATION, entity.getLocationType());
-    assertEquals(10, entity.getLocationUexId());
     assertEquals(200, entity.getQuantity());
+    assertNull(entity.getLocation(), "the location must be set by the service after its check");
     assertNull(entity.getOwnerUserId(), "ownerUserId must not be derived from the request DTO");
-    assertNull(
-        entity.getLocationNameSnapshot(), "snapshot must be set by the service after UEX lookup");
+    assertNull(entity.getLocationNameSnapshot(), "snapshot must be set by the service");
     assertNull(entity.getId());
   }
 
   @Test
-  void updateEntityShouldPreserveOwnerVersionAndSnapshot() {
+  void updateEntityShouldPreserveOwnerVersionLocationAndSnapshot() {
+    Location old = new Location();
+    old.setId(UUID.randomUUID());
     PersonalInventoryItem managed =
         PersonalInventoryItem.builder()
             .id(UUID.randomUUID())
             .ownerUserId(UUID.fromString("9e5e5e5e-0000-4000-8000-000000000001"))
             .name("Old")
             .note("Old note")
-            .locationUexId(1)
-            .locationType(PersonalInventoryLocationType.CITY)
+            .location(old)
             .locationNameSnapshot("OldName")
             .quantity(1)
             .build();
     managed.setVersion(5L);
 
     PersonalInventoryItemUpdateRequest req =
-        new PersonalInventoryItemUpdateRequest(
-            "New", "New note", 2, PersonalInventoryLocationType.SPACE_STATION, 9, 5L);
+        new PersonalInventoryItemUpdateRequest("New", "New note", UUID.randomUUID(), 9, 5L);
 
     mapper.updateEntity(managed, req);
 
     assertEquals("New", managed.getName());
     assertEquals("New note", managed.getNote());
-    assertEquals(2, managed.getLocationUexId());
-    assertEquals(PersonalInventoryLocationType.SPACE_STATION, managed.getLocationType());
     assertEquals(9, managed.getQuantity());
+    assertSame(old, managed.getLocation(), "the location is owned by the service");
     assertEquals(
         UUID.fromString("9e5e5e5e-0000-4000-8000-000000000001"),
         managed.getOwnerUserId(),
@@ -124,6 +142,6 @@ class PersonalInventoryItemMapperTest {
     assertEquals(
         "OldName",
         managed.getLocationNameSnapshot(),
-        "the snapshot is owned by the service (set after UEX lookup), not by the mapper");
+        "the snapshot is owned by the service, not by the mapper");
   }
 }

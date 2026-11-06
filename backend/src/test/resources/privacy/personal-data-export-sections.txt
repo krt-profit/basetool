@@ -14,7 +14,7 @@
 14|exchangeBulkUndoSkips|ART_15|8d9f1772c8e8725d||
 15|exchangeShipLinks|ART_15|557c2cc7c112cd40||
 16|connectedAppsNameWithholding|ART_15_20|c041d4ffd8119650||
-17|personalInventory|ART_15_20|2a9cd00e215f60c8|name,note|
+17|personalInventory|ART_15_20|2e55b54fdb415302|name,note|
 18|personalBlueprints|ART_15_20|ef17364c99fc99c8|note|
 19|notifications|ART_15|16aa8e577e25cf50|params|
 20|notificationMutes|ART_15_20|cca6a56bac89af74||

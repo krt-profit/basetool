@@ -9,11 +9,11 @@
 
 ## Akteur
 
-Der Standard-Testuser `test-admin`. **Mein Inventar** (`/personal-inventory`, Entität `PersonalInventoryItem`: freier Name + UEX-Ort + Menge, pro JWT-`sub`) ist rein benutzerbezogen und trägt keinen Mandanten-Scope — abzugrenzen von der persönlichen Lager-Sicht `/inventory/my` (Entität `InventoryItem`), die UC-13 abdeckt.
+Der Standard-Testuser `test-admin`. **Mein Inventar** (`/personal-inventory`, Entität `PersonalInventoryItem`: freier Name + Lagerort (`location`) + Menge, pro JWT-`sub`) ist rein benutzerbezogen und trägt keinen Mandanten-Scope — abzugrenzen von der persönlichen Lager-Sicht `/inventory/my` (Entität `InventoryItem`), die UC-13 abdeckt.
 
 ## Vorbedingungen
 
-- Eine UEX-`city` mit numerischer `id_city` (`E2E Personal Inventory City`, `id_city=900001`) ist geseedet (`uex-catalog-seed.sql`) — nur so liefert der Orts-Typeahead (`/personal-inventory/uex-search`) einen Treffer, und nur so löst `resolveLocationName(CITY, id)` den Ort auf. Die Refinery-City des Katalogs hat bewusst keine `id_city` und ist daher hier unbrauchbar.
+- Eine UEX-`city` (`E2E Personal Inventory City`, `id_city=900001`) mit ihrem `location`-Eintrag gleichen Namens ist geseedet (`uex-catalog-seed.sql`) — der Orts-Typeahead (`/personal-inventory/location-search`) bietet nur `location`-Zeilen an (REQ-P4K-039).
 - Keine Staffel-Mitgliedschaft nötig (benutzerbezogen).
 
 ## Auslöser
@@ -23,7 +23,7 @@ Der User legt auf `/personal-inventory` einen Eintrag an (Ort über den Typeahea
 ## Hauptablauf
 
 1. Navigiere zu `/personal-inventory`.
-2. **Anlegen:** `pi-open-create` öffnet das Modal; `#krt-pi-name` + `#krt-pi-quantity` füllen; `#krt-pi-location-search` mit dem City-Namen füllen → auf den Typeahead-Treffer (`.krt-pi-typeahead-item`) klicken (setzt die versteckten `locationUexId`/`locationType`); Submit postet `POST /personal-inventory/add` (`krtFetch.write`).
+2. **Anlegen:** `pi-open-create` öffnet das Modal; `#krt-pi-name` + `#krt-pi-quantity` füllen; `#krt-pi-location-search` mit dem City-Namen füllen → auf den Typeahead-Treffer (`.krt-pi-typeahead-item`) klicken (setzt die versteckte `locationId`); Submit postet `POST /personal-inventory/add` (`krtFetch.write`).
 3. **Ergebnis:** `#pi-results` wird in place neu gerendert; die Zeile mit dem Namen erscheint.
 4. **Löschen:** `pi-open-delete` der Zeile öffnet `#krt-pi-delete-modal`; Bestätigen postet `POST /personal-inventory/{id}/delete`; die Zeile verschwindet in place.
 

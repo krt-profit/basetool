@@ -4,6 +4,8 @@
   realm-role deletion is a separate owner-approved provisioner run (ADR-0202 amendment 8).
 - **Date:** 2026-10-20
 - **Deciders:** @greluc
+- **Amended by:** [ADR-0348](0348-the-member-rank-is-set-freely-by-the-admin.md) — decision 5:
+  officer reach no longer sets a member-rank range
 - **Amends:** [ADR-0042](0042-unified-membership-rank-with-delegated-appointment.md) — its baseline
   grant: a leadership seat now also confers officer reach in its unit, and every seat requires
   `KRT Member`

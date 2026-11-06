@@ -251,9 +251,9 @@ class UserAccountMergeServiceTest {
     jdbc.update(
         """
         INSERT INTO personal_inventory_item
-          (id, version, created_at, updated_at, owner_user_id, name, location_uex_id,
-           location_type, location_name_snapshot, quantity)
-        VALUES (?, 0, now(), now(), ?, ?, 1, 'CITY', 'Area18', 1)
+          (id, version, created_at, updated_at, owner_user_id, name,
+           location_name_snapshot, quantity)
+        VALUES (?, 0, now(), now(), ?, ?, 'Area18', 1)
         """,
         UUID.randomUUID(),
         owner,

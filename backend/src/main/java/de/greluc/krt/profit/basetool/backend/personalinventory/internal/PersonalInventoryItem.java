@@ -19,14 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -34,14 +36,14 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A personal inventory entry owned by exactly one user ({@link #ownerUserId}); distinct from the
  * squadron stock in {@code InventoryItem}.
  *
- * <p>The location is referenced by its UEX numeric id plus a {@link PersonalInventoryLocationType}
- * discriminator; its display name is denormalized into {@link #locationNameSnapshot} so the entry
- * still renders if the location disappears from UEX.
+ * <p>The place is a {@code location} row (REQ-P4K-039); its display name is denormalized into
+ * {@link #locationNameSnapshot} so the entry still renders when the place no longer resolves.
  */
 @Entity
 @Table(name = "personal_inventory_item")
@@ -71,12 +73,14 @@ public class PersonalInventoryItem extends AbstractEntity<UUID> {
   @Column(length = 2000)
   private String note;
 
-  @Column(name = "location_uex_id", nullable = false)
-  private Integer locationUexId;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "location_type", nullable = false, length = 20)
-  private PersonalInventoryLocationType locationType;
+  /**
+   * The storage place, or {@code null} when the place no longer resolves; the foreign key clears it
+   * when the location is deleted.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "location_id")
+  @Nullable
+  private Location location;
 
   @Column(name = "location_name_snapshot", nullable = false, length = 255)
   private String locationNameSnapshot;

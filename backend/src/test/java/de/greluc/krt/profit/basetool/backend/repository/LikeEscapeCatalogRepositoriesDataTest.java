@@ -117,16 +117,18 @@ class LikeEscapeCatalogRepositoriesDataTest {
     PageRequest page = PageRequest.of(0, 50);
     assertThat(
             locationRepository
-                .findByNameContainingIgnoreCase((TAG + " dock%a").toUpperCase(), page)
+                .findByReferenceOnlyFalseAndNameContainingIgnoreCase(
+                    (TAG + " dock%a").toUpperCase(), page)
                 .map(Location::getName))
         .containsExactly(TAG + " Dock%A");
     assertThat(
             locationRepository
-                .findByNameContainingIgnoreCase(TAG + " Dock_B", page)
+                .findByReferenceOnlyFalseAndNameContainingIgnoreCase(TAG + " Dock_B", page)
                 .map(Location::getName))
         .containsExactly(TAG + " Dock_B");
     assertThat(
-            locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(TAG + " Dock_B", page))
+            locationRepository.findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase(
+                TAG + " Dock_B", page))
         .isEmpty();
     assertThat(
             materialRepository

@@ -52,8 +52,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Cached CRUD service for the admin-curated {@code location} reference table.
  *
- * <p>{@code hidden} removes a row from normal dropdowns; {@code delete} is rejected with {@link
- * EntityInUseException} while any registered {@link LocationUsage} reports the location in use.
+ * <p>{@code hidden} removes a row from normal dropdowns; a reference-only row (REQ-P4K-039) appears
+ * in no list at all; {@code delete} is rejected with {@link EntityInUseException} while any
+ * registered {@link LocationUsage} reports the location in use.
  */
 @Service
 @RequiredArgsConstructor
@@ -75,8 +76,8 @@ public class LocationService {
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public Page<LocationDto> getAllLocations(@NotNull Pageable pageable, boolean includeHidden) {
     return (includeHidden
-            ? locationRepository.findAll(pageable)
-            : locationRepository.findByHiddenFalse(pageable))
+            ? locationRepository.findByReferenceOnlyFalse(pageable)
+            : locationRepository.findByHiddenFalseAndReferenceOnlyFalse(pageable))
         .map(locationMapper::toDto);
   }
 
@@ -92,8 +93,10 @@ public class LocationService {
   public Page<LocationDto> searchLocations(
       @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
     return (includeHidden
-            ? locationRepository.findByNameContainingIgnoreCase(query, pageable)
-            : locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(query, pageable))
+            ? locationRepository.findByReferenceOnlyFalseAndNameContainingIgnoreCase(
+                query, pageable)
+            : locationRepository.findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase(
+                query, pageable))
         .map(locationMapper::toDto);
   }
 
@@ -164,7 +167,9 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'homeLocations'")
   public List<LocationDto> getHomeLocations() {
-    return locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc().stream()
+    return locationRepository
+        .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc()
+        .stream()
         .map(locationMapper::toDto)
         .toList();
   }
