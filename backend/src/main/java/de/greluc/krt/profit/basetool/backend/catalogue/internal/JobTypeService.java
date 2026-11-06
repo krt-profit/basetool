@@ -167,12 +167,23 @@ public class JobTypeService {
             .compare("name", jobType.getName(), jobTypeDto.name())
             .compare("description", jobType.getDescription(), jobTypeDto.description())
             .compare("archetype", jobType.getArchetype(), jobTypeDto.archetype())
-            .compare("isLeadershipRole", jobType.isLeadershipRole(), jobTypeDto.isLeadershipRole())
+            .compare(
+                "isLeadershipRole",
+                jobType.isLeadershipRole(),
+                Boolean.TRUE.equals(jobTypeDto.isLeadershipRole()))
             .compare(
                 "isMissionLead",
                 jobType.isMissionLead(),
                 Boolean.TRUE.equals(jobTypeDto.isMissionLead()))
             .compare("parent", parentIdOf(jobType), jobTypeDto.parentId());
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_JOB_TYPE_UPDATED,
+          id,
+          jobTypeDto.name(),
+          null,
+          changed.toDetails());
+    }
     jobType.setName(jobTypeDto.name());
     jobType.setDescription(jobTypeDto.description());
     jobType.setArchetype(jobTypeDto.archetype());
@@ -188,14 +199,6 @@ public class JobTypeService {
       jobType.setParent(null);
     }
 
-    if (!changed.isEmpty()) {
-      auditRecorder.record(
-          AuditEventType.CATALOGUE_JOB_TYPE_UPDATED,
-          id,
-          jobType.getName(),
-          null,
-          changed.toDetails());
-    }
     return jobTypeRepository.save(jobType);
   }
 

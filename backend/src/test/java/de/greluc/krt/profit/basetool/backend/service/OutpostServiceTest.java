@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostService;
@@ -41,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OutpostServiceTest {
 
   @Mock private OutpostRepository outpostRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private OutpostService service;
 

@@ -224,18 +224,18 @@ public class LocationService {
             .compare("description", location.getDescription(), locationDto.description())
             .compare("hidden", location.getHidden(), locationDto.hidden())
             .compare("homeLocation", location.getHomeLocation(), locationDto.homeLocation());
-    location.setName(locationDto.name());
-    location.setDescription(locationDto.description());
-    location.setHidden(locationDto.hidden());
-    location.setHomeLocation(locationDto.homeLocation());
     if (!changed.isEmpty()) {
       auditRecorder.record(
           AuditEventType.CATALOGUE_LOCATION_UPDATED,
           id,
-          location.getName(),
+          locationDto.name(),
           null,
           changed.toDetails());
     }
+    location.setName(locationDto.name());
+    location.setDescription(locationDto.description());
+    location.setHidden(locationDto.hidden());
+    location.setHomeLocation(locationDto.homeLocation());
     return locationRepository.save(location);
   }
 

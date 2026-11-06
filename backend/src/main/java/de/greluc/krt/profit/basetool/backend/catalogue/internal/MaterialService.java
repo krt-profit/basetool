@@ -335,6 +335,14 @@ public class MaterialService {
         material.getVersion(), materialDetails.getVersion(), Material.class, id);
 
     AuditChangedFields changed = changedFields(material, materialDetails);
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_MATERIAL_UPDATED,
+          id,
+          materialDetails.getName(),
+          null,
+          changed.toDetails());
+    }
     material.setName(materialDetails.getName());
     material.setType(materialDetails.getType());
     material.setDescription(materialDetails.getDescription());
@@ -362,14 +370,6 @@ public class MaterialService {
       material.setCategory(null);
     }
 
-    if (!changed.isEmpty()) {
-      auditRecorder.record(
-          AuditEventType.CATALOGUE_MATERIAL_UPDATED,
-          id,
-          material.getName(),
-          null,
-          changed.toDetails());
-    }
     return materialRepository.save(material);
   }
 

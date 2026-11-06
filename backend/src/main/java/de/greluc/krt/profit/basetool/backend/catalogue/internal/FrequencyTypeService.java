@@ -127,17 +127,17 @@ public class FrequencyTypeService {
             .compare("name", existing.getName(), frequencyType.getName())
             .compare("description", existing.getDescription(), frequencyType.getDescription())
             .compare("active", existing.isActive(), frequencyType.isActive());
-    existing.setName(frequencyType.getName());
-    existing.setDescription(frequencyType.getDescription());
-    existing.setActive(frequencyType.isActive());
     if (!changed.isEmpty()) {
       auditRecorder.record(
           AuditEventType.CATALOGUE_FREQUENCY_TYPE_UPDATED,
           id,
-          existing.getName(),
+          frequencyType.getName(),
           null,
           changed.toDetails());
     }
+    existing.setName(frequencyType.getName());
+    existing.setDescription(frequencyType.getDescription());
+    existing.setActive(frequencyType.isActive());
     return frequencyTypeRepository.save(existing);
   }
 

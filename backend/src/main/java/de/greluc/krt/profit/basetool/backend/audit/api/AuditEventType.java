@@ -871,142 +871,96 @@ public enum AuditEventType {
 
   /** An admin uploaded a P4K catalogue and enqueued its PREVIEW (REQ-P4K-046). */
   CATALOGUE_P4K_PREVIEW_ENQUEUED(AuditDomain.CATALOGUE),
-
   /** A P4K APPLY recorded its run, with the Build and the counts per kind (REQ-P4K-046). */
   CATALOGUE_P4K_APPLIED(AuditDomain.CATALOGUE),
-
   /** A P4K sweep of one kind ran on the admin's mass-guard override (REQ-P4K-012). */
   CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin resolved a P4K review case by keeping the row (REQ-P4K-016). */
   CATALOGUE_P4K_REVIEW_KEPT(AuditDomain.CATALOGUE),
-
   /** An admin resolved a P4K review case by hiding the row (REQ-P4K-016). */
   CATALOGUE_P4K_REVIEW_HIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin deleted sync-report rows older than a chosen age. */
   CATALOGUE_SYNC_REPORTS_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin created a material. */
   CATALOGUE_MATERIAL_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a material. */
   CATALOGUE_MATERIAL_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deleted a material. */
   CATALOGUE_MATERIAL_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin created a material category. */
   CATALOGUE_MATERIAL_CATEGORY_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin renamed a material category. */
   CATALOGUE_MATERIAL_CATEGORY_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deleted a material category. */
   CATALOGUE_MATERIAL_CATEGORY_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin created a material external alias. */
   CATALOGUE_MATERIAL_ALIAS_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a material external alias. */
   CATALOGUE_MATERIAL_ALIAS_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deleted a material external alias. */
   CATALOGUE_MATERIAL_ALIAS_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin hid or showed a manufacturer. */
   CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
-
   /** An admin hid or showed a ship type. */
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
-
   /** An admin created a location. */
   CATALOGUE_LOCATION_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a location. */
   CATALOGUE_LOCATION_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deleted a location. */
   CATALOGUE_LOCATION_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin hid or showed a terminal. */
   CATALOGUE_TERMINAL_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
-
   /** An admin pinned a terminal's loading dock. */
   CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released a terminal's loading-dock pin. */
   CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin pinned a terminal's auto-load flag. */
   CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released a terminal's auto-load pin. */
   CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin pinned a city's loading dock. */
   CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released a city's loading-dock pin. */
   CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin pinned an outpost's loading dock. */
   CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released an outpost's loading-dock pin. */
   CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin pinned a POI's loading dock. */
   CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released a POI's loading-dock pin. */
   CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin pinned a space station's loading dock. */
   CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN(AuditDomain.CATALOGUE),
-
   /** An admin released a space station's loading-dock pin. */
   CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED(AuditDomain.CATALOGUE),
-
   /** An admin created a star system. */
   CATALOGUE_STAR_SYSTEM_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a star system. */
   CATALOGUE_STAR_SYSTEM_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deleted a star system. */
   CATALOGUE_STAR_SYSTEM_DELETED(AuditDomain.CATALOGUE),
-
   /** An admin created a frequency type. */
   CATALOGUE_FREQUENCY_TYPE_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a frequency type. */
   CATALOGUE_FREQUENCY_TYPE_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deactivated a frequency type. */
   CATALOGUE_FREQUENCY_TYPE_DEACTIVATED(AuditDomain.CATALOGUE),
-
   /** An admin reactivated a frequency type. */
   CATALOGUE_FREQUENCY_TYPE_ACTIVATED(AuditDomain.CATALOGUE),
-
   /** An admin reordered the frequency types. */
   CATALOGUE_FREQUENCY_TYPES_REORDERED(AuditDomain.CATALOGUE),
-
   /** An admin created a job type. */
   CATALOGUE_JOB_TYPE_CREATED(AuditDomain.CATALOGUE),
-
   /** An admin edited a job type. */
   CATALOGUE_JOB_TYPE_UPDATED(AuditDomain.CATALOGUE),
-
   /** An admin deactivated a job type. */
   CATALOGUE_JOB_TYPE_DEACTIVATED(AuditDomain.CATALOGUE),
-
   /** An admin reactivated a job type. */
   CATALOGUE_JOB_TYPE_ACTIVATED(AuditDomain.CATALOGUE),
-
   /** The Katalog audit log was exported (REQ-AUDIT-003). */
   CATALOGUE_AUDIT_EXPORTED(AuditDomain.CATALOGUE),
-
   /** The Katalog audit log was purged (REQ-AUDIT-004). */
   CATALOGUE_AUDIT_PURGED(AuditDomain.CATALOGUE);
 
