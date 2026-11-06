@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [v1.22.3](https://github.com/krt-profit/basetool/releases/tag/v1.22.3) - 2026-11-05
+
+### Fixed
+
+- Einsatzdaten verwalten: Eine Aufgabe ohne angehakte „Führungsposition" lässt sich wieder bearbeiten
+  und umbenennen, statt mit „Aktion fehlgeschlagen" abzubrechen (Backend `PUT /api/v1/job-types/{id}`).
+
+### Security
+
+- **Keycloak auf 26.8.2 angehoben (Sicherheitsupdate).** Das Patch-Release schließt 33
+  Sicherheitslücken, darunter mehrere Kontoübernahmen beim Login und beim Verknüpfen von
+  Identitäten sowie eine gespeicherte XSS-Lücke auf der Login-Seite.
+
 ## [v1.22.2](https://github.com/krt-profit/basetool/releases/tag/v1.22.2) - 2026-11-05
 
 ### Added

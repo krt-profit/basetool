@@ -49,13 +49,12 @@ nullaway = "0.14.3"
 checkstyle = "14.3.0"
 googleJavaFormat = "2.0.0"
 node = "26.13.0"
-keycloak = "26.8.1"
+keycloak = "26.8.2"
 jbossLogmanager = "3.2.2.Final"
 junit = "6.1.3"
 lombok = "1.18.48"
 mockito = "5.24.0"
 protobuf3 = "3.25.9"
-vertx = "4.5.35"
 handlebars = "4.5.8"
 plexusUtils = "3.6.1"
 kotlinGradlePlugin = "2.4.21"
@@ -108,7 +107,6 @@ keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
 jboss-logmanager = { module = "org.jboss.logmanager:jboss-logmanager", version.ref = "jbossLogmanager" }
 protobuf3-bom = { module = "com.google.protobuf:protobuf-bom", version.ref = "protobuf3" }
-vertx-bom = { module = "io.vertx:vertx-dependencies", version.ref = "vertx" }
 handlebars = { module = "com.github.jknack:handlebars", version.ref = "handlebars" }
 plexus-utils = { module = "org.codehaus.plexus:plexus-utils", version.ref = "plexusUtils" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlinGradlePlugin" }

@@ -1147,13 +1147,9 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 2. **No matching role:** If the token carries no role the application knows and no membership
    mints one, the account is refused with `403 NO_ROLE` (REQ-SEC-053). It used to be
    given the authority-less **Guest** role, which `V239` deleted.
-3. **Ranks:** The numeric member rank (1–20) follows the **stored** Keycloak role: an account with
-   `OFFICER` may only receive ranks 1–12, an account with `KRT_MEMBER` and without `OFFICER` ranks
-   13–20 (REQ-ROLE-007, ADR-0264). Because `OFFICER` is granted and removed by hand in Keycloak
-   (see "Operational OFFICER grant"), a former lead who still holds it keeps the 1–12 range until
-   the role is removed in Keycloak and reconciled. A mismatch is refused with
-   `RANK_OUTSIDE_ROLE_RANGE`, whose message names the role; the member-edit page shows the range
-   under the rank. (This numeric member rank is unrelated to the functional `MembershipRole` of §2.)
+3. **Ranks:** An admin sets the numeric member rank (1–20) freely: any account may hold any rank,
+   independent of its roles and leadership seats (REQ-ROLE-007, ADR-0348). The rank grants no
+   rights. (This numeric member rank is unrelated to the functional `MembershipRole` of §2.)
 4. **Logistician/Mission-Manager flags** are maintained by admins **per Staffel** on the
    member-edit page: the (up to two) Staffel slots, each with their own
    flags, feed into the membership delta `PATCH /api/v1/org-units/members/{id}/memberships`
@@ -1245,8 +1241,8 @@ backend serves every member) but no control that writes.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in place and confers no reach. Membership rights rest on
   `KRT Member`.
-- An admin may hold any member rank 1–20; for everyone else a rank 1–12 requires officer reach in
-  at least one unit (REQ-ROLE-007). The bank's global
+- Officer reach sets no member-rank range: any account may hold any rank 1–20 (REQ-ROLE-007,
+  ADR-0348). The bank's global
   `OFFICER` view-grant and approval-limit buckets for special accounts are removed (REQ-BANK-037).
 
 ### 7.2 Minimum stock levels (ADR-0302, REQ-INV-067, REQ-INV-068, REQ-SUP-003)

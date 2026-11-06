@@ -267,8 +267,8 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
   `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
-  `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes) and
-  `identity.api.IdentityProblemCode` (`RANK_OUTSIDE_ROLE_RANGE`, REQ-ROLE-007) and
+  `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes),
+  `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`) and
   `catalogue.api.CatalogueProblemCode` (`P4K_UPLOAD_REJECTED`, REQ-P4K-001). Names and wire
   values did not change when they left `CoreProblemCode`; the registry holds 82 codes across the
   eleven enums. Two are

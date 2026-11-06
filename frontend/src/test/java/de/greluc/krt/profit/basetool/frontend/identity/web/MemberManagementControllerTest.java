@@ -37,10 +37,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
-import de.greluc.krt.profit.basetool.frontend.identity.model.RankRangeBasis;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserRankRangeResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -365,39 +363,6 @@ class MemberManagementControllerTest {
     }
 
     @Test
-    void showsTheMembersRankRange() {
-      UUID id = UUID.randomUUID();
-      Model model = new ConcurrentModel();
-      UserRankRangeResponse range =
-          new UserRankRangeResponse(RankRangeBasis.LEADERSHIP_SEAT, 1, 12);
-      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
-          .thenReturn(newUser("alice"));
-      when(backendApiClient.get(
-              eq("/api/v1/users/{id}/rank-range"), eq(UserRankRangeResponse.class), eq(id)))
-          .thenReturn(range);
-
-      controller.editMember(id, null, model, redirectAttributes);
-
-      assertEquals(range, model.getAttribute("memberRankRange"));
-    }
-
-    @Test
-    void anUnreadableRankRangeStillRendersThePageWithoutTheHint() {
-      UUID id = UUID.randomUUID();
-      Model model = new ConcurrentModel();
-      when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
-          .thenReturn(newUser("alice"));
-      when(backendApiClient.get(
-              eq("/api/v1/users/{id}/rank-range"), eq(UserRankRangeResponse.class), eq(id)))
-          .thenThrow(new BackendServiceException("backend down", null, 503));
-
-      String view = controller.editMember(id, null, model, redirectAttributes);
-
-      assertEquals("identity/member-edit", view);
-      assertNull(model.getAttribute("memberRankRange"));
-    }
-
-    @Test
     void happyPath_setsUserAndPrefilledForm() {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");
@@ -703,7 +668,7 @@ class MemberManagementControllerTest {
     }
 
     @Test
-    void rankOutsideRoleRange_flashesTheRankToast_andSendsNoMembershipPatch() {
+    void refusedAttributes_flashTheUpdateFailedToast_andSendNoMembershipPatch() {
       UUID id = UUID.randomUUID();
       Model model = new ConcurrentModel();
       MemberEditForm form =
@@ -711,7 +676,7 @@ class MemberManagementControllerTest {
               20, "desc", "Alice", 1L, null, null, null, null, null, null, null, null, true);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
-      doThrow(rankRefusal("Still holds the Officer role."))
+      doThrow(new BackendServiceException("refused", null, 400))
           .when(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
 
@@ -719,8 +684,7 @@ class MemberManagementControllerTest {
 
       assertEquals("redirect:/members/" + id + "/edit", view);
       assertEquals(
-          "error.member.rank.outsideRoleRange",
-          redirectAttributes.getFlashAttributes().get("errorToast"));
+          "error.member.update.failed", redirectAttributes.getFlashAttributes().get("errorToast"));
       verify(backendApiClient, never()).patch(anyString(), any(), any(), any(Object[].class));
     }
 
@@ -750,75 +714,8 @@ class MemberManagementControllerTest {
     }
   }
 
-  /**
-   * Builds the backend's role-range refusal as the frontend parses it.
-   *
-   * @param detail the localized detail the backend sent, or {@code null} for none
-   * @return the {@code RANK_OUTSIDE_ROLE_RANGE} failure
-   */
-  private static de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException
-      rankRefusal(String detail) {
-    return new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException(
-        "refused",
-        null,
-        400,
-        de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException
-            .CODE_RANK_OUTSIDE_ROLE_RANGE,
-        null,
-        List.of(),
-        detail);
-  }
-
   @Nested
   class AjaxTwinTests {
-
-    @Test
-    void updateMemberAjax_rankOutsideRoleRange_returns422OnTheRankField() {
-      UUID id = UUID.randomUUID();
-      MemberEditForm form =
-          new MemberEditForm(
-              20, "desc", "Alice", 4L, null, null, null, null, null, null, null, null, true);
-      BindingResult br = mock(BindingResult.class);
-      when(br.hasErrors()).thenReturn(false);
-      doThrow(rankRefusal("This member still holds the Officer role."))
-          .when(backendApiClient)
-          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
-
-      org.springframework.http.ResponseEntity<Object> response =
-          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
-
-      assertEquals(422, response.getStatusCode().value());
-      assertEquals(
-          java.util.Map.of("rank", "This member still holds the Officer role."),
-          response.getBody());
-      verify(backendApiClient, never()).patch(anyString(), any(), any(), any(Object[].class));
-      verify(liveSyncLocalBus, never()).publish(anyString(), any());
-    }
-
-    @Test
-    void updateMemberAjax_rankOutsideRoleRange_withoutDetail_usesTheFrontendMessage() {
-      UUID id = UUID.randomUUID();
-      MemberEditForm form =
-          new MemberEditForm(
-              20, "desc", "Alice", 4L, null, null, null, null, null, null, null, null, true);
-      BindingResult br = mock(BindingResult.class);
-      when(br.hasErrors()).thenReturn(false);
-      doThrow(rankRefusal(null))
-          .when(backendApiClient)
-          .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
-      when(messageSource.getMessage(
-              eq("error.member.rank.outsideRoleRange"),
-              any(),
-              anyString(),
-              eq(java.util.Locale.ENGLISH)))
-          .thenReturn("Rank does not fit the role.");
-
-      org.springframework.http.ResponseEntity<Object> response =
-          controller.updateMemberAjax(id, form, br, java.util.Locale.ENGLISH);
-
-      assertEquals(422, response.getStatusCode().value());
-      assertEquals(java.util.Map.of("rank", "Rank does not fit the role."), response.getBody());
-    }
 
     @Test
     void updateMemberAjax_validationError_returns422WithFieldMessages() {

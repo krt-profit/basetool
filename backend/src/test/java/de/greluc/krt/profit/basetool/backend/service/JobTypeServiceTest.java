@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,7 +45,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 /**
  * Unit tests for the "Einsatzleiter" (mission-lead) designation logic on {@link JobTypeService}
  * (REQ-MISSION-013): designating a job type clears any prior holder so at most one type is the
- * Einsatzleiter, and only a MISSION leadership role may be designated.
+ * Einsatzleiter, and only a MISSION leadership role may be designated. An update without a flag (an
+ * unchecked form checkbox) treats it as false.
  */
 @ExtendWith(MockitoExtension.class)
 class JobTypeServiceTest {
@@ -119,5 +121,31 @@ class JobTypeServiceTest {
 
     assertFalse(saved.isMissionLead(), "the designation was cleared");
     verify(jobTypeDesignationObserver).missionLeadRevoked(id);
+  }
+
+  @Test
+  void updateJobType_absentFlags_renamesAndTreatsFlagsAsFalse() {
+    UUID id = UUID.randomUUID();
+    JobType existing = new JobType();
+    existing.setId(id);
+    existing.setVersion(0L);
+    existing.setName("Cargo Schiff Mittel");
+    existing.setArchetype(JobTypeArchetype.MISSION);
+    existing.setLeadershipRole(true);
+
+    when(jobTypeRepository.existsByNameIgnoreCaseAndIdNot("Cargo Schiff mittel", id))
+        .thenReturn(false);
+    when(jobTypeRepository.findById(id)).thenReturn(Optional.of(existing));
+    when(jobTypeRepository.save(any(JobType.class))).thenAnswer(i -> i.getArgument(0));
+
+    JobTypeDto dto =
+        new JobTypeDto(
+            id, "Cargo Schiff mittel", null, JobTypeArchetype.MISSION, null, true, null, null, 0L);
+
+    JobType saved = jobTypeService.updateJobType(id, dto);
+
+    assertEquals("Cargo Schiff mittel", saved.getName());
+    assertFalse(saved.isLeadershipRole(), "an absent leadership flag means false");
+    assertFalse(saved.isMissionLead(), "an absent mission-lead flag means false");
   }
 }

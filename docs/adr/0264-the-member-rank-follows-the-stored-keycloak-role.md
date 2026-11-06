@@ -1,6 +1,6 @@
 # ADR-0264 — The member rank follows the stored Keycloak role
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0348](0348-the-member-rank-is-set-freely-by-the-admin.md)
 - **Date:** 2026-10-17
 - **Deciders:** @greluc
 - **Related:** spec [`role-model.md`](../specs/role-model.md) (REQ-ROLE-007) ·

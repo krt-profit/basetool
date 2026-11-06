@@ -37,8 +37,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
-import de.greluc.krt.profit.basetool.backend.identity.api.OfficerReachDirectory;
-import de.greluc.krt.profit.basetool.backend.identity.api.RankOutsideRoleRangeException;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -73,8 +71,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  *
  * <ul>
  *   <li>{@link UserService#updateUserAttributes} — the non-rank halves (description / displayName /
- *       joinDate / version-check), plus the rank-handling for users that are neither officer nor
- *       squadron member.
+ *       joinDate / version-check), plus the 1–20 rank scale and the rank audit.
  *   <li>{@link UserService#updateReadAnnouncement}.
  *   <li>{@link UserService#isUsernameOrDisplayNameTaken} + {@link
  *       UserService#findMatchesByExactName} — blank-input short-circuit.
@@ -90,7 +87,6 @@ class UserServiceAttributesTest {
   @Mock private AuthHelperService authHelperService;
   @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
-  @Mock private OfficerReachDirectory officerReachDirectory;
   @Mock private AuditRecorder auditRecorder;
   @Mock private CallerUserProjection callerUserProjection;
 
@@ -305,30 +301,23 @@ class UserServiceAttributesTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
-          RankOutsideRoleRangeException.class,
-          () -> userService.updateUserAttributes(USER_ID, 5, null, null, 1L, null));
+          IllegalArgumentException.class,
+          () -> userService.updateUserAttributes(USER_ID, 21, null, null, 1L, null));
 
       verifyNoInteractions(auditRecorder);
     }
 
     @Test
-    void reachRankBoundaries_areInclusive() {
-      assertOfficerRankPasses(1);
-      assertOfficerRankPasses(12);
+    void rankScaleBoundaries_areInclusive() {
+      assertRankPasses(1);
+      assertRankPasses(20);
     }
 
     @Test
-    void squadronMemberRankBoundaries_areInclusive() {
-      assertSquadronRankPasses(13);
-      assertSquadronRankPasses(20);
-    }
-
-    @Test
-    void reachRank_zero_isRejected() {
+    void rank_zero_isRejected() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
-      when(officerReachDirectory.holdsOfficerReach(USER_ID)).thenReturn(true);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
       assertThrows(
@@ -337,7 +326,7 @@ class UserServiceAttributesTest {
     }
 
     @Test
-    void squadronRank_21_isRejected() {
+    void rank_21_isRejected() {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
@@ -348,20 +337,7 @@ class UserServiceAttributesTest {
           () -> userService.updateUserAttributes(USER_ID, 21, null, null, 1L, null));
     }
 
-    private void assertOfficerRankPasses(int rank) {
-      User user = newUser(USER_ID);
-      user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));
-      when(officerReachDirectory.holdsOfficerReach(USER_ID)).thenReturn(true);
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-      when(userRepository.save(user)).thenReturn(user);
-
-      userService.updateUserAttributes(USER_ID, rank, null, null, 1L, null);
-      assertEquals(rank, user.getRank());
-      org.mockito.Mockito.reset(userRepository);
-    }
-
-    private void assertSquadronRankPasses(int rank) {
+    private void assertRankPasses(int rank) {
       User user = newUser(USER_ID);
       user.setVersion(1L);
       user.setRoles(new HashSet<>(Set.of(role(Roles.KRT_MEMBER, "KRT Member"))));

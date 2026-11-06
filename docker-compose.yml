@@ -95,7 +95,7 @@ x-db-keycloak: &db-keycloak-template
     - /var/lib/basetool/db-keycloak:/var/lib/postgresql/data
 
 x-keycloak: &keycloak-template
-  image: quay.io/keycloak/keycloak:26.8@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+  image: quay.io/keycloak/keycloak:26.8@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
