@@ -32,7 +32,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * @param id the job id
  * @param kind {@code PREVIEW} or {@code APPLY}
  * @param status {@code PENDING} / {@code RUNNING} / {@code SUCCEEDED} / {@code FAILED}
- * @param seedNew for an APPLY run, whether brand-new unmatched rows are seeded
+ * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
+ *     created
  * @param sourceFilename original upload filename for display, or {@code null}
  * @param fileSizeBytes size of the uploaded catalog in bytes, or {@code null}
  * @param previewJobId for an APPLY run, the preview it was launched from, else {@code null}
@@ -48,7 +49,7 @@ public record P4kImportJobDto(
     String id,
     @BackendEnumAsString String kind,
     @BackendEnumAsString String status,
-    boolean seedNew,
+    boolean createItemsAndShips,
     String sourceFilename,
     Long fileSizeBytes,
     String previewJobId,

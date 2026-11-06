@@ -45,7 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Transactional lifecycle and persistence of asynchronous P4K catalog-import jobs ({@link
+ * Transactional lifecycle and persistence of asynchronous P4K catalogue-import jobs ({@link
  * P4kImportJob} + {@link P4kImportJobPayload}): creation, the {@code PENDING → RUNNING → SUCCEEDED
  * | FAILED} transitions, payload handling, pruning and startup reconciliation.
  *
@@ -70,35 +70,30 @@ public class P4kImportJobService {
 
   /**
    * Enqueues a new {@link P4kImportJobKind#PREVIEW PREVIEW} job in state {@link
-   * P4kImportJobStatus#PENDING PENDING}, persisting the uploaded catalog into the payload side
-   * table. The returned job is committed when this method returns, so the async worker (triggered
-   * afterwards) is guaranteed to see the row.
+   * P4kImportJobStatus#PENDING PENDING}, persisting the gate-checked upload, compressed, into the
+   * payload side table. The returned job is committed when this method returns, so the async worker
+   * (triggered afterwards) is guaranteed to see the row.
    *
-   * @param bytes the uploaded P4K catalog JSON
+   * @param upload the upload the gate accepted
    * @param filename the original upload filename for display, or {@code null}
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted preview job
-   * @throws BadRequestException if {@code bytes} is empty
    */
   @Transactional
   @NotNull
   public P4kImportJob createPreviewJob(
-      byte[] bytes, @Nullable String filename, @NotNull UUID createdBy) {
-    if (bytes == null || bytes.length == 0) {
-      throw new BadRequestException("The uploaded file is empty.");
-    }
+      @NotNull P4kAcceptedUpload upload, @Nullable String filename, @NotNull UUID createdBy) {
     P4kImportJob job = new P4kImportJob();
     job.setKind(P4kImportJobKind.PREVIEW);
     job.setStatus(P4kImportJobStatus.PENDING);
-    job.setSeedNew(false);
     job.setSourceFilename(trimFilename(filename));
-    job.setFileSizeBytes((long) bytes.length);
+    job.setFileSizeBytes(upload.uploadedBytes());
     job.setCreatedBy(createdBy);
     jobRepository.save(job);
 
     P4kImportJobPayload payload = new P4kImportJobPayload();
     payload.setJobId(job.getId());
-    payload.setContent(bytes);
+    payload.setContent(upload.storedPayload());
     payloadRepository.save(payload);
     return job;
   }
@@ -109,7 +104,7 @@ public class P4kImportJobService {
    * P4kImportJobPayloadRepository#copyPayload}). The returned job is committed on return.
    *
    * @param previewJobId the SUCCEEDED preview job to apply
-   * @param seedNew whether to seed brand-new unmatched player-facing rows
+   * @param createItemsAndShips whether unmatched playable items and ships are created
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted apply job
    * @throws NotFoundException if no job has the given id
@@ -119,7 +114,7 @@ public class P4kImportJobService {
   @Transactional
   @NotNull
   public P4kImportJob createApplyJob(
-      @NotNull UUID previewJobId, boolean seedNew, @NotNull UUID createdBy) {
+      @NotNull UUID previewJobId, boolean createItemsAndShips, @NotNull UUID createdBy) {
     P4kImportJob preview =
         Entities.require(
             jobRepository.findById(previewJobId),
@@ -134,7 +129,7 @@ public class P4kImportJobService {
     P4kImportJob job = new P4kImportJob();
     job.setKind(P4kImportJobKind.APPLY);
     job.setStatus(P4kImportJobStatus.PENDING);
-    job.setSeedNew(seedNew);
+    job.setCreateItemsAndShips(createItemsAndShips);
     job.setSourceFilename(preview.getSourceFilename());
     job.setFileSizeBytes(preview.getFileSizeBytes());
     job.setPreviewJobId(previewJobId);

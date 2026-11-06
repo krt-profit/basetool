@@ -57,10 +57,12 @@ public class P4kImportJobRunner {
    *
    * @param jobId the (already-committed) job to run
    * @param kind whether to preview or apply
-   * @param seedNew for an APPLY run, whether to seed brand-new unmatched rows
+   * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
+   *     created
    */
   @Async(AsyncConfig.IMPORT_EXECUTOR)
-  public void run(@NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean seedNew) {
+  public void run(
+      @NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean createItemsAndShips) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
     try {
@@ -68,7 +70,10 @@ public class P4kImportJobRunner {
       byte[] bytes = jobService.loadPayload(jobId);
       P4kImportResultDto result;
       if (kind == P4kImportJobKind.APPLY) {
-        result = importService.applyImport(bytes, seedNew);
+        UUID createdBy = jobService.getJob(jobId).getCreatedBy();
+        result =
+            importService.applyImport(
+                bytes, new P4kImportService.P4kApplyRequest(jobId, createdBy, createItemsAndShips));
         appliedMasterData = true;
       } else {
         result = importService.previewImport(bytes);

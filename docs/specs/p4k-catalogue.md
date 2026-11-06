@@ -21,12 +21,14 @@ of p4kx, `schemaVersion` 2. Field names below are the contract's.
 The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, #2901, #2902,
 #2927, #3027–#3029).
 
-> [!note] Planned
-> Every requirement of this spec is **planned**: none is implemented yet, every acceptance box is
-> open, and the test classes named under "Enforced by" are the planned ones. The import of today
-> (`P4kImportService`, the old flat format) is what the first requirements replace. The order of
-> delivery is the map's migration order: the gate, the run record and the UUID clean-up first
-> (REQ-P4K-001…007), then the sweep and the change report, then the areas one by one.
+> [!note] Partly implemented
+> REQ-P4K-001…005, REQ-P4K-007…010 and REQ-P4K-045 are implemented (#3031); every other
+> requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
+> included. The order of delivery is the map's migration order: the gate, the run record and the
+> UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
+> by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
+> `P4kItemReconciler`, `P4kShipReconciler`, `P4kCommodityReconciler`, `P4kBlueprintReconciler`)
+> sharing `P4kRowMatcher`; the wire format is `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -49,12 +51,17 @@ preview. Each refusal is logged and counted in `basetool_p4k_import_rejected_tot
 
 **Acceptance**
 
-- [ ] A catalogue with `schemaVersion` 1, 3 or none is a `400`; no `p4k_import_job` row exists.
-- [ ] A `PTU` catalogue is a `400` under the `dev`, `test` and `prod` profiles alike.
-- [ ] A LIVE catalogue whose `source.build` is `null` is a `400`.
-- [ ] Each refusal increments the counter with its reason and logs one line.
+- [x] A catalogue with `schemaVersion` 1, 3 or none is a `400`; no `p4k_import_job` row exists.
+- [x] A `PTU` catalogue is a `400` under the `dev`, `test` and `prod` profiles alike.
+- [x] A LIVE catalogue whose `source.build` is `null` is a `400`.
+- [x] Each refusal increments the counter with its reason and logs one line.
 
-**Enforced by (planned):** `P4kUploadGateTest`, `P4kImportControllerMvcTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
+The refusal is the problem code `P4K_UPLOAD_REJECTED` with the extension property `reason`. A
+head that cannot be read (not JSON, a broken compressed stream) counts as `schema_version`, and
+a `changeNumber` that is no decimal integer as `build_missing`.
+
+**Enforced by:** `P4kUploadGateTest`, `P4kImportControllerMvcTest` · **Code:** `P4kUploadGate`,
+`P4kRejections`, `P4kUploadRejectedException` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
 **Issues:** #2885
 
 ### REQ-P4K-002 — the upload accepts plain, gzip and zstd JSON within two size limits
@@ -63,20 +70,30 @@ The upload accepts `.json`, `.json.gz` and `.json.zst`, recognised by their magi
 file name. The 64 MB limit applies to the uploaded (compressed) file; the decompressed content is
 capped at 1 GB, an `@ConfigurationProperties` default that also guards against decompression bombs.
 The parser reads the decompressed stream without holding it in memory, and the payload is stored
-compressed. zstd is decoded in the backend by a pure-Java decoder (`aircompressor`), no native
-binary. A file above either limit is refused by the gate with reason `too_large`. In practice a
+compressed. zstd is decoded in the backend by zstd-jni, whose jar bundles the native library for
+every image platform (`linux/amd64`, `linux/arm64`, glibc and musl), with a window of at most
+2^27 = 128 MiB, the window p4kx writes (`--long=27`); a larger window is unreadable and refused as
+`schema_version`. A file above either limit is refused by the gate with reason `too_large`. In practice a
 LIVE catalogue arrives as `.json.zst` (p4kx writes level 19 with long-distance matching): the LIVE
 export of p4kx 0.4.2 is 214 MB as JSON and 3.9 MB as `.json.zst`.
 
+The upload limit is the contract's `UPLOAD_LIMIT`, 64,000,000 bytes (`P4kUploadGate`); the
+decompressed limit is `krt.p4k-import.decompressed-limit-bytes` (`P4kImportProperties`,
+1,000,000,000 bytes). The gate drains the decompressed stream once to enforce that limit. A plain
+upload is stored gzipped, a compressed one as it came. zstd-jni extracts its library to
+`java.io.tmpdir` on first use; the backend's `/tmp` is the container runtime's tmpfs, writable
+and without `noexec`. A host that mounts it `noexec` sets `-DZstdTempFolder=<exec-allowed dir>`.
+
 **Acceptance**
 
-- [ ] The same catalogue as `.json`, `.json.gz` and `.json.zst`, each under a wrong extension,
+- [x] The same catalogue as `.json`, `.json.gz` and `.json.zst`, each under a wrong extension,
   imports to the same result.
-- [ ] A compressed file above 64 MB, and one whose decompressed content passes 1 GB, is refused with
+- [x] A compressed file above 64 MB, and one whose decompressed content passes 1 GB, is refused with
   `too_large` before the content is read to the end.
-- [ ] A LIVE-sized `.json.zst` fixture imports with a heap bound well below its decompressed size.
+- [x] A LIVE-sized `.json.zst` fixture imports with a heap bound well below its decompressed size.
 
-**Enforced by (planned):** `P4kCatalogueStreamTest`, `P4kUploadGateTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
+**Enforced by:** `P4kCatalogueStreamTest`, `P4kUploadGateTest` · **Code:** `P4kCompression`,
+`P4kCatalogueReader` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
 **Issues:** #2887
 
 ### REQ-P4K-003 — the import reads the contract's additive rules and nothing of the old format
@@ -90,11 +107,15 @@ export of p4kx 0.4.2 is 214 MB as JSON and 3.9 MB as `.json.zst`.
 
 **Acceptance**
 
-- [ ] A catalogue with an extra kind and extra fields on every entity imports like one without.
-- [ ] An item whose `playability` is `"crew"` (unknown) is treated as `null` and counted.
-- [ ] No class of the old format remains (`P4kCatalogDto` and its siblings read version 2 only).
+- [x] A catalogue with an extra kind and extra fields on every entity imports like one without.
+- [x] An item whose `playability` is `"crew"` (unknown) is treated as `null` and counted.
+- [x] No class of the old format remains (`P4kCatalogDto` and its siblings read version 2 only).
 
-**Enforced by (planned):** `P4kCatalogueContractTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885,
+An unknown value is an `UNKNOWN_VALUE` report row (field and value) and counts in the run's
+`unknownValues`. The fixture `p4k/catalogue-v2-live-trimmed.json` (a trimmed LIVE export) validates
+against the checked-in schema `p4k/basetool-catalog.schema.json` of p4kx 0.4.2.
+
+**Enforced by:** `P4kCatalogueContractTest`, `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885,
 #2887
 
 ### REQ-P4K-004 — an APPLY never rolls the catalogue back to an older Build
@@ -106,11 +127,14 @@ comparison is always within one Channel, where the contract guarantees the numbe
 
 **Acceptance**
 
-- [ ] After a run of change `12913470`, an APPLY of change `12900000` is refused and writes nothing.
-- [ ] Re-applying change `12913470` succeeds and changes no row a second time.
-- [ ] `"9"` is lower than `"10"` (numeric, not text, comparison).
+- [x] After a run of change `12913470`, an APPLY of change `12900000` is refused and writes nothing.
+- [x] Re-applying change `12913470` succeeds and changes no row a second time.
+- [x] `"9"` is lower than `"10"` (numeric, not text, comparison).
 
-**Enforced by (planned):** `P4kImportServiceBuildOrderTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
+The refusal fails the APPLY job with a message; a re-applied run moves `p4k_seen_run_id` to the
+new run and writes no other value.
+
+**Enforced by:** `P4kImportServiceBuildOrderTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
 
 ### REQ-P4K-005 — every successful APPLY is recorded as a run, and every matched row names it
 
@@ -136,14 +160,18 @@ comparison is always within one Channel, where the contract guarantees the numbe
 
 **Acceptance**
 
-- [ ] An APPLY writes one run with the Build, completeness and counts; a PREVIEW writes none.
-- [ ] A run with `publicPatch` `4.10.2` records the public patch `4.10.2`; one with `publicPatch`
+- [x] An APPLY writes one run with the Build, completeness and counts; a PREVIEW writes none.
+- [x] A run with `publicPatch` `4.10.2` records the public patch `4.10.2`; one with `publicPatch`
   `null` and branch `sc-alpha-4.10.2` records the branch lower bound `4.10.2` and shows it as a
   branch; one with branch `sc-alpha-4.10` or `sc-beta-4.10.2` records no version.
-- [ ] Every matched row carries the run's id, also when no value changed.
-- [ ] Pruning the job leaves the run with a `null` job reference.
+- [x] Every matched row carries the run's id, also when no value changed.
+- [x] Pruning the job leaves the run with a `null` job reference.
 
-**Enforced by (planned):** `P4kImportRunTest`, the migration test of the run table · **ADR:**
+The run is `p4k_import_run` (V338) with one `p4k_import_run_kind` row per kind (completeness, its
+Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, the category, starmap
+and shop tables add it with their areas.
+
+**Enforced by:** `P4kImportRunTest` · **ADR:**
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
 
 ### REQ-P4K-006 — a partial catalogue is imported, and only its complete kinds are swept
@@ -164,20 +192,26 @@ a `complete` kind (REQ-P4K-011).
 
 The clean-up of diverging canonical UUIDs happens at the first `schemaVersion` 2 APPLY, not in a
 separate migration. That run sets the P4K GUID (`p4k_uuid`) as the identity of each matched row,
-keeps the Wiki UUID in `scwiki_uuid` and records each mismatch in the change report. A row that two
-P4K GUIDs would claim, or a P4K GUID that two rows would claim, is not resolved by the import: the
-conflict goes to the review list (REQ-P4K-016) and the admin merges or splits; the import never
-merges. `p4k_uuid` becomes unique per kind in the same release, behind a migration that fails while
-duplicates remain.
+keeps the Wiki UUID in `external_uuid` (`game_item`, `ship_type`) or `scwiki_uuid` (the other
+kinds) and records each mismatch in the change report (`IDENTITY_MISMATCH`). Matching runs per
+kind: the P4K GUID, then the Wiki UUID, then a class name and a name that each identify exactly
+one row and one record of the catalogue. A row that two P4K GUIDs would claim, or a P4K GUID that
+two rows would claim (also two catalogue records sharing a name, as three commodities named
+"SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
+the admin merges or splits; the import never merges. `p4k_uuid` becomes unique per kind in the
+same release (V339): the migration first clears `p4k_uuid` on every row of a duplicate group, then
+adds the unique index, and the next APPLY matches those rows again.
 
 **Acceptance**
 
-- [ ] A row matched by class name whose Wiki UUID differs from the P4K GUID ends with the P4K GUID
-  as `p4k_uuid`, the Wiki UUID in `scwiki_uuid` and a report row of the mismatch.
-- [ ] Two rows claiming one P4K GUID produce a review case and keep their values.
-- [ ] The unique-constraint migration fails on a database that still holds a duplicate `p4k_uuid`.
+- [x] A row matched by class name whose Wiki UUID differs from the P4K GUID ends with the P4K GUID
+  as `p4k_uuid`, the Wiki UUID in `external_uuid` / `scwiki_uuid` and a report row of the
+  mismatch.
+- [x] Two rows claiming one P4K GUID produce a review case and keep their values.
+- [x] The unique-constraint migration clears every duplicate group's `p4k_uuid`, then enforces
+  uniqueness.
 
-**Enforced by (planned):** `P4kIdentityCleanupTest`, the unique-constraint migration test ·
+**Enforced by:** `P4kIdentityCleanupTest`, `V339MigrationTest` · **Code:** `P4kRowMatcher` ·
 **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #3029
 
 ## Matching and seeding
@@ -195,11 +229,11 @@ REQ-P4K-026 (commodities) and REQ-P4K-028 (blueprints).
 
 **Acceptance**
 
-- [ ] An APPLY without the seeding checkbox creates no row of any kind and lists every unmatched
+- [x] An APPLY without the seeding checkbox creates no row of any kind and lists every unmatched
   record in the report.
-- [ ] The run's unmatched count per kind equals the number of `UNMATCHED` report rows.
+- [x] The run's unmatched count per kind equals the number of `UNMATCHED` report rows.
 
-**Enforced by (planned):** `P4kImportServiceMatchOnlyTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886
+**Enforced by:** `P4kImportServiceMatchOnlyTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886
 
 ### REQ-P4K-009 — items and ships are seeded only when playable, behind a per-run checkbox
 
@@ -215,11 +249,14 @@ A created row is visible to members at once; items and ships carry no review fla
 
 **Acceptance**
 
-- [ ] With the box ticked, a `player` ship is created; an `ai` and a `mission` ship are counted and
+- [x] With the box ticked, a `player` ship is created; an `ai` and a `mission` ship are counted and
   not created; a `special` and a `null` ship each open a review case.
-- [ ] Without the box, nothing is created and the preview still shows the would-be count.
+- [x] Without the box, nothing is created and the preview still shows the would-be count.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886,
+The box is the APPLY parameter `createItemsAndShips`; a preview counts as if it were ticked. A
+created row has `source_systems = P4K`, and a created ship needs a name no ship holds yet.
+
+**Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886,
 #2897
 
 ### REQ-P4K-010 — rows an earlier seeding created are kept, and those no rule would create are reviewed
@@ -230,9 +267,13 @@ would not create such a row, it goes on the review list and the admins decide (R
 
 **Acceptance**
 
-- [ ] A previously seeded `ai` ship is not stamped and opens a review case on the next APPLY.
+- [x] A previously seeded `ai` ship is not stamped and opens a review case on the next APPLY.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886
+An earlier seeding is recognised by `source_systems = P4K` on `game_item`, `ship_type` and
+`material`; `manufacturer` and `blueprint` carry no such marker, so their seeded rows are matched
+like any other.
+
+**Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2886
 
 ## Orphan sweep, change report and review
 
@@ -299,7 +340,8 @@ prices and terminals.
 ### REQ-P4K-014 — every run keeps a change report, and the report is never pruned
 
 `p4k_import_change` references `p4k_import_run` and holds one row per change: kind, GUID, change
-type, field name, old value, new value. The change types:
+type, field name, old value, new value, and the record's `class_name`, `name_en` and
+`record_path`. The change types:
 
 - `ADDED`, `VANISHED`, `REAPPEARED`, compared by GUID;
 - `CHANGED`, old → new, only for the fields the import writes; the old value is read from the row
@@ -340,7 +382,8 @@ APPLY · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-row
 
 ### REQ-P4K-016 — a review case is a lasting status on the row, resolved as keep or hide
 
-The review list is a status on the row (`open` / `reviewed`), not a per-run copy. Each run sets newly
+The review list is a status on the case (`open` / `reviewed`), not a per-run copy: `p4k_review_case`
+holds one case per kind, GUID and reason, with the run that found it first and last. Each run sets newly
 found cases to `open` and logs them as `REVIEW` in its report; `/admin/p4k-import` lists the open
 cases. A case arises from:
 
@@ -930,10 +973,10 @@ anything. V308 decoded the rows stored before. The material detail page shows th
 - [x] An imported description `NDR: 08\nEffect: Toxic` (escaped) is stored with a real line break.
 - [x] V308 turns a stored escaped line break into a real one and leaves other text unchanged.
 - [x] The material detail page renders each line of the description on its own line.
-- [ ] A version-2 description that already holds a line feed is stored unchanged.
+- [x] A version-2 description that already holds a line feed is stored unchanged.
 
-**Enforced by:** `P4kTextTest`, `P4kImportServiceTest#commodity_seededDescription_hasRealLineBreaks`,
-`V308MigrationTest` · **Code:** `P4kText`, V308, `catalogue/material-detail.css` · **Moved from:**
+**Enforced by:** `P4kTextTest`, `V308MigrationTest` · **Code:** `P4kText`, `P4kLocalisedText`,
+V308, `catalogue/material-detail.css` · **Moved from:**
 REQ-DATA-025
 
 ### REQ-P4K-046 — catalogue admin activity is audited

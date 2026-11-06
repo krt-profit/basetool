@@ -69,6 +69,12 @@ public final class CatalogueMetricNames {
    */
   public static final String P4K_IMPORT_JOBS = "basetool.p4k.import.jobs";
 
+  /**
+   * Counter {@code basetool_p4k_import_rejected_total} — tag {@code reason}, the bounded {@link
+   * P4kRejectionReason#tagValue()} (REQ-P4K-001, REQ-OBS-022).
+   */
+  public static final String P4K_IMPORT_REJECTED = "basetool.p4k.import.rejected";
+
   /** Tag key: the external-sync source system ({@code SyncSourceSystem#name()}). */
   public static final String TAG_SOURCE = "source";
 

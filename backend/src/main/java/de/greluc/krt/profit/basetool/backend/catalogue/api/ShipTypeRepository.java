@@ -47,6 +47,15 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   Optional<ShipType> findByExternalUuid(UUID externalUuid);
 
   /**
+   * Finds the ShipType row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<ShipType> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a ship type by UEX's integer vehicle id, the fallback when the UEX payload carries no
    * UUID.
    *

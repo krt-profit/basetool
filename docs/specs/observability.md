@@ -3999,7 +3999,8 @@ REQ-SEC-014, REQ-SEC-024
 ### REQ-OBS-022 — The P4K import reports when it is due, what each run did and every refused upload
 
 > [!note] Planned — implementation pending (#2895; ADR-0335, ADR-0336)
-> Nothing below is built. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
+> Built so far: the counter `basetool_p4k_import_rejected_total{reason}` (`P4kRejections`, #3031).
+> Everything else below is planned. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
 > `basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` /
 > `P4kImportFailed` of REQ-OBS-011 stay as they are.
 
@@ -4061,7 +4062,7 @@ uploads the gate refused.
   7 days of it.
 - [ ] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
   `kind` and `outcome`.
-- [ ] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once.
+- [x] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once.
 - [ ] Every alert above has a promtool rule test that fires and stays silent.
 
 **Enforced by:** — (planned) · **Related:** REQ-OBS-006, REQ-OBS-011, REQ-OBS-023 · **Issues:**

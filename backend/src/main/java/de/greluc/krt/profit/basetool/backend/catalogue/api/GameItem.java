@@ -54,7 +54,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString(exclude = {"manufacturer", "uexCategory", "linkedShipType"})
 @NoArgsConstructor
 @AllArgsConstructor
-public class GameItem extends AbstractEntity<UUID> {
+public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -282,10 +282,10 @@ public class GameItem extends AbstractEntity<UUID> {
   private String uexGameVersionSeen;
 
   /**
-   * DataForge asset GUID observed by the P4K Reader import, recorded alongside {@link
-   * #externalUuid} so a disagreement stays auditable. Not unique.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code external_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /**
@@ -303,4 +303,9 @@ public class GameItem extends AbstractEntity<UUID> {
   /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
   @Column(name = "p4k_deleted_at")
   private Instant p4kDeletedAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

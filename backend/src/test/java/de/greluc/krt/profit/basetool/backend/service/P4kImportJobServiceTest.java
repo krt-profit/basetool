@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kAcceptedUpload;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
@@ -117,13 +118,14 @@ class P4kImportJobServiceTest {
     byte[] bytes = "{\"items\":[]}".getBytes(StandardCharsets.UTF_8);
     UUID user = UUID.randomUUID();
 
-    P4kImportJob job = service.createPreviewJob(bytes, "p4k.json", user);
+    P4kImportJob job =
+        service.createPreviewJob(new P4kAcceptedUpload(bytes, 9000L), "p4k.json", user);
 
     assertEquals(P4kImportJobKind.PREVIEW, job.getKind());
     assertEquals(P4kImportJobStatus.PENDING, job.getStatus());
     assertEquals(user, job.getCreatedBy());
     assertEquals("p4k.json", job.getSourceFilename());
-    assertEquals((long) bytes.length, job.getFileSizeBytes());
+    assertEquals(9000L, job.getFileSizeBytes());
     assertNotNull(job.getId());
 
     ArgumentCaptor<P4kImportJobPayload> payload =
@@ -131,15 +133,6 @@ class P4kImportJobServiceTest {
     verify(payloadRepository).save(payload.capture());
     assertEquals(job.getId(), payload.getValue().getJobId());
     assertArrayEquals(bytes, payload.getValue().getContent());
-  }
-
-  @Test
-  void createPreviewJob_emptyBytes_throwsBadRequestAndPersistsNothing() {
-    assertThrows(
-        BadRequestException.class,
-        () -> service.createPreviewJob(new byte[0], "p4k.json", UUID.randomUUID()));
-    verify(jobRepository, never()).save(any());
-    verify(payloadRepository, never()).save(any());
   }
 
   @Test
@@ -157,7 +150,7 @@ class P4kImportJobServiceTest {
 
     assertEquals(P4kImportJobKind.APPLY, apply.getKind());
     assertEquals(P4kImportJobStatus.PENDING, apply.getStatus());
-    assertTrue(apply.isSeedNew());
+    assertTrue(apply.isCreateItemsAndShips());
     assertEquals(previewId, apply.getPreviewJobId());
     assertEquals("p4k.json", apply.getSourceFilename());
     assertEquals(4096L, apply.getFileSizeBytes());

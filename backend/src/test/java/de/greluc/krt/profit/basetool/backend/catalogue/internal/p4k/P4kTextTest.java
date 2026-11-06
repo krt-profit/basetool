@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link P4kText} and the DTOs that decode through it (REQ-DATA-025). */
+/** Unit tests for {@link P4kText} and the localised texts that decode through it (REQ-P4K-045). */
 class P4kTextTest {
 
   @Test
@@ -39,28 +39,19 @@ class P4kTextTest {
   }
 
   @Test
-  void dtos_decodeBothDescriptions() {
-    P4kCommodityDto commodity =
-        new P4kCommodityDto(
-            null, null, null, null, null, "a\\nb", "c\\nd", null, null, null, null, null);
-    P4kManufacturerDto manufacturer =
-        new P4kManufacturerDto(null, null, null, null, "a\\nb", "c\\nd", null, null);
-    P4kShipDto ship =
-        new P4kShipDto(
-            null, null, null, null, null, "a\\nb", "c\\nd", null, null, null, null, null, null,
-            null);
-    P4kItemDto item =
-        new P4kItemDto(
-            null, null, null, null, null, null, null, null, null, null, null, null, "a\\nb",
-            "c\\nd", null, null, null);
+  void localisedTexts_decodeBothLanguages() {
+    P4kLocalisedText text = new P4kLocalisedText("@key", "a\\nb", "c\\nd");
 
-    assertThat(commodity.desc()).isEqualTo("a\nb");
-    assertThat(commodity.descDe()).isEqualTo("c\nd");
-    assertThat(manufacturer.desc()).isEqualTo("a\nb");
-    assertThat(manufacturer.descDe()).isEqualTo("c\nd");
-    assertThat(ship.desc()).isEqualTo("a\nb");
-    assertThat(ship.descDe()).isEqualTo("c\nd");
-    assertThat(item.desc()).isEqualTo("a\nb");
-    assertThat(item.descDe()).isEqualTo("c\nd");
+    assertThat(text.en()).isEqualTo("a\nb");
+    assertThat(text.de()).isEqualTo("c\nd");
+    assertThat(text.key()).isEqualTo("@key");
+  }
+
+  @Test
+  void aVersion2TextThatAlreadyHoldsALineFeed_isStoredUnchanged() {
+    P4kLocalisedText text = new P4kLocalisedText(null, "NDR: 08\nEffect: Toxic", null);
+
+    assertThat(text.en()).isEqualTo("NDR: 08\nEffect: Toxic");
+    assertThat(text.de()).isNull();
   }
 }

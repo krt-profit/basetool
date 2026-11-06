@@ -52,6 +52,15 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   Optional<Manufacturer> findByScwikiUuid(UUID scwikiUuid);
 
   /**
+   * Finds the Manufacturer row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<Manufacturer> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a manufacturer by short code against the local {@code abbreviation} (case-insensitive),
    * the fallback when the name match misses. {@code abbreviation} is not unique, so the
    * oldest-created match is returned.

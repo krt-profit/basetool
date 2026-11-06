@@ -1,0 +1,1510 @@
+{
+ "schemaVersion": 2,
+ "source": {
+  "channel": "LIVE",
+  "build": {
+   "branch": "sc-alpha-4.10.2",
+   "version": "4.10.197.2878",
+   "changeNumber": "12913470",
+   "buildId": "2cae0dfc-a941-4dcc-b82a-543b08b52d97",
+   "publicPatch": null
+  },
+  "archiveSize": 161991049216,
+  "archiveModified": "2026-10-15T18:32:56Z",
+  "toolVersion": "0.4.2",
+  "exportedAt": "2026-11-05T07:53:34Z"
+ },
+ "completeness": {
+  "manufacturers": {
+   "status": "complete"
+  },
+  "items": {
+   "status": "complete"
+  },
+  "ships": {
+   "status": "complete"
+  },
+  "commodities": {
+   "status": "complete"
+  },
+  "blueprints": {
+   "status": "complete"
+  },
+  "resourceGroups": {
+   "status": "complete"
+  },
+  "blueprintCategories": {
+   "status": "complete"
+  },
+  "gameplayProperties": {
+   "status": "complete"
+  },
+  "qualityDistributions": {
+   "status": "complete"
+  },
+  "qualityQuantizations": {
+   "status": "complete"
+  },
+  "blueprintPools": {
+   "status": "complete"
+  },
+  "dismantleProcesses": {
+   "status": "complete"
+  },
+  "paints": {
+   "status": "complete"
+  },
+  "loadouts": {
+   "status": "complete"
+  },
+  "starmapObjects": {
+   "status": "complete"
+  },
+  "contracts": {
+   "status": "complete"
+  },
+  "mineableElements": {
+   "status": "complete"
+  },
+  "refiningProcesses": {
+   "status": "complete"
+  },
+  "mineableCompositions": {
+   "status": "complete"
+  },
+  "miningGlobalParams": {
+   "status": "complete"
+  },
+  "harvestableProviderPresets": {
+   "status": "complete"
+  },
+  "subHarvestableMultiConfigs": {
+   "status": "complete"
+  },
+  "harvestableLocations": {
+   "status": "complete"
+  },
+  "lootContainers": {
+   "status": "complete"
+  },
+  "shops": {
+   "status": "complete"
+  },
+  "factionReputations": {
+   "status": "complete"
+  },
+  "reputationScopes": {
+   "status": "complete"
+  },
+  "reputationStandings": {
+   "status": "complete"
+  },
+  "reputationContexts": {
+   "status": "complete"
+  },
+  "missionTypes": {
+   "status": "complete"
+  },
+  "missionLocalities": {
+   "status": "complete"
+  },
+  "contractScenarios": {
+   "status": "complete"
+  },
+  "lootTables": {
+   "status": "complete"
+  },
+  "lootArchetypes": {
+   "status": "complete"
+  },
+  "lootPoolFilters": {
+   "status": "complete"
+  },
+  "legacyLootTables": {
+   "status": "complete"
+  },
+  "legacyLootArchetypes": {
+   "status": "complete"
+  },
+  "mineableEntities": {
+   "status": "complete"
+  },
+  "crafters": {
+   "status": "complete"
+  },
+  "cargoManifests": {
+   "status": "complete"
+  },
+  "missionLocationTemplates": {
+   "status": "complete"
+  },
+  "contractShipSpawns": {
+   "status": "complete"
+  },
+  "contractLocationQueries": {
+   "status": "complete"
+  },
+  "contractTemplates": {
+   "status": "complete"
+  },
+  "missionBrokerEntries": {
+   "status": "complete"
+  },
+  "contractNpcSpawns": {
+   "status": "complete"
+  },
+  "contractEntitySpawns": {
+   "status": "complete"
+  },
+  "shipStoreSlugs": {
+   "status": "complete"
+  }
+ },
+ "manufacturers": [
+  {
+   "guid": "0e6d8f1b-ebb8-4773-8ca4-f25d737c8709",
+   "className": "VGL",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.vgl",
+   "code": "VGL",
+   "name": {
+    "key": "@manufacturer_NameVGL",
+    "en": "Virgil",
+    "de": "Virgil"
+   },
+   "description": {
+    "key": "@manufacturer_DescVGL",
+    "en": "High-end Commercial and Personal armor manufacturer. Aside f",
+    "de": "Hersteller von hochwertiger Ausrüstung für den kommerziellen"
+   }
+  },
+  {
+   "guid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "className": "ORIG",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.orig",
+   "code": "ORIG",
+   "name": {
+    "key": "@manufacturer_NameOrigin",
+    "en": "Origin Jumpworks",
+    "de": "Origin Jumpworks"
+   },
+   "description": {
+    "key": "@manufacturer_DescOrigin",
+    "en": "Known primarily for high-end ship manufacturing, but also pr",
+    "de": "In erster Linie für die Herstellung hochwertiger Schiffe bek"
+   }
+  },
+  {
+   "guid": "57bfcf3d-13f6-4c2c-b7c7-6bf8eacb8a24",
+   "className": "GODI",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.godi",
+   "code": "GODI",
+   "name": {
+    "key": "@manufacturer_NameGODI",
+    "en": "Gorgon Defender Industries",
+    "de": "Gorgon Defender Industries"
+   },
+   "description": {
+    "key": "@manufacturer_DescGODI",
+    "en": "When Humanity started being attacked by Vanduul, it was ofte",
+    "de": "Als die Angriffe der Vanduul gegen die Menschheit anfingen,"
+   }
+  },
+  {
+   "guid": "709e8255-a0b1-4c5e-8b0e-28781be25984",
+   "className": "KSAR",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.ksar",
+   "code": "KSAR",
+   "name": {
+    "key": "@manufacturer_NameKSAR",
+    "en": "Kastak Arms",
+    "de": "Kastak Arms"
+   },
+   "description": {
+    "key": "@manufacturer_DescKSAR",
+    "en": "Kastak Arms makes inexpensive energy weapons with intimidati",
+    "de": "Kastak Arms stellt preiswerte Energiewaffen wie den furchtei"
+   }
+  },
+  {
+   "guid": "8a7bd715-5b97-404f-b02e-0d0cc593f608",
+   "className": "CDS",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.cds",
+   "code": "CDS",
+   "name": {
+    "key": "@manufacturer_NameCDS",
+    "en": "Clark Defense Systems",
+    "de": "Clark Defense Systems"
+   },
+   "description": {
+    "key": "@manufacturer_DescCDS",
+    "en": "Ground-combat defensive systems, covers a lot of commercial",
+    "de": "CDS deckt einen großen kommerziellen Bereich ab, von Körperp"
+   }
+  },
+  {
+   "guid": "b922abdb-0634-4358-9eee-60118f3cf3a7",
+   "className": "ANVL",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.anvl",
+   "code": "ANVL",
+   "name": {
+    "key": "@manufacturer_NameANVL",
+    "en": "Anvil Aerospace",
+    "de": "Anvil Aerospace"
+   },
+   "description": {
+    "key": "@manufacturer_DescANVL",
+    "en": "For civilians, Anvil Aerospace produces small fighting craft",
+    "de": "Für die Zivilbevölkerung stellt Anvil Aerospace kleine Kampf"
+   }
+  },
+  {
+   "guid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "className": "AEGS",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.aegs",
+   "code": "AEG",
+   "name": {
+    "key": "@manufacturer_NameAEGS",
+    "en": "Aegis Dynamics",
+    "de": "Aegis Dynamics"
+   },
+   "description": {
+    "key": "@manufacturer_DescAEGS",
+    "en": "Aegis grew to prominence as a manufacturer of military space",
+    "de": "Während des Ersten Tevarin-Krieges erlangte Aegis als Herste"
+   }
+  },
+  {
+   "guid": "d7cc897f-b760-4a73-93c0-27e23c52db0a",
+   "className": "JUST",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.just",
+   "code": "JUST",
+   "name": {
+    "key": "@manufacturer_NameJUST",
+    "en": "Juno Starwerk",
+    "de": "Juno Starwerk"
+   },
+   "description": {
+    "key": "@manufacturer_DescJUST",
+    "en": "Second only to RSI in terms of longevity in the space indust",
+    "de": "An zweiter Stelle nach RSI, was seine Langlebigkeit in der I"
+   }
+  }
+ ],
+ "items": [
+  {
+   "guid": "00003571-11df-4b9d-a30d-1392d2a4bde7",
+   "className": "MISC_Fury_Thruster_Main",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/thrusters/misc_fury_thruster_main",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "MainThruster",
+   "subType": "JointThruster",
+   "size": 1,
+   "grade": 1,
+   "mass": 350.0,
+   "manufacturerGuid": null,
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": "special",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "000ec670-7acc-4771-b567-7c939d2a80c0",
+   "className": "ORIG_600i_Pilot_SeatAccess",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/seataccess/orig_600i_pilot_seataccess",
+   "name": {
+    "key": "@item_Name_SeatAccess_GenericSeat",
+    "en": "Seat",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Nam"
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "SeatAccess",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 1,
+   "mass": 4.0,
+   "manufacturerGuid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": null,
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "00335844-8889-4c40-b4c5-e4d8496838cf",
+   "className": "ksar_smg_energy_01_contestedzonereward",
+   "recordPath": "libs/foundry/records/entities/scitem/weapons/fps_weapons/ksar_smg_energy_01_contestedzonereward",
+   "name": {
+    "key": "@item_Nameksar_smg_energy_01",
+    "en": "Custodian SMG",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Nam"
+   },
+   "description": {
+    "key": "@item_Descksar_smg_energy_01",
+    "en": "Manufacturer: Kastak Arms",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Des"
+   },
+   "type": "WeaponPersonal",
+   "subType": "Medium",
+   "size": 2,
+   "grade": 1,
+   "mass": 3.35,
+   "manufacturerGuid": "709e8255-a0b1-4c5e-8b0e-28781be25984",
+   "tags": [
+    "stocked",
+    "smg",
+    "ksar_smg_energy_01"
+   ],
+   "displayType": {
+    "key": "@item_displayType_SMG",
+    "en": "SMG",
+    "de": "MP"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "0306b7df-6adf-4da5-9ca8-839a5d41c1cc",
+   "className": "SoftLock_Terminal_Standard_LowTech_CommodityKiosk_console_storage_1_a",
+   "recordPath": "libs/foundry/records/entities/scitem/mission_entities/softlock_terminal/softlock_terminal_standard_lowtech_commoditykiosk_console_storage_1_a",
+   "name": {
+    "key": "@item_displayType_kioskScreen_generic",
+    "en": "Screen",
+    "de": null
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "UNDEFINED",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 1,
+   "mass": 0.0,
+   "manufacturerGuid": null,
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": "mission",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "04285ce3-561f-4377-b0db-c641e3fad1de",
+   "className": "COOL_JUST_S02_Snowpack_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/cooler/cool_just_s02_snowpack_scitem",
+   "name": {
+    "key": "@item_NameCOOL_JUST_S02_Snowpack_SCItem",
+    "en": "Snowpack",
+    "de": "Snowpack"
+   },
+   "description": {
+    "key": "@item_DescCOOL_JUST_S02_Snowpack_SCItem",
+    "en": "Item Type: Cooler",
+    "de": "Hersteller: Juno Starwerk"
+   },
+   "type": "Cooler",
+   "subType": "UNDEFINED",
+   "size": 2,
+   "grade": 1,
+   "mass": 710.0,
+   "manufacturerGuid": "d7cc897f-b760-4a73-93c0-27e23c52db0a",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_Cooler",
+    "en": "Cooler",
+    "de": "Kühler"
+   },
+   "itemClass": "Industrial",
+   "playability": "player",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "339bd641-8dfb-4bc1-b273-5ffc5f702fbb",
+   "className": "SHLD_GODI_S01_AllStop_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/shieldgenerator/shld_godi_s01_allstop_scitem",
+   "name": {
+    "key": "@item_NameSHLD_GODI_S01_AllStop",
+    "en": "AllStop",
+    "de": "AllStop"
+   },
+   "description": {
+    "key": "@item_DescSHLD_GODI_S01_AllStop",
+    "en": "Item Type: Shield Generator",
+    "de": "Hersteller: Gorgon Defender Industries"
+   },
+   "type": "Shield",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 3,
+   "mass": 120.0,
+   "manufacturerGuid": "57bfcf3d-13f6-4c2c-b7c7-6bf8eacb8a24",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_ShieldGenerator",
+    "en": "Shield Generator",
+    "de": "Schildgenerator"
+   },
+   "itemClass": "Military",
+   "playability": "player",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
+   "className": "cds_armor_heavy_arms_01_01_01",
+   "recordPath": "libs/foundry/records/entities/scitem/characters/human/armor/pu_armor/heavy/arms/cds_armor_heavy_arms_01_01_01",
+   "name": {
+    "key": "@item_Name_cds_heavy_armor_01_arms",
+    "en": "ADP-mk4 Arms Woodland",
+    "de": "ADP-MK-IV-Arme (Waldland)"
+   },
+   "description": {
+    "key": "@item_Desc_cds_heavy_armor_01_Shared",
+    "en": "Item Type: Heavy Armor",
+    "de": null
+   },
+   "type": "Char_Armor_Arms",
+   "subType": "Heavy",
+   "size": 1,
+   "grade": 1,
+   "mass": 6.0,
+   "manufacturerGuid": "8a7bd715-5b97-404f-b02e-0d0cc593f608",
+   "tags": [
+    "Marine_Heavy",
+    "Set_01",
+    "Color_01",
+    "SM_Marine"
+   ],
+   "displayType": {
+    "key": "@item_displayType_ArmorArms",
+    "en": "Armor: Arms",
+    "de": "Armpanzerung"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "de20695c-eb2f-4b68-be6f-9806cbd205a7",
+   "className": "vgl_armor_light_arms_01_01_20",
+   "recordPath": "libs/foundry/records/entities/scitem/characters/human/armor/pu_armor/light/arms/vgl_armor_light_arms_01_01_20",
+   "name": {
+    "key": "@item_Name_vgl_armor_light_arms_01_01_20",
+    "en": "TrueDef-Pro Arms Silver/Gold/Grey",
+    "de": "TrueDef-Pro-Arme (Silber/Gold/Grau)"
+   },
+   "description": {
+    "key": "@item_Desc_vgl_advocacy_lightarmor_Shared",
+    "en": "Item Type: Light Armor",
+    "de": null
+   },
+   "type": "Char_Armor_Arms",
+   "subType": "Light",
+   "size": 1,
+   "grade": 1,
+   "mass": 2.0,
+   "manufacturerGuid": "0e6d8f1b-ebb8-4773-8ca4-f25d737c8709",
+   "tags": [
+    "Virgil",
+    "Set_01",
+    "Color_20",
+    "SM_RestrictedArm"
+   ],
+   "displayType": {
+    "key": "@item_displayType_ArmorArms",
+    "en": "Armor: Arms",
+    "de": "Armpanzerung"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": "1036805c-1d16-43db-ae15-7f04f7c38a66",
+   "stats": null
+  }
+ ],
+ "ships": [
+  {
+   "guid": "0045b223-9bea-4ef5-a873-d1316830fe43",
+   "className": "ANVL_Hornet_F7C_Mk2_AI_Super",
+   "recordPath": "libs/foundry/records/entities/spaceships/anvl_hornet_f7c_mk2_ai_super",
+   "name": {
+    "key": "@vehicle_NameANVL_Hornet_F7C_Mk2",
+    "en": "Anvil F7C Hornet Mk II",
+    "de": null
+   },
+   "description": {
+    "key": "@vehicle_DescANVL_Hornet_F7C_Mk2",
+    "en": "Manufacturer: Anvil Aerospace",
+    "de": null
+   },
+   "role": {
+    "key": "@vehicle_class_mediumfighter",
+    "en": "Medium Fighter",
+    "de": "Mittlerer Jäger"
+   },
+   "career": {
+    "key": "@vehicle_focus_combat",
+    "en": "Combat",
+    "de": "Kampf"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "b922abdb-0634-4358-9eee-60118f3cf3a7",
+   "vehicleDefinition": "Scripts/Entities/Vehicles/Implementations/Xml/ANVL_Hornet_F7A.xml",
+   "vehicleKind": "spaceship",
+   "size": 2,
+   "mass": 62117.0,
+   "massBasis": "parts",
+   "hullHealth": 13153.0,
+   "cargoScu": 2.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "ai",
+   "variantOf": "fb231ba1-dba1-4c9f-823a-746c772ae92f",
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "ANVL_Hornet_F7C_Mk2",
+    "baseWaitTimeMinutes": 11.34,
+    "mandatoryWaitTimeMinutes": 3.56,
+    "expediteFee": 5104
+   }
+  },
+  {
+   "guid": "0079c5d5-1678-4f8c-85ba-18ca8f642af6",
+   "className": "AEGS_Avenger_Titan",
+   "recordPath": "libs/foundry/records/entities/spaceships/aegs_avenger_titan",
+   "name": {
+    "key": "@vehicle_NameAEGS_Avenger_Titan",
+    "en": "Aegis Avenger Titan",
+    "de": "Aegis Avenger Titan"
+   },
+   "description": {
+    "key": "@vehicle_DescAEGS_Avenger_Titan",
+    "en": "Manufacturer: Aegis Dynamics",
+    "de": "Hersteller: Aegis Dynamics"
+   },
+   "role": {
+    "key": "@vehicle_class_lightfreight",
+    "en": "Light Freight",
+    "de": "Leichter Frachter"
+   },
+   "career": {
+    "key": "@vehicle_focus_transporter",
+    "en": "Transporter",
+    "de": "Transport"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/aegs_avenger.xml",
+   "vehicleKind": "spaceship",
+   "size": 2,
+   "mass": 48986.68,
+   "massBasis": "parts",
+   "hullHealth": 11900.0,
+   "cargoScu": 8.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "player",
+   "variantOf": null,
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "AEGS_Avenger_Titan",
+    "baseWaitTimeMinutes": 4.05,
+    "mandatoryWaitTimeMinutes": 1.35,
+    "expediteFee": 2343
+   }
+  },
+  {
+   "guid": "05189197-09f7-4869-8db2-5fe21886cda3",
+   "className": "ORIG_890Jump_Unmanned",
+   "recordPath": "libs/foundry/records/entities/spaceships/orig_890jump_unmanned",
+   "name": {
+    "key": "@vehicle_NameORIG_890Jump",
+    "en": "Origin 890 Jump",
+    "de": "Origin 890 Jump"
+   },
+   "description": {
+    "key": "@vehicle_DescORIG_890Jump",
+    "en": "Manufacturer: Origin Jumpworks",
+    "de": "Hersteller: Origin Jumpworks"
+   },
+   "role": {
+    "key": "@item_ShipFocus_LuxuryTouring",
+    "en": "Luxury Touring",
+    "de": "Luxusreisen"
+   },
+   "career": {
+    "key": "@vehicle_focus_exploration",
+    "en": "Exploration",
+    "de": "Erkundung"
+   },
+   "crewSize": 8,
+   "manufacturerGuid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/orig_890jump.xml",
+   "vehicleKind": "spaceship",
+   "size": 6,
+   "mass": 43896159.0,
+   "massBasis": "parts",
+   "hullHealth": 153200.0,
+   "cargoScu": 388.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "mission",
+   "variantOf": "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "ORIG_890Jump",
+    "baseWaitTimeMinutes": 67.5,
+    "mandatoryWaitTimeMinutes": 22.5,
+    "expediteFee": 33750
+   }
+  },
+  {
+   "guid": "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+   "className": "AEGS_Javelin",
+   "recordPath": "libs/foundry/records/entities/spaceships/aegs_javelin",
+   "name": {
+    "key": "@vehicle_NameAEGS_Javelin",
+    "en": "Aegis Javelin",
+    "de": "Aegis-Javelin"
+   },
+   "description": {
+    "key": "@vehicle_DescAEGS_Javelin",
+    "en": "Manufacturer: Aegis Dynamics",
+    "de": "Hersteller: Aegis Dynamics"
+   },
+   "role": {
+    "key": "@vehicle_class_destroyer",
+    "en": "Destroyer",
+    "de": "Zerstörer"
+   },
+   "career": {
+    "key": "@vehicle_class_destroyer",
+    "en": "Destroyer",
+    "de": "Zerstörer"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/aegs_javelin.xml",
+   "vehicleKind": "spaceship",
+   "size": 6,
+   "mass": 111080494.0,
+   "massBasis": "parts",
+   "hullHealth": 7852400.0,
+   "cargoScu": null,
+   "cargoGridsWithIssue": 17,
+   "playability": "special",
+   "variantOf": null,
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "AEGS_Javelin",
+    "baseWaitTimeMinutes": 168.75,
+    "mandatoryWaitTimeMinutes": 56.25,
+    "expediteFee": 84375
+   }
+  }
+ ],
+ "commodities": [
+  {
+   "guid": "001c7bc6-2bb6-4f66-a8ef-a1c63e80ffc5",
+   "className": "borase",
+   "recordPath": "libs/foundry/records/entities/commodities/metals/borase",
+   "name": {
+    "key": "@items_commodities_borase",
+    "en": "Borase",
+    "de": "Borase"
+   },
+   "description": {
+    "key": "@items_commodities_borase_desc",
+    "en": "This highly thermally conductive material is often formed fr",
+    "de": "Dieses höchst wärmeleitfähige Material wird durch die Spalla"
+   },
+   "typeGuid": "9b28b2e4-7df3-43f3-a69a-d82b119e25bf",
+   "subtypeGuid": "33bff393-42f1-4f70-85a1-71e695ed2a5a",
+   "displayType": {
+    "key": "@items_commodities_type_metal",
+    "en": "Metal",
+    "de": "Metall"
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  },
+  {
+   "guid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "className": "Ouratite",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@items_commodities_ouratite",
+    "en": "Ouratite",
+    "de": null
+   },
+   "description": {
+    "key": "@items_commodities_ouratite_desc",
+    "en": "Notable for its ability to withstand kinetic impacts, ourati",
+    "de": null
+   },
+   "typeGuid": "4d3f31f7-feab-488c-8f36-ac7c8c4012b8",
+   "subtypeGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  },
+  {
+   "guid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+   "className": "Aslarite",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@items_commodities_aslarite",
+    "en": "Aslarite",
+    "de": null
+   },
+   "description": {
+    "key": "@items_commodities_aslarite_desc",
+    "en": "Aslarite is a naturally-occurring mineral that is most commo",
+    "de": null
+   },
+   "typeGuid": "8e17c99b-1bf6-49cb-838e-e7eb72a9088f",
+   "subtypeGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  }
+ ],
+ "blueprints": [
+  {
+   "guid": "0037f308-adfc-4c4e-994f-cd477e895aab",
+   "className": "BP_CRAFT_vgl_armor_light_arms_01_01_20",
+   "recordPath": "libs/foundry/records/crafting/blueprints/crafting/fpsgear/armour/engineer/light/bp_craft_vgl_armor_light_arms_01_01_20",
+   "key": "BP_CRAFT_vgl_armor_light_arms_01_01_20",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "categoryGuid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "producedItemGuid": "de20695c-eb2f-4b68-be6f-9806cbd205a7",
+   "craftTimeSeconds": 120,
+   "ingredients": [
+    {
+     "resourceGuid": "7f4599b0-a2b2-4178-8c7e-13292054ab20",
+     "itemGuid": null,
+     "quantityScu": 0.03,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "CASING",
+     "slotKey": "@crafting_ui_slotname_casing"
+    },
+    {
+     "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+     "itemGuid": null,
+     "quantityScu": 0.02,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "INSULATIVE LINER",
+     "slotKey": "@crafting_ui_slotname_insulativeliner"
+    }
+   ],
+   "tiers": [
+    {
+     "craftTimeSeconds": 120,
+     "mandatory": {
+      "kind": "select",
+      "count": 2,
+      "slot": "ASPECTS",
+      "slotKey": null,
+      "options": [
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "CASING",
+        "slotKey": "@crafting_ui_slotname_casing",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "7f4599b0-a2b2-4178-8c7e-13292054ab20",
+          "itemGuid": null,
+          "quantityScu": 0.03,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.85,
+            "atEnd": 1.15
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "INSULATIVE LINER",
+        "slotKey": "@crafting_ui_slotname_insulativeliner",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+          "itemGuid": null,
+          "quantityScu": 0.02,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         },
+         {
+          "propertyGuid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": "Include",
+      "modifiers": []
+     },
+     "optional": []
+    }
+   ],
+   "defaultAvailable": false,
+   "dismantle": {
+    "processGuid": "f4e2e342-a389-47c9-82be-f35824c570de",
+    "tierIndex": 0
+   }
+  },
+  {
+   "guid": "005d95db-96ca-45b7-9647-7e7537b8fac8",
+   "className": "BP_CRAFT_cds_armor_heavy_arms_01_01_01",
+   "recordPath": "libs/foundry/records/crafting/blueprints/crafting/fpsgear/armour/combat/heavy/bp_craft_cds_armor_heavy_arms_01_01_01",
+   "key": "BP_CRAFT_cds_armor_heavy_arms_01_01_01",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "categoryGuid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "producedItemGuid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
+   "craftTimeSeconds": 240,
+   "ingredients": [
+    {
+     "resourceGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+     "itemGuid": null,
+     "quantityScu": 0.06,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "ARMOURED CARAPACE",
+     "slotKey": "@crafting_ui_slotname_armouredcarapace"
+    },
+    {
+     "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+     "itemGuid": null,
+     "quantityScu": 0.02,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "INSULATIVE LINER",
+     "slotKey": "@crafting_ui_slotname_insulativeliner"
+    }
+   ],
+   "tiers": [
+    {
+     "craftTimeSeconds": 240,
+     "mandatory": {
+      "kind": "select",
+      "count": 2,
+      "slot": "ASPECTS",
+      "slotKey": null,
+      "options": [
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "ARMOURED CARAPACE",
+        "slotKey": "@crafting_ui_slotname_armouredcarapace",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+          "itemGuid": null,
+          "quantityScu": 0.06,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.85,
+            "atEnd": 1.15
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "INSULATIVE LINER",
+        "slotKey": "@crafting_ui_slotname_insulativeliner",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+          "itemGuid": null,
+          "quantityScu": 0.02,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         },
+         {
+          "propertyGuid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": "Include",
+      "modifiers": []
+     },
+     "optional": []
+    }
+   ],
+   "defaultAvailable": false,
+   "dismantle": {
+    "processGuid": "f4e2e342-a389-47c9-82be-f35824c570de",
+    "tierIndex": 0
+   }
+  }
+ ],
+ "resourceGroups": [
+  {
+   "guid": "1676f718-39c2-45d7-be78-4023db6452ff",
+   "className": "HeatPlaceholder",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "parentGuid": null
+  }
+ ],
+ "blueprintCategories": [
+  {
+   "guid": "0c11afd4-2287-43fb-8da9-1b6673ac8e1b",
+   "className": "VehicleComponentS4",
+   "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
+   "name": {
+    "key": null,
+    "en": null,
+    "de": null
+   }
+  }
+ ],
+ "gameplayProperties": [],
+ "qualityDistributions": [],
+ "qualityQuantizations": [],
+ "blueprintPools": [],
+ "dismantleProcesses": [],
+ "craftingGlobal": {
+  "dismantleExcludedResourceGuids": [
+   "392b4dca-449a-4d4d-8fef-beab024d9ee7",
+   "4a47cad8-0271-4048-b19b-d9b52521fc20",
+   "86d00bd8-08f7-4231-b375-a609803fc46d",
+   "8cd317a3-df9b-4315-8ac3-0f1fca42dfd4",
+   "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "bde5a2c8-2ef4-46ac-9403-2fcb79e4016c"
+  ],
+  "dismantleExcludedItemGuids": [
+   "e954d75e-fb1e-487e-90a8-170f0284b502",
+   "ee704f52-8794-434d-bcd7-47fec365ffbd"
+  ]
+ },
+ "paints": [],
+ "loadouts": [
+  {
+   "entityGuid": "0005b63c-e673-4165-964b-0ec197192477",
+   "entityKind": "item",
+   "issues": [],
+   "ports": [
+    {
+     "name": "slot_1",
+     "source": "unset",
+     "minSize": 1,
+     "maxSize": 6,
+     "types": [
+      {
+       "type": "NOITEM_Vehicle",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "tableDisplay"
+     ],
+     "portTags": [],
+     "requiredTags": [
+      "DRAK_Caterpillar",
+      "ShipShowdown"
+     ],
+     "displayNameKey": null,
+     "visibility": "unspecified",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    }
+   ]
+  }
+ ],
+ "starmapObjects": [
+  {
+   "guid": "0007b9e3-a737-4bf5-b937-9cd3c6263fbe",
+   "className": "AsteroidCluster_Pyro",
+   "recordPath": "libs/foundry/records/starmap/pu/asteroidcluster_pyro",
+   "name": {
+    "key": "@generic_locations_blank",
+    "en": null,
+    "de": null
+   },
+   "type": "Asteroid_ValidQT",
+   "typeGuid": "f6461834-fa63-468f-a3c4-d1ed6ef8c20d",
+   "parentGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "hideInStarmap": false,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  }
+ ],
+ "contracts": [],
+ "mineableElements": [],
+ "refiningProcesses": [],
+ "mineableCompositions": [],
+ "miningGlobalParams": [],
+ "harvestableProviderPresets": [],
+ "subHarvestableMultiConfigs": [],
+ "harvestableLocations": [],
+ "lootContainers": [],
+ "shops": [
+  {
+   "key": "40fa0e04-ca49-593b-ffb0-20907233c091,4013956c-77bf-e743-db3a-7802f8e7469d,446c6ac8-876c-6579-6bc0-3b54c1c32995,40c7378f-9531-bf6e-cc93-44d1a189fe86,40ea61ed-9418-98d8-db00-742707529fb5,4f70bc03-b2f5-6cea-768c-ffedb033d2a2",
+   "entityGuid": "4f70bc03-b2f5-6cea-768c-ffedb033d2a2",
+   "system": "pyro",
+   "entityName": "SCShop_RestStop_Bar_Rund",
+   "registryName": "RestStop_Bars",
+   "defaultValue": "1141645a-167b-406c-882d-e0b4a238f868",
+   "containers": [
+    "pyrostar",
+    "RegionBD_3base_ab_pyro_final_set_encounter-001",
+    "ab_pyro_asmbl_01_enctr_001b",
+    "LocationHarvestableObjectContainer_ab_pyro_int_enctr_001b",
+    "rstop_bar_001_rund_003"
+   ],
+   "body": "RegionBD_3base_ab_pyro_final_set_encounter-001",
+   "location": "ab_pyro_asmbl_01_enctr_001b",
+   "starmapObjectGuid": null,
+   "kind": "shopfood",
+   "brand": null,
+   "commodityExchange": false,
+   "inventory": null,
+   "itemGuids": null
+  }
+ ],
+ "factionReputations": [],
+ "reputationScopes": [],
+ "reputationStandings": [],
+ "reputationContexts": [],
+ "missionTypes": [],
+ "missionLocalities": [],
+ "contractScenarios": [],
+ "lootTables": [],
+ "lootArchetypes": [],
+ "lootPoolFilters": [],
+ "legacyLootTables": [],
+ "legacyLootArchetypes": [],
+ "mineableEntities": [],
+ "crafters": [],
+ "cargoManifests": [],
+ "missionLocationTemplates": [],
+ "contractShipSpawns": [],
+ "contractLocationQueries": [],
+ "contractTemplates": [],
+ "missionBrokerEntries": [],
+ "contractNpcSpawns": [],
+ "contractEntitySpawns": [],
+ "shipStoreSlugs": [],
+ "itemRecovery": {
+  "guid": "c4ac0f5a-c072-4666-b3a0-5aef0cf3ff65",
+  "className": "GlobalItemRecovery",
+  "recordPath": "libs/foundry/records/entitlementpolicies/globalitemrecovery",
+  "globalBrickTimer": 10.0,
+  "baseReclaimTime": 0.0,
+  "baseDeliveryTime": 0.0,
+  "scalingPriceFloor": 0.0,
+  "aUECperSecond": 1e-06,
+  "defaultLoadoutCooldownMultiplier": 200.0,
+  "defaultLoadoutDeliveryTimeMultiplier": 200.0,
+  "claimCostMultiplier": 0.003,
+  "vehicleChassisRepairCostMultiplier": 1.0,
+  "vehicleComponentRepairCostMultiplier": 1.0,
+  "vehicleRepairMissingItemCostMultiplier": 1.0,
+  "deliverySecondsPerAUEC": 1e-06,
+  "expeditedDeliverySecondsPerAUEC": 5e-07,
+  "defaultLoadoutExpeditedDeliveryTimeMultiplier": 100.0,
+  "flatMinimumDeliveryTimerSeconds": 10.0,
+  "maxExpeditedClaimCostMultiplier": 0.0003,
+  "escalatingClaimsParams": {
+   "escalatingClaimChainLimit": 1,
+   "escalationTimerMultiplier": 1.0,
+   "escalatingClaimCostMultiplier": 1.0,
+   "escalatingDeliveryTimerMultiplier": 1.0
+  },
+  "overrides": [
+   {
+    "classGuids": [
+     "20d5f617-147a-4530-a753-a7afd1875fd1",
+     "a852bb00-e395-468f-9adc-78b3df9c82f6",
+     "973bc147-4422-48a6-99c8-6ff0ead25bdf",
+     "f8c8fe5c-1aa3-41d7-86b0-6bb54b249541",
+     "968249b2-ca7c-4b41-8f58-730673fefc8c",
+     "1164be4d-623e-4ef7-bc3d-4cdb45c22ec5",
+     "ec956be2-8e3a-460d-b3a8-97df4cb12b78",
+     "3ea9bcd8-1ddd-4714-a537-7b2675e8c2d2",
+     "93b13680-9aa6-4c21-b998-e4f8880f7c12",
+     "887cd720-7337-44ae-9708-828ccf808649",
+     "b616b3ad-123c-40f2-80bd-b8f4109633aa",
+     "ea2c22bc-c2f0-42dc-967d-3300f9232f91",
+     "83318d44-b6c1-42d8-bcd1-284318718b42",
+     "16aa514f-12ac-43a4-b51d-44447252186e",
+     "1bed9058-e284-4c0f-b561-6ba57ab4f99d",
+     "6135a874-4cb1-4f49-9f29-5781e5991f2b",
+     "e7eeba8d-b108-48a1-a332-d9edbab2b9c1",
+     "2f231daa-95e5-4cb2-a32e-4db8f29a30d6",
+     "3c9af040-d919-4afc-b768-45821a5b913c",
+     "c6cfa4d9-e794-4bb6-8da9-54cb779ea109",
+     "e32d125f-a3f8-4bc7-b0e6-cb7edf22b7ac",
+     "c2956880-b82a-42d0-962b-eb736dac1536",
+     "b58f7735-9454-4a0a-b724-2bc8d61961d7",
+     "11ebc47d-4763-4faa-9020-171cf6c2651f",
+     "eaeb562d-d4ac-43bd-a843-e8a6d69fad82",
+     "34506e83-b7b8-4804-a7bb-f31f11bb9214",
+     "6c44bcd6-d4c4-41c7-8939-a576e3aa9482"
+    ],
+    "claimCooldownMultiplier": 1.0,
+    "claimCostMultiplier": 1.0,
+    "deliveryTimeMultiplier": 1.0,
+    "maxExpediteCostMultiplier": 1.0,
+    "expeditedDeliveryTimeMultiplier": 1.0,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f6d606c9-b324-4efa-814f-15a59047a6a5",
+     "f1b224dd-273e-488f-9dee-fbf73f44f462",
+     "f0caa993-4c6b-4402-8ef1-d91879060f3b",
+     "4b0585b0-b60b-4c52-a744-d812e5e9ad58",
+     "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+     "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+     "a5a5b055-c5d7-4384-9951-f15d47b88789"
+    ],
+    "claimCooldownMultiplier": 1.0,
+    "claimCostMultiplier": 1.0,
+    "deliveryTimeMultiplier": 1.0,
+    "maxExpediteCostMultiplier": 1.0,
+    "expeditedDeliveryTimeMultiplier": 1.0,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "e379e38c-459a-4705-be7d-49a5f5d7a928",
+     "0d4c5000-ffdb-41f5-9de1-d64252dfef21",
+     "5d2bf0b6-d9be-4738-8717-0f455c461d8a",
+     "28f22bb8-9f1c-4a46-9a39-20bcb1e5000e",
+     "f7b8addd-9253-495c-a278-bdaa236e6cbc",
+     "081236f5-9549-4a60-9123-6ae21f0cd261",
+     "11ebc47d-4763-4faa-9020-171cf6c2651f",
+     "9634b4d6-9f5a-4ad2-8574-431c15e3bc5d",
+     "8c2730d4-52c1-43fb-9972-d9956fb7ea1f"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "831fdcfc-337a-4350-967d-e693d19efeee",
+     "e19fc6c3-f5fa-4623-9a17-b00a29b71500",
+     "674e0a52-4469-4b55-ba0d-6aecc44d1728",
+     "e17ccf62-f2d2-4c4e-a132-a3000d40fbde",
+     "1810d1a7-61e3-4d95-bafb-0f11758c7683",
+     "c03e7aef-6411-4e85-9c10-e89862884433",
+     "6ec72f64-2002-481c-b7c9-b132476ba6aa",
+     "0d690d1a-9f57-4976-bff1-ec46bf039e75",
+     "c4ceff45-d851-44b1-921b-bfef93a6cd6a",
+     "ecdfd0df-6c5f-4183-a24b-9e1546e00a4e",
+     "aaa12a00-a1e7-4dfc-8626-3bebb005209f",
+     "cf9aa91e-15bf-435c-a22d-f2cadc4485ce",
+     "34077e67-5e2c-4903-a17c-2d0e163751c7",
+     "f68ee841-88d1-46f3-a1e2-5dc71d9d5d97",
+     "e4770804-b43a-4c2d-a4e4-fedd410e50fb",
+     "02fe3279-3598-4ce6-96dc-0bc5cb90dfdc",
+     "3d371fd4-50e2-4b5e-859f-1086e905c946",
+     "4559fbe2-55ab-a5a8-4e77-75106cb96ab7",
+     "478bfc10-9577-ac19-262a-d40a93c3fcb2",
+     "4ed10b1c-df4f-4ab0-430e-b5b9f33b0f94",
+     "dc39ca6b-1d76-4db5-9346-356f49954978",
+     "565d8121-50a9-4920-af50-f176caef0431",
+     "13a02a6d-7d67-4d22-8530-d4d2c8443f66",
+     "c989caf2-84a5-4c01-b99e-5fc9f8d0ce8e",
+     "14b8caeb-d5e1-4816-9537-86ef19afada8",
+     "ff873dda-2b79-4fa3-b3ce-535b8adff5e2",
+     "34821163-e32e-42bf-99df-8f42ba66ef34",
+     "6c6e9731-3d70-4f1b-84c2-9dbf3c1f97c7",
+     "ca888820-a627-4f5e-927b-426f654e9968"
+    ],
+    "claimCooldownMultiplier": 0.8,
+    "claimCostMultiplier": 0.8,
+    "deliveryTimeMultiplier": 0.8,
+    "maxExpediteCostMultiplier": 0.8,
+    "expeditedDeliveryTimeMultiplier": 0.8,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f8ac4c26-8f4d-4cb3-9be2-7d867a95a877",
+     "11b660a2-c77c-490b-9e85-ee70400c5cf8",
+     "38ae749f-d4fc-4dfd-907b-ed8db61f3d88",
+     "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+     "ecadf2b2-a404-4776-9289-04af91538d76",
+     "daf936a1-689f-4edb-980a-96947e2727c4",
+     "316c6601-b405-4a3a-abac-394c655718f8"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f80d39f3-50fc-4fca-ada1-76de4c237e3f",
+     "881e3879-a186-44da-8b47-1d8f0a846438",
+     "8ffde65b-ee9b-4a50-b386-3111175736b2",
+     "0920e187-515d-466a-9c6a-a7dde9d2b1bc",
+     "35f6ad71-01c6-4762-a18b-99c7fdde9760",
+     "384d7e27-daec-4554-a8e9-6920a10a86c1",
+     "087b2253-2fc7-4fae-9f9d-97f64b7c43db",
+     "528fdddc-c97f-4ae8-a00e-11a59fc3662d",
+     "6f0e14a9-cb6c-4b71-ae92-376867bb1be8",
+     "4e62ae95-d173-4b94-8b91-9d85bc963ba1"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "d46f4de1-8dc1-473b-9739-88c9ba7e75a6",
+     "0b17b11f-4ac4-4e04-b973-beb6f299b99b",
+     "5cf39b3b-41d8-45c1-8ef2-d4678c7a7b85",
+     "7533ff77-836c-4bd2-9171-487d9c63863c",
+     "40a1f83b-3623-49e6-8168-ab8223998aa2",
+     "f6d606c9-b324-4efa-814f-15a59047a6a5",
+     "f1b224dd-273e-488f-9dee-fbf73f44f462",
+     "f05b74b2-06cf-44d0-8607-c09487359384",
+     "94d31d2e-5fa8-460c-9fa4-2942b6f0ce33",
+     "58544d8c-f000-47a4-9ec6-ad663dbd8ff0"
+    ],
+    "claimCooldownMultiplier": 0.6,
+    "claimCostMultiplier": 0.6,
+    "deliveryTimeMultiplier": 0.6,
+    "maxExpediteCostMultiplier": 0.6,
+    "expeditedDeliveryTimeMultiplier": 0.6,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   }
+  ]
+ }
+}
