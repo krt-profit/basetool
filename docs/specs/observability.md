@@ -1891,12 +1891,18 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   ingest auth failures); the metric carries no client, so the Exchange dashboard's `client_id`
   variable does not filter it.
 - `basetool_ingest_exchange_relay_total{outcome,client_id}` counter — every admitted exchange request the
-  gateway relayed: `ok`, `refused` (the backend refused with a code of the exchange error registry,
-  passed on to the client) or `failed` (answered `502 BACKEND_RELAY_FAILED` — including a backend
-  that cannot be reached, an open circuit breaker and a missing gateway token), registered at zero.
-  `ExchangeRelayFailing` (warning) fires on more than three failures in 15 minutes (REQ-XCH-011,
-  REQ-XCH-028). A large change set refused for want of a slot is not relayed and not counted here
-  but as `relay_busy` on the refusal counter.
+  gateway relayed: `ok` (a usable answer the gateway passed on), `refused` (the backend refused with
+  a code of the exchange error registry, passed on to the client), `failed` (answered `502
+  BACKEND_RELAY_FAILED` — including a backend that cannot be reached, an open circuit breaker and a
+  missing gateway token) or `answer_contract_broken` (a 2xx answer that broke its response schema or
+  carried a property the schema does not declare, answered `502 BACKEND_RELAY_FAILED`; REQ-XCH-050),
+  registered at zero. A usable answer counts once, as `ok` or `answer_contract_broken`, after the
+  gateway checked its contract. `ExchangeRelayFailing` (warning) fires on more than three failures
+  in 15 minutes (REQ-XCH-011, REQ-XCH-028); `ExchangeAnswerContractBroken` (warning) fires per
+  `client_id` on any broken answer, including a client's first, whose series starts at one; its WARN
+  line `Exchange answer breaks` names the schema, the route and the JSON Pointers, never a value. A
+  large change set refused for want of a slot is not relayed and not counted here but as
+  `relay_busy` on the refusal counter.
 - The exchange relay's own Resilience4j circuit breaker `exchange` and its bulkhead
   `exchangeLargeChangeSets` (four change sets of more than 100 ops at once, REQ-XCH-023) report
   through `resilience4j_circuitbreaker_state{application="basetool-ingest",name}` and

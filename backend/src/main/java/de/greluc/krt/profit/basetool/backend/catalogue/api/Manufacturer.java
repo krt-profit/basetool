@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -71,6 +72,7 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Column(columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String description;
 
   private boolean hidden = false;

@@ -22,7 +22,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…005, REQ-P4K-007…010 and REQ-P4K-045 are implemented (#3031); every other
+> REQ-P4K-001…005, REQ-P4K-007…010 and REQ-P4K-045 are implemented (#3031), REQ-P4K-033 is
+> implemented (#3041); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -765,8 +766,14 @@ A column is classified by its content, not its source, and has exactly one class
   and `description_de`, `Material.description`, and on every column filled from a catalogue field
   the contract marks `"x-gameText": true` (`displayType` should it be persisted, the starmap
   object's `name` and `name_de`).
+- A catalogue description column that no game-data source fills, only an admin in the Basetool,
+  holds no game text and stays unmarked: `Location.description`, `StarSystem.description`,
+  `FrequencyType.description`, `RefiningMethod.description` and `JobType.description`. Should a
+  game-data source ever fill one, it becomes `@GameText`.
 - **`@GameMedia`** is defined and sits on no column: the import stores no archive media, and the UEX
   link and image columns stay unmarked UEX data.
+
+Both annotations live in the backend's `kernel` package (`GameText`, `GameMedia`).
 
 A `@GameText` or `@GameMedia` column is shown to logged-in members only and never leaves the
 Basetool to a third party; the exchange enforces this with the guards of REQ-XCH-050.
@@ -775,11 +782,15 @@ nobody's).
 
 **Acceptance**
 
-- [ ] Every entity field filled from an `x-gameText` field of the checked-in schema carries
-  `@GameText`.
-- [ ] Every description column carries `@GameText`; no column carries both annotations.
+- [x] Every entity field filled from an `x-gameText` field of the checked-in schema carries
+  `@GameText`. *The schema is vendored at
+  `backend/src/test/resources/p4k/basetool-catalog.schema.json` (p4kx `v0.4.2`, provenance in the
+  `README.md` beside it); every `x-gameText` property is mapped to the fields it fills or listed
+  as not imported, so a new one fails the test until it is classified.*
+- [x] Every catalogue description column carries `@GameText` unless it is one of the admin-authored
+  columns above; no column carries both annotations, and none carries `@GameMedia`.
 
-**Enforced by (planned):** `GameTextClassificationTest` · **ADR:** [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md) · **Issues:** #2894,
+**Enforced by:** `GameTextClassificationTest` · **ADR:** [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md) · **Issues:** #2894,
 #2887
 
 ## Starmap and locations

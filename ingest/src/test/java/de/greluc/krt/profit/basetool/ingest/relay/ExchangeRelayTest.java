@@ -103,7 +103,34 @@ class ExchangeRelayTest {
     backend.verify();
     assertThat(result.isOk()).isTrue();
     assertThat(result.body().get("items").isArray()).isTrue();
+    assertThat(
+            meters
+                .find(MetricNames.EXCHANGE_RELAY)
+                .tag(MetricNames.TAG_OUTCOME, "ok")
+                .tag(MetricNames.TAG_CLIENT_ID, "versekit")
+                .counter())
+        .as("counted once the gateway passes it on")
+        .isNull();
+  }
+
+  @Test
+  void aUsableAnswerIsCountedAsPassedOnOrAsABrokenContract() {
+    assertThat(
+            meters
+                .get(MetricNames.EXCHANGE_RELAY)
+                .tag(MetricNames.TAG_OUTCOME, "answer_contract_broken")
+                .tag(MetricNames.TAG_CLIENT_ID, MetricNames.EXCHANGE_CLIENT_NONE)
+                .counter()
+                .count())
+        .as("registered at zero")
+        .isZero();
+
+    relay.countPassedOn("versekit");
+    relay.countContractBroken("versekit");
+    relay.countContractBroken("versekit");
+
     assertThat(count("ok")).isEqualTo(1.0d);
+    assertThat(count("answer_contract_broken")).isEqualTo(2.0d);
   }
 
   @Test

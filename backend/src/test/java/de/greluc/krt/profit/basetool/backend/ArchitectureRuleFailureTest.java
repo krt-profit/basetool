@@ -249,6 +249,19 @@ class ArchitectureRuleFailureTest {
             FixtureScopeService.class),
         EXCHANGE,
         "adminThing");
+    assertReports(
+        ArchitectureTest.outboundIntegrationsNeverReadAGameTextOrGameMediaRule(
+            ArchitectureTest.EXCHANGE_DOMAIN),
+        EXCHANGE,
+        "getDescription()");
+    assertThat(
+            ArchitectureTest.outboundIntegrationsNeverReadAGameTextOrGameMediaRule(
+                    ArchitectureTest.EXCHANGE_DOMAIN)
+                .evaluate(EXCHANGE)
+                .getFailureReport()
+                .getDetails())
+        .as("an unmarked getter stays allowed")
+        .noneMatch(detail -> detail.contains("getName()"));
   }
 
   @Test

@@ -44,7 +44,52 @@ tests:
               severity: warning
             exp_annotations:
               summary: "Exchange relays to the backend keep failing"
-              description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, an answer that breaks the v1 schema, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). Check the backend and its exchange layer and the gateway log lines 'Exchange relay to' or 'Exchange answer breaks'."
+              description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). An answer that breaks its contract is counted apart, see ExchangeAnswerContractBroken. Check the backend and its exchange layer and the gateway log lines 'Exchange relay to'."
+
+  - name: fires - one answer breaks its contract
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_relay_total{job="basetool-ingest", instance="ingest:11272", outcome="answer_contract_broken", client_id="versekit"}'
+        values: "0x5 1x20"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ExchangeAnswerContractBroken
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "The backend sent an exchange answer that breaks its contract"
+              description: "The ingest gateway refused a 2xx answer of the backend for client versekit with 502 BACKEND_RELAY_FAILED, because it broke its v1 response schema or carried a property the schema does not declare (REQ-XCH-050). A new backend field that is not declared in the published schema is the usual cause; it may be a game text on its way to a third party. Find the route and the field path in the gateway log line 'Exchange answer breaks', then declare the field in the schema with its class in the field ratchet, or drop it from the exchange DTO."
+
+  - name: fires - the first broken answer of a client, whose series starts at one
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_relay_total{job="basetool-ingest", instance="ingest:11272", outcome="answer_contract_broken", client_id="versekit"}'
+        values: "_x20 1x20"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ExchangeAnswerContractBroken
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              client_id: versekit
+            exp_annotations:
+              summary: "The backend sent an exchange answer that breaks its contract"
+              description: "The ingest gateway refused a 2xx answer of the backend for client versekit with 502 BACKEND_RELAY_FAILED, because it broke its v1 response schema or carried a property the schema does not declare (REQ-XCH-050). A new backend field that is not declared in the published schema is the usual cause; it may be a game text on its way to a third party. Find the route and the field path in the gateway log line 'Exchange answer breaks', then declare the field in the schema with its class in the field ratchet, or drop it from the exchange DTO."
+
+  - name: silent - answers that hold their contract
+
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_exchange_relay_total{job="basetool-ingest", instance="ingest:11272", outcome="answer_contract_broken", client_id="versekit"}'
+        values: "0x30"
+      - series: 'basetool_ingest_exchange_relay_total{job="basetool-ingest", instance="ingest:11272", outcome="ok", client_id="versekit"}'
+        values: "0+20x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ExchangeAnswerContractBroken
+        exp_alerts: []
 
   - name: silent - backend refusals with a registry code are the member's own
     interval: 1m

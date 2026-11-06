@@ -520,9 +520,16 @@ Three rules hold for every exchange route, and each new resource or capability i
   against it; the backend's answers are validated against the published schemas, every gateway
   route has a committed golden answer, the gateway's security filter order is pinned, and a pull
   request touching the exchange path needs the `e2e` label (REQ-XCH-036…-038).
+- **Game texts and game media stay with members.** A column holding a game text carries
+  `@GameText` (`@GameMedia` for archive media, on no column today), by content, whichever writer
+  fills it. Three guards keep them from third parties: an ArchUnit rule forbids the exchange to call
+  such a field's getter, a ratchet (`ExchangeFieldRatchetTest`) gives every published schema
+  property a green class and walks every exchange DTO along its schema, and the gateway answers a
+  backend answer with an undeclared property `502` and counts it `answer_contract_broken`
+  (REQ-XCH-050, REQ-P4K-033, ADR-0344). A new outbound integration joins the first two.
 
 Authority: [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), ADR-0216 …
-ADR-0221, ADR-0224 … ADR-0228; the third-party view is published from `docs/exchange/`.
+ADR-0221, ADR-0224 … ADR-0228, ADR-0344; the third-party view is published from `docs/exchange/`.
 
 ## 8.14 Domain modules — decided, being built
 

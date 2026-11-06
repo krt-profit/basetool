@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -159,11 +160,13 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   /** English description from Wiki. R4. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionEn;
 
   /** German description from Wiki. R4. */
   @Column(name = "description_de", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionDe;
 
   /** Wiki flag indicating this is the base variant of a family. R4. */
