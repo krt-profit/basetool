@@ -68,6 +68,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Optional<Blueprint> findFirstByScwikiKeyOrderByScwikiUuidAsc(String scwikiKey);
 
   /**
+   * Finds a blueprint the P4K seeded that the SC Wiki has not listed yet, by its key: the SC Wiki
+   * blueprint sync's fallback upsert key (REQ-P4K-027).
+   *
+   * @param scwikiKey the blueprint key
+   * @return the P4K-known blueprint of that key without a SC Wiki UUID, if any
+   */
+  Optional<Blueprint> findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(String scwikiKey);
+
+  /**
    * Returns the distinct Wiki item UUIDs referenced by blueprint ingredient lines, so the item sync
    * can also fetch items not yet in {@code game_item}.
    *

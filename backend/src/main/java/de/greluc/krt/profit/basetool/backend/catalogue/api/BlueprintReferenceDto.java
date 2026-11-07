@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Slim reference projection of a {@code Blueprint} for item-order payloads and the blueprint
@@ -30,4 +31,5 @@ import java.util.UUID;
  * @param outputName the human-readable name of the produced item as recorded on the blueprint
  * @param scwikiKey the SC-Wiki key of the blueprint (stable identifier for disambiguation)
  */
-public record BlueprintReferenceDto(UUID id, String outputName, String scwikiKey) {}
+public record BlueprintReferenceDto(
+    UUID id, @Nullable String outputName, @Nullable String scwikiKey) {}

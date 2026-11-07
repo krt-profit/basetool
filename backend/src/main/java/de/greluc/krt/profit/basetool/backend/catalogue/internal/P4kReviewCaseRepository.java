@@ -47,6 +47,17 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
       P4kKind kind, UUID guid, P4kReviewReason reason);
 
   /**
+   * Finds a case of one record that an admin resolved by assigning a row, whatever its reason.
+   *
+   * @param kind the kind
+   * @param guid the P4K GUID
+   * @param resolution the resolution, {@code ASSIGN}
+   * @return the case, if one exists
+   */
+  Optional<P4kReviewCase> findFirstByKindAndGuidAndResolutionAndRowIdIsNotNull(
+      P4kKind kind, UUID guid, P4kReviewResolution resolution);
+
+  /**
    * Pages the cases of one status, oldest first (REQ-P4K-016).
    *
    * @param status the status

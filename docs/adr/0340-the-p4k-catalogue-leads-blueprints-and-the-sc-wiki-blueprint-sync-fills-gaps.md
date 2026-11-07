@@ -1,6 +1,6 @@
 # ADR-0340 — The P4K catalogue leads blueprints and the SC Wiki blueprint sync fills gaps
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-027, REQ-P4K-028), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -45,8 +45,7 @@ catalogue also holds `blueprintPools`, `qualityDistributions`, `qualityQuantizat
 - Because the dismantle rules are unverified, the Wiki cross-check of differing values stays
   meaningful.
 - The stat base values are decided separately in ADR-0342.
-- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`. Implementation is
-  pending.
+- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`.
 
 ## Alternatives considered
 

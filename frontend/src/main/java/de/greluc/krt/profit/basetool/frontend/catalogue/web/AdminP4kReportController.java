@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.P4kReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
@@ -166,6 +167,17 @@ public class AdminP4kReportController {
   @Nullable
   public List<MaterialCategoryDto> resourceGroups() {
     return withBackendStatus(reportClient::resourceGroups);
+  }
+
+  /**
+   * Lists the materials a resource-join review case can assign.
+   *
+   * @return the live materials
+   */
+  @GetMapping("/materials")
+  @Nullable
+  public List<MaterialReferenceDto> materials() {
+    return withBackendStatus(reportClient::materials);
   }
 
   /**

@@ -49,6 +49,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +71,9 @@ import org.springframework.util.StringUtils;
  * <p>Lists all blueprints and fetches each detail through the paced client, and upserts each in its
  * own {@code REQUIRES_NEW} transaction. Unresolved ingredients keep their Wiki snapshot and are
  * re-resolved on later runs. When the detail is unavailable, the flat ingredient list is used and
- * existing group data is kept.
+ * existing group data is kept. On a blueprint the P4K knows, the Wiki fills only what the P4K
+ * delivers as {@code null} and reports differing values ({@link ScWikiBlueprintGapFiller},
+ * REQ-P4K-027).
  *
  * <p>Gated by {@code krt.scwiki.blueprint-sync-enabled} (default {@code false}); an empty Wiki
  * response skips the orphan sweep.
@@ -87,6 +90,9 @@ public class ScWikiBlueprintSyncService {
   private final MaterialExternalAliasService aliasService;
   private final GameItemRepository gameItemRepository;
   private final SyncReportService syncReportService;
+
+  /** Writes the columns the P4K leads only where it delivers none, and reports the differences. */
+  private final ScWikiBlueprintGapFiller gapFiller;
 
   /**
    * Curated corrections applied to each {@code output_name} before it is persisted; see {@link
@@ -223,37 +229,34 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Persists one blueprint's recipe graph in its own {@code REQUIRES_NEW} transaction; call it via
-   * {@link #self}. Rebuilds the requirement-group graph from the detail when present, otherwise the
-   * flat ingredient list, keeping existing group data.
+   * Persists one blueprint in its own {@code REQUIRES_NEW} transaction; call it via {@link #self}.
+   * On a blueprint the P4K does not know the Wiki writes everything; on a P4K-known one it writes
+   * only the columns the P4K delivers as {@code null} and reports the differing ones, and a recipe
+   * the P4K wrote is only gap-filled (REQ-P4K-027). A recipe the Wiki writes is rebuilt from the
+   * detail when present, otherwise from the flat ingredient list, keeping existing group data.
    *
    * @param scwikiUuid the Wiki blueprint UUID (the upsert key)
    * @param dto the blueprint payload (detail when available, else the list row)
-   * @param runId the current run id for unresolved-ingredient events
+   * @param runId the current run id for unresolved-ingredient events and disagreements
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @return the number of unresolved ingredient lines
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public int upsertBlueprintWithinTransaction(
       UUID scwikiUuid, ScWikiBlueprintDto dto, UUID runId, Instant now) {
-    Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
+    Blueprint bp = findOrCreate(scwikiUuid, dto.key());
     bp.setScwikiUuid(scwikiUuid);
-    boolean p4kOwned = bp.getP4kSyncedAt() != null;
-    if (!p4kOwned || !StringUtils.hasText(bp.getScwikiKey())) {
+    boolean p4kKnown = bp.getP4kUuid() != null;
+    if (!p4kKnown || !StringUtils.hasText(bp.getScwikiKey())) {
       bp.setScwikiKey(dto.key());
     }
-    if (!p4kOwned || !StringUtils.hasText(bp.getOutputName())) {
+    if (!p4kKnown || !StringUtils.hasText(bp.getOutputName())) {
       bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
     }
-    if (!p4kOwned || bp.getCategoryUuid() == null) {
-      bp.setCategoryUuid(dto.categoryUuid());
-    }
-    if (!p4kOwned || bp.getCraftTimeSeconds() == null) {
-      bp.setCraftTimeSeconds(dto.craftTimeSeconds());
-    }
-    bp.setIsAvailableByDefault(Boolean.TRUE.equals(dto.isAvailableByDefault()));
+    bp.setCategoryUuid(dto.categoryUuid());
+    gapFiller.fillScalars(bp, dto, runId);
     bp.setUnlockingMissionsCount(dto.unlockingMissionsCount());
-    if (!p4kOwned || bp.getOutputItem() == null) {
+    if (!hasP4kOutputItem(bp)) {
       bp.setOutputItem(resolveGameItem(dto.outputItemUuid()));
     }
     BlueprintCatalogueMetadata metadata = dto.metadata();
@@ -262,21 +265,27 @@ public class ScWikiBlueprintSyncService {
     }
 
     int unresolved = 0;
-    boolean recipeWritable = !p4kOwned || bp.getIngredients().isEmpty();
-    if (recipeWritable) {
-      if (dto.requirementGroups() != null) {
-        unresolved = applyRequirementGraph(bp, dto, runId);
-        bp.setIngredientCount(dto.ingredientCount());
-        bp.setGameVersionSeen(dto.gameVersion());
-      } else if (bp.getRequirementGroups().isEmpty() && dto.ingredients() != null) {
-        unresolved = applyIngredients(bp, dto, runId);
-        bp.setIngredientCount(dto.ingredientCount());
-        bp.setGameVersionSeen(dto.gameVersion());
-      }
-      applyDismantle(bp, dto);
-      if (dto.dismantleReturns() != null) {
-        applyDismantleReturns(bp, dto, runId);
-      }
+    if (bp.isP4kRecipe()) {
+      gapFiller.fillRecipe(
+          bp,
+          dto,
+          runId,
+          new ScWikiBlueprintGapFiller.Resolvers(
+              this::resolveMaterialForChild, this::resolveGameItem));
+      applySummaryProperties(bp, dto);
+      bp.setIngredientCount(dto.ingredientCount());
+      bp.setGameVersionSeen(dto.gameVersion());
+    } else if (dto.requirementGroups() != null) {
+      unresolved = applyRequirementGraph(bp, dto, runId);
+      bp.setIngredientCount(dto.ingredientCount());
+      bp.setGameVersionSeen(dto.gameVersion());
+    } else if (bp.getRequirementGroups().isEmpty() && dto.ingredients() != null) {
+      unresolved = applyIngredients(bp, dto, runId);
+      bp.setIngredientCount(dto.ingredientCount());
+      bp.setGameVersionSeen(dto.gameVersion());
+    }
+    if (bp.getP4kDismantleEfficiency() == null && dto.dismantleReturns() != null) {
+      applyDismantleReturns(bp, dto, runId);
     }
     bp.setScwikiSyncedAt(now);
     bp.setScwikiDeletedAt(null);
@@ -284,6 +293,44 @@ public class ScWikiBlueprintSyncService {
     return unresolved;
   }
 
+  /**
+   * Finds the blueprint of a Wiki UUID: the row holding it, else a P4K-seeded row without one whose
+   * P4K GUID or key equals the Wiki's, else a new row.
+   *
+   * @param scwikiUuid the Wiki blueprint UUID
+   * @param key the Wiki's blueprint key, or {@code null}
+   * @return the managed or new blueprint
+   */
+  @NotNull
+  private Blueprint findOrCreate(@NotNull UUID scwikiUuid, @Nullable String key) {
+    return blueprintRepository
+        .findByScwikiUuid(scwikiUuid)
+        .or(
+            () ->
+                blueprintRepository
+                    .findByP4kUuid(scwikiUuid)
+                    .filter(row -> row.getScwikiUuid() == null))
+        .or(
+            () ->
+                StringUtils.hasText(key)
+                    ? blueprintRepository
+                        .findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(key)
+                    : Optional.empty())
+        .orElseGet(Blueprint::new);
+  }
+
+  /**
+   * Whether the blueprint's output item is the one its P4K produced-item GUID names.
+   *
+   * @param bp the blueprint
+   * @return {@code true} when the P4K resolved the output item
+   */
+  private static boolean hasP4kOutputItem(@NotNull Blueprint bp) {
+    GameItem output = bp.getOutputItem();
+    return output != null
+        && bp.getProducedItemGuid() != null
+        && bp.getProducedItemGuid().equals(output.getP4kUuid());
+  }
   /**
    * Soft-deletes, in its own {@code REQUIRES_NEW} transaction, every blueprint whose {@code
    * scwiki_uuid} was not seen this run; call it via {@link #self}.
@@ -345,20 +392,6 @@ public class ScWikiBlueprintSyncService {
   }
 
   /**
-   * Copies the detail's dismantle time / efficiency onto the blueprint. No-op when the detail omits
-   * the {@code dismantle} block (e.g. on a list-only fallback row).
-   *
-   * @param bp the managed blueprint
-   * @param dto the inbound blueprint DTO (detail or list fallback)
-   */
-  private void applyDismantle(Blueprint bp, ScWikiBlueprintDto dto) {
-    if (dto.dismantle() != null) {
-      bp.setDismantleTimeSeconds(dto.dismantle().timeSeconds());
-      bp.setDismantleEfficiency(dto.dismantle().efficiency());
-    }
-  }
-
-  /**
    * Rebuilds the blueprint's requirement groups, ingredient lines (linked to their slot) and
    * summary properties from the detail, clearing the owned collections first. Unresolved lines log
    * {@link SyncEventType#UNRESOLVED_INGREDIENT}.
@@ -371,7 +404,6 @@ public class ScWikiBlueprintSyncService {
   private int applyRequirementGraph(@NotNull Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
     bp.clearIngredients();
     bp.clearRequirementGroups();
-    bp.clearSummaryProperties();
 
     int unresolved = 0;
     int groupOrder = 0;
@@ -434,18 +466,30 @@ public class ScWikiBlueprintSyncService {
       }
     }
 
-    if (dto.summaryProperties() != null) {
-      int summaryOrder = 0;
-      for (ScWikiBlueprintSummaryPropertyDto sp : dto.summaryProperties()) {
-        BlueprintSummaryProperty summary = new BlueprintSummaryProperty();
-        summary.setOrderIndex(summaryOrder++);
-        summary.setPropertyKey(sp.propertyKey());
-        summary.setLabel(sp.label());
-        summary.setBetterWhen(sp.betterWhen());
-        bp.addSummaryProperty(summary);
-      }
-    }
+    applySummaryProperties(bp, dto);
     return unresolved;
+  }
+
+  /**
+   * Rebuilds the blueprint's summary properties from the detail, a list the Wiki alone serves.
+   *
+   * @param bp the managed blueprint
+   * @param dto the blueprint detail
+   */
+  private void applySummaryProperties(@NotNull Blueprint bp, @NotNull ScWikiBlueprintDto dto) {
+    bp.clearSummaryProperties();
+    if (dto.summaryProperties() == null) {
+      return;
+    }
+    int summaryOrder = 0;
+    for (ScWikiBlueprintSummaryPropertyDto sp : dto.summaryProperties()) {
+      BlueprintSummaryProperty summary = new BlueprintSummaryProperty();
+      summary.setOrderIndex(summaryOrder++);
+      summary.setPropertyKey(sp.propertyKey());
+      summary.setLabel(sp.label());
+      summary.setBetterWhen(sp.betterWhen());
+      bp.addSummaryProperty(summary);
+    }
   }
 
   /**

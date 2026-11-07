@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.web;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kChangeType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeDto;
@@ -63,7 +64,8 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code GET /runs/{id}/changes} — an applied run's report, filtered and paged.
  *   <li>{@code GET /jobs/{id}/changes} — a preview's report, filtered and paged.
  *   <li>{@code GET /review-cases} — the open review cases.
- *   <li>{@code POST /review-cases/{id}/resolve} — resolve a case as keep or hide.
+ *   <li>{@code POST /review-cases/{id}/resolve} — resolve a case as keep, hide or an assignment.
+ *   <li>{@code GET /resource-groups}, {@code GET /materials} — what an assignment may pick.
  *   <li>{@code GET /due} — whether a P4K import is due (REQ-P4K-047).
  * </ul>
  */
@@ -103,12 +105,18 @@ public class AdminP4kImportReportController {
   /**
    * An admin's resolution of a review case.
    *
-   * @param resolution keep, hide, or assign for a {@code NO_RESOURCE_GROUP} case
-   * @param categoryId the resource group an {@code ASSIGN} gives the material, else {@code null}
+   * @param resolution keep, hide, or assign for a {@code NO_RESOURCE_GROUP} or a resource-join case
+   * @param categoryId the resource group an {@code ASSIGN} of a missing group gives the material,
+   *     else {@code null}
+   * @param materialId the material an {@code ASSIGN} of a resource-join case gives the resource,
+   *     else {@code null}
    * @param version the case version the admin saw
    */
   public record P4kReviewResolveRequest(
-      @NotNull P4kReviewResolution resolution, @Nullable UUID categoryId, @NotNull Long version) {}
+      @NotNull P4kReviewResolution resolution,
+      @Nullable UUID categoryId,
+      @Nullable UUID materialId,
+      @NotNull Long version) {}
 
   /**
    * Pages the applied runs, newest first.
@@ -217,7 +225,7 @@ public class AdminP4kImportReportController {
    * @return the resolved case
    */
   @PostMapping("/review-cases/{id}/resolve")
-  @Operation(summary = "Resolve a P4K review case as keep or hide.")
+  @Operation(summary = "Resolve a P4K review case as keep, hide or an assignment.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "The resolved case."),
     @ApiResponse(responseCode = "400", description = "The case is already resolved."),
@@ -230,7 +238,12 @@ public class AdminP4kImportReportController {
       @RequestBody @Valid P4kReviewResolveRequest request,
       @CurrentUserId UUID adminUserId) {
     return reviewService.resolve(
-        id, request.resolution(), request.categoryId(), request.version(), adminUserId);
+        id,
+        request.resolution(),
+        request.categoryId(),
+        request.materialId(),
+        request.version(),
+        adminUserId);
   }
 
   /**
@@ -246,5 +259,21 @@ public class AdminP4kImportReportController {
   })
   public List<MaterialCategoryDto> resourceGroups() {
     return categoryService.findResourceGroups();
+  }
+
+  /**
+   * Lists the materials an admin may assign to a resource that joins no commodity or several
+   * (REQ-P4K-024).
+   *
+   * @return the live materials, sorted by name
+   */
+  @GetMapping("/materials")
+  @Operation(summary = "List the materials a resource-join review case can assign.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The live materials."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
+  public List<MaterialReferenceDto> materials() {
+    return reviewService.liveMaterials();
   }
 }

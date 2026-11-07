@@ -21,6 +21,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -42,7 +46,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Items and ships are seeded only when playable, behind a per-run checkbox, and earlier seeded rows
  * are reviewed; a commodity is created only when a record of the run references it (REQ-P4K-003,
- * REQ-P4K-009, REQ-P4K-010, REQ-P4K-016, REQ-P4K-026).
+ * REQ-P4K-009, REQ-P4K-010, REQ-P4K-016, REQ-P4K-026); a blueprint is created when its produced item
+ * exists or the run creates it (REQ-P4K-028).
  */
 @SpringBootTest
 @Transactional
@@ -57,6 +62,8 @@ class P4kImportServiceSeedingTest {
   @Autowired private P4kReviewCaseRepository reviewCaseRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private MaterialRepository materialRepository;
+  @Autowired private BlueprintRepository blueprintRepository;
+  @Autowired private GameItemRepository gameItemRepository;
 
   private P4kImportRuns runs;
 
@@ -194,5 +201,60 @@ class P4kImportServiceSeedingTest {
 
     assertThat(seeded.getP4kUuid()).isEqualTo(P4kTestCatalogues.ASLARITE);
     assertThat(seeded.getIsVisible()).isTrue();
+  }
+
+  /** The fixture's light-armour blueprint and the item it produces. */
+  private static final UUID ARMS_BLUEPRINT = UUID.fromString("0037f308-adfc-4c4e-994f-cd477e895aab");
+
+  private static final UUID ARMS_ITEM = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
+
+  /** The fixture's heavy-armour blueprint. */
+  private static final UUID HEAVY_BLUEPRINT =
+      UUID.fromString("005d95db-96ca-45b7-9647-7e7537b8fac8");
+
+  @Test
+  void withTheCheckbox_aBlueprintOfAnExistingItemIsCreated_andOneOfAnUnknownItemIsUnmatched() {
+    GameItem arms = new GameItem();
+    arms.setName("TrueDef-Pro Arms Silver/Gold/Grey");
+    arms.setKind(GameItemKind.GENERIC);
+    arms.setP4kUuid(ARMS_ITEM);
+    gameItemRepository.save(arms);
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "blueprints", HEAVY_BLUEPRINT)
+        .put("producedItemGuid", "0f000000-0000-4000-8000-0000000b1e00");
+
+    P4kImportResultDto preview = runs.preview(P4kTestCatalogues.bytes(root));
+    P4kImportResultDto result = runs.apply(P4kTestCatalogues.bytes(root), true);
+
+    assertThat(blueprintRepository.findByP4kUuid(ARMS_BLUEPRINT))
+        .hasValueSatisfying(blueprint -> {
+          assertThat(blueprint.getScwikiUuid()).isNull();
+          assertThat(blueprint.getOutputItem()).isEqualTo(arms);
+          assertThat(blueprint.getOutputName()).isEqualTo(arms.getName());
+          assertThat(blueprint.getProducedItemGuid()).isEqualTo(ARMS_ITEM);
+          assertThat(blueprint.getRequirementGroups()).hasSize(2);
+        });
+    assertThat(blueprintRepository.findByP4kUuid(HEAVY_BLUEPRINT)).isEmpty();
+    assertThat(preview.blueprints().created()).isEqualTo(1);
+    assertThat(result.blueprints().created()).isEqualTo(1);
+    assertThat(changeRepository.findByRunId(result.runId()))
+        .filteredOn(c -> c.getChangeType() == P4kChangeType.UNMATCHED)
+        .extracting(P4kImportChange::getGuid)
+        .contains(HEAVY_BLUEPRINT);
+  }
+
+  @Test
+  void withTheCheckbox_aBlueprintOfAnItemTheRunCreatesIsCreated_andWithoutItNoBlueprintIs() {
+    P4kImportResultDto without = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(without.blueprints().created()).isZero();
+    assertThat(blueprintRepository.findByP4kUuid(ARMS_BLUEPRINT)).isEmpty();
+
+    P4kImportResultDto with = runs.apply(P4kTestCatalogues.fixtureBytes(), true);
+
+    assertThat(with.blueprints().created()).isEqualTo(2);
+    assertThat(blueprintRepository.findByP4kUuid(ARMS_BLUEPRINT))
+        .hasValueSatisfying(blueprint ->
+            assertThat(blueprint.getOutputItem().getP4kUuid()).isEqualTo(ARMS_ITEM));
   }
 }

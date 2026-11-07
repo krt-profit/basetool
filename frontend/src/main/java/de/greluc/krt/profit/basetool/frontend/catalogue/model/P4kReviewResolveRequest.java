@@ -28,12 +28,17 @@ import org.jetbrains.annotations.Nullable;
 /**
  * An admin's resolution of a P4K review case (REQ-P4K-016), relayed to the backend.
  *
- * @param resolution {@code KEEP}, {@code HIDE}, or {@code ASSIGN} for a missing resource group
- * @param categoryId the resource group an {@code ASSIGN} gives the material, else {@code null}
+ * @param resolution {@code KEEP}, {@code HIDE}, or {@code ASSIGN} for a missing resource group or
+ *     a resource that joins no single commodity
+ * @param categoryId the resource group an {@code ASSIGN} of a missing group gives the material,
+ *     else {@code null}
+ * @param materialId the material an {@code ASSIGN} of a resource gives its recipe lines, else
+ *     {@code null}
  * @param version the case version the admin saw
  */
 @DtoMirror
 public record P4kReviewResolveRequest(
     @NotNull @BackendEnumAsString String resolution,
     @Nullable UUID categoryId,
+    @Nullable UUID materialId,
     @NotNull Long version) {}

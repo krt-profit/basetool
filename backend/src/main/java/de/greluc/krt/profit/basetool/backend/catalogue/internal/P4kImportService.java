@@ -61,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
  * hands each kind to its reconciler in dependency order (manufacturers before items and ships,
- * items before blueprints, resource groups before commodities, the starmap tree before the UEX
+ * items, commodities and blueprint categories before blueprints, resource groups before commodities,
+ * the starmap tree before the UEX
  * locations' links to it) and, on APPLY, records the run, its counts per kind, its change report
  * and its {@code CATALOGUE} audit event (REQ-P4K-046).
  *
@@ -85,6 +86,7 @@ public class P4kImportService {
   private final P4kResourceGroupReconciler resourceGroupReconciler;
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kMaterialGroupReview materialGroupReview;
+  private final P4kBlueprintCategoryReconciler blueprintCategoryReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
   private final P4kPaintReconciler paintReconciler;
   private final P4kLoadoutReconciler loadoutReconciler;
@@ -212,7 +214,8 @@ public class P4kImportService {
   }
 
   /**
-   * Reconciles the five kinds and the resource groups in dependency order, then links the paints
+   * Reconciles the five kinds, the resource groups and the blueprint categories in dependency order,
+   * then links the paints
    * and stores the ship loadouts, which refer to the items and ships (REQ-P4K-040, REQ-P4K-041),
    * and imports the starmap tree and links the UEX locations to it when the catalogue lists starmap
    * objects (REQ-P4K-034, REQ-P4K-035).
@@ -233,7 +236,8 @@ public class P4kImportService {
     resourceGroupReconciler.reconcile(catalogue, context);
     context.setAdminCategoriesRetired(
         materialGroupReview.review(commodityReconciler.reconcile(catalogue, context), context));
-    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue.blueprints(), context);
+    blueprintCategoryReconciler.reconcile(catalogue.blueprintCategories(), context);
+    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue, context);
     paintReconciler.reconcile(
         catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
     loadoutReconciler.reconcile(
@@ -430,6 +434,7 @@ public class P4kImportService {
         report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
         report.counts(P4kKind.STARMAP_OBJECT, completeness(head, P4kKind.STARMAP_OBJECT)),
         report.counts(P4kKind.RESOURCE_GROUP, completeness(head, P4kKind.RESOURCE_GROUP)),
+        report.counts(P4kKind.BLUEPRINT_CATEGORY, completeness(head, P4kKind.BLUEPRINT_CATEGORY)),
         ingredientsResolved,
         context.getRunId(),
         Arrays.stream(P4kKind.values()).map(report::sweepResult).toList());
@@ -483,7 +488,8 @@ public class P4kImportService {
                 "commodities" + counts(result.commodities()),
                 "blueprints" + counts(result.blueprints()),
                 "starmapObjects" + counts(Objects.requireNonNull(result.starmapObjects())),
-                "resourceGroups" + counts(result.resourceGroups()))
+                "resourceGroups" + counts(result.resourceGroups()),
+                "blueprintCategories" + counts(Objects.requireNonNull(result.blueprintCategories())))
             .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
@@ -517,6 +523,7 @@ public class P4kImportService {
         .with("blueprints", counts(result.blueprints()))
         .with("starmapObjects", counts(Objects.requireNonNull(result.starmapObjects())))
         .with("resourceGroups", counts(result.resourceGroups()))
+        .with("blueprintCategories", counts(Objects.requireNonNull(result.blueprintCategories())))
         .with("ingredientsResolved", result.ingredientsResolved());
   }
 

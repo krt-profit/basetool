@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.client;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
@@ -60,6 +61,10 @@ public class P4kReportBackendClient {
       new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<PageResponse<P4kReviewCaseDto>> CASE_PAGE =
+      new ParameterizedTypeReference<>() {};
+
+  /** The materials a resource-join case can assign. */
+  private static final ParameterizedTypeReference<List<MaterialReferenceDto>> MATERIAL_LIST =
       new ParameterizedTypeReference<>() {};
 
   private static final ParameterizedTypeReference<List<MaterialCategoryDto>> GROUP_LIST =
@@ -169,6 +174,16 @@ public class P4kReportBackendClient {
   @Nullable
   public List<MaterialCategoryDto> resourceGroups() {
     return backendApiClient.get(BASE + "/resource-groups", GROUP_LIST);
+  }
+
+  /**
+   * Lists the materials a resource-join review case can assign (REQ-P4K-024).
+   *
+   * @return the live materials, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<MaterialReferenceDto> materials() {
+    return backendApiClient.get(BASE + "/materials", MATERIAL_LIST);
   }
 
   /**

@@ -213,6 +213,9 @@ public class BlueprintCraftabilityService {
 
     Map<UUID, MaterialRequirement> requirements = new LinkedHashMap<>();
     for (BlueprintIngredient ingredient : flat) {
+      if (isOptional(ingredient)) {
+        continue;
+      }
       Material material;
       double rawRequired;
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
@@ -387,6 +390,17 @@ public class BlueprintCraftabilityService {
       }
     }
     return null;
+  }
+
+  /**
+   * Whether a line fills an optional cost of the P4K, which a craft may leave out.
+   *
+   * @param ingredient the ingredient line
+   * @return {@code true} when its group is optional
+   */
+  private static boolean isOptional(@NotNull BlueprintIngredient ingredient) {
+    BlueprintRequirementGroup group = ingredient.getRequirementGroup();
+    return group != null && group.isOptional();
   }
 
   /**

@@ -56,6 +56,15 @@ public class P4kCatalogueReader {
   /** The curated kind mapping RSI store slugs to ships, read beside the five base kinds. */
   private static final String SHIP_STORE_SLUGS = "shipStoreSlugs";
 
+  /** The stats a blueprint modifier names. */
+  private static final String GAMEPLAY_PROPERTIES = "gameplayProperties";
+
+  /** The dismantle processes a blueprint's dismantle link names. */
+  private static final String DISMANTLE_PROCESSES = "dismantleProcesses";
+
+  /** The crafting globals holding the dismantle exclusions. */
+  private static final String CRAFTING_GLOBAL = "craftingGlobal";
+
   private final ObjectMapper objectMapper;
 
   /**
@@ -82,8 +91,9 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds, the starmap objects, the ship store slugs, the paints and
-   * the resource groups, skipping everything else, the loadouts included.
+   * Reads the head, the five base kinds, the starmap objects, the ship store slugs, the paints, the
+   * resource groups, the blueprint categories and the crafting records the blueprints refer to,
+   * skipping everything else, the loadouts included.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -96,6 +106,9 @@ public class P4kCatalogueReader {
       Map<P4kKind, List<? extends P4kRecord>> kinds = new EnumMap<>(P4kKind.class);
       List<P4kShipStoreSlug> storeSlugs = List.of();
       List<P4kPaintDto> paints = List.of();
+      List<P4kGameplayPropertyDto> properties = List.of();
+      List<P4kDismantleProcessDto> processes = List.of();
+      P4kCraftingGlobalDto craftingGlobal = null;
       while (parser.nextToken() == JsonToken.PROPERTY_NAME) {
         if (head.offer(parser)) {
           continue;
@@ -109,6 +122,12 @@ public class P4kCatalogueReader {
           storeSlugs = readArray(parser, P4kShipStoreSlug.class);
         } else if (P4kCatalogue.PAINTS.equals(field)) {
           paints = readArray(parser, P4kPaintDto.class);
+        } else if (GAMEPLAY_PROPERTIES.equals(field)) {
+          properties = readArray(parser, P4kGameplayPropertyDto.class);
+        } else if (DISMANTLE_PROCESSES.equals(field)) {
+          processes = readArray(parser, P4kDismantleProcessDto.class);
+        } else if (CRAFTING_GLOBAL.equals(field)) {
+          craftingGlobal = bind(parser, P4kCraftingGlobalDto.class);
         } else {
           parser.skipChildren();
         }
@@ -123,7 +142,9 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
           storeSlugs,
           paints,
-          listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class));
+          listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class),
+          listOf(kinds, P4kKind.BLUEPRINT_CATEGORY, P4kBlueprintCategoryDto.class),
+          P4kCraftingReferences.of(properties, processes, craftingGlobal));
     } catch (JacksonException e) {
       throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
     }
@@ -267,6 +288,7 @@ public class P4kCatalogueReader {
       case BLUEPRINT -> P4kBlueprintDto.class;
       case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
       case RESOURCE_GROUP -> P4kResourceGroupDto.class;
+      case BLUEPRINT_CATEGORY -> P4kBlueprintCategoryDto.class;
     };
   }
 

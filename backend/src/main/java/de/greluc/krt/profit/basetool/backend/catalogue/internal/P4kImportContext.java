@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
@@ -76,6 +77,9 @@ public final class P4kImportContext {
   /** The matched or created resource groups by P4K GUID, for the commodities of the run. */
   private final Map<UUID, MaterialCategory> resourceGroupByGuid = new HashMap<>();
 
+  /** The matched or created blueprint categories by P4K GUID, for the blueprints of the run. */
+  private final Map<UUID, BlueprintCategory> blueprintCategoryByGuid = new HashMap<>();
+
   /**
    * The unmatched manufacturers by P4K GUID, held until the items and ships of the run decide
    * whether a seeded row references them (REQ-P4K-021).
@@ -116,6 +120,7 @@ public final class P4kImportContext {
     repeatedKeys.put(P4kKind.COMMODITY, repeated(catalogue.commodities()));
     repeatedKeys.put(P4kKind.BLUEPRINT, repeated(catalogue.blueprints()));
     repeatedKeys.put(P4kKind.RESOURCE_GROUP, repeated(catalogue.resourceGroups()));
+    repeatedKeys.put(P4kKind.BLUEPRINT_CATEGORY, repeated(catalogue.blueprintCategories()));
   }
 
   /**
@@ -229,6 +234,28 @@ public final class P4kImportContext {
   public MaterialCategory resourceGroup(@Nullable String guid) {
     UUID parsed = P4kGuids.parse(guid);
     return parsed == null ? null : resourceGroupByGuid.get(parsed);
+  }
+
+  /**
+   * Indexes a matched or created blueprint category for the blueprints of the run.
+   *
+   * @param guid the category's GUID
+   * @param category the category
+   */
+  public void indexBlueprintCategory(@NotNull UUID guid, @NotNull BlueprintCategory category) {
+    blueprintCategoryByGuid.put(guid, category);
+  }
+
+  /**
+   * Returns a blueprint category the run matched or created.
+   *
+   * @param guid the category's GUID text, or {@code null}
+   * @return the category, or {@code null}
+   */
+  @Nullable
+  public BlueprintCategory blueprintCategory(@Nullable String guid) {
+    UUID parsed = P4kGuids.parse(guid);
+    return parsed == null ? null : blueprintCategoryByGuid.get(parsed);
   }
 
   /**

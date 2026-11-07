@@ -1153,13 +1153,62 @@
     "en": null,
     "de": null
    }
+  },
+  {
+   "guid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "className": "FPSArmours",
+   "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
+   "name": {
+    "key": null,
+    "en": null,
+    "de": null
+   }
   }
  ],
- "gameplayProperties": [],
+ "gameplayProperties": [
+  {
+   "guid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+   "className": "GPP_Armor_TemperatureMin",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_temperaturemin",
+   "name": {
+    "key": "@StatName_GPP_Armor_TemperatureMin",
+    "en": "Min Temp",
+    "de": null
+   }
+  },
+  {
+   "guid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+   "className": "GPP_Armor_TemperatureMax",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_temperaturemax",
+   "name": {
+    "key": "@StatName_GPP_Armor_TemperatureMax",
+    "en": "Max Temp",
+    "de": null
+   }
+  },
+  {
+   "guid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+   "className": "GPP_Armor_DamageMitigation",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_damagemitigation",
+   "name": {
+    "key": "@StatName_GPP_Armor_DamageMitigation",
+    "en": "Damage Mitigation",
+    "de": null
+   }
+  }
+ ],
  "qualityDistributions": [],
  "qualityQuantizations": [],
  "blueprintPools": [],
- "dismantleProcesses": [],
+ "dismantleProcesses": [
+  {
+   "guid": "f4e2e342-a389-47c9-82be-f35824c570de",
+   "className": "GlobalGenericDismantle",
+   "recordPath": "libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle",
+   "efficiency": 0.5,
+   "timeSeconds": 15
+  }
+ ],
  "craftingGlobal": {
   "dismantleExcludedResourceGuids": [
    "392b4dca-449a-4d4d-8fef-beab024d9ee7",
