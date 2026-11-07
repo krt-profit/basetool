@@ -43,17 +43,20 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   /**
    * A native SQL scalar subquery for the P4K starmap GUID of the {@code location} row aliased
    * {@code l}: its own starmap object's, else its city's, else its space station's, else {@code
-   * NULL} (REQ-P4K-037, REQ-XCH-018).
+   * NULL}; an object the sweep stamped or an admin hid carries none (REQ-P4K-037, REQ-XCH-018).
    */
   String EXCHANGE_GUID =
       """
       (SELECT COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid)
        FROM location gl
        LEFT JOIN starmap_object lso ON lso.id = gl.starmap_object_id
+           AND lso.p4k_deleted_at IS NULL AND lso.p4k_hidden_at IS NULL
        LEFT JOIN city gc ON gc.id = gl.city_id
        LEFT JOIN starmap_object cso ON cso.id = gc.starmap_object_id
+           AND cso.p4k_deleted_at IS NULL AND cso.p4k_hidden_at IS NULL
        LEFT JOIN space_station gs ON gs.id = gl.space_station_id
        LEFT JOIN starmap_object sso ON sso.id = gs.starmap_object_id
+           AND sso.p4k_deleted_at IS NULL AND sso.p4k_hidden_at IS NULL
        WHERE gl.id = l.id)
       """;
 

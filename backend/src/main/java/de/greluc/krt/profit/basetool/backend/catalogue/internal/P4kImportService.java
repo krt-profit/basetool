@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kContentTo
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKindCompleteness;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -54,7 +53,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -142,7 +140,6 @@ public class P4kImportService {
    *     the last applied run
    */
   @Transactional
-  @CacheEvict(cacheNames = CacheConfig.LOCATIONS_CACHE, allEntries = true)
   @NotNull
   public P4kImportResultDto applyImport(
       byte @NotNull [] payload, @NotNull P4kApplyRequest request) {

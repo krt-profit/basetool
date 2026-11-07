@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -146,19 +145,18 @@ public class P4kShopLinker {
    */
   @NotNull
   private Map<UUID, List<StarmapPlaceRow>> terminalsByPlace() {
-    Map<StarmapPlaceKind, Map<String, UUID>> linked = new EnumMap<>(StarmapPlaceKind.class);
+    StarmapParentLinks<UUID> links = new StarmapParentLinks<>();
     for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
       if (kind == StarmapPlaceKind.TERMINAL) {
         continue;
       }
-      Map<String, UUID> ofKind = new HashMap<>();
       for (StarmapPlaceRow row : placeRows.rows(kind)) {
-        if (row.starmapObjectId() != null && row.name() != null) {
-          ofKind.put(StarmapNames.key(row.starSystem(), row.name()), row.starmapObjectId());
+        if (row.starmapObjectId() != null) {
+          links.put(row, row.starmapObjectId());
         }
       }
-      linked.put(kind, ofKind);
     }
+    Map<StarmapPlaceKind, Map<String, UUID>> linked = links.byKind();
     Map<UUID, List<StarmapPlaceRow>> byPlace = new HashMap<>();
     for (StarmapPlaceRow terminal : placeRows.rows(StarmapPlaceKind.TERMINAL)) {
       UUID place = placeOf(terminal, linked);

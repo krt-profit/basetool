@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -160,6 +161,7 @@ public class UexUniverseSyncService {
             syncStoragePlace(
                 locationRepository.findByCityId(entity.getId()).orElse(null),
                 entity.getName(),
+                entity.getName() + " (UEX city " + entity.getIdCity() + ")",
                 Boolean.TRUE.equals(entity.getIsAvailableLive()),
                 l -> l.setCity(entity));
           }
@@ -172,33 +174,29 @@ public class UexUniverseSyncService {
 
   /**
    * Keeps the storage place of a synced city or space station consistent (REQ-P4K-039). A live
-   * place reuses its linked location, adopts one of the same name or gets a new one, and the row
-   * loses the reference-only marker. A place that is not live gets no new location; a
-   * reference-only location already linked to it follows its name.
+   * place reuses its linked location or gets a new one, and the row loses the reference-only
+   * marker; a location of the same name belongs to another place and is never taken over. A place
+   * that is not live gets no new location; a reference-only location already linked to it follows
+   * its name.
    *
    * @param linked the location already linked to the place, or {@code null}
    * @param name the place's synced name
+   * @param fallbackName the name of a new location when another location holds {@code name}
    * @param live whether UEX reports the place as available live
    * @param link links a location to the place
    */
   private void syncStoragePlace(
-      @Nullable Location linked, String name, boolean live, @NotNull Consumer<Location> link) {
+      @Nullable Location linked,
+      String name,
+      @NotNull String fallbackName,
+      boolean live,
+      @NotNull Consumer<Location> link) {
     if (live) {
-      Location location =
-          linked != null
-              ? linked
-              : locationRepository
-                  .findByName(name)
-                  .map(l -> {
-                    link.accept(l);
-                    return l;
-                  })
-                  .orElseGet(() -> {
-                    Location l = new Location();
-                    l.setName(name);
-                    link.accept(l);
-                    return l;
-                  });
+      Location location = linked != null ? linked : newStoragePlace(name, fallbackName, link);
+      if (location == null) {
+        log.warn("No free storage-place name for {}; the place gets no location.", fallbackName);
+        return;
+      }
       location.setReferenceOnly(false);
       renameIfFree(location, name);
       locationRepository.save(location);
@@ -208,6 +206,31 @@ public class UexUniverseSyncService {
       renameIfFree(linked, name);
       locationRepository.save(linked);
     }
+  }
+
+  /**
+   * Creates the location of a live place under the first of its names no location holds yet.
+   *
+   * @param name the place's synced name
+   * @param fallbackName the name to take when {@code name} is held
+   * @param link links the location to the place
+   * @return the unsaved location, or {@code null} when both names are held
+   */
+  @Nullable
+  private Location newStoragePlace(
+      String name, @NotNull String fallbackName, @NotNull Consumer<Location> link) {
+    String free =
+        Stream.of(name, fallbackName)
+            .filter(n -> locationRepository.findByName(n).isEmpty())
+            .findFirst()
+            .orElse(null);
+    if (free == null) {
+      return null;
+    }
+    Location location = new Location();
+    location.setName(free);
+    link.accept(location);
+    return location;
   }
 
   /**
@@ -727,6 +750,7 @@ public class UexUniverseSyncService {
             syncStoragePlace(
                 locationRepository.findBySpaceStationId(entity.getId()).orElse(null),
                 entity.getName(),
+                entity.getName() + " (UEX space station " + entity.getIdSpaceStation() + ")",
                 Boolean.TRUE.equals(entity.getIsAvailableLive()),
                 l -> l.setSpaceStation(entity));
           }

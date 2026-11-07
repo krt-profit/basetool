@@ -80,6 +80,40 @@ CREATE INDEX idx_terminal_starmap_object ON terminal (starmap_object_id);
 ALTER TABLE location ADD COLUMN starmap_object_id UUID REFERENCES starmap_object (id);
 CREATE UNIQUE INDEX uq_location_starmap_object ON location (starmap_object_id);
 
+-- A location without a city or a station takes the one city or station that carries exactly its
+-- name and no other location yet; any other such location stays unresolved.
+UPDATE location l
+SET city_id = (SELECT c.id FROM city c WHERE c.name = l.name)
+WHERE l.city_id IS NULL
+  AND l.space_station_id IS NULL
+  AND (SELECT count(*) FROM city c WHERE c.name = l.name) = 1
+  AND NOT EXISTS (SELECT 1 FROM space_station s WHERE s.name = l.name)
+  AND NOT EXISTS (SELECT 1 FROM location o JOIN city c ON c.id = o.city_id WHERE c.name = l.name);
+UPDATE location l
+SET space_station_id = (SELECT s.id FROM space_station s WHERE s.name = l.name)
+WHERE l.city_id IS NULL
+  AND l.space_station_id IS NULL
+  AND (SELECT count(*) FROM space_station s WHERE s.name = l.name) = 1
+  AND NOT EXISTS (SELECT 1 FROM city c WHERE c.name = l.name)
+  AND NOT EXISTS (SELECT 1 FROM location o JOIN space_station s ON s.id = o.space_station_id
+                  WHERE s.name = l.name);
+
+-- An unresolved location stops the migration with its ids, which the constraint below would not
+-- name; an admin sets its city_id or space_station_id by hand and restarts.
+DO $$
+DECLARE
+    unresolved TEXT;
+BEGIN
+    SELECT string_agg(id::TEXT, ', ' ORDER BY id) INTO unresolved
+    FROM location
+    WHERE city_id IS NULL AND space_station_id IS NULL;
+    IF unresolved IS NOT NULL THEN
+        RAISE EXCEPTION 'location rows without a city or a space station: %', unresolved
+            USING HINT = 'Set city_id or space_station_id on each row, then restart the backend.';
+    END IF;
+END
+$$;
+
 -- A location names a city, a space station or a starmap node.
 ALTER TABLE location
     ADD CONSTRAINT ck_location_place

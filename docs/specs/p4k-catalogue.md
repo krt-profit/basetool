@@ -1158,7 +1158,8 @@ carries the system's name, `Stanton`) and `solarsystem`; `orbit` `planet`, `jump
 `navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
 (UEX's `*_name` columns: city, space station, outpost, moon, planet, orbit, then the star system)
 that is linked; a candidate must lie below it at any depth, and with no linked parent every object of
-the name and type is a candidate. A stamped or hidden object links nothing new. A row left unlinked
+the name and type is a candidate. A parent name that rows of one table in one star system link to
+different objects names no parent. A stamped or hidden object links nothing new. A row left unlinked
 is one `UNMATCHED` row and one case `STARMAP_LINK_AMBIGUOUS` or `STARMAP_LINK_NOT_FOUND` of kind
 `STARMAP_OBJECT`, whose GUID is a name-based UUID of the table and the row; the report names the row
 by its table and its UEX name, and a run that links the row closes the case as `RESOLVED`. A link
@@ -1171,8 +1172,8 @@ manual flag the admin saw and is a `409` when either changed meanwhile, so it ne
 edit of the row's UEX data. `SET` and `CLEAR` mark the link manual (`starmap_link_manual`), which
 every APPLY leaves alone.
 
-**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest` · **Code:** `P4kStarmapLinker`,
-`StarmapPlaceKind`,
+**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest`, `StarmapParentLinksTest` ·
+**Code:** `P4kStarmapLinker`, `StarmapPlaceKind`, `StarmapParentLinks`,
 `StarmapPlaceRows`, `StarmapAdminService`, `P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-036 — a storage place can sit on any visible starmap node an admin picks
@@ -1193,7 +1194,9 @@ exchange `uex` reference keep running through city and station.
 without one or on an object that is not visible) that carries none yet and that no city or space
 station links to (`409`), audited `CATALOGUE_STORAGE_PLACE_CREATED`; one node carries at most one
 place (`uq_location_starmap_object`). The node is set on create only. The database refuses a row
-with none of the three (`ck_location_place`, V352).
+with none of the three (`ck_location_place`, V352). Before adding it, V352 gives a location
+without a city or a station the one city or station of exactly its name that has no location yet,
+and stops with the ids of any location it cannot resolve.
 
 **Enforced by:** `LocationStarmapNodeTest`, `LocationServiceTest`, `P4kStarmapImportTest` · **Code:**
 `LocationService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
@@ -1212,7 +1215,8 @@ write resolver tries `guid`, then `uex`, then the exact name (specified in
 - [x] A German page shows the German P4K name of a linked city; the exchange serves its
   `location.name`.
 
-A place is linked through its own node, else through its city's, else its space station's object.
+A place is linked through its own node, else through its city's, else its space station's object;
+an object the sweep stamped or an admin hid gives no `guid`, so the next one in that order does.
 `LocationDto` carries the object's `p4kName` and `p4kNameDe` (read-only); the admin locations page
 shows the one of the page language under the curated name. The storage-place dialog of
 `/admin/starmap` names the object by its P4K name but opens with an empty name field: the admin
@@ -1268,7 +1272,9 @@ The owner's decision (@greluc, 2026-11-05) fixes the edges:
   and stock pickers, the home locations, the refinery locations and the exchange catalogue and
   resolver skip it; only a lookup by id or by city / station reaches it. The UEX universe sync keeps
   its name in step with the place and clears the marker once the place is live; a live place adopts
-  the reference-only row of its city or station instead of creating a second one.
+  the reference-only row of its city or station instead of creating a second one. A live place
+  without a location gets a new one under its name, or `<name> (UEX city|space station <id>)` when
+  another location holds the name; it never takes over another location by name.
 - **The member picker** (`GET /api/v1/personal-inventory/locations`, the admin twin
   `…/admin/{userId}/locations`) offers every non-hidden, non-reference-only location plus every
   location one of the owner's own items already references. A write accepts exactly those, so every

@@ -150,6 +150,22 @@ class P4kStarmapLinkTest {
   }
 
   @Test
+  void theUnlinkedOnlyList_pagesRowsThatLinkNothing() {
+    City city = fixtures.city("Krt Lorville", P4kStarmapFixtures.SYSTEM, "Krt Unknown Planet");
+
+    assertThat(
+            adminService
+                .places(StarmapPlaceKind.CITY, "krt lorville", true, PageRequest.of(0, 20))
+                .getContent())
+        .singleElement()
+        .satisfies(row -> {
+          assertThat(row.id()).isEqualTo(city.getId());
+          assertThat(row.starmapObjectId()).isNull();
+          assertThat(row.starmapObjectGuid()).isNull();
+        });
+  }
+
+  @Test
   void aCaseALaterRunNoLongerFinds_isClosedAsResolved() {
     City city = fixtures.city("Krt Lorville", P4kStarmapFixtures.SYSTEM, "Krt Unknown Planet");
     runs.apply(tree(), false);

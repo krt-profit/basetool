@@ -128,6 +128,7 @@ class MasterDataCacheEvictionServiceTest {
   void p4kSyncedSet_isExactlyTheP4kWrittenMasterDataCaches() {
     assertEquals(
         List.of(
+            CacheConfig.LOCATIONS_CACHE,
             CacheConfig.MATERIALS_CACHE,
             CacheConfig.MATERIAL_CATEGORIES_CACHE,
             CacheConfig.MATERIAL_BY_ID_CACHE,
