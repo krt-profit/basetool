@@ -261,6 +261,14 @@ Rules:
     rollback to an application version with the org chart finds an empty chart and no free-text
     Grand Admiral; the forward fix is a migration that re-creates the table empty and the column
     nullable.
+  - **Owner-approved single-phase exception: V344** (`key_personal_inventory_location_by_uuid`,
+    2026-11-07, #3043, ADR-0345 decision 8). `personal_inventory_item.location_uex_id` and
+    `location_type` are dropped in the same migration that moves every row onto `location_id`;
+    the owner chose not to keep a dormant pair of external keys for a release. Every row whose city
+    or station still exists resolves, through a reference-only `location` where none existed; a row
+    that does not resolve keeps its `location_name_snapshot`. A rollback to a version that reads the
+    UEX key meets missing columns; the forward fix is a migration that re-adds both nullable and
+    fills them from `location.city_id` / `location.space_station_id`.
 * **Drop-then-add in one file is allowed only on tables that did not yet ship
   to production**, i.e. for migrations younger than the most recently
   deployed version. Use sparingly and only during the very first iteration of

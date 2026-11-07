@@ -49,8 +49,9 @@ released object; the contract leaves the decision to the Basetool from `system`,
    name.
 8. **The personal inventory moves to a UUID FK.** `personal_inventory_item.location_uex_id` +
    `location_type` become a UUID FK; the name snapshot stays. No feature then references a place
-   by an external id. The two legacy columns follow the two-phase drop: they stay, nullable and
-   unread, for one release and are dropped by a later migration.
+   by an external id. The migration drops both legacy columns in the same step, an owner-approved
+   single-phase exception to the two-phase drop of the migration README; the forward fix re-adds
+   them nullable from the linked city or station.
 9. **Visibility of unreleased objects.** Everything is imported. An object is **visible** when its
    `system` is linked to a live-available UEX star system, `hideInStarmap` is `false` and
    `position` is set. Only a visible object appears on the starmap and can carry a new storage

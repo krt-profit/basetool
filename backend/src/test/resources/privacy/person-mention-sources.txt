@@ -232,7 +232,6 @@ exempt-column|personal_blueprint.product_name
 exempt-column|personal_blueprint.source
 exempt-column|personal_blueprint.source_client_id
 exempt-column|personal_inventory_item.location_name_snapshot
-exempt-column|personal_inventory_item.location_type
 exempt-column|purchasing_deal.payment_model
 exempt-column|purchasing_deal.risk_class
 exempt-column|purchasing_deal.status
