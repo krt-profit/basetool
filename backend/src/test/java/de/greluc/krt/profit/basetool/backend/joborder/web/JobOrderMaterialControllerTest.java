@@ -20,14 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
@@ -56,8 +52,6 @@ class JobOrderMaterialControllerTest {
   @Mock private JobOrderQueryService jobOrderQueryService;
   @Mock private JobOrderMaterialDemandService jobOrderMaterialDemandService;
   @Mock private JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
-  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
-  @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
   @Mock private JobOrderMissionAllocationRedactor missionAllocationRedactor;
 
   @InjectMocks private JobOrderMaterialController controller;
@@ -113,56 +107,32 @@ class JobOrderMaterialControllerTest {
   }
 
   @Test
-  void getInventoryItemsForJobOrderMaterial_responsibleSideViewer_delegatesUnredacted() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-    InventoryItemDto inv = sampleInventoryItem();
-    when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
-        .thenReturn(List.of(inv));
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(List.of(inv)))
-        .thenReturn(List.of(inv));
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
-
-    List<InventoryItemDto> result =
-        controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
-
-    assertThat(result).containsExactly(inv);
-    verify(inventoryOwnerRedactor, never()).redactInventoryItems(any());
-  }
-
-  @Test
-  void getInventoryItemsForJobOrderMaterial_requestingSideViewer_redactsOwners() {
+  void getInventoryItemsForJobOrderMaterial_returnsTheMissionSafeRowsWithTheirOwners() {
     UUID jobOrderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
-    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
+    List<InventoryItemDto> missionSafe = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId))
         .thenReturn(raw);
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
+    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(missionSafe);
 
     List<InventoryItemDto> result =
         controller.getInventoryItemsForJobOrderMaterial(jobOrderId, materialId);
 
-    assertThat(result).isSameAs(redacted);
-    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
+    assertThat(result).isSameAs(missionSafe);
   }
 
   @Test
-  void getOrphanedLinkedInventory_requestingSideViewer_redactsOwners() {
+  void getOrphanedLinkedInventory_returnsTheMissionSafeRowsWithTheirOwners() {
     UUID jobOrderId = UUID.randomUUID();
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
-    List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
+    List<InventoryItemDto> missionSafe = List.of(sampleInventoryItem());
     when(jobOrderQueryService.getOrphanedLinkedInventory(jobOrderId)).thenReturn(raw);
-    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactInventoryItems(raw)).thenReturn(redacted);
+    when(missionAllocationRedactor.anonymiseUnreadableMissions(raw)).thenReturn(missionSafe);
 
     List<InventoryItemDto> result = controller.getOrphanedLinkedInventory(jobOrderId);
 
-    assertThat(result).isSameAs(redacted);
-    verify(inventoryOwnerRedactor).redactInventoryItems(raw);
+    assertThat(result).isSameAs(missionSafe);
   }
 
   @Test

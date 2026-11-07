@@ -122,21 +122,6 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
   }
 
   /**
-   * Checks whether the caller may see who owns the Lager stock linked to an order: only within the
-   * read scope of the order's responsible unit.
-   *
-   * @param jobOrderId the order to inspect; never {@code null}
-   * @return {@code true} iff the caller may see the stock owners
-   */
-  public boolean canSeeJobOrderInventoryOwners(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .map(JobOrder::getResponsibleOrgUnit)
-        .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
-        .orElse(false);
-  }
-
-  /**
    * Checks whether the caller may edit job order {@code jobOrderId}: like {@link
    * #canSeeJobOrderInScope} with the edit scope; the assignee grant opens no edit.
    *

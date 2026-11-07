@@ -23,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
 import de.greluc.krt.profit.basetool.backend.joborder.web.MaterialCollectionController;
 import java.util.List;
@@ -36,15 +34,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link MaterialCollectionController}: delegation and the owner/location redaction
- * for a requesting-side viewer (REQ-ORDERS-029).
+ * Unit tests for {@link MaterialCollectionController}: delegation with owner and location passed
+ * through to every viewer of the order (REQ-ORDERS-029).
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialCollectionControllerTest {
 
   @Mock private JobOrderStockReadService jobOrderStockReadService;
-  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
-  @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private MaterialCollectionController controller;
 
@@ -64,39 +60,22 @@ class MaterialCollectionControllerTest {
   }
 
   @Test
-  void getMaterialCollection_responsibleSideViewer_returnsListUnredacted() {
+  void getMaterialCollection_returnsListWithOwnerAndLocationUnchanged() {
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> expected = List.of(sampleEntry());
     when(jobOrderStockReadService.getMaterialCollection(jobOrderId)).thenReturn(expected);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
 
     assertSame(expected, result, "controller must return the service's list unmodified");
-    verify(jobOrderStockReadService).getMaterialCollection(jobOrderId);
-    verifyNoInteractions(inventoryOwnerRedactor);
-  }
-
-  @Test
-  void getMaterialCollection_requestingSideViewer_returnsRedactedList() {
-    UUID jobOrderId = UUID.randomUUID();
-    List<MaterialCollectionEntryDto> raw = List.of(sampleEntry());
-    List<MaterialCollectionEntryDto> redacted = List.of(sampleEntry());
-    when(jobOrderStockReadService.getMaterialCollection(jobOrderId)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactMaterialCollection(raw)).thenReturn(redacted);
-
-    List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
-
-    assertSame(redacted, result, "a requesting-side viewer must get the redacted list");
-    verify(inventoryOwnerRedactor).redactMaterialCollection(raw);
+    assertEquals("alice", result.getFirst().ownerName());
+    assertEquals("Lorville", result.getFirst().location());
   }
 
   @Test
   void getMaterialCollection_emptyResult_isReturnedAsIs() {
     UUID jobOrderId = UUID.randomUUID();
     when(jobOrderStockReadService.getMaterialCollection(jobOrderId)).thenReturn(List.of());
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<MaterialCollectionEntryDto> result = controller.getMaterialCollection(jobOrderId);
 
