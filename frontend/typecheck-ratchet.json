@@ -182,6 +182,7 @@
     ],
     "mission": [
       "mission/mission-detail-actions.js",
+      "mission/mission-detail-head.js",
       "mission/mission-detail-modals.js",
       "mission/mission-detail-participants.js",
       "mission/mission-detail-tabs.js",
