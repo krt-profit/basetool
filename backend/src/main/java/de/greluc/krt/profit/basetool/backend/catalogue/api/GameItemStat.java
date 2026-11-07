@@ -39,7 +39,7 @@ import lombok.ToString;
 
 /**
  * The base value of one blueprint stat on a crafted game item, before any ingredient quality
- * applies (REQ-P4K-030). Written by the P4K import for the items its blueprints produce and by the
+ * applies (REQ-P4K-030). Written by the P4K import for every catalogue item with stats and by the
  * SC Wiki item sync for craftable items where no P4K value exists.
  */
 @Entity

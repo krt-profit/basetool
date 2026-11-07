@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -37,6 +38,14 @@ public interface GameItemStatRepository extends JpaRepository<GameItemStat, UUID
    * @return the item's stat rows, empty when none is stored
    */
   List<GameItemStat> findByGameItemId(UUID gameItemId);
+
+  /**
+   * Returns every stored base value of several game items in one query.
+   *
+   * @param gameItemIds the game items' ids
+   * @return the items' stat rows, empty when none is stored
+   */
+  List<GameItemStat> findByGameItemIdIn(Collection<UUID> gameItemIds);
 
   /**
    * Returns the in-game UUIDs of the items active blueprints craft that have no stored base value

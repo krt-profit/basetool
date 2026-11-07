@@ -101,24 +101,30 @@ public class GameItemStatWriter {
 
   /**
    * Writes the P4K catalogue's base values of an item, inside the caller's transaction: a value
-   * replaces the stored one of either source, and a stored P4K value the catalogue no longer
-   * carries is removed, while an SC Wiki value the catalogue does not cover stays.
+   * replaces the stored one of either source, and, when {@code removeMissing} holds, a stored P4K
+   * value the catalogue no longer carries is removed; an SC Wiki value the catalogue does not cover
+   * stays.
    *
    * @param item the persisted game item
    * @param values the catalogue's base values of the item
+   * @param stored the item's stored stat rows, read by the caller
+   * @param removeMissing whether the catalogue's items are complete, so a missing value is a fact
    * @return {@code true} when a row changed
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public boolean writeP4k(
-      @NotNull GameItem item, @NotNull Map<BlueprintStatProperty, Double> values) {
+      @NotNull GameItem item,
+      @NotNull Map<BlueprintStatProperty, Double> values,
+      @NotNull List<GameItemStat> stored,
+      boolean removeMissing) {
     boolean changed = false;
     Set<BlueprintStatProperty> handled = EnumSet.noneOf(BlueprintStatProperty.class);
-    for (GameItemStat stat : stored(item)) {
+    for (GameItemStat stat : stored) {
       BlueprintStatProperty property = stat.getProperty();
       Double value = values.get(property);
       handled.add(property);
       if (value == null) {
-        if (stat.getSource() == GameItemStatSource.P4K) {
+        if (removeMissing && stat.getSource() == GameItemStatSource.P4K) {
           gameItemStatRepository.delete(stat);
           changed = true;
         }

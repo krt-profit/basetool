@@ -55,7 +55,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "No game item carries a blueprint stat base value"
-              description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every item a catalogue blueprint produces from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
+              description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every catalogue item from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
 
   - name: silent - the series is absent (no scrape)
     interval: 1m

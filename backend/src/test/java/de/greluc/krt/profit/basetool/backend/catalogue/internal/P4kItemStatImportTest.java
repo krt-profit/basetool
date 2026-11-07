@@ -39,13 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * An APPLY writes the blueprint stat base values of every item a catalogue blueprint produces from
- * the item's {@code stats}, with the P4K as their source, over an SC Wiki value; an item no
- * catalogue blueprint produces keeps its Wiki values (REQ-P4K-030).
+ * An APPLY writes the blueprint stat base values of every catalogue item the run matched from the
+ * item's {@code stats}, with the P4K as their source, over an SC Wiki value; a P4K value an item no
+ * longer carries is removed only from a complete catalogue (REQ-P4K-030).
  */
 @SpringBootTest
 @Transactional
@@ -54,8 +53,8 @@ class P4kItemStatImportTest {
   /** The fixture's light armour arms, produced by a fixture blueprint. */
   private static final UUID LIGHT_ARMS = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
 
-  /** The fixture blueprint that produces {@link #LIGHT_ARMS}. */
-  private static final String LIGHT_ARMS_BLUEPRINT = "BP_CRAFT_vgl_armor_light_arms_01_01_20";
+  /** The cooler the fixture Titan's left cooler port holds; no fixture blueprint produces it. */
+  private static final UUID BRACER = UUID.fromString("4ec3037b-4b6f-4837-b00d-cd9b4836a82a");
 
   @Autowired private P4kImportService service;
   @Autowired private P4kImportJobRepository jobRepository;
@@ -71,11 +70,11 @@ class P4kItemStatImportTest {
   }
 
   @Test
-  void aProducedShield_storesItsP4kMaxHealthOverTheWikiValue() {
+  void aShieldNoBlueprintProduces_storesItsP4kMaxHealthOverTheWikiValue() {
     GameItem shield = item(P4kTestCatalogues.SHIELD, "AllStop");
-    stat(shield, BlueprintStatProperty.SHIELD_MAX_HEALTH, 3000.0);
+    stat(shield, BlueprintStatProperty.SHIELD_MAX_HEALTH, 3000.0, GameItemStatSource.SCWIKI);
 
-    runs.apply(P4kTestCatalogues.bytes(withShieldBlueprint()), false);
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
 
     Map<BlueprintStatProperty, GameItemStat> stored = stats(shield);
     assertThat(stored.get(BlueprintStatProperty.SHIELD_MAX_HEALTH).getBaseValue())
@@ -83,6 +82,18 @@ class P4kItemStatImportTest {
     assertThat(stored.get(BlueprintStatProperty.SHIELD_MAX_HEALTH).getSource())
         .isEqualTo(GameItemStatSource.P4K);
     assertThat(stored.get(BlueprintStatProperty.HEALTH_MAX_HEALTH).getBaseValue()).isEqualTo(210.0);
+  }
+
+  @Test
+  void aShipComponentOfAFixtureLoadout_storesItsCoolingRateAndHealth() {
+    GameItem bracer = item(BRACER, "Bracer");
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    Map<BlueprintStatProperty, GameItemStat> stored = stats(bracer);
+    assertThat(stored.get(BlueprintStatProperty.COOLANT_GENERATION).getBaseValue()).isEqualTo(34.0);
+    assertThat(stored.get(BlueprintStatProperty.HEALTH_MAX_HEALTH).getBaseValue()).isEqualTo(180.0);
+    assertThat(stored.values()).allMatch(stat -> stat.getSource() == GameItemStatSource.P4K);
   }
 
   @Test
@@ -106,18 +117,29 @@ class P4kItemStatImportTest {
   }
 
   @Test
-  void anItemNoCatalogueBlueprintProduces_keepsItsWikiValue() {
+  void aWikiValueOfAStatTheCatalogueDoesNotCarry_stays() {
     GameItem shield = item(P4kTestCatalogues.SHIELD, "AllStop");
-    stat(shield, BlueprintStatProperty.SHIELD_MAX_HEALTH, 3000.0);
+    stat(shield, BlueprintStatProperty.WEAPON_DAMAGE, 12.0, GameItemStatSource.SCWIKI);
 
     runs.apply(P4kTestCatalogues.fixtureBytes(), false);
 
-    Map<BlueprintStatProperty, GameItemStat> stored = stats(shield);
-    assertThat(stored).containsOnlyKeys(BlueprintStatProperty.SHIELD_MAX_HEALTH);
-    assertThat(stored.get(BlueprintStatProperty.SHIELD_MAX_HEALTH).getBaseValue())
-        .isEqualTo(3000.0);
-    assertThat(stored.get(BlueprintStatProperty.SHIELD_MAX_HEALTH).getSource())
-        .isEqualTo(GameItemStatSource.SCWIKI);
+    GameItemStat damage = stats(shield).get(BlueprintStatProperty.WEAPON_DAMAGE);
+    assertThat(damage.getBaseValue()).isEqualTo(12.0);
+    assertThat(damage.getSource()).isEqualTo(GameItemStatSource.SCWIKI);
+  }
+
+  @Test
+  void aP4kValueTheItemNoLongerCarries_isRemovedFromACompleteCatalogueOnly() {
+    GameItem shield = item(P4kTestCatalogues.SHIELD, "AllStop");
+    stat(shield, BlueprintStatProperty.QUANTUM_SPEED, 5.0, GameItemStatSource.P4K);
+    ObjectNode partial = P4kTestCatalogues.tree();
+    ((ObjectNode) partial.get("completeness").get("items")).put("status", "partial");
+
+    runs.apply(P4kTestCatalogues.bytes(partial), false);
+    assertThat(stats(shield)).containsKey(BlueprintStatProperty.QUANTUM_SPEED);
+
+    runs.apply(P4kTestCatalogues.withChangeNumber("12913471"), false);
+    assertThat(stats(shield)).doesNotContainKey(BlueprintStatProperty.QUANTUM_SPEED);
   }
 
   @Test
@@ -129,24 +151,6 @@ class P4kItemStatImportTest {
     assertThat(stats(arms)).isEmpty();
   }
 
-  /** The fixture with a copy of the light-arms blueprint that produces the shield instead. */
-  private static ObjectNode withShieldBlueprint() {
-    ObjectNode root = P4kTestCatalogues.tree();
-    ArrayNode blueprints = (ArrayNode) root.get("blueprints");
-    for (int i = 0; i < blueprints.size(); i++) {
-      if (LIGHT_ARMS_BLUEPRINT.equals(blueprints.get(i).path("className").asString())) {
-        ObjectNode copy = ((ObjectNode) blueprints.get(i)).deepCopy();
-        copy.put("guid", UUID.randomUUID().toString());
-        copy.put("className", "BP_CRAFT_SHLD_GODI_S01_AllStop_SCItem");
-        copy.put("key", "BP_CRAFT_SHLD_GODI_S01_AllStop_SCItem");
-        copy.put("producedItemGuid", P4kTestCatalogues.SHIELD.toString());
-        blueprints.add(copy);
-        return root;
-      }
-    }
-    throw new IllegalStateException("Missing " + LIGHT_ARMS_BLUEPRINT);
-  }
-
   private GameItem item(UUID guid, String name) {
     GameItem item = new GameItem();
     item.setName(name);
@@ -155,12 +159,13 @@ class P4kItemStatImportTest {
     return gameItemRepository.save(item);
   }
 
-  private void stat(GameItem item, BlueprintStatProperty property, double value) {
+  private void stat(
+      GameItem item, BlueprintStatProperty property, double value, GameItemStatSource source) {
     GameItemStat stat = new GameItemStat();
     stat.setGameItem(item);
     stat.setProperty(property);
     stat.setBaseValue(value);
-    stat.setSource(GameItemStatSource.SCWIKI);
+    stat.setSource(source);
     statRepository.save(stat);
   }
 

@@ -60,7 +60,7 @@ class P4kCatalogueStreamTest {
     P4kCatalogue fromGzip = read(P4kTestCatalogues.gzip(plain), Long.MAX_VALUE);
     P4kCatalogue fromZstd = read(P4kTestCatalogues.zstd(plain), Long.MAX_VALUE);
 
-    assertThat(fromPlain.items()).hasSize(8);
+    assertThat(fromPlain.items()).hasSize(9);
     assertThat(fromPlain.ships()).hasSize(4);
     assertThat(fromGzip).isEqualTo(fromPlain);
     assertThat(fromZstd).isEqualTo(fromPlain);
@@ -91,7 +91,7 @@ class P4kCatalogueStreamTest {
         new LiveHeapSampler(P4kCompression.openDecompressed(zstd, 1_000_000_000L))) {
       P4kCatalogue catalogue = reader.read(sampler);
 
-      assertThat(catalogue.items()).hasSize(8);
+      assertThat(catalogue.items()).hasSize(9);
       assertThat(sampler.bytesRead).isGreaterThan(LIVE_SIZE_BYTES - 1024);
       assertThat(sampler.peakLiveHeap - before).isLessThan(LIVE_SIZE_BYTES / 8);
     }
