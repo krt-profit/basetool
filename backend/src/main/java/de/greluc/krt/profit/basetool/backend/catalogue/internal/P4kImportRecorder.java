@@ -57,11 +57,11 @@ public class P4kImportRecorder {
     changes.forEach(change -> change.setRunId(runId));
     changeRepository.saveAll(changes);
     List<P4kImportReport.ReviewFinding> findings = report.reviews();
-    Map<CaseKey, P4kReviewCase> stored = storedCases(findings);
+    Map<P4kReviewKey, P4kReviewCase> stored = storedCases(findings);
     List<P4kReviewCase> cases = new ArrayList<>(findings.size());
     for (P4kImportReport.ReviewFinding finding : findings) {
       P4kReviewCase reviewCase =
-          stored.computeIfAbsent(CaseKey.of(finding), _ -> newCase(finding, runId));
+          stored.computeIfAbsent(P4kReviewKey.of(finding), _ -> newCase(finding, runId));
       reviewCase.setLastRunId(runId);
       if (reviewCase.getRowId() == null) {
         reviewCase.setRowId(finding.rowId());
@@ -79,54 +79,21 @@ public class P4kImportRecorder {
    * @return the stored cases by kind, GUID and reason
    */
   @NotNull
-  private Map<CaseKey, P4kReviewCase> storedCases(
+  private Map<P4kReviewKey, P4kReviewCase> storedCases(
       @NotNull List<P4kImportReport.ReviewFinding> findings) {
     Set<P4kKind> kinds =
         findings.stream().map(P4kImportReport.ReviewFinding::kind).collect(Collectors.toSet());
     List<UUID> guids =
         findings.stream().map(P4kImportReport.ReviewFinding::guid).distinct().toList();
-    Map<CaseKey, P4kReviewCase> stored = new HashMap<>();
+    Map<P4kReviewKey, P4kReviewCase> stored = new HashMap<>();
     for (int from = 0; from < guids.size(); from += READ_CHUNK) {
       for (P4kReviewCase reviewCase :
           reviewCaseRepository.findByKindInAndGuidIn(
               kinds, guids.subList(from, Math.min(guids.size(), from + READ_CHUNK)))) {
-        stored.put(CaseKey.of(reviewCase), reviewCase);
+        stored.put(P4kReviewKey.of(reviewCase), reviewCase);
       }
     }
     return stored;
-  }
-
-  /**
-   * The identity of a case: one per kind, GUID and reason (REQ-P4K-016).
-   *
-   * @param kind the kind
-   * @param guid the P4K GUID
-   * @param reason the reason
-   */
-  private record CaseKey(
-      @NotNull P4kKind kind, @NotNull UUID guid, @NotNull P4kReviewReason reason) {
-
-    /**
-     * Keys a finding.
-     *
-     * @param finding the finding
-     * @return its key
-     */
-    @NotNull
-    static CaseKey of(@NotNull P4kImportReport.ReviewFinding finding) {
-      return new CaseKey(finding.kind(), finding.guid(), finding.reason());
-    }
-
-    /**
-     * Keys a stored case.
-     *
-     * @param reviewCase the case
-     * @return its key
-     */
-    @NotNull
-    static CaseKey of(@NotNull P4kReviewCase reviewCase) {
-      return new CaseKey(reviewCase.getKind(), reviewCase.getGuid(), reviewCase.getReason());
-    }
   }
 
   /**

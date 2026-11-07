@@ -80,7 +80,7 @@ class P4kIdentityCleanupTest {
     assertThat(shield.getP4kUuid()).isEqualTo(P4kTestCatalogues.SHIELD);
     assertThat(shield.getExternalUuid()).isEqualTo(wikiUuid);
     assertThat(result.items().identityMismatches()).isEqualTo(1);
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.IDENTITY_MISMATCH)
         .singleElement()
         .satisfies(c -> {
@@ -113,6 +113,25 @@ class P4kIdentityCleanupTest {
 
     assertThat(shield.getP4kUuid()).isEqualTo(other);
     assertThat(hasConflict(P4kKind.ITEM, P4kTestCatalogues.SHIELD)).isTrue();
+  }
+
+  @Test
+  void aUniqueClassName_matches_althoughOtherRecordsShareItAsTheirName() {
+    GameItem shield = item("Class-name shield", P4kTestCatalogues.SHIELD_CLASS);
+    ObjectNode root = P4kTestCatalogues.tree();
+    ObjectNode original = P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD);
+    for (int i = 1; i <= 2; i++) {
+      ObjectNode twin = original.deepCopy();
+      twin.put("guid", "0f000000-0000-4000-8000-0000000000d" + i);
+      twin.put("className", "Shield_Name_Twin_" + i);
+      ((ObjectNode) twin.get("name")).put("en", P4kTestCatalogues.SHIELD_CLASS);
+      ((ArrayNode) root.get("items")).add(twin);
+    }
+
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+
+    assertThat(shield.getP4kUuid()).isEqualTo(P4kTestCatalogues.SHIELD);
+    assertThat(hasConflict(P4kKind.ITEM, P4kTestCatalogues.SHIELD)).isFalse();
   }
 
   @Test

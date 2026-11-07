@@ -117,11 +117,34 @@ class P4kReviewServiceTest {
           assertThat(c.lastRunId()).isEqualTo(second);
         });
     for (UUID run : List.of(first, second)) {
-      assertThat(changeRepository.findByRunId(run))
+      assertThat(P4kImportRuns.report(changeRepository, run))
           .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
           .extracting(P4kImportChange::getGuid)
           .containsOnlyOnce(P4kTestCatalogues.AI_SHIP);
     }
+  }
+
+  @Test
+  void aCaseAnAdminClosed_isNeitherCountedNorReportedByALaterRun() {
+    P4kImportResultDto first = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    reviewService.resolve(
+        reviewCase.getId(), P4kReviewResolution.KEEP, null, null, reviewCase.getVersion(), ADMIN);
+
+    P4kImportResultDto second = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kImportService.P4kPreview preview = runs.previewWithReport(P4kTestCatalogues.fixtureBytes());
+
+    assertThat(second.ships().review()).isEqualTo(first.ships().review() - 1);
+    assertThat(P4kImportRuns.report(changeRepository, second.runId()))
+        .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
+        .extracting(P4kImportChange::getGuid)
+        .doesNotContain(P4kTestCatalogues.AI_SHIP);
+    assertThat(preview.changes())
+        .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
+        .extracting(P4kImportChange::getGuid)
+        .doesNotContain(P4kTestCatalogues.AI_SHIP);
+    assertThat(seededCase().getLastRunId()).isEqualTo(first.runId());
+    assertThat(seededCase().getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
   }
 
   @Test

@@ -81,7 +81,7 @@ class P4kImportServiceSweepTest {
   }
 
   private List<P4kImportChange> changes(UUID runId, P4kChangeType type) {
-    return changeRepository.findByRunId(runId).stream()
+    return P4kImportRuns.report(changeRepository, runId).stream()
         .filter(c -> c.getChangeType() == type)
         .toList();
   }
@@ -253,6 +253,24 @@ class P4kImportServiceSweepTest {
 
     assertThat(gone.getP4kDeletedAt()).isNotNull();
     assertThat(overrideEvents()).hasSize(before);
+  }
+
+  @Test
+  void theMassGuard_dividesByTheLiveRows_notByTheRowsAnEarlierSweepStamped() {
+    List<UUID> listed = P4kSweepFixtures.guids(19);
+    fixtures.knownItems(listed);
+    List<GameItem> gone = fixtures.knownItems(P4kSweepFixtures.guids(2));
+    Instant earlier = Instant.parse("2026-01-01T00:00:00Z");
+    fixtures.knownItems(P4kSweepFixtures.guids(30)).forEach(row -> row.setP4kDeletedAt(earlier));
+
+    P4kImportResultDto result = runs.apply(P4kTestCatalogues.bytes(itemsListing(listed)), false);
+
+    assertThat(gone).allSatisfy(row -> assertThat(row.getP4kDeletedAt()).isNull());
+    assertSkipped(result, P4kSweepOutcome.SKIPPED_MASS_GUARD);
+    assertThat(sweep(result, P4kKind.ITEM))
+        .isEqualTo(
+            new P4kImportResultDto.Sweep(
+                P4kKind.ITEM, P4kSweepOutcome.SKIPPED_MASS_GUARD, 21, 2, 0, 0));
   }
 
   @Test

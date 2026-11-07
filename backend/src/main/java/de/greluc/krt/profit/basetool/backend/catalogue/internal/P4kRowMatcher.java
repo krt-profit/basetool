@@ -113,11 +113,21 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (found.isPresent()) {
       return accept(record, guid, found.get(), creatable, context);
     }
-    Match<T> byClass = fallback(record, guid, className, byClassName, creatable, context);
+    Match<T> byClass =
+        fallback(
+            record,
+            guid,
+            className,
+            byClassName,
+            context.isRepeatedClassName(kind, className),
+            creatable,
+            context);
     if (byClass != null) {
       return byClass;
     }
-    Match<T> byNameMatch = fallback(record, guid, name, byName, creatable, context);
+    Match<T> byNameMatch =
+        fallback(
+            record, guid, name, byName, context.isRepeatedName(kind, name), creatable, context);
     return byNameMatch != null ? byNameMatch : new Unmatched<>(guid);
   }
 
@@ -128,6 +138,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
    * @param guid the record's GUID
    * @param key the key, or {@code null} to skip
    * @param finder finds the rows of the key, ignoring case
+   * @param repeated whether several records of the kind share the key
    * @param creatable whether the current seeding rule of the kind would create the record
    * @param context the run
    * @return the match, or {@code null} when the key finds no row
@@ -138,6 +149,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
       @NotNull UUID guid,
       @Nullable String key,
       @NotNull Function<String, List<T>> finder,
+      boolean repeated,
       boolean creatable,
       @NotNull P4kImportContext context) {
     if (key == null || key.isBlank()) {
@@ -147,7 +159,7 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
     if (candidates.isEmpty()) {
       return null;
     }
-    if (candidates.size() > 1 || context.isRepeated(kind, key)) {
+    if (candidates.size() > 1 || repeated) {
       context.getReport().review(kind, record, guid, P4kReviewReason.GUID_CONFLICT, null);
       return new Held<>();
     }

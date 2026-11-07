@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -93,6 +94,21 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   @Query("SELECT MIN(c.createdAt) FROM P4kReviewCase c WHERE c.status = :status")
   @Nullable
   Instant findOldestCreatedAtByStatus(@Param("status") P4kReviewStatus status);
+
+  /**
+   * Reads the keys of the cases an admin closed, as keep, hide or assign; a case a run closed by
+   * itself ({@code RESOLVED}) is not among them, since a later run reopens it.
+   *
+   * @return the keys of the admin-closed cases
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewKey("
+          + "c.kind, c.guid, c.reason) FROM P4kReviewCase c"
+          + " WHERE c.status = de.greluc.krt.profit.basetool.backend.catalogue.internal"
+          + ".P4kReviewStatus.REVIEWED"
+          + " AND c.resolution <> de.greluc.krt.profit.basetool.backend.catalogue.internal"
+          + ".P4kReviewResolution.RESOLVED")
+  Set<P4kReviewKey> findAdminClosedKeys();
 
   /**
    * Finds the cases of one kind and set of reasons, whatever their status.

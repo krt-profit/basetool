@@ -132,12 +132,14 @@ comparison is always within one Channel, where the contract guarantees the numbe
 
 **Acceptance**
 
-- [x] After a run of change `12913470`, an APPLY of change `12900000` is refused and writes nothing.
+- [x] After a run of change `12913470`, an APPLY of change `12900000` is refused and writes nothing,
+  and its PREVIEW is refused too.
 - [x] Re-applying change `12913470` succeeds and changes no row a second time.
 - [x] `"9"` is lower than `"10"` (numeric, not text, comparison).
 
-The refusal fails the APPLY job with a message; a re-applied run moves `p4k_seen_run_id` to the
-new run and writes no other value.
+The refusal fails the APPLY job with a message; a PREVIEW of such a catalogue is refused, failed
+and counted the same way, so no preview offers an APPLY that would be refused. A re-applied run
+moves `p4k_seen_run_id` to the new run and writes no other value.
 
 An APPLY runs under the `SyncCoordinator` lock the Wiki and UEX syncs share, so it never runs
 beside their duplicate merges (ADR-0349); it waits up to `krt.sync.coordinator.max-wait-ms`, and
@@ -329,7 +331,7 @@ outcome and writes nothing. A row whose GUID the catalogue lists is never stampe
 import held it for review. The stamp goes through the entity, so the row's version and update time
 move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PARTIAL`,
 `SKIPPED_EMPTY`, `SKIPPED_DUPLICATE_GUID`, `SKIPPED_MASS_GUARD`) and, when skipped, a
-`SWEEP_SKIPPED` report row with the kind's P4K-known rows and the rows it would have stamped.
+`SWEEP_SKIPPED` report row with the kind's live P4K-known rows and the rows it would have stamped.
 
 The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
 names them by class name, and no other source lists them. The commodity categories are the target
@@ -345,8 +347,9 @@ shop by its entity name, and no other source lists them.
 
 ### REQ-P4K-012 — a sweep that would stamp more than 5 % of a kind needs the admin's confirmation
 
-The preview shows per kind how many rows the sweep would stamp. When that exceeds **5 %** of the
-kind's P4K-known rows (a code constant, not a property), APPLY stamps that kind only when the admin
+The preview shows per kind how many rows the sweep would stamp. When that exceeds **5 %** (a code
+constant, not a property) of the kind's live P4K-known rows, those with a `p4k_uuid` that no earlier
+sweep stamped, APPLY stamps that kind only when the admin
 ticks a separate "apply marking anyway" box. Without it the import runs normally, only that kind's
 sweep is skipped, and the report records it. Each override is an audit event
 (`CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN`, REQ-P4K-046).
@@ -357,6 +360,8 @@ sweep is skipped, and the report records it. Each override is an audit event
   "sweep skipped: mass guard".
 - [x] With the box, the kind is swept and one audit event names the kind, the count and the share.
 - [x] 5 % exactly sweeps without the box.
+- [x] Rows an earlier sweep stamped do not count: 2 of 21 live rows hold the kind back, however many
+  stamped rows it keeps.
 
 The box is the APPLY parameter `overrideMassGuard`, stored on the job (`override_mass_guard`); the
 audit event's subject is the run, its details `kind`, `count` and `sharePercent`.
@@ -455,8 +460,9 @@ Wiki/UEX reconciliation hardening (#3053).
 
 The review list is a status on the case (`open` / `reviewed`), not a per-run copy: `p4k_review_case`
 holds one case per kind, GUID and reason, with the run that found it first and last. Each run sets newly
-found cases to `open` and logs them as `REVIEW` in its report; `/admin/p4k-import` lists the open
-cases. A case arises from:
+found cases to `open` and logs them as `REVIEW` in its report; a case an admin closed (keep, hide,
+assign) is neither counted nor logged again, so the report and the open list agree.
+`/admin/p4k-import` lists the open cases. A case arises from:
 
 - a row an earlier seeding created that no current rule would create (REQ-P4K-010);
 - an unmatched item or ship of unclear playability (REQ-P4K-009);
@@ -477,6 +483,7 @@ lifts. The row records who resolved the case and when, and each resolution is an
 **Acceptance**
 
 - [x] A case found by two runs is one open case, logged as `REVIEW` in both reports.
+- [x] A case an admin kept is not logged or counted by the next APPLY or preview.
 - [x] "Hide" removes the row from the pickers; the next APPLY that matches it leaves it hidden.
 - [x] The resolution stores the admin and the time and writes one audit event.
 

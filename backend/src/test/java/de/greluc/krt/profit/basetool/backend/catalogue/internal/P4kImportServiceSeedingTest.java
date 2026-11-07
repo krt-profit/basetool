@@ -104,7 +104,7 @@ class P4kImportServiceSeedingTest {
     assertThat(hasCase(NULL_SHIP, P4kReviewReason.UNCLEAR_PLAYABILITY)).isTrue();
     assertThat(hasCase(P4kTestCatalogues.AI_SHIP, P4kReviewReason.UNCLEAR_PLAYABILITY)).isFalse();
     assertThat(result.ships().created()).isEqualTo(1);
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.ADDED)
         .extracting(P4kImportChange::getGuid)
         .contains(P4kTestCatalogues.PLAYER_SHIP);
@@ -145,7 +145,7 @@ class P4kImportServiceSeedingTest {
     assertThat(reviewCase.getFirstRunId()).isEqualTo(first);
     assertThat(reviewCase.getLastRunId()).isEqualTo(second);
     for (UUID run : new UUID[] {first, second}) {
-      assertThat(changeRepository.findByRunId(run))
+      assertThat(P4kImportRuns.report(changeRepository, run))
           .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
           .extracting(P4kImportChange::getGuid)
           .contains(P4kTestCatalogues.AI_SHIP);
@@ -161,7 +161,7 @@ class P4kImportServiceSeedingTest {
     P4kImportResultDto result = runs.apply(P4kTestCatalogues.bytes(root), true);
 
     assertThat(result.items().unknownValues()).isEqualTo(1);
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.UNKNOWN_VALUE)
         .singleElement()
         .satisfies(c -> {
@@ -238,7 +238,7 @@ class P4kImportServiceSeedingTest {
     assertThat(blueprintRepository.findByP4kUuid(HEAVY_BLUEPRINT)).isEmpty();
     assertThat(preview.blueprints().created()).isEqualTo(1);
     assertThat(result.blueprints().created()).isEqualTo(1);
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.UNMATCHED)
         .extracting(P4kImportChange::getGuid)
         .contains(HEAVY_BLUEPRINT);

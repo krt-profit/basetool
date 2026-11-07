@@ -148,8 +148,9 @@ public class P4kManufacturerReconciler {
       @NotNull UUID guid,
       @NotNull P4kImportContext context) {
     UUID holderId;
-    if (context.claimsManufacturerName(name)) {
-      holderId = context.manufacturerNameRow(name);
+    P4kImportContext.NameClaim claim = context.manufacturerNameClaim(name);
+    if (claim != null) {
+      holderId = claim.rowId();
     } else {
       Optional<Manufacturer> holder = context.manufacturerRows().byName(name).stream().findFirst();
       if (holder.isEmpty()) {

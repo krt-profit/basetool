@@ -60,13 +60,25 @@ public final class P4kImportReport {
   private final List<P4kImportChange> changes = new ArrayList<>();
 
   /** The review cases, one per kind, GUID and reason. */
-  private final Map<ReviewKey, ReviewFinding> reviews = new LinkedHashMap<>();
+  private final Map<P4kReviewKey, ReviewFinding> reviews = new LinkedHashMap<>();
+
+  /** The stored cases an admin closed; the run neither counts nor reports them again. */
+  @NotNull private final Set<P4kReviewKey> adminClosed;
 
   /** The mutable counts per kind. */
   private final Map<P4kKind, Tally> tallies = new EnumMap<>(P4kKind.class);
 
   /** The GUIDs of the records the run created a row from, or in a preview would, per kind. */
   private final Map<P4kKind, Set<UUID>> addedGuids = new EnumMap<>(P4kKind.class);
+
+  /**
+   * Creates the empty report of one run.
+   *
+   * @param adminClosed the stored review cases an admin closed as keep, hide or assign
+   */
+  public P4kImportReport(@NotNull Set<P4kReviewKey> adminClosed) {
+    this.adminClosed = Set.copyOf(adminClosed);
+  }
 
   /**
    * A review case the run found.
@@ -251,7 +263,8 @@ public final class P4kImportReport {
   }
 
   /**
-   * Records a review case once per kind, GUID and reason, with its {@code REVIEW} report row.
+   * Records a review case once per kind, GUID and reason, with its {@code REVIEW} report row; a
+   * case an admin closed is neither counted nor reported again (REQ-P4K-016).
    *
    * @param kind the kind
    * @param record the record
@@ -265,9 +278,9 @@ public final class P4kImportReport {
       @NotNull UUID guid,
       @NotNull P4kReviewReason reason,
       @Nullable UUID rowId) {
-    if (reviews.putIfAbsent(
-            new ReviewKey(kind, guid, reason), new ReviewFinding(kind, guid, reason, rowId))
-        != null) {
+    P4kReviewKey key = new P4kReviewKey(kind, guid, reason);
+    if (adminClosed.contains(key)
+        || reviews.putIfAbsent(key, new ReviewFinding(kind, guid, reason, rowId)) != null) {
       return;
     }
     tally(kind).review++;
@@ -449,16 +462,6 @@ public final class P4kImportReport {
         ? text
         : text.substring(0, MAX_SHORT_TEXT);
   }
-
-  /**
-   * The identity of a review case.
-   *
-   * @param kind the kind
-   * @param guid the P4K GUID
-   * @param reason the reason
-   */
-  private record ReviewKey(
-      @NotNull P4kKind kind, @NotNull UUID guid, @NotNull P4kReviewReason reason) {}
 
   /** The mutable counts of one kind. */
   private static final class Tally {

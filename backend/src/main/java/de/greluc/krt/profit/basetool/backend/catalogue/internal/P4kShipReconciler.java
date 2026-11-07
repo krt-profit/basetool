@@ -219,7 +219,7 @@ public class P4kShipReconciler {
         || !context.isCreateItemsAndShips()
         || seeding != P4kSeeding.CREATE
         || name == null
-        || context.isRepeated(P4kKind.SHIP, name)
+        || context.isRepeatedName(P4kKind.SHIP, name)
         || !context.shipRows().byName(name.strip()).isEmpty()) {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;

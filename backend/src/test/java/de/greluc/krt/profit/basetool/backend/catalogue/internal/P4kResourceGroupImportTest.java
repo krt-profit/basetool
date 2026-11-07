@@ -110,7 +110,7 @@ class P4kResourceGroupImportTest {
     assertThat(borase.getCategory()).isEqualTo(ores);
     assertThat(categoryRepository.findByP4kUuid(HEAT_PLACEHOLDER)).isEmpty();
     assertThat(result.resourceGroups().created()).isEqualTo(2);
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getKind() == P4kKind.RESOURCE_GROUP)
         .filteredOn(c -> c.getChangeType() == P4kChangeType.UNMATCHED)
         .extracting(P4kImportChange::getGuid)

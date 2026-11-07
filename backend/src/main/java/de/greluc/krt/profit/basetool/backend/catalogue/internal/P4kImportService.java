@@ -83,6 +83,7 @@ public class P4kImportService {
   private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
   private final P4kImportRecorder recorder;
+  private final P4kReviewCaseRepository reviewCaseRepository;
   private final P4kRejections rejections;
   private final SyncReportService syncReportService;
   private final AuditRecorder auditRecorder;
@@ -117,13 +118,17 @@ public class P4kImportService {
    *
    * @param payload the stored upload
    * @return the result with {@code dryRun = true} and no run, and the report rows
-   * @throws BadRequestException when the payload is no readable version-2 LIVE catalogue
+   * @throws BadRequestException when the payload is no readable version-2 LIVE catalogue, or its
+   *     Build is older than that of the last applied run, which an APPLY would refuse
    */
   @NotNull
   public P4kPreview previewImport(byte @NotNull [] payload) {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
-    P4kImportContext context = P4kImportContext.forPreview(catalogue, Instant.now());
+    refuseOlderBuild(build);
+    P4kImportContext context =
+        P4kImportContext.forPreview(
+            catalogue, Instant.now(), reviewCaseRepository.findAdminClosedKeys());
     int ingredientsResolved = reconcile(payload, catalogue, context);
     sweepAndFollow(catalogue, context, false);
     return new P4kPreview(
@@ -148,14 +153,18 @@ public class P4kImportService {
       byte @NotNull [] payload, @NotNull P4kApplyRequest request) {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
-    long changeNumber = Objects.requireNonNull(P4kChangeNumber.parse(build.changeNumber()));
-    refuseOlderBuild(changeNumber);
+    long changeNumber = refuseOlderBuild(build);
     Instant now = Instant.now();
     P4kImportRun run =
         runRepository.save(newRun(catalogue.head(), build, changeNumber, request, now));
     run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
     P4kImportContext context =
-        P4kImportContext.forApply(catalogue, now, run.getId(), request.createItemsAndShips());
+        P4kImportContext.forApply(
+            catalogue,
+            now,
+            run.getId(),
+            request.createItemsAndShips(),
+            reviewCaseRepository.findAdminClosedKeys());
     int ingredientsResolved = reconcile(payload, catalogue, context);
     List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
@@ -273,10 +282,12 @@ public class P4kImportService {
   /**
    * Refuses a Build whose change number is lower than that of the last applied run (REQ-P4K-004).
    *
-   * @param changeNumber the catalogue's change number
+   * @param build the catalogue's Build, past the gate's head rules
+   * @return the Build's change number
    * @throws BadRequestException when the Build is older; the refusal is logged and counted
    */
-  private void refuseOlderBuild(long changeNumber) {
+  private long refuseOlderBuild(@NotNull P4kBuild build) {
+    long changeNumber = Objects.requireNonNull(P4kChangeNumber.parse(build.changeNumber()));
     Long highest = runRepository.findHighestChangeNumber().orElse(null);
     if (highest != null && changeNumber < highest) {
       rejections.record(P4kRejectionReason.OLDER_BUILD);
@@ -287,6 +298,7 @@ public class P4kImportService {
               + highest
               + ").");
     }
+    return changeNumber;
   }
 
   /**
