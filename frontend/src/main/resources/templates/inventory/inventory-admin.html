@@ -68,7 +68,7 @@
                                     <input type="checkbox" id="matAll" value="ALL" data-trigger="inv-admin-toggle-all" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
                                 </label>
                                 <label class="multi-select-option" th:each="mat : ${materials}">
-                                    <span th:text="${mat.name}">Material</span>
+                                    <span th:text="${mat.displayName(#locale)}">Material</span>
                                     <input type="checkbox" class="matCheck" name="materialIds" th:value="${mat.id}" th:checked="${selectedMaterialIds != null and selectedMaterialIds.contains(mat.id)}" data-trigger="inv-admin-update-state" data-all-id="matAll" data-check-class="matCheck" data-header-id="materialHeader">
                                 </label>
                             </div>
@@ -172,7 +172,7 @@
                                     <input type="checkbox" id="gameItemAll" value="ALL" data-trigger="inv-admin-toggle-all" data-all-id="gameItemAll" data-check-class="gameItemCheck" data-header-id="gameItemHeader">
                                 </label>
                                 <label class="multi-select-option" th:each="gi : ${gameItems}">
-                                    <span th:text="${gi.name}">Item</span>
+                                    <span th:text="${gi.displayName(#locale)}">Item</span>
                                     <input type="checkbox" class="gameItemCheck" name="gameItemIds" th:value="${gi.id}" th:checked="${selectedGameItemIds != null and selectedGameItemIds.contains(gi.id)}" data-trigger="inv-admin-update-state" data-all-id="gameItemAll" data-check-class="gameItemCheck" data-header-id="gameItemHeader">
                                 </label>
                             </div>
@@ -249,7 +249,7 @@
                     <div class="tree-row tree-row--group" data-trigger="inv-admin-toggle-group" th:data-material-id="${group.material.id}">
                         <div class="tree-cell tree-name">
                             <span class="tree-chevron toggle-icon">▶</span>
-                            <span class="tree-label" th:text="${group.material.name}">Material</span>
+                            <span class="tree-label" th:text="${group.material.displayName(#locale)}">Material</span>
                             <span th:if="${group.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
                                   th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
                         </div>

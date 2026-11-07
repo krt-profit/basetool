@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockEntryRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
@@ -289,6 +290,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
     User owner = item.getUser();
     InventoryJobOrderAllocation slice = InventoryAllocations.jobOrderSlice(item, jobOrderId);
     Double sliceAmount = slice == null ? null : slice.getAmount();
+    Material material = gameItem == null ? Objects.requireNonNull(item.getMaterial()) : null;
     return new LinkedStockRow(
         item.getId(),
         item.getVersion() != null ? item.getVersion() : 0L,
@@ -296,7 +298,8 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
         owner.getId(),
         item.getLocation().getName(),
         item.getLocation().getId(),
-        gameItem == null ? Objects.requireNonNull(item.getMaterial()).getName() : null,
+        material != null ? material.getName() : null,
+        material != null ? material.getNameDe() : null,
         item.getQuality(),
         gameItem,
         item.getAmount(),

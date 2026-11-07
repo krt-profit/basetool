@@ -23,11 +23,10 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 
 > [!note] Partly implemented
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
-> and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035, `name_de`
-> with REQ-P4K-023), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and REQ-P4K-032 are
-> implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is implemented (#3043),
-> REQ-P4K-047 is implemented (#3034);
-> every other
+> and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
+> REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
+> implemented (#3043), REQ-P4K-047 is implemented (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -498,7 +497,7 @@ the manufacturer only while `p4k_name` / `p4k_manufacturer_id` are `null`, and t
 duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
 disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;stored=…;source=…`; strings
 compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
-writes nothing. `name_de` comes with REQ-P4K-023.
+writes nothing. The import writes `name_de` by REQ-P4K-023.
 
 **Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest`, `UexItemSyncServiceTest`,
 `ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:** `P4kItemReconciler`,
@@ -568,14 +567,21 @@ sources. `p4k_item_class` carries the CHECK `ck_game_item_p4k_item_class`.
 - **Identity and match order:** `manufacturer.p4k_uuid` is unique and the first match key, then the
   UEX alias (`manufacturer_uex_company`, still the join key for UEX items and vehicles), then the
   name. The abbreviation is never an identity (REQ-DATA-004). `scwiki_uuid` stays a cross-reference.
+  The catalogue carries no UEX id, so the import matches by P4K GUID, then by SC Wiki UUID
+  (REQ-P4K-007), then by name; the UEX alias is the key the UEX sync matches by, and the import
+  adopts a row UEX created by its name. The SC Wiki sync matches a row by its P4K GUID before its
+  own UUID.
 - **Name and abbreviation:** on a row with a P4K GUID only the import writes `name` and
   `abbreviation` (from `code`); UEX writes them only on rows the P4K does not know. A UEX/P4K
-  disagreement goes to `external_sync_report`.
+  disagreement goes to `external_sync_report` as `P4K_DISAGREEMENT` with
+  `column=…;stored=…;source=…`, the source being UEX or the SC Wiki; a value equal ignoring
+  case is no disagreement.
 - **Name conflict:** when another row already holds the P4K name (`name` is unique), the import does
-  not rename; it records the conflict in the report and opens a review case. Merging two rows is an
-  admin action; the import never merges.
-- **Description:** the P4K leads `description` and a new `description_de`. UEX no longer writes the
-  description; rows without a P4K match keep theirs.
+  not rename; it records the conflict in the report and opens a review case (`NAME_CONFLICT`, about
+  the row the import would have renamed). Merging two rows is an admin action; the import never
+  merges.
+- **Description:** the P4K leads `description` and a new `description_de`, both game texts
+  (REQ-P4K-033). UEX no longer writes the description; rows without a P4K match keep theirs.
 - **UEX keeps** `nickname`, `industry`, `wiki`, `is_item_manufacturer`, `is_vehicle_manufacturer` and
   the alias table.
 - **The SC Wiki manufacturer sync** is a cross-check: it writes only its `scwiki_*` columns, never the
@@ -584,13 +590,15 @@ sources. `p4k_item_class` carries the CHECK `ck_game_item_p4k_item_class`.
 
 **Acceptance**
 
-- [ ] A UEX sync leaves the name of a P4K-known manufacturer as the P4K wrote it and reports the
+- [x] A UEX sync leaves the name of a P4K-known manufacturer as the P4K wrote it and reports the
   difference.
-- [ ] A P4K name already held by another row leaves both rows unchanged and opens a review case.
-- [ ] A UEX sync no longer writes `description`.
+- [x] A P4K name already held by another row leaves both rows unchanged and opens a review case.
+- [x] A UEX sync no longer writes `description`.
 
-**Enforced by (planned):** `P4kManufacturerPrecedenceTest`, `UexCompanyServiceTest`,
-`ScWikiManufacturerSyncServiceTest` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+**Enforced by:** `P4kManufacturerPrecedenceTest`, `UexManufacturerServiceTest`,
+`ScWikiManufacturerSyncServiceTest`, `SyncReportServiceTest` · **Code:**
+`P4kManufacturerReconciler`, `UexManufacturerService`, `ScWikiManufacturerSyncService`,
+`SyncReportService#logP4kDisagreement` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ### REQ-P4K-021 — a manufacturer is created only for an item or ship seeded in the same run
 
@@ -601,10 +609,14 @@ the next P4K import adopts such a row by UEX alias or name.
 
 **Acceptance**
 
-- [ ] A seeded ship with an unknown `manufacturerGuid` creates that manufacturer; an unreferenced
+- [x] A seeded ship with an unknown `manufacturerGuid` creates that manufacturer; an unreferenced
   unmatched manufacturer creates nothing and is reported `UNMATCHED`.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+The import holds an unmatched manufacturer until the items and ships of the run are reconciled; the
+first seeded row that references it creates it (`ADDED`, with its name, `code`, German name and
+descriptions), and the rest are reported `UNMATCHED` afterwards. A preview reports the same rows.
+
+**Enforced by:** `P4kManufacturerPrecedenceTest` · **Code:** `P4kManufacturerReconciler` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ### REQ-P4K-022 — manufacturer logos are unmodified Fan Kit images mapped by P4K GUID
 
@@ -617,11 +629,23 @@ does not apply to them; the Fan Kit compliance test covers the PNGs.
 
 **Acceptance**
 
-- [ ] Every mapping entry names an existing PNG and a well-formed GUID; every PNG is mapped.
-- [ ] A manufacturer without a mapping renders the abbreviation badge.
-- [ ] No exchange DTO or schema carries a logo field.
+- [x] Every mapping entry names an existing PNG and a well-formed GUID; every PNG is mapped.
+- [x] A manufacturer without a mapping renders the abbreviation badge.
+- [x] No exchange DTO or schema carries a logo field.
 
-**Enforced by (planned):** `ManufacturerLogoMappingTest`, the Fan Kit compliance test · **ADR:**
+The mapping is `frontend/src/main/resources/catalogue/manufacturer-logos.json`, a JSON object of
+lower-case P4K GUID to PNG file name; the PNGs ship under `static/images/manufacturers/`. The
+mapping ships empty until the Fan Kit PNGs are added, so every manufacturer shows its badge.
+`ManufacturerDto` carries the `p4kUuid` the page looks the logo up by; the exchange schemas carry
+no logo field, which `ExchangeFieldRatchetTest` holds. The logo or badge shows on Ship-Data (the
+manufacturer list and the ship types), in the personal and squadron hangar lists, beside the
+ship-type pickers of both hangar dialogs (the mark of the chosen type's manufacturer, else of the
+chosen manufacturer), and in the inventory item views (the item list, the item groups and the item
+page), whose item references carry a `ManufacturerRefDto` with the GUID.
+
+**Enforced by:** `ManufacturerLogoMappingTest`, `ShipDataPageControllerMvcTest`,
+`ExchangeFieldRatchetTest`, the Fan Kit compliance test · **Code:** `ManufacturerLogos`,
+`catalogue/fragments/manufacturer-mark.html` · **ADR:**
 [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Names
@@ -635,11 +659,26 @@ falls back to `name`. Search and matching keep running on `name`.
 
 **Acceptance**
 
-- [ ] A German page shows the German name of an item; an English page, and a German page for a row
+- [x] A German page shows the German name of an item; an English page, and a German page for a row
   without `name_de`, show `name`.
-- [ ] A search for the German name alone finds nothing it would not find by `name`.
+- [x] A search for the German name alone finds nothing it would not find by `name`.
 
-**Enforced by (planned):** `P4kNamesTest`, the MVC tests of the pages that show catalogue names ·
+The import writes `name.de` on every matched row and every row it creates; a blank German text or
+the game's missing-translation marker (a text starting with `!`) is no German name and leaves the
+stored one. The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID.
+The DTOs of manufacturers, ship types, materials and item references carry `nameDe`, and a page
+picks the name by its language (`LocalisedNames` on server-rendered pages, `localisedName` of
+`krt-localised-name.js` in scripts). Every page that names a manufacturer, item, ship or material
+shows it: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
+matrix, profit calculation and detail, the material and item pickers, job orders, supply,
+purchasing, the dashboard widgets, inventory and stock levels, refinery, the material exchange and
+the blueprint recipe pane. The page-specific DTOs carry the German name beside the name they
+denormalise (`nameDe`, `materialNameDe`, `manufacturerNameDe`). Search, filters, sorting, matching
+and every value sent back to the server stay on `name`. Admin pages where an admin edits or maps a
+name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
+
+**Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `ShipDataPageControllerMvcTest`,
+`ItemPickerLabelsTest`, `ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Commodities and categories

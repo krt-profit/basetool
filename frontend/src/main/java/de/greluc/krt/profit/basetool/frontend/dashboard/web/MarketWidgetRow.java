@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialReq
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param id the offer or request
  * @param offer {@code true} for an offer, {@code false} for a wanted-listing
- * @param name the material or item name
+ * @param name the material or item name in the page language (REQ-P4K-023)
  * @param item whether the line is a craftable item rather than a material
  * @param quality the quality of an offer or the floor of a wanted-listing, {@code null} for items
  * @param quantity the quantity offered or wanted
@@ -59,14 +60,16 @@ record MarketWidgetRow(
    * Reduces an offer to a line.
    *
    * @param dto the offer
+   * @param locale the page locale
    * @return the line
    */
-  static @NotNull MarketWidgetRow of(@NotNull MaterialExchangeOfferDto dto) {
+  static @NotNull MarketWidgetRow of(
+      @NotNull MaterialExchangeOfferDto dto, @Nullable Locale locale) {
     boolean isItem = KIND_ITEM.equals(dto.kind());
     return new MarketWidgetRow(
         dto.id(),
         true,
-        isItem ? dto.itemName() : dto.material().name(),
+        dto.subjectDisplayName(locale),
         isItem,
         isItem ? null : dto.quality(),
         isItem ? count(dto.itemQuantity()) : count(dto.amount()),
@@ -78,14 +81,15 @@ record MarketWidgetRow(
    * Reduces a wanted-listing to a line.
    *
    * @param dto the wanted-listing
+   * @param locale the page locale
    * @return the line
    */
-  static @NotNull MarketWidgetRow of(@NotNull MaterialRequestDto dto) {
+  static @NotNull MarketWidgetRow of(@NotNull MaterialRequestDto dto, @Nullable Locale locale) {
     boolean isItem = KIND_ITEM.equals(dto.kind());
     return new MarketWidgetRow(
         dto.id(),
         false,
-        isItem ? dto.itemName() : dto.material().name(),
+        dto.subjectDisplayName(locale),
         isItem,
         isItem ? null : dto.minQuality(),
         isItem ? count(dto.itemQuantity()) : count(dto.requestedAmount()),

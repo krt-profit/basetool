@@ -69,6 +69,9 @@ public class P4kItemReconciler {
   /** Finds and saves the items. */
   private final GameItemRepository gameItemRepository;
 
+  /** Creates the manufacturer a seeded item references (REQ-P4K-021). */
+  private final P4kManufacturerReconciler manufacturerReconciler;
+
   /** Resolves, counts and logs the catalogue's class values on an APPLY. */
   private final ItemClassResolver itemClassResolver;
 
@@ -79,14 +82,17 @@ public class P4kItemReconciler {
    * Registers the unknown-grade counter, so it exists before the first increment.
    *
    * @param gameItemRepository the item repository
+   * @param manufacturerReconciler creates the manufacturer a seeded item references
    * @param itemClassResolver resolves and counts the catalogue's class values
    * @param meterRegistry the registry the counter lives in
    */
   public P4kItemReconciler(
       @NotNull GameItemRepository gameItemRepository,
+      @NotNull P4kManufacturerReconciler manufacturerReconciler,
       @NotNull ItemClassResolver itemClassResolver,
       @NotNull MeterRegistry meterRegistry) {
     this.gameItemRepository = gameItemRepository;
+    this.manufacturerReconciler = manufacturerReconciler;
     this.itemClassResolver = itemClassResolver;
     this.unknownGrades = meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_GRADE_UNKNOWN);
   }
@@ -205,6 +211,7 @@ public class P4kItemReconciler {
         values.manufacturer(),
         row::setManufacturer,
         Manufacturer::getName);
+    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(item.name()), row::setNameDe);
     writer.lead("wiki_type", row.getWikiType(), values.type(), row::setWikiType);
     writer.lead("wiki_sub_type", row.getWikiSubType(), values.subType(), row::setWikiSubType);
     writer.lead("size_class", row.getSizeClass(), values.size(), row::setSizeClass);
@@ -250,10 +257,12 @@ public class P4kItemReconciler {
       seeding.notCreated(P4kKind.ITEM, item, guid, context);
       return;
     }
+    manufacturerReconciler.seed(item.manufacturerGuid(), context);
     P4kItemValues values = values(item, context);
     if (context.isApply()) {
       GameItem row = new GameItem();
       row.setClassName(StringNormalization.blankToNull(item.className()));
+      row.setNameDe(P4kFields.germanName(item.name()));
       values.storeOn(row);
       values.leadOnto(row);
       row.setDescriptionEn(

@@ -84,7 +84,7 @@ class BlueprintProductServiceTest {
 
   private static BlueprintProductRow row(
       String outputName, String key, String manufacturer, UUID outputItemId) {
-    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId, null);
+    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId, null, null);
   }
 
   private static Blueprint blueprint(String outputName) {

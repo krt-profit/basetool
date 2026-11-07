@@ -68,6 +68,7 @@
     "hangar": [
       "hangar/hangar-squadron.js",
       "hangar/hangar.js",
+      "hangar/manufacturer-mark-preview.js",
       "hangar/member-hangar.js",
       "hangar/ship-unit-change.js"
     ],
@@ -136,6 +137,7 @@
       "kernel/krt-instant-toggle.js",
       "kernel/krt-list-count.js",
       "kernel/krt-live-sync.js",
+      "kernel/krt-localised-name.js",
       "kernel/krt-modal.js",
       "kernel/krt-number-format.js",
       "kernel/krt-number-input.js",

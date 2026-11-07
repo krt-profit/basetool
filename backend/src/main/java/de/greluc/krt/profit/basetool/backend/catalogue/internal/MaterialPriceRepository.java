@@ -161,7 +161,7 @@ public interface MaterialPriceRepository extends JpaRepository<MaterialPrice, UU
           t.cityName, t.spaceStationName, t.outpostName,
           COALESCE(t.planetName, mn.planetName, pl.name),
           t.isJumpPoint, t.hasLoadingDock,
-          t.isAutoLoad
+          t.isAutoLoad, m.nameDe
       )
       FROM MaterialPrice p
       JOIN p.material m

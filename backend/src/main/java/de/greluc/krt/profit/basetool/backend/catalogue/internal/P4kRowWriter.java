@@ -108,6 +108,25 @@ final class P4kRowWriter {
   }
 
   /**
+   * Writes a game text the catalogue leads; the report names the column only (REQ-P4K-033).
+   *
+   * @param column the column written
+   * @param current the row's text
+   * @param incoming the catalogue's text
+   * @param setter writes the text
+   */
+  void leadGameText(
+      @NotNull String column,
+      @Nullable String current,
+      @Nullable String incoming,
+      @NotNull Consumer<String> setter) {
+    if (P4kFields.replaceIfPresent(current, incoming, setter, context.isApply())) {
+      changed = true;
+      context.getReport().changed(kind, record, column, null, null);
+    }
+  }
+
+  /**
    * Replaces the row's name key with the catalogue's usable one.
    *
    * @param current the row's name key
@@ -159,12 +178,9 @@ final class P4kRowWriter {
       @Nullable V incoming,
       @NotNull Consumer<V> setter,
       @NotNull Function<V, String> label) {
-    if (incoming == null
-        || (incoming instanceof String s && s.isBlank())
-        || P4kFields.sameValue(current, incoming)) {
-      return;
+    if (P4kFields.leads(current, incoming)) {
+      write(column, current, incoming, setter, label);
     }
-    write(column, current, incoming, setter, label);
   }
 
   /**

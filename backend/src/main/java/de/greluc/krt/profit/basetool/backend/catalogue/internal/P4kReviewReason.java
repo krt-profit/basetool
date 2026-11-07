@@ -40,6 +40,12 @@ public enum P4kReviewReason {
   GUID_CONFLICT,
 
   /**
+   * A manufacturer whose P4K name another row already holds; the import does not rename it
+   * (REQ-P4K-020).
+   */
+  NAME_CONFLICT,
+
+  /**
    * A personal-blueprint name key that no active blueprint's produced-item GUID resolves
    * (REQ-P4K-029); the case's GUID is a name-based UUID of the key.
    */

@@ -242,7 +242,12 @@ public class BlueprintCraftabilityService {
       requirements
           .computeIfAbsent(
               material.getId(),
-              id -> new MaterialRequirement(id, requirementMaterial.getName(), quantityType))
+              id ->
+                  new MaterialRequirement(
+                      id,
+                      requirementMaterial.getName(),
+                      requirementMaterial.getNameDe(),
+                      quantityType))
           .add(required, floor);
     }
 
@@ -302,7 +307,8 @@ public class BlueprintCraftabilityService {
               round(result.withRefinery.missing),
               (int) Math.floor(result.inventory.available / req.required),
               (int) Math.floor(result.withRefinery.available / req.required),
-              req.quantityType));
+              req.quantityType,
+              req.materialNameDe));
     }
 
     List<CraftabilityGroupDto> groups = buildGroups(recipe, flat, results, itemBridges);
@@ -500,14 +506,19 @@ public class BlueprintCraftabilityService {
   private static final class MaterialRequirement {
     private final UUID materialId;
     private final String materialName;
+    @Nullable private final String materialNameDe;
     private final QuantityType quantityType;
     private double required;
     private int floor;
 
     private MaterialRequirement(
-        UUID materialId, String materialName, @Nullable QuantityType quantityType) {
+        UUID materialId,
+        String materialName,
+        @Nullable String materialNameDe,
+        @Nullable QuantityType quantityType) {
       this.materialId = materialId;
       this.materialName = materialName;
+      this.materialNameDe = materialNameDe;
       this.quantityType = quantityType == null ? QuantityType.SCU : quantityType;
     }
 

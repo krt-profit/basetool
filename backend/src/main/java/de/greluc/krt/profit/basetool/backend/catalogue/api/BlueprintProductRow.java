@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Internal projection row for the blueprint product search: one active {@code blueprint} recipe
@@ -33,10 +34,12 @@ import java.util.UUID;
  * @param outputItemId id of the resolved output {@code game_item}, or {@code null} if unresolved
  * @param producedItemGuid the produced item's DataForge GUID, the product key when present, or
  *     {@code null}
+ * @param manufacturerNameDe the manufacturer's German name, or {@code null} (REQ-P4K-023)
  */
 public record BlueprintProductRow(
     String outputName,
     String scwikiKey,
     String manufacturerName,
     UUID outputItemId,
-    UUID producedItemGuid) {}
+    @Nullable UUID producedItemGuid,
+    @Nullable String manufacturerNameDe) {}

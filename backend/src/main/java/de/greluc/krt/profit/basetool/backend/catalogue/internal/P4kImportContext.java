@@ -24,11 +24,13 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +41,7 @@ import java.util.function.Function;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The state one P4K run shares across its per-kind reconcilers: whether it writes, its run, the
@@ -64,6 +67,12 @@ public final class P4kImportContext {
 
   /** The matched manufacturers by P4K GUID, for the items and ships of the run. */
   private final Map<UUID, Manufacturer> manufacturerByGuid = new HashMap<>();
+
+  /**
+   * The unmatched manufacturers by P4K GUID, held until the items and ships of the run decide
+   * whether a seeded row references them (REQ-P4K-021).
+   */
+  private final Map<UUID, P4kManufacturerDto> unmatchedManufacturers = new LinkedHashMap<>();
 
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
@@ -172,6 +181,40 @@ public final class P4kImportContext {
   public Manufacturer manufacturer(@Nullable String guid) {
     UUID parsed = P4kGuids.parse(guid);
     return parsed == null ? null : manufacturerByGuid.get(parsed);
+  }
+
+  /**
+   * Holds an unmatched manufacturer until the items and ships of the run are reconciled.
+   *
+   * @param guid the manufacturer's GUID
+   * @param manufacturer the record
+   */
+  public void holdUnmatchedManufacturer(
+      @NotNull UUID guid, @NotNull P4kManufacturerDto manufacturer) {
+    unmatchedManufacturers.put(guid, manufacturer);
+  }
+
+  /**
+   * Takes a held unmatched manufacturer for a seeded item or ship that references it.
+   *
+   * @param guid the manufacturer's GUID text, or {@code null}
+   * @return the record, or {@code null} when none is held for the GUID
+   */
+  @Nullable
+  public P4kManufacturerDto takeUnmatchedManufacturer(@Nullable String guid) {
+    UUID parsed = P4kGuids.parse(guid);
+    return parsed == null ? null : unmatchedManufacturers.remove(parsed);
+  }
+
+  /**
+   * Returns the unmatched manufacturers no seeded row took.
+   *
+   * @return the records in catalogue order
+   */
+  @NotNull
+  @Unmodifiable
+  public List<P4kManufacturerDto> heldUnmatchedManufacturers() {
+    return List.copyOf(unmatchedManufacturers.values());
   }
 
   /**

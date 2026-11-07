@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend's profit-calculation row for one material and the chosen ship,
@@ -39,6 +40,7 @@ import java.util.UUID;
  * @param buyTerminalLocation that terminal's location
  * @param sellTerminalName the best selling terminal
  * @param sellTerminalLocation that terminal's location
+ * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
  */
 @DtoMirror
 public record ProfitCalculationDto(
@@ -53,4 +55,51 @@ public record ProfitCalculationDto(
     String buyTerminalName,
     String buyTerminalLocation,
     String sellTerminalName,
-    String sellTerminalLocation) {}
+    String sellTerminalLocation,
+    @Nullable String materialNameDe) {
+
+  /**
+   * Creates a row without a German material name.
+   *
+   * @param materialId the material's id
+   * @param materialName the material's name
+   * @param minBuyPrice the lowest purchase price per SCU
+   * @param maxSellPrice the highest sale price per SCU
+   * @param profitPerScu the profit per SCU between the two
+   * @param marginPercent the margin in percent
+   * @param fullLoadCost the cost of a full load of the ship
+   * @param maxProfitFullLoad the profit of a full load of the ship
+   * @param buyTerminalName the cheapest buying terminal
+   * @param buyTerminalLocation that terminal's location
+   * @param sellTerminalName the best selling terminal
+   * @param sellTerminalLocation that terminal's location
+   */
+  public ProfitCalculationDto(
+      UUID materialId,
+      String materialName,
+      BigDecimal minBuyPrice,
+      BigDecimal maxSellPrice,
+      BigDecimal profitPerScu,
+      BigDecimal marginPercent,
+      BigDecimal fullLoadCost,
+      BigDecimal maxProfitFullLoad,
+      String buyTerminalName,
+      String buyTerminalLocation,
+      String sellTerminalName,
+      String sellTerminalLocation) {
+    this(
+        materialId,
+        materialName,
+        minBuyPrice,
+        maxSellPrice,
+        profitPerScu,
+        marginPercent,
+        fullLoadCost,
+        maxProfitFullLoad,
+        buyTerminalName,
+        buyTerminalLocation,
+        sellTerminalName,
+        sellTerminalLocation,
+        null);
+  }
+}

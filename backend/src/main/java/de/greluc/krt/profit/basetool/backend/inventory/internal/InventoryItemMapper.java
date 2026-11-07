@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
@@ -201,10 +202,21 @@ public abstract class InventoryItemMapper {
     String manufacturer =
         gameItem.getManufacturer() != null ? gameItem.getManufacturer().getName() : null;
     String kind = gameItem.getKind() != null ? gameItem.getKind().name() : null;
+    ManufacturerRefDto manufacturerRef = ManufacturerRefDto.of(gameItem.getManufacturer());
     ShipComponentType componentType = ShipComponentType.fromWikiType(gameItem.getWikiType());
     if (componentType == null) {
       return new InventoryGameItemReferenceDto(
-          gameItem.getId(), gameItem.getName(), manufacturer, kind, gameItem.isP4kRetired());
+          gameItem.getId(),
+          gameItem.getName(),
+          manufacturer,
+          kind,
+          null,
+          null,
+          null,
+          null,
+          gameItem.isP4kRetired(),
+          gameItem.getNameDe(),
+          manufacturerRef);
     }
     ShipComponentClass itemClass = gameItem.getItemClass();
     return new InventoryGameItemReferenceDto(
@@ -216,7 +228,9 @@ public abstract class InventoryItemMapper {
         gameItem.getSizeClass(),
         StringNormalization.trimToNull(gameItem.getGrade()),
         itemClass != null ? itemClass.name() : null,
-        gameItem.isP4kRetired());
+        gameItem.isP4kRetired(),
+        gameItem.getNameDe(),
+        manufacturerRef);
   }
 
   /**

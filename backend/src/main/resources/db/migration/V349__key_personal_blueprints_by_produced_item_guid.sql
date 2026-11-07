@@ -11,7 +11,7 @@ ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_reason;
 ALTER TABLE p4k_review_case
     ADD CONSTRAINT chk_p4k_review_case_reason
         CHECK (reason IN ('UNCLEAR_PLAYABILITY', 'SEEDED_NOT_CREATABLE', 'GUID_CONFLICT',
-                          'PRODUCT_KEY_UNRESOLVED', 'PRODUCT_KEY_AMBIGUOUS'));
+                          'NAME_CONFLICT', 'PRODUCT_KEY_UNRESOLVED', 'PRODUCT_KEY_AMBIGUOUS'));
 
 -- RESOLVED: a later run resolved the case itself, so no admin resolved it.
 ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_resolution;

@@ -272,6 +272,7 @@ public class PurchasingReportService {
                   new MaterialAcc(
                       id,
                       entryName(deal),
+                      entryNameDe(deal),
                       deal.getMaterial() == null ? null : deal.getMaterial().getPriceBuy()))
           .add(deal, f.accepted());
       needs.computeIfAbsent(deal.getNeedId(), NeedAcc::new).add(f.accepted());
@@ -304,7 +305,8 @@ public class PurchasingReportService {
                   ref == null ? "—" : unitNames.getOrDefault(ref.orgUnitId(), "—"),
                   ref == null ? "—" : ref.label(),
                   acc.dealCount(),
-                  acc.bought());
+                  acc.bought(),
+                  ref == null ? null : ref.labelDe());
             })
             .sorted(Comparator.comparingDouble(ReportNeedDto::boughtAmount).reversed())
             .toList();
@@ -355,6 +357,12 @@ public class PurchasingReportService {
     return deal.getMaterial() != null ? deal.getMaterial().getName() : deal.getGameItem().getName();
   }
 
+  private static @Nullable String entryNameDe(@NotNull PurchasingDeal deal) {
+    return deal.getMaterial() != null
+        ? deal.getMaterial().getNameDe()
+        : deal.getGameItem().getNameDe();
+  }
+
   private static @NotNull String csvCell(@NotNull String value) {
     return value.replace(';', ',').replace('\n', ' ');
   }
@@ -382,15 +390,17 @@ public class PurchasingReportService {
   private static final class MaterialAcc {
     private final UUID id;
     private final String name;
+    private final String nameDe;
     private final Double uex;
     private int deals;
     private double bought;
     private double weightedPrice;
     private double weight;
 
-    MaterialAcc(UUID id, String name, Double uex) {
+    MaterialAcc(UUID id, String name, String nameDe, Double uex) {
       this.id = id;
       this.name = name;
+      this.nameDe = nameDe;
       this.uex = uex;
     }
 
@@ -403,7 +413,7 @@ public class PurchasingReportService {
 
     ReportMaterialDto toDto() {
       return new ReportMaterialDto(
-          id, name, deals, bought, weight == 0 ? 0 : weightedPrice / weight, uex);
+          id, name, deals, bought, weight == 0 ? 0 : weightedPrice / weight, uex, nameDe);
     }
   }
 

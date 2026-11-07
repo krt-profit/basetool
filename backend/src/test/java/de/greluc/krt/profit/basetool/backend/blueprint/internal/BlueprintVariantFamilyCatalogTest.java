@@ -61,7 +61,7 @@ class BlueprintVariantFamilyCatalogTest {
   }
 
   private static BlueprintProductRow row(String outputName) {
-    return new BlueprintProductRow(outputName, null, null, null, null);
+    return new BlueprintProductRow(outputName, null, null, null, null, null);
   }
 
   @Test

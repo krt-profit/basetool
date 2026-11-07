@@ -82,6 +82,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
@@ -383,6 +384,7 @@ class ArchitectureTest {
           ScWikiProperties.class,
           CommodityMiningData.class,
           ShipCatalogueFacts.class,
+          ManufacturerRefDto.class,
           GameItemKind.class,
           ItemCatalogueMetadata.class,
           ScWikiItemDto.class,

@@ -40,8 +40,46 @@ public record MaterialDto(
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable
-        CommodityMiningData miningData) {
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable CommodityMiningData miningData,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable String nameDe) {
+
+  /** Creates a material without a German name; {@code nameDe} is written by the P4K only. */
+  public MaterialDto(
+      UUID id,
+      String name,
+      String type,
+      String quantityType,
+      String description,
+      MaterialDto refinedMaterial,
+      MaterialCategoryDto category,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      Boolean isManualRawMaterial,
+      Boolean isJobOrder,
+      Boolean isManualEntry,
+      Boolean isVisible,
+      Long version,
+      @Nullable CommodityMiningData miningData) {
+    this(
+        id,
+        name,
+        type,
+        quantityType,
+        description,
+        refinedMaterial,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        isManualRawMaterial,
+        isJobOrder,
+        isManualEntry,
+        isVisible,
+        version,
+        miningData,
+        null);
+  }
 
   /** Creates the editable summary without source-owned mining enrichment. */
   public MaterialDto(

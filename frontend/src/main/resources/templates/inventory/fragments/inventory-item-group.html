@@ -6,14 +6,15 @@
      class="tree-row tree-row--group" th:data-trigger="${toggleTrigger}" th:data-game-item-id="${group.gameItem.id}">
     <div class="tree-cell tree-name lager-item-name">
         <span class="tree-chevron toggle-icon">▶</span>
-        <span class="tree-label" th:text="${group.gameItem.name}">Item</span>
+        <span class="tree-label" th:text="${group.gameItem.displayName(#locale)}">Item</span>
         <span th:if="${group.gameItem.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
         <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${group.gameItem})}"></span>
         <span th:if="${group.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
               th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
     </div>
     <div class="tree-cell lager-cell-muted">
-        <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
+        <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${group.gameItem.manufacturerRef})}"></span>
+        <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturerDisplayName(#locale)} · |">Hersteller · </span>
         <span th:text="${contextText}">5 Stacks</span>
     </div>
     <div class="tree-cell tree-cell--num tree-amount">

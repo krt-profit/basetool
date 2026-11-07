@@ -178,6 +178,25 @@ public class ScWikiManufacturerSyncService {
       conflicts.add(dto.uuid());
       return null;
     }
+    UUID p4kUuid = manufacturer.getP4kUuid();
+    if (p4kUuid != null) {
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.SCWIKI,
+          runId,
+          "manufacturer",
+          p4kUuid,
+          "name",
+          manufacturer.getName(),
+          dto.name());
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.SCWIKI,
+          runId,
+          "manufacturer",
+          p4kUuid,
+          "abbreviation",
+          manufacturer.getAbbreviation(),
+          dto.code());
+    }
     manufacturer.setScwikiUuid(dto.uuid());
     if (StringUtils.hasText(dto.code())) {
       manufacturer.setScwikiCode(dto.code());
@@ -198,8 +217,8 @@ public class ScWikiManufacturerSyncService {
   }
 
   /**
-   * Resolves a Wiki manufacturer to a local row by {@code scwiki_uuid}, then case-insensitive name,
-   * then case-insensitive {@code abbreviation == code}.
+   * Resolves a Wiki manufacturer to a local row by {@code p4k_uuid}, {@code scwiki_uuid}, then
+   * case-insensitive name, then case-insensitive {@code abbreviation == code}.
    *
    * @param dto the Wiki manufacturer payload
    * @param names current Wiki identities per normalized exact name
@@ -208,7 +227,10 @@ public class ScWikiManufacturerSyncService {
    */
   private ManufacturerMatch resolve(
       @NotNull ScWikiManufacturerDto dto, Map<String, Long> names, Map<String, Long> codes) {
-    Optional<Manufacturer> byUuid = manufacturerRepository.findByScwikiUuid(dto.uuid());
+    Optional<Manufacturer> byUuid =
+        manufacturerRepository
+            .findByP4kUuid(dto.uuid())
+            .or(() -> manufacturerRepository.findByScwikiUuid(dto.uuid()));
     if (byUuid.isPresent()) {
       return new ManufacturerMatch(byUuid.get(), false);
     }

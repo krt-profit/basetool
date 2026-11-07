@@ -20,11 +20,24 @@
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A catalogue entry, location or unit as an id and a name.
  *
  * @param id the id
- * @param name the display name
+ * @param name the name
+ * @param nameDe the German name of a catalogue entry, or {@code null} (REQ-P4K-023)
  */
-public record PurchasingRefDto(UUID id, String name) {}
+public record PurchasingRefDto(UUID id, String name, @Nullable String nameDe) {
+
+  /**
+   * Builds a reference without a German name.
+   *
+   * @param id the id
+   * @param name the name
+   */
+  public PurchasingRefDto(UUID id, String name) {
+    this(id, name, null);
+  }
+}

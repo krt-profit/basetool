@@ -136,7 +136,7 @@
                             th:aria-pressed="${selectedOffer != null and offer.id() == selectedOffer.id()}">
                         <span class="mb-mrow-main">
                             <span class="mb-mrow-mat">
-                                <span class="mb-mrow-name" th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
+                                <span class="mb-mrow-name" th:text="${offer.subjectDisplayName(#locale)}">Material</span>
                                 <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                                 <span th:if="${offer.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${offer.gameItem()})}"></span>
                                 <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -170,7 +170,7 @@
                             <div class="mb-dp-head">
                                 <div class="mb-dp-title">
                                     <h2>
-                                        <span th:text="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}">Material</span>
+                                        <span th:text="${offer.subjectDisplayName(#locale)}">Material</span>
                                         <span th:if="${offer.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                                         <span th:if="${offer.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${offer.gameItem()})}"></span>
                                         <span th:if="${offer.stolen()}" class="chip chip--danger" data-testid="stolen-chip" th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -247,7 +247,7 @@
                                             th:if="${offer.kind() != 'ITEM' or offer.availableAmount() != null}"
                                             th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
                                             th:data-kind="${offer.kind()}"
-                                            th:data-material="${offer.kind() == 'ITEM' ? offer.itemName() : offer.material().name()}"
+                                            th:data-material="${offer.subjectDisplayName(#locale)}"
                                             th:data-quality="${offer.kind() == 'ITEM' ? '' : offer.quality()}"
                                             th:data-amount="${offer.kind() == 'ITEM' ? offer.itemQuantity() : offer.amount()}"
                                             th:data-available="${offer.availableAmount()}"

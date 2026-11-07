@@ -47,7 +47,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto(m.id,
-      m.name, m.quantityType) FROM Material m WHERE m.isVisible = true AND m.p4kDeletedAt IS NULL
+      m.name, m.quantityType, m.nameDe) FROM Material m WHERE m.isVisible = true AND m.p4kDeletedAt IS NULL
       AND m.p4kHiddenAt IS NULL ORDER BY m.name
       """)
   List<MaterialReferenceDto> findAllReference();
@@ -241,7 +241,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
           m.id, m.name, c.id, c.name, c.version,
           m.isIllegal, m.isVolatileQt, m.isVolatileTime,
           MIN(CASE WHEN p.priceBuy > 0 THEN p.priceBuy ELSE null END),
-          MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END)
+          MAX(CASE WHEN p.priceSell > 0 THEN p.priceSell ELSE null END),
+          m.nameDe
       )
       FROM Material m
       LEFT JOIN m.category c
@@ -249,7 +250,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       WHERE (cast(:name as string) IS NULL
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')) ESCAPE '\\')
       AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
-      GROUP BY m.id, m.name, c.id, c.name, c.version,
+      GROUP BY m.id, m.name, m.nameDe, c.id, c.name, c.version,
           m.isIllegal, m.isVolatileQt, m.isVolatileTime
       """)
   Page<MaterialPriceOverviewDto> getMaterialPriceOverview(

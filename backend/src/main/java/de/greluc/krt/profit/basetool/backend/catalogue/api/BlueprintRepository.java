@@ -211,14 +211,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
-   * and produced-item GUID for the product search; the last three are {@code null} when unresolved.
+   * produced-item GUID and German manufacturer name for the product search; every column after the
+   * Wiki key is {@code null} when unresolved.
    *
    * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
    * @return projection rows for every matching active recipe
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid)
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
       AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'

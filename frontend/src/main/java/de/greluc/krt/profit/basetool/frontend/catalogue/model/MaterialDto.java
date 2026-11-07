@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying Material payload. */
 @DtoMirror
@@ -41,7 +44,46 @@ public record MaterialDto(
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
-    CommodityMiningData miningData) {
+    CommodityMiningData miningData,
+    @Nullable String nameDe) {
+
+  /** Creates a material without a German name. */
+  public MaterialDto(
+      UUID id,
+      String name,
+      String type,
+      String quantityType,
+      String description,
+      MaterialDto refinedMaterial,
+      MaterialCategoryDto category,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      Boolean isManualRawMaterial,
+      Boolean isJobOrder,
+      Boolean isManualEntry,
+      Boolean isVisible,
+      Long version,
+      CommodityMiningData miningData) {
+    this(
+        id,
+        name,
+        type,
+        quantityType,
+        description,
+        refinedMaterial,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        isManualRawMaterial,
+        isJobOrder,
+        isManualEntry,
+        isVisible,
+        version,
+        miningData,
+        null);
+  }
 
   /** Creates an editable material summary without source-owned mining data. */
   public MaterialDto(
@@ -77,5 +119,15 @@ public record MaterialDto(
         isVisible,
         version,
         null);
+  }
+
+  /**
+   * Returns the name the page shows (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
   }
 }

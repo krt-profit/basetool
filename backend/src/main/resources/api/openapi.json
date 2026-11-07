@@ -80343,6 +80343,9 @@
           "manufacturerName" : {
             "type" : "string"
           },
+          "manufacturerNameDe" : {
+            "type" : "string"
+          },
           "name" : {
             "type" : "string"
           },
@@ -81217,6 +81220,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "missingScu" : {
@@ -83062,6 +83068,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "noLongerInGame" : {
             "type" : "boolean"
           },
@@ -83287,6 +83296,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"
@@ -83352,7 +83364,13 @@
           "manufacturer" : {
             "type" : "string"
           },
+          "manufacturerRef" : {
+            "$ref" : "#/components/schemas/ManufacturerRefDto"
+          },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "noLongerInGame" : {
@@ -85062,11 +85080,40 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "nickname" : {
             "type" : "string"
           },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "wiki" : {
             "type" : "string"
+          }
+        }
+      },
+      "ManufacturerRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "abbreviation" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },
@@ -85123,6 +85170,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "ownerId" : {
@@ -85362,6 +85412,10 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string",
+            "readOnly" : true
+          },
           "quantityType" : {
             "type" : "string"
           },
@@ -85536,6 +85590,9 @@
             "type" : "string"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "quality" : {
@@ -85724,6 +85781,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "outpostName" : {
             "type" : "string"
           },
@@ -85864,6 +85924,9 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
           }
         }
       },
@@ -85875,6 +85938,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "quantityType" : {
@@ -88303,7 +88369,7 @@
           },
           "reason" : {
             "type" : "string",
-            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT", "PRODUCT_KEY_UNRESOLVED", "PRODUCT_KEY_AMBIGUOUS" ]
+            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT", "NAME_CONFLICT", "PRODUCT_KEY_UNRESOLVED", "PRODUCT_KEY_AMBIGUOUS" ]
           },
           "resolution" : {
             "type" : "string",
@@ -90921,6 +90987,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "maxProfitFullLoad" : {
             "type" : "number"
           },
@@ -90966,6 +91035,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           }
         }
@@ -92068,6 +92140,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "uexReferencePrice" : {
             "type" : "number",
             "format" : "double"
@@ -92118,6 +92193,9 @@
             "format" : "int32"
           },
           "entry" : {
+            "type" : "string"
+          },
+          "entryDe" : {
             "type" : "string"
           },
           "needId" : {
@@ -92679,6 +92757,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "noLongerInGame" : {
             "type" : "boolean"
           },
@@ -93110,6 +93191,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           }
         }

@@ -39,6 +39,8 @@ import org.jetbrains.annotations.Nullable;
  * @param locationName the row's location, shown only in the owner's own picker.
  * @param alreadyReleased whether an active offer already exists for this row.
  * @param stolen whether the row is marked „gestohlen" (REQ-INV-053).
+ * @param materialNameDe the German name of the row's material or game item, or {@code null}
+ *     (REQ-P4K-023).
  */
 public record MaterialExchangeReleasableItemDto(
     UUID inventoryItemId,
@@ -49,4 +51,42 @@ public record MaterialExchangeReleasableItemDto(
     Double amount,
     @Nullable String locationName,
     boolean alreadyReleased,
-    boolean stolen) {}
+    boolean stolen,
+    @Nullable String materialNameDe) {
+
+  /**
+   * Creates a picker entry without a German name.
+   *
+   * @param inventoryItemId the Lager row to release.
+   * @param kind the offer kind releasing this row produces.
+   * @param materialName the display name of the row's material or game item.
+   * @param quantityType the row's quantity unit.
+   * @param quality the row's quality for a material row, else {@code null}.
+   * @param amount the row's quantity in its {@code quantityType} unit.
+   * @param locationName the row's location.
+   * @param alreadyReleased whether an active offer already exists for this row.
+   * @param stolen whether the row is marked „gestohlen".
+   */
+  public MaterialExchangeReleasableItemDto(
+      UUID inventoryItemId,
+      MaterialExchangeOfferKind kind,
+      String materialName,
+      QuantityType quantityType,
+      @Nullable Integer quality,
+      Double amount,
+      @Nullable String locationName,
+      boolean alreadyReleased,
+      boolean stolen) {
+    this(
+        inventoryItemId,
+        kind,
+        materialName,
+        quantityType,
+        quality,
+        amount,
+        locationName,
+        alreadyReleased,
+        stolen,
+        null);
+  }
+}

@@ -77,6 +77,14 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(nullable = false)
   private String name;
 
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
+
   /** Joint manufacturer link. Sticky on UEX in case of a UEX/Wiki disagreement. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "manufacturer_id")

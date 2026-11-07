@@ -40,7 +40,7 @@
             <a class="dash-link" data-testid="dashboard-supply-needs-row"
                th:href="${needScope != null} ? @{/supply/needs(orgUnitId=${needScope})} : @{/supply/needs}">
                 <span class="cell-title">
-                    <span th:text="${need.material() != null ? need.material().name() : need.gameItem().name()}">Quantanium</span>
+                    <span th:text="${need.material() != null ? need.material().displayName(#locale) : need.gameItem().displayName(#locale)}">Quantanium</span>
                     <span th:if="${needShowsUnit}" class="chip" data-testid="dashboard-supply-needs-unit"
                           th:title="${need.orgUnitName()}" th:text="${need.orgUnitShorthand() != null ? need.orgUnitShorthand() : need.orgUnitName()}">ALF</span>
                 </span>

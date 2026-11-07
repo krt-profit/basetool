@@ -71,6 +71,8 @@ public class P4kCommodityReconciler {
             row.getDescription(),
             P4kLocalisedText.enOf(commodity.description()),
             row::setDescription);
+        writer.lead(
+            "name_de", row.getNameDe(), P4kFields.germanName(commodity.name()), row::setNameDe);
         writer.nameKey(row.getNameKey(), P4kLocalisedText.keyOf(commodity.name()), row::setNameKey);
         context.stamp(P4kKind.COMMODITY, commodity, row, guid);
         context.getReport().matched(P4kKind.COMMODITY, writer.isChanged());

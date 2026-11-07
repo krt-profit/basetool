@@ -58,6 +58,7 @@ public class P4kShipReconciler {
   private final P4kShipBaseData baseData;
   private final P4kShipVariants variants;
   private final P4kShipStoreSlugCheck storeSlugCheck;
+  private final P4kManufacturerReconciler manufacturerReconciler;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -116,6 +117,7 @@ public class P4kShipReconciler {
       @NotNull ShipType row, @NotNull P4kShipDto ship, @NotNull P4kImportContext context) {
     P4kRowWriter writer = new P4kRowWriter(context, P4kKind.SHIP, ship);
     baseData.lead(row, ship, writer, context);
+    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(ship.name()), row::setNameDe);
     writer.fillGameText(
         "description_en",
         row.getDescriptionEn(),
@@ -154,9 +156,11 @@ public class P4kShipReconciler {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;
     }
+    manufacturerReconciler.seed(ship.manufacturerGuid(), context);
     if (context.isApply()) {
       ShipType row = new ShipType();
       row.setName(name.strip());
+      row.setNameDe(P4kFields.germanName(ship.name()));
       row.setClassName(StringNormalization.blankToNull(ship.className()));
       row.setManufacturer(context.manufacturer(ship.manufacturerGuid()));
       row.setDescriptionEn(

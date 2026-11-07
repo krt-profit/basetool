@@ -205,6 +205,7 @@ public class P4kImportService {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
     shipReconciler.reconcile(catalogue, context);
+    manufacturerReconciler.finish(context);
     commodityReconciler.reconcile(catalogue.commodities(), context);
     return blueprintReconciler.reconcile(catalogue.blueprints(), context);
   }

@@ -44,6 +44,7 @@ import org.jetbrains.annotations.Nullable;
  * @param craftable crafts this material alone allows from inventory
  * @param craftableWithRefinery the same including the refinery yield
  * @param quantityType the material's quantity unit ({@code SCU} or {@code PIECE})
+ * @param materialNameDe the commodity's German name, or {@code null} (REQ-P4K-023)
  */
 public record CraftabilityMaterialDto(
     UUID materialId,
@@ -58,4 +59,54 @@ public record CraftabilityMaterialDto(
     double missingScuWithRefinery,
     int craftable,
     int craftableWithRefinery,
-    QuantityType quantityType) {}
+    QuantityType quantityType,
+    @Nullable String materialNameDe) {
+
+  /**
+   * Creates a breakdown without a German material name.
+   *
+   * @param materialId the commodity's id
+   * @param materialName the commodity's display name
+   * @param requiredScu amount one craft needs
+   * @param qualityFloor lowest qualifying quality
+   * @param availableScu qualifying amount in "My Inventory" alone
+   * @param availableScuWithRefinery qualifying amount including the open refinery yield
+   * @param effectiveQuality quality of the stock consumed for one craft, or {@code null}
+   * @param effectiveQualityWithRefinery the same including the refinery yield, or {@code null}
+   * @param missingScu amount short of one craft from inventory alone
+   * @param missingScuWithRefinery amount short of one craft including the refinery yield
+   * @param craftable crafts this material alone allows from inventory
+   * @param craftableWithRefinery the same including the refinery yield
+   * @param quantityType the material's quantity unit
+   */
+  public CraftabilityMaterialDto(
+      UUID materialId,
+      String materialName,
+      double requiredScu,
+      int qualityFloor,
+      double availableScu,
+      double availableScuWithRefinery,
+      @Nullable Double effectiveQuality,
+      @Nullable Double effectiveQualityWithRefinery,
+      double missingScu,
+      double missingScuWithRefinery,
+      int craftable,
+      int craftableWithRefinery,
+      QuantityType quantityType) {
+    this(
+        materialId,
+        materialName,
+        requiredScu,
+        qualityFloor,
+        availableScu,
+        availableScuWithRefinery,
+        effectiveQuality,
+        effectiveQualityWithRefinery,
+        missingScu,
+        missingScuWithRefinery,
+        craftable,
+        craftableWithRefinery,
+        quantityType,
+        null);
+  }
+}

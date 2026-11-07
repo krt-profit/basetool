@@ -91,6 +91,7 @@ class ItemReconciliationServiceTest {
     Instant synced = Instant.parse("2026-11-01T10:00:00Z");
     retired.setP4kUuid(guid);
     retired.setNameKey("item_NameSameItem");
+    retired.setNameDe("Gleicher Gegenstand");
     retired.setP4kSyncedAt(synced);
     retired.setP4kSeenRunId(seenRun);
     GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
@@ -110,6 +111,8 @@ class ItemReconciliationServiceTest {
     assertThat(retiredGuidAtFlush).containsExactly((UUID) null);
     assertThat(canonical.getP4kUuid()).isEqualTo(guid);
     assertThat(canonical.getNameKey()).isEqualTo("item_NameSameItem");
+    assertThat(canonical.getNameDe()).isEqualTo("Gleicher Gegenstand");
+    assertThat(retired.getNameDe()).isNull();
     assertThat(canonical.getP4kSyncedAt()).isEqualTo(synced);
     assertThat(canonical.getP4kSeenRunId()).isEqualTo(seenRun);
     verifyNoInteractions(p4kConflicts);

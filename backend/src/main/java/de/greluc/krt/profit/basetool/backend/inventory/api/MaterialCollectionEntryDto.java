@@ -27,6 +27,19 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>{@code quantity} is the entry's total physical stock; {@code allocatedQuantity} is the share
  * earmarked to this order (REQ-INV-027) and is at most {@code quantity}.
+ *
+ * @param inventoryEntryId the Lager row
+ * @param version the row's version
+ * @param ownerName the owner's display name, or {@code null} when redacted
+ * @param ownerId the owner, or {@code null} when redacted
+ * @param location the storage location's name, or {@code null} when redacted
+ * @param locationId the storage location, or {@code null} when redacted
+ * @param materialName the material's name, or {@code null}
+ * @param quality the row's quality, or {@code null}
+ * @param quantity the row's total stock
+ * @param allocatedQuantity the order's share of the row
+ * @param delivered whether the order's share is marked delivered
+ * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
  */
 public record MaterialCollectionEntryDto(
     UUID inventoryEntryId,
@@ -39,4 +52,48 @@ public record MaterialCollectionEntryDto(
     @Nullable Double quality,
     Double quantity,
     Double allocatedQuantity,
-    boolean delivered) {}
+    boolean delivered,
+    @Nullable String materialNameDe) {
+
+  /**
+   * Builds an entry without a German material name.
+   *
+   * @param inventoryEntryId the Lager row
+   * @param version the row's version
+   * @param ownerName the owner's display name, or {@code null} when redacted
+   * @param ownerId the owner, or {@code null} when redacted
+   * @param location the storage location's name, or {@code null} when redacted
+   * @param locationId the storage location, or {@code null} when redacted
+   * @param materialName the material's name, or {@code null}
+   * @param quality the row's quality, or {@code null}
+   * @param quantity the row's total stock
+   * @param allocatedQuantity the order's share of the row
+   * @param delivered whether the order's share is marked delivered
+   */
+  public MaterialCollectionEntryDto(
+      UUID inventoryEntryId,
+      long version,
+      @Nullable String ownerName,
+      @Nullable UUID ownerId,
+      @Nullable String location,
+      @Nullable UUID locationId,
+      @Nullable String materialName,
+      @Nullable Double quality,
+      Double quantity,
+      Double allocatedQuantity,
+      boolean delivered) {
+    this(
+        inventoryEntryId,
+        version,
+        ownerName,
+        ownerId,
+        location,
+        locationId,
+        materialName,
+        quality,
+        quantity,
+        allocatedQuantity,
+        delivered,
+        null);
+  }
+}
