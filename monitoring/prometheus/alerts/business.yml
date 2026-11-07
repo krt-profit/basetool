@@ -601,6 +601,50 @@ groups:
           summary: "P4K import failure in the last 24h"
           description: "At least one P4K catalog import reached FAILED in the last 24 hours. A repeatedly-failing import leaves an empty-looking pending queue; check the job list and backend logs for the error."
 
+      - alert: P4kImportDue
+        expr: (max(basetool_p4k_import_due{job="basetool-backend"}) == 1) or (absent(basetool_p4k_import_due{job="basetool-backend"}) and on() (max(up{job="basetool-backend"}) == 1))
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K import due for 7 days"
+          description: "UEX or the SC Wiki has reported a newer game version than the last P4K APPLY of known version for 7 days, no such APPLY exists, or the backend exports no due signal. Export a fresh LIVE catalogue with p4kx and import it on /admin/p4k-import (REQ-OBS-022)."
+
+      - alert: P4kImportUnknownValues
+        expr: (sum(basetool_p4k_import_last_run_unknown_grades{job="basetool-backend"}) + sum(basetool_p4k_import_last_run_unknown_classes{job="basetool-backend"})) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last P4K import read unknown grades or classes ({{ $value }})"
+          description: "The last P4K APPLY read item grade or itemClass values the Basetool does not know and stored them as no value. Check the run's change report (UNKNOWN_VALUE rows) and extend the mapping (REQ-OBS-022, REQ-P4K-018, REQ-P4K-019)."
+
+      - alert: P4kImportItemClassNullShareRose
+        expr: max(basetool_p4k_import_last_run_item_class_null_ratio_change{job="basetool-backend"}) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K itemClass null share rose by more than 5 points"
+          description: "The share of catalogue items without itemClass rose by more than 5 percentage points against the previous P4K APPLY. A p4kx export may have lost the class; compare the two runs before relying on item classes (REQ-OBS-022)."
+
+      - alert: P4kReviewCaseStale
+        expr: max(basetool_p4k_review_case_open_oldest_age_seconds{job="basetool-backend"}) > 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K review case open for more than 30 days"
+          description: "The oldest open P4K review case is older than 30 days. Resolve the cases on /admin/p4k-import as keep or hide (REQ-OBS-022, REQ-P4K-016)."
+
+      - alert: P4kImportChannelRejected
+        expr: sum(increase(basetool_p4k_import_rejected_total{job="basetool-backend",reason="channel"}[24h])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Non-LIVE P4K catalogue uploaded"
+          description: "The P4K upload gate refused a catalogue of another Channel than LIVE within 24 hours: a test-Channel export was uploaded to this environment. Nothing was imported; check which file was used (REQ-OBS-022, REQ-P4K-001)."
+
       - alert: MailDeliveryFailing
         expr: sum(increase(basetool_mail_total{outcome="failed"}[1h])) > 2
         for: 10m

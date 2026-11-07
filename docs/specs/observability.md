@@ -4044,24 +4044,24 @@ REQ-SEC-014, REQ-SEC-024
 
 ### REQ-OBS-022 — The P4K import reports when it is due, what each run did and every refused upload
 
-> [!note] Planned — implementation pending (#2895; ADR-0335, ADR-0336)
-> Built so far: the counter `basetool_p4k_import_rejected_total{reason}` (`P4kRejections`, #3031).
-> Everything else below is planned. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
-> `basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` /
-> `P4kImportFailed` of REQ-OBS-011 stay as they are.
-
 The P4K catalogue import ([`p4k-catalogue.md`](p4k-catalogue.md),
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md),
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md))
 is observable on three axes: whether a new import is due, what the last applied run did, and which
-uploads the gate refused.
+uploads the gate refused. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
+`basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` / `P4kImportFailed`
+of REQ-OBS-011 stay as they are; they are where a failed APPLY shows, since `p4k_import_run` holds
+successful runs only. A P4K APPLY writes no `external_sync_run` attempt, so the `CatalogueAttempt*`
+alerts never carry `source="P4K"`.
 
-- **"P4K import due".** The signal compares versions only; there is no age rule. Per source, UEX
-  and the SC Wiki, the current game version is the highest version, compared semantically as
-  major.minor.patch, among the rows that source's last successful sync wrote
-  (`game_item.uex_game_version_seen`, `game_item.scwiki_game_version_seen`,
-  `blueprint.game_version_seen`). The import is due when the UEX version **or** the Wiki version is
-  newer than the patch version of the last successful APPLY run with a known version.
+- **"P4K import due".** The signal compares versions only; there is no age rule. Versions compare
+  semantically as major.minor.patch (`P4kGameVersion`; `4.10.2-LIVE.12881860` reads as `4.10.2`,
+  `4.10` as `4.10.0`). The UEX version is the highest `game_item.uex_game_version_seen`; UEX
+  attempts carry no source-wide build. The SC Wiki version is the `game_version` of the newest
+  complete (`SUCCESS` / `UNCHANGED`) SC Wiki `CATALOGUE` attempt in `external_sync_run`
+  (REQ-OBS-011), the build the whole sweep was pinned to. The import is due when the UEX version
+  **or** the Wiki version is newer than the patch version of the last APPLY run with a known
+  version (`P4kImportDueService`).
 - **An APPLY run's patch version.** It is `source.build.publicPatch` of the
   [catalogue contract](https://github.com/p4kx-org/p4kx/blob/main/docs/basetool-catalog.md) when
   present. When that is `null`, the version of `source.build.branch` serves as a lower bound, only
@@ -4073,46 +4073,72 @@ uploads the gate refused.
   successful APPLY run of known version the import counts as due. The Build number
   (`changeNumber`) is never used in its place.
 - **Where it shows.** A "P4K import due" banner on `/admin/p4k-import` appears as soon as the
-  condition holds. A Prometheus alert (`severity: warning`) fires once the condition has held for
-  7 days, with an `absent()` companion for the case of no successful APPLY run. There is no
-  notification type for it.
-- **Per-run gauges.** A `BusinessGaugeSource` of the P4K module reads the last APPLY run from
-  `p4k_import_run` / `p4k_import_change`, sampled by `BusinessMetricsCollector` (REQ-OBS-011), and
-  publishes: the rows per kind and outcome (matched, unmatched, added, vanished, reappeared,
-  changed); the unknown grade values and unknown class values (REQ-OBS-023); the share of
-  `itemClass` `null` and its change against the previous run; the rows the sweep stamped, per kind;
-  the open review cases per kind and the age of the oldest open case. The starmap kind joins these
-  gauges with its rows, its unmatched UEX rows and its open link reviews
+  condition holds; the page reads it from `GET /api/v1/catalog/admin/import/p4k/due` on load and
+  again after an APPLY finishes. The gauge `basetool_p4k_import_due` is `1` while the condition
+  holds, never-run included. The alert `P4kImportDue` (`severity: warning`) fires once it has held
+  for 7 days, with an `absent()` companion in the same rule for a backend that exports no due gauge.
+  There is no notification type for it.
+- **Per-run gauges.** `P4kCatalogueBusinessGauges`, a `BusinessGaugeSource` sampled by
+  `BusinessMetricsCollector` (REQ-OBS-011), reads the last two APPLY runs from `p4k_import_run` /
+  `p4k_import_change` and publishes:
+  - `basetool_p4k_import_last_run_rows{kind,outcome}`: the last run's rows per kind and outcome
+    (`matched`, `unmatched`, `added`, `vanished`, `reappeared`, `changed`); `vanished` is the rows
+    the run's sweep stamped. A kind the run did not list reads 0.
+  - `basetool_p4k_import_last_run_unknown_grades` and `basetool_p4k_import_last_run_unknown_classes`:
+    the last run's `UNKNOWN_VALUE` report rows of kind `ITEM` with `field_name` `grade` and
+    `itemClass` (REQ-OBS-023). The item reconciler reports them under those two field names.
+  - `basetool_p4k_import_last_run_item_class_null_ratio`: the share, 0 to 1, of the catalogue's
+    items whose `itemClass` is `null` or blank, stored per run in
+    `p4k_import_run.item_class_null_share` (an unknown value is a value, not a `null`); `NaN` before
+    the first run that recorded it. `basetool_p4k_import_last_run_item_class_null_ratio_change` is
+    the last run's share minus the previous run's, `0` when either is unknown.
+  - `basetool_p4k_catalogue_stamped_rows{kind}`: the P4K-known rows a sweep stamped as gone and no
+    later run matched again.
+  - `basetool_p4k_review_cases_open{kind}` and `basetool_p4k_review_case_open_oldest_age_seconds`.
+
+  The starmap kind joins these gauges with its rows, its unmatched UEX rows and its open link
+  reviews when it is imported
   ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
   change report records a skipped sweep.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the
   synchronous gate refuses, with `reason` one of `channel`, `schema_version`, `build_missing`,
-  `older_build` and `too_large`.
-- **Alerts.** All `severity: warning`, in `monitoring/prometheus/alerts/`, each with a rule test:
-  the import-due alert above; unknown grade or class values in the last run greater than 0; the
-  `itemClass` `null` share rose by more than 5 percentage points against the previous run; the
-  oldest open review case is older than 30 days; a `reason="channel"` refusal within 24 h, which
-  means a test-Channel catalogue was uploaded to production.
-- **Dashboard.** A Grafana dashboard of its own, "P4K catalogue", shows the panels above. They do
-  not go into `07-basetool-operations.json`.
+  `older_build` and `too_large`; every reason's series is registered at zero at start, so the first
+  refusal is an increase.
+- **Alerts.** All `severity: warning`, in `monitoring/prometheus/alerts/business.yml`, each with a
+  rule test in `monitoring/prometheus/tests/p4k_catalogue_alerts_test.yml`: `P4kImportDue` above;
+  `P4kImportUnknownValues`, unknown grade or class values in the last run greater than 0;
+  `P4kImportItemClassNullShareRose`, the `itemClass` `null` share rose by more than 5 percentage
+  points against the previous run; `P4kReviewCaseStale`, the oldest open review case is older than
+  30 days; `P4kImportChannelRejected`, a `reason="channel"` refusal within 24 h, which means a
+  test-Channel catalogue was uploaded to production.
+- **Dashboard.** The Grafana dashboard "P4K catalogue" (`12-p4k-catalogue.json`, uid
+  `basetool-p4k-catalogue`) shows the panels above. They do not go into
+  `07-basetool-operations.json`.
 
 **Acceptance**
 
-- [ ] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
-  stays off for an equal or older one, and holds with no successful APPLY run of known version.
-- [ ] A run's version is `publicPatch`, else the lower bound of an exact
+- [x] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
+  stays off for an equal or older one, and holds with no successful APPLY run of known version
+  (`P4kImportDueTest`).
+- [x] A run's version is `publicPatch`, else the lower bound of an exact
   `sc-alpha-<major>.<minor>.<patch>` branch, else unknown; the run records which it is, and a UEX
-  version above a branch lower bound reads as due.
-- [ ] The banner shows on `/admin/p4k-import` while the signal holds; the alert fires only after
-  7 days of it.
-- [ ] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
-  `kind` and `outcome`.
-- [x] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once.
-- [ ] Every alert above has a promtool rule test that fires and stays silent.
+  version above a branch lower bound reads as due (`P4kImportRunTest`, `P4kImportDueTest`).
+- [x] The banner shows on `/admin/p4k-import` while the signal holds (`AdminP4kImportDueMvcTest`);
+  the alert fires only after 7 days of it (`p4k_catalogue_alerts_test.yml`).
+- [x] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
+  `kind` and `outcome` (`BusinessMetricsCollectorTest`, `P4kCatalogueBusinessGaugesTest`).
+- [x] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once, and every
+  reason exists at zero before the first refusal (`P4kUploadGateTest`, `P4kRejectionsTest`).
+- [x] Every alert above has a promtool rule test that fires and stays silent.
 
-**Enforced by:** — (planned) · **Related:** REQ-OBS-006, REQ-OBS-011, REQ-OBS-023 · **Issues:**
-#2895, #2896
+**Enforced by:** `P4kImportDueService`, `P4kCatalogueBusinessGauges`, `P4kRejections`,
+`CatalogueMetricNames` · `P4kImportDueTest`, `P4kGameVersionTest`, `P4kItemClassShareTest`,
+`P4kCatalogueBusinessGaugesTest`, `P4kRejectionsTest`, `BusinessMetricsCollectorTest`,
+`AdminP4kImportDueMvcTest` · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/p4k_catalogue_alerts_test.yml`,
+`monitoring/grafana/dashboards/12-p4k-catalogue.json` · **Related:** REQ-OBS-006, REQ-OBS-011,
+REQ-OBS-023 · **Issues:** #2895, #2896, #3034
 
 ### REQ-OBS-023 — The catalogue's precedence is visible: unknown grades and classes, stat sources
 

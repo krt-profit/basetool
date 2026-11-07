@@ -35,6 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
  * @param playability {@code player}, {@code mission}, {@code special}, another value or {@code
  *     null}; read through {@link P4kClosedSet#parse} as a {@link P4kItemPlayability}
+ * @param itemClass the raw {@code itemClass} ({@code Civilian}, {@code Military}, …) or {@code
+ *     null}; its null share per run is a monitoring gauge (REQ-OBS-022)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kItemDto(
@@ -45,5 +47,6 @@ public record P4kItemDto(
     @Nullable P4kLocalisedText description,
     @Nullable Double mass,
     @Nullable String manufacturerGuid,
-    @Nullable String playability)
+    @Nullable String playability,
+    @Nullable String itemClass)
     implements P4kRecord {}

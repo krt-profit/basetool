@@ -115,6 +115,14 @@ public class P4kImportRun extends AbstractEntity<UUID> {
   @Column(name = "applied_at", nullable = false)
   private Instant appliedAt;
 
+  /**
+   * The share, 0 to 1, of the catalogue's items whose {@code itemClass} is {@code null}; {@code
+   * null} when the catalogue lists no item (REQ-OBS-022).
+   */
+  @Column(name = "item_class_null_share")
+  @Nullable
+  private Double itemClassNullShare;
+
   /** The completeness and counts per kind. */
   @ElementCollection(fetch = FetchType.EAGER)
   @BatchSize(size = 50)

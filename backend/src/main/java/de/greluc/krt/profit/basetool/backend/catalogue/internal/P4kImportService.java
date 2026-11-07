@@ -152,6 +152,7 @@ public class P4kImportService {
     Instant now = Instant.now();
     P4kImportRun run =
         runRepository.save(newRun(catalogue.head(), build, changeNumber, request, now));
+    run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
     P4kImportContext context =
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
     int ingredientsResolved = reconcile(catalogue, context);

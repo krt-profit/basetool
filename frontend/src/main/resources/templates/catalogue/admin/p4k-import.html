@@ -12,6 +12,11 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.p4kimport', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.p4kImport.title},
         count=null, actions=null)}"></th:block>
 
+    <div id="krt-p4k-due" class="alert alert-warning" role="status" data-testid="p4k-import-due" hidden>
+        <strong th:text="#{admin.p4kImport.due.title}">P4K-Import fällig</strong>
+        <span id="krt-p4k-due-detail"></span>
+    </div>
+
     <section class="card" aria-labelledby="krt-p4k-upload-title">
         <div class="card-head">
             <h2 id="krt-p4k-upload-title" class="card-title" th:text="#{admin.p4kImport.upload.title}">Katalog hochladen</h2>
@@ -307,6 +312,10 @@
         'toastKept': /*[[#{admin.p4kImport.review.toast.kept}]]*/ 'Kept.',
         'toastHidden': /*[[#{admin.p4kImport.review.toast.hidden}]]*/ 'Hidden.',
         'conflict': /*[[#{admin.p4kImport.review.toast.conflict}]]*/ 'The case changed meanwhile.',
+        'dueDetail': /*[[#{admin.p4kImport.due.detail}]]*/ 'UEX: {0} · SC Wiki: {1} · last import: {2}',
+        'dueUnknown': /*[[#{admin.p4kImport.due.unknown}]]*/ 'unknown',
+        'dueNoRun': /*[[#{admin.p4kImport.due.noRun}]]*/ 'none of known version',
+        'dueLowerBound': /*[[#{admin.p4kImport.due.lowerBound}]]*/ 'at least {0} (branch)',
         'kind.MANUFACTURER': /*[[#{admin.p4kImport.kind.MANUFACTURER}]]*/ 'MANUFACTURER',
         'kind.ITEM': /*[[#{admin.p4kImport.kind.ITEM}]]*/ 'ITEM',
         'kind.SHIP': /*[[#{admin.p4kImport.kind.SHIP}]]*/ 'SHIP',

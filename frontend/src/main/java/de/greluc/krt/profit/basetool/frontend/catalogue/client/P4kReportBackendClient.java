@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.client;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewCaseDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewResolveRequest;
@@ -60,6 +61,16 @@ public class P4kReportBackendClient {
       new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Reads whether a P4K import is due (REQ-P4K-047).
+   *
+   * @return the due signal, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public P4kImportDueDto importDue() {
+    return backendApiClient.get(BASE + "/due", P4kImportDueDto.class);
+  }
 
   /**
    * Reads one page of the applied runs, newest first.

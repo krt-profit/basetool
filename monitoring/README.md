@@ -131,11 +131,13 @@ deliberately not pins opts out with an `image-pin-gate: ignore-file` marker in i
 - **`alertmanager/alertmanager.yml.tmpl`** — **template**, rendered by hand on the host (see
   *Re-rendering the Alertmanager config* below). The rendered file carries secrets and is never
   committed.
-- **`grafana/provisioning/{datasources,dashboards}`** + **`grafana/dashboards/*.json`** — 14
+- **`grafana/provisioning/{datasources,dashboards}`** + **`grafana/dashboards/*.json`** — 15
   dashboards, provisioned **read-only** (see the sandbox-export workflow below). `15-exchange.json`
   („Exchange") is the per-client view of the third-party exchange, with a `client_id` variable
   that filters its metrics and its gateway log panel; the operations dashboard keeps its
-  cross-client exchange panels.
+  cross-client exchange panels. `12-p4k-catalogue.json` („P4K catalogue") shows whether a P4K
+  import is due, the last APPLY run, the stamped rows, the open review cases and the refused
+  uploads (REQ-OBS-022).
 
 > **Client attribution of relayed exchange calls (operator note).** `basetool_api_client_requests_total`
 > counts a call the ingest gateway relays for an exchange client under that client's registered id

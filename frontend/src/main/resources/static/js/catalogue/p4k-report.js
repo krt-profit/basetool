@@ -2,6 +2,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
@@ -416,12 +417,14 @@ function init() {
     if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
     loadCases(0);
+    refreshDueBanner();
 }
 
 /**
- * Reloads the run list and the review list after an APPLY finished.
+ * Reloads the run list, the review list and the due banner after an APPLY finished.
  */
 export function refreshAfterApply() {
+    refreshDueBanner();
     loadRuns(runsPage);
     loadCases(casesPage);
     if (reportTarget) loadReport(reportPage);

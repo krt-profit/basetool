@@ -85,6 +85,7 @@ GET /api/v1/blueprints/me/sharing | MyBlueprintSharingController#getMyBlueprintS
 PUT /api/v1/blueprints/me/sharing | MyBlueprintSharingController#updateMyBlueprintSharing | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/blueprints/products/search | BlueprintProductController#search | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/blueprints/{id}/derivation | GameItemController#getBlueprintDerivation | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/catalog/admin/import/p4k/due | AdminP4kImportReportController#due | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/jobs | AdminP4kImportController#listJobs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/catalog/admin/import/p4k/jobs | AdminP4kImportController#enqueuePreview | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/jobs/{id} | AdminP4kImportController#getJob | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)

@@ -131,5 +131,49 @@ public final class CatalogueMetricNames {
   /** Tag naming the bounded independently applied catalogue slice. */
   public static final String TAG_AGGREGATE = "aggregate";
 
+  /** Gauge {@code basetool_p4k_import_due}: {@code 1} while a P4K import is due (REQ-OBS-022). */
+  public static final String P4K_IMPORT_DUE = "basetool.p4k.import.due";
+
+  /**
+   * Gauge {@code basetool_p4k_import_last_run_rows} — tags {@code kind} and {@code outcome}: the
+   * last APPLY run's rows per kind and outcome (REQ-OBS-022).
+   */
+  public static final String P4K_IMPORT_LAST_RUN_ROWS = "basetool.p4k.import.last.run.rows";
+
+  /** Gauge {@code basetool_p4k_import_last_run_unknown_grades} (REQ-OBS-022). */
+  public static final String P4K_IMPORT_LAST_RUN_UNKNOWN_GRADES =
+      "basetool.p4k.import.last.run.unknown.grades";
+
+  /** Gauge {@code basetool_p4k_import_last_run_unknown_classes} (REQ-OBS-022). */
+  public static final String P4K_IMPORT_LAST_RUN_UNKNOWN_CLASSES =
+      "basetool.p4k.import.last.run.unknown.classes";
+
+  /**
+   * Gauge {@code basetool_p4k_import_last_run_item_class_null_ratio}: the last run's share of items
+   * without {@code itemClass}, 0 to 1 (REQ-OBS-022).
+   */
+  public static final String P4K_IMPORT_LAST_RUN_ITEM_CLASS_NULL_RATIO =
+      "basetool.p4k.import.last.run.item.class.null.ratio";
+
+  /**
+   * Gauge {@code basetool_p4k_import_last_run_item_class_null_ratio_change}: the last run's share
+   * minus the previous run's (REQ-OBS-022).
+   */
+  public static final String P4K_IMPORT_LAST_RUN_ITEM_CLASS_NULL_RATIO_CHANGE =
+      "basetool.p4k.import.last.run.item.class.null.ratio.change";
+
+  /**
+   * Gauge {@code basetool_p4k_catalogue_stamped_rows} — tag {@code kind}: the rows a sweep stamped
+   * as gone (REQ-OBS-022).
+   */
+  public static final String P4K_CATALOGUE_STAMPED_ROWS = "basetool.p4k.catalogue.stamped.rows";
+
+  /** Gauge {@code basetool_p4k_review_cases_open} — tag {@code kind} (REQ-OBS-022). */
+  public static final String P4K_REVIEW_CASES_OPEN = "basetool.p4k.review.cases.open";
+
+  /** Gauge {@code basetool_p4k_review_case_open_oldest_age_seconds} (REQ-OBS-022). */
+  public static final String P4K_REVIEW_CASE_OPEN_OLDEST_AGE =
+      "basetool.p4k.review.case.open.oldest.age";
+
   private CatalogueMetricNames() {}
 }

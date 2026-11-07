@@ -302,6 +302,16 @@ public interface GameItemRepository
       @Param("nameKeys") Collection<String> nameKeys);
 
   /**
+   * Lists the distinct game versions the UEX item sync stamped on the items, for the "P4K import
+   * due" signal (REQ-OBS-022).
+   *
+   * @return the distinct non-null {@code uex_game_version_seen} values, in no particular order
+   */
+  @Query(
+      "SELECT DISTINCT g.uexGameVersionSeen FROM GameItem g WHERE g.uexGameVersionSeen IS NOT NULL")
+  List<String> findDistinctUexGameVersions();
+
+  /**
    * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).
    *
    * @param id the item's id

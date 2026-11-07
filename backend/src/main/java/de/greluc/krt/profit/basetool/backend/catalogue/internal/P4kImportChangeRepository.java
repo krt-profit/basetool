@@ -34,6 +34,18 @@ import org.springframework.data.repository.query.Param;
 public interface P4kImportChangeRepository extends JpaRepository<P4kImportChange, UUID> {
 
   /**
+   * Counts a run's report rows of one kind, change type and field (REQ-OBS-022).
+   *
+   * @param runId the run
+   * @param kind the kind
+   * @param changeType the change type
+   * @param fieldName the field name
+   * @return the number of rows
+   */
+  long countByRunIdAndKindAndChangeTypeAndFieldName(
+      UUID runId, P4kKind kind, P4kChangeType changeType, String fieldName);
+
+  /**
    * Lists the report rows of one run.
    *
    * @param runId the run

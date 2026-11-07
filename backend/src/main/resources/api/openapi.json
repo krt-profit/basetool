@@ -10843,6 +10843,121 @@
         "x-domain" : "joborder"
       }
     },
+    "/api/v1/catalog/admin/import/p4k/due" : {
+      "get" : {
+        "operationId" : "due",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kImportDueDto"
+                }
+              }
+            },
+            "description" : "The due signal.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Tell whether a P4K import is due.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
     "/api/v1/catalog/admin/import/p4k/jobs" : {
       "get" : {
         "operationId" : "listJobs",
@@ -87987,6 +88102,27 @@
           },
           "stillLiveElsewhere" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "P4kImportDueDto" : {
+        "type" : "object",
+        "properties" : {
+          "basisOrigin" : {
+            "type" : "string",
+            "enum" : [ "PUBLIC_PATCH", "BRANCH_LOWER_BOUND" ]
+          },
+          "basisVersion" : {
+            "type" : "string"
+          },
+          "due" : {
+            "type" : "boolean"
+          },
+          "uexVersion" : {
+            "type" : "string"
+          },
+          "wikiVersion" : {
+            "type" : "string"
           }
         }
       },

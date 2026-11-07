@@ -149,4 +149,16 @@ enum P4kSweepTarget {
   String rowNamesQuery() {
     return "SELECT e.id, " + namePath + " FROM " + entity + " e WHERE e.id IN :ids";
   }
+
+  /**
+   * The JPQL that counts the kind's rows a sweep stamped as gone (REQ-OBS-022).
+   *
+   * @return the query text, selecting one {@code Long}
+   */
+  @NotNull
+  String stampedRowsCountQuery() {
+    return "SELECT COUNT(e) FROM "
+        + entity
+        + " e WHERE e.p4kUuid IS NOT NULL AND e.p4kDeletedAt IS NOT NULL";
+  }
 }
