@@ -315,7 +315,11 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   uncraftable.
 - **Craftable count.** Per material the recipe's RESOURCE lines are aggregated into one required
   amount per craft; `N = floor( min over materials of ( qualifying available / required ) )`. The
-  binding ("limiting") material is named.
+  binding ("limiting") material is named. A recipe whose groups are a choose-n selection
+  (`required_group_count`, REQ-P4K-027) counts only the `n` option groups the caller's inventory
+  covers best — most crafts from that group alone first, then the smallest shortfall for one craft,
+  then recipe order — so it is craftable when `n` options are covered, and the material breakdown
+  and shortfall list only those groups' materials. An optional group (`is_optional`) never counts.
 - **Quantity unit (SCU vs Stück).** A RESOURCE ingredient may resolve to a material whose
   `QuantityType` is `PIECE` rather than `SCU`, and a bridged ITEM ingredient is always a PIECE
   material counted in whole units. The computation is done in the material's **own unit**
@@ -729,6 +733,12 @@ change alone.
 - **The factor.** Every factor in the recipe — beside a value, alone on a chip, and in the hint
   „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
   „±0 %", with at most one decimal.
+- **The summand.** A P4K modifier whose `valueKind` is `ADDITIVE` (REQ-P4K-027) carries summands,
+  not factors: its value is the base value plus the summand („3 → 4"), its change the signed summand
+  in the stat's unit when the base value names one („+1", „-0,5", „+2 °C"; a percentage scaled to
+  0–100), never a percentage factor; the admin blueprint page shows it as „+1" instead of „×1.00".
+  The contract gives a summand no unit of its own. A Wiki modifier (`valueKind` `null`) and a
+  `MULTIPLIER` one carry factors.
 
 *Amended (#2927, #3040;
 [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)):*
@@ -740,7 +750,8 @@ a base value comes from the P4K catalogue, or from the SC Wiki where the catalog
 - [x] The recipe response carries the crafted item's base values with their source, sorted by
   property key, and none without a crafted item. *`BlueprintProductServiceTest`.*
 - [x] The value is base times factor; the text is unit-aware and scales a percentage; a missing
-  factor shows „?"; a factor reads as a signed percentage. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
+  factor shows „?"; a factor reads as a signed percentage, a summand as a signed value in the
+  stat's unit. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
 - [x] The frontend mirror follows the contract. *`FrontendDtoContractTest`.*
 
 **Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,

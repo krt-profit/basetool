@@ -81373,6 +81373,10 @@
               "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
             }
           },
+          "valueKind" : {
+            "type" : "string",
+            "enum" : [ "MULTIPLIER", "ADDITIVE" ]
+          },
           "valueRangeType" : {
             "type" : "string"
           }

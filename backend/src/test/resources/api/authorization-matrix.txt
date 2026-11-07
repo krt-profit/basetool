@@ -91,6 +91,7 @@ POST /api/v1/catalog/admin/import/p4k/jobs | AdminP4kImportController#enqueuePre
 GET /api/v1/catalog/admin/import/p4k/jobs/{id} | AdminP4kImportController#getJob | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/catalog/admin/import/p4k/jobs/{id}/apply | AdminP4kImportController#enqueueApply | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/jobs/{id}/changes | AdminP4kImportReportController#previewChanges | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/catalog/admin/import/p4k/materials | AdminP4kImportReportController#materials | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/resource-groups | AdminP4kImportReportController#resourceGroups | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/review-cases | AdminP4kImportReportController#openReviewCases | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/catalog/admin/import/p4k/review-cases/{id}/resolve | AdminP4kImportReportController#resolve | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
