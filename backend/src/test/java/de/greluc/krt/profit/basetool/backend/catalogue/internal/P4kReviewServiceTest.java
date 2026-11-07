@@ -32,15 +32,21 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * A review case is a lasting status, resolved as keep or hide by an admin, audited, and a hide
@@ -60,6 +66,10 @@ class P4kReviewServiceTest {
   @Autowired private P4kReviewCaseRepository caseRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private AuditService auditService;
+  @Autowired private CacheManager cacheManager;
+
+  /** The key of the entry that shows whether a cache was evicted. */
+  private static final String CACHE_PROBE = "p4k-review-probe";
 
   private P4kImportRuns runs;
   private ShipType seeded;
@@ -154,6 +164,68 @@ class P4kReviewServiceTest {
         .satisfies(e ->
             assertThat(e.details())
                 .isEqualTo("kind=SHIP reason=SEEDED_NOT_CREATABLE rowId=" + seeded.getId()));
+  }
+
+  @Test
+  void aHide_evictsTheCatalogueCachesOnCommit() {
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    Cache shipTypes = warmShipTypeCache();
+
+    onCommitOf(() ->
+        reviewService.resolve(
+            reviewCase.getId(),
+            P4kReviewResolution.HIDE,
+            null,
+            null,
+            reviewCase.getVersion(),
+            ADMIN));
+
+    assertThat(shipTypes.get(CACHE_PROBE)).isNull();
+  }
+
+  @Test
+  void aKeep_leavesTheCatalogueCachesWarm() {
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    Cache shipTypes = warmShipTypeCache();
+
+    onCommitOf(() ->
+        reviewService.resolve(
+            reviewCase.getId(),
+            P4kReviewResolution.KEEP,
+            null,
+            null,
+            reviewCase.getVersion(),
+            ADMIN));
+
+    assertThat(shipTypes.get(CACHE_PROBE)).isNotNull();
+  }
+
+  /**
+   * Puts a probe entry into the ship-type cache.
+   *
+   * @return the cache
+   */
+  private Cache warmShipTypeCache() {
+    Cache cache = Objects.requireNonNull(cacheManager.getCache(CacheConfig.SHIP_TYPES_CACHE));
+    cache.put(CACHE_PROBE, "warm");
+    return cache;
+  }
+
+  /**
+   * Runs a write and then the commit callbacks it registered, as the commit of the test's
+   * rolled-back transaction would.
+   *
+   * @param write the write
+   */
+  private static void onCommitOf(Runnable write) {
+    List<TransactionSynchronization> before =
+        TransactionSynchronizationManager.getSynchronizations();
+    write.run();
+    TransactionSynchronizationManager.getSynchronizations().stream()
+        .filter(s -> !before.contains(s))
+        .forEach(TransactionSynchronization::afterCommit);
   }
 
   @Test

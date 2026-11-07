@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueAdminLiveSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueChange;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
@@ -44,6 +45,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kPreviewReport
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -111,10 +114,9 @@ class P4kImportJobRunnerTest {
             jobService,
             importService,
             new P4kPreviewReportCodec(JsonMapper.builder().build()),
-            cacheEvictionService,
+            new P4kCatalogueChange(cacheEvictionService, catalogueUpdates),
             JsonMapper.builder().build(),
             authHelperService,
-            catalogueUpdates,
             syncCoordinator,
             adminLiveSync);
   }
@@ -348,7 +350,7 @@ class P4kImportJobRunnerTest {
   }
 
   @Test
-  void applyPublishesCatalogueChangeOnlyAfterCommittedDataChanges() {
+  void applyPublishesCatalogueChangeAfterTheApplyReturned() {
     UUID job = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     var zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
@@ -366,17 +368,32 @@ class P4kImportJobRunnerTest {
 
     InOrder order = inOrder(importService, catalogueUpdates);
     order.verify(importService).applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class));
-    order.verify(catalogueUpdates).publishAfterCommit(any(), eq(List.of("catalogue")));
+    order.verify(catalogueUpdates).publish(any(), eq(List.of("catalogue")));
   }
 
   @Test
-  void unchangedApplyDoesNotPublishCatalogueChange() {
+  void anApplyWithoutCreatedOrEnrichedRowsStillPublishesCatalogueChange() {
     UUID job = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
     when(jobService.loadPayload(job)).thenReturn(bytes);
     stubAdmin(job, false);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
         .thenReturn(someResult());
+
+    runner.run(job, P4kImportJobKind.APPLY, ADMIN);
+
+    verify(catalogueUpdates)
+        .publish(LiveSyncTopic.global(LiveSyncTopicClass.CATALOGUE), List.of("catalogue"));
+  }
+
+  @Test
+  void aFailedApplyPublishesNoCatalogueChange() {
+    UUID job = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(job)).thenReturn(bytes);
+    stubAdmin(job, false);
+    when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
+        .thenThrow(new IllegalStateException("boom"));
 
     runner.run(job, P4kImportJobKind.APPLY, ADMIN);
 

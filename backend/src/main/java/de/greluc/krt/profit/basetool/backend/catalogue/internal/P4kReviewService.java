@@ -58,7 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
  * resource that joins no single commodity by assigning a material (REQ-P4K-024). A hide stamps
  * {@code p4k_hidden_at} on the row, which drops it out of every picker like the sweep's stamp
  * (REQ-P4K-013), and no later match lifts it. Each resolution stores the admin and the time and
- * records one {@code CATALOGUE} audit event (REQ-P4K-046).
+ * records one {@code CATALOGUE} audit event (REQ-P4K-046); a hide or an assignment changes what
+ * catalogue readers see and is announced through {@link P4kCatalogueChange}.
  */
 @Service
 @RequiredArgsConstructor
@@ -71,6 +72,7 @@ public class P4kReviewService {
   private final AuditRecorder auditRecorder;
   private final MaterialRepository materialRepository;
   private final MaterialCategoryRepository categoryRepository;
+  private final P4kCatalogueChange catalogueChange;
 
   /** The reasons of a resource whose join yields no single commodity (REQ-P4K-024). */
   private static final Set<P4kReviewReason> RESOURCE_JOINS =
@@ -158,6 +160,9 @@ public class P4kReviewService {
       reviewCase.setRowId(material.getId());
     }
     caseRepository.saveAndFlush(reviewCase);
+    if (resolution != P4kReviewResolution.KEEP) {
+      catalogueChange.announce();
+    }
     AuditDetails details =
         AuditDetails.of("kind", reviewCase.getKind().name())
             .with("reason", reviewCase.getReason().name())

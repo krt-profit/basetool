@@ -22,18 +22,13 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
@@ -63,10 +58,9 @@ public class P4kImportJobRunner {
   private final P4kImportJobService jobService;
   private final P4kImportService importService;
   private final P4kPreviewReportCodec reportCodec;
-  private final MasterDataCacheEvictionService cacheEvictionService;
+  private final P4kCatalogueChange catalogueChange;
   private final ObjectMapper objectMapper;
   private final AuthHelperService authHelperService;
-  private final LiveSyncPublisher catalogueUpdates;
   private final SyncCoordinator syncCoordinator;
   private final CatalogueAdminLiveSync adminLiveSync;
 
@@ -95,7 +89,6 @@ public class P4kImportJobRunner {
   private void execute(@NotNull UUID jobId, @NotNull P4kImportJobKind kind) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
-    boolean changedCatalogue = false;
     try {
       jobService.markRunning(jobId);
       byte[] bytes = jobService.loadPayload(jobId);
@@ -111,7 +104,6 @@ public class P4kImportJobRunner {
                     job.isCreateItemsAndShips(),
                     job.isOverrideMassGuard()));
         appliedMasterData = true;
-        changedCatalogue = hasChanges(result);
       } else {
         P4kImportService.P4kPreview preview = importService.previewImport(bytes);
         jobService.storePreviewReport(
@@ -130,17 +122,8 @@ public class P4kImportJobRunner {
     } finally {
       if (kind == P4kImportJobKind.APPLY) {
         if (appliedMasterData) {
-          safely(
-              cacheEvictionService::evictP4kSyncedMasterData,
-              "evict P4K-synced master-data caches");
+          safely(catalogueChange::announce, "evict P4K-synced caches and publish catalogue change");
           safely(adminLiveSync::applied, "publish starmap and shop link change");
-        }
-        if (changedCatalogue) {
-          safely(
-              () ->
-                  catalogueUpdates.publishAfterCommit(
-                      LiveSyncTopic.global(LiveSyncTopicClass.CATALOGUE), List.of("catalogue")),
-              "publish catalogue change");
         }
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
@@ -181,21 +164,6 @@ public class P4kImportJobRunner {
           "A Wiki or UEX sync held the catalogue lock past the wait limit; the APPLY did not run."
               + " Start it again later.");
     }
-  }
-
-  private static boolean hasChanges(P4kImportResultDto result) {
-    return result.ingredientsResolved() > 0
-        || hasChanges(result.manufacturers())
-        || hasChanges(result.items())
-        || hasChanges(result.ships())
-        || hasChanges(result.commodities())
-        || hasChanges(result.blueprints())
-        || hasChanges(result.starmapObjects())
-        || hasChanges(result.shops());
-  }
-
-  private static boolean hasChanges(P4kImportResultDto.@Nullable Counts counts) {
-    return counts != null && (counts.created() > 0 || counts.enriched() > 0);
   }
 
   /**

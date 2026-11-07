@@ -760,6 +760,11 @@ Each writer therefore evicts the caches it can make stale **on completion**, thr
   even when a later step aborts (UEX is fail-fast; SC Wiki swallows per step). The P4K apply gates its
   eviction on the reconcile transaction having actually committed (`appliedMasterData`), so a
   rolled-back apply and every PREVIEW run correctly evict nothing.
+- **P4K writes announce through `P4kCatalogueChange`.** Every committed APPLY, whatever it
+  changed, and every review resolution that hides a row or assigns a resource group or material
+  (REQ-P4K-016, REQ-P4K-024, REQ-P4K-025) evict the P4K set after the commit and then publish the
+  global `CATALOGUE` live-sync event, on which the frontend evicts its catalogue caches and open
+  views refresh; a keep and a rolled-back write announce nothing.
 - The three per-writer cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`, `P4K_SYNCED_CACHES`)
   are the **single source of truth** for "this writer can make these stale". **A new cache added over a
   written table MUST be added to the matching set(s)**, or it silently lags the TTL again after a
@@ -781,13 +786,15 @@ both**, so a single-entity entry can never survive a rename/delete while the lis
 cache is tolerated; the three sets are pinned so a written-table cache cannot be silently dropped);
 `UexSchedulerTest` / `ScWikiSchedulerTest` (the sweep evicts on completion **and** after a mid-sweep
 failure, and does not evict when the cross-scheduler gate skips the sweep); `P4kImportJobRunnerTest`
-(a committed APPLY evicts the P4K set, a PREVIEW and a rolled-back APPLY evict nothing);
+(a committed APPLY evicts the P4K set and publishes the catalogue event, a PREVIEW and a
+rolled-back APPLY do neither); `P4kCatalogueChangeTest` (evict, then publish, after the commit);
+`P4kReviewServiceTest` (a hide evicts on commit, a keep does not);
 `MaterialServiceCachingTest` (`getMaterial` populates only the by-id cache, the list reads only the list
 cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachingTest` /
 `OutpostServiceCachingTest` (each read populates its cache and every override mutator evicts it).
 
 **Enforced by:** `MasterDataCacheEvictionService`, `UexScheduler.runAllSyncSteps`,
-`ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict),
+`ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict), `P4kCatalogueChange` (APPLY and review resolution),
 `MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
 mutators).
 

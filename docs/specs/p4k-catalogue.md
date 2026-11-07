@@ -480,8 +480,10 @@ lifts. The row records who resolved the case and when, and each resolution is an
 resolved case is never resolved again. A hide stamps `p4k_hidden_at` on the row. A GUID conflict
 between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMergeConflictRecorder`),
 is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
+A hide and an assignment evict the P4K-written caches after the commit and publish the global
+`CATALOGUE` event, as a committed APPLY does (REQ-DATA-011, `P4kCatalogueChange`).
 
-**Enforced by:** `P4kReviewServiceTest`, `AdminP4kImportPageControllerMvcTest`,
+**Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2886, #2888
 
