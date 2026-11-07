@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,8 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Migration test for {@code V346__add_game_item_p4k_attribute_columns.sql} (REQ-P4K-017): a row the
- * P4K seeded gets its name, manufacturer and mass as the P4K's own values; no other row does, and
- * the P4K class is one of the five classes.
+ * P4K seeded gets its name, manufacturer and mass as the P4K's own values, a row an earlier import
+ * matched gets its name, no other row gets any, and the P4K class is one of the five classes.
  */
 @SpringBootTest
 @Transactional
@@ -60,6 +61,18 @@ class V346MigrationTest {
         .containsEntry("p4k_name", "V346 Seeded shield")
         .containsEntry("p4k_mass", 120.0);
     assertThat(p4kValues(uex)).containsEntry("p4k_name", null).containsEntry("p4k_mass", null);
+  }
+
+  @Test
+  void theBackfillKeepsTheNameOfARowAnEarlierImportMatched_andOnlyItsName() throws IOException {
+    UUID matched = insertItem("V346 Matched shield", "BOTH", 95.0);
+    jdbcTemplate.update("UPDATE game_item SET p4k_synced_at = now() WHERE id = ?", matched);
+
+    runBackfill();
+
+    assertThat(p4kValues(matched))
+        .containsEntry("p4k_name", "V346 Matched shield")
+        .containsEntry("p4k_mass", null);
   }
 
   @Test
@@ -90,15 +103,15 @@ class V346MigrationTest {
     return jdbcTemplate.queryForMap("SELECT p4k_name, p4k_mass FROM game_item WHERE id = ?", id);
   }
 
-  /** Runs the script's last statement, the backfill; the columns it adds exist already. */
+  /** Runs the script's backfill statements in order; the columns it adds exist already. */
   private void runBackfill() throws IOException {
     try (InputStream in = V346MigrationTest.class.getResourceAsStream(SCRIPT)) {
       assertThat(in).isNotNull();
       String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-      String backfill =
-          Arrays.stream(sql.split(";")).filter(s -> !s.isBlank()).reduce((_, b) -> b).orElseThrow();
-      assertThat(backfill).contains("UPDATE game_item");
-      jdbcTemplate.execute(backfill);
+      List<String> backfill =
+          Arrays.stream(sql.split(";")).filter(s -> s.contains("UPDATE game_item")).toList();
+      assertThat(backfill).hasSize(2);
+      backfill.forEach(jdbcTemplate::execute);
     }
   }
 }

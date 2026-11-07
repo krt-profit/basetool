@@ -232,15 +232,15 @@ public class ScWikiItemSyncService {
     if (!uuid.equals(dto.uuid())) {
       throw new SourceIdentityMismatchException(uuid, dto.uuid());
     }
-    GameItem item = gameItemRepository.findByExternalUuid(uuid).orElse(null);
+    GameItem item = gameItemRepository.findBySourceUuid(uuid).orElse(null);
     final boolean isNew = item == null;
     if (item == null) {
       item = new GameItem();
-      item.setExternalUuid(uuid);
       item.setName(StringUtils.hasText(dto.name()) ? dto.name() : uuid.toString());
       item.setKind(GameItemKind.GENERIC);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     }
+    item.setExternalUuid(uuid);
     fieldWriter.apply(item, dto, runId, now);
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
@@ -680,7 +680,7 @@ public class ScWikiItemSyncService {
       Instant now,
       @Nullable Manufacturer resolvedManufacturer,
       @Nullable UUID reconcileUexId) {
-    GameItem item = gameItemRepository.findByExternalUuid(dto.uuid()).orElse(null);
+    GameItem item = gameItemRepository.findBySourceUuid(dto.uuid()).orElse(null);
     if (item == null) {
       if (ScWikiItemFieldWriter.shouldSkipNewItem(dto)) {
         syncReportService.logScwikiEvent(
@@ -717,6 +717,7 @@ public class ScWikiItemSyncService {
       return BackfillOutcome.CREATED;
     }
 
+    item.setExternalUuid(dto.uuid());
     boolean reconciled = false;
     if (reconcileUexId != null) {
       GameItem survivor =

@@ -23,3 +23,10 @@ SET p4k_name            = name,
     p4k_manufacturer_id = manufacturer_id,
     p4k_mass            = mass
 WHERE source_systems = 'P4K';
+
+-- A row an earlier P4K import matched (p4k_synced_at) holds the name that import led, so p4k_name
+-- keeps the SC Wiki and UEX name guards on it until an APPLY mirrors the column.
+UPDATE game_item
+SET p4k_name = name
+WHERE p4k_synced_at IS NOT NULL
+  AND p4k_name IS NULL;

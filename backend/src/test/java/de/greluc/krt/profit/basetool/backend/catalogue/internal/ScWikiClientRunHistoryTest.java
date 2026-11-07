@@ -84,6 +84,7 @@ class ScWikiClientRunHistoryTest {
 
   @BeforeEach
   void setUp() throws Exception {
+    lenient().when(items.findBySourceUuid(any())).thenCallRealMethod();
     server = new MockWebServer();
     server.start();
     ScWikiProperties properties =

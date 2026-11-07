@@ -221,7 +221,10 @@ admin's hide included) onto the survivor before the
 retired row is archived; and a survivor with a P4K GUID, like a P4K-seeded one, keeps its name and
 manufacturer against the UEX values. `p4k_uuid` becomes unique per kind in the
 same release (V343): the migration first clears `p4k_uuid` on every row of a duplicate group, then
-adds the unique index, and the next APPLY matches those rows again.
+adds the unique index, and the next APPLY matches those rows again. The SC Wiki and UEX item syncs
+take the same view of the key: they look a record's UUID up as `external_uuid`, then as the
+`p4k_uuid` of a row without an `external_uuid` (`GameItemRepository.findBySourceUuid`), so a
+P4K-seeded item gains its Wiki UUID instead of a second row.
 
 **Acceptance**
 
@@ -233,8 +236,10 @@ adds the unique index, and the next APPLY matches those rows again.
   uniqueness.
 - [x] The Wiki/UEX duplicate merge refuses two different P4K GUIDs with a review case per GUID,
   moves a GUID only the retired row holds, and keeps a P4K-matched survivor's name.
+- [x] A Wiki or UEX item sync of a P4K-seeded item's GUID writes onto that row and creates none.
 
 **Enforced by:** `P4kIdentityCleanupTest`, `V343MigrationTest`, `ItemReconciliationServiceTest`,
+`ScWikiItemSyncServiceBackfillTest`, `ScWikiItemSyncServiceClosureTest`, `UexItemSyncServiceTest`,
 `P4kMergeConflictRecorderTest`, `P4kRowIndexTest`, `P4kItemParticipationTest` · **Code:**
 `P4kRowMatcher`, `P4kRowIndex`, `P4kItemParticipation`, `P4kMergeConflictRecorder` ·
 **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #3029
@@ -532,7 +537,9 @@ name. The Wiki/UEX duplicate merge applies the same rule to the survivor.
 
 The P4K's own value of each attribute is kept in a column of its own (`p4k_name`,
 `p4k_manufacturer_id`, `p4k_type`, `p4k_sub_type`, `p4k_size`, `p4k_grade_raw`, `p4k_item_class`,
-`p4k_mass`; V346), mirrored by every APPLY, a `null` included. The displayed columns are `name`,
+`p4k_mass`; V346), mirrored by every APPLY, a `null` included. V346 fills `p4k_name`,
+`p4k_manufacturer_id` and `p4k_mass` from the displayed columns on a P4K-seeded row, and `p4k_name`
+on every other row an earlier import matched (`p4k_synced_at`). The displayed columns are `name`,
 `manufacturer_id`, `wiki_type`, `wiki_sub_type`, `size_class`, `grade`, `item_class` and `mass`; an
 APPLY overwrites one only with a non-null P4K value, so a P4K value that turns `null` leaves the
 displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4k_*` column is
