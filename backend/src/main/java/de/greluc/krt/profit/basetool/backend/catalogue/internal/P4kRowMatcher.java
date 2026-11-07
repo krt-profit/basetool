@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.jetbrains.annotations.NotNull;
@@ -87,6 +88,59 @@ public record P4kRowMatcher<T extends P4kKeyedRow>(
    * @param <T> the row type
    */
   public record Held<T>() implements Match<T> {}
+
+  /**
+   * Writes the values a reconciler's kind leads onto a matched row.
+   *
+   * @param <T> the row type
+   */
+  @FunctionalInterface
+  public interface Enricher<T> {
+
+    /**
+     * Writes onto a matched row, before the run stamps it.
+     *
+     * @param row the matched row
+     * @param guid the record's GUID
+     * @return whether a field changed
+     */
+    boolean enrich(@NotNull T row, @NotNull UUID guid);
+  }
+
+  /**
+   * Matches one record and handles the outcome the way every reconciler does: a matched row is
+   * enriched, stamped, indexed under the keys it now holds and counted; an unmatched record goes to
+   * the reconciler's own rule; a held one is already on the review list.
+   *
+   * @param record the record
+   * @param className the record's class-name key, or {@code null} to skip that step
+   * @param name the record's name key, or {@code null} to skip that step
+   * @param creatable whether the current seeding rule of the kind would create the record
+   * @param context the run
+   * @param rows the kind's row index
+   * @param enricher writes the led values onto a matched row
+   * @param unmatched handles a record without a row, given its GUID or {@code null}
+   */
+  public void reconcile(
+      @NotNull P4kRecord record,
+      @Nullable String className,
+      @Nullable String name,
+      boolean creatable,
+      @NotNull P4kImportContext context,
+      @NotNull P4kRowIndex<T> rows,
+      @NotNull Enricher<T> enricher,
+      @NotNull Consumer<UUID> unmatched) {
+    switch (match(record, className, name, creatable, context)) {
+      case Matched<T>(T row, UUID guid) -> {
+        boolean changed = enricher.enrich(row, guid);
+        context.stamp(kind, record, row, guid);
+        rows.add(row);
+        context.getReport().matched(kind, changed);
+      }
+      case Unmatched<T>(UUID guid) -> unmatched.accept(guid);
+      case Held<T> _ -> {}
+    }
+  }
 
   /**
    * Matches one record.

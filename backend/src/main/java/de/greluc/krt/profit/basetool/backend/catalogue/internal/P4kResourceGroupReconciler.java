@@ -82,28 +82,31 @@ public class P4kResourceGroupReconciler {
     for (P4kResourceGroupDto group : catalogue.resourceGroups()) {
       UUID parsed = group.parsedGuid();
       boolean creatable = parsed != null && referenced.contains(parsed);
-      P4kRowMatcher.Match<MaterialCategory> match =
-          matcher.match(group, group.className(), group.nameEn(), creatable, context);
-      if (match
-          instanceof P4kRowMatcher.Matched<MaterialCategory>(MaterialCategory row, UUID guid)) {
-        P4kRowWriter writer = new P4kRowWriter(context, P4kKind.RESOURCE_GROUP, group);
-        writeNames(writer, row, group);
-        context.stamp(P4kKind.RESOURCE_GROUP, group, row, guid);
-        stored.add(row);
-        context.indexResourceGroup(guid, row);
-        rows.put(group, row);
-        context.getReport().matched(P4kKind.RESOURCE_GROUP, writer.isChanged());
-      } else if (match instanceof P4kRowMatcher.Unmatched<MaterialCategory>(UUID guid)) {
-        MaterialCategory created = creatable ? create(group, guid, context) : null;
-        if (created == null) {
-          context.getReport().unmatched(P4kKind.RESOURCE_GROUP, group);
-        } else {
-          if (context.isApply()) {
-            stored.add(created);
-          }
-          rows.put(group, created);
-        }
-      }
+      matcher.reconcile(
+          group,
+          group.className(),
+          group.nameEn(),
+          creatable,
+          context,
+          stored,
+          (row, guid) -> {
+            P4kRowWriter writer = new P4kRowWriter(context, P4kKind.RESOURCE_GROUP, group);
+            writeNames(writer, row, group);
+            context.indexResourceGroup(guid, row);
+            rows.put(group, row);
+            return writer.isChanged();
+          },
+          guid -> {
+            MaterialCategory created = creatable ? create(group, guid, context) : null;
+            if (created == null) {
+              context.getReport().unmatched(P4kKind.RESOURCE_GROUP, group);
+            } else {
+              if (context.isApply()) {
+                stored.add(created);
+              }
+              rows.put(group, created);
+            }
+          });
     }
     rows.forEach((group, row) -> linkParent(group, row, rows.size(), context));
   }

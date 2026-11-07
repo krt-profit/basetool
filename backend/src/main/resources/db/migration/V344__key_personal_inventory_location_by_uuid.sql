@@ -71,7 +71,7 @@ ALTER TABLE personal_inventory_item
 
 CREATE INDEX idx_personal_inventory_item_location ON personal_inventory_item (location_id);
 
-ALTER TABLE personal_inventory_item DROP CONSTRAINT ck_personal_inventory_item_location_type;
+ALTER TABLE personal_inventory_item DROP CONSTRAINT IF EXISTS ck_personal_inventory_item_location_type;
 
 ALTER TABLE personal_inventory_item DROP COLUMN location_uex_id;
 

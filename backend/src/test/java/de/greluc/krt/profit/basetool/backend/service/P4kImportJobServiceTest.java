@@ -278,19 +278,32 @@ class P4kImportJobServiceTest {
   }
 
   @Test
-  void deletePayload_deletesOnlyWhenPresent() {
+  void deletePayload_deletesTheRowWithoutLoadingTheUpload() {
     UUID id = UUID.randomUUID();
-    when(payloadRepository.existsById(id)).thenReturn(true);
     service.deletePayload(id);
-    verify(payloadRepository).deleteById(id);
+    verify(payloadRepository).deleteByJobId(id);
+    verify(payloadRepository, never()).findById(any());
   }
 
   @Test
-  void deletePayload_isNoOpWhenAlreadyGone() {
+  void thePreviewReport_isStoredAndReadWithoutLoadingTheUpload() {
     UUID id = UUID.randomUUID();
-    when(payloadRepository.existsById(id)).thenReturn(false);
-    service.deletePayload(id);
-    verify(payloadRepository, never()).deleteById(any());
+    byte[] report = {1, 2, 3};
+    when(payloadRepository.storePreviewReport(id, report)).thenReturn(1);
+    when(payloadRepository.findPreviewReport(id)).thenReturn(Optional.of(report));
+
+    service.storePreviewReport(id, report);
+
+    assertArrayEquals(report, service.loadPreviewReport(id).orElseThrow());
+    verify(payloadRepository, never()).findById(any());
+  }
+
+  @Test
+  void storingAPreviewReport_withoutAPayload_isAnError() {
+    UUID id = UUID.randomUUID();
+    when(payloadRepository.storePreviewReport(eq(id), any())).thenReturn(0);
+
+    assertThrows(IllegalStateException.class, () -> service.storePreviewReport(id, new byte[] {1}));
   }
 
   @Test

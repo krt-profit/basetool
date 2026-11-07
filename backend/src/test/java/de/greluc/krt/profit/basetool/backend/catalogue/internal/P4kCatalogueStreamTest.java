@@ -83,6 +83,19 @@ class P4kCatalogueStreamTest {
   }
 
   @Test
+  void theLimitReachedWhileARecordIsBound_isStillReportedAsTooLarge() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD)
+        .put("className", "A".repeat(200_000));
+    byte[] gzip = P4kTestCatalogues.gzip(P4kTestCatalogues.bytes(root));
+    String json = new String(P4kTestCatalogues.bytes(root), StandardCharsets.UTF_8);
+    long insideTheLongClassName = json.indexOf("AAAA") + 100_000L;
+
+    assertThatThrownBy(() -> read(gzip, insideTheLongClassName))
+        .isInstanceOf(P4kContentTooLargeException.class);
+  }
+
+  @Test
   void liveSizedZstdCatalogue_readsWithAHeapBoundWellBelowItsSize() throws IOException {
     byte[] zstd = liveSizedZstd();
     System.gc();

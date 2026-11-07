@@ -287,6 +287,39 @@ class P4kImportJobRunnerTest {
   }
 
   @Test
+  void run_apply_whoseSuccessCannotBeRecorded_isNeverMarkedFailed_andStillAnnounced() {
+    UUID id = UUID.randomUUID();
+    byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    when(jobService.loadPayload(id)).thenReturn(bytes);
+    UUID admin = stubAdmin(id, false);
+    when(importService.applyImport(
+            bytes, new P4kImportService.P4kApplyRequest(id, admin, false, false)))
+        .thenReturn(someResult());
+    doThrow(new IllegalStateException("database gone"))
+        .when(jobService)
+        .markSucceeded(eq(id), anyString());
+
+    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.APPLY, ADMIN));
+
+    verify(jobService, never()).markFailed(any(), anyString());
+    verify(cacheEvictionService).evictP4kSyncedMasterData();
+    verify(jobService).deletePayload(id);
+  }
+
+  @Test
+  void run_whoseFailureCannotBeRecorded_doesNotThrow_andStillHousekeeps() {
+    UUID id = UUID.randomUUID();
+    when(jobService.loadPayload(id)).thenThrow(new IllegalStateException("payload gone"));
+    doThrow(new IllegalStateException("database gone"))
+        .when(jobService)
+        .markFailed(eq(id), anyString());
+
+    assertDoesNotThrow(() -> runner.run(id, P4kImportJobKind.PREVIEW, ADMIN));
+
+    verify(jobService).pruneOldJobs();
+  }
+
+  @Test
   void run_apply_actsUnderTheEnqueuingAdmin_andRestoresTheThreadAfterwards() {
     UUID id = UUID.randomUUID();
     byte[] bytes = "{}".getBytes(StandardCharsets.UTF_8);

@@ -87,6 +87,7 @@ public class P4kImportService {
   private final P4kRejections rejections;
   private final SyncReportService syncReportService;
   private final AuditRecorder auditRecorder;
+  private final P4kCatalogueRevision revision;
 
   /**
    * What an APPLY needs besides the catalogue.
@@ -180,6 +181,7 @@ public class P4kImportService {
         auditDetails(run, result)
             .with("adminCategoriesRetired", context.getAdminCategoriesRetired()));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
+    revision.changed();
     log.info("P4K import applied (run {}): {}", run.getId(), summary(result, context.getReport()));
     return result;
   }

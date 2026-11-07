@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -89,7 +88,10 @@ public final class P4kImportContext {
    */
   private final Map<UUID, P4kManufacturerDto> unmatchedManufacturers = new LinkedHashMap<>();
 
-  /** The manufacturer names the run wrote or seeded, lower-cased, with their claim. */
+  /**
+   * The manufacturer names the run wrote or seeded, folded ({@code P4kMatchKeys}), with their
+   * claim.
+   */
   private final Map<String, NameClaim> manufacturerNames = new HashMap<>();
 
   /** The manufacturer rows, indexed once when the manufacturers are reconciled. */
@@ -110,10 +112,13 @@ public final class P4kImportContext {
   /** The rows the run matched or created, per kind and P4K GUID. */
   private final Map<P4kKind, Map<UUID, P4kKeyedRow>> stamped = new EnumMap<>(P4kKind.class);
 
-  /** The lower-cased class names several records of a kind share; they never match by fallback. */
+  /** The row ids by P4K GUID the cross-kind references of the run read, per kind. */
+  private final Map<P4kKind, P4kRowIds> rowIds = new EnumMap<>(P4kKind.class);
+
+  /** The folded class names several records of a kind share; they never match by fallback. */
   private final Map<P4kKind, Set<String>> repeatedClassNames = new EnumMap<>(P4kKind.class);
 
-  /** The lower-cased names several records of a kind share; they never match by fallback. */
+  /** The folded names several records of a kind share; they never match by fallback. */
   private final Map<P4kKind, Set<String>> repeatedNames = new EnumMap<>(P4kKind.class);
 
   /**
@@ -269,6 +274,18 @@ public final class P4kImportContext {
   @Unmodifiable
   public Map<UUID, P4kKeyedRow> stampedRows(@NotNull P4kKind kind) {
     return Map.copyOf(stamped.getOrDefault(kind, Map.of()));
+  }
+
+  /**
+   * Returns the row ids of a kind, read on first use and kept for the rest of the run.
+   *
+   * @param kind the kind
+   * @param reader reads the kind's row ids
+   * @return the row ids
+   */
+  @NotNull
+  P4kRowIds rowIds(@NotNull P4kKind kind, @NotNull Function<P4kKind, P4kRowIds> reader) {
+    return rowIds.computeIfAbsent(kind, reader);
   }
 
   /**
@@ -466,7 +483,7 @@ public final class P4kImportContext {
    * @param rowId the holding row, {@code null} for a preview's seed
    */
   public void claimManufacturerName(@NotNull String name, @Nullable UUID rowId) {
-    manufacturerNames.put(normalise(name), new NameClaim(rowId));
+    manufacturerNames.put(P4kMatchKeys.fold(name), new NameClaim(rowId));
   }
 
   /**
@@ -478,7 +495,7 @@ public final class P4kImportContext {
    */
   @Nullable
   public NameClaim manufacturerNameClaim(@NotNull String name) {
-    return manufacturerNames.get(normalise(name));
+    return manufacturerNames.get(P4kMatchKeys.fold(name));
   }
 
   /**
@@ -508,7 +525,7 @@ public final class P4kImportContext {
    *
    * @param records the records of a kind
    * @param key reads the key of a record
-   * @return the repeated values, lower-cased
+   * @return the repeated values, folded
    */
   @NotNull
   private static Set<String> repeated(
@@ -517,8 +534,8 @@ public final class P4kImportContext {
     Set<String> repeated = new HashSet<>();
     for (P4kRecord record : records) {
       String value = key.apply(record);
-      if (value != null && !value.isBlank() && !seen.add(normalise(value))) {
-        repeated.add(normalise(value));
+      if (value != null && !value.isBlank() && !seen.add(P4kMatchKeys.fold(value))) {
+        repeated.add(P4kMatchKeys.fold(value));
       }
     }
     return repeated;
@@ -534,17 +551,6 @@ public final class P4kImportContext {
    */
   private static boolean isIn(
       @NotNull Map<P4kKind, Set<String>> repeated, @NotNull P4kKind kind, @Nullable String key) {
-    return key != null && repeated.getOrDefault(kind, Set.of()).contains(normalise(key));
-  }
-
-  /**
-   * Normalises a match key.
-   *
-   * @param key the key
-   * @return the trimmed, lower-cased key
-   */
-  @NotNull
-  private static String normalise(@NotNull String key) {
-    return key.strip().toLowerCase(Locale.ROOT);
+    return key != null && repeated.getOrDefault(kind, Set.of()).contains(P4kMatchKeys.fold(key));
   }
 }

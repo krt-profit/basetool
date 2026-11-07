@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeD
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayload;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobPayloadRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunner;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportResultDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kPreviewReportCodec;
@@ -81,6 +82,7 @@ class P4kImportReportControllerMvcTest {
   @Autowired private P4kImportService importService;
   @Autowired private P4kImportJobRepository jobRepository;
   @Autowired private P4kImportJobPayloadRepository payloadRepository;
+  @Autowired private P4kImportJobService jobService;
   @Autowired private P4kPreviewReportCodec reportCodec;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private P4kReviewCaseRepository caseRepository;
@@ -176,9 +178,10 @@ class P4kImportReportControllerMvcTest {
     P4kImportJobPayload payload = new P4kImportJobPayload();
     payload.setJobId(preview.getId());
     payload.setContent(new byte[] {0});
-    payload.setPreviewReport(
-        reportCodec.encode(computed.changes().stream().map(P4kImportChangeDto::of).toList()));
     payloadRepository.saveAndFlush(payload);
+    jobService.storePreviewReport(
+        preview.getId(),
+        reportCodec.encode(computed.changes().stream().map(P4kImportChangeDto::of).toList()));
 
     mockMvc
         .perform(asAdmin(get(BASE + "/jobs/" + preview.getId() + "/changes").param("kind", "ITEM")))

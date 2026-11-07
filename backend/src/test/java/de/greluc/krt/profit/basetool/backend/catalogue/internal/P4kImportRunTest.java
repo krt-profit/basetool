@@ -122,6 +122,18 @@ class P4kImportRunTest {
   }
 
   @Test
+  void aPublicPatchThatIsNoVersion_readsAsUnset() {
+    assertThat(P4kPatchVersion.of(new P4kBuild("sc-alpha-4.10.2", "v", "1", "b", "LIVE")))
+        .isEqualTo(new P4kPatchVersion("4.10.2", P4kPatchVersionOrigin.BRANCH_LOWER_BOUND));
+    assertThat(P4kPatchVersion.of(new P4kBuild("sc-alpha-4.10", "v", "1", "b", "4.10.2-hotfix")))
+        .isNull();
+    assertThat(
+            P4kPatchVersion.of(
+                new P4kBuild("sc-alpha-4.10", "v", "1", "b", "4.10.2" + "0".repeat(40))))
+        .isNull();
+  }
+
+  @Test
   void everyMatchedRow_carriesTheRun_alsoWhenNoValueChanged() {
     GameItem shield = new GameItem();
     shield.setName("Run test shield");

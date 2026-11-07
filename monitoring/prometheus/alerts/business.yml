@@ -565,6 +565,16 @@ groups:
           summary: "Oldest pending P4K import >6h"
           description: "A P4K catalog import has been PENDING for more than 6 hours — imports normally finish in minutes, so the async worker is likely wedged. Check the backend logs and re-run the import."
 
+      # An APPLY waits up to krt.sync.coordinator.max-wait-ms (1 h) for the sync lock while RUNNING.
+      - alert: P4kImportRunningStuck
+        expr: max(basetool_p4k_import_job_pending_count{status="RUNNING"}) > 0
+        for: 3h
+        labels:
+          severity: warning
+        annotations:
+          summary: "A P4K import has been RUNNING for more than 3h"
+          description: "A P4K import job has stayed RUNNING for more than 3 hours — a run takes minutes plus at most one hour waiting for the sync lock, so the worker is wedged or the job's end could not be recorded. Check the backend log for the job; a backend restart marks it FAILED (REQ-OBS-011)."
+
       - alert: JobOrderStale
         expr: basetool_job_order_open_oldest_age_seconds > 15552000
         for: 1h

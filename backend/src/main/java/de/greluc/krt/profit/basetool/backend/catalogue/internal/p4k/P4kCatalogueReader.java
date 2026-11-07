@@ -86,7 +86,7 @@ public class P4kCatalogueReader {
       }
       return head.build();
     } catch (JacksonException e) {
-      throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
+      throw notCatalogue(e);
     }
   }
 
@@ -98,6 +98,7 @@ public class P4kCatalogueReader {
    * @param in the decompressed catalogue
    * @return the catalogue
    * @throws P4kCatalogueFormatException when the content is not catalogue JSON
+   * @throws P4kContentTooLargeException when the content passes the decompressed limit
    */
   @NotNull
   public P4kCatalogue read(@NotNull InputStream in) {
@@ -147,7 +148,7 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.BLUEPRINT_CATEGORY, P4kBlueprintCategoryDto.class),
           P4kCraftingReferences.of(properties, processes, craftingGlobal));
     } catch (JacksonException e) {
-      throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
+      throw notCatalogue(e);
     }
   }
 
@@ -158,6 +159,7 @@ public class P4kCatalogueReader {
    * @param in the decompressed catalogue
    * @param action receives each loadout in catalogue order
    * @throws P4kCatalogueFormatException when the content is not catalogue JSON
+   * @throws P4kContentTooLargeException when the content passes the decompressed limit
    */
   public void readLoadouts(@NotNull InputStream in, @NotNull Consumer<P4kLoadoutDto> action) {
     try (JsonParser parser = openObject(in)) {
@@ -177,8 +179,26 @@ public class P4kCatalogueReader {
         }
       }
     } catch (JacksonException e) {
-      throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
+      throw notCatalogue(e);
     }
+  }
+
+  /**
+   * Translates a Jackson failure. Jackson wraps an exception the stream throws while it binds a
+   * record, so the decompressed limit reached mid-record arrives as a cause, not on its own.
+   *
+   * @param e the failure
+   * @return the limit's {@link P4kContentTooLargeException} when it caused the failure, else a
+   *     {@link P4kCatalogueFormatException}
+   */
+  @NotNull
+  private static RuntimeException notCatalogue(@NotNull JacksonException e) {
+    for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+      if (cause instanceof P4kContentTooLargeException tooLarge) {
+        return tooLarge;
+      }
+    }
+    return new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
   }
 
   /**

@@ -155,7 +155,8 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
   vanished, reappeared, changed), the uploading admin and the apply time. A PREVIEW writes no run.
   Runs are never pruned; the reference to `p4k_import_job` is `ON DELETE SET NULL`, since jobs are
   pruned by age.
-- **Patch version:** `source.build.publicPatch` when it is set; p4kx reads it from the RSI
+- **Patch version:** `source.build.publicPatch` when it is set and reads `major.minor.patch` (a
+  value of any other shape reads as unset); p4kx reads it from the RSI
   Launcher's install log and writes `null` until the launcher logs this build. The archive holds no
   public patch number (p4kx ADR-0053), and a branch serves several public patches (4.7.0, 4.7.1 and
   4.7.2 all came from `sc-alpha-4.7.0`). When `publicPatch` is `null`, the run keeps the version
@@ -174,7 +175,8 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
 - [x] An APPLY writes one run with the Build, completeness and counts; a PREVIEW writes none.
 - [x] A run with `publicPatch` `4.10.2` records the public patch `4.10.2`; one with `publicPatch`
   `null` and branch `sc-alpha-4.10.2` records the branch lower bound `4.10.2` and shows it as a
-  branch; one with branch `sc-alpha-4.10` or `sc-beta-4.10.2` records no version.
+  branch; one with branch `sc-alpha-4.10` or `sc-beta-4.10.2` records no version; a `publicPatch`
+  such as `LIVE` falls back to the branch rule.
 - [x] Every matched row carries the run's id, also when no value changed.
 - [x] Pruning the job leaves the run with a `null` job reference.
 

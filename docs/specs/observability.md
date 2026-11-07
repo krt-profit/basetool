@@ -2107,7 +2107,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (> 180 d) / `RefineryOrderStale` / `OperationStale` (> 90 d since 2026-08-29, raised from 30 d the
   first time the queue was measured — the oldest open refinery order stood at 29.65 d, hours from
   firing on five orders nobody had called abandoned; #1707). All three are baselines, and measuring
-  the queue is how they get revisited. Every one of these gauges is registered eagerly in
+  the queue is how they get revisited. The P4K queue's `{status="RUNNING"}` count also drives
+  `P4kImportRunningStuck`: a job RUNNING for more than 3 h (a run takes minutes plus at most the
+  one-hour wait for the sync lock) is wedged, or its end could not be recorded.
+  Every one of these gauges is registered eagerly in
   `BusinessMetricsCollector.registerGauges()` (`@PostConstruct`, which has every source register), so an empty queue reports `0` and
   there is no `absent()` ambiguity — unlike the last-success gauge, which is registered lazily and
   needed the never-succeeded companion above.
@@ -4055,8 +4058,8 @@ The P4K catalogue import ([`p4k-catalogue.md`](p4k-catalogue.md),
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md))
 is observable on three axes: whether a new import is due, what the last applied run did, and which
 uploads the gate refused. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
-`basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` / `P4kImportFailed`
-of REQ-OBS-011 stay as they are; they are where a failed APPLY shows, since `p4k_import_run` holds
+`basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` /
+`P4kImportRunningStuck` / `P4kImportFailed` of REQ-OBS-011 stay as they are; they are where a failed APPLY shows, since `p4k_import_run` holds
 successful runs only. A P4K APPLY writes no `external_sync_run` attempt, so the `CatalogueAttempt*`
 alerts never carry `source="P4K"`.
 
@@ -4112,7 +4115,10 @@ alerts never carry `source="P4K"`.
   ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md)). The blueprint categories
   are `kind="BLUEPRINT_CATEGORY"` (REQ-P4K-027). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
-  change report records a skipped sweep.
+  change report records a skipped sweep. The run, stamp and case counts are read again only after
+  an APPLY or a review resolution (`P4kCatalogueRevision`) or at the latest after an hour, which
+  bounds what a Wiki or UEX merge of two P4K rows leaves stale; the due gauge and the oldest open
+  case's age are fresh on every sample.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the
   synchronous gate refuses, with `reason` one of `channel`, `schema_version`, `build_missing`,
   `older_build` and `too_large`; every reason's series is registered at zero at start, so the first
@@ -4123,7 +4129,8 @@ alerts never carry `source="P4K"`.
   `P4kImportItemClassNullShareRose`, the `itemClass` `null` share rose by more than 5 percentage
   points against the previous run; `P4kReviewCaseStale`, the oldest open review case is older than
   30 days; `P4kImportChannelRejected`, a `reason="channel"` refusal within 24 h, which means a
-  test-Channel catalogue was uploaded to production.
+  test-Channel catalogue was uploaded to production; `P4kImportRunningStuck` (REQ-OBS-011), a job
+  RUNNING for more than 3 h.
 - **Dashboard.** The Grafana dashboard "P4K catalogue" (`12-p4k-catalogue.json`, uid
   `basetool-p4k-catalogue`) shows the panels above. They do not go into
   `07-basetool-operations.json`.
@@ -4133,7 +4140,7 @@ alerts never carry `source="P4K"`.
 - [x] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
   stays off for an equal or older one, and holds with no successful APPLY run of known version
   (`P4kImportDueTest`).
-- [x] A run's version is `publicPatch`, else the lower bound of an exact
+- [x] A run's version is a `major.minor.patch` `publicPatch`, else the lower bound of an exact
   `sc-alpha-<major>.<minor>.<patch>` branch, else unknown; the run records which it is, and a UEX
   version above a branch lower bound reads as due (`P4kImportRunTest`, `P4kImportDueTest`).
 - [x] The banner shows on `/admin/p4k-import` while the signal holds (`AdminP4kImportDueMvcTest`);

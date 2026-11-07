@@ -101,6 +101,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexIdentityCensus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
@@ -489,6 +490,7 @@ class ArchitectureTest {
           JobOrderItemStockEntryDto.class,
           JobOrderItemStockGroupDto.class,
           UexValues.class,
+          P4kGuids.class,
           UserDto.class,
           UserDtoRedaction.class,
           UserReferenceDto.class);

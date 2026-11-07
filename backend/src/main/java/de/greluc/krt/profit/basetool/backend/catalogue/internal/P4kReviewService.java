@@ -80,6 +80,7 @@ public class P4kReviewService {
   private final P4kCatalogueChange catalogueChange;
   private final CatalogueAdminLiveSync adminLiveSync;
   private final SyncCoordinator syncCoordinator;
+  private final P4kCatalogueRevision revision;
 
   /** This service's proxy, so a resolution's transaction runs inside the lock. */
   private final ObjectProvider<P4kReviewService> self;
@@ -219,6 +220,7 @@ public class P4kReviewService {
       reviewCase.setRowId(material.getId());
     }
     caseRepository.saveAndFlush(reviewCase);
+    revision.changed();
     if (resolution != P4kReviewResolution.KEEP) {
       catalogueChange.announce();
     }
