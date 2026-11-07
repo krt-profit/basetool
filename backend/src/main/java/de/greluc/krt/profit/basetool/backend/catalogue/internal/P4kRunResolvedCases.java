@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -75,7 +76,29 @@ public class P4kRunResolvedCases {
       @NotNull List<P4kReviewReason> reasons,
       @NotNull Set<Found> found,
       @NotNull Instant now) {
+    settleWithin(kind, reasons, found, _ -> true, now);
+  }
+
+  /**
+   * Settles the cases of the given reasons as {@link #settle} does, but only those whose GUID the
+   * run evaluated; a case of a record a partial catalogue left out stays as it is (REQ-P4K-006).
+   *
+   * @param kind the kind
+   * @param reasons the reasons the caller owns
+   * @param found the cases this run found
+   * @param evaluated whether the run evaluated the record of a case GUID
+   * @param now the run time, stamped on the closed cases
+   */
+  public void settleWithin(
+      @NotNull P4kKind kind,
+      @NotNull List<P4kReviewReason> reasons,
+      @NotNull Set<Found> found,
+      @NotNull Predicate<UUID> evaluated,
+      @NotNull Instant now) {
     for (P4kReviewCase reviewCase : caseRepository.findByKindAndReasonIn(kind, reasons)) {
+      if (!evaluated.test(reviewCase.getGuid())) {
+        continue;
+      }
       boolean foundAgain = found.contains(new Found(reviewCase.getGuid(), reviewCase.getReason()));
       if (foundAgain && reviewCase.getResolution() == P4kReviewResolution.RESOLVED) {
         reviewCase.setStatus(P4kReviewStatus.OPEN);

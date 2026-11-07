@@ -242,6 +242,28 @@ class P4kShopTerminalLinkTest {
   }
 
   @Test
+  void aRunThatLeavesTheShopOut_leavesItsCaseOpen() {
+    runs.apply(catalogue(AREA18), false);
+    assertThat(openCase(P4kReviewReason.SHOP_LINK_NOT_FOUND)).isTrue();
+    ObjectNode partial =
+        P4kStarmapFixtures.catalogue(
+            P4kStarmapFixtures.object(SYSTEM, "SolarSystem", P4kStarmapFixtures.SYSTEM, null),
+            P4kStarmapFixtures.object(ARCCORP, "Planet", "Krt ArcCorp", SYSTEM),
+            P4kStarmapFixtures.object(AREA18, "LandingZone", CITY, ARCCORP));
+    partial
+        .putArray("shops")
+        .add(
+            P4kShopFixtures.shop(
+                "5b000000-0000-4000-8000-0000000000a1,5b000000-0000-4000-8000-0000000000a3",
+                P4kShopFixtures.CUBBY_BLAST,
+                AREA18));
+
+    runs.apply(P4kTestCatalogues.bytes(partial), false);
+
+    assertThat(openCase(P4kReviewReason.SHOP_LINK_NOT_FOUND)).isTrue();
+  }
+
+  @Test
   void aCaseALaterRunNoLongerFinds_isClosedAsResolved() {
     runs.apply(catalogue(AREA18), false);
     assertThat(openCase(P4kReviewReason.SHOP_LINK_NOT_FOUND)).isTrue();

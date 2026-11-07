@@ -1380,7 +1380,8 @@ like a starmap name and without spaces, at least three characters, matches when 
 registry name, entity name or brand, compacted the same way, contains it; the longest match wins
 (`ShopTerminalNames`). One candidate links; several or none leave the shop unlinked, one
 `UNMATCHED` row and one case `SHOP_LINK_AMBIGUOUS` or `SHOP_LINK_NOT_FOUND` of kind `SHOP` with the
-shop's GUID; a run that links the shop closes the case as `RESOLVED`. A shop whose record has no
+shop's GUID; a run that links the shop closes the case as `RESOLVED`, and a run whose catalogue
+leaves the shop out (a partial catalogue, REQ-P4K-006) leaves its case as it is. A shop whose record has no
 `starmapObjectGuid` has no place to link by: it is one `UNMATCHED` row of the change report and
 opens no case (owner decision, 2026-11-07), and a run closes such a shop's earlier case as
 `RESOLVED`. A link the

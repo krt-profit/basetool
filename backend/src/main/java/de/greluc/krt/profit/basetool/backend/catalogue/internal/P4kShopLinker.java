@@ -41,7 +41,8 @@ import org.springframework.stereotype.Component;
  * place is its own starmap link, else the link of its nearest linked UEX parent (REQ-P4K-035).
  * Several candidates or none leave the shop unlinked, count it as unmatched and open a review case;
  * a shop whose record names no place is only counted as unmatched, and a shop an admin linked or
- * unlinked by hand is left alone. A run closes the cases it no longer finds. The links are read as
+ * unlinked by hand is left alone. A run closes the cases of the shops it lists that it no longer
+ * finds; a shop a partial catalogue leaves out keeps its case (REQ-P4K-006). The links are read as
  * stored, so a preview links against the starmap links of the last APPLY.
  */
 @Component
@@ -69,8 +70,10 @@ public class P4kShopLinker {
       @NotNull List<P4kShopReconciler.Reconciled> shops, @NotNull P4kImportContext context) {
     Map<UUID, List<StarmapPlaceRow>> terminalsByPlace = terminalsByPlace();
     Set<P4kRunResolvedCases.Found> found = new HashSet<>();
+    Set<UUID> evaluated = new HashSet<>();
     Map<UUID, UUID> writes = new LinkedHashMap<>();
     for (P4kShopReconciler.Reconciled shop : shops) {
+      evaluated.add(shop.row().getP4kUuid());
       if (!shop.row().isTerminalLinkManual()) {
         linkShop(shop, terminalsByPlace, found, writes, context);
       }
@@ -81,7 +84,7 @@ public class P4kShopLinker {
             UuidArrayLiteral.of(writes.keySet()),
             UuidArrayLiteral.of(new ArrayList<>(writes.values())));
       }
-      runResolvedCases.settle(KIND, REASONS, found, context.getNow());
+      runResolvedCases.settleWithin(KIND, REASONS, found, evaluated::contains, context.getNow());
     }
   }
 
