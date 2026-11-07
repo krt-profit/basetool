@@ -89,8 +89,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipCatalogueFacts;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemNamePrecedence;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemIdentityCompatibility;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationIndex;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kDisplayName;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
@@ -373,8 +375,10 @@ class ArchitectureTest {
   static final Set<Class<?>> LEAF_HELPER_CLASSES =
       Set.of(
           ActingMemberAuthorities.class,
+          GameItemNamePrecedence.class,
           ItemIdentityCompatibility.class,
           ItemReconciliationIndex.class,
+          P4kDisplayName.class,
           ScWikiItemPasses.class,
           ScWikiProperties.class,
           CommodityMiningData.class,

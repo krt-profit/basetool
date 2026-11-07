@@ -863,6 +863,49 @@ class P4kImportServiceTest {
   }
 
   @Test
+  void item_matchedRowTakesTheArchiveNameOverAStaleUexName() {
+    UUID guid = UUID.fromString("6c46b8e3-81c8-4018-bce2-740b81174a00");
+    GameItem existing = new GameItem();
+    existing.setName("Breakneck S4 Gatling");
+    existing.setUexName("Breakneck S4 Gatling");
+    existing.setExternalUuid(guid);
+    existing.setClassName("BEHR_BallisticGatling_S6");
+    when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.of(existing));
+
+    String json =
+        "{\"items\":[{\"guid\":\""
+            + guid
+            + "\",\"className\":\"BEHR_BallisticGatling_S6\","
+            + "\"name\":\" AD6B Ballistic Gatling \"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), false);
+
+    assertEquals(1, result.items().enriched());
+    assertEquals("AD6B Ballistic Gatling", existing.getName());
+    assertEquals("Breakneck S4 Gatling", existing.getUexName());
+  }
+
+  @Test
+  void item_placeholderArchiveNameLeavesTheStoredNameAlone() {
+    UUID guid = UUID.randomUUID();
+    GameItem existing = new GameItem();
+    existing.setName("Arclight");
+    existing.setExternalUuid(guid);
+    existing.setClassName("wpn_arclight");
+    when(gameItemRepository.findByExternalUuid(guid)).thenReturn(Optional.of(existing));
+
+    String json =
+        "{\"items\":[{\"guid\":\""
+            + guid
+            + "\",\"className\":\"wpn_arclight\",\"name\":\"@LOC_PLACEHOLDER\"}]}";
+
+    P4kImportResultDto result = service.applyImport(upload(json), false);
+
+    assertEquals(0, result.items().enriched());
+    assertEquals("Arclight", existing.getName());
+  }
+
+  @Test
   void seededShipsAndMaterialsCarryTheNameKey() {
     UUID shipGuid = UUID.randomUUID();
     UUID commodityGuid = UUID.randomUUID();

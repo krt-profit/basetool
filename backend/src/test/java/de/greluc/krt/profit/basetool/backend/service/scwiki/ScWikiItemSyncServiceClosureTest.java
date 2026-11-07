@@ -328,7 +328,7 @@ class ScWikiItemSyncServiceClosureTest {
     assertEquals("An explorer helmet.", result.getDescriptionEn());
     assertEquals("Ein Forscherhelm.", result.getDescriptionDe());
     assertEquals(1, result.getSizeClass());
-    assertEquals("Venture Helmet", result.getName());
+    assertEquals("Venture Helmet White", result.getName(), "the Wiki name leads UEX (REQ-P4K-017)");
     assertEquals(GameItemKind.ARMOR, result.getKind());
   }
 

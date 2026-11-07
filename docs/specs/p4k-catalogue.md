@@ -377,14 +377,28 @@ the catalogue does not carry keep their source: the dimensions stay with the Wik
 and every price or terminal field with UEX. The admin acts on a disagreement at its source; there is
 no override column and no review status for item disagreements.
 
+**The canonical `name`** follows the same order: the import writes it on every matched row
+(`p4k_synced_at` set) when the catalogue carries a real name; the Wiki item sync writes it on a row
+the P4K does not know; UEX writes it only on a row with no name, or one that neither the P4K nor a
+live Wiki record (`scwiki_name` set, `scwiki_deleted_at` null) names. Each source keeps its own copy
+in `scwiki_name` / `uex_name`. UEX lists some items twice under one UUID, with a wrong name on the
+second id, so a UEX name never replaces an archive or Wiki name.
+
 **Acceptance**
 
+- [x] A UEX sync of id 5277 ("Breakneck S4 Gatling") leaves `BEHR_BallisticGatling_S6` named
+  "AD6B Ballistic Gatling" when the Wiki or the P4K names it so; `uex_name` keeps the UEX value.
+- [x] A Wiki sync renames a UEX-named `BEHR_LaserCannon_S3` to "M5A Cannon"; the
+  `BEHR_LaserCannon_S3_CleanAir` variant keeps its own Wiki name "M5A Cannon Defense Division".
+- [x] A P4K APPLY replaces a matched item's stale name with the catalogue name and leaves it alone
+  for a placeholder.
 - [ ] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
 - [ ] A Wiki `mass` is written where the P4K `mass` is `null`.
 - [ ] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
 
-**Enforced by (planned):** `P4kItemPrecedenceTest`, `ScWikiItemSyncServiceTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
-(supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889
+**Enforced by:** `GameItemNamePrecedenceTest`, `P4kImportServiceTest`, `UexItemSyncServiceTest`
+(the name); planned: `P4kItemPrecedenceTest`, `ScWikiItemSyncServiceTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
+(supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889, #3062
 
 ### REQ-P4K-018 — the grade letter comes from the integer for five component types only, and the raw integer is kept
 

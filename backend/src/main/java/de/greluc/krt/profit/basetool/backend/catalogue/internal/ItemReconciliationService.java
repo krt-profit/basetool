@@ -151,11 +151,9 @@ public class ItemReconciliationService {
 
   private static void copyUexColumns(GameItem from, GameItem to) {
     to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
-    if (to.getSourceSystems() != GameItemSourceSystem.P4K) {
-      to.setName(from.getName());
-      if (from.getManufacturer() != null) {
-        to.setManufacturer(from.getManufacturer());
-      }
+    GameItemNamePrecedence.applyUexName(to, from.getName());
+    if (to.getSourceSystems() != GameItemSourceSystem.P4K && from.getManufacturer() != null) {
+      to.setManufacturer(from.getManufacturer());
     }
     to.setKind(GameItemKind.mergeMoreSpecific(to.getKind(), from.getKind()));
     to.setUexSlug(from.getUexSlug());

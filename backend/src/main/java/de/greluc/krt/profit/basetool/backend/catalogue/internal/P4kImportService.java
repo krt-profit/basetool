@@ -322,7 +322,7 @@ public class P4kImportService {
    * Reconciles items: resolve by {@code external_uuid} → unique case-insensitive {@code class_name}
    * → unique case-insensitive {@code name}, backfill {@code external_uuid} (guarded), fill-if-null
    * {@code class_name} / {@code manufacturer} / {@code mass} / {@code description_en} / {@code
-   * description_de}, stamp the P4K lane, or seed a new item.
+   * description_de}, refresh the name and name key, stamp the P4K lane, or seed a new item.
    *
    * @param dtos inbound item records (may be {@code null})
    * @param manufacturerByGuid the GUID→manufacturer index built from the manufacturer pass
@@ -379,6 +379,7 @@ public class P4kImportService {
               target.getDescriptionDe(), dto.descDe(), v -> target.setDescriptionDe(v), apply);
       enriched |=
           refreshNameKey(target.getNameKey(), dto.nameKey(), v -> target.setNameKey(v), apply);
+      enriched |= GameItemNamePrecedence.applyP4kName(target, dto.name(), apply);
       if (enriched) {
         counts.enriched++;
       }
@@ -723,7 +724,7 @@ public class P4kImportService {
       @NotNull Instant now) {
     if (!seed
         || guid == null
-        || !isRealName(dto.name())
+        || !P4kDisplayName.isReal(dto.name())
         || looksLikeDevAsset(dto.className(), dto.path())
         || gameItemRepository.findByExternalUuid(guid).isPresent()) {
       return false;
@@ -765,7 +766,7 @@ public class P4kImportService {
       @NotNull Instant now) {
     if (!seed
         || guid == null
-        || !isRealName(dto.name())
+        || !P4kDisplayName.isReal(dto.name())
         || looksLikeDevAsset(dto.className(), dto.path())) {
       return false;
     }
@@ -809,7 +810,7 @@ public class P4kImportService {
       @NotNull Instant now) {
     if (!seed
         || guid == null
-        || !isRealName(dto.name())
+        || !P4kDisplayName.isReal(dto.name())
         || dto.code() == null
         || dto.code().isBlank()
         || looksLikeDevAsset(dto.code())) {
@@ -857,7 +858,7 @@ public class P4kImportService {
       @NotNull Instant now) {
     if (!seed
         || guid == null
-        || !isRealName(dto.name())
+        || !P4kDisplayName.isReal(dto.name())
         || looksLikeDevAsset(dto.className(), dto.path())) {
       return false;
     }
@@ -992,28 +993,6 @@ public class P4kImportService {
         guid,
         name,
         "Seeded new row from the P4K catalog (no UEX / SC-Wiki match).");
-  }
-
-  /**
-   * Whether the name is a real, player-facing display name: present, not an unresolved {@code @LOC}
-   * key, and not a placeholder token. This is the primary filter against seeding internal records.
-   *
-   * @param name the candidate display name
-   * @return {@code true} when the name looks like real content
-   */
-  private boolean isRealName(@Nullable String name) {
-    if (name == null || name.isBlank()) {
-      return false;
-    }
-    String trimmed = name.trim();
-    if (trimmed.startsWith("@")) {
-      return false;
-    }
-    String lower = trimmed.toLowerCase(Locale.ROOT);
-    return !lower.equals("uninitialized")
-        && !lower.equals("empty")
-        && !lower.startsWith("loc_placeholder")
-        && !lower.startsWith("loc_empty");
   }
 
   /**
