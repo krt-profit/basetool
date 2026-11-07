@@ -151,16 +151,19 @@ public enum StarmapPlaceKind {
   }
 
   /**
-   * The native statement an APPLY links a row with; it leaves a manual link alone.
+   * The native statement an APPLY links rows with, all of a table at once; it leaves a manual link
+   * alone.
    *
-   * @return the statement with the parameters {@code objectId} and {@code id}
+   * @return the statement with the parameters {@code ids} and {@code objectIds}, two {@code uuid[]}
+   *     literals of the same length, a {@code NULL} object unlinking its row
    */
   @NotNull
   String autoLinkStatement() {
     return "UPDATE "
         + table
-        + " SET starmap_object_id = CAST(:objectId AS UUID) WHERE id = :id"
-        + " AND starmap_link_manual = FALSE";
+        + " t SET starmap_object_id = v.object_id"
+        + " FROM unnest(CAST(:ids AS UUID[]), CAST(:objectIds AS UUID[])) AS v(id, object_id)"
+        + " WHERE t.id = v.id AND t.starmap_link_manual = FALSE";
   }
 
   /**

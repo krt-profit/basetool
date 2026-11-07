@@ -35,6 +35,7 @@ import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,6 +62,9 @@ class P4kLoadoutReconciler {
 
   /** The separator between an item type and its subtype in {@code types}. */
   private static final String SUB_TYPE_SEPARATOR = ".";
+
+  /** The most ships whose trees one delete and one flush replace. */
+  private static final int WRITE_BATCH = 25;
 
   private final ShipTypeLoadoutPortRepository portRepository;
   private final EntityManager entityManager;
@@ -100,6 +104,7 @@ class P4kLoadoutReconciler {
             shipsByGuid(catalogue.ships()),
             context);
     loadouts.forEach(run::accept);
+    run.writePending();
     if (context.isApply()
         && catalogue.head().isComplete(P4kCatalogue.LOADOUTS)
         && !run.written.isEmpty()) {
@@ -156,6 +161,9 @@ class P4kLoadoutReconciler {
     /** The ship types whose tree the run wrote. */
     private final Set<UUID> written = new HashSet<>();
 
+    /** The trees read but not yet written, by ship type. */
+    private final Map<UUID, List<ShipTypeLoadoutPort>> pending = new LinkedHashMap<>();
+
     /**
      * Stores one loadout when it belongs to a ship type the run knows.
      *
@@ -175,11 +183,26 @@ class P4kLoadoutReconciler {
       }
       context.getReport().loadoutWritten(tree.ports.size());
       if (context.isApply()) {
-        portRepository.deleteTree(shipId);
-        tree.ports.forEach(entityManager::persist);
-        entityManager.flush();
-        tree.ports.forEach(entityManager::detach);
+        pending.put(shipId, tree.ports);
+        if (pending.size() >= WRITE_BATCH) {
+          writePending();
+        }
       }
+    }
+
+    /**
+     * Replaces the pending ships' trees: one delete for their old ports, then their new ports in
+     * one flush, detached afterwards so the persistence context stays small.
+     */
+    private void writePending() {
+      if (pending.isEmpty()) {
+        return;
+      }
+      portRepository.deleteTrees(pending.keySet());
+      pending.values().forEach(ports -> ports.forEach(entityManager::persist));
+      entityManager.flush();
+      pending.values().forEach(ports -> ports.forEach(entityManager::detach));
+      pending.clear();
     }
 
     /**

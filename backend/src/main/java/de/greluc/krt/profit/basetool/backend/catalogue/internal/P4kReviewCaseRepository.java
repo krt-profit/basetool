@@ -47,15 +47,23 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
       P4kKind kind, UUID guid, P4kReviewReason reason);
 
   /**
-   * Finds a case of one record that an admin resolved by assigning a row, whatever its reason.
+   * Finds the cases of some kinds and P4K GUIDs, whatever their reason.
+   *
+   * @param kinds the kinds
+   * @param guids the GUIDs
+   * @return the cases
+   */
+  List<P4kReviewCase> findByKindInAndGuidIn(Collection<P4kKind> kinds, Collection<UUID> guids);
+
+  /**
+   * Finds the cases of one kind that an admin resolved by assigning a row, whatever their reason.
    *
    * @param kind the kind
-   * @param guid the P4K GUID
    * @param resolution the resolution, {@code ASSIGN}
-   * @return the case, if one exists
+   * @return the cases, oldest first
    */
-  Optional<P4kReviewCase> findFirstByKindAndGuidAndResolutionAndRowIdIsNotNull(
-      P4kKind kind, UUID guid, P4kReviewResolution resolution);
+  List<P4kReviewCase> findByKindAndResolutionAndRowIdIsNotNullOrderByCreatedAtAsc(
+      P4kKind kind, P4kReviewResolution resolution);
 
   /**
    * Pages the cases of one status, oldest first (REQ-P4K-016).
@@ -87,13 +95,11 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   Instant findOldestCreatedAtByStatus(@Param("status") P4kReviewStatus status);
 
   /**
-   * Finds the cases of one status, kind and set of reasons.
+   * Finds the cases of one kind and set of reasons, whatever their status.
    *
-   * @param status the status
    * @param kind the kind
    * @param reasons the reasons
    * @return the cases
    */
-  List<P4kReviewCase> findByStatusAndKindAndReasonIn(
-      P4kReviewStatus status, P4kKind kind, Collection<P4kReviewReason> reasons);
+  List<P4kReviewCase> findByKindAndReasonIn(P4kKind kind, Collection<P4kReviewReason> reasons);
 }

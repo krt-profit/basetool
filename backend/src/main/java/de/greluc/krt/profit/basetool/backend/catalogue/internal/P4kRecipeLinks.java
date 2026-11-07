@@ -20,12 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -44,38 +44,44 @@ final class P4kRecipeLinks {
   /** The items the run matched or created, by P4K GUID. */
   @NotNull private final Map<UUID, P4kKeyedRow> items;
 
+  /** The stored materials of the run. */
+  @NotNull private final P4kRowIndex<Material> materials;
+
+  /** The stored items of the run. */
+  @NotNull private final P4kRowIndex<GameItem> storedItems;
+
   /** The commodity join of the run's catalogue. */
   @NotNull private final P4kCommodityJoin join;
 
-  /** Finds the materials. */
+  /** Finds the material an admin assigned. */
   @NotNull private final MaterialRepository materialRepository;
-
-  /** Finds the items. */
-  @NotNull private final GameItemRepository gameItemRepository;
 
   /** Finds an admin's assignment of a resource that joins no commodity or several. */
   @NotNull private final P4kReviewCaseRepository reviewCaseRepository;
 
+  /** The materials admins assigned to resources, by resource GUID; read on first use. */
+  @Nullable private Map<UUID, UUID> assignments;
+
   /**
    * Creates the links of one run.
    *
-   * @param context the run, holding the rows it matched
+   * @param context the run, holding the rows it matched and indexed; the items and commodities must
+   *     be reconciled first
    * @param join the commodity join of the run's catalogue
-   * @param materialRepository finds the materials
-   * @param gameItemRepository finds the items
+   * @param materialRepository finds the material an admin assigned
    * @param reviewCaseRepository finds the admin's resource assignments
    */
   P4kRecipeLinks(
       @NotNull P4kImportContext context,
       @NotNull P4kCommodityJoin join,
       @NotNull MaterialRepository materialRepository,
-      @NotNull GameItemRepository gameItemRepository,
       @NotNull P4kReviewCaseRepository reviewCaseRepository) {
     this.commodities = context.stampedRows(P4kKind.COMMODITY);
     this.items = context.stampedRows(P4kKind.ITEM);
+    this.materials = context.commodityRows();
+    this.storedItems = context.itemRows();
     this.join = join;
     this.materialRepository = materialRepository;
-    this.gameItemRepository = gameItemRepository;
     this.reviewCaseRepository = reviewCaseRepository;
   }
 
@@ -95,14 +101,28 @@ final class P4kRecipeLinks {
       if (stamped instanceof Material material) {
         return material;
       }
-      return materialRepository.findByP4kUuid(commodityGuid).orElse(null);
+      return materials.byP4kUuid(commodityGuid).orElse(null);
     }
-    return reviewCaseRepository
-        .findFirstByKindAndGuidAndResolutionAndRowIdIsNotNull(
-            P4kKind.COMMODITY, resourceGuid, P4kReviewResolution.ASSIGN)
-        .map(P4kReviewCase::getRowId)
-        .flatMap(materialRepository::findById)
-        .orElse(null);
+    UUID assigned = assignments().get(resourceGuid);
+    return assigned == null ? null : materialRepository.findById(assigned).orElse(null);
+  }
+
+  /**
+   * Returns the materials admins assigned to resources, read once per run.
+   *
+   * @return the assigned material ids by resource GUID
+   */
+  @NotNull
+  private Map<UUID, UUID> assignments() {
+    if (assignments == null) {
+      assignments = new HashMap<>();
+      for (P4kReviewCase assignment :
+          reviewCaseRepository.findByKindAndResolutionAndRowIdIsNotNullOrderByCreatedAtAsc(
+              P4kKind.COMMODITY, P4kReviewResolution.ASSIGN)) {
+        assignments.putIfAbsent(assignment.getGuid(), assignment.getRowId());
+      }
+    }
+    return assignments;
   }
 
   /**
@@ -130,6 +150,6 @@ final class P4kRecipeLinks {
     if (stamped instanceof GameItem item) {
       return item;
     }
-    return gameItemRepository.findByP4kUuid(itemGuid).orElse(null);
+    return storedItems.byP4kUuid(itemGuid).orElse(null);
   }
 }

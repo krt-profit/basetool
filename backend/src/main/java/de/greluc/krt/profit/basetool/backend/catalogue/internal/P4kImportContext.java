@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
@@ -91,6 +94,18 @@ public final class P4kImportContext {
    * is {@code null} for a preview's seed, which creates no row.
    */
   private final Map<String, UUID> manufacturerNames = new HashMap<>();
+
+  /** The manufacturer rows, indexed once when the manufacturers are reconciled. */
+  @Nullable private P4kRowIndex<Manufacturer> manufacturerRows;
+
+  /** The item rows, indexed once when the items are reconciled. */
+  @Nullable private P4kRowIndex<GameItem> itemRows;
+
+  /** The ship-type rows, indexed once when the ships are reconciled. */
+  @Nullable private P4kRowIndex<ShipType> shipRows;
+
+  /** The material rows, indexed once when the commodities are reconciled. */
+  @Nullable private P4kRowIndex<Material> commodityRows;
 
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
@@ -229,6 +244,104 @@ public final class P4kImportContext {
   public void indexResourceGroup(@NotNull UUID guid, @NotNull MaterialCategory group) {
     resourceGroupByGuid.put(guid, group);
   }
+  /**
+   * Keeps the manufacturer rows the manufacturer reconciler loaded for the rest of the run.
+   *
+   * @param rows the index
+   */
+  public void indexManufacturerRows(@NotNull P4kRowIndex<Manufacturer> rows) {
+    manufacturerRows = rows;
+  }
+
+  /**
+   * Returns the manufacturer rows; the manufacturers must be reconciled first.
+   *
+   * @return the index
+   * @throws IllegalStateException before the manufacturers are reconciled
+   */
+  @NotNull
+  public P4kRowIndex<Manufacturer> manufacturerRows() {
+    return indexed(manufacturerRows, P4kKind.MANUFACTURER);
+  }
+
+  /**
+   * Keeps the item rows the item reconciler loaded for the rest of the run.
+   *
+   * @param rows the index
+   */
+  public void indexItemRows(@NotNull P4kRowIndex<GameItem> rows) {
+    itemRows = rows;
+  }
+
+  /**
+   * Returns the item rows; the items must be reconciled first.
+   *
+   * @return the index
+   * @throws IllegalStateException before the items are reconciled
+   */
+  @NotNull
+  public P4kRowIndex<GameItem> itemRows() {
+    return indexed(itemRows, P4kKind.ITEM);
+  }
+
+  /**
+   * Keeps the ship-type rows the ship reconciler loaded for the rest of the run.
+   *
+   * @param rows the index
+   */
+  public void indexShipRows(@NotNull P4kRowIndex<ShipType> rows) {
+    shipRows = rows;
+  }
+
+  /**
+   * Returns the ship-type rows; the ships must be reconciled first.
+   *
+   * @return the index
+   * @throws IllegalStateException before the ships are reconciled
+   */
+  @NotNull
+  public P4kRowIndex<ShipType> shipRows() {
+    return indexed(shipRows, P4kKind.SHIP);
+  }
+
+  /**
+   * Keeps the material rows the commodity reconciler loaded for the rest of the run.
+   *
+   * @param rows the index
+   */
+  public void indexCommodityRows(@NotNull P4kRowIndex<Material> rows) {
+    commodityRows = rows;
+  }
+
+  /**
+   * Returns the material rows; the commodities must be reconciled first.
+   *
+   * @return the index
+   * @throws IllegalStateException before the commodities are reconciled
+   */
+  @NotNull
+  public P4kRowIndex<Material> commodityRows() {
+    return indexed(commodityRows, P4kKind.COMMODITY);
+  }
+
+  /**
+   * Returns an index the run built.
+   *
+   * @param rows the index, or {@code null} before its kind is reconciled
+   * @param kind the kind, for the error
+   * @param <T> the row type
+   * @return the index
+   * @throws IllegalStateException before the kind is reconciled
+   */
+  @NotNull
+  private static <T extends P4kKeyedRow> P4kRowIndex<T> indexed(
+      @Nullable P4kRowIndex<T> rows, @NotNull P4kKind kind) {
+    if (rows == null) {
+      throw new IllegalStateException("The " + kind + " rows are read before they are indexed.");
+    }
+    return rows;
+  }
+
 
   /**
    * Returns a resource group the run matched or created.

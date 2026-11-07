@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -87,17 +89,19 @@ public class StarmapPlaceRows {
   }
 
   /**
-   * Writes an APPLY's link of a row, unless an admin set the row's link.
+   * Writes an APPLY's links of a table's rows in one statement, leaving every row an admin linked.
    *
    * @param kind the table
-   * @param id the row
-   * @param objectId the linked object, or {@code null} to unlink
+   * @param links the linked object of each row, {@code null} to unlink it
    */
-  public void autoLink(@NotNull StarmapPlaceKind kind, @NotNull UUID id, @Nullable UUID objectId) {
+  public void autoLink(@NotNull StarmapPlaceKind kind, @NotNull Map<UUID, UUID> links) {
+    if (links.isEmpty()) {
+      return;
+    }
     entityManager
         .createNativeQuery(kind.autoLinkStatement())
-        .setParameter("objectId", objectId == null ? null : objectId.toString())
-        .setParameter("id", id)
+        .setParameter("ids", UuidArrayLiteral.of(links.keySet()))
+        .setParameter("objectIds", UuidArrayLiteral.of(new ArrayList<>(links.values())))
         .executeUpdate();
   }
 

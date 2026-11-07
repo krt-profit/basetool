@@ -19,42 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import java.util.Collection;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for the P4K ship variant groups (REQ-P4K-032). */
 @Repository
-public interface ShipTypeP4kVariantRepository extends JpaRepository<ShipTypeP4kVariant, UUID> {
-
-  /**
-   * Deletes the variant rows of other GUIDs that hold a class name, so a renamed variant can take
-   * it; a bulk delete, so it runs before the following insert.
-   *
-   * @param className the class name, compared ignoring case
-   * @param variantUuid the GUID that keeps the class name
-   * @return the rows deleted
-   */
-  @Modifying
-  @Query(
-      """
-      DELETE FROM ShipTypeP4kVariant v
-      WHERE lower(v.className) = lower(:className) AND v.variantUuid <> :variantUuid
-      """)
-  int deleteClassNameHeldByOther(
-      @Param("className") String className, @Param("variantUuid") UUID variantUuid);
-
-  /**
-   * Deletes every variant row whose GUID a complete ships kind no longer lists as a variant.
-   *
-   * @param variantUuids the variant GUIDs of the catalogue; never empty
-   * @return the rows deleted
-   */
-  @Modifying
-  @Query("DELETE FROM ShipTypeP4kVariant v WHERE v.variantUuid NOT IN :variantUuids")
-  int deleteAllExcept(@Param("variantUuids") Collection<UUID> variantUuids);
-}
+public interface ShipTypeP4kVariantRepository extends JpaRepository<ShipTypeP4kVariant, UUID> {}

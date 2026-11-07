@@ -19,8 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -33,6 +39,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class P4kImportRecorder {
+
+  /** The most GUIDs one read of the stored cases names. */
+  private static final int READ_CHUNK = 1_000;
 
   private final P4kImportChangeRepository changeRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
@@ -47,16 +56,76 @@ public class P4kImportRecorder {
     List<P4kImportChange> changes = report.changes();
     changes.forEach(change -> change.setRunId(runId));
     changeRepository.saveAll(changes);
-    for (P4kImportReport.ReviewFinding finding : report.reviews()) {
+    List<P4kImportReport.ReviewFinding> findings = report.reviews();
+    Map<CaseKey, P4kReviewCase> stored = storedCases(findings);
+    List<P4kReviewCase> cases = new ArrayList<>(findings.size());
+    for (P4kImportReport.ReviewFinding finding : findings) {
       P4kReviewCase reviewCase =
-          reviewCaseRepository
-              .findByKindAndGuidAndReason(finding.kind(), finding.guid(), finding.reason())
-              .orElseGet(() -> newCase(finding, runId));
+          stored.computeIfAbsent(CaseKey.of(finding), _ -> newCase(finding, runId));
       reviewCase.setLastRunId(runId);
       if (reviewCase.getRowId() == null) {
         reviewCase.setRowId(finding.rowId());
       }
-      reviewCaseRepository.save(reviewCase);
+      cases.add(reviewCase);
+    }
+    reviewCaseRepository.saveAll(cases);
+  }
+
+  /**
+   * Reads the stored cases of the findings' kinds and GUIDs in chunks of {@value #READ_CHUNK}
+   * GUIDs, which the unique index on kind, GUID and reason serves.
+   *
+   * @param findings the run's findings
+   * @return the stored cases by kind, GUID and reason
+   */
+  @NotNull
+  private Map<CaseKey, P4kReviewCase> storedCases(
+      @NotNull List<P4kImportReport.ReviewFinding> findings) {
+    Set<P4kKind> kinds =
+        findings.stream().map(P4kImportReport.ReviewFinding::kind).collect(Collectors.toSet());
+    List<UUID> guids =
+        findings.stream().map(P4kImportReport.ReviewFinding::guid).distinct().toList();
+    Map<CaseKey, P4kReviewCase> stored = new HashMap<>();
+    for (int from = 0; from < guids.size(); from += READ_CHUNK) {
+      for (P4kReviewCase reviewCase :
+          reviewCaseRepository.findByKindInAndGuidIn(
+              kinds, guids.subList(from, Math.min(guids.size(), from + READ_CHUNK)))) {
+        stored.put(CaseKey.of(reviewCase), reviewCase);
+      }
+    }
+    return stored;
+  }
+
+  /**
+   * The identity of a case: one per kind, GUID and reason (REQ-P4K-016).
+   *
+   * @param kind the kind
+   * @param guid the P4K GUID
+   * @param reason the reason
+   */
+  private record CaseKey(
+      @NotNull P4kKind kind, @NotNull UUID guid, @NotNull P4kReviewReason reason) {
+
+    /**
+     * Keys a finding.
+     *
+     * @param finding the finding
+     * @return its key
+     */
+    @NotNull
+    static CaseKey of(@NotNull P4kImportReport.ReviewFinding finding) {
+      return new CaseKey(finding.kind(), finding.guid(), finding.reason());
+    }
+
+    /**
+     * Keys a stored case.
+     *
+     * @param reviewCase the case
+     * @return its key
+     */
+    @NotNull
+    static CaseKey of(@NotNull P4kReviewCase reviewCase) {
+      return new CaseKey(reviewCase.getKind(), reviewCase.getGuid(), reviewCase.getReason());
     }
   }
 

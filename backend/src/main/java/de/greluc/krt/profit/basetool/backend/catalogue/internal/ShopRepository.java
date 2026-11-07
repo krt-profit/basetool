@@ -32,27 +32,28 @@ import org.springframework.data.repository.query.Param;
 
 /**
  * Reads and stores the P4K shops (REQ-P4K-042…044). The terminal link is mapped read only on {@link
- * Shop}, so only {@link #autoLinkTerminal} and {@link #manualLinkTerminal} write it.
+ * Shop}, so only {@link #autoLinkTerminals} and {@link #manualLinkTerminal} write it.
  */
 public interface ShopRepository extends JpaRepository<Shop, UUID> {
 
   /**
-   * Writes an APPLY's terminal link of a shop, unless an admin set the shop's link.
+   * Writes an APPLY's terminal links of many shops in one statement, leaving every shop an admin
+   * linked.
    *
-   * @param shopId the shop
-   * @param terminalId the linked terminal, or {@code null} to unlink
-   * @return the rows written, {@code 0} for a manual link
+   * @param shopIds the shops, a {@code uuid[]} literal ({@link UuidArrayLiteral})
+   * @param terminalIds the linked terminal of each shop in the same order, a {@code NULL} unlinking
+   * @return the rows written; a manual link is not among them
    */
   @Modifying(flushAutomatically = true)
   @Query(
       value =
           """
-          UPDATE shop SET terminal_id = CAST(:terminalId AS UUID)
-          WHERE id = :shopId AND terminal_link_manual = FALSE
+          UPDATE shop s SET terminal_id = v.terminal_id
+          FROM unnest(CAST(:shopIds AS UUID[]), CAST(:terminalIds AS UUID[])) AS v(id, terminal_id)
+          WHERE s.id = v.id AND s.terminal_link_manual = FALSE
           """,
       nativeQuery = true)
-  int autoLinkTerminal(
-      @Param("shopId") UUID shopId, @Param("terminalId") @Nullable UUID terminalId);
+  int autoLinkTerminals(@Param("shopIds") String shopIds, @Param("terminalIds") String terminalIds);
 
   /**
    * Writes an admin's terminal link of a shop when it still holds the link the admin saw.

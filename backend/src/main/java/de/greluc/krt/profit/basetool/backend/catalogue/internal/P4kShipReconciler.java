@@ -30,7 +30,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipPlayability;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kVehicleKind;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -54,11 +59,15 @@ public class P4kShipReconciler {
   /** The catalogue field holding a ship's vehicle kind. */
   private static final String VEHICLE_KIND = "vehicleKind";
 
+  /** Reads the UEX alias table, a few curated rows. */
+  private static final String ALIASES = "SELECT a FROM ShipTypeUexAlias a";
+
   private final ShipTypeRepository shipTypeRepository;
   private final P4kShipBaseData baseData;
   private final P4kShipVariants variants;
   private final P4kShipStoreSlugCheck storeSlugCheck;
   private final P4kManufacturerReconciler manufacturerReconciler;
+  private final EntityManager entityManager;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
@@ -68,15 +77,21 @@ public class P4kShipReconciler {
    * @param context the run
    */
   public void reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+    List<ShipType> stored = shipTypeRepository.findAll();
+    P4kRowIndex<ShipType> rows =
+        new P4kRowIndex<>(
+            stored, ShipType::getExternalUuid, ShipType::getClassName, ShipType::getName);
+    context.indexShipRows(rows);
+    Map<String, List<ShipType>> aliased = aliasedByClassName(stored);
     P4kRowMatcher<ShipType> matcher =
         new P4kRowMatcher<>(
             P4kKind.SHIP,
-            shipTypeRepository::findByP4kUuid,
-            shipTypeRepository::findByExternalUuid,
+            rows::byP4kUuid,
+            rows::byWikiUuid,
             ShipType::getExternalUuid,
             "external_uuid",
-            shipTypeRepository::findByClassNameOrUexAlias,
-            name -> shipTypeRepository.findByNameIgnoreCase(name).map(List::of).orElseGet(List::of),
+            className -> byClassNameOrUexAlias(rows, aliased, className),
+            rows::byName,
             row -> row.getSourceSystems() == GameItemSourceSystem.P4K);
     for (P4kShipDto ship : catalogue.ships()) {
       String rawPlayability = ship.playability();
@@ -96,6 +111,7 @@ public class P4kShipReconciler {
       if (match instanceof P4kRowMatcher.Matched<ShipType>(ShipType row, UUID guid)) {
         boolean enriched = enrich(row, ship, context);
         context.stamp(P4kKind.SHIP, ship, row, guid);
+        rows.add(row);
         context.getReport().matched(P4kKind.SHIP, enriched);
       } else if (match instanceof P4kRowMatcher.Unmatched<ShipType>(UUID guid)) {
         unmatched(ship, guid, seeding, context);
@@ -103,6 +119,54 @@ public class P4kShipReconciler {
     }
     variants.write(catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), context);
     storeSlugCheck.check(catalogue.shipStoreSlugs(), context);
+  }
+
+  /**
+   * Groups the stored ship types by the class name the {@code ship_type_uex_alias} table ties their
+   * UEX vehicle id to (REQ-DATA-026).
+   *
+   * @param stored every stored ship type
+   * @return the aliased ship types by upper-cased alias class name
+   */
+  @NotNull
+  private Map<String, List<ShipType>> aliasedByClassName(@NotNull List<ShipType> stored) {
+    Map<Integer, List<ShipType>> byVehicleId = new HashMap<>();
+    stored.stream()
+        .filter(row -> row.getUexVehicleId() != null)
+        .forEach(row ->
+            byVehicleId.computeIfAbsent(row.getUexVehicleId(), _ -> new ArrayList<>()).add(row));
+    Map<String, List<ShipType>> aliased = new HashMap<>();
+    for (ShipTypeUexAlias alias :
+        entityManager.createQuery(ALIASES, ShipTypeUexAlias.class).getResultList()) {
+      List<ShipType> holders = byVehicleId.get(alias.getUexVehicleId());
+      if (holders != null) {
+        aliased
+            .computeIfAbsent(alias.getClassName().toUpperCase(Locale.ROOT), _ -> new ArrayList<>())
+            .addAll(holders);
+      }
+    }
+    return aliased;
+  }
+
+  /**
+   * Finds the ship types of a class name ignoring case, or, when none carries it, the ship types
+   * holding the UEX vehicle id the alias ties the class name to (REQ-DATA-026).
+   *
+   * @param rows the ship-type rows of the run
+   * @param aliased the aliased ship types by upper-cased alias class name
+   * @param className the class name
+   * @return the direct matches, else the aliased rows, else an empty list
+   */
+  @NotNull
+  private static List<ShipType> byClassNameOrUexAlias(
+      @NotNull P4kRowIndex<ShipType> rows,
+      @NotNull Map<String, List<ShipType>> aliased,
+      @NotNull String className) {
+    List<ShipType> direct = rows.byClassName(className);
+    if (!direct.isEmpty()) {
+      return direct;
+    }
+    return List.copyOf(aliased.getOrDefault(className.toUpperCase(Locale.ROOT), List.of()));
   }
 
   /**
@@ -152,7 +216,7 @@ public class P4kShipReconciler {
         || seeding != P4kSeeding.CREATE
         || name == null
         || context.isRepeated(P4kKind.SHIP, name)
-        || shipTypeRepository.findByNameIgnoreCase(name.strip()).isPresent()) {
+        || !context.shipRows().byName(name.strip()).isEmpty()) {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;
     }
@@ -171,7 +235,7 @@ public class P4kShipReconciler {
       row.setSourceSystems(GameItemSourceSystem.P4K);
       row.setNameKey(P4kFields.storedNameKey(P4kLocalisedText.keyOf(ship.name())));
       context.stamp(P4kKind.SHIP, ship, row, guid);
-      shipTypeRepository.save(row);
+      context.shipRows().add(shipTypeRepository.save(row));
     }
     context.getReport().added(P4kKind.SHIP, ship);
   }

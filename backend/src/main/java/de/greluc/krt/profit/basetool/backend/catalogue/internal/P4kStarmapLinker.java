@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -77,18 +78,22 @@ public class P4kStarmapLinker {
     for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
       Map<String, UUID> linkedOfKind = new HashMap<>();
       linked.put(kind, linkedOfKind);
+      Map<UUID, UUID> writes = new LinkedHashMap<>();
       for (StarmapPlaceRow row : placeRows.rows(kind)) {
         UUID link =
             row.manual()
                 ? guidById.get(row.starmapObjectId())
-                : linkRow(row, tree, byName, linked, guidById, found, context);
+                : linkRow(row, tree, byName, linked, guidById, found, writes, context);
         if (link != null && row.name() != null) {
           linkedOfKind.put(StarmapNames.key(row.starSystem(), row.name()), link);
         }
       }
+      if (context.isApply()) {
+        placeRows.autoLink(kind, writes);
+      }
     }
     if (context.isApply()) {
-      runResolvedCases.closeUnfound(KIND, REASONS, found, context.getNow());
+      runResolvedCases.settle(KIND, REASONS, found, context.getNow());
     }
   }
 
@@ -113,6 +118,7 @@ public class P4kStarmapLinker {
    * @param linked the GUIDs the rows of earlier kinds link to, by system and name
    * @param guidById the GUIDs of the stored objects by id
    * @param found the cases this run found, extended
+   * @param writes the links of the row's table the APPLY writes, extended by the row's
    * @param context the run
    * @return the GUID the row links to after the run, or {@code null}
    */
@@ -124,6 +130,7 @@ public class P4kStarmapLinker {
       @NotNull Map<StarmapPlaceKind, Map<String, UUID>> linked,
       @NotNull Map<UUID, UUID> guidById,
       @NotNull Set<P4kRunResolvedCases.Found> found,
+      @NotNull Map<UUID, UUID> writes,
       @NotNull P4kImportContext context) {
     UUID ancestor = row.nearestLinkedParent(linked);
     String name = StarmapNames.normalise(row.name());
@@ -149,7 +156,7 @@ public class P4kStarmapLinker {
               target == null ? null : target.toString());
       if (context.isApply()) {
         StarmapObject object = tree.object(target);
-        placeRows.autoLink(row.kind(), row.id(), object == null ? null : object.getId());
+        writes.put(row.id(), object == null ? null : object.getId());
       }
     }
     if (target == null) {
@@ -161,9 +168,6 @@ public class P4kStarmapLinker {
       found.add(finding);
       context.getReport().unmatched(KIND, record);
       context.getReport().review(KIND, record, record.caseGuid(), reason, null);
-      if (context.isApply()) {
-        runResolvedCases.reopenIfRunResolved(KIND, finding);
-      }
     }
     return target;
   }

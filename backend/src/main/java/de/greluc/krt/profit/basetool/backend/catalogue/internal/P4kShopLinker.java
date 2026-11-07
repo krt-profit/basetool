@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,13 +69,19 @@ public class P4kShopLinker {
       @NotNull List<P4kShopReconciler.Reconciled> shops, @NotNull P4kImportContext context) {
     Map<UUID, List<StarmapPlaceRow>> terminalsByPlace = terminalsByPlace();
     Set<P4kRunResolvedCases.Found> found = new HashSet<>();
+    Map<UUID, UUID> writes = new LinkedHashMap<>();
     for (P4kShopReconciler.Reconciled shop : shops) {
       if (!shop.row().isTerminalLinkManual()) {
-        linkShop(shop, terminalsByPlace, found, context);
+        linkShop(shop, terminalsByPlace, found, writes, context);
       }
     }
     if (context.isApply()) {
-      runResolvedCases.closeUnfound(KIND, REASONS, found, context.getNow());
+      if (!writes.isEmpty()) {
+        shopRepository.autoLinkTerminals(
+            UuidArrayLiteral.of(writes.keySet()),
+            UuidArrayLiteral.of(new ArrayList<>(writes.values())));
+      }
+      runResolvedCases.settle(KIND, REASONS, found, context.getNow());
     }
   }
 
@@ -84,12 +91,14 @@ public class P4kShopLinker {
    * @param shop the shop and its record
    * @param terminalsByPlace the UEX terminals by the starmap object of their place
    * @param found the cases this run found, extended
+   * @param writes the terminal links the APPLY writes, extended by the shop's
    * @param context the run
    */
   private void linkShop(
       @NotNull P4kShopReconciler.Reconciled shop,
       @NotNull Map<UUID, List<StarmapPlaceRow>> terminalsByPlace,
       @NotNull Set<P4kRunResolvedCases.Found> found,
+      @NotNull Map<UUID, UUID> writes,
       @NotNull P4kImportContext context) {
     Shop row = shop.row();
     UUID place = row.getStarmapObjectId();
@@ -109,7 +118,7 @@ public class P4kShopLinker {
               current == null ? null : current.toString(),
               target == null ? null : target.toString());
       if (context.isApply()) {
-        shopRepository.autoLinkTerminal(row.getId(), target);
+        writes.put(row.getId(), target);
       }
     }
     if (target == null) {
@@ -121,9 +130,6 @@ public class P4kShopLinker {
       found.add(finding);
       context.getReport().unmatched(KIND, shop.record());
       context.getReport().review(KIND, shop.record(), row.getP4kUuid(), reason, row.getId());
-      if (context.isApply()) {
-        runResolvedCases.reopenIfRunResolved(KIND, finding);
-      }
     }
   }
 

@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
@@ -34,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kDismantleProcessDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -55,7 +55,6 @@ import org.springframework.stereotype.Component;
 public class P4kBlueprintReconciler {
 
   private final BlueprintRepository blueprintRepository;
-  private final GameItemRepository gameItemRepository;
   private final MaterialRepository materialRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
 
@@ -103,27 +102,25 @@ public class P4kBlueprintReconciler {
    * @return the recipe lines whose material or item the run resolved
    */
   public int reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+    P4kRowIndex<Blueprint> stored =
+        new P4kRowIndex<>(
+            blueprintRepository.findAll(),
+            Blueprint::getScwikiUuid,
+            Blueprint::getScwikiKey,
+            _ -> null);
     P4kRowMatcher<Blueprint> matcher =
         new P4kRowMatcher<>(
             P4kKind.BLUEPRINT,
-            blueprintRepository::findByP4kUuid,
-            blueprintRepository::findByScwikiUuid,
+            stored::byP4kUuid,
+            stored::byWikiUuid,
             Blueprint::getScwikiUuid,
             "scwiki_uuid",
-            key ->
-                blueprintRepository
-                    .findFirstByScwikiKeyOrderByScwikiUuidAsc(key)
-                    .map(List::of)
-                    .orElseGet(List::of),
+            key -> firstOfKey(stored, key),
             _ -> List.of(),
             _ -> false);
     P4kRecipeLinks links =
         new P4kRecipeLinks(
-            context,
-            P4kCommodityJoin.of(catalogue),
-            materialRepository,
-            gameItemRepository,
-            reviewCaseRepository);
+            context, P4kCommodityJoin.of(catalogue), materialRepository, reviewCaseRepository);
     Map<UUID, P4kKeyedRow> items = context.stampedRows(P4kKind.ITEM);
     int resolved = 0;
     for (P4kBlueprintDto blueprint : catalogue.blueprints()) {
@@ -135,16 +132,40 @@ public class P4kBlueprintReconciler {
         Values values = values(blueprint, reader, items, context);
         boolean changed = enrich(row, blueprint, values, context);
         context.stamp(P4kKind.BLUEPRINT, blueprint, row, guid);
+        stored.add(row);
         context.getReport().matched(P4kKind.BLUEPRINT, changed);
         resolved +=
             values.recipe() == null
-                ? resolveWikiIngredients(row, context.isApply())
+                ? resolveWikiIngredients(row, context)
                 : values.recipe().resolvedLines();
       } else if (match instanceof P4kRowMatcher.Unmatched<Blueprint>(UUID guid)) {
-        resolved += unmatched(blueprint, guid, values(blueprint, reader, items, context), context);
+        resolved +=
+            unmatched(blueprint, guid, values(blueprint, reader, items, context), stored, context);
       }
     }
     return resolved;
+  }
+
+  /**
+   * Finds the blueprint whose SC Wiki key equals a key exactly, the one with the lowest SC Wiki
+   * UUID when several share it and one without a UUID last, as PostgreSQL orders {@code uuid}
+   * values.
+   *
+   * @param stored the blueprint rows of the run
+   * @param key the record's key
+   * @return that one blueprint, or an empty list
+   */
+  @NotNull
+  private static List<Blueprint> firstOfKey(
+      @NotNull P4kRowIndex<Blueprint> stored, @NotNull String key) {
+    return stored.byClassName(key).stream()
+        .filter(row -> key.equals(row.getScwikiKey()))
+        .min(
+            Comparator.comparing(
+                Blueprint::getScwikiUuid,
+                Comparator.nullsLast(Comparator.comparing(UUID::toString))))
+        .map(List::of)
+        .orElseGet(List::of);
   }
 
   /**
@@ -164,7 +185,7 @@ public class P4kBlueprintReconciler {
       @NotNull P4kImportContext context) {
     UUID producedGuid = P4kGuids.parse(blueprint.producedItemGuid());
     return new Values(
-        producedItem(producedGuid, items),
+        producedItem(producedGuid, items, context),
         producedGuid,
         context.blueprintCategory(blueprint.categoryGuid()),
         blueprint.craftTimeSeconds(),
@@ -319,6 +340,7 @@ public class P4kBlueprintReconciler {
    * @param blueprint the record
    * @param guid the record's GUID, or {@code null}
    * @param values the P4K's values
+   * @param stored the blueprint rows of the run, extended by the created one
    * @param context the run
    * @return the recipe lines of the created blueprint whose material or item resolved
    */
@@ -326,6 +348,7 @@ public class P4kBlueprintReconciler {
       @NotNull P4kBlueprintDto blueprint,
       @Nullable UUID guid,
       @NotNull Values values,
+      @NotNull P4kRowIndex<Blueprint> stored,
       @NotNull P4kImportContext context) {
     UUID producedGuid = values.producedItemGuid();
     boolean producible =
@@ -356,7 +379,7 @@ public class P4kBlueprintReconciler {
         P4kBlueprintRecipe.writeReturns(row, values.returns());
       }
       context.stamp(P4kKind.BLUEPRINT, blueprint, row, guid);
-      blueprintRepository.save(row);
+      stored.add(blueprintRepository.save(row));
     }
     context.getReport().added(P4kKind.BLUEPRINT, blueprint);
     return values.recipe() == null ? 0 : values.recipe().resolvedLines();
@@ -368,20 +391,22 @@ public class P4kBlueprintReconciler {
    *
    * @param guid the produced item's GUID, or {@code null}
    * @param items the items the run matched or created, by GUID
+   * @param context the run
    * @return the item, or {@code null}
    */
   @Nullable
-  private GameItem producedItem(@Nullable UUID guid, @NotNull Map<UUID, P4kKeyedRow> items) {
+  private static GameItem producedItem(
+      @Nullable UUID guid,
+      @NotNull Map<UUID, P4kKeyedRow> items,
+      @NotNull P4kImportContext context) {
     if (guid == null) {
       return null;
     }
     if (items.get(guid) instanceof GameItem item) {
       return item;
     }
-    return gameItemRepository
-        .findByP4kUuid(guid)
-        .or(() -> gameItemRepository.findByExternalUuid(guid))
-        .orElse(null);
+    P4kRowIndex<GameItem> rows = context.itemRows();
+    return rows.byP4kUuid(guid).or(() -> rows.byWikiUuid(guid)).orElse(null);
   }
 
   /**
@@ -389,17 +414,19 @@ public class P4kBlueprintReconciler {
    * or item yet; a recipe the P4K wrote resolves its lines itself.
    *
    * @param blueprint the matched blueprint
-   * @param apply whether to write the link or only count it
+   * @param context the run; a preview only counts the links
    * @return the lines resolved, or in a preview resolvable
    */
-  private int resolveWikiIngredients(@NotNull Blueprint blueprint, boolean apply) {
+  private static int resolveWikiIngredients(
+      @NotNull Blueprint blueprint, @NotNull P4kImportContext context) {
+    boolean apply = context.isApply();
     int resolved = 0;
     for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE
           && ingredient.getMaterial() == null
           && ingredient.getWikiResourceUuid() != null) {
         Material material =
-            materialRepository.findByScwikiUuid(ingredient.getWikiResourceUuid()).orElse(null);
+            context.commodityRows().byWikiUuid(ingredient.getWikiResourceUuid()).orElse(null);
         if (material != null) {
           if (apply) {
             ingredient.setMaterial(material);
@@ -409,8 +436,7 @@ public class P4kBlueprintReconciler {
       } else if (ingredient.getKind() == BlueprintIngredientKind.ITEM
           && ingredient.getGameItem() == null
           && ingredient.getWikiItemUuid() != null) {
-        GameItem item =
-            gameItemRepository.findByExternalUuid(ingredient.getWikiItemUuid()).orElse(null);
+        GameItem item = context.itemRows().byWikiUuid(ingredient.getWikiItemUuid()).orElse(null);
         if (item != null) {
           if (apply) {
             ingredient.setGameItem(item);

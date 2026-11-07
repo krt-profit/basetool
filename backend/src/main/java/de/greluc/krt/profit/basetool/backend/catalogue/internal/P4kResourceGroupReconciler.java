@@ -62,15 +62,21 @@ public class P4kResourceGroupReconciler {
    */
   public void reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
     Set<UUID> referenced = referenced(catalogue);
+    P4kRowIndex<MaterialCategory> stored =
+        new P4kRowIndex<>(
+            repository.findAll(),
+            _ -> null,
+            MaterialCategory::getClassName,
+            MaterialCategory::getName);
     P4kRowMatcher<MaterialCategory> matcher =
         new P4kRowMatcher<>(
             P4kKind.RESOURCE_GROUP,
-            repository::findByP4kUuid,
+            stored::byP4kUuid,
             _ -> Optional.empty(),
             _ -> null,
             "p4k_uuid",
-            repository::findByClassNameIgnoreCase,
-            repository::findByNameIgnoreCase,
+            stored::byClassName,
+            stored::byName,
             _ -> false);
     Map<P4kResourceGroupDto, MaterialCategory> rows = new LinkedHashMap<>();
     for (P4kResourceGroupDto group : catalogue.resourceGroups()) {
@@ -83,6 +89,7 @@ public class P4kResourceGroupReconciler {
         P4kRowWriter writer = new P4kRowWriter(context, P4kKind.RESOURCE_GROUP, group);
         writeNames(writer, row, group);
         context.stamp(P4kKind.RESOURCE_GROUP, group, row, guid);
+        stored.add(row);
         context.indexResourceGroup(guid, row);
         rows.put(group, row);
         context.getReport().matched(P4kKind.RESOURCE_GROUP, writer.isChanged());
@@ -91,6 +98,9 @@ public class P4kResourceGroupReconciler {
         if (created == null) {
           context.getReport().unmatched(P4kKind.RESOURCE_GROUP, group);
         } else {
+          if (context.isApply()) {
+            stored.add(created);
+          }
           rows.put(group, created);
         }
       }

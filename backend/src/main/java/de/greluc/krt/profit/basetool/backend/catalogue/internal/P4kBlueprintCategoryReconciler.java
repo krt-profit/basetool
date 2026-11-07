@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBlueprint
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,8 @@ public class P4kBlueprintCategoryReconciler {
    */
   public void reconcile(
       @NotNull List<P4kBlueprintCategoryDto> categories, @NotNull P4kImportContext context) {
+    P4kRowIndex<BlueprintCategory> stored =
+        new P4kRowIndex<>(repository.findAll(), _ -> null, _ -> null, _ -> null);
     for (P4kBlueprintCategoryDto category : categories) {
       UUID guid = category.parsedGuid();
       String className = category.className();
@@ -56,9 +59,9 @@ public class P4kBlueprintCategoryReconciler {
         context.getReport().unmatched(P4kKind.BLUEPRINT_CATEGORY, category);
         continue;
       }
-      BlueprintCategory row = repository.findByP4kUuid(guid).orElse(null);
+      BlueprintCategory row = stored.byP4kUuid(guid).orElse(null);
       if (row == null) {
-        create(category, guid, className, context);
+        create(category, guid, className, context).ifPresent(stored::add);
         continue;
       }
       P4kRowWriter writer = new P4kRowWriter(context, P4kKind.BLUEPRINT_CATEGORY, category);
@@ -88,8 +91,10 @@ public class P4kBlueprintCategoryReconciler {
    * @param guid the record's GUID
    * @param className the record's class name
    * @param context the run
+   * @return the saved category of an APPLY, empty in a preview
    */
-  private void create(
+  @NotNull
+  private Optional<BlueprintCategory> create(
       @NotNull P4kBlueprintCategoryDto category,
       @NotNull UUID guid,
       @NotNull String className,
@@ -104,5 +109,6 @@ public class P4kBlueprintCategoryReconciler {
     }
     context.indexBlueprintCategory(guid, row);
     context.getReport().added(P4kKind.BLUEPRINT_CATEGORY, category);
+    return context.isApply() ? Optional.of(row) : Optional.empty();
   }
 }

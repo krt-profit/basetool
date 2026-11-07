@@ -74,13 +74,10 @@ public class P4kProductKeyReview {
         P4kRunResolvedCases.Found finding = new P4kRunResolvedCases.Found(guid, reason);
         found.add(finding);
         context.getReport().review(P4kKind.BLUEPRINT, new NameKeyRecord(key), guid, reason, null);
-        if (apply) {
-          runResolvedCases.reopenIfRunResolved(P4kKind.BLUEPRINT, finding);
-        }
       }
     }
     if (apply) {
-      runResolvedCases.closeUnfound(P4kKind.BLUEPRINT, REASONS, found, now);
+      runResolvedCases.settle(P4kKind.BLUEPRINT, REASONS, found, now);
     }
   }
 

@@ -104,15 +104,22 @@ public class P4kItemReconciler {
    * @param context the run
    */
   public void reconcile(@NotNull List<P4kItemDto> items, @NotNull P4kImportContext context) {
+    P4kRowIndex<GameItem> rows =
+        new P4kRowIndex<>(
+            gameItemRepository.findAll(),
+            GameItem::getExternalUuid,
+            GameItem::getClassName,
+            GameItem::getName);
+    context.indexItemRows(rows);
     P4kRowMatcher<GameItem> matcher =
         new P4kRowMatcher<>(
             P4kKind.ITEM,
-            gameItemRepository::findByP4kUuid,
-            gameItemRepository::findByExternalUuid,
+            rows::byP4kUuid,
+            rows::byWikiUuid,
             GameItem::getExternalUuid,
             "external_uuid",
-            gameItemRepository::findByClassNameIgnoreCase,
-            gameItemRepository::findByNameIgnoreCase,
+            rows::byClassName,
+            rows::byName,
             row -> row.getSourceSystems() == GameItemSourceSystem.P4K);
     for (P4kItemDto item : items) {
       String rawPlayability = item.playability();
@@ -127,6 +134,7 @@ public class P4kItemReconciler {
       if (match instanceof P4kRowMatcher.Matched<GameItem>(GameItem row, UUID guid)) {
         boolean enriched = enrich(row, item, values(item, context), context);
         context.stamp(P4kKind.ITEM, item, row, guid);
+        rows.add(row);
         context.getReport().matched(P4kKind.ITEM, enriched);
       } else if (match instanceof P4kRowMatcher.Unmatched<GameItem>(UUID guid)) {
         unmatched(item, guid, seeding, context);
@@ -273,7 +281,7 @@ public class P4kItemReconciler {
       row.setSourceSystems(GameItemSourceSystem.P4K);
       row.setNameKey(P4kFields.storedNameKey(P4kLocalisedText.keyOf(item.name())));
       context.stamp(P4kKind.ITEM, item, row, guid);
-      gameItemRepository.save(row);
+      context.itemRows().add(gameItemRepository.save(row));
     }
     context.getReport().added(P4kKind.ITEM, item);
   }

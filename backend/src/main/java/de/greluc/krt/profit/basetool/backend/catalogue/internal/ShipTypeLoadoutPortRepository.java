@@ -32,15 +32,15 @@ import org.springframework.stereotype.Repository;
 public interface ShipTypeLoadoutPortRepository extends JpaRepository<ShipTypeLoadoutPort, UUID> {
 
   /**
-   * Deletes the whole port tree of a ship type; a bulk delete, so it runs before the new tree is
-   * inserted.
+   * Deletes the whole port trees of some ship types; a bulk delete, so it runs before their new
+   * trees are inserted.
    *
-   * @param shipTypeId the ship type
+   * @param shipTypeIds the ship types; never empty
    * @return the ports deleted
    */
   @Modifying(flushAutomatically = true)
-  @Query("DELETE FROM ShipTypeLoadoutPort p WHERE p.shipTypeId = :shipTypeId")
-  int deleteTree(@Param("shipTypeId") UUID shipTypeId);
+  @Query("DELETE FROM ShipTypeLoadoutPort p WHERE p.shipTypeId IN :shipTypeIds")
+  int deleteTrees(@Param("shipTypeIds") Collection<UUID> shipTypeIds);
 
   /**
    * Deletes the port trees of every ship type a complete loadouts kind no longer lists.

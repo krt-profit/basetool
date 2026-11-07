@@ -99,14 +99,11 @@ public class P4kMaterialGroupReview {
               record.caseGuid(),
               P4kReviewReason.NO_RESOURCE_GROUP,
               material.getId());
-      if (context.isApply()) {
-        runResolvedCases.reopenIfRunResolved(P4kKind.COMMODITY, finding);
-      }
     }
     if (!context.isApply()) {
       return 0;
     }
-    runResolvedCases.closeUnfound(P4kKind.COMMODITY, REASONS, found, context.getNow());
+    runResolvedCases.settle(P4kKind.COMMODITY, REASONS, found, context.getNow());
     List<MaterialCategory> retired =
         entityManager
             .createQuery(UNREFERENCED_ADMIN_CATEGORIES, MaterialCategory.class)

@@ -23,9 +23,13 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import java.util.HashSet;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -34,13 +38,15 @@ import org.springframework.stereotype.Component;
 /**
  * Keeps {@code ship_type_p4k_variant} in step with the catalogue's variant groups (REQ-P4K-032): an
  * APPLY writes every variant with a GUID, a class name the catalogue does not repeat and a {@code
- * variantOf}, and a complete ships kind deletes the variants it no longer lists.
+ * variantOf}, and a complete ships kind deletes the variants it no longer lists. The stored rows
+ * are read once and the rows to delete go in one statement.
  */
 @Component
 @RequiredArgsConstructor
 class P4kShipVariants {
 
   private final ShipTypeP4kVariantRepository variantRepository;
+  private final EntityManager entityManager;
 
   /**
    * Writes the variant groups of an APPLY; a preview writes nothing.
@@ -53,29 +59,70 @@ class P4kShipVariants {
     if (!context.isApply()) {
       return;
     }
-    Set<UUID> written = new HashSet<>();
+    Map<UUID, ShipTypeP4kVariant> wanted = wanted(ships, context);
+    Map<String, UUID> claimedBy = new HashMap<>();
+    wanted.values().forEach(v -> claimedBy.put(folded(v.getClassName()), v.getVariantUuid()));
+    Map<UUID, ShipTypeP4kVariant> stored = new HashMap<>();
+    List<UUID> doomed = new ArrayList<>();
+    for (ShipTypeP4kVariant row : variantRepository.findAll()) {
+      UUID claimant = claimedBy.get(folded(row.getClassName()));
+      boolean nameTaken = claimant != null && !claimant.equals(row.getVariantUuid());
+      if (nameTaken || (complete && !wanted.containsKey(row.getVariantUuid()))) {
+        entityManager.detach(row);
+        doomed.add(row.getVariantUuid());
+      } else {
+        stored.put(row.getVariantUuid(), row);
+      }
+    }
+    if (!doomed.isEmpty()) {
+      variantRepository.deleteAllByIdInBatch(doomed);
+    }
+    wanted.forEach((guid, variant) -> {
+      ShipTypeP4kVariant row = stored.get(guid);
+      if (row == null) {
+        entityManager.persist(variant);
+      } else {
+        row.setClassName(variant.getClassName());
+        row.setBaseUuid(variant.getBaseUuid());
+      }
+    });
+  }
+
+  /**
+   * Reads the variants the catalogue lists: a GUID, a class name it does not repeat and a {@code
+   * variantOf} other than itself.
+   *
+   * @param ships the catalogue's ships
+   * @param context the run
+   * @return the variants by GUID, unsaved
+   */
+  @NotNull
+  private static Map<UUID, ShipTypeP4kVariant> wanted(
+      @NotNull List<P4kShipDto> ships, @NotNull P4kImportContext context) {
+    Map<UUID, ShipTypeP4kVariant> wanted = new LinkedHashMap<>();
     for (P4kShipDto ship : ships) {
       UUID guid = ship.parsedGuid();
       UUID base = P4kGuids.parse(ship.variantOf());
       String className = StringNormalization.blankToNull(ship.className());
-      if (guid == null
-          || base == null
-          || base.equals(guid)
-          || className == null
-          || context.isRepeated(P4kKind.SHIP, className)) {
-        continue;
+      if (guid != null
+          && base != null
+          && !base.equals(guid)
+          && className != null
+          && !context.isRepeated(P4kKind.SHIP, className)) {
+        wanted.put(guid, new ShipTypeP4kVariant(guid, className.strip(), base));
       }
-      variantRepository.deleteClassNameHeldByOther(className.strip(), guid);
-      variantRepository.save(new ShipTypeP4kVariant(guid, className.strip(), base));
-      written.add(guid);
     }
-    if (!complete) {
-      return;
-    }
-    if (written.isEmpty()) {
-      variantRepository.deleteAllInBatch();
-    } else {
-      variantRepository.deleteAllExcept(written);
-    }
+    return wanted;
+  }
+
+  /**
+   * Folds a class name for a comparison ignoring case, as the table's unique index does.
+   *
+   * @param className the class name
+   * @return the lower-cased class name
+   */
+  @NotNull
+  private static String folded(@NotNull String className) {
+    return className.toLowerCase(Locale.ROOT);
   }
 }

@@ -208,7 +208,9 @@ separate migration. That run sets the P4K GUID (`p4k_uuid`) as the identity of e
 keeps the Wiki UUID in `external_uuid` (`game_item`, `ship_type`) or `scwiki_uuid` (the other
 kinds) and records each mismatch in the change report (`IDENTITY_MISMATCH`). Matching runs per
 kind: the P4K GUID, then the Wiki UUID, then a class name and a name that each identify exactly
-one row and one record of the catalogue. A row that two P4K GUIDs would claim, or a P4K GUID that
+one row and one record of the catalogue. A run loads each kind's rows once and matches them in
+memory (`P4kRowIndex`), answering every step as its query on the rows' current values would, so an
+APPLY's length does not grow with one round trip per record. A row that two P4K GUIDs would claim, or a P4K GUID that
 two rows would claim (also two catalogue records sharing a name, as three commodities named
 "SLAM" do), is not resolved by the import: the conflict goes to the review list (REQ-P4K-016) and
 the admin merges or splits; the import never merges. The Wiki/UEX duplicate merge

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipVehicleKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kClosedSet;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
@@ -31,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kVehicleKi
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -56,7 +54,6 @@ class P4kShipBaseData {
   /** The {@code external_sync_report} aggregate of a ship disagreement. */
   private static final String AGGREGATE = "ship_type";
 
-  private final ShipTypeRepository shipTypeRepository;
   private final SyncReportService syncReportService;
 
   /** Writes one led column; a method reference to a generic method implements it. */
@@ -219,8 +216,10 @@ class P4kShipBaseData {
       return;
     }
     String target = name.strip();
-    Optional<ShipType> holder = shipTypeRepository.findByNameIgnoreCase(target);
-    if (holder.isPresent() && !holder.get().getId().equals(row.getId())) {
+    boolean held =
+        context.shipRows().byName(target).stream()
+            .anyMatch(other -> !other.getId().equals(row.getId()));
+    if (held) {
       disagreement(row, ship, context, P4kFields.disagreement("name", row.getName(), target));
       return;
     }

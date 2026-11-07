@@ -54,23 +54,30 @@ public class P4kManufacturerReconciler {
    */
   public void reconcile(
       @NotNull List<P4kManufacturerDto> manufacturers, @NotNull P4kImportContext context) {
+    P4kRowIndex<Manufacturer> rows =
+        new P4kRowIndex<>(
+            manufacturerRepository.findAll(),
+            Manufacturer::getScwikiUuid,
+            _ -> null,
+            Manufacturer::getName);
+    context.indexManufacturerRows(rows);
     P4kRowMatcher<Manufacturer> matcher =
         new P4kRowMatcher<>(
             P4kKind.MANUFACTURER,
-            manufacturerRepository::findByP4kUuid,
-            manufacturerRepository::findByScwikiUuid,
+            rows::byP4kUuid,
+            rows::byWikiUuid,
             Manufacturer::getScwikiUuid,
             "scwiki_uuid",
             _ -> List.of(),
-            name ->
-                manufacturerRepository.findByNameIgnoreCase(name).map(List::of).orElseGet(List::of),
+            rows::byName,
             _ -> false);
     for (P4kManufacturerDto manufacturer : manufacturers) {
       P4kRowMatcher.Match<Manufacturer> match =
           matcher.match(manufacturer, null, manufacturer.nameEn(), false, context);
       if (match instanceof P4kRowMatcher.Matched<Manufacturer>(Manufacturer row, UUID guid)) {
-        boolean changed = write(row, manufacturer, guid, context);
+        final boolean changed = write(row, manufacturer, guid, context);
         context.stamp(P4kKind.MANUFACTURER, manufacturer, row, guid);
+        rows.add(row);
         context.indexManufacturer(guid, row);
         context.getReport().matched(P4kKind.MANUFACTURER, changed);
       } else if (match instanceof P4kRowMatcher.Unmatched<Manufacturer>(UUID guid)) {
@@ -121,6 +128,7 @@ public class P4kManufacturerReconciler {
     context.stamp(P4kKind.MANUFACTURER, held, row, parsed);
     Manufacturer saved = manufacturerRepository.save(row);
     context.claimManufacturerName(name, saved.getId());
+    context.manufacturerRows().add(saved);
     context.indexManufacturer(parsed, saved);
   }
 
@@ -143,7 +151,7 @@ public class P4kManufacturerReconciler {
     if (context.claimsManufacturerName(name)) {
       holderId = context.manufacturerNameRow(name);
     } else {
-      Optional<Manufacturer> holder = manufacturerRepository.findByNameIgnoreCase(name);
+      Optional<Manufacturer> holder = context.manufacturerRows().byName(name).stream().findFirst();
       if (holder.isEmpty()) {
         return false;
       }
@@ -185,7 +193,10 @@ public class P4kManufacturerReconciler {
     writer.lead(
         "abbreviation", row.getAbbreviation(), stripped(manufacturer.code()), row::setAbbreviation);
     writer.lead(
-        "name_de", row.getNameDe(), P4kFields.germanName(manufacturer.name()), row::setNameDe);
+        "name_de",
+        row.getNameDe(),
+        P4kFields.germanName(manufacturer.name()),
+        row::setNameDe);
     writer.leadGameText(
         "description",
         row.getDescription(),
@@ -219,8 +230,10 @@ public class P4kManufacturerReconciler {
     if (name == null || name.equals(row.getName())) {
       return;
     }
-    Optional<Manufacturer> holder = manufacturerRepository.findByNameIgnoreCase(name);
-    if (holder.isPresent() && !holder.get().getId().equals(row.getId())) {
+    boolean held =
+        context.manufacturerRows().byName(name).stream()
+            .anyMatch(other -> !other.getId().equals(row.getId()));
+    if (held) {
       context
           .getReport()
           .review(

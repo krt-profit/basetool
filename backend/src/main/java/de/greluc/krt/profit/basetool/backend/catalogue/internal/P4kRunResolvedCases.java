@@ -61,41 +61,30 @@ public class P4kRunResolvedCases {
   }
 
   /**
-   * Opens a case a run closed again, because this run found it once more.
-   *
-   * @param kind the kind
-   * @param found the case found
-   */
-  public void reopenIfRunResolved(@NotNull P4kKind kind, @NotNull Found found) {
-    caseRepository
-        .findByKindAndGuidAndReason(kind, found.guid(), found.reason())
-        .filter(c -> c.getResolution() == P4kReviewResolution.RESOLVED)
-        .ifPresent(c -> {
-          c.setStatus(P4kReviewStatus.OPEN);
-          c.setResolution(null);
-          c.setResolvedAt(null);
-        });
-  }
-
-  /**
-   * Closes every open case of the given reasons this run did not find.
+   * Settles the cases of the given reasons with one read: a case a run closed is opened again when
+   * this run found it once more, and an open case this run did not find is closed as {@code
+   * RESOLVED}.
    *
    * @param kind the kind
    * @param reasons the reasons the caller owns
    * @param found the cases this run found
    * @param now the run time, stamped on the closed cases
    */
-  public void closeUnfound(
+  public void settle(
       @NotNull P4kKind kind,
       @NotNull List<P4kReviewReason> reasons,
       @NotNull Set<Found> found,
       @NotNull Instant now) {
-    for (P4kReviewCase open :
-        caseRepository.findByStatusAndKindAndReasonIn(P4kReviewStatus.OPEN, kind, reasons)) {
-      if (!found.contains(new Found(open.getGuid(), open.getReason()))) {
-        open.setStatus(P4kReviewStatus.REVIEWED);
-        open.setResolution(P4kReviewResolution.RESOLVED);
-        open.setResolvedAt(now);
+    for (P4kReviewCase reviewCase : caseRepository.findByKindAndReasonIn(kind, reasons)) {
+      boolean foundAgain = found.contains(new Found(reviewCase.getGuid(), reviewCase.getReason()));
+      if (foundAgain && reviewCase.getResolution() == P4kReviewResolution.RESOLVED) {
+        reviewCase.setStatus(P4kReviewStatus.OPEN);
+        reviewCase.setResolution(null);
+        reviewCase.setResolvedAt(null);
+      } else if (!foundAgain && reviewCase.getStatus() == P4kReviewStatus.OPEN) {
+        reviewCase.setStatus(P4kReviewStatus.REVIEWED);
+        reviewCase.setResolution(P4kReviewResolution.RESOLVED);
+        reviewCase.setResolvedAt(now);
       }
     }
   }

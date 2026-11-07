@@ -71,15 +71,19 @@ public class P4kCommodityReconciler {
   public Outcome reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
     P4kCommodityJoin join = P4kCommodityJoin.of(catalogue);
     join.reviewUnresolved(context);
+    P4kRowIndex<Material> materials =
+        new P4kRowIndex<>(
+            materialRepository.findAll(), Material::getScwikiUuid, _ -> null, Material::getName);
+    context.indexCommodityRows(materials);
     P4kRowMatcher<Material> matcher =
         new P4kRowMatcher<>(
             P4kKind.COMMODITY,
-            materialRepository::findByP4kUuid,
-            materialRepository::findByScwikiUuid,
+            materials::byP4kUuid,
+            materials::byWikiUuid,
             Material::getScwikiUuid,
             "scwiki_uuid",
             _ -> List.of(),
-            name -> materialRepository.findByNameIgnoreCase(name).map(List::of).orElseGet(List::of),
+            materials::byName,
             row -> row.getSourceSystems() == MaterialSourceSystem.P4K);
     Map<P4kCommodityDto, Reconciled> rows = new LinkedHashMap<>();
     for (P4kCommodityDto commodity : catalogue.commodities()) {
@@ -90,11 +94,15 @@ public class P4kCommodityReconciler {
         P4kRowWriter writer = new P4kRowWriter(context, P4kKind.COMMODITY, commodity);
         enrich(writer, row, commodity, guid, context);
         writer.lead(
-            "name_de", row.getNameDe(), P4kFields.germanName(commodity.name()), row::setNameDe);
+            "name_de",
+            row.getNameDe(),
+            P4kFields.germanName(commodity.name()),
+            row::setNameDe);
         if (creatable && row.getSourceSystems() == MaterialSourceSystem.P4K) {
           writer.lead("is_visible", row.getIsVisible(), true, row::setIsVisible, String::valueOf);
         }
         context.stamp(P4kKind.COMMODITY, commodity, row, guid);
+        materials.add(row);
         rows.put(commodity, new Reconciled(row, writer));
       } else if (match instanceof P4kRowMatcher.Unmatched<Material>(UUID guid)) {
         Material created = creatable ? create(commodity, guid, context) : null;
@@ -159,7 +167,7 @@ public class P4kCommodityReconciler {
       @NotNull P4kImportContext context) {
     String name = commodity.displayName();
     if (name != null && !name.equals(row.getName())) {
-      if (nameHeldElsewhere(name, row)) {
+      if (nameHeldElsewhere(name, row, context)) {
         context
             .getReport()
             .review(P4kKind.COMMODITY, commodity, guid, P4kReviewReason.GUID_CONFLICT, row.getId());
@@ -201,13 +209,13 @@ public class P4kCommodityReconciler {
    *
    * @param name the name the P4K leads
    * @param row the material that would take it
+   * @param context the run
    * @return {@code true} when writing it would collide
    */
-  private boolean nameHeldElsewhere(@NotNull String name, @NotNull Material row) {
-    return materialRepository
-        .findByNameIgnoreCase(name)
-        .filter(other -> !Objects.equals(other.getId(), row.getId()))
-        .isPresent();
+  private static boolean nameHeldElsewhere(
+      @NotNull String name, @NotNull Material row, @NotNull P4kImportContext context) {
+    return context.commodityRows().byName(name).stream()
+        .anyMatch(other -> !Objects.equals(other.getId(), row.getId()));
   }
 
   /**
@@ -223,7 +231,7 @@ public class P4kCommodityReconciler {
   private Material create(
       @NotNull P4kCommodityDto commodity, @Nullable UUID guid, @NotNull P4kImportContext context) {
     String name = commodity.displayName();
-    if (guid == null || name == null || materialRepository.findByNameIgnoreCase(name).isPresent()) {
+    if (guid == null || name == null || !context.commodityRows().byName(name).isEmpty()) {
       return null;
     }
     Material row = new Material();
@@ -242,7 +250,7 @@ public class P4kCommodityReconciler {
     row.setNameKey(P4kFields.storedNameKey(P4kLocalisedText.keyOf(commodity.name())));
     if (context.isApply()) {
       context.stamp(P4kKind.COMMODITY, commodity, row, guid);
-      materialRepository.save(row);
+      context.commodityRows().add(materialRepository.save(row));
     }
     context.getReport().added(P4kKind.COMMODITY, commodity);
     return row;
