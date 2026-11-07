@@ -43,7 +43,10 @@ public enum P4kKind {
   BLUEPRINT("blueprints"),
 
   /** {@code starmapObjects}, imported into {@code starmap_object} (REQ-P4K-034). */
-  STARMAP_OBJECT("starmapObjects");
+  STARMAP_OBJECT("starmapObjects"),
+
+  /** {@code shops}, imported into {@code shop} by their unique {@code key} (REQ-P4K-042). */
+  SHOP("shops");
 
   /** The top-level field of the catalogue that holds this kind, also its completeness key. */
   @Getter @NotNull private final String catalogueField;

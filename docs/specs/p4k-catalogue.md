@@ -22,20 +22,22 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category and shop
-> tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category tables
+> join with their areas), REQ-P4K-017…019 are implemented (#3035),
 > REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
 > REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
 > implemented (#3043), REQ-P4K-034…038 are implemented (#3044), REQ-P4K-040 and REQ-P4K-041 are
-> implemented (#3045), REQ-P4K-047 is implemented (#3034); every other
+> implemented (#3045), REQ-P4K-042…044 are implemented (#3046), REQ-P4K-047 is implemented
+> (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kCommodityReconciler`, `P4kBlueprintReconciler`)
 > sharing `P4kRowMatcher`, then `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the
-> rows the base kinds matched, and the starmap tree and its UEX links (`P4kStarmapReconciler`,
-> `P4kStarmapLinker`); the wire format is `catalogue.internal.p4k`.
+> rows the base kinds matched, the starmap tree and its UEX links (`P4kStarmapReconciler`,
+> `P4kStarmapLinker`), and the shops and their UEX terminal links (`P4kShopReconciler`,
+> `P4kShopLinker`); the wire format is `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -179,8 +181,8 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
 - [x] Pruning the job leaves the run with a `null` job reference.
 
 The run is `p4k_import_run` (V342) with one `p4k_import_run_kind` row per kind (completeness, its
-Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds and `starmap_object`;
-the category and shop tables add it with their areas.
+Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, `starmap_object` and
+`shop`; the category tables add it with their areas.
 
 **Enforced by:** `P4kImportRunTest` · **ADR:**
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
@@ -328,9 +330,13 @@ move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PART
 The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
 names them by class name, and no other source lists them.
 
-> [!note] Planned — the category and shop tables
-> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027) and the shops do not exist
-> yet; each joins the sweep as one `P4kSweepTarget` when its area adds the table with `p4k_uuid`, `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
+The shops are the target `SHOP`, keyed by the name-based UUID of their `key`; a report row names a
+shop by its entity name, and no other source lists them.
+
+> [!note] Planned — the category tables
+> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027) do not exist yet; each
+> joins the sweep as one `P4kSweepTarget` when its area adds the table with `p4k_uuid`,
+> `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
 
 **Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
 `P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
@@ -931,6 +937,8 @@ A column is classified by its content, not its source, and has exactly one class
   holds no game text and stays unmarked: `Location.description`, `StarSystem.description`,
   `FrequencyType.description`, `RefiningMethod.description` and `JobType.description`. Should a
   game-data source ever fill one, it becomes `@GameText`.
+- A shop's names (`Shop.entityName`, `registryName`, `locationName`, `brand`) are names of
+  containers and entities, which the contract marks as no game text; they stay unmarked.
 - **`@GameMedia`** is defined and sits on no column: the import stores no archive media, and the UEX
   link and image columns stay unmarked UEX data.
 
@@ -1194,9 +1202,20 @@ sweeps. Prices, stock and demand never come from the P4K.
 
 **Acceptance**
 
-- [ ] Two shops sharing an `entityGuid` with different keys are two rows.
+- [x] Two shops sharing an `entityGuid` with different keys are two rows.
 
-**Enforced by (planned):** `P4kShopImportTest` · **ADR:** [ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028
+The table is `shop` (V354), unique on `shop_key`; its `p4k_uuid` is a name-based UUID of the key, so
+the run stamp, the sweep, the report and the review list key a shop like any other P4K row. Every
+record with a key is matched by it or added (`ADDED`), and the P4K writes every column but the
+terminal link, a `null` included; a changed column is a `CHANGED` report row. `kind` is a closed
+set read through `P4kShopKind` (the 20 values of LIVE); an unknown one reads as `null` and is an
+`UNKNOWN_VALUE`. `starmapObjectGuid` resolves to `starmap_object_id`, `null` when the tree lacks
+the object. A key the catalogue repeats is read once. A catalogue without shops leaves the shops,
+their lists and their links as they are. The result's `shops` counts the shops (`matched`,
+`enriched`, `created`) and the shops left without a terminal (`unmatched`, `review`).
+
+**Enforced by:** `P4kShopImportTest` · **Code:** `P4kShopReconciler`, `Shop`, `P4kShopDto` ·
+**ADR:** [ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028, #3046
 
 ### REQ-P4K-043 — a shop links to a UEX terminal by place, then by name
 
@@ -1206,11 +1225,31 @@ re-imports and is an audit event (REQ-P4K-046). An unlinked shop stays usable on
 
 **Acceptance**
 
-- [ ] A shop whose place holds one terminal of the matching name is linked; two candidates open a
+- [x] A shop whose place holds one terminal of the matching name is linked; two candidates open a
   review case.
-- [ ] A manual link survives the next APPLY.
+- [x] A manual link survives the next APPLY.
 
-**Enforced by (planned):** `P4kShopTerminalLinkTest` · **ADR:** [ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028
+A terminal's place is its own starmap link, else the link of its nearest linked UEX parent
+(REQ-P4K-035); the candidates are the terminals whose place is the shop's starmap object. The name
+match reads UEX's `<shop> - <place>` naming: a terminal's part before its first ` - `, normalised
+like a starmap name and without spaces, at least three characters, matches when the shop's
+registry name, entity name or brand, compacted the same way, contains it; the longest match wins
+(`ShopTerminalNames`). One candidate links; several or none (no place included) leave the shop
+unlinked, one `UNMATCHED` row and one case `SHOP_LINK_AMBIGUOUS` or `SHOP_LINK_NOT_FOUND` of kind
+`SHOP` with the shop's GUID; a run that links the shop closes the case as `RESOLVED`. A link the
+run changes is a `CHANGED` row (`terminal_id`). The links are read as stored, so a preview links
+against the starmap links of the last APPLY.
+
+The link columns `shop.terminal_id` and `terminal_link_manual` are mapped read only and written
+only by `ShopRepository`'s statements. An admin sets (`SET`), clears (`CLEAR`) or hands back to the
+import (`RELEASE`) a link at `PUT /api/v1/catalog/admin/shops/{id}/terminal-link`, echoing the link
+and the manual flag seen (`409` when either changed); `SET` and `CLEAR` mark the link manual, which
+every APPLY leaves alone. The admin page `/admin/shops` lists the shops with their links and finds
+terminals by name (`GET …/admin/shops/terminals`).
+
+**Enforced by:** `P4kShopTerminalLinkTest`, `ShopTerminalNamesTest`, `AdminShopsControllerMvcTest`
+· **Code:** `P4kShopLinker`, `ShopTerminalNames`, `ShopAdminService` · **ADR:**
+[ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028, #3046
 
 ### REQ-P4K-044 — a shop's item list shows on the item as "available at"
 
@@ -1220,11 +1259,20 @@ list means the file lists no item.
 
 **Acceptance**
 
-- [ ] An item listed by two shops shows both; a shop with a `null` list contributes nothing and is
+- [x] An item listed by two shops shows both; a shop with a `null` list contributes nothing and is
   not shown as empty.
 
-**Enforced by (planned):** `P4kShopImportTest`, the item detail MVC test · **ADR:** [ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) ·
-**Issues:** #3028
+The rows are `shop_item` (V354); `shop.inventory` is `null` exactly while the list is unknown. APPLY
+replaces the rows of every listed shop with the GUIDs that resolve to a `game_item`; an unknown list
+leaves none. `GET /api/v1/game-items/{id}/catalogue` carries `availableAt`: the shops that are
+neither stamped nor hidden and whose list names the item, each with its linked terminal's name,
+its registry and entity name, its star system and its place's names, one per name and place. The
+item page names a shop by its terminal, else its registry name, and shows an empty list as
+unknown, never as "not available". An item merge moves the rows onto the survivor.
+
+**Enforced by:** `P4kShopImportTest`, `InventoryPageControllerMvcTest` · **Code:**
+`ItemCatalogueDetailsService`, `catalogue/fragments/item-catalogue.html` · **ADR:**
+[ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md) · **Issues:** #3028, #3046
 
 ## Texts, audit and monitoring
 
@@ -1268,10 +1316,11 @@ the never-pruned detail record; the audit event carries no free text.
 The starmap's events are recorded: `CATALOGUE_STARMAP_LINK_SET`, `…_LINK_CLEARED` and
 `…_LINK_RELEASED` (subject the UEX row, details `kind`, `starmapObjectId`,
 `previousStarmapObjectId`), `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` and
-`CATALOGUE_STORAGE_PLACE_CREATED`; the shop link's event follows with REQ-P4K-043.
+`CATALOGUE_STORAGE_PLACE_CREATED`; the shop's are `CATALOGUE_SHOP_LINK_SET`, `…_LINK_CLEARED` and
+`…_LINK_RELEASED` (subject the shop, details `terminalId`, `previousTerminalId`).
 
 **Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
-`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest` ·
+`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`, `P4kShopTerminalLinkTest` ·
 **Enforced by (planned):** further cases in `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
 
 ### REQ-P4K-047 — the import is monitored and says when it is due

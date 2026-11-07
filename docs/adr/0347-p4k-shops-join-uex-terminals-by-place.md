@@ -1,6 +1,6 @@
 # ADR-0347 — P4K shops join UEX terminals by place
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted (implemented)
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-042…044) · ADR-0336 · ADR-0345 · ADR-0346 · #3028 · map #2884 ·
@@ -38,5 +38,5 @@ a placeholder inventory is `null`, not empty.
   stay with UEX.
 - The P4K catalogue spec carries the shop, link and item-list requirements; the audit spec covers
   the manual link through the catalogue domain.
-- Pending: the `shop` table and its import, the terminal link and its review, the item-list rows
-  and the „available at" display.
+- The `shop` and `shop_item` tables (V354), the terminal link with its review cases and the
+  admin page `/admin/shops`, and the „available at" section of the item page implement it (#3046).

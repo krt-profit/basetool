@@ -82,7 +82,10 @@ enum P4kSweepTarget {
    * no other source lists it.
    */
   STARMAP_OBJECT(
-      P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL");
+      P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL"),
+
+  /** {@code shop}; its entity name stands in for a class name, and no other source lists it. */
+  SHOP(P4kKind.SHOP, "Shop", "e.entityName", "e.registryName", "e.id IS NULL");
 
   /** The kind. */
   @NotNull private final P4kKind kind;
@@ -114,6 +117,7 @@ enum P4kSweepTarget {
       case COMMODITY -> COMMODITY;
       case BLUEPRINT -> BLUEPRINT;
       case STARMAP_OBJECT -> STARMAP_OBJECT;
+      case SHOP -> SHOP;
     };
   }
 

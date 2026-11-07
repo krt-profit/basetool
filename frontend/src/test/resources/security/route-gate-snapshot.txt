@@ -136,6 +136,10 @@
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
+/admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
+/admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no
+/admin/shops/{id}/terminal-link POST -> AdminShopsController#changeLink gate=class:hasRole('ADMIN') layout=no
 /admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes

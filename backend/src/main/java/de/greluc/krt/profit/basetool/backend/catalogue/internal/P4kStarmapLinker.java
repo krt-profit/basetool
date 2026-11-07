@@ -125,7 +125,7 @@ public class P4kStarmapLinker {
       @NotNull Map<UUID, UUID> guidById,
       @NotNull Set<P4kRunResolvedCases.Found> found,
       @NotNull P4kImportContext context) {
-    UUID ancestor = linkedParent(row, linked);
+    UUID ancestor = row.nearestLinkedParent(linked);
     String name = StarmapNames.normalise(row.name());
     List<UUID> candidates =
         name == null
@@ -166,39 +166,6 @@ public class P4kStarmapLinker {
       }
     }
     return target;
-  }
-
-  /**
-   * Finds the object the row's nearest linked parent links to: the parents the row names, nearest
-   * first, then its star system.
-   *
-   * @param row the row
-   * @param linked the GUIDs the rows of earlier kinds link to
-   * @return the parent's object, or {@code null} when no named parent is linked
-   */
-  @Nullable
-  private static UUID linkedParent(
-      @NotNull StarmapPlaceRow row, @NotNull Map<StarmapPlaceKind, Map<String, UUID>> linked) {
-    if (row.kind() == StarmapPlaceKind.STAR_SYSTEM) {
-      return null;
-    }
-    for (StarmapPlaceKind.Parent parent : row.kind().getParents()) {
-      String parentName = row.parentName(parent);
-      if (parentName != null) {
-        UUID guid =
-            linked
-                .getOrDefault(parent.kind(), Map.of())
-                .get(StarmapNames.key(row.starSystem(), parentName));
-        if (guid != null) {
-          return guid;
-        }
-      }
-    }
-    return row.starSystem() == null
-        ? null
-        : linked
-            .getOrDefault(StarmapPlaceKind.STAR_SYSTEM, Map.of())
-            .get(StarmapNames.key(row.starSystem(), row.starSystem()));
   }
 
   /**
