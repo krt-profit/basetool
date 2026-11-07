@@ -84,8 +84,9 @@ import org.jetbrains.annotations.Nullable;
  * string literals, {@code +} concatenation, constants of any class, effectively-final locals,
  * {@code String} parameters (through the call sites of their method), helper methods returning a
  * {@code String}, {@code String.format}/{@code formatted}, conditionals, switch expressions and
- * {@code UriComponentsBuilder} chains. Every other operand, including a conditional branch or a
- * switch arm that does not fold, is a runtime value and becomes a {@link #DYNAMIC} part.
+ * {@code UriComponentsBuilder} and catalogue {@code QueryTemplate} chains. Every other operand,
+ * including a conditional branch or a switch arm that does not fold, is a runtime value and becomes
+ * a {@link #DYNAMIC} part.
  */
 final class BackendCallScanner {
 
@@ -122,7 +123,9 @@ final class BackendCallScanner {
           "toUri",
           "cloneBuilder",
           "trim",
-          "strip");
+          "strip",
+          "param",
+          "template");
 
   /** Static factories of {@code UriComponentsBuilder} whose first argument is the path. */
   private static final Set<String> BUILDER_ROOTS =
@@ -138,7 +141,8 @@ final class BackendCallScanner {
           "StringBuilder",
           "StringBuffer",
           "UriComponentsBuilder",
-          "URI");
+          "URI",
+          "QueryTemplate");
 
   /** Methods that extend the path of their receiver by their arguments. */
   private static final Set<String> APPENDING = Set.of("append", "path");
