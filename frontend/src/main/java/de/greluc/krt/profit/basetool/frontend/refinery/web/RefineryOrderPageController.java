@@ -67,6 +67,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -809,7 +810,8 @@ public class RefineryOrderPageController {
           if (good.outputMaterial() != null) {
             RefineryOrderStoreItemForm storeItem = new RefineryOrderStoreItemForm();
             storeItem.setMaterialId(good.outputMaterial().id());
-            storeItem.setMaterialName(good.outputMaterial().name());
+            storeItem.setMaterialName(
+                good.outputMaterial().displayName(LocaleContextHolder.getLocale()));
 
             double amount = 0.0;
             String materialQuantityType = good.outputMaterial().quantityType();

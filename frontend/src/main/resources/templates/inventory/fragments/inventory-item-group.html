@@ -13,7 +13,8 @@
               th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
     </div>
     <div class="tree-cell lager-cell-muted">
-        <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturer} · |">Hersteller · </span>
+        <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${group.gameItem.manufacturerRef})}"></span>
+        <span th:if="${group.gameItem.manufacturer != null}" th:text="|${group.gameItem.manufacturerDisplayName(#locale)} · |">Hersteller · </span>
         <span th:text="${contextText}">5 Stacks</span>
     </div>
     <div class="tree-cell tree-cell--num tree-amount">

@@ -109,7 +109,8 @@ public class JobOrderInventoryOwnerRedactor {
                 e.quality(),
                 e.quantity(),
                 e.allocatedQuantity(),
-                e.delivered()))
+                e.delivered(),
+                e.materialNameDe()))
         .toList();
   }
 

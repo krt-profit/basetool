@@ -636,12 +636,11 @@ The mapping is `frontend/src/main/resources/catalogue/manufacturer-logos.json`, 
 lower-case P4K GUID to PNG file name; the PNGs ship under `static/images/manufacturers/`. The
 mapping ships empty until the Fan Kit PNGs are added, so every manufacturer shows its badge.
 `ManufacturerDto` carries the `p4kUuid` the page looks the logo up by; the exchange schemas carry
-no logo field, which `ExchangeFieldRatchetTest` holds.
-
-> [!note] Partly implemented
-> The logo or badge shows on Ship-Data (the manufacturer list and the ship types) and in the
-> personal and squadron hangar lists. The ship-type form picker and the item and inventory views
-> are planned: their DTOs carry no manufacturer GUID yet.
+no logo field, which `ExchangeFieldRatchetTest` holds. The logo or badge shows on Ship-Data (the
+manufacturer list and the ship types), in the personal and squadron hangar lists, beside the
+ship-type pickers of both hangar dialogs (the mark of the chosen type's manufacturer, else of the
+chosen manufacturer), and in the inventory item views (the item list, the item groups and the item
+page), whose item references carry a `ManufacturerRefDto` with the GUID.
 
 **Enforced by:** `ManufacturerLogoMappingTest`, `ShipDataPageControllerMvcTest`,
 `ExchangeFieldRatchetTest`, the Fan Kit compliance test · **Code:** `ManufacturerLogos`,
@@ -667,13 +666,18 @@ The import writes `name.de` on every matched row and every row it creates; a bla
 the game's missing-translation marker (a text starting with `!`) is no German name and leaves the
 stored one. The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID.
 The DTOs of manufacturers, ship types, materials and item references carry `nameDe`, and a page
-picks the name by its language (`LocalisedNames`): Ship-Data, the hangars and their pickers, the
-material detail page, and the inventory item group and item page show it. The other pages that
-name a catalogue row (the material overview cards and price lists, job orders, refinery, supply,
-the item pickers) are planned; their DTOs carry no German name yet.
+picks the name by its language (`LocalisedNames` on server-rendered pages, `localisedName` of
+`krt-localised-name.js` in scripts). Every page that names a manufacturer, item, ship or material
+shows it: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
+matrix, profit calculation and detail, the material and item pickers, job orders, supply,
+purchasing, the dashboard widgets, inventory and stock levels, refinery, the material exchange and
+the blueprint recipe pane. The page-specific DTOs carry the German name beside the name they
+denormalise (`nameDe`, `materialNameDe`, `manufacturerNameDe`). Search, filters, sorting, matching
+and every value sent back to the server stay on `name`. Admin pages where an admin edits or maps a
+name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
 
 **Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `ShipDataPageControllerMvcTest`,
-`ItemReconciliationServiceTest` ·
+`ItemPickerLabelsTest`, `ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Commodities and categories

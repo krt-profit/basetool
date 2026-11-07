@@ -210,10 +210,16 @@ class PurchasingDealAssembler {
             deal.getRaisingOrgUnitId(), unitNames.getOrDefault(deal.getRaisingOrgUnitId(), "—")),
         deal.getMaterial() == null
             ? null
-            : new PurchasingRefDto(deal.getMaterial().getId(), deal.getMaterial().getName()),
+            : new PurchasingRefDto(
+                deal.getMaterial().getId(),
+                deal.getMaterial().getName(),
+                deal.getMaterial().getNameDe()),
         deal.getGameItem() == null
             ? null
-            : new PurchasingRefDto(deal.getGameItem().getId(), deal.getGameItem().getName()),
+            : new PurchasingRefDto(
+                deal.getGameItem().getId(),
+                deal.getGameItem().getName(),
+                deal.getGameItem().getNameDe()),
         quantityType(deal),
         deal.getQualityTier() == null ? null : tierRef(deal.getQualityTier()),
         deal.getAmount(),

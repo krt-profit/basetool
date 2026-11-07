@@ -125,7 +125,7 @@
                             <label class="rod-good__label" th:for="'inputMaterialId_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</span></label>
                             <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                                <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.name : ''}"></option>
+                                <option th:each="mat : ${materials}" th:if="${mat.id == good.inputMaterialId}" th:value="${mat.id}" th:text="${mat.displayName(#locale)}" th:attr="data-refined-id=${mat.refinedMaterial != null ? mat.refinedMaterial.id : ''},data-refined-name=${mat.refinedMaterial != null ? mat.refinedMaterial.displayName(#locale) : ''}"></option>
                             </select>
                         </div>
                         <div class="form-group">

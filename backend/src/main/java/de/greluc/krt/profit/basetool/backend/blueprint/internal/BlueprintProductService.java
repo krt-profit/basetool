@@ -108,7 +108,8 @@ public class BlueprintProductService implements BlueprintProducts {
               p.variantCount,
               p.manufacturerName,
               p.exampleKey,
-              owned.contains(p.productKey)));
+              owned.contains(p.productKey),
+              p.manufacturerNameDe));
     }
     return out;
   }
@@ -383,6 +384,7 @@ public class BlueprintProductService implements BlueprintProducts {
       }
       if (acc.manufacturerName == null && row.manufacturerName() != null) {
         acc.manufacturerName = row.manufacturerName();
+        acc.manufacturerNameDe = row.manufacturerNameDe();
       }
       if (acc.outputItemId == null && row.outputItemId() != null) {
         acc.outputItemId = row.outputItemId();
@@ -418,6 +420,7 @@ public class BlueprintProductService implements BlueprintProducts {
     private int variantCount;
     private @Nullable String exampleKey;
     private @Nullable String manufacturerName;
+    private @Nullable String manufacturerNameDe;
     private @Nullable UUID outputItemId;
 
     private ProductAccumulator(String productKey, String displayName) {

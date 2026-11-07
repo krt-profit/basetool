@@ -47,7 +47,7 @@
                                 <label class="multi-select-option demand-material-option"
                                        th:each="mat : ${materialOptions}"
                                        th:data-material-name="${mat.name()}">
-                                    <span th:text="${mat.name()}">Titanium</span>
+                                    <span th:text="${mat.displayName(#locale)}">Titanium</span>
                                     <input type="checkbox" class="demandMatCheck" th:value="${mat.id()}" checked
                                            data-trigger="demand-update-material-state">
                                 </label>
@@ -167,7 +167,7 @@
                                                 aria-expanded="false"
                                                 th:aria-label="#{orders.demand.orders.toggle}">
                                             <span class="toggle-icon" aria-hidden="true">&#9654;</span>
-                                            <span class="cell-title" th:text="${row.material().name()}" th:title="${row.material().name()}">Titanium</span>
+                                            <span class="cell-title" th:text="${row.material().displayName(#locale)}" th:title="${row.material().displayName(#locale)}">Titanium</span>
                                             <span class="text-muted demand-orders-count"
                                                   th:text="'(' + ${row.orders() != null ? row.orders().size() : 0} + ')'">(0)</span>
                                         </button>

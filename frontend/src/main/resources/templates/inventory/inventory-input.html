@@ -36,7 +36,7 @@
                     <label for="materialId" th:text="#{inventory.input.material}">Material</label>
                     <select id="materialId" th:field="*{materialId}" required data-krt-combobox="remote-materials">
                         <option value="" data-quantity-type="" th:text="#{info.select}">-- Bitte wählen --</option>
-                        <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.name}"></option>
+                        <option th:each="mat : ${materials}" th:if="${mat.id == inventoryForm.materialId}" th:value="${mat.id}" th:data-quantity-type="${mat.quantityType}" th:text="${mat.displayName(#locale)}"></option>
                     </select>
                 </div>
                 <div class="form-group">

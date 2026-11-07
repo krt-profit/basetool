@@ -49,7 +49,7 @@
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
                             <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', materialIds=${item.material.id})}">
-                                <span class="cell-title" th:text="${item.material.name}">Material</span>
+                                <span class="cell-title" th:text="${item.material.displayName(#locale)}">Material</span>
                             </a>
                             <span th:if="${item.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"
                                   th:text="#{inventory.stockLevels.status.low}" th:title="#{inventory.lowStock.hint}">Niedrig</span>
@@ -90,8 +90,9 @@
                     <tr th:each="item : ${aggregated}" data-testid="inventory-aggregate-row">
                         <td>
                             <a class="row-link" data-testid="row-link" th:href="@{/inventory(storage='all', view='items', gameItemIds=${item.gameItem.id})}">
-                                <span class="cell-title" th:text="${item.gameItem.name}">Item</span>
-                                <span class="cell-sub" th:text="${item.gameItem.manufacturer} ?: '&mdash;'">Hersteller</span>
+                                <span class="cell-title" th:text="${item.gameItem.displayName(#locale)}">Item</span>
+                                <span class="cell-sub"><span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${item.gameItem.manufacturerRef})}"></span>
+                                    <span th:text="${item.gameItem.manufacturerDisplayName(#locale)} ?: '&mdash;'">Hersteller</span></span>
                             </a>
                             <span th:if="${item.gameItem.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                             <span th:if="${item.lowStock}" class="chip chip--danger" data-testid="inventory-low-stock"

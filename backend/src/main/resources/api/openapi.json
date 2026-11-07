@@ -80228,6 +80228,9 @@
           "manufacturerName" : {
             "type" : "string"
           },
+          "manufacturerNameDe" : {
+            "type" : "string"
+          },
           "name" : {
             "type" : "string"
           },
@@ -81102,6 +81105,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "missingScu" : {
@@ -83175,6 +83181,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"
@@ -83239,6 +83248,9 @@
           },
           "manufacturer" : {
             "type" : "string"
+          },
+          "manufacturerRef" : {
+            "$ref" : "#/components/schemas/ManufacturerRefDto"
           },
           "name" : {
             "type" : "string"
@@ -84968,6 +84980,28 @@
           }
         }
       },
+      "ManufacturerRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "abbreviation" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
       "ManufacturerReference" : {
         "type" : "object",
         "properties" : {
@@ -85021,6 +85055,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "ownerId" : {
@@ -85440,6 +85477,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "quality" : {
             "type" : "integer",
             "format" : "int32"
@@ -85626,6 +85666,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "outpostName" : {
             "type" : "string"
           },
@@ -85766,6 +85809,9 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
           }
         }
       },
@@ -85777,6 +85823,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "quantityType" : {
@@ -90802,6 +90851,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "maxProfitFullLoad" : {
             "type" : "number"
           },
@@ -90847,6 +90899,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           }
         }
@@ -91949,6 +92004,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "uexReferencePrice" : {
             "type" : "number",
             "format" : "double"
@@ -91999,6 +92057,9 @@
             "format" : "int32"
           },
           "entry" : {
+            "type" : "string"
+          },
+          "entryDe" : {
             "type" : "string"
           },
           "needId" : {
@@ -92994,6 +93055,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           }
         }

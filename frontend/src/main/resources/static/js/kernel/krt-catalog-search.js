@@ -19,16 +19,19 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtComboboxRemoteSources } from '/js/kernel/krt-combobox-sources.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 /** @param {ApiDto<'MaterialDto'>} row */
 function toMaterialOption(row) {
     return {
         value: row.id,
-        label: row.name,
+        label: localisedName(row.name, row.nameDe),
         data: {
             quantityType: row.quantityType || '',
             refinedId: (row.refinedMaterial && row.refinedMaterial.id) || '',
-            refinedName: (row.refinedMaterial && row.refinedMaterial.name) || '',
+            refinedName: row.refinedMaterial
+                ? localisedName(row.refinedMaterial.name, row.refinedMaterial.nameDe)
+                : '',
         },
     };
 }

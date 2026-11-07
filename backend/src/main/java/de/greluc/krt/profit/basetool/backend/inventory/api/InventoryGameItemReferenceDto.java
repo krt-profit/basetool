@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
  * @param noLongerInGame whether the P4K stamped the item as gone from the game or an admin hid it;
  *     an existing reference then shows the "no longer in the game" notice (REQ-P4K-013)
  * @param nameDe the item's German name, or {@code null} (REQ-P4K-023)
+ * @param manufacturerRef the manufacturer's German name and logo key, or {@code null} when
+ *     unresolved (REQ-P4K-022, REQ-P4K-023)
  */
 public record InventoryGameItemReferenceDto(
     UUID id,
@@ -52,7 +55,8 @@ public record InventoryGameItemReferenceDto(
     @Nullable String grade,
     @Nullable String itemClass,
     boolean noLongerInGame,
-    @Nullable String nameDe) {
+    @Nullable String nameDe,
+    @Nullable ManufacturerRefDto manufacturerRef) {
 
   /**
    * Builds a reference without a German name.
@@ -77,7 +81,18 @@ public record InventoryGameItemReferenceDto(
       @Nullable String grade,
       @Nullable String itemClass,
       boolean noLongerInGame) {
-    this(id, name, manufacturer, kind, componentType, size, grade, itemClass, noLongerInGame, null);
+    this(
+        id,
+        name,
+        manufacturer,
+        kind,
+        componentType,
+        size,
+        grade,
+        itemClass,
+        noLongerInGame,
+        null,
+        null);
   }
 
   /**

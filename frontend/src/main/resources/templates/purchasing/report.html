@@ -121,7 +121,7 @@
                     </thead>
                     <tbody>
                         <tr th:each="m : ${report.materials()}">
-                            <td th:text="${m.name()}">Quantanium</td>
+                            <td th:text="${m.displayName(#locale)}">Quantanium</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${m.dealCount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${m.boughtAmount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.avgPrice}"
@@ -154,7 +154,7 @@
                     <tbody>
                         <tr th:each="n : ${report.needs()}">
                             <td th:text="${n.unit()}">ARGON</td>
-                            <td th:attr="data-label=#{purchasing.deal.entry}" th:text="${n.entry()}">Quantanium</td>
+                            <td th:attr="data-label=#{purchasing.deal.entry}" th:text="${n.entryDisplayName(#locale)}">Quantanium</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.deals}" th:text="${n.dealCount()}">0</td>
                             <td class="num" th:attr="data-label=#{purchasing.report.bought}" th:text="${n.boughtAmount()}">0</td>
                         </tr>

@@ -8,5 +8,6 @@
 - **Deutsche Namen.** Hersteller, Items, Schiffe und Materialien zeigen auf deutschen Seiten ihren
   deutschen Namen aus dem P4K-Katalog, sonst den englischen; die Suche läuft weiter über den Namen
   (REQ-P4K-023).
-- **Herstellerlogos.** Ship-Data und die Hangars zeigen das Fan-Kit-Logo eines Herstellers, solange
-  keines hinterlegt ist sein Kürzel (REQ-P4K-022).
+- **Herstellerlogos.** Ship-Data, die Hangars samt Schiffsauswahl und die Lager-Itemansichten
+  zeigen das Fan-Kit-Logo eines Herstellers, solange keines hinterlegt ist sein Kürzel
+  (REQ-P4K-022).

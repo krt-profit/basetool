@@ -186,10 +186,7 @@ public class StockLevelFigures {
         level.getId(),
         level.getVersion(),
         new OrgUnitReferenceDto(unit.getId(), unit.getName(), unit.getShorthand(), unit.getKind()),
-        material == null
-            ? null
-            : new MaterialReferenceDto(
-                material.getId(), material.getName(), material.getQuantityType()),
+        MaterialReferenceDto.of(material),
         gameItem == null ? null : GameItemReferenceDto.of(gameItem),
         tier == null ? null : qualityTierMapper.toDto(tier),
         level.getMinimum(),

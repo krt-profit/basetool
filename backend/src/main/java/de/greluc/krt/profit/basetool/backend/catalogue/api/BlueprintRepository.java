@@ -210,15 +210,16 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
-   * Projects active blueprint recipes to output name, Wiki key, manufacturer name and output-item
-   * id for the product search; the latter two are {@code null} when unresolved.
+   * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
+   * and German manufacturer name for the product search; the last three are {@code null} when
+   * unresolved.
    *
    * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
    * @return projection rows for every matching active recipe
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, m.nameDe)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
       AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'

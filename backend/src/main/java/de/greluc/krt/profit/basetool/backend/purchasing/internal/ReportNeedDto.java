@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One need of a purchasing report.
@@ -29,6 +30,26 @@ import java.util.UUID;
  * @param entry the material or item the need asks for
  * @param dealCount deals for the need
  * @param boughtAmount the amount accepted
+ * @param entryDe the German name of the material or item, or {@code null} (REQ-P4K-023)
  */
 public record ReportNeedDto(
-    UUID needId, String unit, String entry, int dealCount, double boughtAmount) {}
+    UUID needId,
+    String unit,
+    String entry,
+    int dealCount,
+    double boughtAmount,
+    @Nullable String entryDe) {
+
+  /**
+   * Builds a report row without a German entry name.
+   *
+   * @param needId the need
+   * @param unit the raising unit's name
+   * @param entry the material or item the need asks for
+   * @param dealCount deals for the need
+   * @param boughtAmount the amount accepted
+   */
+  public ReportNeedDto(UUID needId, String unit, String entry, int dealCount, double boughtAmount) {
+    this(needId, unit, entry, dealCount, boughtAmount, null);
+  }
+}

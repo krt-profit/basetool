@@ -75,7 +75,8 @@ public class JobOrderStockReadService {
                 row.quality() != null ? row.quality().doubleValue() : null,
                 row.amount(),
                 row.allocatedAmount(),
-                row.delivered()))
+                row.delivered(),
+                row.materialNameDe()))
         .toList();
   }
 

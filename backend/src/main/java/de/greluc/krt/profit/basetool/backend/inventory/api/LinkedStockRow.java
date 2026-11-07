@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * @param locationName the storage location's name
  * @param locationId the storage location
  * @param materialName the material's name of a material row, otherwise {@code null}
+ * @param materialNameDe the material's German name of a material row, or {@code null} (REQ-P4K-023)
  * @param quality the quality of a material row, otherwise {@code null}
  * @param gameItem the game item of an item row, otherwise {@code null}
  * @param amount the row's stock
@@ -48,6 +49,7 @@ public record LinkedStockRow(
     @NotNull String locationName,
     @NotNull UUID locationId,
     @Nullable String materialName,
+    @Nullable String materialNameDe,
     @Nullable Integer quality,
     @Nullable InventoryGameItemReferenceDto gameItem,
     @NotNull Double amount,

@@ -19,9 +19,40 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.model;
 
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Material Reference payload. */
+/**
+ * Data transfer record carrying Material Reference payload.
+ *
+ * @param id the material's id
+ * @param name its name
+ * @param quantityType its quantity type
+ * @param nameDe its German name, or {@code null} (REQ-P4K-023)
+ */
 @DtoMirror
 public record MaterialReferenceDto(
-    UUID id, String name, @BackendEnumAsString String quantityType) {}
+    UUID id, String name, @BackendEnumAsString String quantityType, @Nullable String nameDe) {
+
+  /**
+   * Creates a reference without a German name.
+   *
+   * @param id the material's id
+   * @param name its name
+   * @param quantityType its quantity type
+   */
+  public MaterialReferenceDto(UUID id, String name, String quantityType) {
+    this(id, name, quantityType, null);
+  }
+
+  /**
+   * Returns the name the page shows.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
+  }
+}

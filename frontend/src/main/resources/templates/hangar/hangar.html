@@ -309,6 +309,10 @@
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
                         <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
+                    <div class="manufacturer-mark-preview" id="ship-type-mark" data-testid="ship-type-mark" aria-hidden="true">
+                        <span th:each="man : ${manufacturers}" th:data-manufacturer-mark-id="${man.id}" hidden
+                              th:insert="~{catalogue/fragments/manufacturer-mark :: mark(${man})}"></span>
+                    </div>
                     <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" class="field-error"></div>
                 </div>
                 <div class="form-group">

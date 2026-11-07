@@ -41,7 +41,7 @@
             <tr class="collection-group__head">
                 <th scope="rowgroup" colspan="5">
                     <span class="split gap-2">
-                        <span class="collection-group__title" th:text="${group.materialName != null ? group.materialName : '-'}">Material</span>
+                        <span class="collection-group__title" th:text="${group.materialName != null ? group.materialDisplayName(#locale) : '-'}">Material</span>
                         <span class="collection-progress collection-progress--group" data-collection-progress="group" role="progressbar"
                               aria-valuemin="0" aria-valuemax="100" th:aria-valuenow="${group.progress.percent()}"
                               th:attr="aria-label=#{collection.progress.label}"

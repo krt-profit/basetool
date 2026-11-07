@@ -18,6 +18,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 function initMaterialboerseRelease() {
     /**
@@ -78,6 +79,7 @@ function initMaterialboerseRelease() {
      * @property {string} inventoryItemId the inventory entry
      * @property {string} kind `MATERIAL` or `ITEM`
      * @property {string} materialName the material or item name
+     * @property {string | null} [materialNameDe] the material's or item's German name
      * @property {number | string} quality the quality tier
      * @property {number | string} amount the stock
      * @property {string} quantityType `SCU` or `PIECE`
@@ -93,6 +95,7 @@ function initMaterialboerseRelease() {
      * @property {string} productKey the product
      * @property {string} name the product name
      * @property {string} [manufacturerName] the manufacturer
+     * @property {string | null} [manufacturerNameDe] the manufacturer's German name
      */
 
     /** @type {MaterialPickerItem[]} */
@@ -540,6 +543,7 @@ function initMaterialboerseRelease() {
         }
         const html = pickerItems.map((it) => {
             const isItem = it.kind === 'ITEM';
+            const label = localisedName(it.materialName, it.materialNameDe);
             let meta =
                 (isItem ? '' : `Q ${it.quality} · `) + formatAmount(it.amount, it.quantityType);
             if (it.locationName) {
@@ -555,10 +559,10 @@ function initMaterialboerseRelease() {
                 : '';
             return krtHtml`<li class="krt-combobox__option" role="option" data-item-id="${
                 it.inventoryItemId
-            }" data-kind="${it.kind}" data-material="${it.materialName}" data-quantity-type="${
+            }" data-kind="${it.kind}" data-material="${label}" data-quantity-type="${
                 it.quantityType
             }" data-quality="${isItem ? '' : it.quality}" data-amount="${it.amount}"><strong>${
-                it.materialName
+                label
             }</strong> ${stolenChip}<small>${meta}</small></li>`;
         });
         krtHtml.set(list, html);
@@ -666,14 +670,14 @@ function initMaterialboerseRelease() {
             list.hidden = !itemPickerListOpen;
             return;
         }
-        const html = productItems.map(
-            (it) =>
-                krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
-                    it.productKey
-                }" data-name="${it.name}"><strong>${it.name}</strong>${
-                    it.manufacturerName ? krtHtml` <small>${it.manufacturerName}</small>` : ''
-                }</li>`,
-        );
+        const html = productItems.map((it) => {
+            const manufacturer = localisedName(it.manufacturerName, it.manufacturerNameDe);
+            return krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
+                it.productKey
+            }" data-name="${it.name}"><strong>${it.name}</strong>${
+                manufacturer ? krtHtml` <small>${manufacturer}</small>` : ''
+            }</li>`;
+        });
         krtHtml.set(list, html);
         list.hidden = !itemPickerListOpen;
     }

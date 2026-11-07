@@ -266,7 +266,7 @@ public class MaterialRequestBoardService {
       itemQuantity = request.getItemQuantity();
     } else {
       Material mat = request.getRequestedMaterial();
-      material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
+      material = MaterialReferenceDto.of(mat);
       requestedAmount = request.getRequestedAmount();
     }
     return new MaterialRequestDto(

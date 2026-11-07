@@ -2577,6 +2577,11 @@
         vertical-align: middle;
     }
 
+    .manufacturer-mark-preview {
+        min-height: 1.5rem;
+        margin-top: var(--space-1);
+    }
+
     .manufacturer-mark__logo {
         width: auto;
         height: 1.25rem;

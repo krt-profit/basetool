@@ -3838,6 +3838,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"

@@ -1,7 +1,6 @@
 # ADR-0338 — The P4K catalogue leads a manufacturer's identity, name and description
 
-- **Status:** Accepted (implemented, except the logos on the ship-type picker and the item and
-  inventory views)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-020…023), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·

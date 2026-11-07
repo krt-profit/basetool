@@ -176,6 +176,10 @@
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte w&auml;hlen...</option>
                         <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
+                    <div class="manufacturer-mark-preview" id="member-ship-type-mark" data-testid="member-ship-type-mark" aria-hidden="true">
+                        <span th:each="man : ${manufacturers}" th:data-manufacturer-mark-id="${man.id}" hidden
+                              th:insert="~{catalogue/fragments/manufacturer-mark :: mark(${man})}"></span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="member-ship-name" th:text="#{hangar.ship.name}">Name</label>

@@ -41,6 +41,8 @@ import org.jetbrains.annotations.Nullable;
  * @param noLongerInGame whether the P4K retired the item; the reference then shows the "no longer
  *     in the game" notice (REQ-P4K-013)
  * @param nameDe the item's German name, or {@code null} (REQ-P4K-023)
+ * @param manufacturerRef the manufacturer's German name and logo key, or {@code null} when
+ *     unresolved (REQ-P4K-022, REQ-P4K-023)
  */
 @DtoMirror
 public record InventoryGameItemReferenceDto(
@@ -53,7 +55,8 @@ public record InventoryGameItemReferenceDto(
     String grade,
     String itemClass,
     boolean noLongerInGame,
-    @Nullable String nameDe)
+    @Nullable String nameDe,
+    @Nullable ManufacturerRefDto manufacturerRef)
     implements ComponentItemReference {
 
   /**
@@ -79,7 +82,18 @@ public record InventoryGameItemReferenceDto(
       String grade,
       String itemClass,
       boolean noLongerInGame) {
-    this(id, name, manufacturer, kind, componentType, size, grade, itemClass, noLongerInGame, null);
+    this(
+        id,
+        name,
+        manufacturer,
+        kind,
+        componentType,
+        size,
+        grade,
+        itemClass,
+        noLongerInGame,
+        null,
+        null);
   }
 
   /**
@@ -126,5 +140,17 @@ public record InventoryGameItemReferenceDto(
    */
   public String displayName(@Nullable Locale locale) {
     return LocalisedNames.display(name, nameDe, locale);
+  }
+
+  /**
+   * Returns the manufacturer name the page shows.
+   *
+   * @param locale the page locale
+   * @return the manufacturer's German name on a German page when there is one, else its name, or
+   *     {@code null} when the item has no manufacturer
+   */
+  @Nullable
+  public String manufacturerDisplayName(@Nullable Locale locale) {
+    return manufacturerRef == null ? manufacturer : manufacturerRef.displayName(locale);
   }
 }

@@ -40,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  *     outpost; {@code null} when the terminal names no place
  * @param sellTerminalName the terminal buying at {@code maxSellPrice}; the first by name on a tie
  * @param sellTerminalLocation that terminal's location, built like {@code buyTerminalLocation}
+ * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
  */
 public record ProfitCalculationDto(
     UUID materialId,
@@ -53,4 +54,50 @@ public record ProfitCalculationDto(
     String buyTerminalName,
     @Nullable String buyTerminalLocation,
     String sellTerminalName,
-    @Nullable String sellTerminalLocation) {}
+    @Nullable String sellTerminalLocation,
+    @Nullable String materialNameDe) {
+  /**
+   * Creates a trade route without a German material name.
+   *
+   * @param materialId the material's id
+   * @param materialName the material's name
+   * @param minBuyPrice the lowest positive purchase price per SCU
+   * @param maxSellPrice the highest positive sale price per SCU
+   * @param profitPerScu {@code maxSellPrice - minBuyPrice}, negative for a loss
+   * @param marginPercent the profit per SCU as a percentage of the purchase price
+   * @param fullLoadCost the purchase price of a full load of the ship
+   * @param maxProfitFullLoad the profit of a full load of the ship
+   * @param buyTerminalName the terminal selling at {@code minBuyPrice}
+   * @param buyTerminalLocation that terminal's location, or {@code null}
+   * @param sellTerminalName the terminal buying at {@code maxSellPrice}
+   * @param sellTerminalLocation that terminal's location, or {@code null}
+   */
+  public ProfitCalculationDto(
+      UUID materialId,
+      String materialName,
+      BigDecimal minBuyPrice,
+      BigDecimal maxSellPrice,
+      BigDecimal profitPerScu,
+      BigDecimal marginPercent,
+      BigDecimal fullLoadCost,
+      BigDecimal maxProfitFullLoad,
+      String buyTerminalName,
+      @Nullable String buyTerminalLocation,
+      String sellTerminalName,
+      @Nullable String sellTerminalLocation) {
+    this(
+        materialId,
+        materialName,
+        minBuyPrice,
+        maxSellPrice,
+        profitPerScu,
+        marginPercent,
+        fullLoadCost,
+        maxProfitFullLoad,
+        buyTerminalName,
+        buyTerminalLocation,
+        sellTerminalName,
+        sellTerminalLocation,
+        null);
+  }
+}

@@ -18,6 +18,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 function initMaterialgesuchModal() {
     /**
@@ -76,13 +77,13 @@ function initMaterialgesuchModal() {
     /** @type {number | null} */
     let materialTimer = null;
     let materialListOpen = false;
-    /** @type {Array<{ id: string, name: string, quantityType: string }>} */
+    /** @type {Array<{ id: string, name: string, nameDe?: string | null, quantityType: string }>} */
     let materialItems = [];
     let itemSeq = 0;
     /** @type {number | null} */
     let itemTimer = null;
     let itemListOpen = false;
-    /** @type {Array<{ productKey: string, name: string, manufacturerName?: string }>} */
+    /** @type {Array<{ productKey: string, name: string, manufacturerName?: string, manufacturerNameDe?: string | null }>} */
     let productItems = [];
 
     /**
@@ -413,11 +414,12 @@ function initMaterialgesuchModal() {
                 it.quantityType === 'PIECE'
                     ? krtI18nText(i18n.unitPiece, 'materialgesuchModalI18n.unitPiece')
                     : i18n.unitScu || 'SCU';
+            const label = localisedName(it.name, it.nameDe);
             return krtHtml`<li class="krt-combobox__option" role="option" data-material-id="${
                 it.id
-            }" data-name="${it.name}" data-quantity-type="${
+            }" data-name="${label}" data-quantity-type="${
                 it.quantityType
-            }"><strong>${it.name}</strong> <small>${unit}</small></li>`;
+            }"><strong>${label}</strong> <small>${unit}</small></li>`;
         });
         krtHtml.set(list, html);
         list.hidden = !materialListOpen;
@@ -505,14 +507,14 @@ function initMaterialgesuchModal() {
             list.hidden = !itemListOpen;
             return;
         }
-        const html = productItems.map(
-            (it) =>
-                krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
-                    it.productKey
-                }" data-name="${it.name}"><strong>${it.name}</strong>${
-                    it.manufacturerName ? krtHtml` <small>${it.manufacturerName}</small>` : ''
-                }</li>`,
-        );
+        const html = productItems.map((it) => {
+            const manufacturer = localisedName(it.manufacturerName, it.manufacturerNameDe);
+            return krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
+                it.productKey
+            }" data-name="${it.name}"><strong>${it.name}</strong>${
+                manufacturer ? krtHtml` <small>${manufacturer}</small>` : ''
+            }</li>`;
+        });
         krtHtml.set(list, html);
         list.hidden = !itemListOpen;
     }
