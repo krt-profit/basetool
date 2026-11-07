@@ -181,6 +181,23 @@ class P4kBlueprintImportTest {
   }
 
   @Test
+  void twoWikiRecipesSharingTheKey_holdTheRecordForAGuidConflictAndNeitherIsRewritten() {
+    Blueprint first = wikiBlueprint();
+    Blueprint second = wikiBlueprint();
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(first.getP4kUuid()).isNull();
+    assertThat(second.getP4kUuid()).isNull();
+    assertThat(first.getCraftTimeSeconds()).isEqualTo(999);
+    assertThat(second.getCraftTimeSeconds()).isEqualTo(999);
+    assertThat(
+            reviewCaseRepository.findByKindAndGuidAndReason(
+                P4kKind.BLUEPRINT, ARMS, P4kReviewReason.GUID_CONFLICT))
+        .isPresent();
+  }
+
+  @Test
   void theAdminsMaterialForAResourceJoiningNoCommodity_survivesTheNextApply() {
     Material assigned = material("Casing Resource");
     Blueprint blueprint = wikiBlueprint();

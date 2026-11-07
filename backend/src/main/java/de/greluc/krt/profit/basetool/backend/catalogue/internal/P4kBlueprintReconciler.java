@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kDismantleProcessDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -115,7 +114,7 @@ public class P4kBlueprintReconciler {
             stored::byWikiUuid,
             Blueprint::getScwikiUuid,
             "scwiki_uuid",
-            key -> firstOfKey(stored, key),
+            key -> ofKey(stored, key),
             _ -> List.of(),
             _ -> false);
     P4kRecipeLinks links =
@@ -147,25 +146,17 @@ public class P4kBlueprintReconciler {
   }
 
   /**
-   * Finds the blueprint whose SC Wiki key equals a key exactly, the one with the lowest SC Wiki
-   * UUID when several share it and one without a UUID last, as PostgreSQL orders {@code uuid}
-   * values.
+   * Finds the blueprints whose SC Wiki key equals a key exactly; several are a GUID conflict the
+   * matcher holds for review (REQ-P4K-007).
    *
    * @param stored the blueprint rows of the run
    * @param key the record's key
-   * @return that one blueprint, or an empty list
+   * @return every blueprint of that key
    */
   @NotNull
-  private static List<Blueprint> firstOfKey(
+  private static List<Blueprint> ofKey(
       @NotNull P4kRowIndex<Blueprint> stored, @NotNull String key) {
-    return stored.byClassName(key).stream()
-        .filter(row -> key.equals(row.getScwikiKey()))
-        .min(
-            Comparator.comparing(
-                Blueprint::getScwikiUuid,
-                Comparator.nullsLast(Comparator.comparing(UUID::toString))))
-        .map(List::of)
-        .orElseGet(List::of);
+    return stored.byClassName(key).stream().filter(row -> key.equals(row.getScwikiKey())).toList();
   }
 
   /**
