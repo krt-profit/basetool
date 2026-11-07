@@ -174,6 +174,49 @@ class P4kManufacturerPrecedenceTest {
   }
 
   @Test
+  void twoSeededManufacturersOfOneName_createTheFirst_andOpenANameConflictCaseForTheSecond() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    named(root, GORGON, "Shared Seed Name", "Shared Seed Name");
+    named(root, AEGIS, "Shared Seed Name", "Shared Seed Name");
+    byte[] catalogue = P4kTestCatalogues.bytes(root);
+
+    P4kImportResultDto preview = runs.preview(catalogue);
+    P4kImportResultDto applied = runs.apply(catalogue, true);
+
+    Manufacturer created = manufacturerRepository.findByP4kUuid(GORGON).orElseThrow();
+    assertThat(created.getName()).isEqualTo("Shared Seed Name");
+    assertThat(manufacturerRepository.findByP4kUuid(AEGIS)).isEmpty();
+    assertThat(
+            reviewCaseRepository.findByKindAndGuidAndReason(
+                P4kKind.MANUFACTURER, AEGIS, P4kReviewReason.NAME_CONFLICT))
+        .hasValueSatisfying(
+            reviewCase -> assertThat(reviewCase.getRowId()).isEqualTo(created.getId()));
+    assertThat(preview.manufacturers().created()).isEqualTo(applied.manufacturers().created());
+    assertThat(shipTypeRepository.findByP4kUuid(P4kTestCatalogues.PLAYER_SHIP))
+        .hasValueSatisfying(ship -> assertThat(ship.getManufacturer()).isNull());
+  }
+
+  @Test
+  void aSeededManufacturerWhoseNameAnExistingRowHolds_isNotCreated_andOpensANameConflictCase() {
+    Manufacturer holder = manufacturer("Kastak Old Spelling", "KSAR");
+    holder.setP4kUuid(KASTAK);
+    ObjectNode root = P4kTestCatalogues.tree();
+    UUID virgil = UUID.fromString("0e6d8f1b-ebb8-4773-8ca4-f25d737c8709");
+    named(root, virgil, "Seed Clash Name", "Seed Clash Name");
+    named(root, KASTAK, "Seed Clash Name", "Seed Clash Name");
+
+    runs.apply(P4kTestCatalogues.bytes(root), true);
+
+    assertThat(holder.getName()).isEqualTo("Seed Clash Name");
+    assertThat(manufacturerRepository.findByP4kUuid(virgil)).isEmpty();
+    assertThat(
+            reviewCaseRepository.findByKindAndGuidAndReason(
+                P4kKind.MANUFACTURER, virgil, P4kReviewReason.NAME_CONFLICT))
+        .hasValueSatisfying(
+            reviewCase -> assertThat(reviewCase.getRowId()).isEqualTo(holder.getId()));
+  }
+
+  @Test
   void withoutTheCheckbox_noManufacturerIsCreated() {
     ObjectNode root = P4kTestCatalogues.tree();
     named(root, AEGIS, "Aegis Seeding Test", "Aegis Seeding Test");

@@ -86,6 +86,12 @@ public final class P4kImportContext {
    */
   private final Map<UUID, P4kManufacturerDto> unmatchedManufacturers = new LinkedHashMap<>();
 
+  /**
+   * The manufacturer names the run wrote or seeded, lower-cased, with the holding row's id; the id
+   * is {@code null} for a preview's seed, which creates no row.
+   */
+  private final Map<String, UUID> manufacturerNames = new HashMap<>();
+
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
 
@@ -279,6 +285,38 @@ public final class P4kImportContext {
   public P4kManufacturerDto takeUnmatchedManufacturer(@Nullable String guid) {
     UUID parsed = P4kGuids.parse(guid);
     return parsed == null ? null : unmatchedManufacturers.remove(parsed);
+  }
+
+  /**
+   * Records that the run gave a manufacturer row a name, so a later seed of that name is a conflict
+   * (REQ-P4K-021).
+   *
+   * @param name the name
+   * @param rowId the holding row, {@code null} for a preview's seed
+   */
+  public void claimManufacturerName(@NotNull String name, @Nullable UUID rowId) {
+    manufacturerNames.put(normalise(name), rowId);
+  }
+
+  /**
+   * Whether the run already gave a manufacturer row this name.
+   *
+   * @param name the name
+   * @return {@code true} when a written or seeded row of the run holds it, ignoring case
+   */
+  public boolean claimsManufacturerName(@NotNull String name) {
+    return manufacturerNames.containsKey(normalise(name));
+  }
+
+  /**
+   * Returns the row the run gave this manufacturer name.
+   *
+   * @param name the name
+   * @return the row's id, or {@code null} when no row of the run holds it or a preview seeded it
+   */
+  @Nullable
+  public UUID manufacturerNameRow(@NotNull String name) {
+    return manufacturerNames.get(normalise(name));
   }
 
   /**

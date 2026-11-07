@@ -642,12 +642,17 @@ the next P4K import adopts such a row by UEX alias or name.
 
 - [x] A seeded ship with an unknown `manufacturerGuid` creates that manufacturer; an unreferenced
   unmatched manufacturer creates nothing and is reported `UNMATCHED`.
+- [x] Two seeded manufacturers sharing a name create the first and open a `NAME_CONFLICT` case for
+  the second; a seeded manufacturer whose name an existing row holds is not created and opens one.
 
 The import holds an unmatched manufacturer until the items and ships of the run are reconciled; the
 first seeded row that references it creates it (`ADDED`, with its name, `code`, German name and
 descriptions), and the rest are reported `UNMATCHED` afterwards. A preview reports the same rows.
+A manufacturer to be created whose name a row already holds, or an earlier creation of the same
+run took (`name` is unique), is not created: it opens a `NAME_CONFLICT` review case about the row
+holding the name, and the seeded row that referenced it gets no manufacturer.
 
-**Enforced by:** `P4kManufacturerPrecedenceTest` · **Code:** `P4kManufacturerReconciler` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+**Enforced by:** `P4kManufacturerPrecedenceTest` · **Code:** `P4kManufacturerReconciler` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890, #3036
 
 ### REQ-P4K-022 — manufacturer logos are unmodified Fan Kit images mapped by P4K GUID
 

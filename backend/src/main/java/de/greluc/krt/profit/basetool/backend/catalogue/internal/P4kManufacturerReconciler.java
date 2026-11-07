@@ -102,8 +102,12 @@ public class P4kManufacturerReconciler {
       context.getReport().unmatched(P4kKind.MANUFACTURER, held);
       return;
     }
+    if (nameTaken(name, held, parsed, context)) {
+      return;
+    }
     context.getReport().added(P4kKind.MANUFACTURER, held);
     if (!context.isApply()) {
+      context.claimManufacturerName(name, null);
       return;
     }
     Manufacturer row = new Manufacturer();
@@ -115,7 +119,40 @@ public class P4kManufacturerReconciler {
     row.setDescriptionDe(
         StringNormalization.blankToNull(P4kLocalisedText.deOf(held.description())));
     context.stamp(P4kKind.MANUFACTURER, held, row, parsed);
-    context.indexManufacturer(parsed, manufacturerRepository.save(row));
+    Manufacturer saved = manufacturerRepository.save(row);
+    context.claimManufacturerName(name, saved.getId());
+    context.indexManufacturer(parsed, saved);
+  }
+
+  /**
+   * Whether a row or an earlier seed of the run holds a seed's name; that opens the {@code
+   * NAME_CONFLICT} review case against the holder and the seed is not created (REQ-P4K-021).
+   *
+   * @param name the seed's stripped name
+   * @param held the seed's record
+   * @param guid the seed's GUID
+   * @param context the run
+   * @return {@code true} when the name is taken
+   */
+  private boolean nameTaken(
+      @NotNull String name,
+      @NotNull P4kManufacturerDto held,
+      @NotNull UUID guid,
+      @NotNull P4kImportContext context) {
+    UUID holderId;
+    if (context.claimsManufacturerName(name)) {
+      holderId = context.manufacturerNameRow(name);
+    } else {
+      Optional<Manufacturer> holder = manufacturerRepository.findByNameIgnoreCase(name);
+      if (holder.isEmpty()) {
+        return false;
+      }
+      holderId = holder.get().getId();
+    }
+    context
+        .getReport()
+        .review(P4kKind.MANUFACTURER, held, guid, P4kReviewReason.NAME_CONFLICT, holderId);
+    return true;
   }
 
   /**
@@ -191,6 +228,7 @@ public class P4kManufacturerReconciler {
       return;
     }
     writer.lead("name", row.getName(), name, row::setName);
+    context.claimManufacturerName(name, row.getId());
   }
 
   /**
