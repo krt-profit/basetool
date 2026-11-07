@@ -76,13 +76,24 @@ function initMaterialboerse() {
         return String(template || '').replace('{0}', /** @type {string} */ (value));
     }
 
+    /**
+     * The offer the member picked; the server's first-entry fallback carries no `has-sel` and
+     * counts as no pick.
+     *
+     * @returns {string | null} the picked offer's id
+     */
     function readSelectedId() {
-        const active = document.querySelector('.mb-mrow.is-active[data-offer-id]');
+        const active = document.querySelector('.mb-md.has-sel .mb-mrow.is-active[data-offer-id]');
         return active ? active.getAttribute('data-offer-id') : null;
     }
 
+    /**
+     * The request the member picked; the server's first-entry fallback counts as no pick.
+     *
+     * @returns {string | null} the picked request's id
+     */
     function readSelectedRequestId() {
-        const active = document.querySelector('.mb-mrow.is-active[data-request-id]');
+        const active = document.querySelector('.mb-md.has-sel .mb-mrow.is-active[data-request-id]');
         return active ? active.getAttribute('data-request-id') : null;
     }
 
@@ -820,6 +831,8 @@ function initMaterialboerse() {
             if (md) {
                 md.classList.remove('has-sel');
             }
+            clearSelection();
+            syncUrl();
             return;
         }
         if (
