@@ -162,6 +162,12 @@ defect `:has()` cannot have. The section legend leads with the same click path, 
 `aria-label` is built from the idle hint, so the announced instruction and the visible one are the
 same sentence.
 
+**A person row never clips or overlaps its own content.** The name block (name, org-unit badges,
+desired and planned function, note mark) keeps at least 12rem and wraps instead of truncating; when
+the function select and the row actions do not fit beside it, they wrap onto a second line of the
+row, aligned right. On a phone every participant's name, badges and wishes stay fully readable, in
+the pool and in a unit alike.
+
 **Touch and pen drag the board through Pointer Events, behind a press-and-hold** (#1936,
 [ADR-0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md)). `pointerdown` with a
 `pointerType` other than `mouse` starts a press; **320 ms** of a stationary finger arms the drag

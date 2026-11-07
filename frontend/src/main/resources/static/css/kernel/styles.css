@@ -6628,6 +6628,7 @@
 
     .person-row {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         padding: 6px 8px;
@@ -6659,16 +6660,19 @@
         color: var(--color-gray-2-text);
         flex: none;
     }
+    /* The name block keeps at least 12rem; when the select and the actions do not fit beside it,
+       they wrap onto a second line, pushed to the right by the first control after the block. */
     .person-row .row-main {
-        flex: 1;
+        flex: 1 1 12rem;
         min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .person-row .row-main + * {
+        margin-inline-start: auto;
     }
     .person-row .row-sub {
         font-size: 0.66rem;
         color: var(--color-gray-2-text);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
     .status-dot {
         width: 8px;

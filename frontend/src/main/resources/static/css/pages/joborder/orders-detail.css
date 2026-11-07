@@ -384,5 +384,66 @@
         .od-prod-demand-cell {
             padding-left: var(--space-3);
         }
+
+        .od-lines-table > tbody > tr.od-row--toggle {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+        }
+        .od-lines-table > tbody > tr.od-row--toggle::after {
+            content: none;
+        }
+        .od-lines-table > tbody > tr.od-row--toggle > td:first-child {
+            padding-bottom: var(--space-2);
+            font-size: 1.05rem;
+        }
+        .od-lines-table > tbody > tr.od-row--toggle > td:not(:first-child) {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: var(--space-1) var(--space-3);
+            min-height: 2.5rem;
+            padding-block: var(--space-1);
+            border-top: var(--border-hairline);
+            color: var(--color-white);
+            font-size: 0.9rem;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+        .od-lines-table > tbody > tr.od-row--toggle > td:not(:first-child)::before {
+            content: attr(data-label);
+            flex: none;
+            margin-right: auto;
+            color: var(--color-gray-2-text);
+            font-size: 0.7rem;
+            font-weight: var(--fw-bold);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-align: left;
+        }
+        .od-lines-table > tbody > tr.od-row--toggle > td:not(:first-child)::after {
+            content: none;
+        }
+        .od-lines-table .claim-open-cell {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .od-lines-table .claim-open-cell :is(.claim-chips, .claim-open-amount) {
+            flex: 0 1 auto;
+        }
+        .od-lines-table .claim-chips {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: var(--space-1);
+        }
+        .od-lines-table .od-claim-chip {
+            margin: 0;
+            white-space: nowrap;
+        }
+        .od-lines-table .od-claim-chip .btn-claim-edit {
+            vertical-align: middle;
+        }
     }
 }

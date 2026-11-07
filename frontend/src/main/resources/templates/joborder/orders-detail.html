@@ -180,7 +180,7 @@
         <span hidden data-od-tab-count="materials" th:text="${order.materials != null ? order.materials.size() : 0}">0</span>
         <th:block th:if="${order.materials == null or order.materials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.materials.empty.text')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.materials == null or order.materials.isEmpty()}">
-        <table class="data-table data-table--stack od-table"
+        <table class="data-table data-table--stack od-table od-lines-table"
                th:with="showClaims=${order.materials != null and !order.materials.isEmpty() and order.materials[0].openAmount != null}">
             <thead>
             <tr>
@@ -206,7 +206,7 @@
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${mat.material.displayName(#locale)}"></td>
-                <td>
+                <td th:attr="data-label=#{orders.material.minQuality}">
                     <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${mat.qualityTier})}"></th:block>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.amount}" th:switch="${mat.material.quantityType}">
@@ -257,7 +257,7 @@
                                 th:text="#{orders.claim.add}">Eintragen</button>
                     </div>
                 </td>
-                <td th:unless="${requesterView}" class="cell-status">
+                <td th:unless="${requesterView}" class="cell-status" th:attr="data-label=#{orders.detail.status}">
                     <span th:if="${mat.currentStock >= mat.amount}" class="chip chip--success" th:text="#{orders.detail.status.fulfilled}">Erfüllt</span>
                     <span th:if="${mat.currentStock < mat.amount}" class="chip chip--warning" th:text="#{orders.detail.status.missing}">Fehlend</span>
                 </td>
@@ -407,7 +407,7 @@
         <span hidden data-od-tab-count="aggregated" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span>
         <th:block th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.aggregated.empty')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">
-        <table class="data-table data-table--stack od-table"
+        <table class="data-table data-table--stack od-table od-lines-table"
                th:with="showClaims=${order.aggregatedMaterials != null and !order.aggregatedMaterials.isEmpty() and order.aggregatedMaterials[0].openAmount != null}">
             <thead>
             <tr>
@@ -430,7 +430,7 @@
                 data-trigger="od-toggle-inventory"
                >
                 <td th:text="${agg.material != null ? agg.material.displayName(#locale) : '-'}"></td>
-                <td>
+                <td th:attr="data-label=#{orders.detail.aggregated.quality}">
                     <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${agg.qualityTier})}"></th:block>
                 </td>
                 <td class="num" th:attr="data-label=#{orders.detail.aggregated.amount}" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">

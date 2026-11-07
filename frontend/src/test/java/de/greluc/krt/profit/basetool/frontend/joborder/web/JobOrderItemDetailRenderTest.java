@@ -366,6 +366,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
 
     assertThat(html).as("claim controls guard the drill-down").contains("data-claim-control");
 
+    assertThat(html)
+        .as("aggregated table stacks as labelled lines on a phone")
+        .contains("od-lines-table");
+    assertThat(html).as("quality cell carries its phone label").contains("data-label=\"Qualität\"");
+
     assertThat(html).as("item-collection link").contains("/orders/" + orderId + "/item-collection");
   }
 
