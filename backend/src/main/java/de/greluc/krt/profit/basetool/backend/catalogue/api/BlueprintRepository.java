@@ -255,8 +255,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid)} for
-   * resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped or
-   * an admin hid is included, since only existing references read it (REQ-P4K-013).
+   * resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped or an
+   * admin hid is included, since only existing references read it (REQ-P4K-013).
    *
    * @return id, output name and produced-item GUID for every active recipe with a non-null output
    *     name, ordered by name then Wiki key then id

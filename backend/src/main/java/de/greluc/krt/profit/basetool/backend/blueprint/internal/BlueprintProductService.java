@@ -163,8 +163,8 @@ public class BlueprintProductService implements BlueprintProducts {
 
   /**
    * Resolves product keys to the game item each product produces, in one scan of the active
-   * recipes; an empty input issues no query. The keys name existing references, so a recipe the
-   * P4K stamped or an admin hid still resolves (REQ-P4K-013).
+   * recipes; an empty input issues no query. The keys name existing references, so a recipe the P4K
+   * stamped or an admin hid still resolves (REQ-P4K-013).
    *
    * @param productKeys the product keys
    * @return product key to output-item id; keys without an active product or output item are absent
@@ -299,8 +299,9 @@ public class BlueprintProductService implements BlueprintProducts {
 
   /**
    * Returns every product a new reference may name as a {@link ResolvedProduct} (product key +
-   * display name + optional resolved output-item id), de-duplicated by product key. Backs the Phase 4 import
-   * matching engine, which needs the full candidate set in memory to score fuzzy suggestions.
+   * display name + optional resolved output-item id), de-duplicated by product key. Backs the Phase
+   * 4 import matching engine, which needs the full candidate set in memory to score fuzzy
+   * suggestions.
    *
    * @return all offerable products, de-duplicated by product key, in master-scan order
    */
@@ -326,9 +327,9 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Indexes every product an existing reference may still name by its recipes' name keys, as
-   * {@link #productsByNameKey()} does but with the recipes the P4K stamped or an admin hid, for
-   * moving references that already exist (REQ-P4K-013).
+   * Indexes every product an existing reference may still name by its recipes' name keys, as {@link
+   * #productsByNameKey()} does but with the recipes the P4K stamped or an admin hid, for moving
+   * references that already exist (REQ-P4K-013).
    *
    * @return name key to the products it names, in master-scan order; never {@code null}
    */

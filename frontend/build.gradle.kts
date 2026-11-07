@@ -998,7 +998,7 @@ val testCatalogueAdminJs =
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.dir(layout.projectDirectory.dir("src/main/resources/static/js/catalogue"))
     inputs.file(
-      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js")
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js"),
     )
     outputs.upToDateWhen { false }
   }

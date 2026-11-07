@@ -33,10 +33,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Picks the cost lines one craft of a recipe consumes (REQ-P4K-027): every line outside an
- * optional group, and of a choose-n recipe ({@code required_group_count}) only the lines of the
- * {@code n} option groups a stock covers best. The craftability and the item-order derivation both
- * select through this class.
+ * Picks the cost lines one craft of a recipe consumes (REQ-P4K-027): every line outside an optional
+ * group, and of a choose-n recipe ({@code required_group_count}) only the lines of the {@code n}
+ * option groups a stock covers best. The craftability and the item-order derivation both select
+ * through this class.
  *
  * <p>An option group covers better when the stock allows more crafts of it alone, then when its
  * shortfall for one craft is smaller; a group without an evaluable line covers nothing, and equal
@@ -75,8 +75,8 @@ public final class RecipeGroupSelection {
     Set<BlueprintRequirementGroup> chosen = Collections.newSetFromMap(new IdentityHashMap<>());
     options.stream()
         .sorted(
-            Comparator.comparing((BlueprintRequirementGroup g) ->
-                coverage(linesOf(mandatory, g), demandOf, stock)))
+            Comparator.comparing(
+                (BlueprintRequirementGroup g) -> coverage(linesOf(mandatory, g), demandOf, stock)))
         .limit(Math.max(choose, 0))
         .forEach(chosen::add);
     return mandatory.stream()
