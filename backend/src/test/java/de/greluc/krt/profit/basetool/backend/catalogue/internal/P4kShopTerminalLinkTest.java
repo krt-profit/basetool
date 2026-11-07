@@ -172,10 +172,24 @@ class P4kShopTerminalLinkTest {
   }
 
   @Test
-  void aShopWithoutAPlace_opensANotFoundCase() {
+  void aShopWithoutAPlace_isOnlyReportedUnmatched_andOpensNoCase() {
     terminal("Cubby Blast - Krt Area18");
 
-    runs.apply(catalogue(null), false);
+    P4kImportResultDto result = runs.apply(catalogue(null), false);
+
+    assertThat(shop().getTerminalId()).isNull();
+    assertThat(result.shops()).isNotNull();
+    assertThat(result.shops().unmatched()).isEqualTo(1);
+    assertThat(result.shops().review()).isZero();
+    assertThat(openCase(P4kReviewReason.SHOP_LINK_NOT_FOUND)).isFalse();
+    assertThat(openCase(P4kReviewReason.SHOP_LINK_AMBIGUOUS)).isFalse();
+  }
+
+  @Test
+  void aShopWhosePlaceHoldsNoMatchingTerminal_opensANotFoundCase() {
+    terminal("Dumper's Depot - Krt Area18");
+
+    runs.apply(catalogue(AREA18), false);
 
     assertThat(shop().getTerminalId()).isNull();
     assertThat(openCase(P4kReviewReason.SHOP_LINK_NOT_FOUND)).isTrue();

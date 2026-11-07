@@ -40,9 +40,9 @@ import org.springframework.stereotype.Component;
  * the one terminal of its place whose name matches it ({@link ShopTerminalNames}). A terminal's
  * place is its own starmap link, else the link of its nearest linked UEX parent (REQ-P4K-035).
  * Several candidates or none leave the shop unlinked, count it as unmatched and open a review case;
- * a shop an admin linked or unlinked by hand is left alone. A run closes the cases it no longer
- * finds. The links are read as stored, so a preview links against the starmap links of the last
- * APPLY.
+ * a shop whose record names no place is only counted as unmatched, and a shop an admin linked or
+ * unlinked by hand is left alone. A run closes the cases it no longer finds. The links are read as
+ * stored, so a preview links against the starmap links of the last APPLY.
  */
 @Component
 @RequiredArgsConstructor
@@ -121,7 +121,9 @@ public class P4kShopLinker {
         writes.put(row.getId(), target);
       }
     }
-    if (target == null) {
+    if (target == null && shop.record().starmapObjectGuid() == null) {
+      context.getReport().unmatched(KIND, shop.record());
+    } else if (target == null) {
       P4kReviewReason reason =
           candidates.isEmpty()
               ? P4kReviewReason.SHOP_LINK_NOT_FOUND

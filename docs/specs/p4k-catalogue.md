@@ -453,8 +453,9 @@ cases. A case arises from:
 
 - a row an earlier seeding created that no current rule would create (REQ-P4K-010);
 - an unmatched item or ship of unclear playability (REQ-P4K-009);
-- a manufacturer name conflict (REQ-P4K-020) and a GUID conflict (REQ-P4K-007);
-- a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043);
+- a manufacturer name conflict (REQ-P4K-020, REQ-P4K-021) and a GUID conflict (REQ-P4K-007);
+- a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043); a shop
+  whose record names no place opens none;
 - a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
   several (REQ-P4K-024);
 - a material without a resource group after an APPLY, resolved by assigning a group
@@ -1350,11 +1351,15 @@ re-imports and is an audit event (REQ-P4K-046). An unlinked shop stays usable on
 A terminal's place is its own starmap link, else the link of its nearest linked UEX parent
 (REQ-P4K-035); the candidates are the terminals whose place is the shop's starmap object. The name
 match reads UEX's `<shop> - <place>` naming: a terminal's part before its first ` - `, normalised
+- [x] A shop whose record names no place is reported `UNMATCHED` and opens no review case.
 like a starmap name and without spaces, at least three characters, matches when the shop's
 registry name, entity name or brand, compacted the same way, contains it; the longest match wins
-(`ShopTerminalNames`). One candidate links; several or none (no place included) leave the shop
-unlinked, one `UNMATCHED` row and one case `SHOP_LINK_AMBIGUOUS` or `SHOP_LINK_NOT_FOUND` of kind
-`SHOP` with the shop's GUID; a run that links the shop closes the case as `RESOLVED`. A link the
+(`ShopTerminalNames`). One candidate links; several or none leave the shop unlinked, one
+`UNMATCHED` row and one case `SHOP_LINK_AMBIGUOUS` or `SHOP_LINK_NOT_FOUND` of kind `SHOP` with the
+shop's GUID; a run that links the shop closes the case as `RESOLVED`. A shop whose record has no
+`starmapObjectGuid` has no place to link by: it is one `UNMATCHED` row of the change report and
+opens no case (owner decision, 2026-11-07), and a run closes such a shop's earlier case as
+`RESOLVED`. A link the
 run changes is a `CHANGED` row (`terminal_id`). The links are read as stored, so a preview links
 against the starmap links of the last APPLY.
 
