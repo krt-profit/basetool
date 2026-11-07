@@ -3,12 +3,14 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
-import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
 import {
-    byId as $,
-    dictionaryLabels,
-    readJson as readJsonOr,
-} from '/js/catalogue/catalogue-link-admin.js';
+    bindPager,
+    pagerLabels,
+    reloadedBeyondEnd,
+    renderPager,
+} from '/js/catalogue/catalogue-pager.js';
+import { byId as $, dictionaryLabels, jsonReader } from '/js/catalogue/catalogue-link-admin.js';
+import { formatTimestamp } from '/js/catalogue/catalogue-time.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
@@ -54,8 +56,9 @@ const t = dictionaryLabels(() => window.krtP4kImportI18n, 'krtP4kImportI18n');
 
 /**
  * The page's room in the admin catalogue live sync (REQ-FE-015): a peer admin's review resolution
- * announces `review`, which reloads the options and the cases, and an APPLY announces `runs` as
- * well, which reloads the run history and the import-due banner.
+ * announces `review`, which reloads the cases, and an APPLY announces `runs` as well, which reloads
+ * the run history, the import-due banner and the options the cases offer, since an APPLY can create
+ * resource groups and materials.
  */
 krtPageSections.create({
     topicClass: 'CATALOGUE_ADMIN',
@@ -67,8 +70,10 @@ krtPageSections.create({
             if (keys.includes('runs')) {
                 refreshDueBanner();
                 loadRuns(runsPage);
+                loadCasesWithOptions(casesPage);
+            } else if (keys.includes('review')) {
+                loadCases(casesPage);
             }
-            if (keys.includes('review')) loadCasesWithOptions(casesPage);
         },
     },
 });
@@ -84,34 +89,8 @@ function pageUrl(path) {
     return base + path;
 }
 
-/**
- * Formats an ISO timestamp in the browser locale.
- *
- * @param {string | undefined} iso the timestamp
- * @returns {string} the formatted time, or an empty string
- */
-function fmtTime(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
-
-/**
- * Reads a JSON answer for one render target, or null when it is no data or a later read of the
- * target superseded it.
- *
- * @param {string} url the proxy URL
- * @param {string} target the render target
- * @returns {Promise<any>} the parsed body, or null
- */
-function readJson(url, target) {
-    return readJsonOr(url, t('error'), target);
-}
-
-/** @returns {{ previous: string, next: string }} the pager button names */
-function pagerLabels() {
-    return { previous: t('pagePrevious'), next: t('pageNext') };
-}
+/** Reads a JSON answer for one render target, or null after the error toast or a newer read. */
+const readJson = jsonReader(() => t('error'));
 
 /**
  * Summarises one run's counts across the kinds.
@@ -146,6 +125,7 @@ function loadRuns(page) {
     readJson(pageUrl(`/runs?page=${page}`), 'p4k-runs').then(
         (/** @type {P4kRunsView | null} */ view) => {
             if (!view || !view.runs) return;
+            if (reloadedBeyondEnd(page, view.runs, loadRuns)) return;
             runsPage = page;
             const body = $('krt-p4k-runs');
             const empty = $('krt-p4k-runs-empty');
@@ -156,7 +136,7 @@ function loadRuns(page) {
                     body,
                     rows.map(
                         (run) =>
-                            krtHtml`<tr data-testid="p4k-run-row"><td><span class="cell-title">${fmtTime(
+                            krtHtml`<tr data-testid="p4k-run-row"><td><span class="cell-title">${formatTimestamp(
                                 run.appliedAt,
                             )}</span><span class="cell-sub">${
                                 (run.createdBy && view.adminNames[run.createdBy]) ||
@@ -169,7 +149,7 @@ function loadRuns(page) {
                     ),
                 );
             }
-            renderPager($('krt-p4k-runs-pager'), view.runs, pagerLabels());
+            renderPager($('krt-p4k-runs-pager'), view.runs, pagerLabels(t));
         },
     );
 }
@@ -212,9 +192,10 @@ function loadReport(page) {
     readJson(url, 'p4k-report').then(
         (/** @type {ApiPage<'P4kImportChangeDto'> | null} */ result) => {
             if (!result) return;
+            if (reloadedBeyondEnd(page, result, loadReport)) return;
             reportPage = page;
             renderReport(result.content || []);
-            renderPager($('krt-p4k-report-pager'), result, pagerLabels());
+            renderPager($('krt-p4k-report-pager'), result, pagerLabels(t));
         },
     );
 }
@@ -290,9 +271,10 @@ function loadCases(page) {
     readJson(pageUrl(`/review-cases?page=${page}`), 'p4k-cases').then(
         (/** @type {ApiPage<'P4kReviewCaseDto'> | null} */ result) => {
             if (!result) return;
+            if (reloadedBeyondEnd(page, result, loadCases)) return;
             casesPage = page;
             renderCases(result.content || []);
-            renderPager($('krt-p4k-cases-pager'), result, pagerLabels());
+            renderPager($('krt-p4k-cases-pager'), result, pagerLabels(t));
         },
     );
 }
@@ -317,40 +299,38 @@ function renderCases(cases) {
                     c.nameEn || c.className || c.guid
                 }</span><span class="cell-sub data-value--mono">${c.guid}</span></td><td>${
                     c.rowName || t('noRow')
-                }</td><td>${fmtTime(c.createdAt)}</td><td class="cell-actions">${caseActions(c)}</td></tr>`,
+                }</td><td>${formatTimestamp(c.createdAt)}</td><td class="cell-actions">${caseActions(c)}</td></tr>`,
         ),
     );
 }
 
-/** @type {{ id: string, name: string }[]} */
-let resourceGroups = [];
+/**
+ * The options of the group picker of a missing-group case (REQ-P4K-025), built once per load.
+ *
+ * @type {KrtHtml[]}
+ */
+let groupOptions = [];
 
 /**
- * Loads the resource groups a missing-group case can assign (REQ-P4K-025).
+ * The options of the material picker of a resource-join case (REQ-P4K-024), built once per load.
  *
- * @returns {Promise<void>} settles once the groups are known
+ * @type {KrtHtml[]}
  */
-function loadResourceGroups() {
-    return readJson(pageUrl('/resource-groups'), 'p4k-resource-groups').then(
-        (/** @type {{ id: string, name: string }[] | null} */ result) => {
-            if (Array.isArray(result)) resourceGroups = result;
-        },
-    );
-}
-
-/** @type {{ id: string, name: string }[]} */
-let materials = [];
+let materialOptions = [];
 
 /**
- * Loads the materials a resource-join case can assign (REQ-P4K-024).
+ * Loads a list of assignable entries as select options.
  *
- * @returns {Promise<void>} settles once the materials are known
+ * @param {string} path the list's path below the page
+ * @param {string} target the render target of the read
+ * @returns {Promise<KrtHtml[] | null>} the options, or null when the list could not be read
  */
-function loadMaterials() {
-    return readJson(pageUrl('/materials'), 'p4k-materials').then(
-        (/** @type {{ id: string, name: string }[] | null} */ result) => {
-            if (Array.isArray(result)) materials = result;
-        },
+function loadOptions(path, target) {
+    return readJson(pageUrl(path), target).then(
+        (/** @type {{ id: string, name: string }[] | null} */ result) =>
+            Array.isArray(result)
+                ? result.map((o) => krtHtml`<option value="${o.id}">${o.name}</option>`)
+                : null,
     );
 }
 
@@ -361,7 +341,14 @@ function loadMaterials() {
  * @param {number} page the zero-based page
  */
 function loadCasesWithOptions(page) {
-    Promise.all([loadResourceGroups(), loadMaterials()]).then(() => loadCases(page));
+    Promise.all([
+        loadOptions('/resource-groups', 'p4k-resource-groups'),
+        loadOptions('/materials', 'p4k-materials'),
+    ]).then(([groups, mats]) => {
+        if (groups) groupOptions = groups;
+        if (mats) materialOptions = mats;
+        loadCases(page);
+    });
 }
 
 /** The reasons of a resource that joins no single commodity, resolved by assigning a material. */
@@ -378,9 +365,7 @@ function caseActions(c) {
     if (RESOURCE_JOIN_REASONS.includes(c.reason || '')) {
         return krtHtml`<select class="form-input" data-material-pick aria-label="${t(
             'pickMaterial',
-        )}"><option value="">${t('pickMaterial')}</option>${materials.map(
-            (m) => krtHtml`<option value="${m.id}">${m.name}</option>`,
-        )}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
+        )}"><option value="">${t('pickMaterial')}</option>${materialOptions}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
             'actionAssign',
         )}</button> <button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
             'actionKeep',
@@ -389,9 +374,7 @@ function caseActions(c) {
     if (c.reason === 'NO_RESOURCE_GROUP') {
         return krtHtml`<select class="form-input" data-group-pick aria-label="${t('pickGroup')}"><option value="">${t(
             'pickGroup',
-        )}</option>${resourceGroups.map(
-            (g) => krtHtml`<option value="${g.id}">${g.name}</option>`,
-        )}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
+        )}</option>${groupOptions}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
             'actionAssign',
         )}</button>`;
     }

@@ -24,7 +24,7 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { bindManufacturerMarkPreview } from '/js/hangar/manufacturer-mark-preview.js';
+import { bindShipTypePicker } from '/js/hangar/ship-type-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
@@ -241,8 +241,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (select) select.disabled = !visible;
     }
 
-    /** Shows the manufacturer mark of the picker's current choice; bound below. */
-    let refreshShipTypeMark = () => {};
+    /**
+     * Chooses a ship type in the picker with its manufacturer filter cleared; bound below.
+     *
+     * @type {(shipTypeId: string) => void}
+     */
+    let chooseShipType = () => {};
 
     /**
      * Opens the ship dialog blank, posting to the clicked button's action.
@@ -253,12 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTitle.textContent = form.getAttribute('data-title-add');
         assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = '';
-        shipField('ship-type').value = '';
+        chooseShipType('');
         setInsurance('');
         shipField('ship-location').value = '';
         shipField('ship-fitted').checked = false;
         shipField('ship-version').value = '';
-        refreshShipTypeMark();
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
         openModal();
@@ -273,12 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
         modalTitle.textContent = form.getAttribute('data-title-edit');
         assignFormAction(form, safeSameOriginUrl(btn.getAttribute('data-action'), form.action));
         shipField('ship-name').value = btn.getAttribute('data-name') ?? '';
-        shipField('ship-type').value = btn.getAttribute('data-type') ?? '';
+        chooseShipType(btn.getAttribute('data-type') ?? '');
         setInsurance(btn.getAttribute('data-ins'));
         shipField('ship-location').value = btn.getAttribute('data-loc') || '';
         shipField('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         shipField('ship-version').value = btn.getAttribute('data-version') ?? '';
-        refreshShipTypeMark();
         const action = /** @type {string} */ (btn.getAttribute('data-action'));
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.hidden = false;
@@ -828,26 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('ship-manufacturer')
     );
     const shipTypeSelect = /** @type {HTMLSelectElement} */ (document.getElementById('ship-type'));
-    const shipTypeAllOptions = Array.from(shipTypeSelect.options);
-
-    manufacturerSelect.addEventListener('change', function () {
-        const selectedManufacturer = this.value;
-
-        const defaultOption = shipTypeAllOptions[0];
-
-        shipTypeSelect.replaceChildren();
-        shipTypeSelect.appendChild(defaultOption);
-
-        shipTypeAllOptions.slice(1).forEach((option) => {
-            if (
-                !selectedManufacturer ||
-                option.getAttribute('data-manufacturer-id') === selectedManufacturer
-            ) {
-                shipTypeSelect.appendChild(option);
-            }
-        });
-    });
-    refreshShipTypeMark = bindManufacturerMarkPreview(
+    chooseShipType = bindShipTypePicker(
         manufacturerSelect,
         shipTypeSelect,
         document.getElementById('ship-type-mark'),

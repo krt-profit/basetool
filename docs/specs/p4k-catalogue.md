@@ -82,7 +82,9 @@ every image platform (`linux/amd64`, `linux/arm64`, glibc and musl), with a wind
 LIVE catalogue arrives as `.json.zst` (p4kx writes level 19 with long-distance matching): the LIVE
 export of p4kx 0.4.2 is 214 MB as JSON and 3.9 MB as `.json.zst`.
 
-The upload limit is the contract's `UPLOAD_LIMIT`, 64,000,000 bytes (`P4kUploadGate`); the
+The upload limit is the contract's `UPLOAD_LIMIT`, 64,000,000 bytes (`P4kUploadGate`), and the
+multipart `max-file-size` of the frontend and the backend is the same 64,000,000 bytes, so a larger
+file is refused by the frontend as `413` and the admin page names the limit in its toast; the
 decompressed limit is `krt.p4k-import.decompressed-limit-bytes` (`P4kImportProperties`,
 1,000,000,000 bytes). The gate drains the decompressed stream once to enforce that limit. A plain
 upload is stored gzipped, a compressed one as it came. zstd-jni extracts its library to
@@ -492,11 +494,13 @@ between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMer
 is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
 A hide and an assignment evict the P4K-written caches after the commit and publish the global
 `CATALOGUE` event, as a committed APPLY does (REQ-DATA-011, `P4kCatalogueChange`).
-`/admin/p4k-import` reloads the resource groups and materials a case can assign before it renders
-the cases again, so a case an APPLY opened offers what that APPLY created. A resolution announces
-the `catalogue-admin` room's `review` section and an APPLY its `runs` and `review` sections, so a
-peer admin's open import page reloads its cases, its run history and its import-due banner in place
-(`CatalogueAdminLiveSync`, REQ-FE-015).
+`/admin/p4k-import` reloads the resource groups and materials a case can assign after an APPLY,
+before it renders the cases again, so a case an APPLY opened offers what that APPLY created; a
+resolution alone reloads only the cases, whose pickers share the options read once. A resolution
+announces the `catalogue-admin` room's `review` section and an APPLY its `runs` and `review`
+sections, so a peer admin's open import page reloads its cases, its run history and its import-due
+banner in place (`CatalogueAdminLiveSync`, REQ-FE-015); a finished PREVIEW reloads none of them. A
+list that shrank below the page it shows reloads its last page.
 
 **Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `CatalogueAdminLiveSyncTest`,
 `frontend/scripts/catalogue-admin.test.mjs`, `AdminP4kImportPageControllerMvcTest`,
@@ -697,7 +701,8 @@ mapping ships empty until the Fan Kit PNGs are added, so every manufacturer show
 no logo field, which `ExchangeFieldRatchetTest` holds. The logo or badge shows on Ship-Data (the
 manufacturer list and the ship types), in the personal and squadron hangar lists, beside the
 ship-type pickers of both hangar dialogs (the mark of the chosen type's manufacturer, else of the
-chosen manufacturer), and in the inventory item views (the item list, the item groups and the item
+chosen manufacturer; opening a dialog clears its manufacturer filter, so the ship's own type is
+selected and marked), and in the inventory item views (the item list, the item groups and the item
 page), whose item references carry a `ManufacturerRefDto` with the GUID.
 
 **Enforced by:** `ManufacturerLogoMappingTest`, `ShipDataPageControllerMvcTest`,
@@ -1266,7 +1271,9 @@ links; a peer admin's link, visibility or storage-place change and an APPLY relo
 place through the `catalogue-admin` room's `starmap` section (REQ-FE-010). Every list read of the admin
 starmap, shops and P4K import pages names its render target (`catalogue-link-admin.js`,
 `readJson`): a later read of the target aborts the earlier one through the `krtFetch` supersede
-key, and an answer that still arrives after it is dropped (REQ-FE-013).
+key, and an answer that still arrives after it is dropped (REQ-FE-013). A link change refused as
+`409` closes the picker and reloads the list, so no further pick is sent against the stale link;
+a list that shrank below the page it shows reloads its last page.
 
 **Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest`,
 `CatalogueAdminLiveSyncTest`, `LiveSyncSectionMapParityTest` · **Code:** `StarmapVisibility`,

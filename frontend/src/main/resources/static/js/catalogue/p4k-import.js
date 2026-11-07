@@ -3,6 +3,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { openReport, refreshAfterApply } from '/js/catalogue/p4k-report.js';
+import { formatTimestamp } from '/js/catalogue/catalogue-time.js';
 
 /** @typedef {ApiDto<'P4kImportJobDto'>} P4kJob */
 /** @typedef {ApiDto<'P4kImportResultDto'>} P4kResult */
@@ -42,7 +43,13 @@ let applyTargetId = null;
 let pollTimer = null;
 
 let gated = false;
-let wasActive = false;
+
+/**
+ * The ids of the APPLY jobs the last poll saw queued or running; one that leaves the set finished.
+ *
+ * @type {Set<string>}
+ */
+let activeApplyIds = new Set();
 
 /**
  * Looks up an element by id.
@@ -208,6 +215,10 @@ function upload() {
                 reported = true;
                 if (status === 400) {
                     toastRejected(body);
+                } else if (status === 413) {
+                    showFrontendErrorToast(
+                        krtI18nText(i18n().tooLarge, 'krtP4kImportI18n.tooLarge'),
+                    );
                 } else {
                     toastError();
                 }
@@ -258,14 +269,19 @@ function isActive(job) {
 }
 
 /**
- * Arms the poll while any job is active and disarms it otherwise.
+ * Arms the poll while any job is active and disarms it otherwise, and refreshes the run list, the
+ * review list and the due banner once an APPLY the poll saw active has finished; a finished PREVIEW
+ * changes none of them.
  *
  * @param {P4kJob[]} jobs the current jobs
  */
 function pollControl(jobs) {
     const anyActive = jobs.some(isActive);
-    if (wasActive && !anyActive) refreshAfterApply();
-    wasActive = anyActive;
+    const applying = new Set(
+        jobs.filter((j) => j.kind === 'APPLY' && isActive(j)).map((j) => j.id || ''),
+    );
+    if ([...activeApplyIds].some((id) => !applying.has(id))) refreshAfterApply();
+    activeApplyIds = applying;
     if (anyActive && !pollTimer) {
         pollTimer = window.setInterval(loadJobs, 3000);
     } else if (!anyActive) {
@@ -320,7 +336,7 @@ function renderJobs(jobs) {
         html.push(
             krtHtml`<tr data-testid="p4k-job-row"><td><span class="cell-title">${
                 job.sourceFilename || ''
-            }</span><span class="cell-sub">${fmtTime(job.createdAt)}</span></td><td data-label="${
+            }</span><span class="cell-sub">${formatTimestamp(job.createdAt)}</span></td><td data-label="${
                 kindHeader
             }">${kindLabel(job)}</td><td class="cell-status"><span class="chip ${statusChip(
                 job,
@@ -383,18 +399,6 @@ function statusLabel(job) {
         default:
             return job.status || '';
     }
-}
-
-/**
- * Formats an ISO timestamp in the browser locale.
- *
- * @param {string | undefined} iso the timestamp
- * @returns {string} the formatted time, the input when unparseable, or an empty string
- */
-function fmtTime(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
 /**

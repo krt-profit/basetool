@@ -21,6 +21,7 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { krtModal } from '/js/kernel/krt-modal.js';
 
 /** @typedef {'SET' | 'CLEAR' | 'RELEASE'} LinkAction */
 
@@ -91,6 +92,16 @@ export function readJson(url, errorLabel, target) {
             return null;
         },
     );
+}
+
+/**
+ * Builds a page's JSON reader: {@link readJson} with the page's load-error toast.
+ *
+ * @param {() => string} errorLabel reads the toast shown when a read fails
+ * @returns {(url: string, target: string) => Promise<any>} reads one render target's answer
+ */
+export function jsonReader(errorLabel) {
+    return (url, target) => readJson(url, errorLabel(), target);
 }
 
 /**
@@ -165,7 +176,7 @@ export function showCandidates(listId, emptyId, items) {
  * @param {string} listId the candidate list's id
  * @param {(candidateId: string | null, button: HTMLButtonElement) => void} pick links the candidate
  */
-export function bindCandidateClick(listId, pick) {
+function bindCandidateClick(listId, pick) {
     const list = byId(listId);
     if (!list) return;
     list.addEventListener('click', (e) => {
@@ -173,6 +184,105 @@ export function bindCandidateClick(listId, pick) {
         const btn = target ? target.closest('button[data-candidate-id]') : null;
         if (btn instanceof HTMLButtonElement) pick(btn.dataset.candidateId || null, btn);
     });
+}
+
+/**
+ * @template T
+ * @typedef {object} LinkRowActions
+ * @property {string} rowsId the list body's id
+ * @property {string} rowSelector the selector of a listed row
+ * @property {(row: HTMLElement) => T | undefined} find the shown entry of a row
+ * @property {(entry: T) => void} open opens the picker for an entry
+ * @property {(entry: T, action: 'CLEAR' | 'RELEASE', button: HTMLButtonElement) => void} change
+ *     sends a clear or a release of the entry's link
+ */
+
+/**
+ * Hands a link list's row clicks to its actions: a `data-link-open` button opens the picker, a
+ * `data-link-action` button sends a clear or a release.
+ *
+ * @template T
+ * @param {LinkRowActions<T>} actions the list and its actions
+ */
+export function bindLinkRowActions(actions) {
+    const rows = byId(actions.rowsId);
+    if (!rows) return;
+    rows.addEventListener('click', (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        const btn = target
+            ? target.closest('button[data-link-open], button[data-link-action]')
+            : null;
+        const row = btn ? btn.closest(actions.rowSelector) : null;
+        if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
+        const entry = actions.find(row);
+        if (!entry) return;
+        if (btn.dataset.linkOpen !== undefined) {
+            actions.open(entry);
+            return;
+        }
+        const action = btn.dataset.linkAction;
+        if (action === 'CLEAR' || action === 'RELEASE') actions.change(entry, action, btn);
+    });
+}
+
+/**
+ * @template T
+ * @typedef {object} LinkPickerConfig
+ * @property {string} modalId the picker dialog's id
+ * @property {string} subjectId the element that names the entry being linked
+ * @property {string} searchId the picker's search input
+ * @property {string} candidatesId the candidate list's id
+ * @property {(entry: T) => string} subject the entry's name in the dialog
+ * @property {(entry: T) => string} search the search the picker opens with
+ * @property {() => void} loadCandidates loads the candidates of the current search
+ * @property {(entry: T, candidateId: string | null, button: HTMLButtonElement) => Promise<boolean>} link
+ *     links the entry to a picked candidate and tells whether it was saved
+ */
+
+/**
+ * @template T
+ * @typedef {object} LinkPicker
+ * @property {(entry: T) => void} open opens the picker for an entry
+ * @property {() => void} dismiss closes an open picker and forgets its entry, so no further pick is
+ *     sent against a link that changed meanwhile
+ */
+
+/**
+ * Wires a link picker dialog: its search reloads the candidates while typing, and a picked
+ * candidate is linked to the entry the picker was opened for, closing the dialog once saved.
+ *
+ * @template T
+ * @param {LinkPickerConfig<T>} cfg the dialog and its callbacks
+ * @returns {LinkPicker<T>} the picker
+ */
+export function createLinkPicker(cfg) {
+    /** @type {T | null} */
+    let entry = null;
+    const dismiss = () => {
+        if (entry === null) return;
+        entry = null;
+        krtModal.close(cfg.modalId);
+    };
+    bindTypedFilter(cfg.searchId, cfg.loadCandidates);
+    bindCandidateClick(cfg.candidatesId, (candidateId, btn) => {
+        const picked = entry;
+        if (picked === null) return;
+        cfg.link(picked, candidateId, btn).then((saved) => {
+            if (saved) dismiss();
+        });
+    });
+    return {
+        open(next) {
+            entry = next;
+            const subject = byId(cfg.subjectId);
+            if (subject) subject.textContent = cfg.subject(next);
+            const search = byId(cfg.searchId);
+            if (search instanceof HTMLInputElement) search.value = cfg.search(next);
+            krtModal.open(cfg.modalId, { focus: search });
+            cfg.loadCandidates();
+        },
+        dismiss,
+    };
 }
 
 /**

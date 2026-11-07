@@ -808,7 +808,7 @@ controller-local `@ExceptionHandler` is bypassed.
   localized 413 (JSON `UPLOAD_TOO_LARGE` for XHR, the error page otherwise), not a 500.
 
 **The file relays cap below the multipart limit (APPSEC-03, 2026-09-22).** The multipart limit is
-64 MB because the admin P4K import needs it, and the edge proxy admits 2000 MB — so a relay that reads
+64,000,000 bytes, the P4K import's `UPLOAD_LIMIT` (REQ-P4K-002), and the edge proxy admits 2000 MB — so a relay that reads
 `file.getBytes()` before checking anything lets any member park 64 MB in the frontend heap per request,
 before the backend parser ever sees the upload and refuses it at its own cap. Every file relay
 therefore compares `MultipartFile#getSize()` against the backend parser's cap **before reading a

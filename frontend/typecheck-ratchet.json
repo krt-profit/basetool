@@ -43,6 +43,7 @@
       "catalogue/catalogue-link-admin.js",
       "catalogue/catalogue-list.js",
       "catalogue/catalogue-pager.js",
+      "catalogue/catalogue-time.js",
       "catalogue/locations.js",
       "catalogue/material-detail.js",
       "catalogue/materials-matrix.js",
@@ -72,8 +73,8 @@
     "hangar": [
       "hangar/hangar-squadron.js",
       "hangar/hangar.js",
-      "hangar/manufacturer-mark-preview.js",
       "hangar/member-hangar.js",
+      "hangar/ship-type-picker.js",
       "hangar/ship-unit-change.js"
     ],
     "identity": [

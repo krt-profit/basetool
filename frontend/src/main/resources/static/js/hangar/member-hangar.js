@@ -21,7 +21,7 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { bindManufacturerMarkPreview } from '/js/hangar/manufacturer-mark-preview.js';
+import { bindShipTypePicker } from '/js/hangar/ship-type-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
@@ -196,8 +196,12 @@ function initMemberHangar() {
         renderSelection();
     });
 
-    /** Shows the manufacturer mark of the picker's current choice; bound below. */
-    let refreshShipTypeMark = () => {};
+    /**
+     * Chooses a ship type in the picker with its manufacturer filter cleared; bound below.
+     *
+     * @type {(shipTypeId: string) => void}
+     */
+    let chooseShipType = () => {};
 
     /**
      * Opens the dialog blank for a new ship of the member.
@@ -211,11 +215,10 @@ function initMemberHangar() {
             safeSameOriginUrl(btn.getAttribute('data-action'), shipForm.action),
         );
         field('member-ship-name').value = '';
-        field('member-ship-type').value = '';
+        chooseShipType('');
         field('member-ship-location').value = '';
         field('member-ship-fitted').checked = false;
         field('member-ship-version').value = '';
-        refreshShipTypeMark();
         setInsurance('');
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
@@ -232,11 +235,10 @@ function initMemberHangar() {
         modalTitle.textContent = shipForm.getAttribute('data-title-edit');
         assignFormAction(shipForm, safeSameOriginUrl(action, shipForm.action));
         field('member-ship-name').value = btn.getAttribute('data-name') ?? '';
-        field('member-ship-type').value = btn.getAttribute('data-type') ?? '';
+        chooseShipType(btn.getAttribute('data-type') ?? '');
         field('member-ship-location').value = btn.getAttribute('data-loc') || '';
         field('member-ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         field('member-ship-version').value = btn.getAttribute('data-version') ?? '';
-        refreshShipTypeMark();
         setInsurance(btn.getAttribute('data-ins'));
         modalDeleteBtn.setAttribute('data-action', action.replace(/\/update$/, '/delete'));
         modalDeleteBtn.hidden = false;
@@ -319,17 +321,7 @@ function initMemberHangar() {
         document.getElementById('member-ship-manufacturer')
     );
     const shipType = /** @type {HTMLSelectElement} */ (document.getElementById('member-ship-type'));
-    const allTypes = Array.from(shipType.options);
-    manufacturer.addEventListener('change', () => {
-        const chosen = manufacturer.value;
-        shipType.replaceChildren(
-            allTypes[0],
-            ...allTypes
-                .slice(1)
-                .filter((o) => !chosen || o.getAttribute('data-manufacturer-id') === chosen),
-        );
-    });
-    refreshShipTypeMark = bindManufacturerMarkPreview(
+    chooseShipType = bindShipTypePicker(
         manufacturer,
         shipType,
         document.getElementById('member-ship-type-mark'),

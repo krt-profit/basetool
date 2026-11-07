@@ -22,6 +22,32 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 /** @typedef {{ previous: string, next: string }} PagerLabels */
 
 /**
+ * The pager button names from a page's dictionary.
+ *
+ * @param {(key: string) => string} t the page's label reader
+ * @returns {PagerLabels} the accessible names of the two buttons
+ */
+export function pagerLabels(t) {
+    return { previous: t('pagePrevious'), next: t('pageNext') };
+}
+
+/**
+ * Reloads a list's last page when the page it asked for lies beyond it, as after the last row of
+ * the last page was resolved or a peer shrank the list.
+ *
+ * @param {number} asked the zero-based page the list asked for
+ * @param {{ totalPages?: number }} page the page the backend answered
+ * @param {(page: number) => void} load loads a page of the list
+ * @returns {boolean} true when the last page is being reloaded and the answer must not be shown
+ */
+export function reloadedBeyondEnd(asked, page, load) {
+    const last = Math.max((page.totalPages || 0) - 1, 0);
+    if (asked <= last) return false;
+    load(last);
+    return true;
+}
+
+/**
  * Renders a previous/next pager below a script-rendered list, or hides it on a single page.
  *
  * @param {HTMLElement | null} nav the pager element

@@ -75,12 +75,18 @@ const LINK_ADMIN_AS_IMPORTED = [
     'const dictionaryLabels = () => (key) => key;',
     'const filterValue = (id) => ($(id) ? $(id).value.trim() : "");',
     'const idOf = (entry) => entry.id || "";',
-    'const readJsonOr = (url, label, target) => krtFetch.getJson(url, { key: target });',
-    'const sendLinkChange = () => Promise.resolve(false);',
+    'const jsonReader = () => (url, target) => krtFetch.getJson(url, { key: target });',
+    'const sendLinkChange = (change) => { __ui.linkChanges.push(change); return Promise.resolve(false); };',
     'const showCandidates = () => {};',
     'const swapRow = () => null;',
     'const bindTypedFilter = () => {};',
-    'const bindCandidateClick = () => {};',
+    'const bindLinkRowActions = () => {};',
+    'const createLinkPicker = (cfg) => {',
+    '  const picker = { cfg, opened: [], dismissed: 0,',
+    '    open(entry) { picker.opened.push(entry); }, dismiss() { picker.dismissed += 1; } };',
+    '  __ui.pickers.push(picker);',
+    '  return picker;',
+    '};',
 ].join('\n');
 
 /** A fake element with the properties the page modules read and write. */
@@ -131,7 +137,7 @@ class FakeForm extends FakeElement {
  * @param {Record<string, string>} [extraStubs] further modules to replace, keyed by path
  */
 function load(entry, elements, read = () => new Promise(() => {}), extraStubs = {}) {
-    const ui = { errors: [], successes: [], opened: [], closed: [] };
+    const ui = { errors: [], successes: [], opened: [], closed: [], pickers: [], linkChanges: [] };
     const net = { read, writes: [] };
     const live = { sections: [] };
     const context = vm.createContext({
@@ -140,6 +146,9 @@ function load(entry, elements, read = () => new Promise(() => {}), extraStubs = 
         Map,
         Set,
         URLSearchParams,
+        FormData: class {
+            append() {}
+        },
         __ui: ui,
         __net: net,
         __live: live,
@@ -151,7 +160,14 @@ function load(entry, elements, read = () => new Promise(() => {}), extraStubs = 
         HTMLFormElement: FakeForm,
         HTMLButtonElement: class extends FakeElement {},
         CSS: { escape: (s) => s },
-        window: { setTimeout, krtStarmapI18n: {}, krtShopsI18n: {}, krtP4kImportI18n: {} },
+        window: {
+            setTimeout,
+            setInterval: () => 1,
+            clearInterval() {},
+            krtStarmapI18n: {},
+            krtShopsI18n: {},
+            krtP4kImportI18n: {},
+        },
         document: {
             readyState: 'loading',
             documentElement: { lang: 'de' },
@@ -308,11 +324,11 @@ await test('after an APPLY the assignment options reload before the refreshed ca
     await report.answer('/materials', [{ id: 'm-new', name: 'New ore' }]);
     assert.ok(paths().some((p) => p.startsWith('/review-cases')));
     assert.deepEqual(
-        report.fn('resourceGroups').map((g) => g.id),
+        report.fn('groupOptions').map((o) => o.values[0]),
         ['g-new'],
     );
     assert.deepEqual(
-        report.fn('materials').map((m) => m.id),
+        report.fn('materialOptions').map((o) => o.values[0]),
         ['m-new'],
     );
 });
@@ -326,15 +342,208 @@ await test('a peer admin resolution or APPLY reloads the review cases and the ru
     const paths = () => report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
 
     room.receiver.refresh(['review']);
-    assert.ok(paths().includes('/resource-groups'), 'a resolution reloads the options and cases');
+    assert.ok(
+        paths().some((p) => p.startsWith('/review-cases')),
+        'a resolution reloads the cases',
+    );
+    assert.ok(!paths().includes('/resource-groups'), 'without refetching the options');
     assert.ok(!paths().some((p) => p.startsWith('/runs')), 'the runs stay');
 
-    room.receiver.refresh(['runs']);
+    room.receiver.refresh(['runs', 'review']);
     assert.ok(
         paths().some((p) => p.startsWith('/runs')),
         'an APPLY reloads the runs',
     );
+    assert.ok(paths().includes('/resource-groups'), 'and the options its cases offer');
     assert.equal(report.ui.banners, 1, 'and the import-due banner');
+});
+
+await test('resolving the last case of the last page reloads the page before it', async () => {
+    const report = p4kReport();
+    report.fn('loadCases')(2);
+    await report.answer('/review-cases?page=2', { content: [], page: 2, totalPages: 2 });
+    const paths = report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
+    assert.ok(paths.includes('/review-cases?page=1'), 'the last page that still holds cases');
+    await report.answer('/review-cases?page=1', { content: [], page: 1, totalPages: 2 });
+    assert.equal(report.fn('casesPage'), 1);
+});
+
+/**
+ * Loads the shops page with the shared link-admin stand-ins and a transport the test settles.
+ */
+function shopsPage() {
+    const reads = [];
+    const page = load(
+        'catalogue/shops.js',
+        {},
+        (url) => {
+            const read = pending();
+            reads.push({ url, ...read });
+            return read.promise;
+        },
+        {
+            '/js/catalogue/catalogue-link-admin.js': `${STUBS['/js/kernel/krt-fetch.js']}\n${LINK_ADMIN_AS_IMPORTED}`,
+        },
+    );
+    return { fn: page.fn, reads, ui: page.ui };
+}
+
+await test('a link conflict closes the picker, so no further pick is sent against the stale link', () => {
+    const shops = shopsPage();
+    const picker = shops.ui.pickers[0];
+    assert.ok(picker, 'the page wires its terminal picker');
+    const shop = { id: 's-1', terminalId: 't-1', manual: false };
+    picker.open(shop);
+    shops.fn('changeLink')(shop, 'SET', 't-2', null);
+    shops.ui.linkChanges[0].reload();
+    assert.equal(picker.dismissed, 1, 'the picker is dismissed');
+    assert.ok(
+        shops.reads.some((r) => r.url.startsWith('/admin/shops/entries')),
+        'and the list reloads',
+    );
+});
+
+await test('a shop list that shrank below the asked page reloads its last page', async () => {
+    const shops = shopsPage();
+    shops.fn('loadShops')(3);
+    shops.reads[0].resolve({ content: [], page: 3, totalPages: 3 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(shops.reads[1].url.includes('page=2'), 'the last page is read');
+});
+
+/** A list whose click listener the test calls itself. */
+class FakeList extends FakeElement {
+    addEventListener(type, listener) {
+        this.listener = listener;
+    }
+}
+
+await test('the shared link picker sends a pick only for the entry it is open for', async () => {
+    const candidates = new FakeList('cands');
+    const page = load('catalogue/catalogue-link-admin.js', {
+        cands: candidates,
+        subject: new FakeElement('subject'),
+        search: new FakeInput('search'),
+    });
+    const links = [];
+    let answer = false;
+    const picker = page.fn('createLinkPicker')({
+        modalId: 'modal',
+        subjectId: 'subject',
+        searchId: 'search',
+        candidatesId: 'cands',
+        subject: (e) => e.name,
+        search: (e) => e.name,
+        loadCandidates() {},
+        link(entry, candidateId) {
+            links.push([entry.id, candidateId]);
+            return Promise.resolve(answer);
+        },
+    });
+    const Button = page.fn('HTMLButtonElement');
+    const pick = (id) => {
+        const btn = new Button('pick');
+        btn.dataset.candidateId = id;
+        btn.closest = () => btn;
+        candidates.listener({ target: btn });
+    };
+    picker.dismiss();
+    assert.deepEqual(page.ui.closed, [], 'a picker that is not open closes nothing');
+
+    picker.open({ id: 'e-1', name: 'Area18' });
+    assert.deepEqual(page.ui.opened, ['modal']);
+    pick('c-1');
+    await Promise.resolve();
+    assert.deepEqual(page.ui.closed, [], 'a refused pick keeps the dialog');
+
+    picker.dismiss();
+    assert.deepEqual(page.ui.closed, ['modal']);
+    pick('c-2');
+    assert.deepEqual(links, [['e-1', 'c-1']], 'no pick after the dismiss');
+
+    answer = true;
+    picker.open({ id: 'e-2', name: 'Lorville' });
+    pick('c-3');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(page.ui.closed, ['modal', 'modal'], 'a saved pick closes the dialog');
+});
+
+await test('a slower earlier read of the due signal never overwrites the newer banner', async () => {
+    const reads = [];
+    const banner = new FakeElement('krt-p4k-due');
+    banner.hidden = true;
+    const page = load(
+        'catalogue/p4k-due.js',
+        { 'krt-p4k-due': banner, 'krt-p4k-due-detail': new FakeElement('detail') },
+        (url, opts) => {
+            const read = pending();
+            reads.push({ key: opts.key, ...read });
+            return read.promise;
+        },
+    );
+    const older = page.fn('refreshDueBanner')();
+    const newer = page.fn('refreshDueBanner')();
+    assert.deepEqual(
+        reads.map((r) => r.key),
+        ['p4k-due', 'p4k-due'],
+        'both reads carry the supersede key',
+    );
+    reads[1].resolve({ due: true });
+    await newer;
+    reads[0].resolve({ due: false });
+    await older;
+    assert.equal(banner.hidden, false, 'the banner shows the newer signal');
+});
+
+/**
+ * Loads the P4K import module with the report module replaced by a recorder.
+ *
+ * @param {string} [fetchStub] the transport stand-in
+ */
+function p4kImport(fetchStub) {
+    const extra = {
+        '/js/catalogue/p4k-report.js': [
+            'function openReport() {}',
+            'function refreshAfterApply() { __ui.applied = (__ui.applied || 0) + 1; }',
+        ].join('\n'),
+    };
+    if (fetchStub) extra['/js/kernel/krt-fetch.js'] = fetchStub;
+    return load('catalogue/p4k-import.js', {}, undefined, extra);
+}
+
+await test('a finished PREVIEW leaves the runs and cases alone; a finished APPLY refreshes them', () => {
+    const page = p4kImport();
+    const poll = page.fn('pollControl');
+    poll([{ id: 'p-1', kind: 'PREVIEW', status: 'RUNNING' }]);
+    poll([{ id: 'p-1', kind: 'PREVIEW', status: 'SUCCEEDED' }]);
+    assert.equal(page.ui.applied, undefined, 'a preview changes no run');
+
+    poll([
+        { id: 'a-1', kind: 'APPLY', status: 'RUNNING' },
+        { id: 'p-2', kind: 'PREVIEW', status: 'RUNNING' },
+    ]);
+    poll([
+        { id: 'a-1', kind: 'APPLY', status: 'RUNNING' },
+        { id: 'p-2', kind: 'PREVIEW', status: 'SUCCEEDED' },
+    ]);
+    assert.equal(page.ui.applied, undefined, 'the APPLY still runs');
+    poll([{ id: 'a-1', kind: 'APPLY', status: 'SUCCEEDED' }]);
+    assert.equal(page.ui.applied, 1, 'the finished APPLY refreshes once');
+});
+
+await test('an upload above the multipart limit names the size limit', async () => {
+    const page = p4kImport(
+        [
+            'const krtFetch = {',
+            '  submitForm(opts) { opts.onError(413, { code: "UPLOAD_TOO_LARGE" });',
+            '    return Promise.resolve({ ok: false }); },',
+            '};',
+        ].join('\n'),
+    );
+    page.fn('fileInput = { files: [{ name: "catalogue.json.zst" }], value: "" }');
+    page.fn('upload')();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.deepEqual(page.ui.errors, ['krtP4kImportI18n.tooLarge']);
 });
 
 if (failures > 0) {
