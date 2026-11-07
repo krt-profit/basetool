@@ -143,9 +143,9 @@ class SyncReportServiceTest {
     verify(repository).save(saved.capture());
     ExternalSyncReport row = saved.getValue();
     assertEquals(SyncSourceSystem.UEX, row.getSourceSystem());
-    assertEquals(SyncEventType.P4K_VALUE_DISAGREEMENT, row.getEventType());
+    assertEquals(SyncEventType.P4K_DISAGREEMENT, row.getEventType());
     assertEquals(guid, row.getExternalUuid());
-    assertEquals("name: UEX 'Aegis UEX', P4K 'Aegis'", row.getDetail());
+    assertEquals("column=name;p4k=Aegis;uex=Aegis UEX", row.getDetail());
   }
 
   @Test

@@ -107,8 +107,8 @@ public enum SyncEventType {
   SOURCE_RECORDS_RESTORED,
 
   /**
-   * A UEX or SC Wiki value differs from the value the P4K import leads on a P4K-known row; the P4K
-   * value stays (REQ-P4K-020). {@code detail} names the column and both values.
+   * A UEX or SC Wiki value differs from the value the P4K leads on a P4K-known row; the P4K value
+   * stays and {@code detail} names the column and both values (REQ-P4K-017, REQ-P4K-020).
    */
-  P4K_VALUE_DISAGREEMENT
+  P4K_DISAGREEMENT
 }

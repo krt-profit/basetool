@@ -46,7 +46,7 @@ public class P4kManufacturerReconciler {
   private final ManufacturerRepository manufacturerRepository;
 
   /**
-   * Reconciles every manufacturer and holds the unmatched ones for {@link #forSeededRow} and {@link
+   * Reconciles every manufacturer and holds the unmatched ones for {@link #seed} and {@link
    * #finish}.
    *
    * @param manufacturers the catalogue's manufacturers
@@ -84,32 +84,27 @@ public class P4kManufacturerReconciler {
   }
 
   /**
-   * Returns the manufacturer of an item or ship the run seeds, creating it from a held unmatched
-   * record on first use (REQ-P4K-021); a preview reports the creation and returns {@code null}.
+   * Creates the held unmatched manufacturer an item or ship the run seeds references, on first use
+   * (REQ-P4K-021), and indexes it so {@link P4kImportContext#manufacturer} returns it; a preview
+   * only reports the creation. A matched or unknown GUID changes nothing.
    *
    * @param guid the referenced manufacturer GUID text, or {@code null}
    * @param context the run
-   * @return the matched or created manufacturer, or {@code null}
    */
-  @Nullable
-  public Manufacturer forSeededRow(@Nullable String guid, @NotNull P4kImportContext context) {
-    Manufacturer matched = context.manufacturer(guid);
-    if (matched != null) {
-      return matched;
-    }
+  public void seed(@Nullable String guid, @NotNull P4kImportContext context) {
     P4kManufacturerDto held = context.takeUnmatchedManufacturer(guid);
     if (held == null) {
-      return null;
+      return;
     }
     UUID parsed = held.parsedGuid();
     String name = stripped(held.nameEn());
     if (parsed == null || name == null) {
       context.getReport().unmatched(P4kKind.MANUFACTURER, held);
-      return null;
+      return;
     }
     context.getReport().added(P4kKind.MANUFACTURER, held);
     if (!context.isApply()) {
-      return null;
+      return;
     }
     Manufacturer row = new Manufacturer();
     row.setName(name);
@@ -120,9 +115,7 @@ public class P4kManufacturerReconciler {
     row.setDescriptionDe(
         StringNormalization.blankToNull(P4kLocalisedText.deOf(held.description())));
     context.stamp(P4kKind.MANUFACTURER, held, row, parsed);
-    Manufacturer saved = manufacturerRepository.save(row);
-    context.indexManufacturer(parsed, saved);
-    return saved;
+    context.indexManufacturer(parsed, manufacturerRepository.save(row));
   }
 
   /**

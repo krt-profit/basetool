@@ -23,9 +23,9 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 
 > [!note] Partly implemented
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
-> and shop tables join with their areas), REQ-P4K-033 is
-> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-020, REQ-P4K-021 and
-> REQ-P4K-023 are implemented and REQ-P4K-022 partly (#3036; see its note); every other
+> and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-033 is
+> implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -401,9 +401,9 @@ pruned; they hold identifiers, short names and fact values only, never a game te
 
 A `CHANGED` row names the column the import wrote (`class_name`, `manufacturer_id`, `mass`,
 `name_key`, …); a game-text column (`description_en`, `description_de`, `description`) is logged
-by name with both values `null`. An item's rename shows as its `name_key`, the only name the import
-writes until REQ-P4K-017. `position` keeps the order the run found its rows in, and
-`still_live_elsewhere` carries the "still live in UEX/Wiki" flag of a `VANISHED` row.
+by name with both values `null`. An item's rename shows as its `name` and its `name_key`.
+`position` keeps the order the run found its rows in, and `still_live_elsewhere` carries the
+"still live in UEX/Wiki" flag of a `VANISHED` row.
 
 **Enforced by:** `P4kChangeReportTest` · **Code:** `P4kImportReport`, `P4kRowWriter` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
@@ -481,34 +481,60 @@ no override column and no review status for item disagreements.
 
 **Acceptance**
 
-- [ ] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
-- [ ] A Wiki `mass` is written where the P4K `mass` is `null`.
-- [ ] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
+- [x] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
+- [x] A Wiki `mass` is written where the P4K `mass` is `null`.
+- [x] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
 
-**Enforced by (planned):** `P4kItemPrecedenceTest`, `ScWikiItemSyncServiceTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
+The P4K's own value of each attribute is kept in a column of its own (`p4k_name`,
+`p4k_manufacturer_id`, `p4k_type`, `p4k_sub_type`, `p4k_size`, `p4k_grade_raw`, `p4k_item_class`,
+`p4k_mass`; V346), mirrored by every APPLY, a `null` included. The displayed columns are `name`,
+`manufacturer_id`, `wiki_type`, `wiki_sub_type`, `size_class`, `grade`, `item_class` and `mass`; an
+APPLY overwrites one only with a non-null P4K value, so a P4K value that turns `null` leaves the
+displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4k_*` column is
+`null`; for the grade it is the letter `p4k_type` and `p4k_grade_raw` map to. UEX writes `name` and
+the manufacturer only while `p4k_name` / `p4k_manufacturer_id` are `null`, and the Wiki/UEX
+duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
+disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;p4k=…;wiki=…`; strings
+compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
+writes nothing. The import writes `name_de` by REQ-P4K-023.
+
+**Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest`, `UexItemSyncServiceTest`,
+`ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:** `P4kItemReconciler`,
+`P4kItemValues`, `ScWikiItemFieldWriter` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
 (supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889
 
 ### REQ-P4K-018 — the grade letter comes from the integer for five component types only, and the raw integer is kept
 
 The catalogue carries the raw DataForge `grade` integer. The import maps **1 → A, 2 → B, 3 → C,
-4 → D** only for the item `type`s `Cooler`, `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`, and
-treats the 19 mismatching grade-1 items the contract lists as no grade. Everywhere else the P4K grade
-counts as `null` for the letter column, so the Wiki fills it. The import never reads the `Grade:`
-line of a description (a game text).
+4 → D** only for the item `type`s `Cooler`, `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`.
+Everywhere else the P4K grade counts as `null` for the letter column, so the Wiki fills it. The
+import never reads the `Grade:` line of a description (a game text).
+
+The contract names 19 grade-1 items whose `Grade:` line disagrees with the integer only by type,
+not by GUID or class name, so the import cannot single them out. Seven are of an unmapped type
+(`JumpDrive`, `QuantumInterdictionGenerator`, `Misc`, `WeaponMining`) and get no letter from the
+P4K. The others (a `Radar`, two `Cooler`s, and those of the nine ship-specific `Bespoke`
+components whose type is one of the five) map like their type, to `A`; a differing Wiki letter is
+reported as a disagreement (REQ-P4K-017).
 
 A nullable `p4k_grade_raw` stores the integer for every matched item, whatever its type. It is a
-fact value, may reach the exchange, and has no UI. A value outside 1–4 on a mapped type (5 to 7 on
+fact value, may reach the exchange, and has no UI. A value outside 1–4 (5 to 7 on
 `WeaponAttachment`, anything higher) leaves the letter `null`, keeps the raw value and counts in
 `basetool_catalogue_item_grade_unknown_total`.
 
 **Acceptance**
 
-- [ ] A `Shield` of grade 3 stores `C` and `p4k_grade_raw` 3; a `WeaponPersonal` of grade 1 stores
+- [x] A `Shield` of grade 3 stores `C` and `p4k_grade_raw` 3; a `WeaponPersonal` of grade 1 stores
   no letter from the P4K and `p4k_grade_raw` 1.
-- [ ] Each of the 19 listed items stores no letter from the P4K.
-- [ ] A grade 6 counts once in the unknown-grade counter and keeps `p4k_grade_raw` 6.
+- [x] A grade-1 item of an unmapped type the contract lists among the 19 (`JumpDrive`,
+  `QuantumInterdictionGenerator`, `Misc`, `WeaponMining`) stores no letter from the P4K.
+- [x] A grade 6 counts once in the unknown-grade counter and keeps `p4k_grade_raw` 6.
 
-**Enforced by (planned):** `P4kGradeMappingTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) · **Issues:** #2889
+An unknown grade is also an `UNKNOWN_VALUE` row of the change report (field `grade`); the counter
+moves on an APPLY only, once per matched item.
+
+**Enforced by:** `P4kGradeMappingTest`, `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` ·
+**Code:** `P4kGradeMapping` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) · **Issues:** #2889
 
 ### REQ-P4K-019 — an item's class comes from the P4K, a `null` never clears it, and an unknown value is counted
 
@@ -521,10 +547,16 @@ import monitoring.
 
 **Acceptance**
 
-- [ ] `"Military"` stores `MILITARY`; a `null` leaves a stored `STEALTH` in place.
-- [ ] An unknown value stores no class and increments the counter once per item.
+- [x] `"Military"` stores `MILITARY`; a `null` leaves a stored `STEALTH` in place.
+- [x] An unknown value stores no class and increments the counter once per item.
 
-**Enforced by (planned):** `P4kItemPrecedenceTest`, `ShipComponentClassTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) ·
+"Stored as no class" means `p4k_item_class` stays `null`, so a stored class stays and the Wiki
+fills it. An unknown class is also an `UNKNOWN_VALUE` row of the change report (field
+`itemClass`); the counter and the log line move on an APPLY only. `ItemClassResolver` serves both
+sources. `p4k_item_class` carries the CHECK `ck_game_item_p4k_item_class`.
+
+**Enforced by:** `P4kItemPrecedenceTest`, `ShipComponentClassTest`, `ScWikiItemFieldWriterTest` ·
+**Code:** `ItemClassResolver` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) ·
 **Issues:** #2889
 
 ## Manufacturers
@@ -540,8 +572,9 @@ import monitoring.
   own UUID.
 - **Name and abbreviation:** on a row with a P4K GUID only the import writes `name` and
   `abbreviation` (from `code`); UEX writes them only on rows the P4K does not know. A UEX/P4K
-  disagreement goes to `external_sync_report` as `P4K_VALUE_DISAGREEMENT`, naming the column and
-  both values; a value equal ignoring case is no disagreement.
+  disagreement goes to `external_sync_report` as `P4K_DISAGREEMENT` with
+  `column=…;p4k=…;uex=…` (`wiki=…` from the SC Wiki); a value equal ignoring case is no
+  disagreement.
 - **Name conflict:** when another row already holds the P4K name (`name` is unique), the import does
   not rename; it records the conflict in the report and opens a review case (`NAME_CONFLICT`, about
   the row the import would have renamed). Merging two rows is an admin action; the import never

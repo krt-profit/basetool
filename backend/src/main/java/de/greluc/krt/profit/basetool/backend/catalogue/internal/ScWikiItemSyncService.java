@@ -126,7 +126,6 @@ public class ScWikiItemSyncService {
               + " skipping.");
       return 0;
     }
-    meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN);
     meterRegistry.gauge(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
     try (var _ = scWikiClient.openSyncRun()) {
       int written =
@@ -250,7 +249,7 @@ public class ScWikiItemSyncService {
       item.setKind(GameItemKind.GENERIC);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     }
-    fieldWriter.apply(item, dto, now);
+    fieldWriter.apply(item, dto, runId, now);
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
@@ -713,7 +712,7 @@ public class ScWikiItemSyncService {
       item.setKind(passKind);
       item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
       item.setManufacturer(resolvedManufacturer);
-      fieldWriter.apply(item, dto, now);
+      fieldWriter.apply(item, dto, runId, now);
       gameItemRepository.save(item);
       gameItemStatWriter.write(item, dto);
       syncReportService.logScwikiEvent(
@@ -741,7 +740,7 @@ public class ScWikiItemSyncService {
       }
     }
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), passKind));
-    fieldWriter.apply(item, dto, now);
+    fieldWriter.apply(item, dto, runId, now);
     BackfillOutcome outcome = reconciled ? BackfillOutcome.RECONCILED : BackfillOutcome.UPDATED;
     if (item.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
@@ -783,7 +782,7 @@ public class ScWikiItemSyncService {
     }
     uexRow.setExternalUuid(dto.uuid());
     uexRow.setKind(GameItemKind.mergeMoreSpecific(uexRow.getKind(), passKind));
-    fieldWriter.apply(uexRow, dto, now);
+    fieldWriter.apply(uexRow, dto, runId, now);
     uexRow.setSourceSystems(GameItemSourceSystem.BOTH);
     gameItemRepository.save(uexRow);
     gameItemStatWriter.write(uexRow, dto);

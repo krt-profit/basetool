@@ -145,14 +145,13 @@ public class P4kShipReconciler {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;
     }
-    Manufacturer manufacturer =
-        manufacturerReconciler.forSeededRow(ship.manufacturerGuid(), context);
+    manufacturerReconciler.seed(ship.manufacturerGuid(), context);
     if (context.isApply()) {
       ShipType row = new ShipType();
       row.setName(name.strip());
       row.setNameDe(P4kFields.germanName(ship.name()));
       row.setClassName(StringNormalization.blankToNull(ship.className()));
-      row.setManufacturer(manufacturer);
+      row.setManufacturer(context.manufacturer(ship.manufacturerGuid()));
       row.setDescriptionEn(
           StringNormalization.blankToNull(P4kLocalisedText.enOf(ship.description())));
       row.setDescriptionDe(

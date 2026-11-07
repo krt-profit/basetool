@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -270,21 +271,21 @@ public class SyncReportService {
             .runId(runId)
             .ranAt(Instant.now())
             .sourceSystem(source)
-            .eventType(SyncEventType.P4K_VALUE_DISAGREEMENT)
+            .eventType(SyncEventType.P4K_DISAGREEMENT)
             .aggregate(aggregate)
             .externalUuid(p4kUuid)
             .externalName(p4kValue)
             .detail(
-                column
-                    + ": "
-                    + source.name()
-                    + " '"
-                    + sourceValue.strip()
-                    + "', P4K '"
+                "column="
+                    + column
+                    + ";p4k="
                     + p4kValue
-                    + "'")
+                    + ";"
+                    + source.name().toLowerCase(Locale.ROOT)
+                    + "="
+                    + sourceValue.strip())
             .build());
-    countSyncEvent(source, SyncEventType.P4K_VALUE_DISAGREEMENT);
+    countSyncEvent(source, SyncEventType.P4K_DISAGREEMENT);
     return true;
   }
 

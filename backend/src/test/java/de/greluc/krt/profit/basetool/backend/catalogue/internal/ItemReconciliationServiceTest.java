@@ -119,7 +119,34 @@ class ItemReconciliationServiceTest {
   }
 
   @Test
-  void aP4kMatchedSurvivorKeepsItsNameAndManufacturer() {
+  void theP4kValuesOfTheRetiredRowMoveAndLeadTheSurvivor() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    retired.setP4kUuid(UUID.randomUUID());
+    retired.setP4kName("Same Item P4K");
+    retired.setP4kType("Shield");
+    retired.setP4kSize(2);
+    retired.setP4kGradeRaw(3);
+    GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
+    canonical.setExternalUuid(UUID.randomUUID());
+    canonical.setSizeClass(3);
+    canonical.setGrade("A");
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+
+    assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))
+        .isSameAs(canonical);
+
+    assertThat(retired.getP4kName()).isNull();
+    assertThat(retired.getP4kGradeRaw()).isNull();
+    assertThat(canonical.getP4kName()).isEqualTo("Same Item P4K");
+    assertThat(canonical.getName()).isEqualTo("Same Item P4K");
+    assertThat(canonical.getP4kGradeRaw()).isEqualTo(3);
+    assertThat(canonical.getSizeClass()).isEqualTo(2);
+    assertThat(canonical.getGrade()).isEqualTo("C");
+  }
+
+  @Test
+  void aSurvivorWithAP4kNameKeepsIt() {
     GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
     retired.setUexItemId(91);
     retired.setName("Same Item");
@@ -127,6 +154,7 @@ class ItemReconciliationServiceTest {
     canonical.setExternalUuid(UUID.randomUUID());
     canonical.setP4kUuid(UUID.randomUUID());
     canonical.setName("SAME item");
+    canonical.setP4kName("SAME item");
     when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
 
     assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))

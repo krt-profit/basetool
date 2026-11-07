@@ -174,8 +174,8 @@ public class ItemReconciliationService {
       @Nullable String className) {}
 
   /**
-   * The P4K columns of a row (REQ-P4K-005, REQ-P4K-007), carried from a retired row onto a survivor
-   * that the P4K never matched.
+   * The P4K columns of a row (REQ-P4K-005, REQ-P4K-007, REQ-P4K-017), carried from a retired row
+   * onto a survivor that the P4K never matched.
    *
    * @param p4kUuid the P4K GUID
    * @param nameKey the {@code global.ini} name key
@@ -183,6 +183,7 @@ public class ItemReconciliationService {
    * @param syncedAt the last P4K touch
    * @param deletedAt the P4K soft-delete marker
    * @param seenRunId the run that last matched the row
+   * @param values the P4K's values of the attributes it leads
    */
   private record P4kParticipation(
       @NotNull UUID p4kUuid,
@@ -190,7 +191,8 @@ public class ItemReconciliationService {
       @Nullable String nameDe,
       @Nullable Instant syncedAt,
       @Nullable Instant deletedAt,
-      @Nullable UUID seenRunId) {
+      @Nullable UUID seenRunId,
+      @NotNull P4kItemValues values) {
 
     /**
      * Takes the P4K columns off a row; the GUID is unique, so it must leave before it lands.
@@ -207,18 +209,20 @@ public class ItemReconciliationService {
               row.getNameDe(),
               row.getP4kSyncedAt(),
               row.getP4kDeletedAt(),
-              row.getP4kSeenRunId());
+              row.getP4kSeenRunId(),
+              P4kItemValues.of(row));
       row.setP4kUuid(null);
       row.setNameKey(null);
       row.setNameDe(null);
       row.setP4kSyncedAt(null);
       row.setP4kDeletedAt(null);
       row.setP4kSeenRunId(null);
+      P4kItemValues.NONE.storeOn(row);
       return taken;
     }
 
     /**
-     * Writes the columns onto a row.
+     * Writes the columns onto a row; the P4K's values lead the row's displayed attributes.
      *
      * @param row the survivor
      */
@@ -229,16 +233,18 @@ public class ItemReconciliationService {
       row.setP4kSyncedAt(syncedAt);
       row.setP4kDeletedAt(deletedAt);
       row.setP4kSeenRunId(seenRunId);
+      values.storeOn(row);
+      values.leadOnto(row);
     }
   }
 
   private static void copyUexColumns(GameItem from, GameItem to) {
     to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
-    if (to.getP4kUuid() == null && to.getSourceSystems() != GameItemSourceSystem.P4K) {
+    if (to.getP4kName() == null) {
       to.setName(from.getName());
-      if (from.getManufacturer() != null) {
-        to.setManufacturer(from.getManufacturer());
-      }
+    }
+    if (to.getP4kManufacturer() == null && from.getManufacturer() != null) {
+      to.setManufacturer(from.getManufacturer());
     }
     to.setKind(GameItemKind.mergeMoreSpecific(to.getKind(), from.getKind()));
     to.setUexSlug(from.getUexSlug());
