@@ -374,9 +374,7 @@ public class UexItemSyncService {
     }
 
     item.setUexName(dto.name());
-    if (item.getP4kName() == null || !StringUtils.hasText(item.getName())) {
-      item.setName(dto.name());
-    }
+    GameItemNamePrecedence.applyUexName(item, dto.name());
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
     Manufacturer manufacturer = resolveManufacturer(dto, lookups);
     if (manufacturer != null && item.getP4kManufacturer() == null) {

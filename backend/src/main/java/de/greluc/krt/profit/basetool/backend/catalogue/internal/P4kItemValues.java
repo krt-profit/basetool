@@ -77,13 +77,13 @@ record P4kItemValues(
    * Reduces a catalogue name to one the Basetool displays.
    *
    * @param nameEn the catalogue's English name
-   * @return the stripped name, or {@code null} when blank or an engine placeholder such as {@code
-   *     <= PLACEHOLDER =>}
+   * @return the stripped name, or {@code null} when blank, an unresolved key or an engine
+   *     placeholder such as {@code <= PLACEHOLDER =>} ({@link P4kDisplayName#isReal})
    */
   @Nullable
   static String usableName(@Nullable String nameEn) {
     String name = StringNormalization.blankToNull(nameEn);
-    if (name == null || name.contains("<") || name.contains(">")) {
+    if (!P4kDisplayName.isReal(name) || name.contains("<") || name.contains(">")) {
       return null;
     }
     return name.strip();

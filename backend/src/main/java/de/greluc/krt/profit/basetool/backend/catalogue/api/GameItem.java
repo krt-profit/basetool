@@ -73,7 +73,10 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
 
-  /** Canonical display name: {@link #p4kName} when set, else the UEX or SC Wiki name. */
+  /**
+   * Canonical display name: {@link #p4kName} when set, else the live Wiki name, else the UEX name
+   * (REQ-P4K-017).
+   */
   @Column(nullable = false)
   private String name;
 

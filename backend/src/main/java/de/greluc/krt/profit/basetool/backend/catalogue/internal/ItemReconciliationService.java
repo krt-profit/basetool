@@ -243,9 +243,7 @@ public class ItemReconciliationService {
 
   private static void copyUexColumns(GameItem from, GameItem to) {
     to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
-    if (to.getP4kName() == null) {
-      to.setName(from.getName());
-    }
+    GameItemNamePrecedence.applyUexName(to, from.getName());
     if (to.getP4kManufacturer() == null && from.getManufacturer() != null) {
       to.setManufacturer(from.getManufacturer());
     }

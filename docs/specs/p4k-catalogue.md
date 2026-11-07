@@ -491,8 +491,22 @@ the catalogue does not carry keep their source: the dimensions stay with the Wik
 and every price or terminal field with UEX. The admin acts on a disagreement at its source; there is
 no override column and no review status for item disagreements.
 
+**The canonical `name`** follows the same order: the import writes it on every matched row whose
+catalogue carries a real name (`p4k_name` set); the Wiki item sync writes it on a row whose
+`p4k_name` is `null`; UEX writes it only on a row with no name, or one that neither the P4K
+(`p4k_name` set) nor a live Wiki record (`scwiki_name` set, `scwiki_deleted_at` null) names. Each
+source keeps its own copy in `p4k_name` / `scwiki_name` / `uex_name`. UEX lists some items twice
+under one UUID, with a wrong name on the second id, so a UEX name never replaces an archive or Wiki
+name. The Wiki/UEX duplicate merge applies the same rule to the survivor.
+
 **Acceptance**
 
+- [x] A UEX sync of id 5277 ("Breakneck S4 Gatling") leaves `BEHR_BallisticGatling_S6` named
+  "AD6B Ballistic Gatling" when the Wiki or the P4K names it so; `uex_name` keeps the UEX value.
+- [x] A Wiki sync renames a UEX-named `BEHR_LaserCannon_S3` to "M5A Cannon"; the
+  `BEHR_LaserCannon_S3_CleanAir` variant keeps its own Wiki name "M5A Cannon Defense Division".
+- [x] A P4K APPLY replaces a matched item's stale name with the catalogue name and leaves it alone
+  for a placeholder.
 - [x] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
 - [x] A Wiki `mass` is written where the P4K `mass` is `null`.
 - [x] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
@@ -503,17 +517,16 @@ The P4K's own value of each attribute is kept in a column of its own (`p4k_name`
 `manufacturer_id`, `wiki_type`, `wiki_sub_type`, `size_class`, `grade`, `item_class` and `mass`; an
 APPLY overwrites one only with a non-null P4K value, so a P4K value that turns `null` leaves the
 displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4k_*` column is
-`null`; for the grade it is the letter `p4k_type` and `p4k_grade_raw` map to. UEX writes `name` and
-the manufacturer only while `p4k_name` / `p4k_manufacturer_id` are `null`, and the Wiki/UEX
-duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
+`null`; for the grade it is the letter `p4k_type` and `p4k_grade_raw` map to. UEX writes the
+manufacturer only while `p4k_manufacturer_id` is `null`, and the Wiki/UEX duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
 disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;stored=…;source=…`; strings
 compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
 writes nothing. The import writes `name_de` by REQ-P4K-023.
 
-**Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest`, `UexItemSyncServiceTest`,
-`ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:** `P4kItemReconciler`,
-`P4kItemValues`, `ScWikiItemFieldWriter` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
-(supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889
+**Enforced by:** `P4kItemPrecedenceTest`, `GameItemNamePrecedenceTest`, `ScWikiItemFieldWriterTest`,
+`UexItemSyncServiceTest`, `ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:**
+`P4kItemReconciler`, `P4kItemValues`, `GameItemNamePrecedence`, `ScWikiItemFieldWriter` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
+(supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889, #3062
 
 ### REQ-P4K-018 — the grade letter comes from the integer for five component types only, and the raw integer is kept
 
