@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
@@ -70,6 +71,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -715,6 +718,29 @@ class JobOrderItemProductionServiceTest {
     assertThat(captor.getValue().getPersonal()).isTrue();
     assertThat(captor.getValue().getGameItem()).isSameAs(gameItem);
     assertThat(captor.getValue().getJobOrderAllocations()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void bookProduction_bookIn_onAPlaceNoPickerOffers_isRefused_noSave(Location location) {
+    givenProducibleLineWithoutMaterials();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(location.getId(), ownerId, null, true, false));
+
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(LocationNotOfferedException.class);
+    verify(inventoryItemRepository, never()).save(any());
   }
 
   @Test

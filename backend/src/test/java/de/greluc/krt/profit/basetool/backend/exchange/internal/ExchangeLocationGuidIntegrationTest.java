@@ -140,6 +140,20 @@ class ExchangeLocationGuidIntegrationTest {
   }
 
   @Test
+  void aPlaceNoPickerOffersIsFoundByNeitherItsGuidNorItsUexLinkNorItsName() {
+    ExchangeLocationRef everyReference =
+        new ExchangeLocationRef(
+            onLinkedCity.getName(), new ExchangeLocationRef.Uex("CITY", LINKED_CITY), CITY_GUID);
+    for (boolean referenceOnly : new boolean[] {false, true}) {
+      onLinkedCity.setHidden(!referenceOnly);
+      onLinkedCity.setReferenceOnly(referenceOnly);
+      onLinkedCity = locationRepository.saveAndFlush(onLinkedCity);
+
+      assertThat(resolver.resolve(everyReference)).as("referenceOnly=%s", referenceOnly).isEmpty();
+    }
+  }
+
+  @Test
   void theStockFeedCarriesTheGuidOfAPlaceOnALinkedCityBesideItsUexLinkAndCuratedName() {
     UUID member = member();
     UUID material = material();

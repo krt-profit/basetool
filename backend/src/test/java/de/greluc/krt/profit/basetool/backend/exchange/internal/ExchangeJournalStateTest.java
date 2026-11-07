@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintCrea
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
@@ -51,6 +52,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -276,7 +279,7 @@ class ExchangeJournalStateTest {
       when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
       when(ships.existsById(shipId)).thenReturn(false);
       when(types.existsById(typeId)).thenReturn(true);
-      when(locations.existsById(locationId)).thenReturn(true);
+      when(locations.findById(locationId)).thenReturn(Optional.of(place(false, false)));
       String before = json(ExchangeShipJournal.State.of(ship(unitId)).toJournal());
 
       String reason =
@@ -290,6 +293,63 @@ class ExchangeJournalStateTest {
               MEMBER,
               new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null),
               unitId);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aRemovedShipWhoseEarlierPlaceNoPickerOffersIsGone(boolean referenceOnly) {
+      latestChangeIsTheClients(ExchangeResource.SHIP);
+      UUID shipId = UUID.randomUUID();
+      when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.empty());
+      when(ships.existsById(shipId)).thenReturn(false);
+      when(types.existsById(typeId)).thenReturn(true);
+      when(locations.findById(locationId))
+          .thenReturn(Optional.of(place(!referenceOnly, referenceOnly)));
+      String before = json(ExchangeShipJournal.State.of(ship(null)).toJournal());
+
+      String reason =
+          journal.restore(
+              scope(Set.of()),
+              List.of(entry(ExchangeJournalAction.SHIP_REMOVE, shipId.toString(), before, null)));
+
+      assertThat(reason).isEqualTo(ExchangeUndoService.GONE);
+      verify(commands, never()).addShipForClient(any(), any());
+    }
+
+    @Test
+    void aShipStillOnItsEarlierPlaceIsSetBackEvenWhenNoPickerOffersThePlace() {
+      latestChangeIsTheClients(ExchangeResource.SHIP);
+      Ship current = ship(null);
+      UUID shipId = UUID.randomUUID();
+      when(ships.lockOwnedById(shipId, MEMBER)).thenReturn(Optional.of(current));
+      when(types.existsById(typeId)).thenReturn(true);
+      String before = json(ExchangeShipJournal.State.of(ship(null)).toJournal());
+
+      String reason =
+          journal.restore(
+              scope(Set.of()),
+              List.of(entry(ExchangeJournalAction.SHIP_UPSERT, shipId.toString(), before, "{}")));
+
+      assertThat(reason).isNull();
+      verify(locations, never()).findById(any());
+      verify(commands)
+          .updateShip(
+              MEMBER,
+              shipId,
+              new ShipRequestDto("Kestrel", typeId, "LTI", locationId, true, null, null));
+    }
+
+    /**
+     * A place with the journal's location id and the given markers.
+     *
+     * @param hidden whether an admin hid it
+     * @param referenceOnly whether it exists only for existing personal-inventory rows
+     * @return the place
+     */
+    private Location place(boolean hidden, boolean referenceOnly) {
+      Location place = NotOfferedPlaces.place(hidden, referenceOnly);
+      place.setId(locationId);
+      return place;
     }
 
     @Test

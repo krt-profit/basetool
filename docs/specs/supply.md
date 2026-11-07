@@ -126,6 +126,9 @@ between zero and the pledged amount and a location. In the same transaction the 
 into the unit's pool — from the earmarked row by `transferToPool`, otherwise by `bookIntoPool` — the
 donation becomes `RECEIVED` or `PARTIALLY_RECEIVED`, and the credited need's progress includes it.
 
+**Storage place (REQ-P4K-039):** the receipt books into only a place a picker offers; a hidden or
+reference-only one is a `400` `LOCATION_NOT_OFFERED`.
+
 **Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService#receive`
 
 ### REQ-SUP-010 — Decline and withdraw
@@ -141,6 +144,9 @@ earmark.
 The lead or a Logistician of a receiving unit records a donation already received, for a named member or
 without a donor, and books it into the pool in the same transaction. The page picks the donor from the
 member search or leaves it empty.
+
+**Storage place (REQ-P4K-039):** the recorded donation books into only a place a picker offers; a
+hidden or reference-only one is a `400` `LOCATION_NOT_OFFERED`.
 
 **Enforced by:** `SupplyDonationServiceTest`, `SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService#record`
 

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -261,7 +262,8 @@ public class SupplyDonationService {
       requireUser(request.donorUserId());
     }
     Location location =
-        Entities.require(locationRepository.findById(request.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(request.locationId()), "Location not found");
     StockLot lot = new StockLot(material, item, location, quality, false);
     stockCommands.lockLots(holder, List.of(lot.key()));
     OrgUnit unit = requireUnit(unitId);
@@ -324,7 +326,8 @@ public class SupplyDonationService {
     }
     validAmount(donation.getMaterial(), donation.getGameItem(), received);
     Location location =
-        Entities.require(locationRepository.findById(request.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(request.locationId()), "Location not found");
     OrgUnit unit = requireUnit(unitId);
 
     StockRow source =

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
@@ -66,6 +67,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -156,7 +159,7 @@ class PurchasingDeliveryServiceTest {
   void recordMovesAFundedDealIntoDeliveryAndTellsTheRaisingUnit() {
     when(dealService.lock(DEAL)).thenReturn(deal);
     when(deliveryRepository.findByDealIdOrderByCreatedAtAsc(DEAL)).thenReturn(List.of());
-    when(locationRepository.existsById(LOCATION)).thenReturn(true);
+    when(locationRepository.findById(LOCATION)).thenReturn(Optional.of(location));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(DELEGATE));
     when(deliveryRepository.saveAndFlush(any(PurchasingDealDelivery.class)))
         .thenAnswer(invocation -> {
@@ -282,12 +285,42 @@ class PurchasingDeliveryServiceTest {
   void recordRefusesAnUnknownLocation() {
     when(dealService.lock(DEAL)).thenReturn(deal);
     when(deliveryRepository.findByDealIdOrderByCreatedAtAsc(DEAL)).thenReturn(List.of());
-    when(locationRepository.existsById(LOCATION)).thenReturn(false);
+    when(locationRepository.findById(LOCATION)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.record(DEAL, new RecordDeliveryRequest(1.0, LOCATION)))
         .isInstanceOf(BadRequestException.class);
 
     verify(deliveryRepository, never()).saveAndFlush(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void recordRefusesAPlaceNoPickerOffers(Location place) {
+    when(dealService.lock(DEAL)).thenReturn(deal);
+    when(deliveryRepository.findByDealIdOrderByCreatedAtAsc(DEAL)).thenReturn(List.of());
+    when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+    assertThatThrownBy(() -> service.record(DEAL, new RecordDeliveryRequest(1.0, place.getId())))
+        .isInstanceOf(LocationNotOfferedException.class);
+
+    verify(deliveryRepository, never()).saveAndFlush(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void acceptingOntoAPlaceNoPickerOffersIsRefused(Location place) {
+    PurchasingDealDelivery recorded = delivery(10.0, DeliveryStatus.RECORDED);
+    recorded.setVersion(1L);
+    allowAcceptance(recorded);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ACCEPTOR));
+    when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+    assertThatThrownBy(() ->
+            service.accept(
+                DEAL, DELIVERY, new AcceptDeliveryRequest(10.0, 0.0, null, 500, place.getId(), 1L)))
+        .isInstanceOf(LocationNotOfferedException.class);
+
+    verifyNoInteractions(stockCommands);
   }
 
   @Test

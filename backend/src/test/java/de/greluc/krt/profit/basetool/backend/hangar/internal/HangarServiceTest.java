@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -32,7 +33,9 @@ import static org.mockito.Mockito.times;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
@@ -58,6 +61,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -673,21 +678,95 @@ class HangarServiceTest {
     verify(shipRepository, never()).setLocationForOwner(any(), any());
   }
 
-  @Test
-  void setHomeLocationForMyShips_hiddenHomeLocation_throwsBadRequest() {
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void setHomeLocationForMyShips_homeLocationNoPickerOffers_isRefused(Location location) {
     UUID userId = UUID.randomUUID();
-    UUID locationId = UUID.randomUUID();
-    Location location = new Location();
-    location.setId(locationId);
     location.setHomeLocation(true);
-    location.setHidden(true);
-
-    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
 
     assertThrows(
-        BadRequestException.class,
-        () -> hangarService.setHomeLocationForMyShips(userId, locationId));
+        LocationNotOfferedException.class,
+        () -> hangarService.setHomeLocationForMyShips(userId, location.getId()));
     verify(shipRepository, never()).setLocationForOwner(any(), any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void addShip_onAPlaceNoPickerOffers_isRefused(Location location) {
+    UUID userId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+    User user = new User();
+    user.setId(userId);
+    ShipType shipType = new ShipType();
+    shipType.setId(shipTypeId);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findById(shipTypeId)).thenReturn(Optional.of(shipType));
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+
+    ShipRequestDto request =
+        new ShipRequestDto("Ship", shipTypeId, "LTI", location.getId(), false, null, null);
+
+    assertThrows(LocationNotOfferedException.class, () -> hangarService.addShip(userId, request));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void updateShip_keepingAPlaceNoPickerOffers_saves(Location location) {
+    Ship ship = ownShipOn(location);
+    UUID userId = ship.getOwner().getId();
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    hangarService.updateShip(
+        userId,
+        ship.getId(),
+        new ShipRequestDto(
+            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null));
+
+    verify(shipRepository).save(ship);
+    assertSame(location, ship.getLocation());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void updateShip_movingOntoAPlaceNoPickerOffers_isRefused(Location location) {
+    Ship ship = ownShipOn(NotOfferedPlaces.place(false, false));
+    UUID userId = ship.getOwner().getId();
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+
+    ShipRequestDto request =
+        new ShipRequestDto(
+            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null);
+
+    assertThrows(
+        LocationNotOfferedException.class,
+        () -> hangarService.updateShip(userId, ship.getId(), request));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  /**
+   * Stubs an owned ship on a place, with its type, for the update tests.
+   *
+   * @param location the ship's current place
+   * @return the ship
+   */
+  private Ship ownShipOn(Location location) {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    ShipType type = new ShipType();
+    type.setId(UUID.randomUUID());
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setOwner(owner);
+    ship.setShipType(type);
+    ship.setName("Test");
+    ship.setInsurance("LTI");
+    ship.setLocation(location);
+    when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+    when(shipTypeRepository.findById(type.getId())).thenReturn(Optional.of(type));
+    return ship;
   }
 
   @Test

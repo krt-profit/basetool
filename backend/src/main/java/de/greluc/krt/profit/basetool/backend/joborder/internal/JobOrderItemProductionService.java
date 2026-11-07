@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -366,7 +367,8 @@ public class JobOrderItemProductionService {
                 .orElseThrow(() ->
                     new BadRequestException("No acting user to book the produced stock in for"));
     final Location location =
-        Entities.require(locationRepository.findById(bookIn.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(bookIn.locationId()), "Location not found");
     final OrgUnit owningOrgUnit =
         orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
             owner, bookIn.owningOrgUnitId());

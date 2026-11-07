@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -66,6 +67,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -315,6 +318,22 @@ class RefineryOrderStoreServiceTest {
           () ->
               refineryOrderService.storeRefineryOrder(
                   OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false));
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void throwsLocationNotOffered_whenNoPickerOffersThePlace(Location place) {
+      place.setId(LOCATION_ID);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
+      when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(place));
+
+      assertThrows(
+          LocationNotOfferedException.class,
+          () ->
+              refineryOrderService.storeRefineryOrder(
+                  OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false));
+      verify(inventoryItemRepository, never()).save(any());
     }
 
     @Test

@@ -110,6 +110,10 @@ station. It MUST NOT be derived from UEX's parent-level `has_refinery` boolean o
 The offered set MUST additionally exclude **hidden** locations (`location.hidden = true`), on the
 same terms as every other location picker.
 
+**Storage place (REQ-P4K-039):** a create, an update and the store set only a place a picker offers;
+a hidden or reference-only one is a `400` `LOCATION_NOT_OFFERED`. An entry whose place does not
+change keeps it.
+
 **Why:** UEX publishes both statements and they disagree. Measured against the live UEX API on
 2026-07-28, 21 terminals carry `type = 'refinery'`, while the parent flag is wrong in *both*
 directions:

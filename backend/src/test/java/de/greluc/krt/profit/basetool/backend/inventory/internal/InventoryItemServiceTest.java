@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
@@ -66,6 +67,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -615,6 +618,41 @@ class InventoryItemServiceTest {
 
     assertNotNull(result);
     verify(inventoryItemRepository).save(any(InventoryItem.class));
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void createInventoryItem_onAPlaceNoPickerOffers_isRefused(Location location) {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            null,
+            location.getId(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    lenient().when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    lenient().when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+
+    assertThrows(
+        LocationNotOfferedException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 
   @Test

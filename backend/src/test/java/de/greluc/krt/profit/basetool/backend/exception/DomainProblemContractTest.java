@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ProductionAllocationException;
@@ -171,6 +172,16 @@ class DomainProblemContractTest {
             "problem.owner_org_unit_required",
             "No owning org unit could be resolved.",
             "Owning org unit required",
+            null,
+            Map.of()),
+        new Expected(
+            new LocationNotOfferedException(),
+            HttpStatus.BAD_REQUEST,
+            "LOCATION_NOT_OFFERED",
+            "location-not-offered",
+            "problem.location_not_offered",
+            "problem.location_not_offered.detail",
+            "Location not offered",
             null,
             Map.of()),
         new Expected(

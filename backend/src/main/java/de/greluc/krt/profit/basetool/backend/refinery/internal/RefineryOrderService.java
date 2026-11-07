@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -136,7 +137,7 @@ public class RefineryOrderService {
     }
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
-          Entities.require(
+          OfferedLocations.require(
               locationRepository.findById(order.getLocation().getId()),
               "error.location.not_found"));
       validateLocationHasRefinery(order.getLocation());
@@ -253,9 +254,11 @@ public class RefineryOrderService {
 
     if (details.getLocation() != null && details.getLocation().getId() != null) {
       order.setLocation(
-          Entities.require(
-              locationRepository.findById(details.getLocation().getId()),
-              "error.location.not_found"));
+          OfferedLocations.requireOfferedOrCurrent(
+              Entities.require(
+                  locationRepository.findById(details.getLocation().getId()),
+                  "error.location.not_found"),
+              order.getLocation()));
       validateLocationHasRefinery(order.getLocation());
     }
 

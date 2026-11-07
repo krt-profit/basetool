@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
@@ -158,7 +159,7 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
     if (shipType == null
         || before.insurance() == null
         || !shipTypeRepository.existsById(shipType)
-        || (locationId != null && !locationRepository.existsById(locationId))) {
+        || (locationId != null && !restorablePlace(locationId, ship.orElse(null)))) {
       return false;
     }
     ShipRequestDto dto =
@@ -190,6 +191,23 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
       shipCommands.changeShipOrgUnit(member, shipId, unit.id(), unitVersion);
     }
     return true;
+  }
+
+  /**
+   * Whether an undo may put a ship back on a place: the place still exists and is the ship's
+   * current one or one the pickers offer (REQ-P4K-039).
+   *
+   * @param locationId the place the earlier state names
+   * @param current the ship as it is now, or {@code null} when it is gone
+   * @return {@code true} when the hangar would accept the place
+   */
+  private boolean restorablePlace(@NotNull UUID locationId, @Nullable Ship current) {
+    if (current != null
+        && current.getLocation() != null
+        && locationId.equals(current.getLocation().getId())) {
+      return true;
+    }
+    return locationRepository.findById(locationId).filter(OfferedLocations::isOffered).isPresent();
   }
 
   /**
