@@ -49,7 +49,9 @@ final class P4kRowIds {
   }
 
   /**
-   * Loads the index of a kind; run after the kind's reconciler, inside the run's transaction.
+   * Returns the index of a kind; call it after the kind's reconciler, inside the run's transaction.
+   * The run reads it once and hands every later caller the same index, since no later step adds a
+   * row of that kind.
    *
    * @param entityManager the run's entity manager
    * @param kind the kind
@@ -58,6 +60,22 @@ final class P4kRowIds {
    */
   @NotNull
   static P4kRowIds load(
+      @NotNull EntityManager entityManager,
+      @NotNull P4kKind kind,
+      @NotNull P4kImportContext context) {
+    return context.rowIds(kind, _ -> read(entityManager, kind, context));
+  }
+
+  /**
+   * Reads the index of a kind: one query, overlaid with the run's matches.
+   *
+   * @param entityManager the run's entity manager
+   * @param kind the kind
+   * @param context the run
+   * @return the index
+   */
+  @NotNull
+  private static P4kRowIds read(
       @NotNull EntityManager entityManager,
       @NotNull P4kKind kind,
       @NotNull P4kImportContext context) {

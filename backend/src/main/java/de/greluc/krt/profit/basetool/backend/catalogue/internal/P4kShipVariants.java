@@ -110,7 +110,7 @@ class P4kShipVariants {
           && base != null
           && !base.equals(guid)
           && className != null
-          && !context.isRepeated(P4kKind.SHIP, className)) {
+          && !context.isRepeatedClassName(P4kKind.SHIP, className)) {
         wanted.put(guid, new ShipTypeP4kVariant(guid, className.strip(), base));
       }
     }

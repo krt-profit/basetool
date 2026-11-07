@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -39,9 +38,10 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The rows of one kind, loaded once per run and looked up in memory by the keys {@link
  * P4kRowMatcher} matches on (REQ-P4K-007): the P4K GUID, the SC Wiki UUID, the class name and the
- * name, both ignoring case. A lookup answers what the repository query of that key would answer on
- * the rows' current values: an entry whose row has since been given another key is skipped, and
- * {@link #add} indexes a row under the keys it holds after a write or on creation.
+ * name, both ignoring case and surrounding blanks ({@code P4kMatchKeys}). A lookup answers what the
+ * repository query of that key would answer on the rows' current values: an entry whose row has
+ * since been given another key is skipped, and {@link #add} indexes a row under the keys it holds
+ * after a write or on creation.
  *
  * @param <T> the row type
  */
@@ -83,8 +83,8 @@ public final class P4kRowIndex<T extends P4kKeyedRow> {
   public void add(@NotNull T row) {
     put(byP4kUuid, row.getP4kUuid(), row);
     put(byWikiUuid, wikiUuid.apply(row), row);
-    put(byClassName, folded(className.apply(row)), row);
-    put(byName, folded(name.apply(row)), row);
+    put(byClassName, P4kMatchKeys.fold(className.apply(row)), row);
+    put(byName, P4kMatchKeys.fold(name.apply(row)), row);
   }
 
   /**
@@ -119,8 +119,9 @@ public final class P4kRowIndex<T extends P4kKeyedRow> {
   @NotNull
   @Unmodifiable
   public List<T> byClassName(@NotNull String key) {
-    String folded = key.toUpperCase(Locale.ROOT);
-    return current(byClassName.get(folded), row -> folded.equals(folded(className.apply(row))));
+    String folded = P4kMatchKeys.fold(key);
+    return current(
+        byClassName.get(folded), row -> folded.equals(P4kMatchKeys.fold(className.apply(row))));
   }
 
   /**
@@ -132,8 +133,8 @@ public final class P4kRowIndex<T extends P4kKeyedRow> {
   @NotNull
   @Unmodifiable
   public List<T> byName(@NotNull String key) {
-    String folded = key.toUpperCase(Locale.ROOT);
-    return current(byName.get(folded), row -> folded.equals(folded(name.apply(row))));
+    String folded = P4kMatchKeys.fold(key);
+    return current(byName.get(folded), row -> folded.equals(P4kMatchKeys.fold(name.apply(row))));
   }
 
   /**
@@ -162,16 +163,5 @@ public final class P4kRowIndex<T extends P4kKeyedRow> {
   @Unmodifiable
   private List<T> current(@Nullable Set<T> rows, @NotNull Predicate<T> holds) {
     return rows == null ? List.of() : rows.stream().filter(holds).toList();
-  }
-
-  /**
-   * Folds a key for a case-insensitive comparison the way {@code upper(...)} does in the queries.
-   *
-   * @param key the key, or {@code null}
-   * @return the upper-cased key, or {@code null}
-   */
-  @Nullable
-  private static String folded(@Nullable String key) {
-    return key == null ? null : key.toUpperCase(Locale.ROOT);
   }
 }

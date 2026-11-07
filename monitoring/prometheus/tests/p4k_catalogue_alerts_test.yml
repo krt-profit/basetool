@@ -86,6 +86,33 @@ tests:
         alertname: P4kReviewCaseStale
         exp_alerts: []
 
+  - name: a job RUNNING for more than 3 hours alerts
+    interval: 5m
+    input_series:
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="RUNNING"}'
+        values: "1x48"
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="PENDING"}'
+        values: "0x48"
+    alert_rule_test:
+      - eval_time: 3h5m
+        alertname: P4kImportRunningStuck
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "A P4K import has been RUNNING for more than 3h"
+              description: "A P4K import job has stayed RUNNING for more than 3 hours — a run takes minutes plus at most one hour waiting for the sync lock, so the worker is wedged or the job's end could not be recorded. Check the backend log for the job; a backend restart marks it FAILED (REQ-OBS-011)."
+
+  - name: jobs that each finish stay silent although the queue is rarely empty
+    interval: 5m
+    input_series:
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="RUNNING"}'
+        values: "1x23 0 1x23"
+    alert_rule_test:
+      - eval_time: 3h55m
+        alertname: P4kImportRunningStuck
+        exp_alerts: []
+
   - name: a Channel refusal alerts at once
     interval: 1m
     input_series:

@@ -108,7 +108,7 @@ class P4kStarmapImportTest {
     assertThat(second.starmapObjects()).isNotNull();
     assertThat(second.starmapObjects().enriched()).isZero();
     assertThat(second.starmapObjects().matched()).isEqualTo(2);
-    assertThat(changeRepository.findByRunId(first.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, first.runId()))
         .filteredOn(c ->
             c.getKind() == P4kKind.STARMAP_OBJECT
                 && c.getGuid() != null

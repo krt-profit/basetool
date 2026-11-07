@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -53,6 +55,19 @@ public class P4kCatalogueBusinessGauges implements BusinessGaugeSource {
   private final P4kImportChangeRepository changeRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
   private final P4kStampedRows stampedRows;
+  private final P4kCatalogueRevision revision;
+
+  /** The longest the counts go without being read again when no P4K write moved them. */
+  static final Duration RECOUNT_AFTER = Duration.ofHours(1);
+
+  /** The revision the counts were last read at; none before the first sample. */
+  private long countedRevision = -1;
+
+  /** When the counts were last read. */
+  @NotNull private Instant countedAt = Instant.EPOCH;
+
+  /** When the oldest open review case was opened, {@code null} while none is open. */
+  @Nullable private Instant oldestOpenCaseCreatedAt;
 
   private final AtomicLong due = new AtomicLong();
   private final List<KindGauges> kindGauges = new ArrayList<>();
@@ -101,9 +116,27 @@ public class P4kCatalogueBusinessGauges implements BusinessGaugeSource {
         registry, CatalogueMetricNames.P4K_REVIEW_CASE_OPEN_OLDEST_AGE, oldestOpenCaseAge);
   }
 
+  /**
+   * Samples the gauges. The due signal, which the Wiki and UEX syncs move, and the oldest open
+   * case's age are fresh every time; the run, stamp and case counts are read again only after a P4K
+   * write ({@link P4kCatalogueRevision}) or once {@link #RECOUNT_AFTER} has passed, which bounds
+   * what a Wiki or UEX merge of two P4K rows leaves stale.
+   */
   @Override
   public void sample() {
     due.set(dueService.evaluate().due() ? 1L : 0L);
+    long current = revision.current();
+    Instant now = Instant.now();
+    if (current != countedRevision || countedAt.plus(RECOUNT_AFTER).isBefore(now)) {
+      countedRevision = current;
+      countedAt = now;
+      recount();
+    }
+    oldestOpenCaseAge.set(BusinessGauges.ageSeconds(oldestOpenCaseCreatedAt));
+  }
+
+  /** Reads the run, stamp and review-case figures the P4K writes move. */
+  private void recount() {
     List<P4kImportRun> lastTwo = runRepository.findTop2ByOrderByAppliedAtDesc();
     P4kImportRun last = lastTwo.isEmpty() ? null : lastTwo.getFirst();
     P4kImportRun previous = lastTwo.size() > 1 ? lastTwo.get(1) : null;
@@ -121,9 +154,8 @@ public class P4kCatalogueBusinessGauges implements BusinessGaugeSource {
           .openCases()
           .set(reviewCaseRepository.countByStatusAndKind(P4kReviewStatus.OPEN, gauges.kind()));
     }
-    oldestOpenCaseAge.set(
-        BusinessGauges.ageSeconds(
-            reviewCaseRepository.findOldestCreatedAtByStatus(P4kReviewStatus.OPEN)));
+    oldestOpenCaseCreatedAt =
+        reviewCaseRepository.findOldestCreatedAtByStatus(P4kReviewStatus.OPEN);
   }
 
   /**

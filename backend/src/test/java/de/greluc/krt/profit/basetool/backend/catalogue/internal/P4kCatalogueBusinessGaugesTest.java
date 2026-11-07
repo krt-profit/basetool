@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
@@ -54,6 +56,7 @@ class P4kCatalogueBusinessGaugesTest {
   @Mock private P4kReviewCaseRepository reviewCaseRepository;
   @Mock private P4kStampedRows stampedRows;
 
+  private final P4kCatalogueRevision revision = new P4kCatalogueRevision();
   private SimpleMeterRegistry registry;
   private P4kCatalogueBusinessGauges gauges;
 
@@ -66,7 +69,8 @@ class P4kCatalogueBusinessGaugesTest {
             runRepository,
             changeRepository,
             reviewCaseRepository,
-            stampedRows);
+            stampedRows,
+            revision);
     gauges.register(registry);
   }
 
@@ -154,6 +158,24 @@ class P4kCatalogueBusinessGaugesTest {
         .isEqualTo(7.0d);
     assertThat(value(CatalogueMetricNames.P4K_REVIEW_CASE_OPEN_OLDEST_AGE))
         .isGreaterThan(30 * 86_400.0d);
+  }
+
+  @Test
+  void theCountsAreReadAgainOnlyAfterAP4kWrite_whileTheDueSignalIsReadEveryTime() {
+    when(stampedRows.count(any())).thenReturn(1L);
+    gauges.sample();
+    when(stampedRows.count(any())).thenReturn(2L);
+
+    gauges.sample();
+    assertThat(kindValue(CatalogueMetricNames.P4K_CATALOGUE_STAMPED_ROWS, P4kKind.ITEM))
+        .isEqualTo(1.0d);
+
+    revision.changed();
+    gauges.sample();
+    assertThat(kindValue(CatalogueMetricNames.P4K_CATALOGUE_STAMPED_ROWS, P4kKind.ITEM))
+        .isEqualTo(2.0d);
+    verify(runRepository, times(2)).findTop2ByOrderByAppliedAtDesc();
+    verify(gameItemRepository, times(3)).findDistinctUexGameVersions();
   }
 
   @Test

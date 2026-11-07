@@ -34,7 +34,6 @@ import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -105,17 +104,15 @@ public class P4kShipReconciler {
         context.getReport().unknownValue(P4kKind.SHIP, ship, VEHICLE_KIND, rawVehicleKind);
       }
       P4kSeeding seeding = P4kSeeding.forShip(playability);
-      P4kRowMatcher.Match<ShipType> match =
-          matcher.match(
-              ship, ship.className(), ship.nameEn(), seeding == P4kSeeding.CREATE, context);
-      if (match instanceof P4kRowMatcher.Matched<ShipType>(ShipType row, UUID guid)) {
-        boolean enriched = enrich(row, ship, context);
-        context.stamp(P4kKind.SHIP, ship, row, guid);
-        rows.add(row);
-        context.getReport().matched(P4kKind.SHIP, enriched);
-      } else if (match instanceof P4kRowMatcher.Unmatched<ShipType>(UUID guid)) {
-        unmatched(ship, guid, seeding, context);
-      }
+      matcher.reconcile(
+          ship,
+          ship.className(),
+          ship.nameEn(),
+          seeding == P4kSeeding.CREATE,
+          context,
+          rows,
+          (row, _) -> enrich(row, ship, context),
+          guid -> unmatched(ship, guid, seeding, context));
     }
     variants.write(catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), context);
     storeSlugCheck.check(catalogue.shipStoreSlugs(), context);
@@ -126,7 +123,7 @@ public class P4kShipReconciler {
    * UEX vehicle id to (REQ-DATA-026).
    *
    * @param stored every stored ship type
-   * @return the aliased ship types by upper-cased alias class name
+   * @return the aliased ship types by folded alias class name
    */
   @NotNull
   private Map<String, List<ShipType>> aliasedByClassName(@NotNull List<ShipType> stored) {
@@ -141,7 +138,7 @@ public class P4kShipReconciler {
       List<ShipType> holders = byVehicleId.get(alias.getUexVehicleId());
       if (holders != null) {
         aliased
-            .computeIfAbsent(alias.getClassName().toUpperCase(Locale.ROOT), _ -> new ArrayList<>())
+            .computeIfAbsent(P4kMatchKeys.fold(alias.getClassName()), _ -> new ArrayList<>())
             .addAll(holders);
       }
     }
@@ -153,7 +150,7 @@ public class P4kShipReconciler {
    * holding the UEX vehicle id the alias ties the class name to (REQ-DATA-026).
    *
    * @param rows the ship-type rows of the run
-   * @param aliased the aliased ship types by upper-cased alias class name
+   * @param aliased the aliased ship types by folded alias class name
    * @param className the class name
    * @return the direct matches, else the aliased rows, else an empty list
    */
@@ -166,7 +163,7 @@ public class P4kShipReconciler {
     if (!direct.isEmpty()) {
       return direct;
     }
-    return List.copyOf(aliased.getOrDefault(className.toUpperCase(Locale.ROOT), List.of()));
+    return List.copyOf(aliased.getOrDefault(P4kMatchKeys.fold(className), List.of()));
   }
 
   /**
@@ -219,7 +216,7 @@ public class P4kShipReconciler {
         || !context.isCreateItemsAndShips()
         || seeding != P4kSeeding.CREATE
         || name == null
-        || context.isRepeated(P4kKind.SHIP, name)
+        || context.isRepeatedName(P4kKind.SHIP, name)
         || !context.shipRows().byName(name.strip()).isEmpty()) {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;

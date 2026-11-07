@@ -127,7 +127,7 @@ class P4kStampedRowVisibilityTest {
         .doesNotContain(gone.getId())
         .isEmpty();
     assertThat(shipTypeMapper.toDto(gone).noLongerInGame()).isTrue();
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.VANISHED)
         .singleElement()
         .satisfies(c -> {

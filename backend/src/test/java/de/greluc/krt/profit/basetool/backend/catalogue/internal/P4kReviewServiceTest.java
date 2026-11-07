@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
@@ -39,6 +40,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +74,7 @@ class P4kReviewServiceTest {
   @Autowired private AuditService auditService;
   @Autowired private CacheManager cacheManager;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private SyncCoordinator syncCoordinator;
 
   /** The key of the entry that shows whether a cache was evicted. */
   private static final String CACHE_PROBE = "p4k-review-probe";
@@ -117,10 +121,81 @@ class P4kReviewServiceTest {
           assertThat(c.lastRunId()).isEqualTo(second);
         });
     for (UUID run : List.of(first, second)) {
-      assertThat(changeRepository.findByRunId(run))
+      assertThat(P4kImportRuns.report(changeRepository, run))
           .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
           .extracting(P4kImportChange::getGuid)
           .containsOnlyOnce(P4kTestCatalogues.AI_SHIP);
+    }
+  }
+
+  @Test
+  void aCaseAnAdminClosed_isNeitherCountedNorReportedByALaterRun() {
+    P4kImportResultDto first = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    reviewService.resolve(
+        reviewCase.getId(), P4kReviewResolution.KEEP, null, null, reviewCase.getVersion(), ADMIN);
+
+    P4kImportResultDto second = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kImportService.P4kPreview preview = runs.previewWithReport(P4kTestCatalogues.fixtureBytes());
+
+    assertThat(second.ships().review()).isEqualTo(first.ships().review() - 1);
+    assertThat(P4kImportRuns.report(changeRepository, second.runId()))
+        .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
+        .extracting(P4kImportChange::getGuid)
+        .doesNotContain(P4kTestCatalogues.AI_SHIP);
+    assertThat(preview.changes())
+        .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
+        .extracting(P4kImportChange::getGuid)
+        .doesNotContain(P4kTestCatalogues.AI_SHIP);
+    assertThat(seededCase().getLastRunId()).isEqualTo(first.runId());
+    assertThat(seededCase().getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
+  }
+
+  @Test
+  void aResolutionWhileAnApplyHoldsTheSyncLock_isAConflict_andWritesNothing() throws Exception {
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    CountDownLatch held = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    Thread apply =
+        Thread.ofVirtual()
+            .start(() ->
+                syncCoordinator.runExclusively(
+                    P4kImportJobRunner.APPLY_LOCK_LABEL,
+                    () -> {
+                      held.countDown();
+                      awaitQuietly(release);
+                    }));
+    try {
+      assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+
+      assertThatThrownBy(() ->
+              reviewService.resolve(
+                  reviewCase.getId(),
+                  P4kReviewResolution.HIDE,
+                  null,
+                  null,
+                  reviewCase.getVersion(),
+                  ADMIN))
+          .isInstanceOf(BusinessConflictException.class);
+    } finally {
+      release.countDown();
+      apply.join();
+    }
+    assertThat(seededCase().getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    assertThat(seeded.getP4kHiddenAt()).isNull();
+  }
+
+  /**
+   * Waits for a latch, keeping the thread's interrupt flag.
+   *
+   * @param latch the latch
+   */
+  private static void awaitQuietly(CountDownLatch latch) {
+    try {
+      latch.await();
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
     }
   }
 

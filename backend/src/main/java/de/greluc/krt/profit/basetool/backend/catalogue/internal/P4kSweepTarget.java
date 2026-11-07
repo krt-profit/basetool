@@ -151,6 +151,17 @@ enum P4kSweepTarget {
   }
 
   /**
+   * The JPQL that reads the kind's live P4K-known rows, those no sweep stamped, as {@link
+   * P4kKnownRow}s: the base of the sweep and its mass guard (REQ-P4K-012).
+   *
+   * @return the query text
+   */
+  @NotNull
+  String liveRowsQuery() {
+    return knownRowsQuery() + " AND e.p4kDeletedAt IS NULL";
+  }
+
+  /**
    * The JPQL that loads the rows of a set of ids.
    *
    * @return the query text with the parameter {@code ids}

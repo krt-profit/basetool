@@ -231,7 +231,9 @@ public class AdminP4kImportReportController {
     @ApiResponse(responseCode = "400", description = "The case is already resolved."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator."),
     @ApiResponse(responseCode = "404", description = "No case with the given id."),
-    @ApiResponse(responseCode = "409", description = "The case changed since it was read.")
+    @ApiResponse(
+        responseCode = "409",
+        description = "The case changed since it was read, or an import or sync is running.")
   })
   public P4kReviewCaseDto resolve(
       @PathVariable("id") UUID id,

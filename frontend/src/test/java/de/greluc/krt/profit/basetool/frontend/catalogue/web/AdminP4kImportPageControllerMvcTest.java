@@ -178,6 +178,47 @@ class AdminP4kImportPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void theRunList_readsAnAdminWithoutAUserRecordOnce() throws Exception {
+    P4kImportRunDto first =
+        new P4kImportRunDto(
+            RUN.toString(),
+            "2026-11-01T10:00:00Z",
+            "LIVE",
+            "sc-alpha-4.4.0",
+            "4.4.0",
+            12913470L,
+            null,
+            null,
+            ADMIN.toString(),
+            List.of());
+    P4kImportRunDto second =
+        new P4kImportRunDto(
+            UUID.randomUUID().toString(),
+            "2026-11-02T10:00:00Z",
+            "LIVE",
+            "sc-alpha-4.4.0",
+            "4.4.0",
+            12913471L,
+            null,
+            null,
+            ADMIN.toString(),
+            List.of());
+    when(backendApiClient.get(
+            eq(BASE + "/runs?page={page}&size={size}"), anyTypeRef(), eq(0), eq(25)))
+        .thenReturn(page(List.of(first, second), 0, 1));
+    when(backendApiClient.get("/api/v1/users/{id}", UserDto.class, ADMIN)).thenReturn(null);
+
+    mockMvc
+        .perform(get("/admin/p4k-import/runs"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.adminNames['" + ADMIN + "']").doesNotExist());
+
+    Mockito.verify(backendApiClient, Mockito.times(1))
+        .get("/api/v1/users/{id}", UserDto.class, ADMIN);
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void aRunsReport_relaysTheFiltersAndThePage() throws Exception {
     P4kImportChangeDto row =
         new P4kImportChangeDto(

@@ -72,21 +72,24 @@ public class P4kManufacturerReconciler {
             rows::byName,
             _ -> false);
     for (P4kManufacturerDto manufacturer : manufacturers) {
-      P4kRowMatcher.Match<Manufacturer> match =
-          matcher.match(manufacturer, null, manufacturer.nameEn(), false, context);
-      if (match instanceof P4kRowMatcher.Matched<Manufacturer>(Manufacturer row, UUID guid)) {
-        final boolean changed = write(row, manufacturer, guid, context);
-        context.stamp(P4kKind.MANUFACTURER, manufacturer, row, guid);
-        rows.add(row);
-        context.indexManufacturer(guid, row);
-        context.getReport().matched(P4kKind.MANUFACTURER, changed);
-      } else if (match instanceof P4kRowMatcher.Unmatched<Manufacturer>(UUID guid)) {
-        if (guid == null) {
-          context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
-        } else {
-          context.holdUnmatchedManufacturer(guid, manufacturer);
-        }
-      }
+      matcher.reconcile(
+          manufacturer,
+          null,
+          manufacturer.nameEn(),
+          false,
+          context,
+          rows,
+          (row, guid) -> {
+            context.indexManufacturer(guid, row);
+            return write(row, manufacturer, guid, context);
+          },
+          guid -> {
+            if (guid == null) {
+              context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
+            } else {
+              context.holdUnmatchedManufacturer(guid, manufacturer);
+            }
+          });
     }
   }
 
@@ -148,8 +151,9 @@ public class P4kManufacturerReconciler {
       @NotNull UUID guid,
       @NotNull P4kImportContext context) {
     UUID holderId;
-    if (context.claimsManufacturerName(name)) {
-      holderId = context.manufacturerNameRow(name);
+    P4kImportContext.NameClaim claim = context.manufacturerNameClaim(name);
+    if (claim != null) {
+      holderId = claim.rowId();
     } else {
       Optional<Manufacturer> holder = context.manufacturerRows().byName(name).stream().findFirst();
       if (holder.isEmpty()) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -167,20 +168,17 @@ public final class UexValues {
   /**
    * Parses a UEX-emitted UUID string, tolerating the empty/blank strings UEX returns for a large
    * fraction of rows (concepts, retired variants, flavour categories) by returning {@code null}
-   * instead of throwing. A malformed non-blank value is logged at debug and likewise skipped.
+   * instead of throwing. A malformed non-blank value is logged at debug and likewise skipped; the
+   * parsing rule is {@link P4kGuids#parse}.
    *
    * @param raw the raw UUID string from a UEX DTO, or {@code null}
    * @return the parsed UUID, or {@code null} for empty / blank / malformed input
    */
   public static @Nullable UUID parseUuid(@Nullable String raw) {
-    if (!StringUtils.hasText(raw)) {
-      return null;
+    UUID parsed = P4kGuids.parse(raw);
+    if (parsed == null && StringUtils.hasText(raw)) {
+      log.debug("Skipping malformed UEX uuid '{}'.", raw);
     }
-    try {
-      return UUID.fromString(raw.trim());
-    } catch (IllegalArgumentException e) {
-      log.debug("Skipping malformed UEX uuid '{}': {}", raw, e.getMessage());
-      return null;
-    }
+    return parsed;
   }
 }

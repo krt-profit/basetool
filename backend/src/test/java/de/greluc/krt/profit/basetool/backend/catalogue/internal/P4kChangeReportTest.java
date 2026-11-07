@@ -76,7 +76,7 @@ class P4kChangeReportTest {
     blueprintRepository.save(gone);
 
     P4kImportResultDto result = runs.apply(P4kTestCatalogues.fixtureBytes(), true, true);
-    List<P4kImportChange> report = changeRepository.findByRunId(result.runId());
+    List<P4kImportChange> report = P4kImportRuns.report(changeRepository, result.runId());
 
     assertThat(report)
         .filteredOn(c -> c.getChangeType() == P4kChangeType.CHANGED)
@@ -113,7 +113,7 @@ class P4kChangeReportTest {
     List<String> gameTexts = gameTexts(root);
 
     P4kImportResultDto result = runs.apply(P4kTestCatalogues.bytes(root), true);
-    List<P4kImportChange> report = changeRepository.findByRunId(result.runId());
+    List<P4kImportChange> report = P4kImportRuns.report(changeRepository, result.runId());
 
     assertThat(gameTexts).isNotEmpty();
     assertThat(report)
@@ -140,7 +140,7 @@ class P4kChangeReportTest {
             .toList();
     P4kImportResultDto applied = runs.apply(P4kTestCatalogues.fixtureBytes(), true);
     List<P4kImportChangeDto> written =
-        changeRepository.findByRunId(applied.runId()).stream()
+        P4kImportRuns.report(changeRepository, applied.runId()).stream()
             .sorted(Comparator.comparingInt(P4kImportChange::getPosition))
             .map(P4kImportChangeDto::of)
             .toList();

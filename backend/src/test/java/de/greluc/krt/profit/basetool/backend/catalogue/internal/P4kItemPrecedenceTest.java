@@ -163,7 +163,7 @@ class P4kItemPrecedenceTest {
     assertThat(counter(CatalogueMetricNames.CATALOGUE_ITEM_GRADE_UNKNOWN) - before).isEqualTo(1.0);
     assertThat(stored.getP4kGradeRaw()).isEqualTo(6);
     assertThat(stored.getGrade()).isEqualTo("B");
-    assertThat(changeRepository.findByRunId(result.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.UNKNOWN_VALUE)
         .filteredOn(c -> "grade".equals(c.getFieldName()))
         .singleElement()

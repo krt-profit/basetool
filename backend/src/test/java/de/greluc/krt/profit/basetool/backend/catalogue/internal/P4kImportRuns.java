@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCompression;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Pageable;
 
 /**
  * Runs P4K APPLYs and previews in the integration tests the way the job runner does: from a stored
@@ -94,5 +96,18 @@ record P4kImportRuns(
   @NotNull
   P4kImportService.P4kPreview previewWithReport(byte @NotNull [] plain) {
     return service.previewImport(P4kCompression.toStoredPayload(plain));
+  }
+
+  /**
+   * Reads the whole stored report of an applied run through the page query the admin page uses.
+   *
+   * @param changeRepository the report repository
+   * @param runId the run
+   * @return the run's report rows in the order the run found them
+   */
+  @NotNull
+  static List<P4kImportChange> report(
+      @NotNull P4kImportChangeRepository changeRepository, @NotNull UUID runId) {
+    return changeRepository.findPage(runId, null, null, Pageable.unpaged()).getContent();
   }
 }

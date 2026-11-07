@@ -121,7 +121,7 @@ class P4kManufacturerPrecedenceTest {
                 P4kKind.MANUFACTURER, GORGON, P4kReviewReason.NAME_CONFLICT))
         .hasValueSatisfying(
             reviewCase -> assertThat(reviewCase.getRowId()).isEqualTo(known.getId()));
-    assertThat(changeRepository.findByRunId(run))
+    assertThat(P4kImportRuns.report(changeRepository, run))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
         .extracting(P4kImportChange::getGuid)
         .contains(GORGON);
@@ -158,7 +158,7 @@ class P4kManufacturerPrecedenceTest {
         .hasValueSatisfying(ship -> assertThat(ship.getManufacturer()).isSameAs(aegis));
     assertThat(manufacturerRepository.findByP4kUuid(ANVIL)).isEmpty();
     assertThat(preview.manufacturers().created()).isEqualTo(applied.manufacturers().created());
-    assertThat(changeRepository.findByRunId(applied.runId()))
+    assertThat(P4kImportRuns.report(changeRepository, applied.runId()))
         .filteredOn(c -> c.getKind() == P4kKind.MANUFACTURER)
         .satisfies(rows -> {
           assertThat(rows)

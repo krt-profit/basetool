@@ -85,7 +85,7 @@ class P4kImportServiceMatchOnlyTest {
     assertThat(rowCounts()).isEqualTo(before);
     assertThat(result.items().created()).isZero();
     assertThat(result.ships().created()).isZero();
-    List<P4kImportChange> changes = changeRepository.findByRunId(result.runId());
+    List<P4kImportChange> changes = P4kImportRuns.report(changeRepository, result.runId());
     P4kImportRun run = runRepository.findById(result.runId()).orElseThrow();
     for (P4kImportRunKind kind : run.getKinds()) {
       long unmatchedRows =

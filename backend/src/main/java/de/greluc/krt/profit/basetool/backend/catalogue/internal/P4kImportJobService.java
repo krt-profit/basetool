@@ -214,14 +214,13 @@ public class P4kImportJobService {
    */
   @Transactional
   public void storePreviewReport(@NotNull UUID jobId, byte @NotNull [] report) {
-    payloadRepository
-        .findById(jobId)
-        .orElseThrow(() -> new IllegalStateException("Payload missing for P4K import job " + jobId))
-        .setPreviewReport(report);
+    if (payloadRepository.storePreviewReport(jobId, report) == 0) {
+      throw new IllegalStateException("Payload missing for P4K import job " + jobId);
+    }
   }
 
   /**
-   * Loads the change report a preview stored.
+   * Loads the change report a preview stored, without the upload beside it.
    *
    * @param jobId the preview job
    * @return the encoded report, empty when the job has none or is gone
@@ -229,7 +228,7 @@ public class P4kImportJobService {
   @Transactional(readOnly = true)
   @NotNull
   public Optional<byte[]> loadPreviewReport(@NotNull UUID jobId) {
-    return payloadRepository.findById(jobId).map(P4kImportJobPayload::getPreviewReport);
+    return payloadRepository.findPreviewReport(jobId);
   }
 
   /**
@@ -278,15 +277,13 @@ public class P4kImportJobService {
 
   /**
    * Deletes a job's stored upload, reclaiming the bytes once they are no longer needed (an APPLY
-   * run is terminal). A no-op when the payload is already gone.
+   * run is terminal), without loading them. A no-op when the payload is already gone.
    *
    * @param jobId the job id
    */
   @Transactional
   public void deletePayload(@NotNull UUID jobId) {
-    if (payloadRepository.existsById(jobId)) {
-      payloadRepository.deleteById(jobId);
-    }
+    payloadRepository.deleteByJobId(jobId);
   }
 
   /**

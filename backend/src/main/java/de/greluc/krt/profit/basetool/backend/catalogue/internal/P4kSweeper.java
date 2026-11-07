@@ -38,16 +38,19 @@ import org.springframework.stereotype.Component;
 /**
  * The orphan sweep of a P4K run (REQ-P4K-011, REQ-P4K-012, ADR-0336): per kind, on a valid census
  * only, it stamps {@code p4k_deleted_at} on every P4K-known row whose GUID the catalogue no longer
- * lists, unless that would stamp more than {@value #MASS_GUARD_PERCENT} % of the kind and the admin
- * did not override the guard. Runs after the reconcilers, inside the run's transaction; a preview
- * computes the same report and writes nothing.
+ * lists, unless that would stamp more than {@value #MASS_GUARD_PERCENT} % of the kind's live
+ * P4K-known rows and the admin did not override the guard. Runs after the reconcilers, inside the
+ * run's transaction; a preview computes the same report and writes nothing.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class P4kSweeper {
 
-  /** The share of a kind's P4K-known rows above which the sweep needs the admin's override. */
+  /**
+   * The share of a kind's live P4K-known rows, those no sweep stamped yet, above which the sweep
+   * needs the admin's override.
+   */
   static final int MASS_GUARD_PERCENT = 5;
 
   /** The most ids one stamping query binds. */
@@ -81,12 +84,12 @@ public class P4kSweeper {
   /**
    * Whether stamping a number of rows passes the mass guard of a kind.
    *
-   * @param known the kind's P4K-known rows
+   * @param live the kind's live P4K-known rows, those no sweep stamped yet
    * @param toStamp the rows the sweep would stamp
-   * @return {@code true} when that is more than {@value #MASS_GUARD_PERCENT} % of the known rows
+   * @return {@code true} when that is more than {@value #MASS_GUARD_PERCENT} % of the live rows
    */
-  static boolean exceedsMassGuard(int known, int toStamp) {
-    return (long) toStamp * 100 > (long) known * MASS_GUARD_PERCENT;
+  static boolean exceedsMassGuard(int live, int toStamp) {
+    return (long) toStamp * 100 > (long) live * MASS_GUARD_PERCENT;
   }
 
   /**
@@ -107,11 +110,11 @@ public class P4kSweeper {
     List<? extends P4kRecord> records = catalogue.records(kind);
     P4kSweepTarget target = P4kSweepTarget.of(kind);
     if (!catalogue.head().isComplete(kind)) {
-      report.sweep(kind, P4kSweepOutcome.SKIPPED_PARTIAL, knownRows(target).size(), 0);
+      report.sweep(kind, P4kSweepOutcome.SKIPPED_PARTIAL, liveRows(target).size(), 0);
       return false;
     }
     if (records.isEmpty()) {
-      report.sweep(kind, P4kSweepOutcome.SKIPPED_EMPTY, knownRows(target).size(), 0);
+      report.sweep(kind, P4kSweepOutcome.SKIPPED_EMPTY, liveRows(target).size(), 0);
       return false;
     }
     Set<UUID> listed = new HashSet<>();
@@ -119,19 +122,18 @@ public class P4kSweeper {
       UUID guid = record.parsedGuid();
       if (guid != null && !listed.add(guid)) {
         log.warn("P4K sweep of {} skipped: GUID {} occurs twice in the catalogue.", kind, guid);
-        report.sweep(kind, P4kSweepOutcome.SKIPPED_DUPLICATE_GUID, knownRows(target).size(), 0);
+        report.sweep(kind, P4kSweepOutcome.SKIPPED_DUPLICATE_GUID, liveRows(target).size(), 0);
         return false;
       }
     }
-    List<P4kKnownRow> known = knownRows(target);
-    List<P4kKnownRow> vanished =
-        known.stream().filter(row -> !row.stamped() && !listed.contains(row.guid())).toList();
-    boolean guarded = exceedsMassGuard(known.size(), vanished.size());
+    List<P4kKnownRow> live = liveRows(target);
+    List<P4kKnownRow> vanished = live.stream().filter(row -> !listed.contains(row.guid())).toList();
+    boolean guarded = exceedsMassGuard(live.size(), vanished.size());
     if (guarded && !overrideMassGuard) {
-      report.sweep(kind, P4kSweepOutcome.SKIPPED_MASS_GUARD, known.size(), vanished.size());
+      report.sweep(kind, P4kSweepOutcome.SKIPPED_MASS_GUARD, live.size(), vanished.size());
       return false;
     }
-    report.sweep(kind, P4kSweepOutcome.SWEPT, known.size(), vanished.size());
+    report.sweep(kind, P4kSweepOutcome.SWEPT, live.size(), vanished.size());
     vanished.forEach(row -> report.vanished(kind, row));
     if (context.isApply()) {
       stamp(target, vanished, context);
@@ -140,14 +142,14 @@ public class P4kSweeper {
   }
 
   /**
-   * Reads the P4K-known rows of a kind.
+   * Reads the live P4K-known rows of a kind, the base of the sweep and of its mass guard.
    *
    * @param target the kind's table
-   * @return every row with a P4K GUID
+   * @return every row with a P4K GUID that no sweep stamped yet
    */
   @NotNull
-  private List<P4kKnownRow> knownRows(@NotNull P4kSweepTarget target) {
-    return entityManager.createQuery(target.knownRowsQuery(), P4kKnownRow.class).getResultList();
+  private List<P4kKnownRow> liveRows(@NotNull P4kSweepTarget target) {
+    return entityManager.createQuery(target.liveRowsQuery(), P4kKnownRow.class).getResultList();
   }
 
   /**

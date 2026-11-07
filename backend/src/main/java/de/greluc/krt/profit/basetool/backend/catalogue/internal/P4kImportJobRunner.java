@@ -44,7 +44,8 @@ import tools.jackson.databind.ObjectMapper;
  * writes nothing and takes no lock.
  *
  * <p>Each run marks the job {@code RUNNING}, reconciles in a separate transaction, then marks it
- * {@code SUCCEEDED} or {@code FAILED}. Afterwards an APPLY reclaims its payload and every run
+ * {@code SUCCEEDED} or {@code FAILED}; a failure to record that terminal state is logged and never
+ * turns a committed APPLY into a failed one. Afterwards an APPLY reclaims its payload and every run
  * prunes the job history; housekeeping failures are only logged.
  */
 @Component
@@ -90,35 +91,19 @@ public class P4kImportJobRunner {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
     boolean appliedMasterData = false;
     try {
-      jobService.markRunning(jobId);
-      byte[] bytes = jobService.loadPayload(jobId);
-      P4kImportResultDto result;
-      if (kind == P4kImportJobKind.APPLY) {
-        P4kImportJob job = jobService.getJob(jobId);
-        result =
-            applyExclusively(
-                bytes,
-                new P4kImportService.P4kApplyRequest(
-                    jobId,
-                    job.getCreatedBy(),
-                    job.isCreateItemsAndShips(),
-                    job.isOverrideMassGuard()));
-        appliedMasterData = true;
-      } else {
-        P4kImportService.P4kPreview preview = importService.previewImport(bytes);
-        jobService.storePreviewReport(
-            jobId,
-            reportCodec.encode(preview.changes().stream().map(P4kImportChangeDto::of).toList()));
-        result = preview.result();
-      }
-      jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
-      log.info("P4K import job {} ({}) succeeded.", jobId, kind);
+      P4kImportResultDto result = work(jobId, kind);
+      appliedMasterData = kind == P4kImportJobKind.APPLY;
+      settle(
+          jobId,
+          kind,
+          () -> jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result)),
+          "succeeded");
     } catch (BadRequestException e) {
       log.warn("P4K import job {} ({}) failed: {}", jobId, kind, e.getMessage());
-      jobService.markFailed(jobId, describe(e));
+      settle(jobId, kind, () -> jobService.markFailed(jobId, describe(e)), "failed");
     } catch (Exception e) {
       log.warn("P4K import job {} ({}) failed", jobId, kind, e);
-      jobService.markFailed(jobId, describe(e));
+      settle(jobId, kind, () -> jobService.markFailed(jobId, describe(e)), "failed");
     } finally {
       if (kind == P4kImportJobKind.APPLY) {
         if (appliedMasterData) {
@@ -128,6 +113,59 @@ public class P4kImportJobRunner {
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
       safely(jobService::pruneOldJobs, "prune old jobs");
+    }
+  }
+
+  /**
+   * Marks the job {@code RUNNING} and does its work: an APPLY under the lock, a preview with its
+   * report stored on the job.
+   *
+   * @param jobId the job
+   * @param kind whether to preview or apply
+   * @return the run's result
+   */
+  @NotNull
+  private P4kImportResultDto work(@NotNull UUID jobId, @NotNull P4kImportJobKind kind) {
+    jobService.markRunning(jobId);
+    byte[] bytes = jobService.loadPayload(jobId);
+    if (kind == P4kImportJobKind.APPLY) {
+      P4kImportJob job = jobService.getJob(jobId);
+      return applyExclusively(
+          bytes,
+          new P4kImportService.P4kApplyRequest(
+              jobId, job.getCreatedBy(), job.isCreateItemsAndShips(), job.isOverrideMassGuard()));
+    }
+    P4kImportService.P4kPreview preview = importService.previewImport(bytes);
+    jobService.storePreviewReport(
+        jobId, reportCodec.encode(preview.changes().stream().map(P4kImportChangeDto::of).toList()));
+    return preview.result();
+  }
+
+  /**
+   * Records the job's terminal state. A failure to record it is logged and goes no further: the
+   * run's outcome stands (an APPLY that committed is never relabelled as failed), and the job stays
+   * {@code RUNNING} until the next startup fails it, which the stuck-job alert reports.
+   *
+   * @param jobId the job
+   * @param kind the job's kind
+   * @param mark records the terminal state
+   * @param outcome {@code succeeded} or {@code failed}, for the log lines
+   */
+  private void settle(
+      @NotNull UUID jobId,
+      @NotNull P4kImportJobKind kind,
+      @NotNull Runnable mark,
+      @NotNull String outcome) {
+    try {
+      mark.run();
+      log.info("P4K import job {} ({}) {}.", jobId, kind, outcome);
+    } catch (RuntimeException e) {
+      log.error(
+          "P4K import job {} ({}) {} but could not be marked so; it stays RUNNING.",
+          jobId,
+          kind,
+          outcome,
+          e);
     }
   }
 

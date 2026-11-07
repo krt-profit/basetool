@@ -46,14 +46,6 @@ public interface P4kImportChangeRepository extends JpaRepository<P4kImportChange
       UUID runId, P4kKind kind, P4kChangeType changeType, String fieldName);
 
   /**
-   * Lists the report rows of one run.
-   *
-   * @param runId the run
-   * @return the run's report rows, in no particular order
-   */
-  List<P4kImportChange> findByRunId(UUID runId);
-
-  /**
    * Lists the report rows of one change type among some runs and GUIDs, for the review list's
    * record names.
    *

@@ -82,6 +82,18 @@ class P4kImportServiceBuildOrderTest {
   }
 
   @Test
+  void aPreviewOfAnOlderBuild_isRefusedLikeItsApply() {
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    double refusalsBefore = olderBuildRefusals();
+
+    assertThatThrownBy(() -> runs.previewWithReport(P4kTestCatalogues.withChangeNumber("12900000")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("older than the last applied one");
+
+    assertThat(olderBuildRefusals()).isEqualTo(refusalsBefore + 1);
+  }
+
+  @Test
   void theSameBuild_appliesAgain_andChangesNoValueASecondTime() {
     GameItem shield = new GameItem();
     shield.setName("Same build shield");

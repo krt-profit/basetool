@@ -97,10 +97,38 @@ public class SyncCoordinator {
           maxWaitMillis);
       return false;
     }
+    runHolding(label, task);
+    return true;
+  }
+
+  /**
+   * Runs {@code task} under the shared lock only when no sync or import holds it, without waiting;
+   * for a request an admin waits on. The lock is released even if the task throws.
+   *
+   * @param label short human-readable name of the caller, shown in the wait/skip log lines of a
+   *     sync that queues behind it
+   * @param task the work to run under the exclusive lock
+   * @return {@code true} if the task ran, {@code false} if another holder had the lock
+   */
+  public boolean tryRunExclusively(String label, Runnable task) {
+    if (!lock.tryLock()) {
+      log.info("{} refused: the {} sync is running.", label, activeLabel);
+      return false;
+    }
+    runHolding(label, task);
+    return true;
+  }
+
+  /**
+   * Runs a task while this thread holds the lock, then releases it.
+   *
+   * @param label the holder's name
+   * @param task the task
+   */
+  private void runHolding(String label, Runnable task) {
     try {
       activeLabel = label;
       task.run();
-      return true;
     } finally {
       activeLabel = null;
       lock.unlock();

@@ -20,18 +20,27 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
-/** Lenient parsing of catalogue GUID text. */
+/** Lenient parsing of the GUID text the catalogue sources (P4K, UEX) emit. */
 public final class P4kGuids {
+
+  /**
+   * The canonical 8-4-4-4-12 hex form; {@link UUID#fromString} alone also accepts short groups such
+   * as {@code 1-2-3-4-5}.
+   */
+  private static final Pattern CANONICAL =
+      Pattern.compile(
+          "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
   /** Non-instantiable holder of static helpers. */
   private P4kGuids() {}
 
   /**
-   * Parses GUID text; a blank or malformed value yields {@code null}, so one bad GUID never aborts
-   * an import.
+   * Parses GUID text in the canonical form; a blank or malformed value yields {@code null}, so one
+   * bad GUID never aborts an import or a sync.
    *
    * @param guid the GUID text, or {@code null}
    * @return the UUID, or {@code null}
@@ -39,13 +48,10 @@ public final class P4kGuids {
   @Contract("null -> null")
   @Nullable
   public static UUID parse(@Nullable String guid) {
-    if (guid == null || guid.isBlank()) {
+    if (guid == null) {
       return null;
     }
-    try {
-      return UUID.fromString(guid.trim());
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
+    String text = guid.strip();
+    return CANONICAL.matcher(text).matches() ? UUID.fromString(text) : null;
   }
 }

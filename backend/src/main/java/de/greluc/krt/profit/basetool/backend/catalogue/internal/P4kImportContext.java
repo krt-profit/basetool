@@ -37,7 +37,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -72,7 +71,7 @@ public final class P4kImportContext {
   @Getter @Setter private int adminCategoriesRetired;
 
   /** The report the run fills. */
-  @Getter @NotNull private final P4kImportReport report = new P4kImportReport();
+  @Getter @NotNull private final P4kImportReport report;
 
   /** The matched manufacturers by P4K GUID, for the items and ships of the run. */
   private final Map<UUID, Manufacturer> manufacturerByGuid = new HashMap<>();
@@ -90,10 +89,10 @@ public final class P4kImportContext {
   private final Map<UUID, P4kManufacturerDto> unmatchedManufacturers = new LinkedHashMap<>();
 
   /**
-   * The manufacturer names the run wrote or seeded, lower-cased, with the holding row's id; the id
-   * is {@code null} for a preview's seed, which creates no row.
+   * The manufacturer names the run wrote or seeded, folded ({@code P4kMatchKeys}), with their
+   * claim.
    */
-  private final Map<String, UUID> manufacturerNames = new HashMap<>();
+  private final Map<String, NameClaim> manufacturerNames = new HashMap<>();
 
   /** The manufacturer rows, indexed once when the manufacturers are reconciled. */
   @Nullable private P4kRowIndex<Manufacturer> manufacturerRows;
@@ -113,8 +112,21 @@ public final class P4kImportContext {
   /** The rows the run matched or created, per kind and P4K GUID. */
   private final Map<P4kKind, Map<UUID, P4kKeyedRow>> stamped = new EnumMap<>(P4kKind.class);
 
-  /** The lower-cased match keys several records of a kind share; they never match by fallback. */
-  private final Map<P4kKind, Set<String>> repeatedKeys = new EnumMap<>(P4kKind.class);
+  /** The row ids by P4K GUID the cross-kind references of the run read, per kind. */
+  private final Map<P4kKind, P4kRowIds> rowIds = new EnumMap<>(P4kKind.class);
+
+  /** The folded class names several records of a kind share; they never match by fallback. */
+  private final Map<P4kKind, Set<String>> repeatedClassNames = new EnumMap<>(P4kKind.class);
+
+  /** The folded names several records of a kind share; they never match by fallback. */
+  private final Map<P4kKind, Set<String>> repeatedNames = new EnumMap<>(P4kKind.class);
+
+  /**
+   * The run's claim on a manufacturer name (REQ-P4K-021).
+   *
+   * @param rowId the row holding the name, {@code null} for a preview's seed, which creates no row
+   */
+  public record NameClaim(@Nullable UUID rowId) {}
 
   /**
    * Creates the context of a preview: it writes nothing, has no run and counts what "create new
@@ -122,11 +134,15 @@ public final class P4kImportContext {
    *
    * @param catalogue the catalogue, scanned for repeated class names and names
    * @param now the time the preview runs at
+   * @param adminClosed the stored review cases an admin closed, which the run does not report again
    * @return the context
    */
   @NotNull
-  public static P4kImportContext forPreview(@NotNull P4kCatalogue catalogue, @NotNull Instant now) {
-    return new P4kImportContext(catalogue, false, now, null, true);
+  public static P4kImportContext forPreview(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull Instant now,
+      @NotNull Set<P4kReviewKey> adminClosed) {
+    return new P4kImportContext(catalogue, false, now, null, true, adminClosed);
   }
 
   /**
@@ -136,6 +152,7 @@ public final class P4kImportContext {
    * @param now the apply time stamped on matched rows
    * @param runId the run being recorded
    * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param adminClosed the stored review cases an admin closed, which the run does not report again
    * @return the context
    */
   @NotNull
@@ -143,8 +160,9 @@ public final class P4kImportContext {
       @NotNull P4kCatalogue catalogue,
       @NotNull Instant now,
       @NotNull UUID runId,
-      boolean createItemsAndShips) {
-    return new P4kImportContext(catalogue, true, now, runId, createItemsAndShips);
+      boolean createItemsAndShips,
+      @NotNull Set<P4kReviewKey> adminClosed) {
+    return new P4kImportContext(catalogue, true, now, runId, createItemsAndShips, adminClosed);
   }
 
   /**
@@ -155,35 +173,49 @@ public final class P4kImportContext {
    * @param now the apply time
    * @param runId the run of an APPLY, {@code null} for a preview
    * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param adminClosed the stored review cases an admin closed
    */
   private P4kImportContext(
       @NotNull P4kCatalogue catalogue,
       boolean apply,
       @NotNull Instant now,
       @Nullable UUID runId,
-      boolean createItemsAndShips) {
+      boolean createItemsAndShips,
+      @NotNull Set<P4kReviewKey> adminClosed) {
     this.apply = apply;
     this.now = now;
     this.runId = runId;
     this.createItemsAndShips = createItemsAndShips;
-    repeatedKeys.put(P4kKind.MANUFACTURER, repeated(catalogue.manufacturers()));
-    repeatedKeys.put(P4kKind.ITEM, repeated(catalogue.items()));
-    repeatedKeys.put(P4kKind.SHIP, repeated(catalogue.ships()));
-    repeatedKeys.put(P4kKind.COMMODITY, repeated(catalogue.commodities()));
-    repeatedKeys.put(P4kKind.BLUEPRINT, repeated(catalogue.blueprints()));
-    repeatedKeys.put(P4kKind.RESOURCE_GROUP, repeated(catalogue.resourceGroups()));
-    repeatedKeys.put(P4kKind.BLUEPRINT_CATEGORY, repeated(catalogue.blueprintCategories()));
+    this.report = new P4kImportReport(adminClosed);
+    indexRepeated(P4kKind.MANUFACTURER, catalogue.manufacturers());
+    indexRepeated(P4kKind.ITEM, catalogue.items());
+    indexRepeated(P4kKind.SHIP, catalogue.ships());
+    indexRepeated(P4kKind.COMMODITY, catalogue.commodities());
+    indexRepeated(P4kKind.BLUEPRINT, catalogue.blueprints());
+    indexRepeated(P4kKind.RESOURCE_GROUP, catalogue.resourceGroups());
+    indexRepeated(P4kKind.BLUEPRINT_CATEGORY, catalogue.blueprintCategories());
   }
 
   /**
-   * Whether several records of a kind share a match key, so the key identifies none of them.
+   * Whether several records of a kind share a class name, so it identifies none of them.
    *
    * @param kind the kind
-   * @param key a class name or name, or {@code null}
-   * @return {@code true} when the key occurs more than once, ignoring case
+   * @param className a class name, or {@code null}
+   * @return {@code true} when the class name occurs more than once, ignoring case
    */
-  public boolean isRepeated(@NotNull P4kKind kind, @Nullable String key) {
-    return key != null && repeatedKeys.getOrDefault(kind, Set.of()).contains(normalise(key));
+  public boolean isRepeatedClassName(@NotNull P4kKind kind, @Nullable String className) {
+    return isIn(repeatedClassNames, kind, className);
+  }
+
+  /**
+   * Whether several records of a kind share a name, so it identifies none of them.
+   *
+   * @param kind the kind
+   * @param name a name, or {@code null}
+   * @return {@code true} when the name occurs more than once, ignoring case
+   */
+  public boolean isRepeatedName(@NotNull P4kKind kind, @Nullable String name) {
+    return isIn(repeatedNames, kind, name);
   }
 
   /**
@@ -242,6 +274,18 @@ public final class P4kImportContext {
   @Unmodifiable
   public Map<UUID, P4kKeyedRow> stampedRows(@NotNull P4kKind kind) {
     return Map.copyOf(stamped.getOrDefault(kind, Map.of()));
+  }
+
+  /**
+   * Returns the row ids of a kind, read on first use and kept for the rest of the run.
+   *
+   * @param kind the kind
+   * @param reader reads the kind's row ids
+   * @return the row ids
+   */
+  @NotNull
+  P4kRowIds rowIds(@NotNull P4kKind kind, @NotNull Function<P4kKind, P4kRowIds> reader) {
+    return rowIds.computeIfAbsent(kind, reader);
   }
 
   /**
@@ -439,28 +483,19 @@ public final class P4kImportContext {
    * @param rowId the holding row, {@code null} for a preview's seed
    */
   public void claimManufacturerName(@NotNull String name, @Nullable UUID rowId) {
-    manufacturerNames.put(normalise(name), rowId);
+    manufacturerNames.put(P4kMatchKeys.fold(name), new NameClaim(rowId));
   }
 
   /**
-   * Whether the run already gave a manufacturer row this name.
+   * Returns the run's claim on a manufacturer name.
    *
    * @param name the name
-   * @return {@code true} when a written or seeded row of the run holds it, ignoring case
-   */
-  public boolean claimsManufacturerName(@NotNull String name) {
-    return manufacturerNames.containsKey(normalise(name));
-  }
-
-  /**
-   * Returns the row the run gave this manufacturer name.
-   *
-   * @param name the name
-   * @return the row's id, or {@code null} when no row of the run holds it or a preview seeded it
+   * @return the claim of the written or seeded row holding it, ignoring case, or {@code null} when
+   *     the run gave no row this name
    */
   @Nullable
-  public UUID manufacturerNameRow(@NotNull String name) {
-    return manufacturerNames.get(normalise(name));
+  public NameClaim manufacturerNameClaim(@NotNull String name) {
+    return manufacturerNames.get(P4kMatchKeys.fold(name));
   }
 
   /**
@@ -475,36 +510,47 @@ public final class P4kImportContext {
   }
 
   /**
-   * Collects the class names and names several records share.
+   * Indexes the class names and the names several records of a kind share, each key on its own.
+   *
+   * @param kind the kind
+   * @param records the records of the kind
+   */
+  private void indexRepeated(@NotNull P4kKind kind, @NotNull List<? extends P4kRecord> records) {
+    repeatedClassNames.put(kind, repeated(records, P4kRecord::className));
+    repeatedNames.put(kind, repeated(records, P4kRecord::nameEn));
+  }
+
+  /**
+   * Collects the values of one match key several records share.
    *
    * @param records the records of a kind
-   * @return the repeated keys, lower-cased
+   * @param key reads the key of a record
+   * @return the repeated values, folded
    */
   @NotNull
-  private static Set<String> repeated(@NotNull List<? extends P4kRecord> records) {
+  private static Set<String> repeated(
+      @NotNull List<? extends P4kRecord> records, @NotNull Function<P4kRecord, String> key) {
     Set<String> seen = new HashSet<>();
     Set<String> repeated = new HashSet<>();
-    List<Function<P4kRecord, String>> keys = List.of(P4kRecord::className, P4kRecord::nameEn);
-    for (Function<P4kRecord, String> key : keys) {
-      seen.clear();
-      for (P4kRecord record : records) {
-        String value = key.apply(record);
-        if (value != null && !value.isBlank() && !seen.add(normalise(value))) {
-          repeated.add(normalise(value));
-        }
+    for (P4kRecord record : records) {
+      String value = key.apply(record);
+      if (value != null && !value.isBlank() && !seen.add(P4kMatchKeys.fold(value))) {
+        repeated.add(P4kMatchKeys.fold(value));
       }
     }
     return repeated;
   }
 
   /**
-   * Normalises a match key.
+   * Whether a key is among a kind's repeated values.
    *
-   * @param key the key
-   * @return the trimmed, lower-cased key
+   * @param repeated the repeated values per kind
+   * @param kind the kind
+   * @param key the key, or {@code null}
+   * @return {@code true} when the key is set and repeated, ignoring case
    */
-  @NotNull
-  private static String normalise(@NotNull String key) {
-    return key.strip().toLowerCase(Locale.ROOT);
+  private static boolean isIn(
+      @NotNull Map<P4kKind, Set<String>> repeated, @NotNull P4kKind kind, @Nullable String key) {
+    return key != null && repeated.getOrDefault(kind, Set.of()).contains(P4kMatchKeys.fold(key));
   }
 }

@@ -128,17 +128,15 @@ public class P4kItemReconciler {
         context.getReport().unknownValue(P4kKind.ITEM, item, PLAYABILITY, rawPlayability);
       }
       P4kSeeding seeding = P4kSeeding.forItem(playability);
-      P4kRowMatcher.Match<GameItem> match =
-          matcher.match(
-              item, item.className(), item.nameEn(), seeding == P4kSeeding.CREATE, context);
-      if (match instanceof P4kRowMatcher.Matched<GameItem>(GameItem row, UUID guid)) {
-        boolean enriched = enrich(row, item, values(item, context), context);
-        context.stamp(P4kKind.ITEM, item, row, guid);
-        rows.add(row);
-        context.getReport().matched(P4kKind.ITEM, enriched);
-      } else if (match instanceof P4kRowMatcher.Unmatched<GameItem>(UUID guid)) {
-        unmatched(item, guid, seeding, context);
-      }
+      matcher.reconcile(
+          item,
+          item.className(),
+          item.nameEn(),
+          seeding == P4kSeeding.CREATE,
+          context,
+          rows,
+          (row, _) -> enrich(row, item, values(item, context), context),
+          guid -> unmatched(item, guid, seeding, context));
     }
   }
 
