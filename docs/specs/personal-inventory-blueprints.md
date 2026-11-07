@@ -786,7 +786,9 @@ reconcilers and the sweep (`PersonalBlueprintKeyUpgrade`, behind the catalogue's
 `ProducedItemGuidFollower`): a name key held by a member, the default set, an alias, a
 Materialbörse offer or request, or the exchange feed and journal moves when exactly one active
 product carries that name and a GUID. The merge keeps the GUID row's note, or the fallback row's
-when the GUID row has none. Audit events written before a move keep the key they recorded; the
+when the GUID row has none. "The audit details move" means every event from the move on carries the
+GUID key; the audit history is append-only, so events written before a move keep the key they
+recorded, and the
 move itself is audited (`BLUEPRINT_PRODUCT_KEYS_UPGRADED` per run, `BLUEPRINT_PRODUCT_MERGED` per
 merge). The key is the produced item's GUID, not a `game_item` id, so a Wiki/UEX item merge and
 its `game_item_redirect` leave it untouched.

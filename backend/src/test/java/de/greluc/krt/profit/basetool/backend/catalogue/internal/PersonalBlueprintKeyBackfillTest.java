@@ -167,6 +167,43 @@ class PersonalBlueprintKeyBackfillTest {
   }
 
   @Test
+  void materialboerseOffersAndRequestsMoveWithTheKeyAlsoWhenTheMemberRowsMerge() {
+    owned(memberA, LIGHT, EARLY, null);
+    owned(memberA, LIGHT_ITEM.toString(), LATE, null);
+    owned(memberB, LIGHT, LATE, null);
+    UUID offerA = itemOffer(memberA, LIGHT);
+    UUID offerB = itemOffer(memberB, LIGHT);
+    UUID requestA = itemRequest(memberA, LIGHT);
+    UUID heavyRequest = itemRequest(memberB, HEAVY);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    for (UUID offer : List.of(offerA, offerB)) {
+      assertThat(
+              jdbc.queryForMap(
+                  "SELECT item_product_key, version FROM material_exchange_offer WHERE id = ?",
+                  offer))
+          .containsEntry("item_product_key", LIGHT_ITEM.toString())
+          .containsEntry("version", 1L);
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT item_product_key FROM material_exchange_request WHERE id = ?",
+                String.class,
+                requestA))
+        .isEqualTo(LIGHT_ITEM.toString());
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT item_product_key FROM material_exchange_request WHERE id = ?",
+                String.class,
+                heavyRequest))
+        .isEqualTo(HEAVY);
+    assertThat(rows(memberA))
+        .extracting(row -> row.get("product_key"))
+        .containsExactly(LIGHT_ITEM.toString());
+  }
+
+  @Test
   void aNameOfNoOrSeveralGuidsKeepsItsKeyWithAReviewCaseThatALaterRunCloses() {
     owned(memberB, HEAVY, null, null);
     owned(memberB, LONELY, null, null);
@@ -263,6 +300,44 @@ class PersonalBlueprintKeyBackfillTest {
         productKey,
         acquiredAt == null ? null : Timestamp.from(acquiredAt),
         note);
+  }
+
+  /**
+   * Posts a free-stated item offer on the Materialbörse.
+   *
+   * @param owner the member
+   * @param productKey the product key
+   * @return the offer id
+   */
+  private UUID itemOffer(UUID owner, String productKey) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_exchange_offer (id, owner_id, status, released_at, created_at,"
+            + " updated_at, offer_kind, item_product_key, item_name, item_quantity)"
+            + " VALUES (?, ?, 'ACTIVE', now(), now(), now(), 'ITEM', ?, 'Arms', 1)",
+        id,
+        owner,
+        productKey);
+    return id;
+  }
+
+  /**
+   * Posts an item request on the Materialbörse.
+   *
+   * @param owner the member
+   * @param productKey the product key
+   * @return the request id
+   */
+  private UUID itemRequest(UUID owner, String productKey) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_exchange_request (id, request_kind, item_product_key, item_name,"
+            + " item_quantity, owner_id, status, posted_at, created_at, updated_at)"
+            + " VALUES (?, 'ITEM', ?, 'Arms', 1, ?, 'ACTIVE', now(), now(), now())",
+        id,
+        productKey,
+        owner);
+    return id;
   }
 
   /**
