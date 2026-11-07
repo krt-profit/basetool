@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -44,6 +45,22 @@ public interface P4kImportRunRepository extends JpaRepository<P4kImportRun, UUID
    * @return the latest run, empty before the first run
    */
   Optional<P4kImportRun> findFirstByOrderByAppliedAtDesc();
+
+  /**
+   * Returns the run applied last among those whose patch version is known, the comparison basis of
+   * "P4K import due" (REQ-OBS-022).
+   *
+   * @return the latest run with a patch version, empty when no run has one
+   */
+  Optional<P4kImportRun> findFirstByPatchVersionIsNotNullOrderByAppliedAtDesc();
+
+  /**
+   * Returns the last two applied runs, newest first, for the last-run gauges and the {@code
+   * itemClass} null share's change (REQ-OBS-022).
+   *
+   * @return at most two runs, newest first
+   */
+  List<P4kImportRun> findTop2ByOrderByAppliedAtDesc();
 
   /**
    * Pages the applied runs, newest first (REQ-P4K-015).

@@ -51,11 +51,17 @@ public class P4kItemReconciler {
   /** The catalogue field holding an item's playability. */
   private static final String PLAYABILITY = "playability";
 
-  /** The catalogue field holding an item's raw grade. */
-  private static final String GRADE = "grade";
+  /**
+   * The catalogue field holding an item's raw grade; the {@code field_name} of an unknown grade in
+   * the change report (REQ-P4K-018).
+   */
+  static final String GRADE = "grade";
 
-  /** The catalogue field holding an item's class. */
-  private static final String ITEM_CLASS = "itemClass";
+  /**
+   * The catalogue field holding an item's class; the {@code field_name} of an unknown class in the
+   * change report (REQ-P4K-019).
+   */
+  static final String ITEM_CLASS = "itemClass";
 
   /** The source name the class resolver logs. */
   private static final String SOURCE = "P4K";

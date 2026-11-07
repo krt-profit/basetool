@@ -36,7 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * @param size the {@code AttachDef.Size}, or {@code null}
  * @param grade the raw {@code AttachDef.Grade} integer, or {@code null}
  * @param itemClass {@code Civilian}, {@code Competition}, {@code Industrial}, {@code Military},
- *     {@code Stealth}, another value or {@code null}
+ *     {@code Stealth}, another value or {@code null}; its null share per run is a monitoring gauge
+ *     (REQ-OBS-022)
  * @param mass the mass in kilograms, or {@code null}
  * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
  * @param playability {@code player}, {@code mission}, {@code special}, another value or {@code

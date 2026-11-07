@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexCategory;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
@@ -61,6 +62,7 @@ class P4kItemPrecedenceTest {
   @Autowired private UexCategoryRepository uexCategoryRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private P4kCatalogueBusinessGauges businessGauges;
   @Autowired private EntityManager entityManager;
 
   private P4kImportRuns runs;
@@ -183,6 +185,27 @@ class P4kItemPrecedenceTest {
     assertThat(counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN) - before).isEqualTo(1.0);
     assertThat(stored.getItemClass()).isEqualTo(ShipComponentClass.STEALTH);
     assertThat(stored.getP4kItemClass()).isNull();
+  }
+
+  @Test
+  void anUnknownGradeAndClass_moveTheLastRunGauges() {
+    gameItemRepository.save(item(P4kTestCatalogues.COOLER, "Unknown-grade cooler"));
+    gameItemRepository.save(item(P4kTestCatalogues.SHIELD, "Unknown-class shield"));
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.COOLER).put("grade", 6);
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD).put("itemClass", "Prototype");
+    SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    businessGauges.register(registry);
+
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+    businessGauges.sample();
+
+    assertThat(
+            registry.get(CatalogueMetricNames.P4K_IMPORT_LAST_RUN_UNKNOWN_GRADES).gauge().value())
+        .isEqualTo(1.0);
+    assertThat(
+            registry.get(CatalogueMetricNames.P4K_IMPORT_LAST_RUN_UNKNOWN_CLASSES).gauge().value())
+        .isEqualTo(1.0);
   }
 
   @Test

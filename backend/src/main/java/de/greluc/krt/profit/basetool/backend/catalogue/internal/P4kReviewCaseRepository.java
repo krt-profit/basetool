@@ -20,11 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Spring Data repository for {@link P4kReviewCase}. */
 public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UUID> {
@@ -49,4 +53,23 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
    */
   Page<P4kReviewCase> findByStatusOrderByCreatedAtAscIdAsc(
       P4kReviewStatus status, Pageable pageable);
+
+  /**
+   * Counts the cases of one status and kind (REQ-OBS-022).
+   *
+   * @param status the status
+   * @param kind the kind
+   * @return the number of cases
+   */
+  long countByStatusAndKind(P4kReviewStatus status, P4kKind kind);
+
+  /**
+   * Returns when the oldest case of one status was opened (REQ-OBS-022).
+   *
+   * @param status the status
+   * @return the earliest creation time, or {@code null} when no case has the status
+   */
+  @Query("SELECT MIN(c.createdAt) FROM P4kReviewCase c WHERE c.status = :status")
+  @Nullable
+  Instant findOldestCreatedAtByStatus(@Param("status") P4kReviewStatus status);
 }

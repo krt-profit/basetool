@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRejectionReason;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -38,6 +39,18 @@ import org.springframework.stereotype.Component;
 public class P4kRejections {
 
   private final MeterRegistry meterRegistry;
+
+  /**
+   * Registers one series per refusal reason at zero, so the first refusal after a start is an
+   * increase the {@code P4kImportChannelRejected} alert can see (REQ-OBS-022).
+   */
+  @PostConstruct
+  void registerAtZero() {
+    for (P4kRejectionReason reason : P4kRejectionReason.values()) {
+      meterRegistry.counter(
+          CatalogueMetricNames.P4K_IMPORT_REJECTED, MetricNames.TAG_REASON, reason.tagValue());
+    }
+  }
 
   /**
    * Logs and counts one refusal.

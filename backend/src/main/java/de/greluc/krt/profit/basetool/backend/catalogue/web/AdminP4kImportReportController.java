@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.web;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kChangeType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportRunDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewCaseDto;
@@ -59,6 +61,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code GET /jobs/{id}/changes} — a preview's report, filtered and paged.
  *   <li>{@code GET /review-cases} — the open review cases.
  *   <li>{@code POST /review-cases/{id}/resolve} — resolve a case as keep or hide.
+ *   <li>{@code GET /due} — whether a P4K import is due (REQ-P4K-047).
  * </ul>
  */
 @RestController
@@ -75,6 +78,23 @@ public class AdminP4kImportReportController {
 
   private final P4kImportReportService reportService;
   private final P4kReviewService reviewService;
+  private final P4kImportDueService dueService;
+
+  /**
+   * Tells whether a P4K import is due: the UEX or the SC Wiki game version is newer than the patch
+   * version of the last APPLY of known version, or no such APPLY exists (REQ-P4K-047).
+   *
+   * @return the decision and the versions it compared
+   */
+  @GetMapping("/due")
+  @Operation(summary = "Tell whether a P4K import is due.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The due signal."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
+  public P4kImportDueDto due() {
+    return dueService.evaluate();
+  }
 
   /**
    * An admin's resolution of a review case.

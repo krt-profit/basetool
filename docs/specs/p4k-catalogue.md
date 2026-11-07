@@ -25,7 +25,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
 > and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035, `name_de`
 > with REQ-P4K-023), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
-> implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
+> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-047 is implemented (#3034);
+> every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -1152,16 +1153,17 @@ The P4K import's metrics, alerts and dashboard are REQ-OBS-022 and REQ-OBS-023 i
 and outcome, unknown grade and class values, the `itemClass` null share, stamped rows, open review
 cases, and the "P4K import due" signal. `/admin/p4k-import` shows a "P4K import due" banner as soon
 as the UEX or the Wiki game version is newer than the patch version (REQ-P4K-005) of the last
-successful APPLY whose version is known, or no such APPLY exists.
+successful APPLY whose version is known, or no such APPLY exists. Every APPLY run also records
+the share of the catalogue's items without `itemClass` (`p4k_import_run.item_class_null_share`).
 
 **Acceptance**
 
-- [ ] With no run, and with a Wiki version newer than the last run's patch, the banner shows; with
+- [x] With no run, and with a Wiki version newer than the last run's patch, the banner shows; with
   equal versions it does not.
-- [ ] A later run with an unknown version does not replace the earlier run as the comparison basis.
+- [x] A later run with an unknown version does not replace the earlier run as the comparison basis.
 
-**Enforced by (planned):** `P4kImportDueTest`, `AdminP4kImportPageControllerMvcTest` · **Issues:**
-#2895
+**Enforced by:** `P4kImportDueTest`, `P4kItemClassShareTest`, `AdminP4kImportDueMvcTest` ·
+**Issues:** #2895, #3034
 
 ## Out of scope
 

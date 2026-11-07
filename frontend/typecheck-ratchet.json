@@ -47,6 +47,7 @@
       "catalogue/materials-profit-calculation.js",
       "catalogue/materials.js",
       "catalogue/mission-data.js",
+      "catalogue/p4k-due.js",
       "catalogue/p4k-import.js",
       "catalogue/p4k-report.js",
       "catalogue/ship-data.js",
