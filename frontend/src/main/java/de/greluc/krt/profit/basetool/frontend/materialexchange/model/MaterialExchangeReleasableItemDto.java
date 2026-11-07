@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend view of one Materialbörse release-picker entry — a Lager row of the caller's own stock
@@ -41,6 +42,8 @@ import java.util.UUID;
  * @param locationName the row's location (shown only in the owner's own picker).
  * @param alreadyReleased whether an active offer already exists for this row.
  * @param stolen whether the row is marked „gestohlen" (REQ-INV-053).
+ * @param materialNameDe the German name of the row's catalog entry, or {@code null}; the picker JS
+ *     shows it on a German page (REQ-P4K-023).
  */
 @DtoMirror
 public record MaterialExchangeReleasableItemDto(
@@ -52,4 +55,42 @@ public record MaterialExchangeReleasableItemDto(
     Double amount,
     String locationName,
     boolean alreadyReleased,
-    boolean stolen) {}
+    boolean stolen,
+    @Nullable String materialNameDe) {
+
+  /**
+   * Creates a picker entry without a German name.
+   *
+   * @param inventoryItemId the Lager row to release.
+   * @param kind which offer kind releasing this row produces.
+   * @param materialName the display name of the row's catalog entry.
+   * @param quantityType the row's quantity unit name.
+   * @param quality the row's quality, {@code null} for a game-item row.
+   * @param amount the row's quantity in its {@code quantityType} unit.
+   * @param locationName the row's location.
+   * @param alreadyReleased whether an active offer already exists for this row.
+   * @param stolen whether the row is marked „gestohlen".
+   */
+  public MaterialExchangeReleasableItemDto(
+      UUID inventoryItemId,
+      String kind,
+      String materialName,
+      String quantityType,
+      Integer quality,
+      Double amount,
+      String locationName,
+      boolean alreadyReleased,
+      boolean stolen) {
+    this(
+        inventoryItemId,
+        kind,
+        materialName,
+        quantityType,
+        quality,
+        amount,
+        locationName,
+        alreadyReleased,
+        stolen,
+        null);
+  }
+}

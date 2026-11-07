@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.client;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewCaseDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewResolveRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +62,20 @@ public class P4kReportBackendClient {
   private static final ParameterizedTypeReference<PageResponse<P4kReviewCaseDto>> CASE_PAGE =
       new ParameterizedTypeReference<>() {};
 
+  private static final ParameterizedTypeReference<List<MaterialCategoryDto>> GROUP_LIST =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Reads whether a P4K import is due (REQ-P4K-047).
+   *
+   * @return the due signal, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public P4kImportDueDto importDue() {
+    return backendApiClient.get(BASE + "/due", P4kImportDueDto.class);
+  }
 
   /**
    * Reads one page of the applied runs, newest first.
@@ -143,6 +159,16 @@ public class P4kReportBackendClient {
       @NotNull UUID caseId, @NotNull P4kReviewResolveRequest request) {
     return backendApiClient.post(
         BASE + "/review-cases/{id}/resolve", request, P4kReviewCaseDto.class, caseId);
+  }
+
+  /**
+   * Lists the resource groups a missing-group review case can assign (REQ-P4K-025).
+   *
+   * @return the live resource groups, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<MaterialCategoryDto> resourceGroups() {
+    return backendApiClient.get(BASE + "/resource-groups", GROUP_LIST);
   }
 
   /**

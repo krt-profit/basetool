@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +64,9 @@ class LikeEscapeCatalogRepositoriesDataTest {
   private static final String TAG = "Lk" + UUID.randomUUID().toString().substring(0, 8);
 
   @Autowired private LocationRepository locationRepository;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private MaterialRepository materialRepository;
   @Autowired private TerminalRepository terminalRepository;
   @Autowired private MaterialPriceRepository materialPriceRepository;
@@ -107,7 +112,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
     Location hidden = new Location();
     hidden.setName(TAG + " Dock_B");
     hidden.setHidden(true);
-    locationRepository.save(hidden);
+    locationRepository.save(TestPlaces.onOwnCity(hidden, cityRepository));
     Material visible = saveMaterial(TAG + " Gem%A");
     saveMaterial(TAG + " GemXA");
     Material invisible = saveMaterial(TAG + " Gem_B");
@@ -242,7 +247,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
   private void saveLocation(String name) {
     Location location = new Location();
     location.setName(name);
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private Material saveMaterial(String name) {

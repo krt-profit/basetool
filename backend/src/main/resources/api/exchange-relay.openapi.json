@@ -2521,6 +2521,10 @@
           "bt" : {
             "type" : "string"
           },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string"
           }
@@ -2918,6 +2922,10 @@
             "maxLength" : 128,
             "minLength" : 1
           },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "locKey" : {
             "type" : "string",
             "maxLength" : 200,
@@ -2955,6 +2963,10 @@
           "bt" : {
             "type" : "string"
           },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string"
           }
@@ -2963,6 +2975,10 @@
       "ExchangeLocationDto" : {
         "type" : "object",
         "properties" : {
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string"
           },
@@ -2985,6 +3001,10 @@
       "ExchangeLocationRef" : {
         "type" : "object",
         "properties" : {
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string",
             "maxLength" : 200,
@@ -3838,6 +3858,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"
@@ -3943,6 +3966,16 @@
           "name" : {
             "type" : "string"
           },
+          "p4kName" : {
+            "type" : "string"
+          },
+          "p4kNameDe" : {
+            "type" : "string"
+          },
+          "starmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -4005,6 +4038,10 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string",
+            "readOnly" : true
           },
           "quantityType" : {
             "type" : "string"

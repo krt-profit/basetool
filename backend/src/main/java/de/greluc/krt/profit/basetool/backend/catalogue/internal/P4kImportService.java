@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kContentTo
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKindCompleteness;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -52,15 +54,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
  * hands each kind to its reconciler in dependency order (manufacturers before items and ships,
- * resource groups before commodities, items and commodities before blueprints) and, on APPLY,
- * records the run, its counts per kind, its change report and its {@code CATALOGUE} audit event
- * (REQ-P4K-046).
+ * items before blueprints, resource groups before commodities, the starmap tree before the UEX
+ * locations' links to it) and, on APPLY, records the run, its counts per kind, its change report
+ * and its {@code CATALOGUE} audit event (REQ-P4K-046).
  *
  * <ul>
  *   <li>{@link #previewImport(byte[])} computes everything and writes nothing.
@@ -81,8 +84,14 @@ public class P4kImportService {
   private final P4kShipReconciler shipReconciler;
   private final P4kResourceGroupReconciler resourceGroupReconciler;
   private final P4kCommodityReconciler commodityReconciler;
+  private final P4kMaterialGroupReview materialGroupReview;
   private final P4kBlueprintReconciler blueprintReconciler;
+  private final P4kPaintReconciler paintReconciler;
+  private final P4kLoadoutReconciler loadoutReconciler;
+  private final P4kStarmapReconciler starmapReconciler;
+  private final P4kStarmapLinker starmapLinker;
   private final P4kSweeper sweeper;
+  private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
   private final P4kImportRecorder recorder;
   private final P4kRejections rejections;
@@ -126,16 +135,16 @@ public class P4kImportService {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
     P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
-    int ingredientsResolved = reconcile(catalogue, context);
-    sweeper.sweep(catalogue, context, false);
+    int ingredientsResolved = reconcile(payload, catalogue, context);
+    sweepAndFollow(catalogue, context, false);
     return new P4kPreview(
         result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
   }
 
   /**
    * Applies an import in one transaction: refuses an older Build, records the run, reconciles every
-   * kind, stamps the matched rows with the run, sweeps the complete kinds and stores the change
-   * report.
+   * kind, stamps the matched rows with the run, sweeps the complete kinds, moves the personal
+   * blueprints onto the produced-item GUIDs (REQ-P4K-029) and stores the change report.
    *
    * @param payload the stored upload
    * @param request the job, the uploader and the admin's choices
@@ -144,6 +153,7 @@ public class P4kImportService {
    *     the last applied run
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.LOCATIONS_CACHE, allEntries = true)
   @NotNull
   public P4kImportResultDto applyImport(
       byte @NotNull [] payload, @NotNull P4kApplyRequest request) {
@@ -154,41 +164,92 @@ public class P4kImportService {
     Instant now = Instant.now();
     P4kImportRun run =
         runRepository.save(newRun(catalogue.head(), build, changeNumber, request, now));
+    run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
     P4kImportContext context =
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
-    int ingredientsResolved = reconcile(catalogue, context);
-    List<P4kKind> overridden = sweeper.sweep(catalogue, context, request.overrideMassGuard());
+    int ingredientsResolved = reconcile(payload, catalogue, context);
+    List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
     overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
     syncReportService.logP4kEvent(
-        run.getId(), SyncEventType.SYNC_RUN_SUMMARY, "catalog", null, null, summary(result));
+        run.getId(),
+        SyncEventType.SYNC_RUN_SUMMARY,
+        "catalog",
+        null,
+        null,
+        summary(result, context.getReport()));
     auditRecorder.record(
         AuditEventType.CATALOGUE_P4K_APPLIED,
         run.getId(),
         run.getBuildVersion(),
         null,
-        auditDetails(run, result));
+        auditDetails(run, result)
+            .with("adminCategoriesRetired", context.getAdminCategoriesRetired()));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
-    log.info("P4K import applied (run {}): {}", run.getId(), summary(result));
+    log.info("P4K import applied (run {}): {}", run.getId(), summary(result, context.getReport()));
     return result;
   }
 
   /**
-   * Reconciles the kinds in dependency order.
+   * Sweeps the complete kinds, then hands the blueprints' produced-item GUIDs to the modules keyed
+   * by them (REQ-P4K-029).
    *
+   * @param catalogue the catalogue
+   * @param context the run
+   * @param overrideMassGuard whether a kind is swept past the mass guard
+   * @return the kinds swept only because of the override
+   */
+  @NotNull
+  private List<P4kKind> sweepAndFollow(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context,
+      boolean overrideMassGuard) {
+    List<P4kKind> overridden = sweeper.sweep(catalogue, context, overrideMassGuard);
+    productKeyReview.follow(context, context.getNow());
+    return overridden;
+  }
+
+  /**
+   * Reconciles the five kinds and the resource groups in dependency order, then links the paints
+   * and stores the ship loadouts, which refer to the items and ships (REQ-P4K-040, REQ-P4K-041),
+   * and imports the starmap tree and links the UEX locations to it when the catalogue lists starmap
+   * objects (REQ-P4K-034, REQ-P4K-035).
+   *
+   * @param payload the stored upload, streamed again for the loadouts
    * @param catalogue the catalogue
    * @param context the run
    * @return the ingredient lines the blueprints resolved
    */
-  private int reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+  private int reconcile(
+      byte @NotNull [] payload,
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context) {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
-    shipReconciler.reconcile(catalogue.ships(), context);
+    shipReconciler.reconcile(catalogue, context);
+    manufacturerReconciler.finish(context);
     resourceGroupReconciler.reconcile(catalogue, context);
-    commodityReconciler.reconcile(catalogue, context);
-    return blueprintReconciler.reconcile(catalogue.blueprints(), context);
+    context.setAdminCategoriesRetired(
+        materialGroupReview.review(commodityReconciler.reconcile(catalogue, context), context));
+    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue.blueprints(), context);
+    paintReconciler.reconcile(
+        catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
+    loadoutReconciler.reconcile(
+        action ->
+            read(
+                payload,
+                in -> {
+                  reader.readLoadouts(in, action);
+                  return null;
+                }),
+        catalogue,
+        context);
+    if (!catalogue.starmapObjects().isEmpty()) {
+      starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
+    }
+    return ingredientsResolved;
   }
 
   /**
@@ -200,9 +261,23 @@ public class P4kImportService {
    */
   @NotNull
   private P4kCatalogue read(byte @NotNull [] payload) {
+    return Objects.requireNonNull(read(payload, reader::read));
+  }
+
+  /**
+   * Hands the decompressed content of a stored upload to a reading step.
+   *
+   * @param payload the stored upload, compressed
+   * @param step reads the decompressed content
+   * @param <T> what the step returns
+   * @return the step's result
+   * @throws BadRequestException when it cannot be read or passes the decompressed limit
+   */
+  @Nullable
+  private <T> T read(byte @NotNull [] payload, @NotNull Function<InputStream, T> step) {
     try (InputStream in =
         P4kCompression.openDecompressed(payload, properties.decompressedLimitBytes())) {
-      return reader.read(in);
+      return step.apply(in);
     } catch (P4kCatalogueFormatException e) {
       throw new BadRequestException("The stored catalogue is not readable catalogue JSON.", e);
     } catch (P4kContentTooLargeException e) {
@@ -353,6 +428,7 @@ public class P4kImportService {
         report.counts(P4kKind.SHIP, completeness(head, P4kKind.SHIP)),
         report.counts(P4kKind.COMMODITY, completeness(head, P4kKind.COMMODITY)),
         report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
+        report.counts(P4kKind.STARMAP_OBJECT, completeness(head, P4kKind.STARMAP_OBJECT)),
         report.counts(P4kKind.RESOURCE_GROUP, completeness(head, P4kKind.RESOURCE_GROUP)),
         ingredientsResolved,
         context.getRunId(),
@@ -394,20 +470,29 @@ public class P4kImportService {
    * Renders the run summary for {@code external_sync_report}.
    *
    * @param result the result
+   * @param report the run's report, for the loadout and paint counts
    * @return one line with the counts per kind
    */
   @NotNull
-  private static String summary(@NotNull P4kImportResultDto result) {
+  private static String summary(
+      @NotNull P4kImportResultDto result, @NotNull P4kImportReport report) {
     return Stream.of(
                 "manufacturers" + counts(result.manufacturers()),
                 "items" + counts(result.items()),
                 "ships" + counts(result.ships()),
                 "commodities" + counts(result.commodities()),
                 "blueprints" + counts(result.blueprints()),
+                "starmapObjects" + counts(Objects.requireNonNull(result.starmapObjects())),
                 "resourceGroups" + counts(result.resourceGroups()))
             .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
+        + "; loadoutShips="
+        + report.loadoutShips()
+        + "; loadoutPorts="
+        + report.loadoutPorts()
+        + "; paintLinks="
+        + report.paintLinks()
         + "; createItemsAndShips="
         + result.createItemsAndShips();
   }
@@ -430,6 +515,7 @@ public class P4kImportService {
         .with("ships", counts(result.ships()))
         .with("commodities", counts(result.commodities()))
         .with("blueprints", counts(result.blueprints()))
+        .with("starmapObjects", counts(Objects.requireNonNull(result.starmapObjects())))
         .with("resourceGroups", counts(result.resourceGroups()))
         .with("ingredientsResolved", result.ingredientsResolved());
   }

@@ -351,7 +351,9 @@ public class AdminAuditLogPageController {
                   "BLUEPRINT_DEFAULT_REMOVED",
                   "BLUEPRINT_DEFAULTS_GRANTED",
                   "BLUEPRINT_AUDIT_EXPORTED",
-                  "BLUEPRINT_AUDIT_PURGED")),
+                  "BLUEPRINT_AUDIT_PURGED",
+                  "BLUEPRINT_PRODUCT_KEYS_UPGRADED",
+                  "BLUEPRINT_PRODUCT_MERGED")),
           Map.entry(
               "CONNECTED_APPS",
               List.of(
@@ -429,6 +431,12 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN",
                   "CATALOGUE_P4K_REVIEW_KEPT",
                   "CATALOGUE_P4K_REVIEW_HIDDEN",
+                  "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED",
+                  "CATALOGUE_STARMAP_LINK_SET",
+                  "CATALOGUE_STARMAP_LINK_CLEARED",
+                  "CATALOGUE_STARMAP_LINK_RELEASED",
+                  "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN",
+                  "CATALOGUE_STORAGE_PLACE_CREATED",
                   "CATALOGUE_SYNC_REPORTS_DELETED",
                   "CATALOGUE_SYNC_RUN_FINISHED",
                   "CATALOGUE_MATERIAL_CREATED",

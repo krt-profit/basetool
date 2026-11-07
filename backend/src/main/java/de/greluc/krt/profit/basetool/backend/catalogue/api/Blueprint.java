@@ -97,6 +97,15 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "output_name")
   private String outputName;
 
+  /**
+   * The DataForge GUID of the item the blueprint produces, written by the P4K import whether or not
+   * a {@code game_item} carries it; the key of a member's personal blueprint (REQ-P4K-029,
+   * ADR-0343). Never a Wiki UUID.
+   */
+  @Column(name = "produced_item_guid")
+  @Nullable
+  private UUID producedItemGuid;
+
   /** Wiki category UUID for the blueprint (informational; not resolved to an entity in R4). */
   @Column(name = "category_uuid")
   private UUID categoryUuid;

@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,9 +36,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST controller for the material collection overview of a job order. Provides a sorted list of
- * all inventory items linked to a specific job order. The per-entry owner/location is redacted for
- * a requesting-side viewer of an SK-public order (REQ-ORDERS-029, ADR-0107) via {@link
- * JobOrderInventoryOwnerRedactor}, gated on {@code canSeeJobOrderInventoryOwners}.
+ * all inventory items linked to a specific job order, with owner and location for every viewer of
+ * the order (REQ-ORDERS-029).
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -48,14 +45,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class MaterialCollectionController {
 
   private final JobOrderStockReadService jobOrderStockReadService;
-  private final JobOrderAccessPolicy jobOrderAccessPolicy;
-  private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
    * Returns the inventory contributions linked to the given job order.
-   *
-   * <p>Owner and location are blanked when {@code canSeeJobOrderInventoryOwners} is {@code false}
-   * (REQ-ORDERS-029); all other fields are always kept.
    *
    * @param jobOrderId job order id
    * @return inventory entries sorted by owner, location, material, quality and quantity
@@ -76,10 +68,6 @@ public class MaterialCollectionController {
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   public List<MaterialCollectionEntryDto> getMaterialCollection(
       @PathVariable @NotNull UUID jobOrderId) {
-    List<MaterialCollectionEntryDto> entries =
-        jobOrderStockReadService.getMaterialCollection(jobOrderId);
-    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)
-        ? entries
-        : inventoryOwnerRedactor.redactMaterialCollection(entries);
+    return jobOrderStockReadService.getMaterialCollection(jobOrderId);
   }
 }

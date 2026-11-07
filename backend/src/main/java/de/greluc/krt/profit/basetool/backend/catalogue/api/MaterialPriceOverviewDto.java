@@ -24,7 +24,20 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Material Price Overview payload. */
+/**
+ * One material of the price overview with its best buy and sell price across every visible
+ * terminal.
+ *
+ * @param id the material's id
+ * @param name the material's name
+ * @param category the material's category, or {@code null}
+ * @param isIllegal whether the material is contraband
+ * @param isVolatileQt whether the material decays during quantum travel
+ * @param isVolatileTime whether the material decays over time
+ * @param minPriceBuy the lowest positive buy price, or {@code null}
+ * @param maxPriceSell the highest positive sell price, or {@code null}
+ * @param nameDe the material's German name, or {@code null} (REQ-P4K-023)
+ */
 public record MaterialPriceOverviewDto(
     UUID id,
     String name,
@@ -33,7 +46,41 @@ public record MaterialPriceOverviewDto(
     @JsonProperty("isVolatileQt") boolean isVolatileQt,
     @JsonProperty("isVolatileTime") boolean isVolatileTime,
     BigDecimal minPriceBuy,
-    BigDecimal maxPriceSell) {
+    BigDecimal maxPriceSell,
+    @Nullable String nameDe) {
+  /**
+   * Creates an overview row without a German name.
+   *
+   * @param id the material's id
+   * @param name the material's name
+   * @param category the material's category, or {@code null}
+   * @param isIllegal whether the material is contraband
+   * @param isVolatileQt whether the material decays during quantum travel
+   * @param isVolatileTime whether the material decays over time
+   * @param minPriceBuy the lowest positive buy price, or {@code null}
+   * @param maxPriceSell the highest positive sell price, or {@code null}
+   */
+  public MaterialPriceOverviewDto(
+      UUID id,
+      String name,
+      @Nullable MaterialCategoryDto category,
+      boolean isIllegal,
+      boolean isVolatileQt,
+      boolean isVolatileTime,
+      BigDecimal minPriceBuy,
+      BigDecimal maxPriceSell) {
+    this(
+        id,
+        name,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        minPriceBuy,
+        maxPriceSell,
+        null);
+  }
+
   /**
    * Convenience constructor used by JPA tuple-mapping queries: flattened category columns get
    * wrapped into a {@link MaterialCategoryDto}, and UEX-style {@code Integer} flag columns are
@@ -49,7 +96,8 @@ public record MaterialPriceOverviewDto(
       Integer isVolatileQt,
       Integer isVolatileTime,
       BigDecimal minPriceBuy,
-      BigDecimal maxPriceSell) {
+      BigDecimal maxPriceSell,
+      @Nullable String nameDe) {
     this(
         id,
         name,
@@ -60,7 +108,8 @@ public record MaterialPriceOverviewDto(
         isVolatileQt != null && isVolatileQt == 1,
         isVolatileTime != null && isVolatileTime == 1,
         minPriceBuy,
-        maxPriceSell);
+        maxPriceSell,
+        nameDe);
   }
 
   /**
@@ -88,6 +137,7 @@ public record MaterialPriceOverviewDto(
         isVolatileQt,
         isVolatileTime,
         minPriceBuy,
-        maxPriceSell);
+        maxPriceSell,
+        null);
   }
 }

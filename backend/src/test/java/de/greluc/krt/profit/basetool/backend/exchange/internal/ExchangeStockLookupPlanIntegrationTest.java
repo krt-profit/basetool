@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -62,6 +64,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ExchangeStockLookupPlanIntegrationTest {
 
   @Autowired private JdbcTemplate jdbc;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private UserRepository userRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private InventoryItemRepository inventoryRepository;
@@ -97,7 +102,7 @@ class ExchangeStockLookupPlanIntegrationTest {
         "lookup-plan-" + item);
     Location place = new Location();
     place.setName("lookup-plan-" + UUID.randomUUID());
-    location = locationRepository.saveAndFlush(place).getId();
+    location = locationRepository.saveAndFlush(TestPlaces.onOwnCity(place, cityRepository)).getId();
   }
 
   @AfterEach

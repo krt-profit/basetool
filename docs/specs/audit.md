@@ -238,7 +238,11 @@ web, naming its client (REQ-AUDIT-005):
   (`BLUEPRINT_DEFAULT_ADDED` / `_REMOVED`, REQ-INV-017) and default-grant provisioning
   (`BLUEPRINT_DEFAULTS_GRANTED`, one summary event per run — per member at the roster sync,
   across all members at startup, on the nightly task and after a default was added — never one
-  per granted row). The admin paths on another member's set write the same events. The subject is
+  per granted row), and the move of the product keys onto the produced items' GUIDs after a P4K
+  APPLY (`BLUEPRINT_PRODUCT_KEYS_UPGRADED`, one summary event per run with counts, and
+  `BLUEPRINT_PRODUCT_MERGED`, one per member whose fallback row merged into the GUID row, the
+  details naming the old and the new key; REQ-INV-070). Events written before such a move keep
+  the key they recorded. The admin paths on another member's set write the same events. The subject is
   the owned or default blueprint, labelled by its **catalogue product name**; the owner is the
   target; the details hold the product key and counts, never the note.
 - **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`, `AuditDomain.CONNECTED_APPS`,
@@ -463,9 +467,18 @@ The coverage list holds the **Katalog** area
     authentication, so the APPLY names that admin as actor;
   - `CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN`, one event per kind whose sweep ran on the admin's "apply
     marking anyway" override, with the kind, the rows to stamp and their share in percent; and the
-    resolution of a review case, `CATALOGUE_P4K_REVIEW_KEPT` or `CATALOGUE_P4K_REVIEW_HIDDEN`, one
-    event per case. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
+    resolution of a review case, `CATALOGUE_P4K_REVIEW_KEPT`, `CATALOGUE_P4K_REVIEW_HIDDEN` or, for a
+    material without a resource group, `CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED` (with `groupId`,
+    REQ-P4K-025), one event per case; the APPLY event carries `adminCategoriesRetired`. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
     record them;
+  - the starmap ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
+    REQ-P4K-035…038): `CATALOGUE_STARMAP_LINK_SET`, `CATALOGUE_STARMAP_LINK_CLEARED` and
+    `CATALOGUE_STARMAP_LINK_RELEASED` when an admin links, unlinks or hands back to the import the
+    starmap link of a UEX location (subject the UEX row, label its UEX name, details `kind`,
+    `starmapObjectId` and `previousStarmapObjectId`); `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN`
+    (subject the starmap object, label its class name, `visibility=VISIBLE|HIDDEN|RULE`); and
+    `CATALOGUE_STORAGE_PLACE_CREATED` when an admin creates a storage place on a starmap object
+    (subject the location, details `starmapObjectId` and `hidden`);
   - `CATALOGUE_SYNC_REPORTS_DELETED`, the manual delete of sync reports, with `source` (`UEX`,
     `SCWIKI`, `P4K` or `ALL`), `olderThanDays` and the `deleted` count (the automatic `pruneRuns`
     stays a log line);
@@ -504,13 +517,9 @@ domain switches (purge marker, export marker) carry the case, and `basetool_audi
 counts them (REQ-OBS-011).
 
 > [!note] Planned — the rest of the Katalog area (ADR-0346)
-> - The starmap and its places
->   ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)): an admin
->   setting or clearing the link of a UEX location to a starmap object, creating a storage place on
->   a starmap node without a UEX row, and setting a starmap object visible or hidden against the
->   visibility rule (#2902); and an admin's manual link of a P4K shop to a UEX terminal
->   ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md), #3028). Each flow adds its
->   event type to this domain when it is built.
+> An admin's manual link of a P4K shop to a UEX terminal
+> ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md), #3028) adds its event type to
+> this domain when it is built.
 
 **Acceptance**
 
@@ -522,7 +531,9 @@ counts them (REQ-OBS-011).
   (`AdminAuditLogPageControllerTest`).
 - [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with
   its committed outcome (`SyncRunServiceTest`).
-- [ ] The starmap and shop links and the visibility overrides record their events (planned above).
+- [x] The starmap links, the visibility overrides and the storage places on a starmap object record
+  their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
+- [ ] The shop link records its event (planned above).
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 

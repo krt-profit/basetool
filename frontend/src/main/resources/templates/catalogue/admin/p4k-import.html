@@ -12,6 +12,11 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.p4kimport', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.p4kImport.title},
         count=null, actions=null)}"></th:block>
 
+    <div id="krt-p4k-due" class="alert alert-warning" role="status" data-testid="p4k-import-due" hidden>
+        <strong th:text="#{admin.p4kImport.due.title}">P4K-Import fällig</strong>
+        <span id="krt-p4k-due-detail"></span>
+    </div>
+
     <section class="card" aria-labelledby="krt-p4k-upload-title">
         <div class="card-head">
             <h2 id="krt-p4k-upload-title" class="card-title" th:text="#{admin.p4kImport.upload.title}">Katalog hochladen</h2>
@@ -284,6 +289,7 @@
         rowShips:         /*[[#{admin.p4kImport.row.ships}]]*/ 'Ships',
         rowCommodities:   /*[[#{admin.p4kImport.row.commodities}]]*/ 'Commodities',
         rowBlueprints:    /*[[#{admin.p4kImport.row.blueprints}]]*/ 'Blueprints',
+        rowStarmapObjects: /*[[#{admin.p4kImport.row.starmapObjects}]]*/ 'Starmap objects',
         rowResourceGroups: /*[[#{admin.p4kImport.row.resourceGroups}]]*/ 'Commodity categories',
         toastUploaded:    /*[[#{admin.p4kImport.toast.uploaded}]]*/ 'Uploaded.',
         toastApplyStarted:/*[[#{admin.p4kImport.toast.applyStarted}]]*/ 'Apply started.',
@@ -302,17 +308,26 @@
         'reportPreview': /*[[#{admin.p4kImport.report.preview}]]*/ 'Preview',
         'stillLive': /*[[#{admin.p4kImport.report.stillLive}]]*/ 'still live in UEX/Wiki',
         'sweepCounts': /*[[#{admin.p4kImport.report.sweepCounts}]]*/ '{0} of {1}',
+        'loadoutIssues': /*[[#{admin.p4kImport.report.loadoutIssues}]]*/ '{0} unresolved ports; issues: {1}',
         'noRow': /*[[#{admin.p4kImport.review.noRow}]]*/ 'no row',
         'actionKeep': /*[[#{admin.p4kImport.review.keep}]]*/ 'Keep',
         'actionHide': /*[[#{admin.p4kImport.review.hide}]]*/ 'Hide',
+        'actionAssign': /*[[#{admin.p4kImport.review.assign}]]*/ 'Assign',
+        'pickGroup': /*[[#{admin.p4kImport.review.pickGroup}]]*/ 'Pick a category',
         'toastKept': /*[[#{admin.p4kImport.review.toast.kept}]]*/ 'Kept.',
         'toastHidden': /*[[#{admin.p4kImport.review.toast.hidden}]]*/ 'Hidden.',
+        'toastAssigned': /*[[#{admin.p4kImport.review.toast.assigned}]]*/ 'Category assigned.',
         'conflict': /*[[#{admin.p4kImport.review.toast.conflict}]]*/ 'The case changed meanwhile.',
+        'dueDetail': /*[[#{admin.p4kImport.due.detail}]]*/ 'UEX: {0} · SC Wiki: {1} · last import: {2}',
+        'dueUnknown': /*[[#{admin.p4kImport.due.unknown}]]*/ 'unknown',
+        'dueNoRun': /*[[#{admin.p4kImport.due.noRun}]]*/ 'none of known version',
+        'dueLowerBound': /*[[#{admin.p4kImport.due.lowerBound}]]*/ 'at least {0} (branch)',
         'kind.MANUFACTURER': /*[[#{admin.p4kImport.kind.MANUFACTURER}]]*/ 'MANUFACTURER',
         'kind.ITEM': /*[[#{admin.p4kImport.kind.ITEM}]]*/ 'ITEM',
         'kind.SHIP': /*[[#{admin.p4kImport.kind.SHIP}]]*/ 'SHIP',
         'kind.COMMODITY': /*[[#{admin.p4kImport.kind.COMMODITY}]]*/ 'COMMODITY',
         'kind.BLUEPRINT': /*[[#{admin.p4kImport.kind.BLUEPRINT}]]*/ 'BLUEPRINT',
+        'kind.STARMAP_OBJECT': /*[[#{admin.p4kImport.kind.STARMAP_OBJECT}]]*/ 'STARMAP_OBJECT',
         'kind.RESOURCE_GROUP': /*[[#{admin.p4kImport.kind.RESOURCE_GROUP}]]*/ 'RESOURCE_GROUP',
         'type.ADDED': /*[[#{admin.p4kImport.change.ADDED}]]*/ 'ADDED',
         'type.CHANGED': /*[[#{admin.p4kImport.change.CHANGED}]]*/ 'CHANGED',
@@ -323,11 +338,18 @@
         'type.IDENTITY_MISMATCH': /*[[#{admin.p4kImport.change.IDENTITY_MISMATCH}]]*/ 'IDENTITY_MISMATCH',
         'type.UNKNOWN_VALUE': /*[[#{admin.p4kImport.change.UNKNOWN_VALUE}]]*/ 'UNKNOWN_VALUE',
         'type.SWEEP_SKIPPED': /*[[#{admin.p4kImport.change.SWEEP_SKIPPED}]]*/ 'SWEEP_SKIPPED',
+        'type.LOADOUT_ISSUES': /*[[#{admin.p4kImport.change.LOADOUT_ISSUES}]]*/ 'LOADOUT_ISSUES',
         'reason.UNCLEAR_PLAYABILITY': /*[[#{admin.p4kImport.reason.UNCLEAR_PLAYABILITY}]]*/ 'UNCLEAR_PLAYABILITY',
         'reason.SEEDED_NOT_CREATABLE': /*[[#{admin.p4kImport.reason.SEEDED_NOT_CREATABLE}]]*/ 'SEEDED_NOT_CREATABLE',
         'reason.GUID_CONFLICT': /*[[#{admin.p4kImport.reason.GUID_CONFLICT}]]*/ 'GUID_CONFLICT',
+        'reason.NAME_CONFLICT': /*[[#{admin.p4kImport.reason.NAME_CONFLICT}]]*/ 'NAME_CONFLICT',
+        'reason.PRODUCT_KEY_UNRESOLVED': /*[[#{admin.p4kImport.reason.PRODUCT_KEY_UNRESOLVED}]]*/ 'PRODUCT_KEY_UNRESOLVED',
+        'reason.PRODUCT_KEY_AMBIGUOUS': /*[[#{admin.p4kImport.reason.PRODUCT_KEY_AMBIGUOUS}]]*/ 'PRODUCT_KEY_AMBIGUOUS',
+        'reason.STARMAP_LINK_AMBIGUOUS': /*[[#{admin.p4kImport.reason.STARMAP_LINK_AMBIGUOUS}]]*/ 'STARMAP_LINK_AMBIGUOUS',
+        'reason.STARMAP_LINK_NOT_FOUND': /*[[#{admin.p4kImport.reason.STARMAP_LINK_NOT_FOUND}]]*/ 'STARMAP_LINK_NOT_FOUND',
         'reason.RESOURCE_JOIN_NONE': /*[[#{admin.p4kImport.reason.RESOURCE_JOIN_NONE}]]*/ 'RESOURCE_JOIN_NONE',
         'reason.RESOURCE_JOIN_SEVERAL': /*[[#{admin.p4kImport.reason.RESOURCE_JOIN_SEVERAL}]]*/ 'RESOURCE_JOIN_SEVERAL',
+        'reason.NO_RESOURCE_GROUP': /*[[#{admin.p4kImport.reason.NO_RESOURCE_GROUP}]]*/ 'NO_RESOURCE_GROUP',
         'sweep.SWEPT': /*[[#{admin.p4kImport.sweep.SWEPT}]]*/ 'SWEPT',
         'sweep.SKIPPED_PARTIAL': /*[[#{admin.p4kImport.sweep.SKIPPED_PARTIAL}]]*/ 'SKIPPED_PARTIAL',
         'sweep.SKIPPED_EMPTY': /*[[#{admin.p4kImport.sweep.SKIPPED_EMPTY}]]*/ 'SKIPPED_EMPTY',

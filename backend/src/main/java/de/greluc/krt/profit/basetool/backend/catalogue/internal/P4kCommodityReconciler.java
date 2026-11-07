@@ -29,16 +29,20 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCommodity
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -61,8 +65,10 @@ public class P4kCommodityReconciler {
    *
    * @param catalogue the catalogue, whose blueprints and commodities reference the commodities
    * @param context the run
+   * @return which materials the run gives a resource group and which it creates without one
    */
-  public void reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+  @NotNull
+  public Outcome reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
     P4kCommodityJoin join = P4kCommodityJoin.of(catalogue);
     join.reviewUnresolved(context);
     P4kRowMatcher<Material> matcher =
@@ -83,6 +89,8 @@ public class P4kCommodityReconciler {
       if (match instanceof P4kRowMatcher.Matched<Material>(Material row, UUID guid)) {
         P4kRowWriter writer = new P4kRowWriter(context, P4kKind.COMMODITY, commodity);
         enrich(writer, row, commodity, guid, context);
+        writer.lead(
+            "name_de", row.getNameDe(), P4kFields.germanName(commodity.name()), row::setNameDe);
         if (creatable && row.getSourceSystems() == MaterialSourceSystem.P4K) {
           writer.lead("is_visible", row.getIsVisible(), true, row::setIsVisible, String::valueOf);
         }
@@ -108,7 +116,31 @@ public class P4kCommodityReconciler {
         .map(Reconciled::writer)
         .filter(Objects::nonNull)
         .forEach(writer -> context.getReport().matched(P4kKind.COMMODITY, writer.isChanged()));
+    Set<UUID> grouped = new HashSet<>();
+    List<Material> createdWithoutGroup = new ArrayList<>();
+    rows.forEach((commodity, reconciled) -> {
+      Material row = reconciled.row();
+      if (context.resourceGroup(commodity.typeGuid()) == null) {
+        if (reconciled.writer() == null) {
+          createdWithoutGroup.add(row);
+        }
+      } else if (row.getId() != null) {
+        grouped.add(row.getId());
+      }
+    });
+    return new Outcome(Set.copyOf(grouped), List.copyOf(createdWithoutGroup));
   }
+
+  /**
+   * What the commodities of a run leave for the group review (REQ-P4K-025).
+   *
+   * @param grouped the saved materials the run gives a resource group from their record
+   * @param createdWithoutGroup the materials the run creates whose record names no group, unsaved
+   *     in a preview
+   */
+  public record Outcome(
+      @NotNull @Unmodifiable Set<UUID> grouped,
+      @NotNull @Unmodifiable List<Material> createdWithoutGroup) {}
 
   /**
    * Writes the values the P4K leads or fills onto a matched material.
@@ -196,6 +228,7 @@ public class P4kCommodityReconciler {
     }
     Material row = new Material();
     row.setName(name);
+    row.setNameDe(P4kFields.germanName(commodity.name()));
     row.setType(commodity.refinedSubtypeGuid() == null ? MaterialType.NO_REFINE : MaterialType.RAW);
     row.setSourceSystems(MaterialSourceSystem.P4K);
     row.setIsVisible(true);

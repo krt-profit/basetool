@@ -21,6 +21,7 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { bindManufacturerMarkPreview } from '/js/hangar/manufacturer-mark-preview.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
@@ -195,6 +196,9 @@ function initMemberHangar() {
         renderSelection();
     });
 
+    /** Shows the manufacturer mark of the picker's current choice; bound below. */
+    let refreshShipTypeMark = () => {};
+
     /**
      * Opens the dialog blank for a new ship of the member.
      *
@@ -211,6 +215,7 @@ function initMemberHangar() {
         field('member-ship-location').value = '';
         field('member-ship-fitted').checked = false;
         field('member-ship-version').value = '';
+        refreshShipTypeMark();
         setInsurance('');
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
@@ -231,6 +236,7 @@ function initMemberHangar() {
         field('member-ship-location').value = btn.getAttribute('data-loc') || '';
         field('member-ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         field('member-ship-version').value = btn.getAttribute('data-version') ?? '';
+        refreshShipTypeMark();
         setInsurance(btn.getAttribute('data-ins'));
         modalDeleteBtn.setAttribute('data-action', action.replace(/\/update$/, '/delete'));
         modalDeleteBtn.hidden = false;
@@ -323,6 +329,11 @@ function initMemberHangar() {
                 .filter((o) => !chosen || o.getAttribute('data-manufacturer-id') === chosen),
         );
     });
+    refreshShipTypeMark = bindManufacturerMarkPreview(
+        manufacturer,
+        shipType,
+        document.getElementById('member-ship-type-mark'),
+    );
 
     const conflict = {
         title: message('conflictTitle'),

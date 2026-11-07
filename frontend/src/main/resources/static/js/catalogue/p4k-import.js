@@ -411,6 +411,7 @@ function createdTotal(result) {
         result.ships,
         result.commodities,
         result.blueprints,
+        result.starmapObjects,
         result.resourceGroups,
     ];
     let sum = 0;
@@ -597,8 +598,12 @@ function renderResult(result) {
         [krtI18nText(i18n().rowCommodities, 'krtP4kImportI18n.rowCommodities'), result.commodities],
         [krtI18nText(i18n().rowBlueprints, 'krtP4kImportI18n.rowBlueprints'), result.blueprints],
         [
+            krtI18nText(i18n().rowStarmapObjects, 'krtP4kImportI18n.rowStarmapObjects'),
+            result.starmapObjects || undefined,
+        ],
+        [
             krtI18nText(i18n().rowResourceGroups, 'krtP4kImportI18n.rowResourceGroups'),
-            result.resourceGroups,
+            result.resourceGroups || undefined,
         ],
     ];
     const body = $('krt-p4k-rows');

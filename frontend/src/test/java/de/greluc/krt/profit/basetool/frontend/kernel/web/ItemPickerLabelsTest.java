@@ -109,6 +109,36 @@ class ItemPickerLabelsTest {
   }
 
   @Test
+  void germanPage_labelsWithTheGermanNameAndKeepsTheName() {
+    InventoryGameItemReferenceDto item =
+        new InventoryGameItemReferenceDto(
+            ID,
+            "FR-66",
+            "Gorgon",
+            "SHIP_ITEM",
+            "SHIELD",
+            1,
+            "A",
+            "MILITARY",
+            false,
+            "FR-66 DE",
+            null);
+
+    assertThat(labels.options(List.of(item)))
+        .containsExactly(new ItemPickerOption(ID, "FR-66", "FR-66 DE · S1 · A · Militär"));
+  }
+
+  @Test
+  void englishPage_labelsWithTheName() {
+    LocaleContextHolder.setLocale(Locale.ENGLISH);
+    InventoryGameItemReferenceDto item =
+        new InventoryGameItemReferenceDto(
+            ID, "P8-SC SMG", null, "WEAPON", null, null, null, null, false, "P8-SC MP", null);
+
+    assertThat(labels.label(item)).isEqualTo("P8-SC SMG");
+  }
+
+  @Test
   void options_ofAMissingPage_isEmpty() {
     assertThat(labels.options((PageResponse<InventoryGameItemReferenceDto>) null)).isEmpty();
   }

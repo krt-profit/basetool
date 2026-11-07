@@ -2,6 +2,11 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
+import {
+    bindPager as bindListPager,
+    renderPager as renderListPager,
+} from '/js/catalogue/catalogue-pager.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
@@ -10,7 +15,15 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
 /** The kinds a report filters by, in display order. */
-const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP'];
+const KINDS = [
+    'MANUFACTURER',
+    'ITEM',
+    'SHIP',
+    'COMMODITY',
+    'BLUEPRINT',
+    'STARMAP_OBJECT',
+    'RESOURCE_GROUP',
+];
 
 /** The change types a report filters by, in display order. */
 const TYPES = [
@@ -23,6 +36,7 @@ const TYPES = [
     'IDENTITY_MISMATCH',
     'UNKNOWN_VALUE',
     'SWEEP_SKIPPED',
+    'LOADOUT_ISSUES',
 ];
 
 /** @type {P4kReportTarget | null} */
@@ -95,27 +109,7 @@ function readJson(url) {
  * @param {{ page?: number, totalPages?: number } | null} page the page the list shows
  */
 function renderPager(nav, page) {
-    if (!nav) return;
-    const total = page && page.totalPages ? page.totalPages : 0;
-    const current = page && page.page ? page.page : 0;
-    nav.hidden = total <= 1;
-    krtHtml.set(
-        nav,
-        krtHtml`<button type="button" class="page-btn" data-page="${current - 1}" aria-label="${t(
-            'pagePrevious',
-        )}">‹</button><span class="page-status"><b>${current + 1}</b> / ${Math.max(
-            total,
-            1,
-        )}</span><button type="button" class="page-btn" data-page="${current + 1}" aria-label="${t(
-            'pageNext',
-        )}">›</button>`,
-    );
-    nav.querySelectorAll('button[data-page]').forEach((btn) => {
-        if (btn instanceof HTMLButtonElement) {
-            const target = Number(btn.dataset.page);
-            btn.disabled = target < 0 || target >= total;
-        }
-    });
+    renderListPager(nav, page, { previous: t('pagePrevious'), next: t('pageNext') });
 }
 
 /**
@@ -125,25 +119,7 @@ function renderPager(nav, page) {
  * @param {(page: number) => void} load loads a page of its list
  */
 function bindPager(id, load) {
-    const nav = $(id);
-    if (!nav) return;
-    nav.addEventListener('click', (e) => {
-        const page = pagerTarget(e);
-        if (page != null) load(page);
-    });
-}
-
-/**
- * Reads the page a pager button asks for.
- *
- * @param {Event} e the click
- * @returns {number | null} the page, or null when the click hit no enabled button
- */
-function pagerTarget(e) {
-    const target = /** @type {Element | null} */ (e.target);
-    const btn = target && target.closest ? target.closest('button[data-page]') : null;
-    if (!(btn instanceof HTMLButtonElement) || btn.disabled) return null;
-    return Number(btn.dataset.page);
+    bindListPager($(id), load);
 }
 
 /**
@@ -288,7 +264,8 @@ function fieldLabel(row) {
 }
 
 /**
- * The value column of a report row: old → new, or the counts of a skipped sweep.
+ * The value column of a report row: old → new, the counts of a skipped sweep, or the unresolved
+ * ports and issue codes of an incomplete loadout.
  *
  * @param {P4kChange} row the row
  * @returns {string} the text
@@ -298,6 +275,11 @@ function valueChange(row) {
         return t('sweepCounts')
             .replace('{0}', row.newValue || '0')
             .replace('{1}', row.oldValue || '0');
+    }
+    if (row.changeType === 'LOADOUT_ISSUES') {
+        return t('loadoutIssues')
+            .replace('{0}', row.newValue || '0')
+            .replace('{1}', row.oldValue || '–');
     }
     if (row.oldValue == null && row.newValue == null) return '';
     return `${row.oldValue == null ? '∅' : row.oldValue} → ${row.newValue == null ? '∅' : row.newValue}`;
@@ -339,17 +321,64 @@ function renderCases(cases) {
                     c.nameEn || c.className || c.guid
                 }</span><span class="cell-sub data-value--mono">${c.guid}</span></td><td>${
                     c.rowName || t('noRow')
-                }</td><td>${fmtTime(c.createdAt)}</td><td class="cell-actions"><button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
-                    'actionKeep',
-                )}</button> <button type="button" class="btn btn-quiet-danger btn-xs" data-resolution="HIDE">${t(
-                    'actionHide',
-                )}</button></td></tr>`,
+                }</td><td>${fmtTime(c.createdAt)}</td><td class="cell-actions">${caseActions(c)}</td></tr>`,
         ),
     );
 }
 
+/** @type {{ id: string, name: string }[]} */
+let resourceGroups = [];
+
 /**
- * Resolves the case of a clicked keep or hide button and removes its row in place.
+ * Loads the resource groups a missing-group case can assign (REQ-P4K-025).
+ *
+ * @returns {Promise<void>} settles once the groups are known
+ */
+function loadResourceGroups() {
+    return readJson(pageUrl('/resource-groups')).then(
+        (/** @type {{ id: string, name: string }[] | null} */ result) => {
+            resourceGroups = Array.isArray(result) ? result : [];
+        },
+    );
+}
+
+/**
+ * The action cell of a case: a group picker for a missing resource group, keep and hide otherwise.
+ *
+ * @param {P4kCase} c the case
+ * @returns {ReturnType<typeof krtHtml>} the cell content
+ */
+function caseActions(c) {
+    if (c.reason === 'NO_RESOURCE_GROUP') {
+        return krtHtml`<select class="form-input" data-group-pick aria-label="${t('pickGroup')}"><option value="">${t(
+            'pickGroup',
+        )}</option>${resourceGroups.map(
+            (g) => krtHtml`<option value="${g.id}">${g.name}</option>`,
+        )}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
+            'actionAssign',
+        )}</button>`;
+    }
+    return krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
+        'actionKeep',
+    )}</button> <button type="button" class="btn btn-quiet-danger btn-xs" data-resolution="HIDE">${t(
+        'actionHide',
+    )}</button>`;
+}
+
+/**
+ * The toast of a resolution.
+ *
+ * @param {string} resolution the resolution sent
+ * @returns {string} the message
+ */
+function resolvedToast(resolution) {
+    if (resolution === 'HIDE') return t('toastHidden');
+    if (resolution === 'ASSIGN') return t('toastAssigned');
+    return t('toastKept');
+}
+
+/**
+ * Resolves the case of a clicked keep, hide or assign button and removes its row in place.
  *
  * @param {MouseEvent} e the click
  */
@@ -360,11 +389,21 @@ function onCasesClick(e) {
     if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
     const caseId = row.dataset.caseId || '';
     const resolution = btn.dataset.resolution || '';
+    const pick = row.querySelector('select[data-group-pick]');
+    const categoryId = pick instanceof HTMLSelectElement ? pick.value : '';
+    if (resolution === 'ASSIGN' && !categoryId) {
+        if (pick instanceof HTMLSelectElement) pick.focus();
+        return;
+    }
     krtFetch
         .write({
             method: 'POST',
             url: pageUrl(`/review-cases/${encodeURIComponent(caseId)}/resolve`),
-            payload: { resolution, version: Number(row.dataset.caseVersion) },
+            payload: {
+                resolution,
+                categoryId: categoryId || null,
+                version: Number(row.dataset.caseVersion),
+            },
             submitter: btn,
             toast: false,
             onConflict() {
@@ -375,7 +414,7 @@ function onCasesClick(e) {
         })
         .then((result) => {
             if (!result.ok) return;
-            showFrontendSuccessToast(resolution === 'HIDE' ? t('toastHidden') : t('toastKept'));
+            showFrontendSuccessToast(resolvedToast(resolution));
             loadCases(casesPage);
         });
 }
@@ -415,13 +454,15 @@ function init() {
     const cases = $('krt-p4k-cases');
     if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
-    loadCases(0);
+    loadResourceGroups().then(() => loadCases(0));
+    refreshDueBanner();
 }
 
 /**
- * Reloads the run list and the review list after an APPLY finished.
+ * Reloads the run list, the review list and the due banner after an APPLY finished.
  */
 export function refreshAfterApply() {
+    refreshDueBanner();
     loadRuns(runsPage);
     loadCases(casesPage);
     if (reportTarget) loadReport(reportPage);

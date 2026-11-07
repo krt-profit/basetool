@@ -50,6 +50,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -545,7 +546,8 @@ public class JobOrderPageController {
    * the detail page's warning banner.
    *
    * @param order the loaded order (any kind)
-   * @return distinct item names lacking derived materials, in line order; never {@code null}
+   * @return distinct item names lacking derived materials in the page language (REQ-P4K-023), in
+   *     line order; never {@code null}
    */
   @NotNull
   private List<String> itemsWithoutDerivedMaterials(JobOrderDto order) {
@@ -553,9 +555,10 @@ public class JobOrderPageController {
     if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
       return names;
     }
+    Locale locale = LocaleContextHolder.getLocale();
     for (JobOrderItemDto item : order.items()) {
       if (item.materials() == null || item.materials().isEmpty()) {
-        String name = item.gameItem() != null ? item.gameItem().name() : null;
+        String name = item.gameItem() != null ? item.gameItem().displayName(locale) : null;
         if (name != null && !names.contains(name)) {
           names.add(name);
         }

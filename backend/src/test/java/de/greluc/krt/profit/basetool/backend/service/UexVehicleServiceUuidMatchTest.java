@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
@@ -423,6 +424,74 @@ class UexVehicleServiceUuidMatchTest {
 
     verify(shipTypeRepository, never()).markUexDeletedExcept(any(), any());
     verify(syncReportService).recordSweep(false);
+  }
+
+  @Test
+  void aP4kKnownShipKeepsItsLedValuesAndTheDisagreementIsReported() {
+    UexVehicleDto dto = vehicleDto(5, "", "Avenger Titan");
+    Manufacturer aegis = new Manufacturer();
+    aegis.setId(UUID.randomUUID());
+    aegis.setName("Aegis Dynamics");
+    ShipType p4kKnown = new ShipType();
+    p4kKnown.setId(UUID.randomUUID());
+    p4kKnown.setName("Aegis Avenger Titan");
+    p4kKnown.setUexVehicleId(5);
+    p4kKnown.setP4kUuid(UUID.randomUUID());
+    p4kKnown.setManufacturer(aegis);
+    p4kKnown.setCrewMax(2);
+    p4kKnown.setMass(48_986.68);
+    p4kKnown.setScu(new BigDecimal("8.000"));
+    p4kKnown.setRole("Light Freight");
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(5)).thenReturn(Optional.of(p4kKnown));
+    when(manufacturerRepository.findByNameIgnoreCase("Origin Jumpworks"))
+        .thenReturn(Optional.of(origin));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    assertEquals(aegis, p4kKnown.getManufacturer());
+    assertEquals(2, p4kKnown.getCrewMax());
+    assertEquals(1, p4kKnown.getCrewMin());
+    assertEquals(48_986.68, p4kKnown.getMass());
+    assertEquals(0, new BigDecimal("8").compareTo(p4kKnown.getScu()));
+    assertEquals("Light Freight", p4kKnown.getRole());
+    assertEquals("Aegis Avenger Titan", p4kKnown.getName());
+    ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+    verify(syncReportService)
+        .logUexEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq("ship_type"),
+            eq(p4kKnown.getP4kUuid()),
+            eq("Avenger Titan"),
+            detail.capture());
+    assertTrue(detail.getValue().contains("column=manufacturer_id;stored=Aegis Dynamics"));
+    assertTrue(detail.getValue().contains("column=crew_max;stored=2;source=1"));
+    assertTrue(detail.getValue().contains("column=scu"));
+    assertTrue(detail.getValue().contains("column=mass"));
+  }
+
+  @Test
+  void aShipWithoutAP4kGuidTakesTheUexValues() {
+    UexVehicleDto dto = vehicleDto(5, "", "Avenger Titan");
+    ShipType uexOnly = new ShipType();
+    uexOnly.setId(UUID.randomUUID());
+    uexOnly.setName("Avenger Titan");
+    uexOnly.setUexVehicleId(5);
+    uexOnly.setCrewMax(2);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(5)).thenReturn(Optional.of(uexOnly));
+    when(manufacturerRepository.findByNameIgnoreCase("Origin Jumpworks"))
+        .thenReturn(Optional.of(origin));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    assertEquals(origin, uexOnly.getManufacturer());
+    assertEquals(1, uexOnly.getCrewMax());
+    verify(syncReportService, never())
+        .logUexEvent(any(), eq(SyncEventType.P4K_DISAGREEMENT), any(), any(), any(), any());
   }
 
   private UexVehicleDto vehicleDto(int id, String uuid, String name) {

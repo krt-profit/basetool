@@ -68,6 +68,16 @@ public interface P4kRecord {
   }
 
   /**
+   * Returns the name a change report row stores (REQ-P4K-014).
+   *
+   * @return the English name, or {@code null} for a kind whose name is a game text
+   */
+  @Nullable
+  default String reportName() {
+    return nameEn();
+  }
+
+  /**
    * Returns the name a row created from the record shows: the English name, or the class name while
    * the name is unknown or a placeholder.
    *

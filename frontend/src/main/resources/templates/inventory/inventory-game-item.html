@@ -13,6 +13,10 @@
         titleText=${gameItemName ?: #messages.msg('inventory.items.drilldown.title')},
         count=${inventoryGameItemPage != null ? inventoryGameItemPage.totalElements() : null},
         countId='inventory-game-item-count', countFor='inventory-game-item-results', actions=null)}"></th:block>
+    <p class="cell-sub" th:if="${gameItemManufacturer != null}" data-testid="game-item-manufacturer">
+        <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${gameItemManufacturer})}"></span>
+        <span th:text="${gameItemManufacturer.displayName(#locale)}">Hersteller</span>
+    </p>
 
     <div id="inventory-game-item-results" class="card card--flush">
         <th:block th:fragment="inventoryGameItemResults">

@@ -107,8 +107,9 @@ public enum SyncEventType {
   SOURCE_RECORDS_RESTORED,
 
   /**
-   * UEX or SC Wiki sync: a value differs from the one the P4K leads on a row the P4K matched; the
-   * P4K value stays (REQ-P4K-024).
+   * A value of a column the P4K catalogue leads disagrees with UEX, the SC Wiki or the catalogue's
+   * own cross-check, and the stored value stays (REQ-P4K-017, REQ-P4K-020, REQ-P4K-024,
+   * REQ-P4K-031); {@code detail} holds {@code column=…;stored=…;source=…} entries.
    */
-  P4K_VALUE_DIFFERS
+  P4K_DISAGREEMENT
 }

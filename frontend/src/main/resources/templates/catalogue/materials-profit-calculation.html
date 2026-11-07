@@ -31,7 +31,7 @@
                         th:value="${ship.id}"
                         th:selected="${ship.id == defaultShipId}"
                         th:attr="data-hull-c=${ship.name != null and #strings.containsIgnoreCase(ship.name, 'hull c')}"
-                        th:text="${ship.name} + ' · ' + ${ship.scu.stripTrailingZeros().toPlainString()} + ' SCU'"></option>
+                        th:text="${ship.displayName(#locale)} + ' · ' + ${ship.scu.stripTrailingZeros().toPlainString()} + ' SCU'"></option>
             </select>
         </div>
 

@@ -82,7 +82,8 @@ class LocationControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
-    LocationDto dto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, false, 1L);
+    LocationDto dto =
+        new LocationDto(UUID.randomUUID(), "Lorville", null, false, false, 1L, null, null, null);
     when(service.getAllLocations(any(Pageable.class), eq(false)))
         .thenReturn(new PageImpl<>(List.of(dto)));
 
@@ -130,7 +131,7 @@ class LocationControllerTest {
   @Test
   void getById_returnsTheServicesReadModel() {
     UUID id = UUID.randomUUID();
-    LocationDto dto = new LocationDto(id, "x", null, false, false, 1L);
+    LocationDto dto = new LocationDto(id, "x", null, false, false, 1L, null, null, null);
     when(service.getLocation(id)).thenReturn(dto);
 
     LocationDto result = controller.getLocation(id);
@@ -140,8 +141,10 @@ class LocationControllerTest {
 
   @Test
   void getRefineryLocations_mapsEachEntityToDto() {
-    LocationDto dto1 = new LocationDto(UUID.randomUUID(), "ARC-L1", null, false, false, 1L);
-    LocationDto dto2 = new LocationDto(UUID.randomUUID(), "CRU-L4", null, false, false, 1L);
+    LocationDto dto1 =
+        new LocationDto(UUID.randomUUID(), "ARC-L1", null, false, false, 1L, null, null, null);
+    LocationDto dto2 =
+        new LocationDto(UUID.randomUUID(), "CRU-L4", null, false, false, 1L, null, null, null);
     when(service.getRefineryLocations()).thenReturn(List.of(dto1, dto2));
 
     List<LocationDto> result = controller.getRefineryLocations();
@@ -151,8 +154,10 @@ class LocationControllerTest {
 
   @Test
   void getHomeLocations_mapsEachEntityToDto() {
-    LocationDto dto1 = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
-    LocationDto dto2 = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 1L);
+    LocationDto dto1 =
+        new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L, null, null, null);
+    LocationDto dto2 =
+        new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 1L, null, null, null);
     when(service.getHomeLocations()).thenReturn(List.of(dto1, dto2));
 
     List<LocationDto> result = controller.getHomeLocations();
@@ -162,7 +167,8 @@ class LocationControllerTest {
 
   @Test
   void create_stripsServerManagedFields_andDelegatesToService() {
-    LocationDto request = new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, false, 99L);
+    LocationDto request =
+        new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, false, 99L, null, null, null);
     Location mappedEntity = new Location();
     mappedEntity.setId(request.id());
     mappedEntity.setVersion(request.version());
@@ -172,7 +178,8 @@ class LocationControllerTest {
     Location persisted = new Location();
     persisted.setId(UUID.randomUUID());
     persisted.setVersion(1L);
-    LocationDto response = new LocationDto(persisted.getId(), "New Loc", "desc", false, false, 1L);
+    LocationDto response =
+        new LocationDto(persisted.getId(), "New Loc", "desc", false, false, 1L, null, null, null);
 
     when(service.createLocation(any())).thenReturn(persisted);
     when(mapper.toDto(persisted)).thenReturn(response);
@@ -191,9 +198,11 @@ class LocationControllerTest {
   @Test
   void update_forwardsIdAndDtoToService_withoutEntityMapping() {
     UUID id = UUID.randomUUID();
-    LocationDto request = new LocationDto(id, "Renamed", "desc", false, false, 4L);
+    LocationDto request =
+        new LocationDto(id, "Renamed", "desc", false, false, 4L, null, null, null);
     Location updated = new Location();
-    LocationDto response = new LocationDto(id, "Renamed", "desc", false, false, 5L);
+    LocationDto response =
+        new LocationDto(id, "Renamed", "desc", false, false, 5L, null, null, null);
 
     when(service.updateLocation(id, request)).thenReturn(updated);
     when(mapper.toDto(updated)).thenReturn(response);

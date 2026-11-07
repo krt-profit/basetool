@@ -3612,6 +3612,7 @@
       },
       "type": "timeseries",
       "title": "Exchange catalogue resolutions/hour by kind and status",
+      "description": "References catalog/resolve answered, by catalogue and outcome (REQ-XCH-012), and the blueprint references that still carry the deprecated bt instead of guid (REQ-XCH-015); bt is removed once that line stays at zero after its 90-day window.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -3643,6 +3644,15 @@
           "expr": "sum by (kind, status) (increase(basetool_exchange_resolve_refs_total[1h]))",
           "refId": "A",
           "legendFormat": "{{kind}} {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(increase(basetool_exchange_blueprint_bt_refs_total[1h]))",
+          "refId": "B",
+          "legendFormat": "blueprint refs with deprecated bt",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

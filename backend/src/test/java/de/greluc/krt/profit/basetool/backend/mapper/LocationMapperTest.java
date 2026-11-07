@@ -57,7 +57,8 @@ class LocationMapperTest {
   @Test
   void toEntity_shouldMapExposedFields() {
     UUID id = UUID.randomUUID();
-    LocationDto dto = new LocationDto(id, "Lorville", "Hurston city", true, true, 1L);
+    LocationDto dto =
+        new LocationDto(id, "Lorville", "Hurston city", true, true, 1L, null, null, null);
 
     Location entity = mapper.toEntity(dto);
 

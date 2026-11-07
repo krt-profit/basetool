@@ -6,6 +6,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 /** @type {HTMLInputElement | null} */
 let searchInput = null;
@@ -189,7 +190,7 @@ function renderResults(items) {
         const cls = `krt-pi-typeahead-item krt-bp-result${
             blocked ? ' krt-bp-result-owned' : ''
         }${isStaged ? ' krt-bp-result-staged' : ''}`;
-        let meta = it.manufacturerName || '';
+        let meta = localisedName(it.manufacturerName, it.manufacturerNameDe);
         if (blocked) {
             meta = krtI18nText(i18n().owned, 'krtBlueprintsI18n.owned');
         } else if (it.variantCount && it.variantCount > 1) {

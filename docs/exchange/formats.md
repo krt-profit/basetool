@@ -20,7 +20,8 @@ entry:
 
 | Field | What it is |
 | --- | --- |
-| `bt` | The Basetool's own key, as the feed and `catalog/resolve` answer it. Always wins. |
+| `guid` | A blueprint product's key: the DataForge GUID of the item it produces. Always wins. Blueprints only. |
+| `bt` | The Basetool's own key, as the feed and `catalog/resolve` answer it. Deprecated for blueprints (see below). |
 | `scRecord` | The DataForge record name (the scmdb `tag`), case-insensitive. Not unique. |
 | `scGuid` | The game entity GUID. |
 | `uexId` | The UEX id. |
@@ -29,8 +30,14 @@ entry:
 
 When no field resolves to exactly one entry, the first that resolved to several decides: the answer
 is `ambiguous` with at most ten candidates `{bt, name}`. Fuzzy suggestions are always `ambiguous`,
-even a single one, because they are never taken without the member. Store the `bt` the server answers
-and send it from then on.
+even a single one, because they are never taken without the member. Store the `guid` the server
+answers for a blueprint, and the `bt` for any other entry, and send it from then on.
+
+**`bt` on a blueprint is deprecated.** A blueprint product is keyed by the GUID of the item it
+produces, and the server answers it as `guid`. A blueprint's `bt` keeps working, including a
+name key a client stored earlier, for 90 days from the release that added `guid`; the
+[changelog](changelog.md) announces the removal with its date. A blueprint still known only by
+its name carries no `guid` until the Basetool resolves it; keep its `bt` until then.
 
 `POST /exchange/v1/catalog/resolve` resolves up to 500 references of one `kind` (`BLUEPRINT`,
 `ITEM`, `MATERIAL`, `SHIP_TYPE`) at a time. A reference with a `locKey` whose key fields, the
@@ -51,11 +58,14 @@ send 0 when the quality is not known. An item has none and is stored at 0.
 
 ## Place — `location-ref`
 
-A warehouse location, by `uex: {kind: CITY | SPACE_STATION, id}`, by exact `name`, or both; the
-UEX link is tried first. The **warehouse** is the Basetool's record of the org's stock, the
-*Inventory* area of the web app; its locations are the places stock and ships can be recorded at.
-`GET /exchange/v1/catalog/locations` lists them. A place without a warehouse location is
-`LOCATION_UNKNOWN`; it is never created.
+A warehouse location, by `guid`, by `uex: {kind: CITY | SPACE_STATION, id}`, by exact `name`, or
+any of them; `guid` is tried first, then the UEX link, then the name, and a value that matches no
+location falls through to the next. `guid` is the lower-case DataForge GUID of the starmap object
+the location stands for: its own, else its city's, else its space station's. The feeds send it
+beside `uex`, which stays; a location linked to no starmap object has none. The **warehouse** is
+the Basetool's record of the org's stock, the *Inventory* area of the web app; its locations are
+the places stock and ships can be recorded at. `GET /exchange/v1/catalog/locations` lists them.
+A place without a warehouse location is `LOCATION_UNKNOWN`; it is never created.
 
 ## Provenance — `provenance`
 

@@ -76,6 +76,13 @@ enum P4kSweepTarget {
       "e.outputName",
       "e.scwikiSyncedAt IS NOT NULL AND e.scwikiDeletedAt IS NULL"),
 
+  /**
+   * {@code starmap_object}; its name is a game text, so the report names it by its class name, and
+   * no other source lists it.
+   */
+  STARMAP_OBJECT(
+      P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL"),
+
   /** {@code material_category}: no other source lists a resource group. */
   RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0");
 
@@ -108,6 +115,7 @@ enum P4kSweepTarget {
       case MANUFACTURER -> MANUFACTURER;
       case COMMODITY -> COMMODITY;
       case BLUEPRINT -> BLUEPRINT;
+      case STARMAP_OBJECT -> STARMAP_OBJECT;
       case RESOURCE_GROUP -> RESOURCE_GROUP;
     };
   }
@@ -151,5 +159,17 @@ enum P4kSweepTarget {
   @NotNull
   String rowNamesQuery() {
     return "SELECT e.id, " + namePath + " FROM " + entity + " e WHERE e.id IN :ids";
+  }
+
+  /**
+   * The JPQL that counts the kind's rows a sweep stamped as gone (REQ-OBS-022).
+   *
+   * @return the query text, selecting one {@code Long}
+   */
+  @NotNull
+  String stampedRowsCountQuery() {
+    return "SELECT COUNT(e) FROM "
+        + entity
+        + " e WHERE e.p4kUuid IS NOT NULL AND e.p4kDeletedAt IS NOT NULL";
   }
 }

@@ -124,6 +124,31 @@ class SyncReportServiceTest {
   }
 
   @Test
+  void logP4kDisagreement_recordsADifferingValue_andIgnoresAnEqualOrAbsentOne() {
+    UUID runId = UUID.randomUUID();
+    UUID guid = UUID.randomUUID();
+
+    boolean differing =
+        service.logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "manufacturer", guid, "name", "Aegis", "Aegis UEX ");
+    boolean equalIgnoringCase =
+        service.logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "manufacturer", guid, "name", "Aegis", "aegis");
+    boolean absent =
+        service.logP4kDisagreement(
+            SyncSourceSystem.SCWIKI, runId, "manufacturer", guid, "name", "Aegis", " ");
+
+    assertEquals(List.of(true, false, false), List.of(differing, equalIgnoringCase, absent));
+    ArgumentCaptor<ExternalSyncReport> saved = ArgumentCaptor.forClass(ExternalSyncReport.class);
+    verify(repository).save(saved.capture());
+    ExternalSyncReport row = saved.getValue();
+    assertEquals(SyncSourceSystem.UEX, row.getSourceSystem());
+    assertEquals(SyncEventType.P4K_DISAGREEMENT, row.getEventType());
+    assertEquals(guid, row.getExternalUuid());
+    assertEquals("column=name;stored=Aegis;source=Aegis UEX", row.getDetail());
+  }
+
+  @Test
   void pruneRuns_deletesEverythingOutsideTheKeepSet() {
     List<UUID> kept = List.of(UUID.randomUUID(), UUID.randomUUID());
     when(repository.findRecentRunIds(eq(SyncSourceSystem.SCWIKI), any(Pageable.class)))

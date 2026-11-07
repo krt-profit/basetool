@@ -210,15 +210,16 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
-   * Projects active blueprint recipes to output name, Wiki key, manufacturer name and output-item
-   * id for the product search; the latter two are {@code null} when unresolved.
+   * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
+   * produced-item GUID and German manufacturer name for the product search; every column after the
+   * Wiki key is {@code null} when unresolved.
    *
    * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
    * @return projection rows for every matching active recipe
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
       AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
@@ -226,16 +227,16 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 
   /**
-   * Projects every active blueprint recipe to {@code (id, outputName)} for resolving a product key
-   * to a representative recipe.
+   * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid)} for
+   * resolving a product key to a representative recipe.
    *
-   * @return id + output name for every active recipe with a non-null output name, ordered by name
-   *     then Wiki key then id
+   * @return id, output name and produced-item GUID for every active recipe with a non-null output
+   *     name, ordered by name then Wiki key then id
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow(b.id,
-      b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
+      b.outputName, b.producedItemGuid) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
       NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC
       """)
   List<BlueprintIdNameRow> findActiveIdNameRows();
@@ -253,11 +254,12 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       """
       SELECT new
       de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository$ExchangeBlueprintKeyRow(
-      b.outputName, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid, oi.uexItemId,
-      oi.nameKey)
+      b.outputName, b.producedItemGuid, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid,
+      oi.uexItemId, oi.nameKey)
       FROM Blueprint b LEFT JOIN b.outputItem oi
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
-      AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR oi.externalUuid IN :guids
+      AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR b.producedItemGuid IN :guids
+      OR oi.externalUuid IN :guids
       OR oi.p4kUuid IN :guids OR oi.uexItemId IN :uexIds OR LOWER(oi.nameKey) IN :nameKeys)
       """)
   List<ExchangeBlueprintKeyRow> findExchangeKeyRows(
@@ -269,7 +271,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * The game identifiers of one active blueprint and its output item, for resolving a blueprint by
    * GUID, UEX id or name key (REQ-XCH-012).
    *
-   * @param outputName the blueprint's output name, from which its product key is derived
+   * @param outputName the blueprint's output name, from which a name key is derived
+   * @param producedItemGuid the produced item's GUID, the product key when present, or {@code null}
    * @param blueprintScwikiUuid the blueprint's Wiki UUID, or {@code null}
    * @param blueprintP4kUuid the blueprint's game-file UUID, or {@code null}
    * @param itemExternalUuid the output item's Wiki UUID, or {@code null}
@@ -279,6 +282,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   record ExchangeBlueprintKeyRow(
       String outputName,
+      UUID producedItemGuid,
       UUID blueprintScwikiUuid,
       UUID blueprintP4kUuid,
       UUID itemExternalUuid,

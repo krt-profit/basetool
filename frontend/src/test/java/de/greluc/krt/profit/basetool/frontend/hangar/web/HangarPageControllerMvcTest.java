@@ -194,7 +194,9 @@ class HangarPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"hangar-filter-form\"")))
         .andExpect(content().string(containsString("id=\"hangar-ship-filter\"")))
         .andExpect(content().string(containsString("name=\"search\"")))
-        .andExpect(content().string(containsString("Avenger Titan")));
+        .andExpect(content().string(containsString("Avenger Titan")))
+        .andExpect(content().string(containsString("data-testid=\"manufacturer-badge\"")))
+        .andExpect(content().string(containsString("data-testid=\"ship-type-mark\"")));
   }
 
   @Test

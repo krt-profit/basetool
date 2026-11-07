@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,9 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
  * REST controller for the order-detail Item-Bestand panel: lists the game-item stock earmarked to a
  * job order, grouped per game item (REQ-ORDERS-028).
  *
- * <p>Reading requires {@code canSeeJobOrder}; per-entry owner and location are redacted via {@link
- * JobOrderInventoryOwnerRedactor} unless {@code canSeeJobOrderInventoryOwners} holds
- * (REQ-ORDERS-029).
+ * <p>Reading requires {@code canSeeJobOrder}; every such viewer sees each entry's owner and
+ * location (REQ-ORDERS-029).
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -50,14 +47,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderItemStockController {
 
   private final JobOrderStockReadService jobOrderStockReadService;
-  private final JobOrderAccessPolicy jobOrderAccessPolicy;
-  private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
    * Returns the game-item stock earmarked to the given job order, grouped per game item.
-   *
-   * <p>Owner and location are blanked when {@code canSeeJobOrderInventoryOwners} is {@code false}
-   * (REQ-ORDERS-029); amounts and the delivered marker are always kept.
    *
    * @param jobOrderId job order id
    * @return name-sorted game-item groups with per-entry owner, location, amounts, this-order slice,
@@ -79,10 +71,6 @@ public class JobOrderItemStockController {
   @GetMapping("/{jobOrderId}/item-stock")
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   public List<JobOrderItemStockGroupDto> getItemStock(@PathVariable @NotNull UUID jobOrderId) {
-    List<JobOrderItemStockGroupDto> groups =
-        jobOrderStockReadService.getItemStockForJobOrder(jobOrderId);
-    return jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)
-        ? groups
-        : inventoryOwnerRedactor.redactItemStockGroups(groups);
+    return jobOrderStockReadService.getItemStockForJobOrder(jobOrderId);
   }
 }

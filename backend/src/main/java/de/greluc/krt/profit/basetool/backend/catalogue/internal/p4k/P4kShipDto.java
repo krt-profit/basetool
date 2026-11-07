@@ -34,6 +34,20 @@ import org.jetbrains.annotations.Nullable;
  * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
  * @param playability {@code player}, {@code ai}, {@code mission}, {@code special}, another value or
  *     {@code null}; read through {@link P4kClosedSet#parse} as a {@link P4kShipPlayability}
+ * @param variantOf the GUID of the base of the ship's variant group, {@code null} for a base and an
+ *     ungrouped ship
+ * @param role the localised role
+ * @param career the localised career
+ * @param crewSize the crew size, or {@code null}
+ * @param mass the hull mass in kilograms, or {@code null}
+ * @param hullHealth the hull hit points, or {@code null}
+ * @param size the item size of the attach definition, or {@code null}
+ * @param vehicleKind {@code spaceship}, {@code groundVehicle}, another value or {@code null}; read
+ *     as a {@link P4kVehicleKind}
+ * @param cargoScu the cargo capacity in SCU, a lower bound while {@code cargoGridsWithIssue} is
+ *     above 0, or {@code null}
+ * @param cargoGridsWithIssue the cargo grids without a readable capacity, or {@code null}
+ * @param insurance the insurance facts, or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kShipDto(
@@ -43,5 +57,16 @@ public record P4kShipDto(
     @Nullable P4kLocalisedText name,
     @Nullable P4kLocalisedText description,
     @Nullable String manufacturerGuid,
-    @Nullable String playability)
+    @Nullable String playability,
+    @Nullable String variantOf,
+    @Nullable P4kLocalisedText role,
+    @Nullable P4kLocalisedText career,
+    @Nullable Integer crewSize,
+    @Nullable Double mass,
+    @Nullable Double hullHealth,
+    @Nullable Integer size,
+    @Nullable String vehicleKind,
+    @Nullable Double cargoScu,
+    @Nullable Integer cargoGridsWithIssue,
+    @Nullable P4kShipInsurance insurance)
     implements P4kRecord {}

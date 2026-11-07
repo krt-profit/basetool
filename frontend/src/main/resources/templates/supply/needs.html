@@ -61,7 +61,7 @@
                                 <span class="cell-sub" th:text="${n.orgUnitName()}">Spezialkommando ARGON</span>
                             </td>
                             <td th:attr="data-label=#{supply.need.entry}">
-                                <span class="cell-title" th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</span>
+                                <span class="cell-title" th:text="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}">Quantanium</span>
                                 <span class="cell-sub">
                                     <span th:if="${n.gameItem() != null}" class="supply-item-chips" data-testid="supply-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${n.gameItem()})}"></span>
                                     <span th:if="${n.qualityTier() != null}"
@@ -95,7 +95,7 @@
                                             data-testid="supply-pledge"
                                             th:if="${n.status() == 'OPEN'}"
                                             th:data-need-id="${n.id()}" th:data-unit-id="${n.orgUnitId()}"
-                                            th:data-entry="${n.material() != null ? n.material().name() : n.gameItem().name()}"
+                                            th:data-entry="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}"
                                             th:data-quantity-type="${n.quantityType()}"
                                             th:text="#{supply.pledge.action}">Spenden</button>
                                     <th:block th:if="${n.canManage() and (n.status() == 'OPEN' or n.status() == 'PAUSED')}">
@@ -109,7 +109,7 @@
                                                 th:data-reason="${n.purchaseReason()}"
                                                 th:data-max-price="${n.maxUnitPrice()}"
                                                 th:data-quantity-type="${n.quantityType()}"
-                                                th:data-entry="${n.material() != null ? n.material().name() : n.gameItem().name()}"
+                                                th:data-entry="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}"
                                                 th:attr="title=#{supply.need.edit},aria-label=#{supply.need.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                                         <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'supply-need-more-' + n.id()}, items=~{::supply-need-more-items})}">
                                             <th:block th:ref="supply-need-more-items">
@@ -163,13 +163,13 @@
                     <div class="form-group" id="supply-need-material-row">
                         <label for="supply-need-material" th:text="#{supply.need.material}">Material</label>
                         <select id="supply-need-material">
-                            <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.name()}">Quantanium</option>
+                            <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.displayName(#locale)}">Quantanium</option>
                         </select>
                     </div>
                     <div class="form-group" id="supply-need-item-row" hidden>
                         <label for="supply-need-item" th:text="#{supply.need.item}">Item</label>
                         <select id="supply-need-item">
-                            <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.name()}">Item</option>
+                            <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.displayName(#locale)}">Item</option>
                         </select>
                     </div>
                     <div class="form-group" id="supply-need-tier-row">

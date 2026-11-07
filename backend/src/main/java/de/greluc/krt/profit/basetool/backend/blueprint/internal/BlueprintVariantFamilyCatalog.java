@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BlueprintVariantFamilyCatalog {
 
   private final BlueprintRepository blueprintRepository;
-  private final BlueprintNameNormalizer normalizer;
+  private final ProductKeys productKeys;
   private final BlueprintVariantFamilyResolver familyResolver;
 
   /**
@@ -65,7 +65,7 @@ public class BlueprintVariantFamilyCatalog {
       if (outputName == null) {
         continue;
       }
-      String productKey = normalizer.normalize(outputName);
+      String productKey = productKeys.of(row.producedItemGuid(), outputName);
       if (productKey.isEmpty()) {
         continue;
       }

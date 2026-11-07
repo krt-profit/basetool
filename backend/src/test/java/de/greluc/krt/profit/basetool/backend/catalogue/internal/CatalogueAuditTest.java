@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -270,9 +271,16 @@ class CatalogueAuditTest {
   }
 
   @Test
-  void location_createUpdateDelete_updateNamesChangedFieldsOnly() {
+  void location_updateDelete_updateNamesChangedFieldsOnly() {
     LocationService locationService =
-        new LocationService(locationRepository, locationMapper, List.of(), auditRecorder);
+        new LocationService(
+            locationRepository,
+            locationMapper,
+            List.of(),
+            auditRecorder,
+            mock(StarmapObjectRepository.class),
+            mock(StarmapVisibility.class),
+            mock(StarmapPlaceRows.class));
     Location location = new Location();
     location.setId(ID);
     location.setName("Home");
@@ -281,11 +289,10 @@ class CatalogueAuditTest {
     when(locationRepository.save(location)).thenReturn(location);
     when(locationRepository.findById(ID)).thenReturn(Optional.of(location));
 
-    locationService.createLocation(location);
-    locationService.updateLocation(ID, new LocationDto(ID, "Home", "new text", true, false, 0L));
+    locationService.updateLocation(
+        ID, new LocationDto(ID, "Home", "new text", true, false, 0L, null, null, null));
     locationService.deleteLocation(ID);
 
-    verifyEvent(AuditEventType.CATALOGUE_LOCATION_CREATED, "Home", "hidden=false");
     verifyEvent(AuditEventType.CATALOGUE_LOCATION_UPDATED, "Home", "changed=description,hidden");
     verify(auditRecorder).record(AuditEventType.CATALOGUE_LOCATION_DELETED, ID, "Home", null, null);
   }
@@ -293,7 +300,14 @@ class CatalogueAuditTest {
   @Test
   void location_updateWithoutChange_recordsNothing() {
     LocationService locationService =
-        new LocationService(locationRepository, locationMapper, List.of(), auditRecorder);
+        new LocationService(
+            locationRepository,
+            locationMapper,
+            List.of(),
+            auditRecorder,
+            mock(StarmapObjectRepository.class),
+            mock(StarmapVisibility.class),
+            mock(StarmapPlaceRows.class));
     Location location = new Location();
     location.setId(ID);
     location.setName("Home");
@@ -301,7 +315,8 @@ class CatalogueAuditTest {
     when(locationRepository.findById(ID)).thenReturn(Optional.of(location));
     when(locationRepository.save(location)).thenReturn(location);
 
-    locationService.updateLocation(ID, new LocationDto(ID, "Home", null, false, false, 0L));
+    locationService.updateLocation(
+        ID, new LocationDto(ID, "Home", null, false, false, 0L, null, null, null));
 
     verifyNoInteractions(auditRecorder);
   }

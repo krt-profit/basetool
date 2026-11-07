@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.scope.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -57,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -89,6 +91,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 class GrantCascadeAggregateAccessIntegrationTest {
 
   @Autowired private MissionAccessPolicy missionAccessPolicy;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private InventoryAccessPolicy inventoryAccessPolicy;
   @Autowired private RefineryAccessPolicy refineryAccessPolicy;
   @Autowired private RefineryOrderController refineryOrderController;
@@ -154,7 +159,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
 
       Location location = new Location();
       location.setName("Cascade Depot " + tag);
-      location = locationRepository.save(location);
+      location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
       Material material = new Material();
       material.setName("Cascade Ore " + tag);
       material.setType(MaterialType.REFINED);

@@ -67,6 +67,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -509,7 +510,10 @@ class CachedCatalogueEntityInvariantTest {
                           "changed",
                           true,
                           true,
-                          locationService.getLocation(id).version())));
+                          locationService.getLocation(id).version(),
+                          null,
+                          null,
+                          null)));
         });
     cases.put(
         "LocationService#deleteLocation",
@@ -948,8 +952,11 @@ class CachedCatalogueEntityInvariantTest {
   }
 
   private Location newLocation() {
+    UUID node = TestPlaces.visibleNode(new JdbcTemplate(dataSource));
+    cleanup.push(() -> deleteRow("starmap_object", node));
     Location location = new Location();
     location.setName("G19 location " + UUID.randomUUID());
+    location.setStarmapObjectId(node);
     return location;
   }
 

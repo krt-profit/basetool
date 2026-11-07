@@ -33,3 +33,33 @@ INSERT INTO location (id, name, city_id, hidden)
 VALUES ('88888888-8888-8888-8888-888888888888', 'E2E Personal Inventory City',
         '66666666-6666-6666-6666-666666666666', false)
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO location (id, version, created_at, updated_at, name, city_id, hidden)
+VALUES ('0e2e0000-0000-4000-8000-000000008001', 0, now(), now(),
+        'E2E Collection Transfer Alt Hub', '11111111-1111-1111-1111-111111111111', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO terminal (id, version, created_at, updated_at, name, type, is_available_live,
+                      star_system_name, city_name, hidden, has_loading_dock, is_auto_load)
+VALUES ('0e2e0000-0000-4000-8000-000000008101', 0, now(), now(),
+        'E2E Matrix Trade Terminal', 'commodity', true, 'Stanton', 'E2E Refinery City',
+        false, true, true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO material (id, version, created_at, updated_at, id_commodity, name, type,
+                      quantity_type, is_raw, is_refined, is_visible, source_systems)
+VALUES ('0e2e0000-0000-4000-8000-000000008201', 0, now(), now(), 900801,
+        'E2E Matrix Commodity Alpha', 'REFINED', 'SCU', 0, 1, true, 'UEX_ONLY'),
+       ('0e2e0000-0000-4000-8000-000000008202', 0, now(), now(), 900802,
+        'E2E Matrix Commodity Beta', 'REFINED', 'SCU', 0, 1, true, 'UEX_ONLY')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO material_price (id, version, created_at, updated_at, material_id, terminal_id,
+                            price_buy, price_sell, status_buy, status_sell)
+VALUES ('0e2e0000-0000-4000-8000-000000008301', 0, now(), now(),
+        '0e2e0000-0000-4000-8000-000000008201', '0e2e0000-0000-4000-8000-000000008101',
+        100, 120, true, true),
+       ('0e2e0000-0000-4000-8000-000000008302', 0, now(), now(),
+        '0e2e0000-0000-4000-8000-000000008202', '0e2e0000-0000-4000-8000-000000008101',
+        200, 240, true, true)
+ON CONFLICT (id) DO NOTHING;

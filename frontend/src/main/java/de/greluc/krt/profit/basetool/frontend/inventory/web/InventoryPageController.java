@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -41,6 +42,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -190,23 +192,25 @@ public class InventoryPageController {
    * @param materialId the drilled-into material
    * @param items the rows of the current page
    * @param materials the material catalog
-   * @return the material's name, or {@code null} when neither source knows it
+   * @return the material's display name in the request locale (REQ-P4K-023), or {@code null} when
+   *     neither source knows it
    */
   @Nullable
   private static String drilldownMaterialName(
       @NotNull UUID materialId,
       @NotNull List<InventoryItemDto> items,
       @NotNull List<MaterialReferenceDto> materials) {
+    Locale locale = LocaleContextHolder.getLocale();
     return items.stream()
         .map(InventoryItemDto::material)
         .filter(Objects::nonNull)
-        .map(MaterialReferenceDto::name)
+        .map(material -> material.displayName(locale))
         .filter(Objects::nonNull)
         .findFirst()
         .or(() ->
             materials.stream()
                 .filter(m -> materialId.equals(m.id()))
-                .map(MaterialReferenceDto::name)
+                .map(m -> m.displayName(locale))
                 .findFirst())
         .orElse(null);
   }
@@ -271,9 +275,18 @@ public class InventoryPageController {
         items.stream()
             .map(InventoryItemDto::gameItem)
             .filter(Objects::nonNull)
-            .map(InventoryGameItemReferenceDto::name)
+            .map(item -> item.displayName(LocaleContextHolder.getLocale()))
             .findFirst()
             .orElseGet(() -> catalogue.map(ItemCatalogueDetailsDto::name).orElse(null)));
+    model.addAttribute(
+        "gameItemManufacturer",
+        items.stream()
+            .map(InventoryItemDto::gameItem)
+            .filter(Objects::nonNull)
+            .map(InventoryGameItemReferenceDto::manufacturerRef)
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null));
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory/inventory-game-item :: inventoryGameItemResults";
     }

@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +64,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -85,6 +88,10 @@ import tools.jackson.databind.json.JsonMapper;
 class DualUseRequestBodyProofTest {
 
   @Autowired private WebApplicationContext context;
+
+  @Autowired private CityRepository cityRepository;
+
+  @Autowired private JdbcTemplate jdbc;
 
   @Autowired private UserRepository userRepository;
 
@@ -224,7 +231,15 @@ class DualUseRequestBodyProofTest {
         id(
             adminPost(
                 "/api/v1/locations",
-                body("name", "Victim Loc", "hidden", false, "homeLocation", false)));
+                body(
+                    "name",
+                    "Victim Loc",
+                    "hidden",
+                    false,
+                    "homeLocation",
+                    false,
+                    "starmapObjectId",
+                    TestPlaces.visibleNode(jdbc))));
 
     JsonNode created =
         adminPost(
@@ -239,7 +254,9 @@ class DualUseRequestBodyProofTest {
                 "homeLocation",
                 false,
                 "version",
-                7));
+                7,
+                "starmapObjectId",
+                TestPlaces.visibleNode(jdbc)));
     UUID createdId = id(created);
     assertThat(createdId).isNotEqualTo(victimId);
 
@@ -654,7 +671,7 @@ class DualUseRequestBodyProofTest {
     Location location = new Location();
     location.setName("Dual-Use Refinery");
     location.setSpaceStation(spaceStation);
-    return locationRepository.save(location);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private List<Map<String, Object>> goods() {

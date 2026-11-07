@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
@@ -60,6 +62,8 @@ import org.springframework.transaction.annotation.Transactional;
 class InventoryItemCatalogQueryDataTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private GameItemRepository gameItemRepository;
@@ -92,7 +96,7 @@ class InventoryItemCatalogQueryDataTest {
 
     location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     material = new Material();
     material.setName("Quantanium-" + UUID.randomUUID());

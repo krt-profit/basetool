@@ -178,6 +178,13 @@ public final class ExchangeMetricNames {
   public static final String EXCHANGE_RESOLVE_REFS = "basetool.exchange.resolve.refs";
 
   /**
+   * Counter {@code basetool_exchange_blueprint_bt_refs_total} — one per blueprint reference that
+   * carries the deprecated {@code bt}, watching its use through the 90-day window before it is
+   * removed (REQ-XCH-015, ADR-0343).
+   */
+  public static final String EXCHANGE_BLUEPRINT_BT_REFS = "basetool.exchange.blueprint.bt.refs";
+
+  /**
    * Tag key: the registry change on {@link #EXCHANGE_REGISTRY_CHANGES}, bounded by {@code
    * ExchangeRegistryAction}.
    */

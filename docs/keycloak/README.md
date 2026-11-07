@@ -181,7 +181,19 @@ mapper), update this file in the same PR — secrets stay redacted.
 The backend's user sync (`KeycloakService`, `UserSyncTask`) authenticates to the Keycloak Admin API
 as the `backend-service` confidential client's service account. Because the built-in
 `realm-management` client is omitted from the reference above, the required grants are documented
-here instead. The service account MUST hold **all three** `realm-management` client roles:
+here instead.
+
+**Keycloak 26.8.2 requires an Admin API audience and scope.** Assign the built-in `kc-admin-api`
+client scope to `backend-service` as a default scope through the realm provisioner (REQ-OPS-033).
+The scope supplies the realm's Admin API audience and includes `kc-admin-api` in the token's
+`scope` claim. Roles alone are insufficient: custom clients without this assignment receive `401`.
+The provisioner references the existing built-in scope and leaves its mapper and Keycloak's
+security check intact; a missing built-in scope requires a correctly upgraded realm. Generated
+sandbox/E2E realms carry the same scope and built-in mapper. Existing realms need the usual
+reviewed provisioner dry run and apply; shipping application images does not assign the scope.
+[Upstream upgrade contract](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/upgrading/topics/changes/changes-26_8_2.adoc#admin-rest-api-now-enforces-an-audience-check).
+
+The service account MUST hold **all three** `realm-management` client roles:
 
 |     Role     |                                                                                                 Why                                                                                                 |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

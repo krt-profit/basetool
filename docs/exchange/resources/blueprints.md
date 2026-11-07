@@ -10,7 +10,7 @@ A [`blueprint`](../schemas/) is one product in the set:
 | Field | Meaning |
 | --- | --- |
 | `key` | Opaque identifier of the product. It equals `ref.bt`: the Basetool's product key, or `h:` and a SHA-256 when that key is longer than 128 characters. |
-| `ref` | `{bt, name}`; `name` is the product's display name, cut to 200 characters. |
+| `ref` | `{guid, bt, name}`; `guid` is the GUID of the item the product produces, its key, and is absent while the Basetool knows the product only by its name; `bt` is deprecated ([formats](../formats.md)); `name` is the product's display name, cut to 200 characters. |
 | `acquiredAt` | When the member got it, when known. |
 | `provenance` | `{source}` when the Basetool recorded where the blueprint came from. |
 | `isDefault` | Granted to every member by default. It cannot be removed. |

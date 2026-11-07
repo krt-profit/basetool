@@ -223,7 +223,10 @@ public class ExchangeStockFeedService {
                 lot.getGameItemSize(),
                 lot.getGameItemGrade(),
                 lot.getGameItemClass()),
-        new ExchangeLocationDto(cut(lot.getLocationName()), uex(lot)),
+        new ExchangeLocationDto(
+            cut(lot.getLocationName()),
+            ExchangeCatalogService.uex(lot.getUexCityId(), lot.getUexSpaceStationId()),
+            lot.getLocationGuid()),
         lot.getQuality(),
         lot.getStolen(),
         new ExchangeQuantityDto(amount(lot.getAmount(), unit), unit),
@@ -264,23 +267,6 @@ public class ExchangeStockFeedService {
    */
   static @Nullable Boolean flag(@Nullable Integer value) {
     return value == null ? null : value == 1;
-  }
-
-  /**
-   * Returns the UEX place of a lot's location; a city link wins over a space-station link.
-   *
-   * @param lot the lot
-   * @return the place, or {@code null} when the location links none
-   */
-  private static @Nullable ExchangeLocationDto.UexRef uex(@NotNull ExchangeStockLotRow lot) {
-    if (lot.getUexCityId() != null && lot.getUexCityId() > 0) {
-      return new ExchangeLocationDto.UexRef(ExchangeCatalogService.KIND_CITY, lot.getUexCityId());
-    }
-    if (lot.getUexSpaceStationId() != null && lot.getUexSpaceStationId() > 0) {
-      return new ExchangeLocationDto.UexRef(
-          ExchangeCatalogService.KIND_SPACE_STATION, lot.getUexSpaceStationId());
-    }
-    return null;
   }
 
   /**

@@ -239,6 +239,48 @@ public class SyncReportService {
   }
 
   /**
+   * Records a UEX or SC Wiki value that differs from the value the P4K leads on a P4K-known row,
+   * which keeps its value (REQ-P4K-020); an absent source value, or one equal to the P4K value
+   * ignoring case, is no finding.
+   *
+   * @param source the source serving the value, {@code UEX} or {@code SCWIKI}
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param aggregate the aggregate the event concerns
+   * @param p4kUuid the row's P4K GUID
+   * @param column the column the values belong to
+   * @param p4kValue the value the row keeps
+   * @param sourceValue the value the source serves
+   * @return whether an event was recorded
+   */
+  public boolean logP4kDisagreement(
+      @NotNull SyncSourceSystem source,
+      @NotNull UUID runId,
+      @NotNull String aggregate,
+      @NotNull UUID p4kUuid,
+      @NotNull String column,
+      @Nullable String p4kValue,
+      @Nullable String sourceValue) {
+    if (sourceValue == null
+        || sourceValue.isBlank()
+        || sourceValue.strip().equalsIgnoreCase(p4kValue)) {
+      return false;
+    }
+    repository.save(
+        ExternalSyncReport.builder()
+            .runId(runId)
+            .ranAt(Instant.now())
+            .sourceSystem(source)
+            .eventType(SyncEventType.P4K_DISAGREEMENT)
+            .aggregate(aggregate)
+            .externalUuid(p4kUuid)
+            .externalName(p4kValue)
+            .detail(P4kFields.disagreement(column, p4kValue, sourceValue.strip()))
+            .build());
+    countSyncEvent(source, SyncEventType.P4K_DISAGREEMENT);
+    return true;
+  }
+
+  /**
    * Records one P4K catalog-import finding for the given aggregate, stamping {@code source = P4K}
    * and {@code ran_at = now}.
    *

@@ -60,6 +60,21 @@ public class MaterialCategoryService {
   }
 
   /**
+   * Returns the live P4K resource groups, sorted by name: the groups an admin may assign to a
+   * material without one (REQ-P4K-025); admin categories are left out.
+   *
+   * @return the groups
+   */
+  public List<MaterialCategoryDto> findResourceGroups() {
+    return repository
+        .findByP4kUuidIsNotNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+            Sort.by("name").ascending())
+        .stream()
+        .map(mapper::toDto)
+        .toList();
+  }
+
+  /**
    * Returns the category.
    *
    * @param id category primary key

@@ -1,0 +1,30 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .starmap-section {
+        margin-top: var(--space-6);
+    }
+    .starmap-section-title {
+        margin: 0 0 var(--space-3);
+    }
+    .starmap-filter input,
+    .starmap-filter select {
+        min-width: 10rem;
+    }
+    .starmap-form .form-group label {
+        display: block;
+    }
+    .starmap-candidates {
+        display: grid;
+        gap: var(--space-2);
+        margin: var(--space-3) 0 0;
+        padding: 0;
+        list-style: none;
+    }
+    .starmap-candidates li {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: space-between;
+    }
+}

@@ -1,6 +1,6 @@
 # ADR-0107 — Requesting-side viewers of an SK-public order see redacted inventory owner/location
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0350](0350-every-order-viewer-sees-the-linked-stock-owner-and-location.md) — every viewer of the order sees the owner and location of its linked stock
 - **Date:** 2026-07-17
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`orders-item-production.md`](../specs/orders-item-production.md) `REQ-ORDERS-029`

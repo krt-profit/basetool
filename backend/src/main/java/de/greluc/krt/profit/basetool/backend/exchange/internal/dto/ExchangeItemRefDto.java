@@ -19,14 +19,31 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * A catalogue entry as the feed names it: the Basetool key a client echoes as {@code bt}, and the
- * display name (REQ-XCH-012).
+ * A catalogue entry as the feed names it: for a blueprint product the produced item's GUID, its
+ * key, and for every entry the Basetool key a client echoes as {@code bt}, and the display name
+ * (REQ-XCH-012, REQ-INV-070).
  *
- * @param bt the Basetool key: for a blueprint the same opaque key as the feed entry, for a material
- *     or item its id
+ * @param guid a blueprint product's produced-item GUID, or {@code null} for every other entry
+ * @param bt the Basetool key: for a blueprint the same opaque key as the feed entry, deprecated in
+ *     favour of {@code guid}; for a material or item its id
  * @param name the display name
  */
-public record ExchangeItemRefDto(@NotNull String bt, @NotNull String name) {}
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record ExchangeItemRefDto(@Nullable UUID guid, @NotNull String bt, @NotNull String name) {
+
+  /**
+   * Creates an entry without a produced-item GUID.
+   *
+   * @param bt the Basetool key
+   * @param name the display name
+   */
+  public ExchangeItemRefDto(@NotNull String bt, @NotNull String name) {
+    this(null, bt, name);
+  }
+}

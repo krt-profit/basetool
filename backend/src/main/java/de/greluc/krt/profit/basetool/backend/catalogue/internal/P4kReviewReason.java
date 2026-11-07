@@ -40,6 +40,36 @@ public enum P4kReviewReason {
   GUID_CONFLICT,
 
   /**
+   * A manufacturer whose P4K name another row already holds; the import does not rename it
+   * (REQ-P4K-020).
+   */
+  NAME_CONFLICT,
+
+  /**
+   * A personal-blueprint name key that no active blueprint's produced-item GUID resolves
+   * (REQ-P4K-029); the case's GUID is a name-based UUID of the key.
+   */
+  PRODUCT_KEY_UNRESOLVED,
+
+  /**
+   * A personal-blueprint name key that resolves to several produced-item GUIDs (REQ-P4K-029); the
+   * case's GUID is a name-based UUID of the key.
+   */
+  PRODUCT_KEY_AMBIGUOUS,
+
+  /**
+   * A UEX location row whose normalised name, type and linked parent match several starmap objects
+   * (REQ-P4K-035); the case's GUID is a name-based UUID of the row.
+   */
+  STARMAP_LINK_AMBIGUOUS,
+
+  /**
+   * A UEX location row whose normalised name, type and linked parent match no starmap object
+   * (REQ-P4K-035); the case's GUID is a name-based UUID of the row.
+   */
+  STARMAP_LINK_NOT_FOUND,
+
+  /**
    * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that no commodity
    * record carries as its {@code subtypeGuid} (REQ-P4K-024); the case's GUID is that {@code
    * ResourceType}.
@@ -51,5 +81,11 @@ public enum P4kReviewReason {
    * commodity records share as their {@code subtypeGuid}, so none is created or linked
    * (REQ-P4K-024, REQ-P4K-026); the case's GUID is that {@code ResourceType}.
    */
-  RESOURCE_JOIN_SEVERAL
+  RESOURCE_JOIN_SEVERAL,
+
+  /**
+   * A material without a resource group after the APPLY: the P4K matched no record, or its record
+   * names no group (REQ-P4K-025); the case's GUID is a name-based UUID of the material.
+   */
+  NO_RESOURCE_GROUP
 }

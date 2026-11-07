@@ -1,6 +1,6 @@
 # ADR-0338 — The P4K catalogue leads a manufacturer's identity, name and description
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-020…023), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -58,8 +58,7 @@ abbreviation is never an identity (REQ-DATA-004). The Basetool shows only Englis
 - German pages show German names for manufacturers, items, ships and commodities.
 - Logos come from the Fan Kit, not from the game archive, so the rule against archive media does
   not apply to them.
-- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`. Implementation is
-  pending.
+- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`.
 
 ## Alternatives considered
 

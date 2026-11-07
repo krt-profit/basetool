@@ -42,6 +42,18 @@ public final class P4kImportReport {
   /** The longest short name or class name a report row stores. */
   private static final int MAX_SHORT_TEXT = 255;
 
+  /** The {@code field_name} of a {@link P4kChangeType#LOADOUT_ISSUES} row. */
+  private static final String LOADOUT_FIELD = "loadout";
+
+  /** The ships whose port tree the run wrote. */
+  private int loadoutShips;
+
+  /** The ports of those trees. */
+  private int loadoutPorts;
+
+  /** The ship links of the listed paints. */
+  private int paintLinks;
+
   /** The report rows, in the order the run found them. */
   private final List<P4kImportChange> changes = new ArrayList<>();
 
@@ -245,6 +257,68 @@ public final class P4kImportReport {
   }
 
   /**
+   * Records a ship loadout that was not read in full (REQ-P4K-040).
+   *
+   * @param ship the ship the loadout belongs to
+   * @param issues the loadout's issue codes, possibly empty
+   * @param unresolvedPorts the ports whose attachment could not be resolved
+   */
+  public void loadoutIssues(
+      @NotNull P4kRecord ship, @NotNull List<String> issues, int unresolvedPorts) {
+    P4kImportChange change = row(P4kKind.SHIP, ship, P4kChangeType.LOADOUT_ISSUES);
+    change.setFieldName(LOADOUT_FIELD);
+    change.setOldValue(String.join(",", issues));
+    change.setNewValue(Integer.toString(unresolvedPorts));
+    add(change);
+  }
+
+  /**
+   * Counts a ship whose port tree the run wrote, or would write.
+   *
+   * @param ports the ports of the tree, nested ones included
+   */
+  public void loadoutWritten(int ports) {
+    loadoutShips++;
+    loadoutPorts += ports;
+  }
+
+  /**
+   * Counts the ship links of a listed paint.
+   *
+   * @param links the ship types the paint is linked to
+   */
+  public void paintLinked(int links) {
+    paintLinks += links;
+  }
+
+  /**
+   * Returns the ships whose port tree the run wrote.
+   *
+   * @return the ship count
+   */
+  public int loadoutShips() {
+    return loadoutShips;
+  }
+
+  /**
+   * Returns the ports of the trees the run wrote.
+   *
+   * @return the port count
+   */
+  public int loadoutPorts() {
+    return loadoutPorts;
+  }
+
+  /**
+   * Returns the ship links of the paints the run listed.
+   *
+   * @return the link count
+   */
+  public int paintLinks() {
+    return paintLinks;
+  }
+
+  /**
    * Returns the counts of one kind.
    *
    * @param kind the kind
@@ -338,7 +412,7 @@ public final class P4kImportReport {
     change.setChangeType(type);
     change.setGuid(record.parsedGuid());
     change.setClassName(shorten(record.className()));
-    change.setNameEn(shorten(record.nameEn()));
+    change.setNameEn(shorten(record.reportName()));
     change.setRecordPath(record.recordPath());
     return change;
   }

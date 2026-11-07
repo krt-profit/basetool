@@ -384,12 +384,14 @@ public class ScWikiCommoditySyncService {
         material.setDensityGramPerCc(density);
       }
     } else if (density != null && !density.equals(material.getDensityGramPerCc())) {
-      syncReportService.logCommodityEvent(
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.SCWIKI,
           runId,
-          SyncEventType.P4K_VALUE_DIFFERS,
-          dto.uuid(),
-          dto.name(),
-          "density_g_per_cc: Wiki " + density + ", P4K " + material.getDensityGramPerCc());
+          "commodity",
+          material.getP4kUuid(),
+          "density_g_per_cc",
+          String.valueOf(material.getDensityGramPerCc()),
+          String.valueOf(density));
     }
     material.setScwikiSyncedAt(now);
     material.setScwikiDeletedAt(null);

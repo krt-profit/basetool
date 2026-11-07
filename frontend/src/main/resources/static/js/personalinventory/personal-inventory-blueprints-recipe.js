@@ -3,6 +3,7 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     computeModifierValue,
@@ -841,11 +842,23 @@ function craftCount(data) {
 }
 
 /**
+ * The name the page shows for a material of the breakdown (REQ-P4K-023).
+ *
+ * @param {ApiDto<'CraftabilityMaterialDto'>} m the material's breakdown
+ * @returns {string} the German name on a German page when there is one, else the name, `?` when
+ *     both are absent
+ */
+function shownMaterialName(m) {
+    return localisedName(m.materialName, m.materialNameDe) || '?';
+}
+
+/**
  * The materials that cap the craftable count under the current refinery setting: every material
  * whose own count equals the blueprint's count.
  *
  * @param {any} data the blueprint's craftability
- * @returns {string[]} the limiting material names, in recipe order; empty when none caps the count
+ * @returns {string[]} the limiting material names as the page shows them, in recipe order; empty
+ *     when none caps the count
  */
 function limitingNames(data) {
     /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
@@ -856,7 +869,7 @@ function limitingNames(data) {
             return (refineryOn ? m.craftableWithRefinery : m.craftable) === count;
         })
         .map((m) => {
-            return m.materialName || '?';
+            return shownMaterialName(m);
         });
     if (names.length > 0) {
         return names;
@@ -1050,7 +1063,7 @@ function renderIngredients(data) {
         const unit = ` ${unitLabel(qt)}`;
         const row = el('tr');
         const nameCell = el('td');
-        nameCell.appendChild(el('span', 'cell-title', m.materialName || '?'));
+        nameCell.appendChild(el('span', 'cell-title', shownMaterialName(m)));
         row.appendChild(nameCell);
         const need = el('td', 'num', fmtAmount(m.requiredScu, qt) + unit);
         need.setAttribute('data-label', dict.colNeed || '');
@@ -1058,7 +1071,7 @@ function renderIngredients(data) {
         let stockState = 'is-ok';
         if (missing > 0) {
             stockState = 'is-short';
-        } else if (limits.has(m.materialName || '?')) {
+        } else if (limits.has(shownMaterialName(m))) {
             stockState = 'is-limit';
         }
         const stock = el('td', `num krt-bp-ing-stock ${stockState}`, fmtAmount(avail, qt) + unit);

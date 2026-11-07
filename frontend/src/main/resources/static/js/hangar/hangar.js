@@ -24,6 +24,7 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { bindManufacturerMarkPreview } from '/js/hangar/manufacturer-mark-preview.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import {
@@ -240,6 +241,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (select) select.disabled = !visible;
     }
 
+    /** Shows the manufacturer mark of the picker's current choice; bound below. */
+    let refreshShipTypeMark = () => {};
+
     /**
      * Opens the ship dialog blank, posting to the clicked button's action.
      *
@@ -254,6 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-location').value = '';
         shipField('ship-fitted').checked = false;
         shipField('ship-version').value = '';
+        refreshShipTypeMark();
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
         openModal();
@@ -273,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-location').value = btn.getAttribute('data-loc') || '';
         shipField('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         shipField('ship-version').value = btn.getAttribute('data-version') ?? '';
+        refreshShipTypeMark();
         const action = /** @type {string} */ (btn.getAttribute('data-action'));
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.hidden = false;
@@ -841,6 +847,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+    refreshShipTypeMark = bindManufacturerMarkPreview(
+        manufacturerSelect,
+        shipTypeSelect,
+        document.getElementById('ship-type-mark'),
+    );
 
     /** @type {number | null} */
     let hangarFilterTimer = null;

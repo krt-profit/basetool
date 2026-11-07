@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -52,6 +53,9 @@ public class P4kCatalogueReader {
   /** The head field holding the completeness per kind. */
   private static final String COMPLETENESS = "completeness";
 
+  /** The curated kind mapping RSI store slugs to ships, read beside the five base kinds. */
+  private static final String SHIP_STORE_SLUGS = "shipStoreSlugs";
+
   private final ObjectMapper objectMapper;
 
   /**
@@ -78,7 +82,8 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds and the resource groups, skipping everything else.
+   * Reads the head, the five base kinds, the starmap objects, the ship store slugs, the paints and
+   * the resource groups, skipping everything else, the loadouts included.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -89,16 +94,23 @@ public class P4kCatalogueReader {
     try (JsonParser parser = openObject(in)) {
       HeadBuilder head = new HeadBuilder();
       Map<P4kKind, List<? extends P4kRecord>> kinds = new EnumMap<>(P4kKind.class);
+      List<P4kShipStoreSlug> storeSlugs = List.of();
+      List<P4kPaintDto> paints = List.of();
       while (parser.nextToken() == JsonToken.PROPERTY_NAME) {
         if (head.offer(parser)) {
           continue;
         }
-        P4kKind kind = kindOf(parser.currentName());
+        String field = parser.currentName();
+        P4kKind kind = kindOf(field);
         parser.nextToken();
-        if (kind == null) {
-          parser.skipChildren();
-        } else {
+        if (kind != null) {
           kinds.put(kind, readArray(parser, recordType(kind)));
+        } else if (SHIP_STORE_SLUGS.equals(field)) {
+          storeSlugs = readArray(parser, P4kShipStoreSlug.class);
+        } else if (P4kCatalogue.PAINTS.equals(field)) {
+          paints = readArray(parser, P4kPaintDto.class);
+        } else {
+          parser.skipChildren();
         }
       }
       return new P4kCatalogue(
@@ -108,7 +120,40 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.SHIP, P4kShipDto.class),
           listOf(kinds, P4kKind.COMMODITY, P4kCommodityDto.class),
           listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class),
+          listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
+          storeSlugs,
+          paints,
           listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class));
+    } catch (JacksonException e) {
+      throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
+    }
+  }
+
+  /**
+   * Streams the {@code loadouts} kind: binds one loadout at a time, hands it on and drops it, so
+   * the kind never sits in memory as a whole; every other field is skipped.
+   *
+   * @param in the decompressed catalogue
+   * @param action receives each loadout in catalogue order
+   * @throws P4kCatalogueFormatException when the content is not catalogue JSON
+   */
+  public void readLoadouts(@NotNull InputStream in, @NotNull Consumer<P4kLoadoutDto> action) {
+    try (JsonParser parser = openObject(in)) {
+      while (parser.nextToken() == JsonToken.PROPERTY_NAME) {
+        String field = parser.currentName();
+        parser.nextToken();
+        if (!P4kCatalogue.LOADOUTS.equals(field)) {
+          parser.skipChildren();
+        } else if (parser.currentToken() == JsonToken.START_ARRAY) {
+          while (parser.nextToken() != JsonToken.END_ARRAY) {
+            P4kLoadoutDto loadout = bind(parser, P4kLoadoutDto.class);
+            if (loadout != null) {
+              action.accept(loadout);
+            }
+          }
+          return;
+        }
+      }
     } catch (JacksonException e) {
       throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
     }
@@ -220,6 +265,7 @@ public class P4kCatalogueReader {
       case SHIP -> P4kShipDto.class;
       case COMMODITY -> P4kCommodityDto.class;
       case BLUEPRINT -> P4kBlueprintDto.class;
+      case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
       case RESOURCE_GROUP -> P4kResourceGroupDto.class;
     };
   }

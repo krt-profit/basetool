@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
@@ -76,14 +77,14 @@ class BlueprintProductServiceTest {
         new BlueprintProductService(
             blueprintRepository,
             personalBlueprintRepository,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             blueprintMapper,
             gameItemStatRepository);
   }
 
   private static BlueprintProductRow row(
       String outputName, String key, String manufacturer, UUID outputItemId) {
-    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId);
+    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId, null, null);
   }
 
   private static Blueprint blueprint(String outputName) {
@@ -306,8 +307,8 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveIdNameRows())
         .thenReturn(
             List.of(
-                new BlueprintIdNameRow(id1, "Arclight Pistol"),
-                new BlueprintIdNameRow(id2, "Arclight Pistol")));
+                new BlueprintIdNameRow(id1, "Arclight Pistol", null),
+                new BlueprintIdNameRow(id2, "Arclight Pistol", null)));
     Blueprint recipe = new Blueprint();
     var metadata =
         new BlueprintCatalogueMetadata(
@@ -345,7 +346,7 @@ class BlueprintProductServiceTest {
     UUID id = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon")));
+        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon", null)));
     GameItem item = new GameItem();
     item.setId(itemId);
     Blueprint recipe = new Blueprint();
@@ -383,7 +384,7 @@ class BlueprintProductServiceTest {
   @Test
   void resolveRecipe_returnsEmptyForUnknownKey() {
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item")));
+        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item", null)));
 
     assertTrue(service.resolveRecipe("ghost").isEmpty());
   }

@@ -74,7 +74,9 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "job_type.archetype",
         "job_type.description",
         "job_type.name",
+        "material_category.class_name",
         "material_category.name",
+        "material_category.name_de",
         "material_external_alias.external_code",
         "material_external_alias.external_key",
         "material_external_alias.external_name",
@@ -121,9 +123,13 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "poi",
         "refining_method",
         "ship_type",
+        "ship_type_loadout_port",
+        "ship_type_p4k_variant",
+        "ship_type_paint",
         "ship_type_uex_alias",
         "space_station",
         "star_system",
+        "starmap_object",
         "terminal",
         "uex_category");
   }

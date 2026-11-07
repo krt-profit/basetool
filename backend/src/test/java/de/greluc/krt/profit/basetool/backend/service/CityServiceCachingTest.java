@@ -58,8 +58,6 @@ class CityServiceCachingTest {
 
   @BeforeEach
   void seedAndClearCache() {
-    cityRepository.deleteAll();
-
     alpha = new City();
     alpha.setName("Alpha City");
     cityRepository.save(alpha);

@@ -76,6 +76,7 @@ class PersonSearchEndStateTest {
     VALID.put("mission_objective.kind", "PRIMARY");
     VALID.put("inventory_item.material_id", UUID.randomUUID());
     VALID.put("inventory_item.quality", 500);
+    VALID.put("location.city_id", UUID.randomUUID());
     VALID.put("exchange_installation.key_thumbprint", THUMBPRINT);
     VALID.put("exchange_journal.resource", "STOCK");
     VALID.put("exchange_journal.action", "STOCK_SET_QUANTITY");

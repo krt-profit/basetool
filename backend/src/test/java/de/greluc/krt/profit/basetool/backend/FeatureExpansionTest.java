@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -71,6 +73,8 @@ import tools.jackson.databind.json.JsonMapper;
 class FeatureExpansionTest {
 
   @Autowired private SquadronRepository squadronRepository;
+
+  @Autowired private CityRepository cityRepository;
 
   private Squadron iridium;
 
@@ -143,7 +147,7 @@ class FeatureExpansionTest {
 
     stanton = new Location();
     stanton.setName("Stanton");
-    stanton = locationRepository.save(stanton);
+    stanton = locationRepository.save(TestPlaces.onOwnCity(stanton, cityRepository));
   }
 
   /**
@@ -162,7 +166,7 @@ class FeatureExpansionTest {
   void testLocationCrud_Officer_Forbidden() throws Exception {
     Location seeded = new Location();
     seeded.setName("Terra");
-    seeded = locationRepository.save(seeded);
+    seeded = locationRepository.save(TestPlaces.onOwnCity(seeded, cityRepository));
     locationRepository.flush();
     UUID seededId = seeded.getId();
     long countBefore = locationRepository.count();

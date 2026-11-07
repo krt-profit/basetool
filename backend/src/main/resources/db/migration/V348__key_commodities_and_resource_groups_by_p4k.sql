@@ -35,9 +35,10 @@ ALTER TABLE p4k_review_case
         CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP'));
 
 -- A ResourceType that a blueprint ingredient or a refinedSubtypeGuid references joins no
--- commodity record, or several (REQ-P4K-024).
+-- commodity record, or several (REQ-P4K-024); a material has no resource group (REQ-P4K-025).
 ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_reason;
 ALTER TABLE p4k_review_case
     ADD CONSTRAINT chk_p4k_review_case_reason
         CHECK (reason IN ('UNCLEAR_PLAYABILITY', 'SEEDED_NOT_CREATABLE', 'GUID_CONFLICT',
-                          'RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'));
+                          'NAME_CONFLICT', 'RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL',
+                          'NO_RESOURCE_GROUP'));

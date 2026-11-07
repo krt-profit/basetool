@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository.ExchangeLocationGuid;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInsuranceDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
@@ -34,6 +36,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -71,6 +75,7 @@ public class ExchangeShipFeedService {
   private final ShipRepository shipRepository;
   private final ExchangeShipLinkRepository linkRepository;
   private final ExchangeFeedReader feedReader;
+  private final LocationRepository locationRepository;
 
   /**
    * Returns one page of the member's ships, each with the id the calling installation linked it to.
@@ -119,8 +124,9 @@ public class ExchangeShipFeedService {
             ? ExchangeFeedCursor.snapshot(at, delivered.getLast().id()).format()
             : ExchangeFeedCursor.feed(at).format();
     Map<UUID, String> linked = links(caller, delivered);
+    Map<UUID, UUID> guids = guids(delivered);
     return new ExchangeShipPageDto(
-        delivered.stream().map(ship -> toDto(ship, linked.get(ship.id()))).toList(),
+        delivered.stream().map(ship -> toDto(ship, linked.get(ship.id()), guids)).toList(),
         List.of(),
         next,
         more);
@@ -149,12 +155,13 @@ public class ExchangeShipFeedService {
                 .stream()
                 .collect(Collectors.toMap(row -> row.id().toString(), Function.identity()));
     Map<UUID, String> linked = links(caller, current.values());
+    Map<UUID, UUID> guids = guids(current.values());
     List<ExchangeShipDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();
     for (String key : changes.keys()) {
       ExchangeShipRow ship = current.get(key);
       if (ship != null) {
-        items.add(toDto(ship, linked.get(ship.id())));
+        items.add(toDto(ship, linked.get(ship.id()), guids));
       } else {
         removed.add(changes.tombstone(key, key));
       }
@@ -185,14 +192,35 @@ public class ExchangeShipFeedService {
   }
 
   /**
+   * Reads the starmap GUIDs of the given ships' locations in one query.
+   *
+   * @param ships the ships
+   * @return the GUID by location id; a location without one is absent
+   */
+  private @NotNull Map<UUID, UUID> guids(@NotNull Collection<ExchangeShipRow> ships) {
+    Set<UUID> locations =
+        ships.stream()
+            .map(ExchangeShipRow::locationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    if (locations.isEmpty()) {
+      return Map.of();
+    }
+    return locationRepository.findExchangeGuids(locations).stream()
+        .collect(
+            Collectors.toMap(ExchangeLocationGuid::getLocationId, ExchangeLocationGuid::getGuid));
+  }
+
+  /**
    * Maps a ship.
    *
    * @param ship the ship
    * @param externalId the calling installation's id for it, or {@code null}
+   * @param guids the starmap GUID by location id
    * @return the feed entry
    */
   private static @NotNull ExchangeShipDto toDto(
-      @NotNull ExchangeShipRow ship, @Nullable String externalId) {
+      @NotNull ExchangeShipRow ship, @Nullable String externalId, @NotNull Map<UUID, UUID> guids) {
     return new ExchangeShipDto(
         ship.id().toString(),
         externalId,
@@ -202,7 +230,10 @@ public class ExchangeShipFeedService {
         insurance(ship.insurance()),
         ship.locationName() == null
             ? null
-            : new ExchangeLocationDto(cut(ship.locationName()), uex(ship)),
+            : new ExchangeLocationDto(
+                cut(ship.locationName()),
+                ExchangeCatalogService.uex(ship.uexCityId(), ship.uexSpaceStationId()),
+                ship.locationId() == null ? null : guids.get(ship.locationId())),
         ship.fitted(),
         orgUnit(ship.orgUnit()),
         ship.orgUnitVersion());
@@ -234,23 +265,6 @@ public class ExchangeShipFeedService {
       return new ExchangeInsuranceDto(MONTHS, Math.min(Integer.parseInt(insurance), 120));
     }
     return new ExchangeInsuranceDto(MONTHS, 0);
-  }
-
-  /**
-   * Returns the UEX place of a ship's location; a city link wins over a space-station link.
-   *
-   * @param ship the ship
-   * @return the place, or {@code null} when the location links none
-   */
-  private static @Nullable ExchangeLocationDto.UexRef uex(@NotNull ExchangeShipRow ship) {
-    if (ship.uexCityId() != null && ship.uexCityId() > 0) {
-      return new ExchangeLocationDto.UexRef(ExchangeCatalogService.KIND_CITY, ship.uexCityId());
-    }
-    if (ship.uexSpaceStationId() != null && ship.uexSpaceStationId() > 0) {
-      return new ExchangeLocationDto.UexRef(
-          ExchangeCatalogService.KIND_SPACE_STATION, ship.uexSpaceStationId());
-    }
-    return null;
   }
 
   /**

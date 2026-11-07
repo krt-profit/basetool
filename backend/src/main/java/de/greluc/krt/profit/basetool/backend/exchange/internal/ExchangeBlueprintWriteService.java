@@ -287,24 +287,37 @@ public class ExchangeBlueprintWriteService
   }
 
   /**
-   * Turns a feed key or a resolved {@code bt} back into the product key.
+   * Turns a feed key or a resolved {@code bt} back into the product key. A fallback name key a
+   * client still holds after the product moved to its GUID key maps to that GUID key when the name
+   * names exactly one product (REQ-INV-070).
    *
    * @param key the key, the product key itself or its {@code h:} hash
-   * @param keysByBt the hashes already looked up
+   * @param keysByBt the keys already looked up, filled on first use
    * @return the product key, or {@code null} when no product has that hash
    */
   private @Nullable String productKeyOf(
       @NotNull String key, @NotNull Map<String, String> keysByBt) {
-    if (!key.startsWith("h:")) {
-      return key;
-    }
     if (keysByBt.isEmpty()) {
-      for (ResolvedProduct product : productService.allProducts()) {
-        keysByBt.put(
-            ExchangeBlueprintFeedService.keyOf(product.productKey()), product.productKey());
-      }
+      Map<String, List<ResolvedProduct>> byNameKey = productService.productsByNameKey();
+      byNameKey
+          .values()
+          .forEach(named ->
+              named.forEach(product ->
+                  keysByBt.putIfAbsent(
+                      ExchangeBlueprintFeedService.keyOf(product.productKey()),
+                      product.productKey())));
+      byNameKey.forEach((nameKey, named) -> {
+        if (named.size() == 1) {
+          keysByBt.putIfAbsent(
+              ExchangeBlueprintFeedService.keyOf(nameKey), named.getFirst().productKey());
+        }
+      });
     }
-    return keysByBt.get(key);
+    String current = keysByBt.get(key);
+    if (current != null || key.startsWith("h:")) {
+      return current;
+    }
+    return key;
   }
 
   /**

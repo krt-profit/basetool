@@ -26,6 +26,6 @@ import jakarta.validation.constraints.NotBlank;
  * product from the blueprint catalog type-ahead and submits its normalized {@code productKey}; the
  * service resolves the canonical name and output item from the catalog before stamping the row.
  *
- * @param productKey normalized product key of the blueprint product to mark as default
+ * @param productKey product key of the blueprint product to mark as default
  */
 public record DefaultBlueprintCreateRequest(@NotBlank String productKey) {}

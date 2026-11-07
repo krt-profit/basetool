@@ -22,17 +22,22 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
-> and shop tables join with their areas), REQ-P4K-033 is
-> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-024…026 are implemented
-> except the category mapping migration of REQ-P4K-025 (#3037); every other
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's blueprint category
+> and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented (#3037), REQ-P4K-029
+> is implemented (#3039), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
+> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-034…038 are implemented
+> (#3044), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-047 is implemented
+> (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
-> `P4kBlueprintReconciler`)
-> sharing `P4kRowMatcher`; the wire format is `catalogue.internal.p4k`.
+> `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then `P4kPaintReconciler` and
+> `P4kLoadoutReconciler`, which link to the rows the base kinds matched, and the starmap tree and
+> its UEX links (`P4kStarmapReconciler`, `P4kStarmapLinker`); the wire format is
+> `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -176,9 +181,9 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
 - [x] Pruning the job leaves the run with a `null` job reference.
 
 The run is `p4k_import_run` (V342) with one `p4k_import_run_kind` row per kind (completeness, its
-Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds and the commodity
-categories (`material_category`, V348); the blueprint category, starmap and shop tables add it with
-their areas.
+Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, `starmap_object` and
+the commodity categories (`material_category`, V348); the blueprint category and shop tables add it
+with their areas.
 
 **Enforced by:** `P4kImportRunTest` · **ADR:**
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
@@ -323,13 +328,14 @@ move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PART
 `SKIPPED_EMPTY`, `SKIPPED_DUPLICATE_GUID`, `SKIPPED_MASS_GUARD`) and, when skipped, a
 `SWEEP_SKIPPED` report row with the kind's P4K-known rows and the rows it would have stamped.
 
-The commodity categories are swept as `RESOURCE_GROUP` (`material_category`); no other source lists
-a resource group, so a stamped group is never "still live elsewhere".
+The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
+names them by class name, and no other source lists them. The commodity categories are the target
+`RESOURCE_GROUP` (`material_category`); no other source lists a resource group either.
 
-> [!note] Planned — the blueprint category, starmap and shop tables
-> The blueprint category table (REQ-P4K-027), the starmap objects and the shops do not exist yet;
-> each joins the sweep as one `P4kSweepTarget` when its area adds the table with `p4k_uuid`,
-> `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
+> [!note] Planned — the blueprint category and shop tables
+> The blueprint category table (REQ-P4K-027) and the shops do not exist yet; each joins the sweep as
+> one `P4kSweepTarget` when its area adds the table with `p4k_uuid`, `p4k_seen_run_id`,
+> `p4k_deleted_at` and `p4k_hidden_at`.
 
 **Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
 `P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
@@ -406,9 +412,9 @@ pruned; they hold identifiers, short names and fact values only, never a game te
 
 A `CHANGED` row names the column the import wrote (`class_name`, `manufacturer_id`, `mass`,
 `name_key`, …); a game-text column (`description_en`, `description_de`, `description`) is logged
-by name with both values `null`. An item's rename shows as its `name_key`, the only name the import
-writes until REQ-P4K-017. `position` keeps the order the run found its rows in, and
-`still_live_elsewhere` carries the "still live in UEX/Wiki" flag of a `VANISHED` row.
+by name with both values `null`. An item's rename shows as its `name` and its `name_key`.
+`position` keeps the order the run found its rows in, and `still_live_elsewhere` carries the
+"still live in UEX/Wiki" flag of a `VANISHED` row.
 
 **Enforced by:** `P4kChangeReportTest` · **Code:** `P4kImportReport`, `P4kRowWriter` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
@@ -450,6 +456,8 @@ cases. A case arises from:
 - a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043);
 - a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
   several (REQ-P4K-024);
+- a material without a resource group after an APPLY, resolved by assigning a group
+  (REQ-P4K-025);
 - a personal-blueprint row that resolves to no produced-item GUID or to several (REQ-P4K-029).
 
 An admin resolves a case as **keep** or **hide**. Hide works like the P4K stamp (REQ-P4K-013): the
@@ -487,34 +495,60 @@ no override column and no review status for item disagreements.
 
 **Acceptance**
 
-- [ ] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
-- [ ] A Wiki `mass` is written where the P4K `mass` is `null`.
-- [ ] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
+- [x] A P4K `size` 2 survives a Wiki sync that serves `size` 3, and the disagreement is reported.
+- [x] A Wiki `mass` is written where the P4K `mass` is `null`.
+- [x] A P4K APPLY leaves `dimension_x/y/z` and the UEX category alone.
 
-**Enforced by (planned):** `P4kItemPrecedenceTest`, `ScWikiItemSyncServiceTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
+The P4K's own value of each attribute is kept in a column of its own (`p4k_name`,
+`p4k_manufacturer_id`, `p4k_type`, `p4k_sub_type`, `p4k_size`, `p4k_grade_raw`, `p4k_item_class`,
+`p4k_mass`; V346), mirrored by every APPLY, a `null` included. The displayed columns are `name`,
+`manufacturer_id`, `wiki_type`, `wiki_sub_type`, `size_class`, `grade`, `item_class` and `mass`; an
+APPLY overwrites one only with a non-null P4K value, so a P4K value that turns `null` leaves the
+displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4k_*` column is
+`null`; for the grade it is the letter `p4k_type` and `p4k_grade_raw` map to. UEX writes `name` and
+the manufacturer only while `p4k_name` / `p4k_manufacturer_id` are `null`, and the Wiki/UEX
+duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
+disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;stored=…;source=…`; strings
+compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
+writes nothing. The import writes `name_de` by REQ-P4K-023.
+
+**Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest`, `UexItemSyncServiceTest`,
+`ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:** `P4kItemReconciler`,
+`P4kItemValues`, `ScWikiItemFieldWriter` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md)
 (supersedes [ADR-0283](../adr/0283-a-game-items-size-grade-and-class-come-from-the-sc-wiki-only.md); replaces REQ-DATA-024) · **Issues:** #2889
 
 ### REQ-P4K-018 — the grade letter comes from the integer for five component types only, and the raw integer is kept
 
 The catalogue carries the raw DataForge `grade` integer. The import maps **1 → A, 2 → B, 3 → C,
-4 → D** only for the item `type`s `Cooler`, `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`, and
-treats the 19 mismatching grade-1 items the contract lists as no grade. Everywhere else the P4K grade
-counts as `null` for the letter column, so the Wiki fills it. The import never reads the `Grade:`
-line of a description (a game text).
+4 → D** only for the item `type`s `Cooler`, `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`.
+Everywhere else the P4K grade counts as `null` for the letter column, so the Wiki fills it. The
+import never reads the `Grade:` line of a description (a game text).
+
+The contract names 19 grade-1 items whose `Grade:` line disagrees with the integer only by type,
+not by GUID or class name, so the import cannot single them out. Seven are of an unmapped type
+(`JumpDrive`, `QuantumInterdictionGenerator`, `Misc`, `WeaponMining`) and get no letter from the
+P4K. The others (a `Radar`, two `Cooler`s, and those of the nine ship-specific `Bespoke`
+components whose type is one of the five) map like their type, to `A`; a differing Wiki letter is
+reported as a disagreement (REQ-P4K-017).
 
 A nullable `p4k_grade_raw` stores the integer for every matched item, whatever its type. It is a
-fact value, may reach the exchange, and has no UI. A value outside 1–4 on a mapped type (5 to 7 on
+fact value, may reach the exchange, and has no UI. A value outside 1–4 (5 to 7 on
 `WeaponAttachment`, anything higher) leaves the letter `null`, keeps the raw value and counts in
 `basetool_catalogue_item_grade_unknown_total`.
 
 **Acceptance**
 
-- [ ] A `Shield` of grade 3 stores `C` and `p4k_grade_raw` 3; a `WeaponPersonal` of grade 1 stores
+- [x] A `Shield` of grade 3 stores `C` and `p4k_grade_raw` 3; a `WeaponPersonal` of grade 1 stores
   no letter from the P4K and `p4k_grade_raw` 1.
-- [ ] Each of the 19 listed items stores no letter from the P4K.
-- [ ] A grade 6 counts once in the unknown-grade counter and keeps `p4k_grade_raw` 6.
+- [x] A grade-1 item of an unmapped type the contract lists among the 19 (`JumpDrive`,
+  `QuantumInterdictionGenerator`, `Misc`, `WeaponMining`) stores no letter from the P4K.
+- [x] A grade 6 counts once in the unknown-grade counter and keeps `p4k_grade_raw` 6.
 
-**Enforced by (planned):** `P4kGradeMappingTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) · **Issues:** #2889
+An unknown grade is also an `UNKNOWN_VALUE` row of the change report (field `grade`); the counter
+moves on an APPLY only, once per matched item.
+
+**Enforced by:** `P4kGradeMappingTest`, `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` ·
+**Code:** `P4kGradeMapping` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) · **Issues:** #2889
 
 ### REQ-P4K-019 — an item's class comes from the P4K, a `null` never clears it, and an unknown value is counted
 
@@ -527,10 +561,16 @@ import monitoring.
 
 **Acceptance**
 
-- [ ] `"Military"` stores `MILITARY`; a `null` leaves a stored `STEALTH` in place.
-- [ ] An unknown value stores no class and increments the counter once per item.
+- [x] `"Military"` stores `MILITARY`; a `null` leaves a stored `STEALTH` in place.
+- [x] An unknown value stores no class and increments the counter once per item.
 
-**Enforced by (planned):** `P4kItemPrecedenceTest`, `ShipComponentClassTest` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) ·
+"Stored as no class" means `p4k_item_class` stays `null`, so a stored class stays and the Wiki
+fills it. An unknown class is also an `UNKNOWN_VALUE` row of the change report (field
+`itemClass`); the counter and the log line move on an APPLY only. `ItemClassResolver` serves both
+sources. `p4k_item_class` carries the CHECK `ck_game_item_p4k_item_class`.
+
+**Enforced by:** `P4kItemPrecedenceTest`, `ShipComponentClassTest`, `ScWikiItemFieldWriterTest` ·
+**Code:** `ItemClassResolver` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) ·
 **Issues:** #2889
 
 ## Manufacturers
@@ -540,14 +580,21 @@ import monitoring.
 - **Identity and match order:** `manufacturer.p4k_uuid` is unique and the first match key, then the
   UEX alias (`manufacturer_uex_company`, still the join key for UEX items and vehicles), then the
   name. The abbreviation is never an identity (REQ-DATA-004). `scwiki_uuid` stays a cross-reference.
+  The catalogue carries no UEX id, so the import matches by P4K GUID, then by SC Wiki UUID
+  (REQ-P4K-007), then by name; the UEX alias is the key the UEX sync matches by, and the import
+  adopts a row UEX created by its name. The SC Wiki sync matches a row by its P4K GUID before its
+  own UUID.
 - **Name and abbreviation:** on a row with a P4K GUID only the import writes `name` and
   `abbreviation` (from `code`); UEX writes them only on rows the P4K does not know. A UEX/P4K
-  disagreement goes to `external_sync_report`.
+  disagreement goes to `external_sync_report` as `P4K_DISAGREEMENT` with
+  `column=…;stored=…;source=…`, the source being UEX or the SC Wiki; a value equal ignoring
+  case is no disagreement.
 - **Name conflict:** when another row already holds the P4K name (`name` is unique), the import does
-  not rename; it records the conflict in the report and opens a review case. Merging two rows is an
-  admin action; the import never merges.
-- **Description:** the P4K leads `description` and a new `description_de`. UEX no longer writes the
-  description; rows without a P4K match keep theirs.
+  not rename; it records the conflict in the report and opens a review case (`NAME_CONFLICT`, about
+  the row the import would have renamed). Merging two rows is an admin action; the import never
+  merges.
+- **Description:** the P4K leads `description` and a new `description_de`, both game texts
+  (REQ-P4K-033). UEX no longer writes the description; rows without a P4K match keep theirs.
 - **UEX keeps** `nickname`, `industry`, `wiki`, `is_item_manufacturer`, `is_vehicle_manufacturer` and
   the alias table.
 - **The SC Wiki manufacturer sync** is a cross-check: it writes only its `scwiki_*` columns, never the
@@ -556,13 +603,15 @@ import monitoring.
 
 **Acceptance**
 
-- [ ] A UEX sync leaves the name of a P4K-known manufacturer as the P4K wrote it and reports the
+- [x] A UEX sync leaves the name of a P4K-known manufacturer as the P4K wrote it and reports the
   difference.
-- [ ] A P4K name already held by another row leaves both rows unchanged and opens a review case.
-- [ ] A UEX sync no longer writes `description`.
+- [x] A P4K name already held by another row leaves both rows unchanged and opens a review case.
+- [x] A UEX sync no longer writes `description`.
 
-**Enforced by (planned):** `P4kManufacturerPrecedenceTest`, `UexCompanyServiceTest`,
-`ScWikiManufacturerSyncServiceTest` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+**Enforced by:** `P4kManufacturerPrecedenceTest`, `UexManufacturerServiceTest`,
+`ScWikiManufacturerSyncServiceTest`, `SyncReportServiceTest` · **Code:**
+`P4kManufacturerReconciler`, `UexManufacturerService`, `ScWikiManufacturerSyncService`,
+`SyncReportService#logP4kDisagreement` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ### REQ-P4K-021 — a manufacturer is created only for an item or ship seeded in the same run
 
@@ -573,10 +622,14 @@ the next P4K import adopts such a row by UEX alias or name.
 
 **Acceptance**
 
-- [ ] A seeded ship with an unknown `manufacturerGuid` creates that manufacturer; an unreferenced
+- [x] A seeded ship with an unknown `manufacturerGuid` creates that manufacturer; an unreferenced
   unmatched manufacturer creates nothing and is reported `UNMATCHED`.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
+The import holds an unmatched manufacturer until the items and ships of the run are reconciled; the
+first seeded row that references it creates it (`ADDED`, with its name, `code`, German name and
+descriptions), and the rest are reported `UNMATCHED` afterwards. A preview reports the same rows.
+
+**Enforced by:** `P4kManufacturerPrecedenceTest` · **Code:** `P4kManufacturerReconciler` · **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ### REQ-P4K-022 — manufacturer logos are unmodified Fan Kit images mapped by P4K GUID
 
@@ -589,11 +642,23 @@ does not apply to them; the Fan Kit compliance test covers the PNGs.
 
 **Acceptance**
 
-- [ ] Every mapping entry names an existing PNG and a well-formed GUID; every PNG is mapped.
-- [ ] A manufacturer without a mapping renders the abbreviation badge.
-- [ ] No exchange DTO or schema carries a logo field.
+- [x] Every mapping entry names an existing PNG and a well-formed GUID; every PNG is mapped.
+- [x] A manufacturer without a mapping renders the abbreviation badge.
+- [x] No exchange DTO or schema carries a logo field.
 
-**Enforced by (planned):** `ManufacturerLogoMappingTest`, the Fan Kit compliance test · **ADR:**
+The mapping is `frontend/src/main/resources/catalogue/manufacturer-logos.json`, a JSON object of
+lower-case P4K GUID to PNG file name; the PNGs ship under `static/images/manufacturers/`. The
+mapping ships empty until the Fan Kit PNGs are added, so every manufacturer shows its badge.
+`ManufacturerDto` carries the `p4kUuid` the page looks the logo up by; the exchange schemas carry
+no logo field, which `ExchangeFieldRatchetTest` holds. The logo or badge shows on Ship-Data (the
+manufacturer list and the ship types), in the personal and squadron hangar lists, beside the
+ship-type pickers of both hangar dialogs (the mark of the chosen type's manufacturer, else of the
+chosen manufacturer), and in the inventory item views (the item list, the item groups and the item
+page), whose item references carry a `ManufacturerRefDto` with the GUID.
+
+**Enforced by:** `ManufacturerLogoMappingTest`, `ShipDataPageControllerMvcTest`,
+`ExchangeFieldRatchetTest`, the Fan Kit compliance test · **Code:** `ManufacturerLogos`,
+`catalogue/fragments/manufacturer-mark.html` · **ADR:**
 [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Names
@@ -607,11 +672,26 @@ falls back to `name`. Search and matching keep running on `name`.
 
 **Acceptance**
 
-- [ ] A German page shows the German name of an item; an English page, and a German page for a row
+- [x] A German page shows the German name of an item; an English page, and a German page for a row
   without `name_de`, show `name`.
-- [ ] A search for the German name alone finds nothing it would not find by `name`.
+- [x] A search for the German name alone finds nothing it would not find by `name`.
 
-**Enforced by (planned):** `P4kNamesTest`, the MVC tests of the pages that show catalogue names ·
+The import writes `name.de` on every matched row and every row it creates; a blank German text or
+the game's missing-translation marker (a text starting with `!`) is no German name and leaves the
+stored one. The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID.
+The DTOs of manufacturers, ship types, materials and item references carry `nameDe`, and a page
+picks the name by its language (`LocalisedNames` on server-rendered pages, `localisedName` of
+`krt-localised-name.js` in scripts). Every page that names a manufacturer, item, ship or material
+shows it: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
+matrix, profit calculation and detail, the material and item pickers, job orders, supply,
+purchasing, the dashboard widgets, inventory and stock levels, refinery, the material exchange and
+the blueprint recipe pane. The page-specific DTOs carry the German name beside the name they
+denormalise (`nameDe`, `materialNameDe`, `manufacturerNameDe`). Search, filters, sorting, matching
+and every value sent back to the server stay on `name`. Admin pages where an admin edits or maps a
+name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
+
+**Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `ShipDataPageControllerMvcTest`,
+`ItemPickerLabelsTest`, `ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Commodities and categories
@@ -656,8 +736,8 @@ Several catalogue records sharing a name (three "SLAM") match no row by name; ea
 `GUID_CONFLICT` case. A name the P4K leads that another material already holds is not written and
 opens a `GUID_CONFLICT` case on the row. `material.type` is never `null`: "stays `null`" means
 it keeps its value, and a created row starts as `NO_REFINE`. A UEX name or SC Wiki density that
-differs on a row with a `p4k_uuid` is reported as `P4K_VALUE_DIFFERS`. `name_de` on `material`
-comes with REQ-P4K-023.
+differs on a row with a `p4k_uuid` is reported as `P4K_DISAGREEMENT`. The P4K also leads
+`material.name_de` (REQ-P4K-023).
 
 **Enforced by:** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest` · **Code:**
 `P4kCommodityReconciler`, `P4kCommodityJoin` · **ADR:**
@@ -667,16 +747,25 @@ comes with REQ-P4K-023.
 
 The `resourceGroups` kind becomes the commodity categories: P4K GUID as identity, `name` /
 `name_de` from the P4K (the `className` when the name is a placeholder and `en` is `null`),
-`parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). A one-off
-migration maps every admin-maintained category onto a group and removes the admin categories;
-admins no longer create or rename categories. A group that vanishes from a complete kind is stamped
-like any other P4K row (REQ-P4K-011).
+`parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). The
+admin-maintained categories are not mapped onto groups: each P4K-matched material takes its group
+from its catalogue record on APPLY (`typeGuid`, REQ-P4K-024). A material that has no group after an
+APPLY (the P4K matched no record, or its record names no group) opens a review case "no resource
+group", which an admin resolves by assigning an existing group; admins never create or rename a
+group or a category. An admin category is retired once no material references it; until then it
+stays readable, so no material shows without a category. A group that vanishes from a complete
+kind is stamped like any other P4K row (REQ-P4K-011). (Owner decision on #3037: production's two
+admin categories "Erz" and "Raffiniertes Erz" each spread over three resource groups, so no
+category-to-group mapping holds.)
 
 **Acceptance**
 
 - [x] A group with a placeholder name shows its `className`.
 - [x] Two groups listing each other are imported without a cycle.
-- [ ] After the migration every material that had a category has its mapped group.
+- [x] A P4K-matched material takes the group its record names, and an admin category no material
+  references any longer is gone after the APPLY.
+- [x] A material without a group after an APPLY opens one case, the admin's assignment of an
+  existing group resolves it with an audit event, and an admin category or a keep is refused.
 - [x] No admin endpoint creates or renames a category.
 
 The groups are the rows of `material_category` (V348: `p4k_uuid`, `class_name`, `name_de`,
@@ -690,12 +779,17 @@ two groups listing each other the first in record order keeps the link. The pick
 stamped or hidden group. `MaterialCategoryController` is read-only, and the admin page has no
 category editor.
 
-> [!note] Planned — the category mapping migration
-> The admin categories a name match does not reach need a mapping onto groups, which the owner
-> confirms; the migration then re-points their materials and removes them.
+The case is `NO_RESOURCE_GROUP` (kind `COMMODITY`, one per live material, its GUID a name-based
+UUID of the material's name); a later run closes it as `RESOLVED` once the material has a group.
+It is resolved only as `ASSIGN` with a live resource group from
+`GET /api/v1/catalog/admin/import/p4k/resource-groups` (`CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED`); keep
+and hide do not apply. An admin category is a `material_category` row without `p4k_uuid`; the
+APPLY deletes the unreferenced ones (it is no P4K row, so REQ-P4K-013's stamp does not apply) and
+records the number as `adminCategoriesRetired` on `CATALOGUE_P4K_APPLIED`.
 
-**Enforced by:** `P4kResourceGroupImportTest`, `MaterialCategoryControllerTest`; the category
-migration test is planned · **Code:** `P4kResourceGroupReconciler` · **ADR:**
+**Enforced by:** `P4kResourceGroupImportTest`, `P4kMaterialGroupReviewTest`,
+`MaterialCategoryControllerTest` · **Code:** `P4kResourceGroupReconciler`, `P4kMaterialGroupReview`
+· **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891, #2825
 
 ### REQ-P4K-026 — a commodity is created only when a record of the same run references it
@@ -769,11 +863,18 @@ REQ-INV-019, REQ-XCH-012's blueprint reference).
 
 **Acceptance**
 
-- [ ] A matched blueprint stores its `producedItemGuid`, also when no `game_item` carries that GUID.
-- [ ] A fallback row whose product resolves in a later run is upgraded to the GUID key and its
+- [x] A matched blueprint stores its `producedItemGuid`, also when no `game_item` carries that GUID.
+- [x] A fallback row whose product resolves in a later run is upgraded to the GUID key and its
   review case closed.
 
-**Enforced by (planned):** `P4kBlueprintImportTest`, `PersonalBlueprintKeyBackfillTest` · **ADR:**
+The import writes `blueprint.produced_item_guid` as a P4K-owned column. A fallback name key's
+case is a `BLUEPRINT` case with the reason `PRODUCT_KEY_UNRESOLVED` (no GUID) or
+`PRODUCT_KEY_AMBIGUOUS` (several), keyed by a name-based UUID of the name key; its report row
+names the key as class name and the product as English name. A run that resolves the key
+closes the case as `RESOLVED`, which only a run sets. Only an APPLY moves keys and opens or
+closes cases; a preview reports the same `REVIEW` rows, read against the GUIDs already stored.
+
+**Enforced by:** `PersonalBlueprintKeyBackfillTest` · **ADR:**
 [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md) · **Issues:** #2893
 
 ### REQ-P4K-030 — a crafted item's blueprint stat base values come from the P4K, and the SC Wiki fills gaps
@@ -822,13 +923,25 @@ REQ-DATA-027) · **Issues:** #2927
 
 **Acceptance**
 
-- [ ] A ship with `cargoGridsWithIssue` 0 takes the P4K `cargoScu`; one with 2 keeps the stored
+- [x] A ship with `cargoGridsWithIssue` 0 takes the P4K `cargoScu`; one with 2 keeps the stored
   value and reports a difference.
-- [ ] A UEX sync leaves the P4K crew and role of a P4K-known ship.
-- [ ] A store slug that maps to another ship than the UEX URL is reported, nothing is written.
+- [x] A UEX sync leaves the P4K crew and role of a P4K-known ship.
+- [x] A store slug that maps to another ship than the UEX URL is reported, nothing is written.
 
-**Enforced by (planned):** `P4kShipPrecedenceTest`, `UexVehicleServiceTest`,
-`ScWikiVehicleSyncServiceTest` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) · **Issues:** #2897
+The columns: `crewSize` → `crew_max` (the game has no minimum crew, so `crew_min` stays with UEX),
+`role` and `career` → `role` and `career` (the English label), `mass` → `mass`, `hullHealth` →
+`health`, `size` → `size_class`, `vehicleKind` → `vehicle_kind` (`SPACESHIP`, `GROUND_VEHICLE`;
+another value is an unknown closed-set value of REQ-P4K-003), `insurance` → `insurance_*`,
+`cargoScu` → `scu`; `name_de` comes with REQ-P4K-023. On a matched row the import writes a non-null
+catalogue value over a different stored one and logs it as `CHANGED`; a `null` never clears. A
+name another ship type already holds is not taken (`name` is unique) and is reported instead. The
+Wiki and UEX write a led column on a P4K-known row only while it is empty (`P4kLedColumns`); every
+disagreement is one `P4K_DISAGREEMENT` event of the writing source's run, its `detail` holding
+`column=…;stored=…;source=…` entries.
+
+**Enforced by:** `P4kShipPrecedenceTest`, `UexVehicleServiceUuidMatchTest`,
+`ScWikiVehicleSyncServiceTest` · **Code:** `P4kShipBaseData`, `P4kShipStoreSlugCheck`,
+`P4kLedColumns` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) · **Issues:** #2897
 
 ### REQ-P4K-032 — ship types match by GUID and class name first, by name last, and never pick a duplicate
 
@@ -843,11 +956,17 @@ never merged automatically.
 
 **Acceptance**
 
-- [ ] Two ship types with the same normalised name answer `ambiguous` with both candidates.
-- [ ] A variant's class name resolves to its own ship type when one exists, else to its base's.
-- [ ] A class-name match wins over a different ship type of the same name.
+- [x] Two ship types with the same normalised name answer `ambiguous` with both candidates.
+- [x] A variant's class name resolves to its own ship type when one exists, else to its base's.
+- [x] A class-name match wins over a different ship type of the same name.
 
-**Enforced by (planned):** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
+An APPLY keeps the variant groups in `ship_type_p4k_variant` (variant GUID, class name, base GUID);
+a complete ships kind deletes the variants it no longer lists. The hangar import's uploads carry
+only names and slugs, so it takes the name stages and then the slug; a name or slug that finds
+several ship types is skipped as unmatched.
+
+**Enforced by:** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest`, `P4kShipPrecedenceTest` ·
+**Code:** `ShipTypeMatcher`, `P4kShipVariants` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
 **Issues:** #2897
 
 ## Game texts
@@ -900,10 +1019,19 @@ object follows the sweep (REQ-P4K-011); a UEX row linked to it stays usable.
 
 **Acceptance**
 
-- [ ] An object whose parent is imported in the same run gets its parent link, whatever the order.
-- [ ] A jump point without a UEX counterpart is imported and is no trade place.
+- [x] An object whose parent is imported in the same run gets its parent link, whatever the order.
+- [x] A jump point without a UEX counterpart is imported and is no trade place.
 
-**Enforced by (planned):** `P4kStarmapImportTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+Every record with a GUID is matched by that GUID or added (`ADDED`); the P4K writes every column
+but the admin's visibility override, a `null` included, and a changed column is a `CHANGED` report
+row. The parent is set once the whole kind is read; a `parentGuid` the catalogue does not list
+leaves the parent `null`. A GUID the catalogue repeats is read once. `name` and `name_de` are game
+texts (`@GameText`): a report row names the object by its class name only. A catalogue without
+starmap objects leaves the tree and the links as they are. The result's `starmapObjects` counts the
+objects (`matched`, `enriched`, `created`) and the UEX rows left unlinked (`unmatched`, `review`).
+
+**Enforced by:** `P4kStarmapImportTest`, `GameTextClassificationTest` · **Code:**
+`P4kStarmapReconciler`, `StarmapObject` (V352) · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-035 — the UEX locations link to the starmap tree; ambiguity goes to review, manual links win
 
@@ -917,11 +1045,38 @@ event (REQ-P4K-046).
 
 **Acceptance**
 
-- [ ] A city whose name, type and linked planet match one object is linked.
-- [ ] Two candidates open one review case and link nothing.
-- [ ] A manual link survives an APPLY that would link elsewhere.
+- [x] A city whose name, type and linked planet match one object is linked.
+- [x] Two candidates open one review case and link nothing.
+- [x] A manual link survives an APPLY that would link elsewhere.
 
-**Enforced by (planned):** `P4kStarmapLinkTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+The tables are linked parents first, in the order above. A name is normalised to lower case without
+accents, every other run of characters one space, and compared with the object's English name. The
+type is compared as a family, the type's lower-case name up to its first `_` (`Outpost_InvalidQT` is
+`outpost`), taken from the types of the LIVE catalogue: `star_system` takes `star` (the star
+carries the system's name, `Stanton`) and `solarsystem`; `orbit` `planet`, `jumppoint` and
+`anomaly` (the jump points of Pyro and Nyx); `planet` `planet`; `moon` `moon`; `city`
+`landingzone` and `manmade` (Levski); `space_station` `manmade` (Everus Harbor) and
+`manmade_visibleoninteraction`'s family `manmade` (the Lagrange stations), and `landingzone`;
+`outpost` `outpost`, `manmade`; `poi` `pointofinterest`, `outpost`, `manmade`, `asteroid`,
+`navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
+(UEX's `*_name` columns: city, space station, outpost, moon, planet, orbit, then the star system)
+that is linked; a candidate must lie below it at any depth, and with no linked parent every object of
+the name and type is a candidate. A stamped or hidden object links nothing new. A row left unlinked
+is one `UNMATCHED` row and one case `STARMAP_LINK_AMBIGUOUS` or `STARMAP_LINK_NOT_FOUND` of kind
+`STARMAP_OBJECT`, whose GUID is a name-based UUID of the table and the row; the report names the row
+by its table and its UEX name, and a run that links the row closes the case as `RESOLVED`. A link
+the run changes is a `CHANGED` row (`<table>.starmap_object_id`, old and new GUID).
+
+The link columns are not mapped on the UEX entities, so a UEX sync never writes them. An admin sets
+(`SET`), clears (`CLEAR`) or hands back to the import (`RELEASE`) a link at
+`PUT /api/v1/catalog/admin/starmap/places/{kind}/{id}/link`; the request echoes the link and the
+manual flag the admin saw and is a `409` when either changed meanwhile, so it never collides with an
+edit of the row's UEX data. `SET` and `CLEAR` mark the link manual (`starmap_link_manual`), which
+every APPLY leaves alone.
+
+**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest` · **Code:** `P4kStarmapLinker`,
+`StarmapPlaceKind`,
+`StarmapPlaceRows`, `StarmapAdminService`, `P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-036 — a storage place can sit on any visible starmap node an admin picks
 
@@ -933,11 +1088,18 @@ exchange `uex` reference keep running through city and station.
 
 **Acceptance**
 
-- [ ] A `location` with none of the three references is refused by the database.
-- [ ] An admin creates a storage place on a visible outpost; a hidden object is refused.
-- [ ] An APPLY creates no `location` row.
+- [x] A `location` with none of the three references is refused by the database.
+- [x] An admin creates a storage place on a visible outpost; a hidden object is refused.
+- [x] An APPLY creates no `location` row.
 
-**Enforced by (planned):** `LocationStarmapNodeTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+`POST /api/v1/locations` creates a storage place only on a starmap object (`starmapObjectId`, `400`
+without one or on an object that is not visible) that carries none yet and that no city or space
+station links to (`409`), audited `CATALOGUE_STORAGE_PLACE_CREATED`; one node carries at most one
+place (`uq_location_starmap_object`). The node is set on create only. The database refuses a row
+with none of the three (`ck_location_place`, V352).
+
+**Enforced by:** `LocationStarmapNodeTest`, `LocationServiceTest`, `P4kStarmapImportTest` · **Code:**
+`LocationService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-037 — a linked place shows its P4K name, and only the curated name reaches the exchange
 
@@ -950,11 +1112,16 @@ write resolver tries `guid`, then `uex`, then the exact name (specified in
 
 **Acceptance**
 
-- [ ] A German page shows the German P4K name of a linked city; the exchange serves its
+- [x] A German page shows the German P4K name of a linked city; the exchange serves its
   `location.name`.
 
-**Enforced by (planned):** `LocationNameDisplayTest`, `ExchangeResolveServiceTest` · **ADR:**
-[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+A place is linked through its own node, else through its city's, else its space station's object.
+`LocationDto` carries the object's `p4kName` and `p4kNameDe` (read-only); the admin locations page
+shows the one of the page language under the curated name.
+
+**Enforced by:** `LocationNameDisplayTest`, `LocationStarmapNodeTest`,
+`ExchangeLocationGuidIntegrationTest`, `ExchangeCatalogControllerTest` · **ADR:**
+[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-038 — a starmap object is visible only inside a linked live star system
 
@@ -966,11 +1133,20 @@ rule, survives re-imports and is an audit event (REQ-P4K-046).
 
 **Acceptance**
 
-- [ ] An object in a linked live system with a position and `hideInStarmap` `false` is visible; the
+- [x] An object in a linked live system with a position and `hideInStarmap` `false` is visible; the
   same object with `hideInStarmap` `null` or `true`, or without a position, is hidden.
-- [ ] An admin override to visible survives the next APPLY.
+- [x] An admin override to visible survives the next APPLY.
 
-**Enforced by (planned):** `StarmapVisibilityTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902
+The object's `system` is the folder of its star system (`stanton`); it is linked to the UEX star
+system whose normalised name equals it. An object the sweep stamped or an admin hid through a review
+case is never visible. The override is `starmap_object.visibility_override` (`VISIBLE`, `HIDDEN`, or
+`null` for the rule), set at `PUT /api/v1/catalog/admin/starmap/objects/{id}/visibility` with the
+object's version and audited `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` (`visibility=VISIBLE|HIDDEN|RULE`).
+The admin page `/admin/starmap` lists the objects with their visibility and the UEX rows with their
+links.
+
+**Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest` · **Code:**
+`StarmapVisibility`, `StarmapAdminService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902, #3044
 
 ### REQ-P4K-039 — no feature references a location by an external id
 
@@ -1027,12 +1203,21 @@ longer lists. Ports with `issues` and
 describes the type's default, not a member's ship. Ports, sizes, flags and the default item are fact
 values; no exchange route serves them yet (#2821 decides).
 
+The tree is `ship_type_loadout_port` (`V353`): one row per port with its ship type, its parent, its
+place among its siblings, `types` as `Type` or `Type.SubType` per entry, `item_guid` (the
+catalogue's GUID, kept for an entity without a row, a docked vehicle included) and `game_item_id`.
+An unknown `source` reads as `null` and counts as an `UNKNOWN_VALUE` (REQ-P4K-003). A ship loadout
+with `issues` or unresolved ports is one `LOADOUT_ISSUES` report row (`old_value` the issue codes,
+`new_value` the unresolved ports). A complete but empty kind removes nothing, as the sweep skips an
+empty kind. The import streams the kind in a second pass over the upload, one loadout at a time,
+because it is most of the file. An item merge moves the default item of a port onto the survivor.
+
 **Acceptance**
 
-- [ ] A ship's tree is stored with nested ports and default items; a second APPLY replaces it.
-- [ ] An `itemGuid` without a `game_item` row stores the port with a `null` item reference.
+- [x] A ship's tree is stored with nested ports and default items; a second APPLY replaces it.
+- [x] An `itemGuid` without a `game_item` row stores the port with a `null` item reference.
 
-**Enforced by (planned):** `P4kLoadoutImportTest` · **Issues:** #3027
+**Enforced by:** `P4kLoadoutImportTest` · **Issues:** #3027, #3045
 
 ### REQ-P4K-041 — a paint is an item, and its ships are a link table
 
@@ -1041,11 +1226,15 @@ table `ship_type_paint` holds the `shipGuids` assignment. APPLY replaces the lin
 the `paints` kind lists; a `partial` kind leaves unlisted paints as they are, a `complete` kind also
 removes the links of paints it no longer lists.
 
+A link needs both rows: a paint whose item or a ship whose ship type the Basetool lacks links
+nothing. A complete but empty kind removes nothing, and an item merge moves the paint's links onto
+the survivor.
+
 **Acceptance**
 
-- [ ] A paint fitting three ship types yields three link rows; one fitting none yields none.
+- [x] A paint fitting three ship types yields three link rows; one fitting none yields none.
 
-**Enforced by (planned):** `P4kPaintImportTest` · **Issues:** #3027
+**Enforced by:** `P4kPaintImportTest` · **Issues:** #3027, #3045
 
 ## Shops
 
@@ -1129,7 +1318,13 @@ the never-pruned detail record; the audit event carries no free text.
   override and storage place writes exactly one `CATALOGUE` event with the row UUID as subject;
   the event types of the override and the review resolution exist.
 
-**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest` ·
+The starmap's events are recorded: `CATALOGUE_STARMAP_LINK_SET`, `…_LINK_CLEARED` and
+`…_LINK_RELEASED` (subject the UEX row, details `kind`, `starmapObjectId`,
+`previousStarmapObjectId`), `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` and
+`CATALOGUE_STORAGE_PLACE_CREATED`; the shop link's event follows with REQ-P4K-043.
+
+**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
+`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest` ·
 **Enforced by (planned):** further cases in `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
 
 ### REQ-P4K-047 — the import is monitored and says when it is due
@@ -1139,16 +1334,17 @@ The P4K import's metrics, alerts and dashboard are REQ-OBS-022 and REQ-OBS-023 i
 and outcome, unknown grade and class values, the `itemClass` null share, stamped rows, open review
 cases, and the "P4K import due" signal. `/admin/p4k-import` shows a "P4K import due" banner as soon
 as the UEX or the Wiki game version is newer than the patch version (REQ-P4K-005) of the last
-successful APPLY whose version is known, or no such APPLY exists.
+successful APPLY whose version is known, or no such APPLY exists. Every APPLY run also records
+the share of the catalogue's items without `itemClass` (`p4k_import_run.item_class_null_share`).
 
 **Acceptance**
 
-- [ ] With no run, and with a Wiki version newer than the last run's patch, the banner shows; with
+- [x] With no run, and with a Wiki version newer than the last run's patch, the banner shows; with
   equal versions it does not.
-- [ ] A later run with an unknown version does not replace the earlier run as the comparison basis.
+- [x] A later run with an unknown version does not replace the earlier run as the comparison basis.
 
-**Enforced by (planned):** `P4kImportDueTest`, `AdminP4kImportPageControllerMvcTest` · **Issues:**
-#2895
+**Enforced by:** `P4kImportDueTest`, `P4kItemClassShareTest`, `AdminP4kImportDueMvcTest` ·
+**Issues:** #2895, #3034
 
 ## Out of scope
 

@@ -63,5 +63,11 @@ public enum P4kChangeType {
    * P4kSweepOutcome}, {@code old_value} the kind's P4K-known rows and {@code new_value} the rows
    * the sweep would have stamped.
    */
-  SWEEP_SKIPPED
+  SWEEP_SKIPPED,
+
+  /**
+   * A ship loadout with issue codes or unresolved ports (REQ-P4K-040); {@code field_name} is {@code
+   * loadout}, {@code old_value} holds the issue codes, {@code new_value} the unresolved ports.
+   */
+  LOADOUT_ISSUES
 }

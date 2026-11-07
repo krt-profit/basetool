@@ -35,7 +35,7 @@ import pathlib
 state = pathlib.Path(os.environ["STUB_STATE"])
 flavour = os.environ["STUB_FLAVOUR"]
 
-builtin_scopes = ["acr", "address", "basic", "email", "microprofile-jwt", "offline_access",
+builtin_scopes = ["acr", "address", "basic", "email", "kc-admin-api", "microprofile-jwt", "offline_access",
                   "organization", "phone", "profile", "roles", "service_account", "web-origins"]
 scopes = [{"id": f"s-{n}", "name": n, "protocol": "openid-connect", "attributes": {}}
           for n in builtin_scopes]
@@ -120,7 +120,7 @@ if flavour == "testing":
         "c-frontend": ["s-address", "s-microprofile-jwt", "s-offline_access", "s-organization",
                        "s-phone"],
         "c-backend": ["s-address", "s-microprofile-jwt", "s-offline_access", "s-organization",
-                      "s-phone"],
+                      "s-phone", "s-kc-admin-api"],
     }
     data["client_mappers"] = {"c-frontend": [{
         "id": "m-stray", "name": "testing-only-mapper", "protocol": "openid-connect",
@@ -511,6 +511,12 @@ assert_eq "$(query "$state" "scope_names('default', 'basetool-frontend')")" \
   "the frontend carries extractor-ingest and NOT extractor-ingest-only (REQ-INGEST-011)"
 assert_eq "$(query "$state" "scope_names('default', 'basetool-sc-extractor')")" \
   "['basic']" "the extractor carries only basic by default: no ingest scope, no backend audience (H1)"
+assert_eq "$(query "$state" "'kc-admin-api' in scope_names('default', 'backend-service')")" \
+  "True" "the backend's service account receives the Admin API audience and scope"
+assert_eq "$(query "$state" "[c['clientId'] for c in d['clients'] if 'kc-admin-api' in scope_names('default', c['clientId']) or 'kc-admin-api' in scope_names('optional', c['clientId'])]")" \
+  "['backend-service']" "only the backend identity is assigned the Admin API scope"
+assert_eq "$(grep -cE '^(create|update|delete) client-scopes/s-kc-admin-api(/|$)' "${state}/calls.log" || true)" \
+  "0" "the built-in Admin API scope is assigned without mutating it"
 assert_eq "$(query "$state" "[client('basetool-sc-extractor')['consentRequired'], client('basetool-sc-extractor')['attributes']['dpop.bound.access.tokens']]")" \
   "[True, 'true']" "the extractor asks for consent and binds every token to DPoP (H1)"
 assert_eq "$(query "$state" "sorted(client('basetool-frontend')['redirectUris'])")" \
@@ -676,6 +682,10 @@ assert_contains "$output" "~ baseUrl: <absent> -> https://testing.example/" \
 assert_eq "$(query "$state" "client('basetool-frontend')['baseUrl']")" "https://testing.example/" \
   "and gets it, so Keycloak's error pages link back to the app"
 assert_eq "$(query "$state" "client('backend-service')['secret']")" "$SECRET_MARKER" "the existing secret is untouched"
+assert_eq "$(query "$state" "'kc-admin-api' in scope_names('default', 'backend-service')")" \
+  "True" "an existing backend client receives the default Admin API scope"
+assert_eq "$(query "$state" "'kc-admin-api' in scope_names('optional', 'backend-service')")" \
+  "False" "an optional Admin API scope is moved to default for client credentials"
 if [[ -e "${state}/SECRET_SENT_BACK" ]]; then fail "no client secret is sent back in an update"; else
   pass "no client secret is sent back in an update"; fi
 assert_not_contains "$output" "$SECRET_MARKER" "the existing secret is never printed"
@@ -1176,6 +1186,35 @@ printf '[{"clientId": "hangar-exporter", "name": "Hangar-Exporter", "firefoxExte
 output="$(run_provisioner "$state" --external-clients "$(to_child_path "${state}/bad.json")")"
 assert_contains "$output" "needs a true or false firefoxExtension" "a non-boolean firefoxExtension is refused"
 rm -rf "$state"
+
+echo "23. a missing built-in Admin API scope is diagnosed without creating or rewriting it"
+for flavour in empty testing; do
+  for mode in dry-run apply; do
+    state="$(mktemp -d)"
+    make_stub "$state" "$flavour"
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["scopes"] = [s for s in d["scopes"] if s["name"] != "kc-admin-api"]
+for scopes in d["client_optional_scopes"].values():
+    if "s-kc-admin-api" in scopes:
+        scopes.remove("s-kc-admin-api")
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+    before="$(cat "${state}/state.json")"
+    if [[ "$mode" == apply ]]; then
+      output="$(run_provisioner "$state" --apply)"
+    else
+      output="$(run_provisioner "$state")"
+    fi
+    assert_eq "$(cat "${state}/rc")" "1" "$flavour/$mode: the missing Admin API scope is refused"
+    assert_contains "$output" "scope 'kc-admin-api' does not exist" "$flavour/$mode: the missing built-in is named"
+    assert_eq "$(writes_in "$state")" "0" "$flavour/$mode: the provisioner sends no write"
+    assert_eq "$(cat "${state}/state.json")" "$before" "$flavour/$mode: the realm remains unchanged"
+    rm -rf "$state"
+  done
+done
 
 echo
 if [[ $tests_failed -gt 0 ]]; then

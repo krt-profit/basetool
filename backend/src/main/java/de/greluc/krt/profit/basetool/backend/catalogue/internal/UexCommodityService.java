@@ -441,14 +441,16 @@ public class UexCommodityService {
    */
   private void reportNameDisagreement(
       @NotNull Material material, @NotNull UexCommodityDto dto, @NotNull UUID runId) {
-    if (material.getP4kUuid() != null && !dto.name().equals(material.getName())) {
-      syncReportService.logUexEvent(
+    UUID p4kUuid = material.getP4kUuid();
+    if (p4kUuid != null) {
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.UEX,
           runId,
-          SyncEventType.P4K_VALUE_DIFFERS,
           "commodity",
-          material.getP4kUuid(),
-          dto.name(),
-          "name: UEX commodity " + dto.id() + " differs from the P4K name.");
+          p4kUuid,
+          "name",
+          material.getName(),
+          dto.name());
     }
   }
 

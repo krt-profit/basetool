@@ -63,4 +63,12 @@ public interface MaterialCategoryRepository extends JpaRepository<MaterialCatego
    * @return the live categories
    */
   List<MaterialCategory> findByP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Sort sort);
+
+  /**
+   * Lists the live P4K resource groups, without the admin categories.
+   *
+   * @param sort the order
+   * @return the groups with a P4K GUID, neither stamped nor hidden
+   */
+  List<MaterialCategory> findByP4kUuidIsNotNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Sort sort);
 }

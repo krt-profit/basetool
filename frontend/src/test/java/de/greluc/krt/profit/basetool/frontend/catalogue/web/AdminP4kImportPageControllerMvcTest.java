@@ -130,6 +130,25 @@ class AdminP4kImportPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void thePage_labelsTheStarmapCountsKindAndLinkReasons() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/admin/p4k-import").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "rowStarmapObjects: \"Sternenkarte\"",
+            "'kind.STARMAP_OBJECT': \"Sternenkarten-Objekt\"",
+            "'reason.STARMAP_LINK_AMBIGUOUS': \"UEX-Ort passt zu mehreren Sternenkarten-Objekten\"",
+            "'reason.STARMAP_LINK_NOT_FOUND': \"UEX-Ort passt zu keinem Sternenkarten-Objekt\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void theRunList_namesTheAdmins() throws Exception {
     P4kImportRunDto run =
         new P4kImportRunDto(
@@ -198,10 +217,10 @@ class AdminP4kImportPageControllerMvcTest {
   void aResolution_returnsTheCase_andAStaleOneIsAConflict() throws Exception {
     String resolve = BASE + "/review-cases/{id}/resolve";
     when(backendApiClient.post(
-            resolve, new P4kReviewResolveRequest("HIDE", 3L), P4kReviewCaseDto.class, CASE))
+            resolve, new P4kReviewResolveRequest("HIDE", null, 3L), P4kReviewCaseDto.class, CASE))
         .thenReturn(hiddenCase());
     when(backendApiClient.post(
-            resolve, new P4kReviewResolveRequest("HIDE", 2L), P4kReviewCaseDto.class, CASE))
+            resolve, new P4kReviewResolveRequest("HIDE", null, 2L), P4kReviewCaseDto.class, CASE))
         .thenThrow(new BackendServiceException("stale", null, 409));
 
     mockMvc

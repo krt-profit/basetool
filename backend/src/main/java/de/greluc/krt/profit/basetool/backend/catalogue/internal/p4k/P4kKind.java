@@ -42,6 +42,9 @@ public enum P4kKind {
   /** {@code blueprints}, matched against {@code blueprint}. */
   BLUEPRINT("blueprints"),
 
+  /** {@code starmapObjects}, imported into {@code starmap_object} (REQ-P4K-034). */
+  STARMAP_OBJECT("starmapObjects"),
+
   /**
    * {@code resourceGroups}, the commodity categories, matched against {@code material_category}.
    */

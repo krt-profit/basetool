@@ -322,7 +322,9 @@ public class SupplyMapper {
   }
 
   private static @Nullable SupplyRefDto materialRef(@Nullable Material material) {
-    return material == null ? null : new SupplyRefDto(material.getId(), material.getName());
+    return material == null
+        ? null
+        : new SupplyRefDto(material.getId(), material.getName(), material.getNameDe());
   }
 
   private static @Nullable GameItemReferenceDto gameItemRef(@Nullable GameItem gameItem) {
@@ -377,7 +379,8 @@ public class SupplyMapper {
         need.getPurchasedAmount(),
         need.isPurchasable(),
         need.getMaxUnitPrice(),
-        need.getStatus());
+        need.getStatus(),
+        material != null ? material.getNameDe() : gameItem == null ? null : gameItem.getNameDe());
   }
 
   /**

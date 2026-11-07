@@ -246,4 +246,30 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
      */
     String getEntityKey();
   }
+
+  /**
+   * Returns every key the blueprint feed has recorded.
+   *
+   * @return the distinct blueprint entity keys
+   */
+  @Query(
+      value = "SELECT DISTINCT entity_key FROM exchange_change WHERE resource = 'BLUEPRINT'",
+      nativeQuery = true)
+  List<String> findBlueprintEntityKeys();
+
+  /**
+   * Moves the blueprint feed's entries from one product key to another, keeping their positions
+   * (REQ-XCH-015).
+   *
+   * @param from the name key
+   * @param to the GUID key
+   * @return the entries moved
+   */
+  @Modifying
+  @Query(
+      value =
+          "UPDATE exchange_change SET entity_key = :to"
+              + " WHERE resource = 'BLUEPRINT' AND entity_key = :from",
+      nativeQuery = true)
+  int moveBlueprintKey(@Param("from") String from, @Param("to") String to);
 }

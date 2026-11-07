@@ -34,9 +34,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityOccurrenceSync;
@@ -225,13 +225,8 @@ class UexCommodityServiceTest {
     assertEquals("Borase", p4kKnown.getName());
     assertEquals(1.0, p4kKnown.getDensityGramPerCc());
     verify(syncReportService)
-        .logUexEvent(
-            eq(runId),
-            eq(SyncEventType.P4K_VALUE_DIFFERS),
-            eq("commodity"),
-            eq(p4kGuid),
-            eq("Borase (Ore)"),
-            any());
+        .logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "commodity", p4kGuid, "name", "Borase", "Borase (Ore)");
   }
 
   @Test

@@ -82,6 +82,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
@@ -142,7 +143,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAuditLa
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
@@ -383,6 +383,7 @@ class ArchitectureTest {
           ScWikiProperties.class,
           CommodityMiningData.class,
           ShipCatalogueFacts.class,
+          ManufacturerRefDto.class,
           GameItemKind.class,
           ItemCatalogueMetadata.class,
           ScWikiItemDto.class,
@@ -417,7 +418,6 @@ class ArchitectureTest {
           InventoryProperties.class,
           JobOrderAllocationDto.class,
           JobOrderAuditLabel.class,
-          JobOrderInventoryOwnerRedactor.class,
           KnownExchangeClients.class,
           LikePatterns.class,
           LocationReferenceDto.class,

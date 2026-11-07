@@ -81,18 +81,18 @@ public class ItemPickerLabels {
   }
 
   /**
-   * Builds one item's option label.
+   * Builds one item's option label, with the item's name in the request's language (REQ-P4K-023).
    *
    * @param item the game-item reference
-   * @return the label, the plain name for a non-component
+   * @return the label, the plain display name for a non-component
    */
   public String label(@NotNull ComponentItemReference item) {
-    if (item.componentType() == null) {
-      return item.name();
-    }
     Locale locale = LocaleContextHolder.getLocale();
+    if (item.componentType() == null) {
+      return item.displayName(locale);
+    }
     List<String> parts = new ArrayList<>();
-    parts.add(item.name());
+    parts.add(item.displayName(locale));
     String sizeGrade = sizeGrade(item, locale);
     if (sizeGrade != null) {
       parts.add(sizeGrade);

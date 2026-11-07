@@ -20,13 +20,38 @@
 package de.greluc.krt.profit.basetool.frontend.purchasing.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code PurchasingRefDto}; must match it field for field.
  *
  * @param id the id
- * @param name the display name
+ * @param name the name
+ * @param nameDe the German name of a catalogue entry, or {@code null} (REQ-P4K-023)
  */
 @DtoMirror
-public record PurchasingRefDto(UUID id, String name) {}
+public record PurchasingRefDto(UUID id, String name, @Nullable String nameDe) {
+
+  /**
+   * Builds a reference without a German name.
+   *
+   * @param id the id
+   * @param name the name
+   */
+  public PurchasingRefDto(UUID id, String name) {
+    this(id, name, null);
+  }
+
+  /**
+   * Returns the name the page shows (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
+  }
+}

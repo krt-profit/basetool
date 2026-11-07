@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.Contract;
@@ -33,6 +36,9 @@ final class P4kFields {
 
   /** The shape of a stored name key: no {@code @}, no whitespace. */
   private static final Pattern NAME_KEY = Pattern.compile("^[^@\\s]+$");
+
+  /** The prefix the game's localisation writes in place of a missing translation. */
+  static final String MISSING_TRANSLATION = "!";
 
   /** Non-instantiable holder of static helpers. */
   private P4kFields() {}
@@ -63,6 +69,60 @@ final class P4kFields {
   }
 
   /**
+   * Writes a value the catalogue leads: a present value replaces a different one, and an absent or
+   * blank one never clears the row's.
+   *
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param apply whether to write or only report
+   * @param <V> the value type
+   * @return whether the row's value changes
+   */
+  static <V> boolean replaceIfPresent(
+      @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
+    if (!leads(current, incoming)) {
+      return false;
+    }
+    if (apply) {
+      setter.accept(incoming);
+    }
+    return true;
+  }
+
+  /**
+   * Whether a catalogue value the P4K leads replaces the row's: it is present, not blank and not
+   * the same fact as the row's value.
+   *
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @return {@code true} when the catalogue value is written
+   */
+  @Contract("_, null -> false")
+  static boolean leads(@Nullable Object current, @Nullable Object incoming) {
+    return incoming != null
+        && !(incoming instanceof String s && s.isBlank())
+        && !sameValue(current, incoming);
+  }
+
+  /**
+   * Returns the usable German name of a record.
+   *
+   * @param name the record's localised name, or {@code null}
+   * @return the stripped German text, or {@code null} when it is absent, blank or the game's
+   *     missing-translation marker (a text starting with {@value #MISSING_TRANSLATION})
+   */
+  @Nullable
+  static String germanName(@Nullable P4kLocalisedText name) {
+    String de = P4kLocalisedText.deOf(name);
+    if (de == null) {
+      return null;
+    }
+    String stripped = de.strip();
+    return stripped.isEmpty() || stripped.startsWith(MISSING_TRANSLATION) ? null : stripped;
+  }
+
+  /**
    * Replaces a stored name key with the catalogue's usable one; the catalogue is the only source of
    * name keys, so it always wins.
    *
@@ -85,6 +145,35 @@ final class P4kFields {
       setter.accept(stored);
     }
     return true;
+  }
+
+  /**
+   * Whether two values are the same fact; decimals compare by value, so {@code 8.0} equals {@code
+   * 8.000}.
+   *
+   * @param a one value
+   * @param b the other value
+   * @return {@code true} when both are {@code null} or equal
+   */
+  static boolean sameValue(@Nullable Object a, @Nullable Object b) {
+    if (a instanceof BigDecimal x && b instanceof BigDecimal y) {
+      return x.compareTo(y) == 0;
+    }
+    return Objects.equals(a, b);
+  }
+
+  /**
+   * Renders one {@code P4K_DISAGREEMENT} detail entry.
+   *
+   * @param column the led column
+   * @param stored the value that stays
+   * @param source the other source's differing value
+   * @return the {@code column=…;stored=…;source=…} entry
+   */
+  @NotNull
+  static String disagreement(
+      @NotNull String column, @Nullable String stored, @Nullable String source) {
+    return "column=" + column + ";stored=" + stored + ";source=" + source;
   }
 
   /**

@@ -163,7 +163,9 @@ exempt-column|job_order_handover_item.location_name
 exempt-column|job_type.archetype
 exempt-column|job_type.description
 exempt-column|job_type.name
+exempt-column|material_category.class_name
 exempt-column|material_category.name
+exempt-column|material_category.name_de
 exempt-column|material_exchange_offer.item_name
 exempt-column|material_exchange_offer.item_product_key
 exempt-column|material_exchange_offer.offer_kind
@@ -292,8 +294,12 @@ exempt-table|planet
 exempt-table|poi
 exempt-table|refining_method
 exempt-table|ship_type
+exempt-table|ship_type_loadout_port
+exempt-table|ship_type_p4k_variant
+exempt-table|ship_type_paint
 exempt-table|ship_type_uex_alias
 exempt-table|space_station
 exempt-table|star_system
+exempt-table|starmap_object
 exempt-table|terminal
 exempt-table|uex_category

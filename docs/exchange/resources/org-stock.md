@@ -27,7 +27,7 @@ single entries are an extra, see [Entries](#entries).
 | `material` | `{bt, name}`: a material, or a game item, as in a [stock lot](stock.md#a-lot). |
 | `materialKind` | Materials only, as in a [stock lot](stock.md#material-kind). |
 | `component` | Ship components only, as in a [stock lot](stock.md#component). |
-| `location` | `{name, uex?}` of the warehouse location. |
+| `location` | `{name, uex?, guid?}` of the warehouse location. |
 | `quality` | 0 to 1000; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}`, the summed amount in the material's own unit. |

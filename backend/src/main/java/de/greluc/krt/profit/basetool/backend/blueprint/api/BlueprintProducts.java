@@ -32,9 +32,9 @@ import org.jetbrains.annotations.Nullable;
 public interface BlueprintProducts {
 
   /**
-   * Resolves a normalized product key to its canonical product.
+   * Resolves a product key to its canonical product.
    *
-   * @param productKey the normalized product key, or {@code null}
+   * @param productKey the product key, or {@code null}
    * @return the product, or empty when the key is blank or names no active product
    */
   @NotNull
@@ -50,7 +50,7 @@ public interface BlueprintProducts {
 
   /**
    * Resolves the product an item offer names from the game item it produces (REQ-MARKET-014): of
-   * the active blueprints producing the item, the lowest normalized product key.
+   * the active blueprints producing the item, the lowest product key.
    *
    * @param gameItemId the game item, or {@code null}
    * @return the product, or empty if the id is {@code null} or no active blueprint produces the
@@ -62,18 +62,27 @@ public interface BlueprintProducts {
   /**
    * Resolves product keys to the game item each product produces, in one pass over the catalogue.
    *
-   * @param productKeys the normalized product keys
+   * @param productKeys the product keys
    * @return product key to output-item id; keys without an active product or output item are absent
    */
   @NotNull
   Map<String, UUID> outputItemIdsByProductKey(@NotNull Collection<String> productKeys);
 
   /**
-   * Indexes every active recipe's lower-cased {@code scwiki_key} to the normalized product keys it
-   * produces (REQ-XCH-012).
+   * Indexes every active recipe's lower-cased {@code scwiki_key} to the product keys it produces
+   * (REQ-XCH-012).
    *
    * @return the index in first-seen order, never {@code null}
    */
   @NotNull
   Map<String, Set<String>> scwikiKeyToProductKeys();
+
+  /**
+   * Indexes every active product by the name keys of its recipes' output names; a name that names
+   * several products maps to all of them (REQ-INV-070).
+   *
+   * @return name key to products in first-seen order, never {@code null}
+   */
+  @NotNull
+  Map<String, List<ResolvedProduct>> productsByNameKey();
 }

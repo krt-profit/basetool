@@ -80,6 +80,8 @@ public interface ShipMapper {
   }
 
   /** Nested mapping for the ship's stationing {@link Location}. */
+  @Mapping(target = "p4kName", ignore = true)
+  @Mapping(target = "p4kNameDe", ignore = true)
   LocationDto locationToDto(Location location);
 
   /** Nested mapping for the ship's {@link Manufacturer}. */

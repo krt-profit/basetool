@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +41,23 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends LookupTableRepository<Location, UUID> {
 
   /**
+   * A native SQL scalar subquery for the P4K starmap GUID of the {@code location} row aliased
+   * {@code l}: its own starmap object's, else its city's, else its space station's, else {@code
+   * NULL} (REQ-P4K-037, REQ-XCH-018).
+   */
+  String EXCHANGE_GUID =
+      """
+      (SELECT COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid)
+       FROM location gl
+       LEFT JOIN starmap_object lso ON lso.id = gl.starmap_object_id
+       LEFT JOIN city gc ON gc.id = gl.city_id
+       LEFT JOIN starmap_object cso ON cso.id = gc.starmap_object_id
+       LEFT JOIN space_station gs ON gs.id = gl.space_station_id
+       LEFT JOIN starmap_object sso ON sso.id = gs.starmap_object_id
+       WHERE gl.id = l.id)
+      """;
+
+  /**
    * Returns slim {@code LocationReferenceDto}s (id + name) for every non-hidden location, ordered
    * by name, unbounded. Payload-bounded pickers use {@link #searchReference(String, Pageable)}
    * instead.
@@ -52,19 +70,52 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
   List<LocationReferenceDto> findAllReference();
 
   /**
-   * Lists the non-hidden locations with the UEX ids of their city or space station, ordered by
-   * name, for the exchange catalogue (REQ-XCH-018).
+   * Lists the non-hidden locations with the UEX ids of their city or space station and their
+   * starmap GUID, ordered by name, for the exchange catalogue (REQ-XCH-018).
    *
    * @return one row per non-hidden location
    */
   @Query(
-      """
-      SELECT new
-      de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository$ExchangeLocationRow(
-      l.name, c.idCity, s.idSpaceStation) FROM Location l LEFT JOIN l.city c
-      LEFT JOIN l.spaceStation s WHERE l.hidden = false AND l.referenceOnly = false ORDER BY l.name
-      """)
+      value =
+          "SELECT l.name AS name, c.id_city AS uexCityId,"
+              + " s.id_space_station AS uexSpaceStationId, "
+              + EXCHANGE_GUID
+              + " AS guid FROM location l LEFT JOIN city c ON c.id = l.city_id"
+              + " LEFT JOIN space_station s ON s.id = l.space_station_id"
+              + " WHERE l.hidden = false AND l.reference_only = false ORDER BY l.name",
+      nativeQuery = true)
   List<ExchangeLocationRow> findExchangeLocations();
+
+  /**
+   * Finds the non-hidden storage place whose starmap GUID is {@code guid}; a place linked to the
+   * starmap object itself wins over one linked through its city or space station, then the name
+   * decides (REQ-P4K-037, REQ-XCH-016).
+   *
+   * @param guid the GUID of the P4K starmap object
+   * @return the location, or empty when no non-hidden storage place carries the GUID
+   */
+  @Query(
+      value =
+          "SELECT l.* FROM location l WHERE l.hidden = false AND l.reference_only = false AND "
+              + EXCHANGE_GUID
+              + " = :guid ORDER BY (l.starmap_object_id IS NULL), l.name, l.id LIMIT 1",
+      nativeQuery = true)
+  Optional<Location> findExchangeByGuid(@Param("guid") UUID guid);
+
+  /**
+   * Reads the starmap GUIDs of the given locations; a location without one has no row
+   * (REQ-XCH-018).
+   *
+   * @param ids the location ids; never empty
+   * @return one row per given location that carries a GUID
+   */
+  @Query(
+      value =
+          "SELECT gx.location_id AS locationId, gx.guid AS guid FROM (SELECT l.id AS location_id, "
+              + EXCHANGE_GUID
+              + " AS guid FROM location l WHERE l.id IN (:ids)) gx WHERE gx.guid IS NOT NULL",
+      nativeQuery = true)
+  List<ExchangeLocationGuid> findExchangeGuids(@Param("ids") Collection<UUID> ids);
 
   /**
    * Paged live search for the location pickers (REQ-FE-016): non-hidden locations whose name
@@ -95,6 +146,22 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
 
   /** Derived Spring-Data query - returns entities matching {@code CityId}. */
   Optional<Location> findByCityId(UUID cityId);
+
+  /**
+   * Whether a storage place sits on a starmap object (REQ-P4K-036).
+   *
+   * @param starmapObjectId the starmap object
+   * @return {@code true} when a location names it
+   */
+  boolean existsByStarmapObjectId(UUID starmapObjectId);
+
+  /**
+   * Finds the storage places on a set of starmap objects.
+   *
+   * @param starmapObjectIds the starmap objects
+   * @return the locations on them
+   */
+  List<Location> findByStarmapObjectIdIn(Collection<UUID> starmapObjectIds);
 
   /** Derived Spring-Data query - returns entities matching {@code SpaceStationId}. */
   Optional<Location> findBySpaceStationId(UUID spaceStationId);
@@ -195,12 +262,56 @@ public interface LocationRepository extends LookupTableRepository<Location, UUID
    */
   Optional<Location> findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(String name);
 
-  /**
-   * One non-hidden location as the exchange catalogue reads it from the database.
-   *
-   * @param name the location name
-   * @param uexCityId the UEX id of the linked city, or {@code null}
-   * @param uexSpaceStationId the UEX id of the linked space station, or {@code null}
-   */
-  record ExchangeLocationRow(String name, Integer uexCityId, Integer uexSpaceStationId) {}
+  /** One non-hidden location as the exchange catalogue reads it from the database. */
+  interface ExchangeLocationRow {
+
+    /**
+     * The location's curated name.
+     *
+     * @return the name
+     */
+    String getName();
+
+    /**
+     * The UEX id of the linked city.
+     *
+     * @return the id, or {@code null}
+     */
+    @Nullable
+    Integer getUexCityId();
+
+    /**
+     * The UEX id of the linked space station.
+     *
+     * @return the id, or {@code null}
+     */
+    @Nullable
+    Integer getUexSpaceStationId();
+
+    /**
+     * The GUID of the P4K starmap object the location stands for.
+     *
+     * @return the GUID, or {@code null} when the location links none
+     */
+    @Nullable
+    UUID getGuid();
+  }
+
+  /** The starmap GUID of one location, as {@link #findExchangeGuids(Collection)} reads it. */
+  interface ExchangeLocationGuid {
+
+    /**
+     * The location.
+     *
+     * @return the location id
+     */
+    UUID getLocationId();
+
+    /**
+     * The GUID of the P4K starmap object the location stands for.
+     *
+     * @return the GUID
+     */
+    UUID getGuid();
+  }
 }

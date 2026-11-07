@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md); planned: [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md), [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md)
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md), [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md); planned: [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -129,7 +129,7 @@ existing and future users:
   (`in_keycloak = true`) so a re-run never duplicates;
 - adding a new default grants it to all existing users at once (REQ-INV-017).
 
-Granting MUST use the same normalized `product_key` the rest of the blueprint feature uses, so a
+Granting MUST use the same `product_key` (REQ-INV-070) the rest of the blueprint feature uses, so a
 granted default lines up with the catalog, the product search "owned" flag, the availability
 overview (REQ-INV-012/013) and the job-order coverage view — i.e. a default counts as genuinely
 owned everywhere, for every user.
@@ -749,10 +749,6 @@ change alone.
 
 ### REQ-INV-070 — A personal blueprint is keyed by its produced item's GUID
 
-> [!note] Planned — implementation pending (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
-> Today a personal blueprint is keyed by the normalised product key (`product_key`).
-
 A member owns a **product** — what a blueprint produces — not a single recipe record. Its key is
 the DataForge GUID of the produced item, which the P4K import stores as `producedItemGuid` on the
 `blueprint` row, so the key does not depend on a matched `game_item` row. Only the DataForge GUID
@@ -777,11 +773,26 @@ counts, never a Wiki UUID. A name is used only to resolve to that key.
 
 **Acceptance**
 
-- [ ] A name that resolves to one GUID is stored under that GUID; one that resolves to several is
+- [x] A name that resolves to one GUID is stored under that GUID; one that resolves to several is
   `SUGGESTED` with the candidates, and the pick is learned as an alias.
-- [ ] The backfill keys every resolvable row by GUID and keeps the name key, with a review case, for
+- [x] The backfill keys every resolvable row by GUID and keeps the name key, with a review case, for
   the others; a later run that resolves such a row upgrades it.
-- [ ] A fallback row and a GUID row of the same product merge into one GUID row with the earliest
+- [x] A fallback row and a GUID row of the same product merge into one GUID row with the earliest
   date and the note, and the merge writes one audit event.
 
-**Enforced by:** — (planned) · **Issues:** #2893
+`product_key` holds the GUID's lower-case text for a GUID-keyed product and the normalised name
+for a fallback row (`ProductKeys`). The backfill runs inside every P4K APPLY, after the
+reconcilers and the sweep (`PersonalBlueprintKeyUpgrade`, behind the catalogue's
+`ProducedItemGuidFollower`): a name key held by a member, the default set, an alias, a
+Materialbörse offer or request, or the exchange feed and journal moves when exactly one active
+product carries that name and a GUID. The merge keeps the GUID row's note, or the fallback row's
+when the GUID row has none. "The audit details move" means every event from the move on carries the
+GUID key; the audit history is append-only, so events written before a move keep the key they
+recorded, and the
+move itself is audited (`BLUEPRINT_PRODUCT_KEYS_UPGRADED` per run, `BLUEPRINT_PRODUCT_MERGED` per
+merge). The key is the produced item's GUID, not a `game_item` id, so a Wiki/UEX item merge and
+its `game_item_redirect` leave it untouched.
+
+**Enforced by:** `PersonalBlueprintKeyBackfillTest`, `BlueprintImportServiceTest`,
+`ProductKeysTest` · **Code:** `ProductKeys`, `PersonalBlueprintKeyUpgrade`,
+`BlueprintProductService#productsByNameKey` · **Issues:** #2893

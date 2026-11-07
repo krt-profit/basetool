@@ -42,6 +42,7 @@ import org.jetbrains.annotations.Nullable;
  * @param purchasable whether the raising unit allows buying
  * @param maxUnitPrice the highest whole-aUEC unit price a deal may pay, or {@code null}
  * @param status the need's state
+ * @param labelDe the German name of the material or game item, or {@code null} (REQ-P4K-023)
  */
 public record NeedRef(
     @NotNull UUID id,
@@ -57,7 +58,59 @@ public record NeedRef(
     double purchasedAmount,
     boolean purchasable,
     @Nullable Long maxUnitPrice,
-    @NotNull NeedStatus status) {
+    @NotNull NeedStatus status,
+    @Nullable String labelDe) {
+
+  /**
+   * Builds a reference without a German label.
+   *
+   * @param id the need
+   * @param orgUnitId the raising unit
+   * @param materialId the material, or {@code null} for a game-item need
+   * @param gameItemId the game item, or {@code null} for a material need
+   * @param qualityTierId the tier a material must reach, or {@code null} for a game item
+   * @param minQuality the lowest quality that satisfies the tier, {@code 0} for a game item
+   * @param label the name of the material or game item
+   * @param quantityPiece whether the entry is counted in whole units
+   * @param amount the amount asked for
+   * @param fulfilledAmount what donations and accepted deliveries cover together
+   * @param purchasedAmount the part of the covered amount that came from accepted deliveries
+   * @param purchasable whether the raising unit allows buying
+   * @param maxUnitPrice the highest whole-aUEC unit price a deal may pay, or {@code null}
+   * @param status the need's state
+   */
+  public NeedRef(
+      @NotNull UUID id,
+      @NotNull UUID orgUnitId,
+      @Nullable UUID materialId,
+      @Nullable UUID gameItemId,
+      @Nullable UUID qualityTierId,
+      int minQuality,
+      @NotNull String label,
+      boolean quantityPiece,
+      double amount,
+      double fulfilledAmount,
+      double purchasedAmount,
+      boolean purchasable,
+      @Nullable Long maxUnitPrice,
+      @NotNull NeedStatus status) {
+    this(
+        id,
+        orgUnitId,
+        materialId,
+        gameItemId,
+        qualityTierId,
+        minQuality,
+        label,
+        quantityPiece,
+        amount,
+        fulfilledAmount,
+        purchasedAmount,
+        purchasable,
+        maxUnitPrice,
+        status,
+        null);
+  }
 
   /**
    * Returns what the need still asks for.

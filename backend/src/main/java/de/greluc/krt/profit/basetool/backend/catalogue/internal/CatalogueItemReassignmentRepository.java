@@ -26,7 +26,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Moves recipe references inside the catalogue module during a verified item reconciliation. */
+/**
+ * Moves the recipe, loadout and paint references inside the catalogue module during a verified item
+ * reconciliation.
+ */
 interface CatalogueItemReassignmentRepository extends Repository<GameItem, UUID> {
 
   /**
@@ -64,4 +67,42 @@ interface CatalogueItemReassignmentRepository extends Repository<GameItem, UUID>
           """,
       nativeQuery = true)
   int ingredients(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Repoints the loadout ports that hold the retired item by default (REQ-P4K-040).
+   *
+   * @param retiredId retired catalogue item
+   * @param survivorId canonical catalogue item
+   * @return affected ports
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE ship_type_loadout_port SET game_item_id = :survivorId
+          WHERE game_item_id = :retiredId
+          """,
+      nativeQuery = true)
+  int loadoutPorts(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Moves the retired paint's ship links onto the survivor (REQ-P4K-041); a link the survivor
+   * already holds stays with the retired item and goes with it.
+   *
+   * @param retiredId retired catalogue item
+   * @param survivorId canonical catalogue item
+   * @return moved links
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE ship_type_paint SET game_item_id = :survivorId
+          WHERE game_item_id = :retiredId
+            AND ship_type_id NOT IN
+              (SELECT held.ship_type_id FROM ship_type_paint held
+               WHERE held.game_item_id = :survivorId)
+          """,
+      nativeQuery = true)
+  int paints(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
 }

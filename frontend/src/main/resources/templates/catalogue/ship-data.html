@@ -66,8 +66,8 @@
                     <tbody>
                         <tr th:each="st : ${shipTypes}" data-testid="ship-type-row" th:classappend="${st.hidden} ? 'sd-row--hidden' : ''">
                             <td>
-                                <span class="cell-title" th:text="${st.name}">Name</span>
-                                <span class="cell-sub" th:if="${st.manufacturer != null}" th:text="${st.manufacturer.abbreviation}">Hersteller</span>
+                                <span class="cell-title" th:text="${st.displayName(#locale)}">Name</span>
+                                <span class="cell-sub" th:if="${st.manufacturer != null}" th:insert="~{catalogue/fragments/manufacturer-mark :: mark(${st.manufacturer})}">Hersteller</span>
                             </td>
                             <td th:attr="data-label=#{ship.shiptype.description}" th:text="${st.description}">Desc</td>
                             <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
@@ -126,8 +126,8 @@
                     <tbody>
                         <tr th:each="m : ${manufacturers}" data-testid="manufacturer-row" th:classappend="${m.hidden} ? 'sd-row--hidden' : ''">
                             <td>
-                                <span class="cell-title" th:text="${m.name}">Name</span>
-                                <span class="cell-sub" th:text="${m.abbreviation}">Kürzel</span>
+                                <span class="cell-title" th:text="${m.displayName(#locale)}">Name</span>
+                                <span class="cell-sub" th:insert="~{catalogue/fragments/manufacturer-mark :: mark(${m})}">Kürzel</span>
                             </td>
                             <td th:attr="data-label=#{ship.manufacturer.description}" th:text="${m.description}">Desc</td>
                             <td class="cell-actions" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">

@@ -211,6 +211,9 @@ public class ExchangeDraftService {
     if (ref.name() != null && !ref.name().isBlank()) {
       return ref.name().trim();
     }
+    if (ref.guid() != null) {
+      return ref.guid().toString();
+    }
     if (ref.bt() != null) {
       return ref.bt();
     }

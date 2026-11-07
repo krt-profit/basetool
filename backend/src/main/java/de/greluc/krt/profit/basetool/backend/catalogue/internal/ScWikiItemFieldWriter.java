@@ -19,16 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
-import java.util.Locale;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -36,46 +32,69 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-/** Applies Wiki item metadata without changing canonical identity or UEX-owned attributes. */
+/**
+ * Applies Wiki item metadata without changing canonical identity or UEX-owned attributes; the
+ * attributes the P4K leads are written only where the P4K value is {@code null}, and a differing
+ * Wiki value is reported (REQ-P4K-017…019).
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ScWikiItemFieldWriter {
-  private static final int MAX_CLASS_LOG_LENGTH = 64;
-  private static final int MAX_LOGGED_UNKNOWN_CLASSES = 32;
-  private final Set<String> unknownClassesLogged = ConcurrentHashMap.newKeySet();
-  private final MeterRegistry meterRegistry;
+
+  /** The source name the class resolver logs. */
+  private static final String SOURCE = "SC Wiki";
+
+  /** Resolves, counts and logs the Wiki's class values. */
+  private final ItemClassResolver itemClassResolver;
+
+  /** Receives the disagreements with the P4K. */
+  private final SyncReportService syncReportService;
 
   /**
    * Writes the Wiki-owned attributes and source presence; omitted size, grade and class stay
-   * intact.
+   * intact, and an attribute the P4K holds a value for keeps it.
    *
    * @param item managed catalogue item
    * @param dto identity-verified source payload
+   * @param runId the Wiki run a disagreement is reported under
    * @param now source-sync timestamp
    */
-  public void apply(@NotNull GameItem item, @NotNull ScWikiItemDto dto, @NotNull Instant now) {
+  public void apply(
+      @NotNull GameItem item,
+      @NotNull ScWikiItemDto dto,
+      @NotNull UUID runId,
+      @NotNull Instant now) {
     item.setScwikiName(dto.name());
     item.setWikiMetadata(dto.metadata());
     item.setScwikiSlug(dto.slug());
     item.setClassName(dto.className());
     item.setClassification(dto.classification());
     item.setClassificationLabel(dto.classificationLabel());
-    item.setWikiType(dto.type());
+    fillGap(item, runId, "wiki_type", item.getP4kType(), dto.type(), item::setWikiType);
     item.setWikiTypeLabel(dto.typeLabel());
-    item.setWikiSubType(dto.subType());
+    fillGap(
+        item, runId, "wiki_sub_type", item.getP4kSubType(), dto.subType(), item::setWikiSubType);
     item.setWikiSubTypeLabel(dto.subTypeLabel());
     if (StringUtils.hasText(dto.size())) {
-      item.setSizeClass(parseSize(dto.size()));
+      fillGap(
+          item, runId, "size_class", item.getP4kSize(), parseSize(dto.size()), item::setSizeClass);
     }
     if (StringUtils.hasText(dto.grade())) {
-      item.setGrade(dto.grade());
+      String p4kGrade = P4kGradeMapping.letter(item.getP4kType(), item.getP4kGradeRaw());
+      fillGap(item, runId, "grade", p4kGrade, dto.grade(), item::setGrade);
     }
     if (StringUtils.hasText(dto.itemClass())) {
-      item.setItemClass(resolveClass(dto.itemClass()));
+      fillGap(
+          item,
+          runId,
+          "item_class",
+          item.getP4kItemClass(),
+          itemClassResolver.resolve(dto.itemClass(), SOURCE),
+          item::setItemClass);
     }
     item.setRarity(dto.rarity());
-    item.setMass(dto.mass());
+    fillGap(item, runId, "mass", item.getP4kMass(), dto.mass(), item::setMass);
     if (dto.dimension() != null) {
       item.setDimensionX(dto.dimension().width());
       item.setDimensionY(dto.dimension().height());
@@ -92,19 +111,46 @@ public class ScWikiItemFieldWriter {
     item.setScwikiDeletedAt(null);
   }
 
-  private @Nullable ShipComponentClass resolveClass(@NotNull String wikiClass) {
-    ShipComponentClass resolved = ShipComponentClass.fromWikiClass(wikiClass);
-    if (resolved == null) {
-      meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
-      String value = LogSafe.text(wikiClass.strip(), MAX_CLASS_LOG_LENGTH);
-      if (unknownClassesLogged.size() < MAX_LOGGED_UNKNOWN_CLASSES
-          && unknownClassesLogged.add(value.toLowerCase(Locale.ROOT))) {
-        log.warn(
-            "Unknown SC Wiki item class '{}' — storing no class; add it to ShipComponentClass.",
-            value);
-      }
+  /**
+   * Writes the Wiki's value where the P4K holds none; otherwise keeps the column and reports a Wiki
+   * value that differs from the P4K's.
+   *
+   * @param item the item
+   * @param runId the Wiki run
+   * @param column the column written
+   * @param p4kValue the P4K's value of the column
+   * @param wikiValue the Wiki's value
+   * @param setter writes the column
+   * @param <V> the value type
+   */
+  private <V> void fillGap(
+      @NotNull GameItem item,
+      @NotNull UUID runId,
+      @NotNull String column,
+      @Nullable V p4kValue,
+      @Nullable V wikiValue,
+      @NotNull Consumer<V> setter) {
+    if (p4kValue == null) {
+      setter.accept(wikiValue);
+      return;
     }
-    return resolved;
+    if (wikiValue == null || same(p4kValue, wikiValue)) {
+      return;
+    }
+    syncReportService.logScwikiEvent(
+        runId,
+        SyncEventType.P4K_DISAGREEMENT,
+        "game_item",
+        item.getExternalUuid(),
+        item.getName(),
+        P4kFields.disagreement(column, String.valueOf(p4kValue), String.valueOf(wikiValue)));
+  }
+
+  private static boolean same(@NotNull Object p4kValue, @NotNull Object wikiValue) {
+    if (p4kValue instanceof String p4k && wikiValue instanceof String wiki) {
+      return p4k.strip().equalsIgnoreCase(wiki.strip());
+    }
+    return Objects.equals(p4kValue, wikiValue);
   }
 
   private static @Nullable Integer parseSize(String size) {

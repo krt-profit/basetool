@@ -76,7 +76,7 @@
                             <td><span class="cell-title" th:text="'#' + ${d.dealNo()}">#1</span></td>
                             <td th:attr="data-label=#{purchasing.deal.unit}" th:text="${d.raisingOrgUnit().name()}">ARGON</td>
                             <td th:attr="data-label=#{purchasing.deal.entry}">
-                                <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
+                                <span class="cell-title" th:text="${d.material() != null ? d.material().displayName(#locale) : d.gameItem().displayName(#locale)}">Quantanium</span>
                                 <span class="cell-sub" th:if="${d.qualityTier() != null}"
                                       th:text="#{purchasing.deal.quality(${#locale.language == 'en' ? d.qualityTier().labelEn() : d.qualityTier().labelDe()})}">Qualit&auml;t: Keine</span>
                             </td>
@@ -116,10 +116,10 @@
                         <label for="purchasing-deal-need" th:text="#{purchasing.deal.need}">Bedarf</label>
                         <select id="purchasing-deal-need" required data-testid="purchasing-deal-need">
                             <option th:each="n : ${openNeeds}" th:value="${n.id()}"
-                                    th:data-entry="${n.material() != null ? n.material().name() : n.gameItem().name()}"
+                                    th:data-entry="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}"
                                     th:data-open="${n.openAmount()}" th:data-max-price="${n.maxUnitPrice()}"
                                     th:data-unit="${n.orgUnitName()}"
-                                    th:text="${n.orgUnitName() + ' - ' + (n.material() != null ? n.material().name() : n.gameItem().name())}">ARGON - Quantanium</option>
+                                    th:text="${n.orgUnitName() + ' - ' + (n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale))}">ARGON - Quantanium</option>
                         </select>
                         <p id="purchasing-deal-need-hint" class="form-hint"></p>
                     </div>

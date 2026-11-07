@@ -63,6 +63,14 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(nullable = false, unique = true)
   private String name;
 
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private MaterialType type;

@@ -58,7 +58,18 @@ public record P4kCatalogueHead(
    * @return {@code true} when the catalogue states the kind complete
    */
   public boolean isComplete(@NotNull P4kKind kind) {
-    P4kKindCompleteness entry = completeness.get(kind.getCatalogueField());
+    return isComplete(kind.getCatalogueField());
+  }
+
+  /**
+   * Whether the kind a top-level field holds is complete; a field without an entry reads as
+   * partial.
+   *
+   * @param catalogueField the field, e.g. {@code paints}
+   * @return {@code true} when the catalogue states the kind complete
+   */
+  public boolean isComplete(@NotNull String catalogueField) {
+    P4kKindCompleteness entry = completeness.get(catalogueField);
     return entry != null && entry.isComplete();
   }
 
