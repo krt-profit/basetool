@@ -135,16 +135,6 @@ public record P4kShopDto(
   }
 
   /**
-   * Parses {@link #starmapObjectGuid()}.
-   *
-   * @return the GUID, or {@code null} when absent or not a UUID
-   */
-  @Nullable
-  public UUID parsedStarmapObjectGuid() {
-    return P4kGuids.parse(starmapObjectGuid);
-  }
-
-  /**
    * Parses {@link #entityGuid()}.
    *
    * @return the GUID, or {@code null} when absent or not a UUID

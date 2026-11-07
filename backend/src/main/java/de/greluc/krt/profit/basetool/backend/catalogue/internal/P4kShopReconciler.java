@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShopDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShopKind;
 import jakarta.persistence.EntityManager;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -75,8 +74,8 @@ public class P4kShopReconciler {
     shopRepository.findAll().forEach(s -> byGuid.put(s.getP4kUuid(), s));
     P4kRowIds items = P4kRowIds.load(entityManager, P4kKind.ITEM, context);
     P4kRowIds objects = P4kRowIds.load(entityManager, P4kKind.STARMAP_OBJECT, context);
-    Map<UUID, Map<UUID, ShopItem>> storedItems = storedItems();
-    List<ShopItem> gone = new ArrayList<>();
+    Map<UUID, Set<UUID>> storedItems = context.isApply() ? storedItems() : Map.of();
+    Map<UUID, Set<UUID>> gone = new LinkedHashMap<>();
     Map<UUID, Reconciled> run = new LinkedHashMap<>();
     for (P4kShopDto record : records) {
       String key = record.key();
@@ -92,13 +91,17 @@ public class P4kShopReconciler {
       context.stamp(KIND, record, row, guid);
       run.put(guid, new Reconciled(record, row));
       if (context.isApply()) {
-        Map<UUID, ShopItem> current = storedItems.getOrDefault(row.getId(), Map.of());
-        P4kLinkDiff<UUID> diff = P4kLinkDiff.of(itemIds(record, items), current.keySet());
-        diff.removed().forEach(itemId -> gone.add(current.get(itemId)));
+        P4kLinkDiff<UUID> diff =
+            P4kLinkDiff.of(itemIds(record, items), storedItems.getOrDefault(row.getId(), Set.of()));
+        if (!diff.removed().isEmpty()) {
+          gone.put(row.getId(), diff.removed());
+        }
         diff.added().forEach(itemId -> entityManager.persist(new ShopItem(row.getId(), itemId)));
       }
     }
-    P4kLinkDiff.deleteInChunks(gone, itemRepository::deleteAllInBatch);
+    gone.forEach((shopId, itemIds) ->
+        P4kLinkDiff.deleteInChunks(
+            List.copyOf(itemIds), chunk -> itemRepository.deleteLinks(shopId, chunk)));
     return List.copyOf(run.values());
   }
 
@@ -215,17 +218,15 @@ public class P4kShopReconciler {
   }
 
   /**
-   * Reads the stored item rows, grouped by shop and item.
+   * Reads the stored item links as ids, grouped by shop.
    *
-   * @return the item rows per shop and item
+   * @return the linked item ids per shop
    */
   @NotNull
-  private Map<UUID, Map<UUID, ShopItem>> storedItems() {
-    Map<UUID, Map<UUID, ShopItem>> stored = new HashMap<>();
-    for (ShopItem link : itemRepository.findAll()) {
-      stored
-          .computeIfAbsent(link.getShopId(), _ -> new HashMap<>())
-          .put(link.getGameItemId(), link);
+  private Map<UUID, Set<UUID>> storedItems() {
+    Map<UUID, Set<UUID>> stored = new HashMap<>();
+    for (ShopItemRepository.ShopItemLink link : itemRepository.findAllLinks()) {
+      stored.computeIfAbsent(link.getShopId(), _ -> new HashSet<>()).add(link.getGameItemId());
     }
     return stored;
   }

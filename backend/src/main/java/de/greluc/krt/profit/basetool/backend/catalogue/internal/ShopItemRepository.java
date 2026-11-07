@@ -19,7 +19,55 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Reads and stores the items of the shops' known item lists (REQ-P4K-044). */
-public interface ShopItemRepository extends JpaRepository<ShopItem, ShopItem.Key> {}
+public interface ShopItemRepository extends JpaRepository<ShopItem, ShopItem.Key> {
+
+  /**
+   * Reads every link as a key pair, without loading an entity.
+   *
+   * @return one pair per stored link
+   */
+  @Query("SELECT si.shopId AS shopId, si.gameItemId AS gameItemId FROM ShopItem si")
+  @NotNull
+  List<ShopItemLink> findAllLinks();
+
+  /**
+   * Deletes some of one shop's links in one statement.
+   *
+   * @param shopId the shop
+   * @param gameItemIds the items whose links go; never empty
+   * @return the number of deleted links
+   */
+  @Modifying(flushAutomatically = true)
+  @Query("DELETE FROM ShopItem si WHERE si.shopId = :shopId AND si.gameItemId IN :gameItemIds")
+  int deleteLinks(
+      @Param("shopId") @NotNull UUID shopId,
+      @Param("gameItemIds") @NotNull Collection<UUID> gameItemIds);
+
+  /** One stored link of a shop to an item. */
+  interface ShopItemLink {
+
+    /**
+     * Returns the shop.
+     *
+     * @return the shop's id
+     */
+    UUID getShopId();
+
+    /**
+     * Returns the item the shop's list names.
+     *
+     * @return the item's id
+     */
+    UUID getGameItemId();
+  }
+}

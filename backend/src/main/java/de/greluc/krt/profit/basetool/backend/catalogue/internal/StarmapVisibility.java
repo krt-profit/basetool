@@ -28,10 +28,10 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Component;
 
 /**
- * The visibility rule of the starmap (REQ-P4K-038, #2902): an object is visible when its star
- * system folder names a live-available UEX star system, {@code hideInStarmap} is {@code false} and
- * it has a position; an admin's override wins over the rule. An object the sweep stamped or an
- * admin hid through a review case is never visible.
+ * The visibility rule of the starmap (REQ-P4K-038): an object is visible when its star system
+ * folder names a live-available UEX star system, {@code hideInStarmap} is {@code false} and it has
+ * a position; an admin's override wins over the rule. An object the sweep stamped or an admin hid
+ * through a review case is never visible.
  */
 @Component
 @RequiredArgsConstructor
