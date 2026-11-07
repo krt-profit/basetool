@@ -489,7 +489,11 @@ lifts. The row records who resolved the case and when, and each resolution is an
 
 `p4k_review_case` holds `status` (`OPEN`, `REVIEWED`), `resolution` (`KEEP`, `HIDE`),
 `resolved_by` and `resolved_at`; a resolution echoes the case version (`409` when stale), and a
-resolved case is never resolved again. A hide stamps `p4k_hidden_at` on the row. A GUID conflict
+resolved case is never resolved again. A resolution takes the `SyncCoordinator` lock an APPLY and
+the Wiki and UEX syncs hold for its whole transaction, without waiting: while one of them runs it
+is refused with `409`, so it never writes a row beside them. An `ASSIGN` of a missing group whose
+material no longer exists is refused and leaves the case open. A hide stamps `p4k_hidden_at` on
+the row. A GUID conflict
 between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMergeConflictRecorder`),
 is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
 A hide and an assignment evict the P4K-written caches after the commit and publish the global

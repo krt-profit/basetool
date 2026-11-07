@@ -99,9 +99,15 @@ public class AdminP4kReportController {
     PageResponse<P4kImportRunDto> runs =
         withBackendStatus(() -> reportClient.runs(page, PAGE_SIZE));
     Map<String, String> names = new HashMap<>();
-    for (P4kImportRunDto run : PageResponse.contentOf(runs)) {
-      names.computeIfAbsent(run.createdBy(), this::adminName);
-    }
+    PageResponse.contentOf(runs).stream()
+        .map(P4kImportRunDto::createdBy)
+        .distinct()
+        .forEach(userId -> {
+          String name = adminName(userId);
+          if (name != null) {
+            names.put(userId, name);
+          }
+        });
     return new P4kImportRunsView(
         runs == null ? new PageResponse<>(List.of(), page, PAGE_SIZE, 0, 0, List.of()) : runs,
         Map.copyOf(names));

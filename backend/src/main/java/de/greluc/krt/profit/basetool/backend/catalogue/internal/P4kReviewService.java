@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -42,14 +43,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -75,6 +79,13 @@ public class P4kReviewService {
   private final MaterialCategoryRepository categoryRepository;
   private final P4kCatalogueChange catalogueChange;
   private final CatalogueAdminLiveSync adminLiveSync;
+  private final SyncCoordinator syncCoordinator;
+
+  /** This service's proxy, so a resolution's transaction runs inside the lock. */
+  private final ObjectProvider<P4kReviewService> self;
+
+  /** The holder name a resolution shows in the {@link SyncCoordinator} log lines. */
+  static final String RESOLVE_LOCK_LABEL = "P4K review resolution";
 
   /** The reasons of a resource whose join yields no single commodity (REQ-P4K-024). */
   private static final Set<P4kReviewReason> RESOURCE_JOINS =
@@ -112,14 +123,59 @@ public class P4kReviewService {
    * @return the resolved case
    * @throws NotFoundException when no case has the id
    * @throws BadRequestException when the case is already resolved, the resolution is {@code
-   *     RESOLVED}, which only a run sets, or {@code ASSIGN} does not meet an assignable case and a
-   *     live resource group or material
+   *     RESOLVED}, which only a run sets, {@code ASSIGN} does not meet an assignable case and a
+   *     live resource group or material, or a missing group's material no longer exists
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
+   * @throws BusinessConflictException when an APPLY or a Wiki or UEX sync holds the {@link
+   *     SyncCoordinator} lock over the rows a resolution writes
+   */
+  @Transactional(propagation = Propagation.SUPPORTS)
+  @NotNull
+  public P4kReviewCaseDto resolve(
+      @NotNull UUID caseId,
+      @NotNull P4kReviewResolution resolution,
+      @Nullable UUID categoryId,
+      @Nullable UUID materialId,
+      long version,
+      @NotNull UUID adminId) {
+    AtomicReference<P4kReviewCaseDto> resolved = new AtomicReference<>();
+    boolean ran =
+        syncCoordinator.tryRunExclusively(
+            RESOLVE_LOCK_LABEL,
+            () ->
+                resolved.set(
+                    self.getObject()
+                        .resolveWithinLock(
+                            caseId, resolution, categoryId, materialId, version, adminId)));
+    if (!ran) {
+      throw new BusinessConflictException(
+          "A P4K import or a Wiki or UEX sync is running; resolve the case once it has finished.");
+    }
+    return Objects.requireNonNull(resolved.get());
+  }
+
+  /**
+   * Resolves an open case in its own transaction; only {@link #resolve} calls it, holding the
+   * {@link SyncCoordinator} lock for the whole transaction.
+   *
+   * @param caseId the case
+   * @param resolution keep, hide or assign
+   * @param categoryId the resource group an {@code ASSIGN} of a missing group gives the material,
+   *     else {@code null}
+   * @param materialId the material an {@code ASSIGN} of a resource gives its recipe lines, else
+   *     {@code null}
+   * @param version the case version the admin saw
+   * @param adminId the resolving admin
+   * @return the resolved case
+   * @throws NotFoundException when no case has the id
+   * @throws BadRequestException when {@link #resolve} would refuse the resolution
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
   @Transactional
   @NotNull
-  public P4kReviewCaseDto resolve(
+  public P4kReviewCaseDto resolveWithinLock(
       @NotNull UUID caseId,
       @NotNull P4kReviewResolution resolution,
       @Nullable UUID categoryId,
@@ -146,6 +202,7 @@ public class P4kReviewService {
     }
     boolean assign = resolution == P4kReviewResolution.ASSIGN;
     final MaterialCategory group = groupCase ? liveGroup(categoryId) : null;
+    final Material ungrouped = groupCase ? caseMaterial(reviewCase) : null;
     final Material material = assign && resourceCase ? liveMaterial(materialId) : null;
     Instant now = Instant.now();
     reviewCase.setStatus(P4kReviewStatus.REVIEWED);
@@ -155,8 +212,8 @@ public class P4kReviewService {
     if (resolution == P4kReviewResolution.HIDE && reviewCase.getRowId() != null) {
       hide(reviewCase.getKind(), reviewCase.getRowId(), now);
     }
-    if (group != null && reviewCase.getRowId() != null) {
-      materialRepository.findById(reviewCase.getRowId()).ifPresent(m -> m.setCategory(group));
+    if (ungrouped != null) {
+      ungrouped.setCategory(group);
     }
     if (material != null) {
       reviewCase.setRowId(material.getId());
@@ -201,6 +258,24 @@ public class P4kReviewService {
         categoryId == null ? null : categoryRepository.findById(categoryId).orElse(null);
     if (found == null || found.getP4kUuid() == null || found.isP4kRetired()) {
       throw new BadRequestException("Assign an existing resource group.");
+    }
+    return found;
+  }
+
+  /**
+   * Loads the material a {@code NO_RESOURCE_GROUP} case is about.
+   *
+   * @param reviewCase the case
+   * @return the material
+   * @throws BadRequestException when the material no longer exists; the next APPLY closes such a
+   *     case by itself
+   */
+  @NotNull
+  private Material caseMaterial(@NotNull P4kReviewCase reviewCase) {
+    UUID rowId = reviewCase.getRowId();
+    Material found = rowId == null ? null : materialRepository.findById(rowId).orElse(null);
+    if (found == null) {
+      throw new BadRequestException("The material of this case no longer exists.");
     }
     return found;
   }

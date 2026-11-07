@@ -155,6 +155,28 @@ class P4kMaterialGroupReviewTest {
   }
 
   @Test
+  void assigningAGroupToAMaterialThatNoLongerExists_isRefused_andLeavesTheCaseOpen() {
+    Material gone = material("Gone Before The Assignment", null);
+    runs.apply(withMineral(), false);
+    MaterialCategory mineral = categoryRepository.findByP4kUuid(MINERAL).orElseThrow();
+    P4kReviewCase open = groupCase(gone);
+    materialRepository.delete(gone);
+    materialRepository.flush();
+
+    assertThatThrownBy(() ->
+            reviewService.resolve(
+                open.getId(),
+                P4kReviewResolution.ASSIGN,
+                mineral.getId(),
+                null,
+                open.getVersion(),
+                ADMIN))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    assertThat(open.getResolvedBy()).isNull();
+  }
+
+  @Test
   void assigningAnAdminCategory_orKeepingAGroupCase_isRefused() {
     MaterialCategory erz = adminCategory("Erz");
     Material unknown = material("Not In The Game", erz);
