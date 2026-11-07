@@ -59,6 +59,7 @@ import org.springframework.stereotype.Component;
 public class P4kCommodityReconciler {
 
   private final MaterialRepository materialRepository;
+  private final P4kReviewCaseRepository reviewCaseRepository;
 
   /**
    * Reconciles every commodity; the resource groups must be reconciled first.
@@ -113,11 +114,15 @@ public class P4kCommodityReconciler {
         }
       }
     }
+    P4kResourceAssignments assignments =
+        new P4kResourceAssignments(materialRepository, reviewCaseRepository);
     rows.forEach((commodity, source) -> {
       P4kCommodityDto targetRecord = join.single(commodity.refinedSubtypeGuid());
       Reconciled target = targetRecord == null ? null : rows.get(targetRecord);
       if (target != null) {
         linkRefined(source, target, context);
+      } else if (targetRecord == null) {
+        linkAssigned(source, commodity, assignments, context);
       }
     });
     rows.values().stream()
@@ -254,6 +259,36 @@ public class P4kCommodityReconciler {
     }
     context.getReport().added(P4kKind.COMMODITY, commodity);
     return row;
+  }
+
+  /**
+   * Links a material to the material an admin assigned to its {@code refinedSubtypeGuid}, which
+   * joins no commodity of the catalogue (REQ-P4K-024); the assigned material's type stays the
+   * admin's.
+   *
+   * @param source the refining material
+   * @param commodity the source's record
+   * @param assignments the admins' resource assignments
+   * @param context the run
+   */
+  private static void linkAssigned(
+      @NotNull Reconciled source,
+      @NotNull P4kCommodityDto commodity,
+      @NotNull P4kResourceAssignments assignments,
+      @NotNull P4kImportContext context) {
+    UUID refinedSubtype = P4kGuids.parse(commodity.refinedSubtypeGuid());
+    Material assigned = refinedSubtype == null ? null : assignments.material(refinedSubtype);
+    if (assigned == null) {
+      return;
+    }
+    Material row = source.row();
+    source.write(
+        "refined_material_id",
+        row.getRefinedMaterial(),
+        assigned,
+        row::setRefinedMaterial,
+        Material::getName,
+        context);
   }
 
   /**

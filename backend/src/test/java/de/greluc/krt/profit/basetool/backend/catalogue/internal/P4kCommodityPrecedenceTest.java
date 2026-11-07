@@ -56,6 +56,10 @@ class P4kCommodityPrecedenceTest {
   @Autowired private P4kImportJobRepository jobRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private P4kReviewCaseRepository reviewCaseRepository;
+  @Autowired private P4kReviewService reviewService;
+
+  /** The admin who assigns the materials of these tests. */
+  private static final UUID ADMIN = UUID.fromString("00000000-0000-0000-0000-00000000a4d3");
 
   private P4kImportRuns runs;
 
@@ -150,6 +154,29 @@ class P4kCommodityPrecedenceTest {
     assertThat(several.getFirstRunId()).isEqualTo(first);
     assertThat(several.getLastRunId()).isEqualTo(second);
     assertThat(hasCase(UNKNOWN_RESOURCE, P4kReviewReason.RESOURCE_JOIN_NONE)).isTrue();
+  }
+
+  @Test
+  void theAdminsMaterialForARefinedSubtypeJoiningNoCommodity_becomesTheRefinedMaterial() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    UUID unjoined = UUID.fromString("0f000000-0000-4000-8000-00000000e011");
+    P4kTestCatalogues.record(root, "commodities", BORASE)
+        .put("refinedSubtypeGuid", unjoined.toString());
+    Material borase = material("Borase", BORASE, null);
+    Material assigned = material("Refined Borase", null, null);
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+    P4kReviewCase open =
+        reviewCaseRepository
+            .findByKindAndGuidAndReason(
+                P4kKind.COMMODITY, unjoined, P4kReviewReason.RESOURCE_JOIN_NONE)
+            .orElseThrow();
+    assertThat(borase.getRefinedMaterial()).isNull();
+
+    reviewService.resolve(
+        open.getId(), P4kReviewResolution.ASSIGN, null, assigned.getId(), open.getVersion(), ADMIN);
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+
+    assertThat(borase.getRefinedMaterial()).isEqualTo(assigned);
   }
 
   @Test

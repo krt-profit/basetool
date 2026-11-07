@@ -763,7 +763,8 @@ reasons are `RESOURCE_JOIN_NONE` and `RESOURCE_JOIN_SEVERAL`, one case per `Reso
 An admin resolves such a case as `ASSIGN` with a live material from
 `GET /api/v1/catalog/admin/import/p4k/materials` (`CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED`), or keeps
 it; the case holds the material as its row, and every later APPLY links that resource's recipe
-lines to it.
+lines to it and makes it the refined material of every commodity whose `refinedSubtypeGuid` is
+that resource (`P4kResourceAssignments`).
 Several catalogue records sharing a name (three "SLAM") match no row by name; each opens a
 `GUID_CONFLICT` case. A name the P4K leads that another material already holds is not written and
 opens a `GUID_CONFLICT` case on the row. `material.type` is never `null`: "stays `null`" means

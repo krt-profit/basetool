@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCommodityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -53,14 +52,8 @@ final class P4kRecipeLinks {
   /** The commodity join of the run's catalogue. */
   @NotNull private final P4kCommodityJoin join;
 
-  /** Finds the material an admin assigned. */
-  @NotNull private final MaterialRepository materialRepository;
-
-  /** Finds an admin's assignment of a resource that joins no commodity or several. */
-  @NotNull private final P4kReviewCaseRepository reviewCaseRepository;
-
-  /** The materials admins assigned to resources, by resource GUID; read on first use. */
-  @Nullable private Map<UUID, UUID> assignments;
+  /** The materials admins assigned to resources that join no single commodity. */
+  @NotNull private final P4kResourceAssignments assignments;
 
   /**
    * Creates the links of one run.
@@ -81,8 +74,7 @@ final class P4kRecipeLinks {
     this.materials = context.commodityRows();
     this.storedItems = context.itemRows();
     this.join = join;
-    this.materialRepository = materialRepository;
-    this.reviewCaseRepository = reviewCaseRepository;
+    this.assignments = new P4kResourceAssignments(materialRepository, reviewCaseRepository);
   }
 
   /**
@@ -103,26 +95,7 @@ final class P4kRecipeLinks {
       }
       return materials.byP4kUuid(commodityGuid).orElse(null);
     }
-    UUID assigned = assignments().get(resourceGuid);
-    return assigned == null ? null : materialRepository.findById(assigned).orElse(null);
-  }
-
-  /**
-   * Returns the materials admins assigned to resources, read once per run.
-   *
-   * @return the assigned material ids by resource GUID
-   */
-  @NotNull
-  private Map<UUID, UUID> assignments() {
-    if (assignments == null) {
-      assignments = new HashMap<>();
-      for (P4kReviewCase assignment :
-          reviewCaseRepository.findByKindAndResolutionAndRowIdIsNotNullOrderByCreatedAtAsc(
-              P4kKind.COMMODITY, P4kReviewResolution.ASSIGN)) {
-        assignments.putIfAbsent(assignment.getGuid(), assignment.getRowId());
-      }
-    }
-    return assignments;
+    return assignments.material(resourceGuid);
   }
 
   /**
