@@ -110,6 +110,7 @@ its back/forward cache.
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
 `MaterialCollectionTransferInPlaceE2eTest` (row re-keyed after a transfer) +
+`MaterialAliasEmptyStateInPlaceE2eTest` (the empty state restored after the last row's delete) +
 `JobOrderReactivatePriorityInPlaceE2eTest` (header refreshed on reactivate) · **Code:**
 `krt-fetch.js`, the converted page handlers · **Issues:** #571, #572
 
