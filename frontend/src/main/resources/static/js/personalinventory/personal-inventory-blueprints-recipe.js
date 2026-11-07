@@ -866,6 +866,19 @@ function shownMaterialName(m) {
 }
 
 /**
+ * The breakdown rows the craft under the current refinery setting consumes: of a choose-n recipe
+ * the two settings may count different option groups (REQ-P4K-027).
+ *
+ * @param {any} data the blueprint's craftability
+ * @returns {ApiDto<'CraftabilityMaterialDto'>[]} the counted rows in recipe order
+ */
+function countedMaterials(data) {
+    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
+    const materials = data.materials || [];
+    return materials.filter((m) => (refineryOn ? m.countedWithRefinery : m.counted));
+}
+
+/**
  * The materials that cap the craftable count under the current refinery setting: every material
  * whose own count equals the blueprint's count.
  *
@@ -874,8 +887,7 @@ function shownMaterialName(m) {
  *     when none caps the count
  */
 function limitingNames(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     const count = craftCount(data);
     const names = materials
         .filter((m) => {
@@ -1030,8 +1042,7 @@ function renderKpi(data) {
  * @returns {HTMLElement | null} the section, or null when no material was evaluated
  */
 function renderIngredients(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     if (materials.length === 0) {
         return null;
     }

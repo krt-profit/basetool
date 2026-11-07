@@ -82097,6 +82097,12 @@
             "type" : "number",
             "format" : "double"
           },
+          "counted" : {
+            "type" : "boolean"
+          },
+          "countedWithRefinery" : {
+            "type" : "boolean"
+          },
           "craftable" : {
             "type" : "integer",
             "format" : "int32"

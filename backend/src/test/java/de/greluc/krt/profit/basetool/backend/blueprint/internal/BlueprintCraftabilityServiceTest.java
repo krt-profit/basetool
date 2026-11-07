@@ -173,6 +173,33 @@ class BlueprintCraftabilityServiceTest {
   }
 
   @Test
+  void aChooseTwoOfThreeRecipe_selectsItsOptionsAgainstTheRefineryInclusiveStockOnItsOwn() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 500, 1.0)));
+    when(refineryOrderService.pendingYieldSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_C, 500, 0.1)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
+
+    assertEquals(0, dto.craftable());
+    assertEquals(3, dto.craftableWithRefinery());
+    CraftabilityMaterialDto liner = material(dto, MAT_B);
+    assertTrue(liner.counted());
+    assertFalse(liner.countedWithRefinery());
+    assertEquals(0.02, liner.missingScu(), 1e-9);
+    CraftabilityMaterialDto covering = material(dto, MAT_C);
+    assertFalse(covering.counted());
+    assertTrue(covering.countedWithRefinery());
+    assertEquals(3, covering.craftableWithRefinery());
+    assertEquals(0.0, covering.missingScuWithRefinery(), 1e-9);
+    assertTrue(material(dto, MAT_A).counted());
+    assertTrue(material(dto, MAT_A).countedWithRefinery());
+  }
+
+  @Test
   void computeForOwner_belowFloorStockMakesTheBlueprintNotCraftable() {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))

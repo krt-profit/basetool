@@ -320,6 +320,11 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   covers best — most crafts from that group alone first, then the smallest shortfall for one craft,
   then recipe order — so it is craftable when `n` options are covered, and the material breakdown
   and shortfall list only those groups' materials. An optional group (`is_optional`) never counts.
+  The inventory-only and the refinery-inclusive figures each select their `n` groups against their
+  own stock; the breakdown lists the materials either selection counts, and each row's `counted` /
+  `countedWithRefinery` flag says which figures it belongs to, so the page shows and limits by only
+  the rows of the current refinery setting. The selection is `catalogue.api.RecipeGroupSelection`,
+  which the item-order derivation shares (REQ-ORDERS-025).
 - **Quantity unit (SCU vs Stück).** A RESOURCE ingredient may resolve to a material whose
   `QuantityType` is `PIECE` rather than `SCU`, and a bridged ITEM ingredient is always a PIECE
   material counted in whole units. The computation is done in the material's **own unit**

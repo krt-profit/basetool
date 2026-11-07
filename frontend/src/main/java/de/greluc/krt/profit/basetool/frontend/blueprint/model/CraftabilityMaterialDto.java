@@ -44,6 +44,8 @@ import org.jetbrains.annotations.Nullable;
  * @param craftableWithRefinery crafts this material alone allows including refinery yield
  * @param quantityType the unit of the {@code *Scu} figures, {@code "SCU"} or {@code "PIECE"}
  * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
+ * @param counted whether the inventory-only craft consumes the material (REQ-P4K-027)
+ * @param countedWithRefinery whether the refinery-inclusive craft consumes the material
  */
 @DtoMirror
 public record CraftabilityMaterialDto(
@@ -60,53 +62,6 @@ public record CraftabilityMaterialDto(
     int craftable,
     int craftableWithRefinery,
     @BackendEnumAsString String quantityType,
-    @Nullable String materialNameDe) {
-
-  /**
-   * Creates a breakdown without a German material name.
-   *
-   * @param materialId the material's id
-   * @param materialName the material's display name
-   * @param requiredScu the SCU one craft needs of this material
-   * @param qualityFloor the lowest qualifying quality applied
-   * @param availableScu qualifying SCU in "My Inventory" stock alone
-   * @param availableScuWithRefinery qualifying SCU including the open refinery yield
-   * @param effectiveQuality SCU-weighted quality from inventory alone, or {@code null}
-   * @param effectiveQualityWithRefinery the same including the open refinery yield, or {@code null}
-   * @param missingScu amount short of one craft from inventory alone
-   * @param missingScuWithRefinery amount short of one craft including refinery yield
-   * @param craftable crafts this material alone allows from inventory
-   * @param craftableWithRefinery crafts this material alone allows including refinery yield
-   * @param quantityType the unit of the {@code *Scu} figures
-   */
-  public CraftabilityMaterialDto(
-      UUID materialId,
-      String materialName,
-      double requiredScu,
-      int qualityFloor,
-      double availableScu,
-      double availableScuWithRefinery,
-      Double effectiveQuality,
-      Double effectiveQualityWithRefinery,
-      double missingScu,
-      double missingScuWithRefinery,
-      int craftable,
-      int craftableWithRefinery,
-      String quantityType) {
-    this(
-        materialId,
-        materialName,
-        requiredScu,
-        qualityFloor,
-        availableScu,
-        availableScuWithRefinery,
-        effectiveQuality,
-        effectiveQualityWithRefinery,
-        missingScu,
-        missingScuWithRefinery,
-        craftable,
-        craftableWithRefinery,
-        quantityType,
-        null);
-  }
-}
+    @Nullable String materialNameDe,
+    boolean counted,
+    boolean countedWithRefinery) {}

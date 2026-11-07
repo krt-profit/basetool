@@ -34,6 +34,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection.LineDemand;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -133,7 +135,7 @@ public class JobOrderItemService {
     item.setAmount(line.amount());
     item.getMaterials().clear();
 
-    for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
+    for (BlueprintIngredient ingredient : countedLines(blueprint)) {
       Material material;
       double rawQuantity;
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
@@ -418,7 +420,7 @@ public class JobOrderItemService {
     List<SubAssemblySuggestionDto> subAssemblies = new ArrayList<>();
     List<String> unresolved = new ArrayList<>();
 
-    for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
+    for (BlueprintIngredient ingredient : countedLines(blueprint)) {
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
         Material material = ingredient.getMaterial();
         if (material == null) {
@@ -450,6 +452,44 @@ public class JobOrderItemService {
     }
     return new ItemDerivationDto(
         blueprintRef(blueprint), scaledBy, materials, subAssemblies, unresolved);
+  }
+
+  /**
+   * The lines one ordered unit consumes (REQ-P4K-027): no optional cost, and of a choose-n recipe
+   * the option groups {@link RecipeGroupSelection} picks. An order can link only the materials it
+   * snapshots, so the selection is measured against no stock: the groups with the smallest demand
+   * for one craft, equal ones in recipe order.
+   *
+   * @param blueprint the ordered recipe
+   * @return the counted lines in recipe order
+   */
+  @NotNull
+  private List<BlueprintIngredient> countedLines(@NotNull Blueprint blueprint) {
+    return RecipeGroupSelection.countedLines(
+        blueprint, this::lineDemand, RecipeGroupSelection.NO_STOCK);
+  }
+
+  /**
+   * Returns what one ordered unit needs of a line's material.
+   *
+   * @param ingredient the line
+   * @return the demand, or {@code null} for an unresolved line or a craftable sub-assembly
+   */
+  @Nullable
+  private LineDemand lineDemand(@NotNull BlueprintIngredient ingredient) {
+    boolean resource = ingredient.getKind() == BlueprintIngredientKind.RESOURCE;
+    Material material = resource ? ingredient.getMaterial() : bridgedMaterial(ingredient);
+    if (material == null || material.getId() == null) {
+      return null;
+    }
+    double perUnit;
+    if (resource) {
+      perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
+    } else {
+      perUnit = ingredient.getQuantityUnits() == null ? 0.0 : ingredient.getQuantityUnits();
+    }
+    return new LineDemand(
+        material.getId(), QuantityTypeRounding.roundForQuantityType(perUnit, material), 0);
   }
 
   @NotNull

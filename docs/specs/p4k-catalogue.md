@@ -867,8 +867,10 @@ every option is required). Each option becomes a `blueprint_requirement_group` (
 `group_key`, its `count` the `required_count`, the modifiers of the option and of its nested
 selections the group's modifiers) with the resource and item lines under it, depth first, as its
 `blueprint_ingredient` lines; each optional cost becomes a group with `is_optional`, which the
-craftability leaves out. The craftability counts, of a choose-n recipe, the `n` option groups the
-member's inventory covers best (REQ-INV-048), and the recipe views show an `ADDITIVE` modifier's
+craftability and item orders leave out. Both select through `RecipeGroupSelection`: the
+craftability counts, of a choose-n recipe, the `n` option groups the member's inventory covers best
+(REQ-INV-048), and an item order snapshots the `n` groups the same selection picks against no
+stock, the ones with the smallest demand (REQ-ORDERS-025), and the recipe views show an `ADDITIVE` modifier's
 values as summands, not factors (REQ-INV-069). A line keeps its `ResourceType` or entity GUID (`p4k_resource_guid`,
 `p4k_item_guid`) and links the one commodity the join yields (REQ-P4K-024), else the material an
 admin assigned, and an item by its P4K GUID. A modifier keeps `property_guid`; its `property_key`
@@ -889,9 +891,10 @@ links, and reports a differing quantity. The categories are `blueprint_category`
 `class_name`, `name`, `name_de` and the P4K stamps), linked as `blueprint.category_id`; every listed
 category is created. The SC Wiki's `category_uuid` stays as the Wiki serves it.
 
-**Enforced by:** `P4kBlueprintImportTest`, `ScWikiBlueprintSyncServiceTest` · **Code:**
+**Enforced by:** `P4kBlueprintImportTest`, `ScWikiBlueprintSyncServiceTest`,
+`BlueprintCraftabilityServiceTest`, `JobOrderItemServiceTest` · **Code:**
 `P4kBlueprintReconciler`, `P4kBlueprintRecipeReader`, `P4kBlueprintCategoryReconciler`,
-`ScWikiBlueprintGapFiller` · **ADR:**
+`ScWikiBlueprintGapFiller`, `RecipeGroupSelection` · **ADR:**
 [ADR-0340](../adr/0340-the-p4k-catalogue-leads-blueprints-and-the-sc-wiki-blueprint-sync-fills-gaps.md) · **Issues:** #2892
 
 ### REQ-P4K-028 — a blueprint is created when its produced item exists, behind the per-run checkbox

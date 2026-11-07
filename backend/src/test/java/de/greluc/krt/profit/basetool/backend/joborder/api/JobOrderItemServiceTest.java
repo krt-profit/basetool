@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
@@ -447,6 +448,85 @@ class JobOrderItemServiceTest {
     assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
     assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
     assertThat(preview.unresolvedIngredients()).containsExactly("Unknownium");
+  }
+
+  @Test
+  void buildItemLineSnapshotsOnlyTheTwoChosenOptionsOfAChooseTwoOfThreeRecipe() {
+    GameItem legs = gameItem("Legs", GameItemKind.WEAPON);
+    Material paneling = material("Segment Paneling", QuantityType.SCU);
+    Material liner = material("Insulative Liner", QuantityType.SCU);
+    Material covering = material("Panel Covering", QuantityType.SCU);
+    Material extra = material("Optional Plating", QuantityType.SCU);
+    Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
+    when(gameItemRepository.findById(legs.getId())).thenReturn(Optional.of(legs));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    JobOrderItem built =
+        service.buildItemLine(
+            new CreateJobOrderItemLineDto(
+                null, legs.getId(), blueprint.getId(), 2, List.of(), null, null));
+
+    assertThat(built.getMaterials())
+        .extracting(m -> m.getMaterial().getName())
+        .containsExactlyInAnyOrder("Segment Paneling", "Insulative Liner");
+    assertThat(requirementFor(built, paneling).getRequiredQuantity()).isEqualTo(0.06);
+    assertThat(requirementFor(built, liner).getRequiredQuantity()).isEqualTo(0.04);
+  }
+
+  @Test
+  void deriveForPreviewShowsOnlyTheChosenOptionsAndNoOptionalCost() {
+    GameItem legs = gameItem("Legs", GameItemKind.WEAPON);
+    Material paneling = material("Segment Paneling", QuantityType.SCU);
+    Material liner = material("Insulative Liner", QuantityType.SCU);
+    Material covering = material("Panel Covering", QuantityType.SCU);
+    Material extra = material("Optional Plating", QuantityType.SCU);
+    stubMapper(paneling);
+    stubMapper(liner);
+    Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 1);
+
+    assertThat(preview.materials())
+        .extracting(DerivedMaterialDto::requiredQuantity)
+        .containsExactly(0.03, 0.02);
+  }
+
+  /**
+   * The LIVE choose-2-of-3 blueprint {@code BP_CRAFT_thp_light_legs_01_01_01} as the P4K import
+   * stores it (three option groups, a craft fills two), plus one optional cost (REQ-P4K-027).
+   */
+  private static Blueprint chooseTwoOfThreeLegs(
+      GameItem output, Material paneling, Material liner, Material covering, Material extra) {
+    Blueprint blueprint = blueprint(output);
+    blueprint.setRequiredGroupCount(2);
+    Material[] materials = {paneling, liner, covering};
+    double[] scu = {0.03, 0.02, 0.03};
+    for (int i = 0; i < materials.length; i++) {
+      blueprint.addIngredient(inGroup(blueprint, resource(materials[i], scu[i], null), i, false));
+    }
+    blueprint.addIngredient(inGroup(blueprint, resource(extra, 0.01, null), 3, true));
+    return blueprint;
+  }
+
+  /**
+   * Puts a line into a new requirement group of its own.
+   *
+   * @param blueprint the recipe the group joins
+   * @param line the line
+   * @param index the group's position
+   * @param optional whether the group is an optional cost
+   * @return the line
+   */
+  private static BlueprintIngredient inGroup(
+      Blueprint blueprint, BlueprintIngredient line, int index, boolean optional) {
+    BlueprintRequirementGroup group = new BlueprintRequirementGroup();
+    group.setOrderIndex(index);
+    group.setRequiredCount(1);
+    group.setOptional(optional);
+    blueprint.addRequirementGroup(group);
+    line.setRequirementGroup(group);
+    return line;
   }
 
   @Test
