@@ -109,7 +109,10 @@ function harness(script = []) {
         getItem: (k) => (storage.has(k) ? storage.get(k) : null),
         setItem: (k, v) => storage.set(k, v),
     };
-    context.window.krtFetchI18n = { itemRetired: 'Item retired wording' };
+    context.window.krtFetchI18n = {
+        itemRetired: 'Item retired wording',
+        blueprintRetired: 'Blueprint retired wording',
+    };
     vm.createContext(context);
     vm.runInContext(SOURCE, context);
     return { krtFetch: context.krtFetch, calls, navigations };
@@ -236,14 +239,19 @@ await test('the caller signal aborts the read', async () => {
     await assert.rejects(read, (e) => e.name === 'AbortError');
 });
 
-await test('a retired-item refusal reads the page-wide wording and no other problem does', () => {
+await test('a retired-row refusal reads its page-wide wording and no other problem does', () => {
     const h = harness();
     assert.equal(
-        h.krtFetch.itemRetiredMessage({ code: 'CATALOGUE_ITEM_RETIRED', detail: 'backend' }),
+        h.krtFetch.catalogueRetiredMessage({ code: 'CATALOGUE_ITEM_RETIRED', detail: 'backend' }),
         'Item retired wording',
     );
-    assert.equal(h.krtFetch.itemRetiredMessage({ code: 'VALIDATION_FAILED' }), null);
-    assert.equal(h.krtFetch.itemRetiredMessage(null), null);
+    assert.equal(
+        h.krtFetch.catalogueRetiredMessage({ code: 'CATALOGUE_BLUEPRINT_RETIRED', detail: 'x' }),
+        'Blueprint retired wording',
+    );
+    assert.equal(h.krtFetch.catalogueRetiredMessage({ code: 'VALIDATION_FAILED' }), null);
+    assert.equal(h.krtFetch.catalogueRetiredMessage({ code: 'toString' }), null);
+    assert.equal(h.krtFetch.catalogueRetiredMessage(null), null);
 });
 
 if (failures > 0) {

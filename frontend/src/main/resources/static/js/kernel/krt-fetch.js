@@ -605,9 +605,9 @@ async function handleProblem(response, problem, opts) {
         errorToast(prefix + ownerRequired);
         return;
     }
-    const itemRetired = itemRetiredMessage(problem);
-    if (itemRetired) {
-        errorToast(prefix + itemRetired);
+    const retired = catalogueRetiredMessage(problem);
+    if (retired) {
+        errorToast(prefix + retired);
         return;
     }
     const generic = problem && problem.detail ? problem.detail : genericError;
@@ -629,18 +629,28 @@ function ownerOrgUnitRequiredMessage(problem) {
     return krtI18nText(i18n && i18n.required, 'krtOwnerPickerI18n.required');
 }
 
+/** The `krtFetchI18n` property holding the wording of each retired-catalogue-row refusal. */
+const CATALOGUE_RETIRED_WORDING = new Map([
+    ['CATALOGUE_ITEM_RETIRED', 'itemRetired'],
+    ['CATALOGUE_BLUEPRINT_RETIRED', 'blueprintRetired'],
+]);
+
 /**
- * Returns the localized message for a CATALOGUE_ITEM_RETIRED problem from
- * `window.krtFetchI18n`, or null for any other problem (REQ-P4K-013).
+ * Returns the localized message for a CATALOGUE_ITEM_RETIRED or CATALOGUE_BLUEPRINT_RETIRED problem
+ * from `window.krtFetchI18n`, or null for any other problem (REQ-P4K-013).
  *
  * @param {any} problem the parsed RFC 7807 body, or null
- * @returns {string | null} the localized message, or null when this is not that refusal
+ * @returns {string | null} the localized message, or null when this is not such a refusal
  */
-function itemRetiredMessage(problem) {
-    if (!problem || typeof problem !== 'object' || problem.code !== 'CATALOGUE_ITEM_RETIRED') {
+function catalogueRetiredMessage(problem) {
+    const property =
+        problem && typeof problem === 'object'
+            ? CATALOGUE_RETIRED_WORDING.get(problem.code)
+            : undefined;
+    if (!property) {
         return null;
     }
-    return krtI18nText(defaults().itemRetired, 'krtFetchI18n.itemRetired');
+    return krtI18nText(defaults()[property], `krtFetchI18n.${property}`);
 }
 
 /**
@@ -1122,7 +1132,7 @@ export const krtFetch = {
     syncVersion,
     handleProblem,
     ownerOrgUnitRequiredMessage,
-    itemRetiredMessage,
+    catalogueRetiredMessage,
     maybeReauthenticate,
     reauthRedirect,
     serialize: runSerialized,

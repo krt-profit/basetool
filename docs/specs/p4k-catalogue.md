@@ -405,6 +405,8 @@ prices and terminals.
 - [x] A write that sets a retired game item on an entry, or keeps one on an entry it edits, is
   refused with `400` and code `CATALOGUE_ITEM_RETIRED`; reading, listing and deleting the entry
   still work.
+- [x] A write that sets a retired blueprint on an item-order line by its id, or keeps one on a line
+  it edits, is refused with `400` and code `CATALOGUE_BLUEPRINT_RETIRED`.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager and item-order item pickers
@@ -430,11 +432,20 @@ lists, deletes, withdrawals and the state changes of an existing entry (pause, r
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
 `catalogue.api`; the JPQL queries that keep only listed items and recipes concatenate
 `P4kRetirementJpql`, the query form of `P4kKeyedRow.isP4kRetired()`. The frontend shows
-`error.catalogue.itemRetired` for the code (`krtFetch.itemRetiredMessage`). An exchange pool
+`error.catalogue.itemRetired` for the code (`krtFetch.catalogueRetiredMessage`). An exchange pool
 book-in (REQ-XCH-045) keeps the item its lot resolved.
 
+**The backend refuses a retired blueprint the same way.** The one write that names a blueprint by
+its id, an item-order line added or edited (REQ-ORDERS-032), resolves it through
+`SelectableBlueprints` in `catalogue.api` and answers `400` with code `CATALOGUE_BLUEPRINT_RETIRED`
+and the property `blueprintId`, also when the edited line keeps it; the user picks another
+blueprint of the item. The frontend shows `error.catalogue.blueprintRetired`. The writes that name a
+blueprint by product key (a personal or default blueprint, a Materialbörse offer or request, the
+exchange's blueprint changes) already resolve only offerable products, so a product whose recipes
+are all retired answers as unknown there.
+
 **Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
-`SelectableGameItemsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
+`SelectableGameItemsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
 `SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
 `PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888

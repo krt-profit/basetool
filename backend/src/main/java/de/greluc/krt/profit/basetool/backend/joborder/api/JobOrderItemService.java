@@ -35,7 +35,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection.LineDemand;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredBlueprintException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableBlueprints;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -73,6 +75,7 @@ public class JobOrderItemService {
 
   private final BlueprintRepository blueprintRepository;
   private final SelectableGameItems selectableGameItems;
+  private final SelectableBlueprints selectableBlueprints;
   private final MaterialRepository materialRepository;
   private final MaterialMapper materialMapper;
   private final QualityTierService qualityTierService;
@@ -88,6 +91,7 @@ public class JobOrderItemService {
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
    * @throws RetiredGameItemException when the P4K retired the ordered game item
+   * @throws RetiredBlueprintException when the P4K retired the chosen blueprint
    */
   @NotNull
   public JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line) {
@@ -109,13 +113,12 @@ public class JobOrderItemService {
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
    * @throws RetiredGameItemException when the P4K retired the ordered game item, also on a line
    *     that keeps it
+   * @throws RetiredBlueprintException when the P4K retired the chosen blueprint, also on a line
+   *     that keeps it
    */
   public void applyItemLine(JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
     GameItem gameItem = selectableGameItems.require(line.gameItemId());
-    Blueprint blueprint =
-        Entities.require(
-            blueprintRepository.findById(line.blueprintId()),
-            () -> "Blueprint not found: " + line.blueprintId());
+    Blueprint blueprint = selectableBlueprints.require(line.blueprintId());
 
     if (blueprint.getOutputItem() == null
         || !gameItem.getId().equals(blueprint.getOutputItem().getId())) {

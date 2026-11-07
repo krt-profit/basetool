@@ -436,10 +436,10 @@ interface KrtFetchApi {
      */
     ownerOrgUnitRequiredMessage(problem: any): string | null;
     /**
-     * The localized message for a `CATALOGUE_ITEM_RETIRED` problem, or `null` for any other
-     * problem; for page-local `onError` handlers (REQ-P4K-013).
+     * The localized message for a `CATALOGUE_ITEM_RETIRED` or `CATALOGUE_BLUEPRINT_RETIRED`
+     * problem, or `null` for any other problem; for page-local `onError` handlers (REQ-P4K-013).
      */
-    itemRetiredMessage(problem: any): string | null;
+    catalogueRetiredMessage(problem: any): string | null;
     /** Redirects to the re-auth path when the response carries `X-Reauthenticate`. */
     maybeReauthenticate(response: Response): boolean;
     /** Redirects the window to a same-origin re-authentication path. */

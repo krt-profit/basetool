@@ -873,9 +873,9 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         toast: false,
         errorMessage: failedMessage,
         onError(status, problem) {
-            const itemRetired = krtFetch.itemRetiredMessage(problem);
+            const retired = krtFetch.catalogueRetiredMessage(problem);
             const fallback = status === 400 ? invalidMessage : failedMessage;
-            showFrontendErrorToast(itemRetired || fallback);
+            showFrontendErrorToast(retired || fallback);
             return true;
         },
         onSuccess(body) {
