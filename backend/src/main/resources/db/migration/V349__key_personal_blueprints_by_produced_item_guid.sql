@@ -5,6 +5,14 @@ ALTER TABLE blueprint ADD COLUMN produced_item_guid UUID;
 
 CREATE INDEX idx_blueprint_produced_item_guid ON blueprint (produced_item_guid);
 
+-- The product-key follow of every P4K run reads and moves keys across all members: the distinct
+-- blueprint keys of the change feed and the journal, their moves by key, and the members' rows of
+-- one key. The member-leading indexes cannot serve these predicates.
+CREATE INDEX IF NOT EXISTS idx_personal_blueprint_product_key ON personal_blueprint (product_key);
+CREATE INDEX IF NOT EXISTS idx_exchange_change_resource_key ON exchange_change (resource, entity_key);
+CREATE INDEX IF NOT EXISTS idx_exchange_journal_resource_key
+    ON exchange_journal (resource, entity_key);
+
 -- A personal-blueprint name key that resolves to no produced-item GUID or to several is a review
 -- case; the case's guid is a name-based UUID of that name key.
 ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_reason;

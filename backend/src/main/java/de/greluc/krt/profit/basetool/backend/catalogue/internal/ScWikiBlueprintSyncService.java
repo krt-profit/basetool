@@ -232,8 +232,9 @@ public class ScWikiBlueprintSyncService {
    * Persists one blueprint in its own {@code REQUIRES_NEW} transaction; call it via {@link #self}.
    * On a blueprint the P4K does not know the Wiki writes everything; on a P4K-known one it writes
    * only the columns the P4K delivers as {@code null} and reports the differing ones, and a recipe
-   * the P4K wrote is only gap-filled (REQ-P4K-027). A recipe the Wiki writes is rebuilt from the
-   * detail when present, otherwise from the flat ingredient list, keeping existing group data.
+   * the P4K wrote is only gap-filled, from a payload that carries requirement groups (REQ-P4K-027);
+   * its summary properties change only then. A recipe the Wiki writes is rebuilt from the detail
+   * when present, otherwise from the flat ingredient list, keeping existing group data.
    *
    * @param scwikiUuid the Wiki blueprint UUID (the upsert key)
    * @param dto the blueprint payload (detail when available, else the list row)
@@ -266,15 +267,17 @@ public class ScWikiBlueprintSyncService {
 
     int unresolved = 0;
     if (bp.isP4kRecipe()) {
-      gapFiller.fillRecipe(
-          bp,
-          dto,
-          runId,
-          new ScWikiBlueprintGapFiller.Resolvers(
-              this::resolveMaterialForChild, this::resolveGameItem));
-      applySummaryProperties(bp, dto);
-      bp.setIngredientCount(dto.ingredientCount());
-      bp.setGameVersionSeen(dto.gameVersion());
+      if (dto.requirementGroups() != null) {
+        gapFiller.fillRecipe(
+            bp,
+            dto,
+            runId,
+            new ScWikiBlueprintGapFiller.Resolvers(
+                this::resolveMaterialForChild, this::resolveGameItem));
+        applySummaryProperties(bp, dto);
+        bp.setIngredientCount(dto.ingredientCount());
+        bp.setGameVersionSeen(dto.gameVersion());
+      }
     } else if (dto.requirementGroups() != null) {
       unresolved = applyRequirementGraph(bp, dto, runId);
       bp.setIngredientCount(dto.ingredientCount());
@@ -311,8 +314,7 @@ public class ScWikiBlueprintSyncService {
                 .filter(row -> row.getScwikiUuid() == null))
         .or(() ->
             StringUtils.hasText(key)
-                ? blueprintRepository.findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(
-                    key)
+                ? blueprintRepository.findP4kSeededByScwikiKey(key).stream().findFirst()
                 : Optional.empty())
         .orElseGet(Blueprint::new);
   }

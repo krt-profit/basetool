@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -40,8 +41,8 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The recipe of one blueprint as the P4K delivers it (REQ-P4K-027): the requirement groups with
  * their modifiers and cost lines, and how many of the mandatory groups a craft fills. The value
- * compares to the recipe a blueprint stores, so an unchanged recipe is neither reported nor
- * rewritten.
+ * {@linkplain #matches matches} the recipe a blueprint stores when the P4K changed nothing, so an
+ * unchanged recipe is neither reported nor rewritten, also after the SC Wiki filled its gaps.
  *
  * @param requiredGroupCount how many mandatory groups one craft fills, {@code null} for all
  * @param groups the requirement groups in order, the mandatory before the optional ones
@@ -91,6 +92,20 @@ record P4kBlueprintRecipe(
       modifiers = List.copyOf(modifiers);
       lines = List.copyOf(lines);
     }
+
+    /**
+     * Whether a stored group holds this group's P4K values.
+     *
+     * @param stored the stored group
+     * @return {@code true} when the key, the counts, the modifiers and the lines match
+     */
+    boolean matches(@NotNull Group stored) {
+      return Objects.equals(key, stored.key)
+          && optional == stored.optional
+          && Objects.equals(requiredCount, stored.requiredCount)
+          && pairwise(modifiers, stored.modifiers, Modifier::matches)
+          && pairwise(lines, stored.lines, Line::matches);
+    }
   }
 
   /**
@@ -132,6 +147,25 @@ record P4kBlueprintRecipe(
      */
     Modifier {
       segments = List.copyOf(segments);
+    }
+
+    /**
+     * Whether a stored modifier holds this modifier's P4K values; a stat key or label the P4K
+     * leaves {@code null} is the SC Wiki's to fill.
+     *
+     * @param stored the stored modifier
+     * @return {@code true} when every value the P4K delivers matches
+     */
+    boolean matches(@NotNull Modifier stored) {
+      return Objects.equals(propertyGuid, stored.propertyGuid)
+          && led(propertyKey, stored.propertyKey)
+          && led(label, stored.label)
+          && valueKind == stored.valueKind
+          && Objects.equals(qualityMin, stored.qualityMin)
+          && Objects.equals(qualityMax, stored.qualityMax)
+          && Objects.equals(atMin, stored.atMin)
+          && Objects.equals(atMax, stored.atMax)
+          && segments.equals(stored.segments);
     }
   }
 
@@ -181,6 +215,25 @@ record P4kBlueprintRecipe(
     boolean resolved() {
       return material != null || item != null;
     }
+
+    /**
+     * Whether a stored line holds this line's P4K values; a material, item or name the P4K leaves
+     * {@code null} is the SC Wiki's to fill.
+     *
+     * @param stored the stored line
+     * @return {@code true} when every value the P4K delivers matches
+     */
+    boolean matches(@NotNull Line stored) {
+      return kind == stored.kind
+          && Objects.equals(resourceGuid, stored.resourceGuid)
+          && Objects.equals(itemGuid, stored.itemGuid)
+          && led(material, stored.material)
+          && led(item, stored.item)
+          && led(name, stored.name)
+          && Objects.equals(quantityScu, stored.quantityScu)
+          && Objects.equals(quantityUnits, stored.quantityUnits)
+          && Objects.equals(minQuality, stored.minQuality);
+    }
   }
 
   /**
@@ -196,6 +249,52 @@ record P4kBlueprintRecipe(
       @Nullable Material material,
       @Nullable String name,
       @Nullable Double quantityScu) {}
+
+  /**
+   * Whether a stored recipe holds every value of this recipe the P4K delivers; the values the P4K
+   * leaves {@code null} are the SC Wiki's to fill and do not count (REQ-P4K-027).
+   *
+   * @param stored the stored recipe, or {@code null} when the stored recipe is not the P4K's
+   * @return {@code true} when the recipe need not be rewritten
+   */
+  boolean matches(@Nullable P4kBlueprintRecipe stored) {
+    return stored != null
+        && Objects.equals(requiredGroupCount, stored.requiredGroupCount)
+        && pairwise(groups, stored.groups, Group::matches);
+  }
+
+  /**
+   * Whether a stored value holds the P4K's: equal, or any value where the P4K delivers none.
+   *
+   * @param p4kValue the P4K's value, or {@code null}
+   * @param stored the stored value, or {@code null}
+   * @return {@code true} when the stored value need not change
+   */
+  private static boolean led(@Nullable Object p4kValue, @Nullable Object stored) {
+    return p4kValue == null || p4kValue.equals(stored);
+  }
+
+  /**
+   * Whether two lists have one length and match element by element.
+   *
+   * @param p4k the P4K's elements
+   * @param stored the stored elements
+   * @param matches whether a stored element holds a P4K element
+   * @param <T> the element type
+   * @return {@code true} when every pair matches
+   */
+  private static <T> boolean pairwise(
+      @NotNull List<T> p4k, @NotNull List<T> stored, @NotNull BiPredicate<T, T> matches) {
+    if (p4k.size() != stored.size()) {
+      return false;
+    }
+    for (int i = 0; i < p4k.size(); i++) {
+      if (!matches.test(p4k.get(i), stored.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /**
    * Counts the lines that resolved to a material or an item.
@@ -304,11 +403,13 @@ record P4kBlueprintRecipe(
 
   /**
    * Replaces a blueprint's requirement groups and ingredient lines with this recipe and marks the
-   * recipe as the P4K's; the summary properties stay.
+   * recipe as the P4K's; the summary properties stay, and where the P4K delivers {@code null} the
+   * new rows keep what the SC Wiki filled on the stored ones ({@link P4kRecipeWikiFills}).
    *
    * @param blueprint the blueprint
    */
   void writeTo(@NotNull Blueprint blueprint) {
+    final P4kRecipeWikiFills fills = P4kRecipeWikiFills.of(blueprint);
     blueprint.clearIngredients();
     blueprint.clearRequirementGroups();
     blueprint.setRequiredGroupCount(requiredGroupCount);
@@ -322,10 +423,13 @@ record P4kBlueprintRecipe(
       row.setKind(GROUP_KIND);
       row.setRequiredCount(group.requiredCount());
       row.setOptional(group.optional());
+      fills.fillGroup(row);
       blueprint.addRequirementGroup(row);
       int modifierOrder = 0;
       for (Modifier modifier : group.modifiers()) {
-        row.addModifier(modifierRow(modifier, modifierOrder++));
+        BlueprintRequirementModifier modifierRow = modifierRow(modifier, modifierOrder++);
+        fills.fillModifier(group.key(), modifierRow);
+        row.addModifier(modifierRow);
       }
       for (Line line : group.lines()) {
         BlueprintIngredient ingredient = new BlueprintIngredient();
@@ -340,6 +444,7 @@ record P4kBlueprintRecipe(
         ingredient.setQuantityScu(line.quantityScu());
         ingredient.setQuantityUnits(line.quantityUnits());
         ingredient.setMinQuality(line.minQuality());
+        fills.fillLine(group.key(), ingredient);
         blueprint.addIngredient(ingredient);
       }
     }

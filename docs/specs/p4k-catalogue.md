@@ -394,7 +394,9 @@ search, the product-key resolution of a new personal blueprint, default blueprin
 offer or request, the name and Wiki-key matches of the imports and the exchange's catalogue
 resolution (`BlueprintRepository.findOfferableProductRows`, `findExchangeKeyRows`); an owned
 product's recipe, its craftability, a product-key upgrade and the output item of an existing
-exchange item still read it (`findActiveProductRows`, `findActiveIdNameRows`). The notice is `noLongerInGame` on
+exchange item still read it (`findActiveProductRows`, `findActiveIdNameRows`); there a live recipe
+of the product represents it before a retired one, and the variant count counts only the recipes of
+the representative's liveness. The notice is `noLongerInGame` on
 `InventoryGameItemReferenceDto`, `GameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the
 hangar, the job-order items, handovers and item collection, and the mission units.
 
@@ -911,7 +913,11 @@ several are its segments. The returns are the resource lines of the dismantle's 
 process's `efficiency` share of its stored quantity, without `dismantleExcludedResourceGuids`; the
 dismantle time and efficiency come from the process. A recipe or returns equal to the stored ones
 are neither reported nor rewritten; a change is one `CHANGED` row (`requirement_groups`,
-`dismantle_returns`).
+`dismantle_returns`). A stored recipe equals the P4K's when it holds every value the P4K delivers:
+a line's material, item or name and a modifier's stat key or label the P4K leaves `null` are the
+Wiki's fill and do not count. A rewrite keeps, where the P4K delivers `null`, what the Wiki filled
+on the stored rows: slot names, stat labels, keys and directions, the lines' names, Wiki identities
+and links.
 
 The P4K's own value of each led scalar is kept beside it (`p4k_craft_time_seconds`,
 `p4k_default_available`, `p4k_dismantle_time_seconds`, `p4k_dismantle_efficiency`), and
@@ -920,7 +926,12 @@ that value is `null` and reports a differing value as `P4K_DISAGREEMENT`; on a P
 only the slot names, the stat labels and directions and the lines' Wiki identities and missing
 links, and reports a differing quantity. A Wiki line fills only the P4K line of its slot whose
 `p4k_resource_guid` / `p4k_item_guid` (or Wiki identity) equals the Wiki's resource-type or item
-UUID; a P4K line no Wiki line names stays unfilled. The categories are `blueprint_category` (`p4k_uuid`,
+UUID; a P4K line no Wiki line names stays unfilled. On a P4K-known blueprint a list row that stands
+in for a missed detail leaves the recipe, its summary properties, `ingredient_count` and
+`game_version_seen` alone, and a `null` Wiki value never clears a led column. The Wiki's tombstone
+(`scwiki_deleted_at`) never stamps a blueprint the P4K still lists (`p4k_uuid` set,
+`p4k_deleted_at` unset). A Wiki UUID binds to a P4K-seeded blueprint of its key that the P4K still
+lists before a retired one, then by P4K GUID. The categories are `blueprint_category` (`p4k_uuid`,
 `class_name`, `name`, `name_de` and the P4K stamps), linked as `blueprint.category_id`; every listed
 category is created. The SC Wiki's `category_uuid` stays as the Wiki serves it.
 

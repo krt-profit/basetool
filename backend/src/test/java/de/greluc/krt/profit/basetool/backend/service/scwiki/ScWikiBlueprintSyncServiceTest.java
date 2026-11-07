@@ -892,6 +892,57 @@ class ScWikiBlueprintSyncServiceTest {
   }
 
   @Test
+  void aListRowStandingInForAMissedDetail_keepsTheWikiFillsOfAP4kRecipe() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    bp.setP4kUuid(UUID.randomUUID());
+    bp.setP4kRecipe(true);
+    bp.setCraftTimeSeconds(540);
+    bp.setIngredientCount(3);
+    BlueprintSummaryProperty summary = new BlueprintSummaryProperty();
+    summary.setOrderIndex(0);
+    summary.setPropertyKey("weapon_damage");
+    bp.addSummaryProperty(summary);
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+    ObjectNode listPayload = JsonMapper.builder().build().valueToTree(detail);
+    for (String key :
+        List.of(
+            "requirement_groups",
+            "summary_properties",
+            "craft_time_seconds",
+            "ingredient_count",
+            "tiers")) {
+      listPayload.remove(key);
+    }
+    ScWikiBlueprintDto list =
+        JsonMapper.builder().build().treeToValue(listPayload, ScWikiBlueprintDto.class);
+
+    service.upsertBlueprintWithinTransaction(detail.uuid(), list, UUID.randomUUID(), Instant.now());
+
+    assertEquals(540, bp.getCraftTimeSeconds());
+    assertEquals(3, bp.getIngredientCount());
+    assertEquals(List.of(summary), bp.getSummaryProperties());
+  }
+
+  @Test
+  void aP4kSeededBlueprintWithoutAWikiUuid_isFoundByItsKey_theP4kLiveRowFirst() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint live = new Blueprint();
+    live.setP4kUuid(UUID.randomUUID());
+    Blueprint swept = new Blueprint();
+    swept.setP4kUuid(UUID.randomUUID());
+    swept.setP4kDeletedAt(Instant.now());
+    when(blueprintRepository.findP4kSeededByScwikiKey(detail.key()))
+        .thenReturn(List.of(live, swept));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertEquals(detail.uuid(), live.getScwikiUuid());
+    assertNull(swept.getScwikiUuid());
+  }
+
+  @Test
   void aP4kLine_isFilledOnlyFromTheWikiLineOfItsOwnResource_whateverTheOrder() throws IOException {
     ScWikiBlueprintDto detail = capturedDetail();
     Blueprint bp = new Blueprint();
