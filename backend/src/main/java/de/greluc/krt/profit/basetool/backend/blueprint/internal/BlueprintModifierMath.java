@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierValueKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +31,8 @@ import org.jetbrains.annotations.Nullable;
  * {@code computeModifierValue}.
  *
  * <p>A modifier maps an ingredient quality to a stat multiplier; below {@code 1.0} worsens a
- * higher-is-better stat, above {@code 1.0} a lower-is-better one (REQ-INV-048).
+ * higher-is-better stat, above {@code 1.0} a lower-is-better one (REQ-INV-048); for a P4K {@code
+ * ADDITIVE} modifier the neutral value is {@code 0}.
  */
 final class BlueprintModifierMath {
 
@@ -42,6 +44,9 @@ final class BlueprintModifierMath {
 
   /** Neutral multiplier: a value on the wrong side of this worsens the stat. */
   private static final double NEUTRAL = 1.0d;
+
+  /** Neutral summand of a P4K {@code additive} modifier. */
+  private static final double NEUTRAL_SUMMAND = 0.0d;
 
   /** Float tolerance so a multiplier of exactly {@code 1.0} never reads as degrading. */
   private static final double EPS = 1e-9d;
@@ -111,11 +116,13 @@ final class BlueprintModifierMath {
       return false;
     }
     String betterWhen = modifier.getBetterWhen();
+    double neutral =
+        modifier.getValueKind() == BlueprintModifierValueKind.ADDITIVE ? NEUTRAL_SUMMAND : NEUTRAL;
     if ("higher".equalsIgnoreCase(betterWhen)) {
-      return value < NEUTRAL - EPS;
+      return value < neutral - EPS;
     }
     if ("lower".equalsIgnoreCase(betterWhen)) {
-      return value > NEUTRAL + EPS;
+      return value > neutral + EPS;
     }
     return false;
   }

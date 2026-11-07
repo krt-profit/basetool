@@ -22,10 +22,10 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's blueprint category
-> table joins with its area), REQ-P4K-017…019 are implemented (#3035),
-> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented (#3037), REQ-P4K-029
-> is implemented (#3039), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033), REQ-P4K-017…019 are
+> implemented (#3035), REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented
+> (#3037), REQ-P4K-027 and REQ-P4K-028 are implemented (#3038), REQ-P4K-029 is implemented
+> (#3039), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
 > implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-034…038 are implemented
 > (#3044), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-042…044 are implemented
 > (#3046), REQ-P4K-047 is implemented
@@ -35,10 +35,11 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
-> `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then `P4kPaintReconciler` and
-> `P4kLoadoutReconciler`, which link to the rows the base kinds matched, the starmap tree and its
-> UEX links (`P4kStarmapReconciler`, `P4kStarmapLinker`), and the shops and their UEX terminal
-> links (`P4kShopReconciler`, `P4kShopLinker`); the wire format is `catalogue.internal.p4k`.
+> `P4kBlueprintCategoryReconciler`, `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then
+> `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the rows the base kinds matched,
+> the starmap tree and its UEX links (`P4kStarmapReconciler`, `P4kStarmapLinker`), and the shops
+> and their UEX terminal links (`P4kShopReconciler`, `P4kShopLinker`); the wire format is
+> `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -334,15 +335,12 @@ move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PART
 
 The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
 names them by class name, and no other source lists them. The commodity categories are the target
-`RESOURCE_GROUP` (`material_category`); no other source lists a resource group either.
+`RESOURCE_GROUP` (`material_category`); no other source lists a resource group either. The blueprint
+categories are the target `BLUEPRINT_CATEGORY` (`blueprint_category`), named by class name; no other
+source lists them either.
 
 The shops are the target `SHOP`, keyed by the name-based UUID of their `key`; a report row names a
 shop by its entity name, and no other source lists them.
-
-> [!note] Planned — the blueprint category table
-> The blueprint category table (REQ-P4K-027) does not exist yet; it joins the sweep as one
-> `P4kSweepTarget` when its area adds the table with `p4k_uuid`, `p4k_seen_run_id`,
-> `p4k_deleted_at` and `p4k_hidden_at`.
 
 **Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
 `P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
@@ -742,8 +740,7 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 
 - [x] Three commodities sharing one `subtypeGuid` import as three rows keyed by their `guid`.
 - [x] An ingredient whose `resourceGuid` matches two commodities, or none, opens a review case.
-- [ ] The admin's assignment of such an ingredient survives the next APPLY (with the P4K recipe
-  import of REQ-P4K-027; until then the import writes no ingredient link by `resourceGuid`).
+- [x] The admin's assignment of such an ingredient survives the next APPLY.
 - [x] A UEX commodity sync leaves the P4K name and density of a P4K-known material and reports a
   different name.
 - [x] A material UEX does not know becomes RAW when it has `refinedSubtypeGuid` and its target
@@ -752,6 +749,10 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 `P4kCommodityReconciler` writes the led values through `P4kRowWriter.lead` (a `CHANGED` row each);
 `subtypeGuid` is `material.p4k_subtype_uuid`, and the join is `P4kCommodityJoin`. The two review
 reasons are `RESOURCE_JOIN_NONE` and `RESOURCE_JOIN_SEVERAL`, one case per `ResourceType` GUID.
+An admin resolves such a case as `ASSIGN` with a live material from
+`GET /api/v1/catalog/admin/import/p4k/materials` (`CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED`), or keeps
+it; the case holds the material as its row, and every later APPLY links that resource's recipe
+lines to it.
 Several catalogue records sharing a name (three "SLAM") match no row by name; each opens a
 `GUID_CONFLICT` case. A name the P4K leads that another material already holds is not written and
 opens a `GUID_CONFLICT` case on the row. `material.type` is never `null`: "stays `null`" means
@@ -850,12 +851,43 @@ seeding created invisible turns visible when the run would create it.
 
 **Acceptance**
 
-- [ ] A line with `quantityScu` 2 and `quantityMultiplier` 1.15 stores 2.3 SCU.
-- [ ] A choose-2-of-3 selection is stored as one selection with three options.
-- [ ] A Wiki craft time that differs from the P4K value leaves the P4K value and is reported; on a
+- [x] A line with `quantityScu` 2 and `quantityMultiplier` 1.15 stores 2.3 SCU.
+- [x] A choose-2-of-3 selection is stored as one selection with three options.
+- [x] A Wiki craft time that differs from the P4K value leaves the P4K value and is reported; on a
   P4K-unknown blueprint the Wiki writes it.
 
-**Enforced by (planned):** `P4kBlueprintImportTest`, `ScWikiBlueprintSyncServiceTest` · **ADR:**
+The first tier is the recipe: LIVE holds one tier per blueprint, and `craftTimeSeconds` and the
+dismantle's `tierIndex` name it; a further tier is not stored. The mandatory cost's root selection
+is the blueprint's `required_group_count` when it lets the player leave options out (`null` when
+every option is required). Each option becomes a `blueprint_requirement_group` (its `slot` the
+`group_key`, its `count` the `required_count`, the modifiers of the option and of its nested
+selections the group's modifiers) with the resource and item lines under it, depth first, as its
+`blueprint_ingredient` lines; each optional cost becomes a group with `is_optional`, which the
+craftability leaves out. The craftability counts, of a choose-n recipe, the `n` option groups the
+member's inventory covers best (REQ-INV-048), and the recipe views show an `ADDITIVE` modifier's
+values as summands, not factors (REQ-INV-069). A line keeps its `ResourceType` or entity GUID (`p4k_resource_guid`,
+`p4k_item_guid`) and links the one commodity the join yields (REQ-P4K-024), else the material an
+admin assigned, and an item by its P4K GUID. A modifier keeps `property_guid`; its `property_key`
+is the `gameplayProperties` class name without `GPP_` in lower case (the SC Wiki's key), its label
+the property's English name, its `value_kind` `MULTIPLIER` or `ADDITIVE`; one range is its band,
+several are its segments. The returns are the resource lines of the dismantle's tier, each the
+process's `efficiency` share of its stored quantity, without `dismantleExcludedResourceGuids`; the
+dismantle time and efficiency come from the process. A recipe or returns equal to the stored ones
+are neither reported nor rewritten; a change is one `CHANGED` row (`requirement_groups`,
+`dismantle_returns`).
+
+The P4K's own value of each led scalar is kept beside it (`p4k_craft_time_seconds`,
+`p4k_default_available`, `p4k_dismantle_time_seconds`, `p4k_dismantle_efficiency`), and
+`p4k_recipe` marks a recipe the P4K wrote. The SC Wiki blueprint sync writes a led column only where
+that value is `null` and reports a differing value as `P4K_DISAGREEMENT`; on a P4K recipe it fills
+only the slot names, the stat labels and directions and the lines' Wiki identities and missing
+links, and reports a differing quantity. The categories are `blueprint_category` (`p4k_uuid`,
+`class_name`, `name`, `name_de` and the P4K stamps), linked as `blueprint.category_id`; every listed
+category is created. The SC Wiki's `category_uuid` stays as the Wiki serves it.
+
+**Enforced by:** `P4kBlueprintImportTest`, `ScWikiBlueprintSyncServiceTest` · **Code:**
+`P4kBlueprintReconciler`, `P4kBlueprintRecipeReader`, `P4kBlueprintCategoryReconciler`,
+`ScWikiBlueprintGapFiller` · **ADR:**
 [ADR-0340](../adr/0340-the-p4k-catalogue-leads-blueprints-and-the-sc-wiki-blueprint-sync-fills-gaps.md) · **Issues:** #2892
 
 ### REQ-P4K-028 — a blueprint is created when its produced item exists, behind the per-run checkbox
@@ -866,10 +898,14 @@ them. Other unmatched blueprints stay match-only and are listed as `UNMATCHED`.
 
 **Acceptance**
 
-- [ ] With the box ticked, a blueprint of an existing item is created; one whose item is unknown and
+- [x] With the box ticked, a blueprint of an existing item is created; one whose item is unknown and
   not seeded is reported `UNMATCHED`.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0340](../adr/0340-the-p4k-catalogue-leads-blueprints-and-the-sc-wiki-blueprint-sync-fills-gaps.md) · **Issues:** #2892
+A created blueprint has no `scwiki_uuid` until the SC Wiki lists it; the Wiki sync then finds it by
+its P4K GUID or its key and fills the UUID. It is named through its produced item: `output_name` is
+the item's name.
+
+**Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0340](../adr/0340-the-p4k-catalogue-leads-blueprints-and-the-sc-wiki-blueprint-sync-fills-gaps.md) · **Issues:** #2892
 
 ### REQ-P4K-029 — the import stores the produced item's GUID that keys a member's blueprints
 

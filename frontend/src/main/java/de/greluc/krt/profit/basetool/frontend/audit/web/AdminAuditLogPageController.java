@@ -432,6 +432,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_P4K_REVIEW_KEPT",
                   "CATALOGUE_P4K_REVIEW_HIDDEN",
                   "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED",
+                  "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED",
                   "CATALOGUE_STARMAP_LINK_SET",
                   "CATALOGUE_STARMAP_LINK_CLEARED",
                   "CATALOGUE_STARMAP_LINK_RELEASED",

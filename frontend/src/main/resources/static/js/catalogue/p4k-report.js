@@ -24,6 +24,7 @@ const KINDS = [
     'STARMAP_OBJECT',
     'SHOP',
     'RESOURCE_GROUP',
+    'BLUEPRINT_CATEGORY',
 ];
 
 /** The change types a report filters by, in display order. */
@@ -343,13 +344,44 @@ function loadResourceGroups() {
     );
 }
 
+/** @type {{ id: string, name: string }[]} */
+let materials = [];
+
 /**
- * The action cell of a case: a group picker for a missing resource group, keep and hide otherwise.
+ * Loads the materials a resource-join case can assign (REQ-P4K-024).
+ *
+ * @returns {Promise<void>} settles once the materials are known
+ */
+function loadMaterials() {
+    return readJson(pageUrl('/materials')).then(
+        (/** @type {{ id: string, name: string }[] | null} */ result) => {
+            materials = Array.isArray(result) ? result : [];
+        },
+    );
+}
+
+/** The reasons of a resource that joins no single commodity, resolved by assigning a material. */
+const RESOURCE_JOIN_REASONS = ['RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'];
+
+/**
+ * The action cell of a case: a group picker for a missing resource group, a material picker and
+ * keep for a resource without a single commodity, keep and hide otherwise.
  *
  * @param {P4kCase} c the case
  * @returns {ReturnType<typeof krtHtml>} the cell content
  */
 function caseActions(c) {
+    if (RESOURCE_JOIN_REASONS.includes(c.reason || '')) {
+        return krtHtml`<select class="form-input" data-material-pick aria-label="${t(
+            'pickMaterial',
+        )}"><option value="">${t('pickMaterial')}</option>${materials.map(
+            (m) => krtHtml`<option value="${m.id}">${m.name}</option>`,
+        )}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
+            'actionAssign',
+        )}</button> <button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
+            'actionKeep',
+        )}</button>`;
+    }
     if (c.reason === 'NO_RESOURCE_GROUP') {
         return krtHtml`<select class="form-input" data-group-pick aria-label="${t('pickGroup')}"><option value="">${t(
             'pickGroup',
@@ -392,8 +424,11 @@ function onCasesClick(e) {
     const resolution = btn.dataset.resolution || '';
     const pick = row.querySelector('select[data-group-pick]');
     const categoryId = pick instanceof HTMLSelectElement ? pick.value : '';
-    if (resolution === 'ASSIGN' && !categoryId) {
-        if (pick instanceof HTMLSelectElement) pick.focus();
+    const materialPick = row.querySelector('select[data-material-pick]');
+    const materialId = materialPick instanceof HTMLSelectElement ? materialPick.value : '';
+    if (resolution === 'ASSIGN' && !categoryId && !materialId) {
+        const focus = pick || materialPick;
+        if (focus instanceof HTMLSelectElement) focus.focus();
         return;
     }
     krtFetch
@@ -403,6 +438,7 @@ function onCasesClick(e) {
             payload: {
                 resolution,
                 categoryId: categoryId || null,
+                materialId: materialId || null,
                 version: Number(row.dataset.caseVersion),
             },
             submitter: btn,
@@ -455,7 +491,7 @@ function init() {
     const cases = $('krt-p4k-cases');
     if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
-    loadResourceGroups().then(() => loadCases(0));
+    Promise.all([loadResourceGroups(), loadMaterials()]).then(() => loadCases(0));
     refreshDueBanner();
 }
 

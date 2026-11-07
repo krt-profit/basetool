@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 
@@ -27,6 +28,8 @@ import java.util.List;
  * over a quality band, with ordered {@code segments} for stepped stats.
  *
  * <p>The slider spans {@code effectiveQualityMin..effectiveQualityMax}, which covers all segments.
+ * {@code valueKind} is {@code ADDITIVE} for a P4K modifier whose values are summands, {@code
+ * MULTIPLIER} or {@code null} for factors.
  */
 @DtoMirror
 public record BlueprintRequirementModifierDto(
@@ -38,6 +41,7 @@ public record BlueprintRequirementModifierDto(
     Double modifierAtMinQuality,
     Double modifierAtMaxQuality,
     String valueRangeType,
+    @BackendEnumAsString String valueKind,
     List<BlueprintRequirementModifierSegmentDto> segments,
     Double effectiveQualityMin,
     Double effectiveQualityMax) {}

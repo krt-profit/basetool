@@ -62,6 +62,7 @@ class BlueprintCraftabilityServiceTest {
   private static final UUID BP_ID = UUID.randomUUID();
   private static final UUID MAT_A = UUID.randomUUID();
   private static final UUID MAT_B = UUID.randomUUID();
+  private static final UUID MAT_C = UUID.randomUUID();
   private static final UUID GI_A = UUID.randomUUID();
 
   @Mock private PersonalBlueprintService personalBlueprintService;
@@ -112,6 +113,63 @@ class BlueprintCraftabilityServiceTest {
     assertEquals(1000.0, dto.groups().get(0).effectiveQuality(), 1e-9);
     assertEquals(MAT_B, dto.groups().get(1).materialId());
     assertEquals(600.0, dto.groups().get(1).effectiveQuality(), 1e-9);
+  }
+
+  /**
+   * The LIVE choose-2-of-3 blueprint {@code BP_CRAFT_thp_light_legs_01_01_01} as the P4K import
+   * stores it (see {@code p4k/blueprint-choose-2-of-3-live.json}): three option groups of which a
+   * craft fills two (REQ-P4K-027).
+   */
+  private static Blueprint chooseTwoOfThreeLegs() {
+    Blueprint bp = new Blueprint();
+    bp.setRequiredGroupCount(2);
+    String[] slots = {"SEGMENT PANELING", "INSULATIVE LINER", "PANEL COVERING"};
+    UUID[] materials = {MAT_A, MAT_B, MAT_C};
+    double[] scu = {0.03, 0.02, 0.03};
+    for (int i = 0; i < 3; i++) {
+      BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+      slot.setOrderIndex(i);
+      slot.setGroupKey(slots[i]);
+      slot.setRequiredCount(1);
+      bp.addRequirementGroup(slot);
+      bp.addIngredient(
+          resource(i, material(materials[i], "M" + i, QuantityType.SCU), scu[i], null, slot));
+    }
+    return bp;
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_isCraftableFromTheTwoCoveredOptions_andCountsOnlyThem() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 500, 1.0), new CraftabilitySlice(MAT_C, 500, 0.1)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(3, dto.craftable());
+    assertEquals(2, dto.materials().size());
+    assertEquals(MAT_A, dto.materials().get(0).materialId());
+    assertEquals(MAT_C, dto.materials().get(1).materialId());
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_withOneCoveredOption_isShortOnlyTheCheapestSecondOption() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 500, 1.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(0, dto.craftable());
+    assertEquals(2, dto.materials().size());
+    assertEquals(0.02, material(dto, MAT_B).missingScu(), 1e-9);
+    assertTrue(dto.materials().stream().noneMatch(m -> MAT_C.equals(m.materialId())));
   }
 
   @Test

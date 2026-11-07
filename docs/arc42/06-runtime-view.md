@@ -245,7 +245,11 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    Build than the last run is refused; otherwise it writes `p4k_import_run`, matches every kind by
    P4K GUID first, stamps the matched rows with the run, creates playable items and ships only when
    the admin ticked the box, and stores the change report and the review cases
-   (REQ-P4K-004…010).
+   (REQ-P4K-004…010). The blueprints come after the items, the commodities and the blueprint
+   categories: each matched blueprint takes the recipe of its first tier, its category, craft time and
+   dismantle from the P4K, and with the box ticked a blueprint of an existing or created item is
+   created (REQ-P4K-027, REQ-P4K-028). The SC Wiki blueprint sync later fills only what the P4K left
+   empty and reports what differs.
 4. **Sweep.** In the same transaction `P4kSweeper` stamps `p4k_deleted_at` on the P4K-known rows a
    complete kind no longer lists, on a valid census and within the 5 % mass guard unless the admin
    ticked "apply marking anyway"; a matched stamped row is cleared. Every outcome is a report row
@@ -256,6 +260,7 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    rows, merging a member's fallback row into an existing GUID row — and the name keys left over
    become `BLUEPRINT` review cases (REQ-P4K-029, REQ-INV-070).
 5. **Review.** The run list, each run's report and the open review cases are read through
-   `P4kImportReportService` and `P4kReviewService`; resolving a case as keep or hide is audited, and
+   `P4kImportReportService` and `P4kReviewService`; resolving a case as keep, hide or an assignment
+   (a resource group, or the material of a resource that joins no single commodity) is audited, and
    a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,
    REQ-P4K-016).

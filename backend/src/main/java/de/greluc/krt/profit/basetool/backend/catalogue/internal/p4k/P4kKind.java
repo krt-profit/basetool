@@ -51,7 +51,13 @@ public enum P4kKind {
   /**
    * {@code resourceGroups}, the commodity categories, matched against {@code material_category}.
    */
-  RESOURCE_GROUP("resourceGroups");
+  RESOURCE_GROUP("resourceGroups"),
+
+  /**
+   * {@code blueprintCategories}, the blueprint categories, imported into {@code
+   * blueprint_category}.
+   */
+  BLUEPRINT_CATEGORY("blueprintCategories");
 
   /** The top-level field of the catalogue that holds this kind, also its completeness key. */
   @Getter @NotNull private final String catalogueField;

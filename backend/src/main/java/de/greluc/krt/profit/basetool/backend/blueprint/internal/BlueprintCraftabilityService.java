@@ -36,9 +36,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -209,10 +211,118 @@ public class BlueprintCraftabilityService {
     }
 
     List<BlueprintIngredient> flat = recipe.getIngredients();
-    boolean hasUnevaluatedItem = false;
+    Requirements counted = requirements(countedLines(recipe, inventory, itemBridges), itemBridges);
+    boolean hasUnevaluatedItem = counted.unevaluatedItem();
+    Map<UUID, MaterialRequirement> requirements = counted.byMaterial();
 
+    if (requirements.isEmpty()) {
+      return new BlueprintCraftabilityDto(
+          blueprintId, true, hasUnevaluatedItem, false, 0, 0, null, null, List.of(), List.of());
+    }
+    return evaluate(
+        blueprintId,
+        recipe,
+        flat,
+        requirements,
+        hasUnevaluatedItem,
+        inventory,
+        withRefinery,
+        itemBridges);
+  }
+
+  /**
+   * The lines a craft counts: every line of a mandatory group, or, when the recipe is a choose-n
+   * selection ({@code required_group_count}), the lines of the {@code n} groups the member's
+   * inventory covers best (REQ-P4K-027). Optional groups never count.
+   *
+   * @param recipe the representative recipe
+   * @param inventory stock pooled per material, inventory only
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the counted lines in recipe order
+   */
+  @NotNull
+  private List<BlueprintIngredient> countedLines(
+      @NotNull Blueprint recipe,
+      @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
+      @NotNull Map<UUID, Material> itemBridges) {
+    List<BlueprintIngredient> mandatory =
+        recipe.getIngredients().stream().filter(line -> !isOptional(line)).toList();
+    Integer choose = recipe.getRequiredGroupCount();
+    List<BlueprintRequirementGroup> options =
+        recipe.getRequirementGroups().stream().filter(g -> !g.isOptional()).toList();
+    if (choose == null || choose >= options.size()) {
+      return mandatory;
+    }
+    Set<BlueprintRequirementGroup> chosen = Collections.newSetFromMap(new IdentityHashMap<>());
+    options.stream()
+        .sorted(
+            Comparator.comparing((BlueprintRequirementGroup g) ->
+                coverage(linesOf(mandatory, g), inventory, itemBridges)))
+        .limit(Math.max(choose, 0))
+        .forEach(chosen::add);
+    return mandatory.stream()
+        .filter(line ->
+            line.getRequirementGroup() == null || chosen.contains(line.getRequirementGroup()))
+        .toList();
+  }
+
+  /**
+   * Returns the lines of one requirement group.
+   *
+   * @param lines the lines
+   * @param group the group
+   * @return its lines in recipe order
+   */
+  @NotNull
+  private static List<BlueprintIngredient> linesOf(
+      @NotNull List<BlueprintIngredient> lines, @NotNull BlueprintRequirementGroup group) {
+    return lines.stream().filter(line -> line.getRequirementGroup() == group).toList();
+  }
+
+  /**
+   * How well the member's inventory covers one option group: the crafts it allows, and the
+   * shortfall for one craft; a group with no evaluable material covers nothing.
+   *
+   * @param lines the group's lines
+   * @param inventory stock pooled per material, inventory only
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the coverage
+   */
+  @NotNull
+  private Coverage coverage(
+      @NotNull List<BlueprintIngredient> lines,
+      @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
+      @NotNull Map<UUID, Material> itemBridges) {
+    Requirements group = requirements(lines, itemBridges);
+    if (group.byMaterial().isEmpty()) {
+      return new Coverage(0, Double.MAX_VALUE);
+    }
+    int crafts = Integer.MAX_VALUE;
+    double missing = 0.0d;
+    for (MaterialRequirement requirement : group.byMaterial().values()) {
+      Availability available =
+          availability(
+              inventory.get(requirement.materialId), requirement.floor, requirement.required);
+      crafts = Math.min(crafts, (int) Math.floor(available.available / requirement.required));
+      missing += available.missing;
+    }
+    return new Coverage(crafts, missing);
+  }
+
+  /**
+   * Pools the material requirements of a set of lines; an ITEM line without a bridged material is
+   * flagged and left out.
+   *
+   * @param lines the lines
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the requirements per material and whether an item line could not be evaluated
+   */
+  @NotNull
+  private static Requirements requirements(
+      @NotNull List<BlueprintIngredient> lines, @NotNull Map<UUID, Material> itemBridges) {
+    boolean hasUnevaluatedItem = false;
     Map<UUID, MaterialRequirement> requirements = new LinkedHashMap<>();
-    for (BlueprintIngredient ingredient : flat) {
+    for (BlueprintIngredient ingredient : lines) {
       Material material;
       double rawRequired;
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
@@ -250,12 +360,32 @@ public class BlueprintCraftabilityService {
                       quantityType))
           .add(required, floor);
     }
+    return new Requirements(requirements, hasUnevaluatedItem);
+  }
 
-    if (requirements.isEmpty()) {
-      return new BlueprintCraftabilityDto(
-          blueprintId, true, hasUnevaluatedItem, false, 0, 0, null, null, List.of(), List.of());
-    }
-
+  /**
+   * Evaluates pooled requirements against the stock maps.
+   *
+   * @param blueprintId the owned blueprint id
+   * @param recipe the representative recipe
+   * @param flat the recipe's ingredient lines
+   * @param requirements the counted requirements per material, not empty
+   * @param hasUnevaluatedItem whether an item line could not be evaluated
+   * @param inventory stock pooled per material, inventory only
+   * @param withRefinery stock pooled per material, inventory plus open refinery yield
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the craftability entry
+   */
+  @NotNull
+  private BlueprintCraftabilityDto evaluate(
+      @NotNull UUID blueprintId,
+      @NotNull Blueprint recipe,
+      @NotNull List<BlueprintIngredient> flat,
+      @NotNull Map<UUID, MaterialRequirement> requirements,
+      boolean hasUnevaluatedItem,
+      @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
+      @NotNull Map<UUID, List<CraftabilitySlice>> withRefinery,
+      @NotNull Map<UUID, Material> itemBridges) {
     Map<UUID, MaterialResult> results = new LinkedHashMap<>();
     int craftable = Integer.MAX_VALUE;
     int craftableWithRefinery = Integer.MAX_VALUE;
@@ -387,6 +517,17 @@ public class BlueprintCraftabilityService {
       }
     }
     return null;
+  }
+
+  /**
+   * Whether a line fills an optional cost of the P4K, which a craft may leave out.
+   *
+   * @param ingredient the ingredient line
+   * @return {@code true} when its group is optional
+   */
+  private static boolean isOptional(@NotNull BlueprintIngredient ingredient) {
+    BlueprintRequirementGroup group = ingredient.getRequirementGroup();
+    return group != null && group.isOptional();
   }
 
   /**
@@ -549,4 +690,29 @@ public class BlueprintCraftabilityService {
    */
   private record MaterialResult(
       MaterialRequirement requirement, Availability inventory, Availability withRefinery) {}
+
+  /**
+   * The pooled requirements of a set of lines.
+   *
+   * @param byMaterial the requirement per material id, in line order
+   * @param unevaluatedItem whether an item line had no bridged material
+   */
+  private record Requirements(
+      @NotNull Map<UUID, MaterialRequirement> byMaterial, boolean unevaluatedItem) {}
+
+  /**
+   * How well the inventory covers one option group of a choose-n recipe; the better one sorts
+   * first: more crafts, then the smaller shortfall.
+   *
+   * @param crafts the crafts the inventory allows for the group alone
+   * @param missing the shortfall for one craft of the group
+   */
+  private record Coverage(int crafts, double missing) implements Comparable<Coverage> {
+
+    @Override
+    public int compareTo(@NotNull Coverage other) {
+      int byCrafts = Integer.compare(other.crafts, crafts);
+      return byCrafts != 0 ? byCrafts : Double.compare(missing, other.missing);
+    }
+  }
 }

@@ -41,11 +41,13 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.BlueprintOutputNameOverrides;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiBlueprintGapFiller;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiBlueprintSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDismantleDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiBlueprintIngredientDto;
@@ -116,6 +118,7 @@ class ScWikiBlueprintSyncServiceTest {
             aliasService,
             gameItemRepository,
             syncReportService,
+            new ScWikiBlueprintGapFiller(syncReportService),
             new BlueprintOutputNameOverrides(new BlueprintNameNormalizer()),
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -801,29 +804,102 @@ class ScWikiBlueprintSyncServiceTest {
   }
 
   @Test
-  void wikiDetailEnrichesP4kBlueprintWithoutOverwritingItsRecipe() throws IOException {
+  void aWikiCraftTimeThatDiffersFromTheP4k_leavesTheP4kValue_andIsReported() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    UUID runId = UUID.randomUUID();
+    UUID p4kUuid = UUID.randomUUID();
+    Blueprint bp = new Blueprint();
+    bp.setP4kUuid(p4kUuid);
+    bp.setCraftTimeSeconds(77);
+    bp.setP4kCraftTimeSeconds(77);
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+
+    service.upsertBlueprintWithinTransaction(detail.uuid(), detail, runId, Instant.now());
+
+    assertEquals(77, bp.getCraftTimeSeconds());
+    verify(syncReportService)
+        .logP4kDisagreement(
+            SyncSourceSystem.SCWIKI,
+            runId,
+            "blueprint",
+            p4kUuid,
+            "craft_time_seconds",
+            "77",
+            "540");
+  }
+
+  @Test
+  void onAP4kUnknownBlueprint_theWikiWritesTheCraftTime() throws IOException {
     ScWikiBlueprintDto detail = capturedDetail();
     Blueprint bp = new Blueprint();
-    bp.setP4kSyncedAt(Instant.now());
-    bp.setOutputName("P4K output");
     bp.setCraftTimeSeconds(77);
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertEquals(540, bp.getCraftTimeSeconds());
+    verify(syncReportService, never())
+        .logP4kDisagreement(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aP4kCraftTimeOfNull_isFilledByTheWiki() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    bp.setP4kUuid(UUID.randomUUID());
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertEquals(540, bp.getCraftTimeSeconds());
+  }
+
+  @Test
+  void aRecipeTheP4kWrote_keepsItsLines_andTheWikiFillsOnlyItsGaps() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    bp.setP4kUuid(UUID.randomUUID());
+    bp.setP4kRecipe(true);
+    BlueprintRequirementGroup frame = new BlueprintRequirementGroup();
+    frame.setOrderIndex(0);
+    frame.setGroupKey("frame");
+    bp.addRequirementGroup(frame);
     BlueprintIngredient canonical = new BlueprintIngredient();
     canonical.setKind(BlueprintIngredientKind.RESOURCE);
     canonical.setOrderIndex(0);
     canonical.setQuantityScu(9.0);
+    canonical.setRequirementGroup(frame);
     bp.addIngredient(canonical);
     when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
 
     service.upsertBlueprintWithinTransaction(
         detail.uuid(), detail, UUID.randomUUID(), Instant.now());
 
-    assertEquals("P4K output", bp.getOutputName());
-    assertEquals(77, bp.getCraftTimeSeconds());
     assertSame(canonical, bp.getIngredients().getFirst());
+    assertEquals(1, bp.getIngredients().size());
     assertEquals(9.0, canonical.getQuantityScu());
-    assertTrue(bp.getRequirementGroups().isEmpty());
+    assertSame(frame, bp.getRequirementGroups().getFirst());
+    assertNotNull(frame.getName());
+    assertEquals(
+        UUID.fromString("dc6fbcbb-5990-4ed5-82ee-93152dab7845"), canonical.getWikiResourceUuid());
     assertNotNull(bp.getWikiMetadata());
-    assertFalse(bp.getWikiMetadata().unlockingMissions().isEmpty());
+  }
+
+  @Test
+  void aP4kSeededBlueprintWithoutAWikiUuid_isFoundByItsGuid_andTakesTheWikiUuid()
+      throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint seeded = new Blueprint();
+    seeded.setP4kUuid(detail.uuid());
+    when(blueprintRepository.findByP4kUuid(detail.uuid())).thenReturn(Optional.of(seeded));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertEquals(detail.uuid(), seeded.getScwikiUuid());
+    verify(blueprintRepository).save(seeded);
   }
 
   @Test

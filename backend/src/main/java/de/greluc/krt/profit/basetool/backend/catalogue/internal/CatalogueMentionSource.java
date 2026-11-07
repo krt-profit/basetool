@@ -53,6 +53,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "blueprint_requirement_modifier.better_when",
         "blueprint_requirement_modifier.label",
         "blueprint_requirement_modifier.property_key",
+        "blueprint_requirement_modifier.value_kind",
         "blueprint_requirement_modifier.value_range_type",
         "blueprint_summary_property.better_when",
         "blueprint_summary_property.label",
@@ -103,6 +104,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
   public @NotNull Set<String> exemptTables() {
     return Set.of(
         "blueprint",
+        "blueprint_category",
         "city",
         "faction",
         "game_item",

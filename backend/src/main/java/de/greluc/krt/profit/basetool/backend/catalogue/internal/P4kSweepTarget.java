@@ -87,7 +87,11 @@ enum P4kSweepTarget {
   SHOP(P4kKind.SHOP, "Shop", "e.entityName", "e.registryName", "e.id IS NULL"),
 
   /** {@code material_category}: no other source lists a resource group. */
-  RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0");
+  RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0"),
+
+  /** {@code blueprint_category}: no other source lists a blueprint category. */
+  BLUEPRINT_CATEGORY(
+      P4kKind.BLUEPRINT_CATEGORY, "BlueprintCategory", "e.className", "e.className", "1 = 0");
 
   /** The kind. */
   @NotNull private final P4kKind kind;
@@ -121,6 +125,7 @@ enum P4kSweepTarget {
       case STARMAP_OBJECT -> STARMAP_OBJECT;
       case SHOP -> SHOP;
       case RESOURCE_GROUP -> RESOURCE_GROUP;
+      case BLUEPRINT_CATEGORY -> BLUEPRINT_CATEGORY;
     };
   }
 

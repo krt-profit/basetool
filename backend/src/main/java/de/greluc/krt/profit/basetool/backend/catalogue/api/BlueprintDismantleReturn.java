@@ -75,11 +75,18 @@ public class BlueprintDismantleReturn extends AbstractEntity<UUID> {
   @Column(name = "wiki_resource_uuid")
   private UUID wikiResourceUuid;
 
+  /** The P4K {@code ResourceType} GUID of a return line the P4K wrote. */
+  @Column(name = "p4k_resource_guid")
+  @Nullable
+  private UUID p4kResourceGuid;
+
   /** Wiki display name of the returned commodity at sync time. */
   @Column(name = "wiki_name_snapshot")
+  @Nullable
   private String wikiNameSnapshot;
 
   /** Quantity recovered, in SCU. */
   @Column(name = "quantity_scu")
+  @Nullable
   private Double quantityScu;
 }

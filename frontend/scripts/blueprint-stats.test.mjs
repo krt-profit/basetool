@@ -35,6 +35,9 @@ const statValueAt = fn('statValueAt');
 const formatStatNumber = fn('formatStatNumber');
 const formatStatRange = fn('formatStatRange');
 const formatFactorPercent = fn('formatFactorPercent');
+const isAdditive = fn('isAdditive');
+const formatSummand = fn('formatSummand');
+const formatModifierChange = fn('formatModifierChange');
 
 const UNITS = {
     PERCENT: '%',
@@ -98,6 +101,24 @@ assert.equal(formatStatRange(minTemp, 1.1, 'de', UNITS), '-61 → -67,1 °C');
 
 const fireRate = { propertyKey: 'weapon_firerate', baseValue: 650, unit: 'ROUNDS_PER_MINUTE' };
 assert.equal(formatStatRange(fireRate, 1.05, 'en', UNITS), '650 → 683 rpm');
+
+assert.equal(isAdditive({ valueKind: 'ADDITIVE' }), true);
+assert.equal(isAdditive({ valueKind: 'MULTIPLIER' }), false);
+assert.equal(isAdditive({ valueKind: null }), false, 'a Wiki modifier carries factors');
+assert.equal(statValueAt(3, 1, true), 4, 'Power Pips 3 with an additive +1 is 4');
+assert.equal(statValueAt(3, -1, true), 2);
+assert.equal(formatSummand(1, 'de'), '+1');
+assert.equal(formatSummand(-0.5, 'de'), '-0,5');
+assert.equal(formatSummand(0, 'en'), '±0');
+assert.equal(formatSummand(2, 'en', '°C'), '+2 °C');
+const pips = { propertyKey: 'itemresource_powergeneration', baseValue: 3, unit: 'NONE' };
+assert.equal(formatModifierChange(1, true, pips, 'en', UNITS), '+1', 'not „+0 %" nor „×1"');
+assert.equal(formatModifierChange(-1, true, null, 'de', UNITS), '-1');
+assert.equal(formatModifierChange(1.1, false, pips, 'de', UNITS), '+10 %');
+assert.equal(formatModifierChange(2, true, minTemp, 'de', UNITS), '+2 °C');
+assert.equal(formatModifierChange(0.05, true, mitigation, 'en', UNITS), '+5 %');
+assert.equal(formatStatRange(pips, 1, 'en', UNITS, true), '3 → 4');
+assert.equal(formatStatRange(minTemp, -2, 'de', UNITS, true), '-61 → -63 °C');
 
 const index = indexBaseStats([
     integrity,

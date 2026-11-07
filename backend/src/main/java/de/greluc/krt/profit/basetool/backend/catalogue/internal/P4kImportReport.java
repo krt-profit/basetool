@@ -23,9 +23,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -62,6 +64,9 @@ public final class P4kImportReport {
 
   /** The mutable counts per kind. */
   private final Map<P4kKind, Tally> tallies = new EnumMap<>(P4kKind.class);
+
+  /** The GUIDs of the records the run created a row from, or in a preview would, per kind. */
+  private final Map<P4kKind, Set<UUID>> addedGuids = new EnumMap<>(P4kKind.class);
 
   /**
    * A review case the run found.
@@ -110,7 +115,22 @@ public final class P4kImportReport {
    */
   public void added(@NotNull P4kKind kind, @NotNull P4kRecord record) {
     tally(kind).created++;
+    UUID guid = record.parsedGuid();
+    if (guid != null) {
+      addedGuids.computeIfAbsent(kind, _ -> new HashSet<>()).add(guid);
+    }
     add(row(kind, record, P4kChangeType.ADDED));
+  }
+
+  /**
+   * Whether the run created a row from a record, or in a preview would.
+   *
+   * @param kind the kind
+   * @param guid the record's GUID
+   * @return {@code true} when a row of the GUID was added in this run
+   */
+  public boolean isAdded(@NotNull P4kKind kind, @NotNull UUID guid) {
+    return addedGuids.getOrDefault(kind, Set.of()).contains(guid);
   }
 
   /**

@@ -12,6 +12,7 @@ bank_holder_posting bank
 bank_posting bank
 bank_transaction bank
 blueprint catalogue
+blueprint_category catalogue
 blueprint_dismantle_return catalogue
 blueprint_external_alias blueprint
 blueprint_ingredient catalogue

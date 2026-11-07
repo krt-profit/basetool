@@ -7,9 +7,10 @@ import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     computeModifierValue,
-    formatFactorPercent,
+    formatModifierChange,
     formatStatRange,
     indexBaseStats,
+    isAdditive,
 } from '/js/personalinventory/personal-inventory-blueprint-stats.js';
 
 /** @type {HTMLElement | null} */
@@ -604,7 +605,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatFactorPercent(banded[0].modifierAtMaxQuality, document.documentElement.lang)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatModifierChange(banded[0].modifierAtMaxQuality, isAdditive(banded[0]), null, document.documentElement.lang, statUnitLabels())}`,
             );
         }
         if (hintParts.length > 0) {
@@ -652,19 +653,23 @@ function statUnitLabels() {
 }
 
 /**
- * Writes a chip's value for a modifier factor: „base → value" with the factor beside it when the
- * crafted item's base value is known, the factor alone otherwise.
+ * Writes a chip's value for a modifier value: „base → value" with the change beside it when the
+ * crafted item's base value is known, the change alone otherwise. A factor shows as a signed
+ * percentage, a summand of an additive modifier as a signed value in the stat's unit.
  *
  * @param {StatChip} chip the chip
- * @param {number | null | undefined} factor the modifier factor, null when unknown
- * @param {string} missing the text for an unknown factor
+ * @param {number | null | undefined} factor the modifier value, null when unknown
+ * @param {string} missing the text for an unknown value
  * @returns {void}
  */
 function showChipValue(chip, factor, missing) {
     const lang = document.documentElement.lang;
-    const factorText = factor == null ? missing : formatFactorPercent(factor, lang);
+    const additive = isAdditive(chip.modifier);
+    const units = statUnitLabels();
+    const factorText =
+        factor == null ? missing : formatModifierChange(factor, additive, chip.base, lang, units);
     if (chip.base && chip.factorOut) {
-        chip.out.textContent = formatStatRange(chip.base, factor, lang, statUnitLabels());
+        chip.out.textContent = formatStatRange(chip.base, factor, lang, units, additive);
         chip.factorOut.textContent = ` ${factorText}`;
         return;
     }

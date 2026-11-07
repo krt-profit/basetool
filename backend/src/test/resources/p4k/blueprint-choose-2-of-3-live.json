@@ -1,0 +1,206 @@
+{
+ "guid": "2663f762-5648-41d4-8746-c8dcc07e71b1",
+ "className": "BP_CRAFT_thp_light_legs_01_01_01",
+ "recordPath": "libs/foundry/records/crafting/blueprints/crafting/fpsgear/armour/stealth/light/bp_craft_thp_light_legs_01_01_01",
+ "key": "BP_CRAFT_thp_light_legs_01_01_01",
+ "name": {
+  "key": "@LOC_PLACEHOLDER",
+  "en": null,
+  "de": null
+ },
+ "categoryGuid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+ "producedItemGuid": "fd0cdccb-eb52-4c8e-a872-ebdaea337d5a",
+ "craftTimeSeconds": 140,
+ "ingredients": [
+  {
+   "resourceGuid": "06cafea0-49fe-4dce-b0f0-dc583316c66d",
+   "itemGuid": null,
+   "quantityScu": 0.03,
+   "quantityUnits": null,
+   "minQuality": 0,
+   "slot": "SEGMENT PANELING",
+   "slotKey": "@crafting_ui_slotname_segmentpanelling"
+  },
+  {
+   "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+   "itemGuid": null,
+   "quantityScu": 0.02,
+   "quantityUnits": null,
+   "minQuality": 0,
+   "slot": "INSULATIVE LINER",
+   "slotKey": "@crafting_ui_slotname_insulativeliner"
+  },
+  {
+   "resourceGuid": "392b4dca-449a-4d4d-8fef-beab024d9ee7",
+   "itemGuid": null,
+   "quantityScu": 0.03,
+   "quantityUnits": null,
+   "minQuality": 0,
+   "slot": "PANEL COVERING",
+   "slotKey": "@crafting_ui_slotname_panelcovering"
+  }
+ ],
+ "tiers": [
+  {
+   "craftTimeSeconds": 140,
+   "mandatory": {
+    "kind": "select",
+    "count": 2,
+    "slot": "ASPECTS",
+    "slotKey": null,
+    "options": [
+     {
+      "kind": "select",
+      "count": 1,
+      "slot": "SEGMENT PANELING",
+      "slotKey": "@crafting_ui_slotname_segmentpanelling",
+      "options": [
+       {
+        "kind": "resource",
+        "count": null,
+        "slot": null,
+        "slotKey": null,
+        "options": [],
+        "resourceGuid": "06cafea0-49fe-4dce-b0f0-dc583316c66d",
+        "itemGuid": null,
+        "quantityScu": 0.03,
+        "quantityUnits": null,
+        "minQuality": 0,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": []
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": null,
+      "modifiers": [
+       {
+        "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+        "ranges": [
+         {
+          "kind": "multiplier",
+          "startQuality": 0,
+          "endQuality": 1000,
+          "atStart": 9.0,
+          "atEnd": 1.1
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "kind": "select",
+      "count": 1,
+      "slot": "INSULATIVE LINER",
+      "slotKey": "@crafting_ui_slotname_insulativeliner",
+      "options": [
+       {
+        "kind": "resource",
+        "count": null,
+        "slot": null,
+        "slotKey": null,
+        "options": [],
+        "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+        "itemGuid": null,
+        "quantityScu": 0.02,
+        "quantityUnits": null,
+        "minQuality": 0,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": []
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": null,
+      "modifiers": [
+       {
+        "propertyGuid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+        "ranges": [
+         {
+          "kind": "multiplier",
+          "startQuality": 0,
+          "endQuality": 1000,
+          "atStart": 0.8,
+          "atEnd": 1.2
+         }
+        ]
+       },
+       {
+        "propertyGuid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+        "ranges": [
+         {
+          "kind": "multiplier",
+          "startQuality": 0,
+          "endQuality": 1000,
+          "atStart": 0.8,
+          "atEnd": 1.2
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "kind": "select",
+      "count": 1,
+      "slot": "PANEL COVERING",
+      "slotKey": "@crafting_ui_slotname_panelcovering",
+      "options": [
+       {
+        "kind": "resource",
+        "count": null,
+        "slot": null,
+        "slotKey": null,
+        "options": [],
+        "resourceGuid": "392b4dca-449a-4d4d-8fef-beab024d9ee7",
+        "itemGuid": null,
+        "quantityScu": 0.03,
+        "quantityUnits": null,
+        "minQuality": 0,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": []
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": null,
+      "modifiers": [
+       {
+        "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+        "ranges": []
+       }
+      ]
+     }
+    ],
+    "resourceGuid": null,
+    "itemGuid": null,
+    "quantityScu": null,
+    "quantityUnits": null,
+    "minQuality": null,
+    "quantityMultiplier": null,
+    "compositionInclusion": "Include",
+    "modifiers": []
+   },
+   "optional": []
+  }
+ ],
+ "defaultAvailable": false,
+ "dismantle": {
+  "processGuid": "f4e2e342-a389-47c9-82be-f35824c570de",
+  "tierIndex": 0
+ }
+}

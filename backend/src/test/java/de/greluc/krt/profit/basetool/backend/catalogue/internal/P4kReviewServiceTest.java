@@ -117,7 +117,12 @@ class P4kReviewServiceTest {
 
     P4kReviewCaseDto resolved =
         reviewService.resolve(
-            reviewCase.getId(), P4kReviewResolution.HIDE, null, reviewCase.getVersion(), ADMIN);
+            reviewCase.getId(),
+            P4kReviewResolution.HIDE,
+            null,
+            null,
+            reviewCase.getVersion(),
+            ADMIN);
     runs.apply(P4kTestCatalogues.fixtureBytes(), true);
 
     assertThat(resolved.status()).isEqualTo(P4kReviewStatus.REVIEWED);
@@ -135,7 +140,7 @@ class P4kReviewServiceTest {
     int before = events(AuditEventType.CATALOGUE_P4K_REVIEW_KEPT).size();
 
     reviewService.resolve(
-        reviewCase.getId(), P4kReviewResolution.KEEP, null, reviewCase.getVersion(), ADMIN);
+        reviewCase.getId(), P4kReviewResolution.KEEP, null, null, reviewCase.getVersion(), ADMIN);
 
     P4kReviewCase stored = seededCase();
     assertThat(stored.getResolution()).isEqualTo(P4kReviewResolution.KEEP);
@@ -159,13 +164,14 @@ class P4kReviewServiceTest {
 
     assertThatThrownBy(() ->
             reviewService.resolve(
-                reviewCase.getId(), P4kReviewResolution.KEEP, null, version + 1, ADMIN))
+                reviewCase.getId(), P4kReviewResolution.KEEP, null, null, version + 1, ADMIN))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     P4kReviewCaseDto kept =
-        reviewService.resolve(reviewCase.getId(), P4kReviewResolution.KEEP, null, version, ADMIN);
+        reviewService.resolve(
+            reviewCase.getId(), P4kReviewResolution.KEEP, null, null, version, ADMIN);
     assertThatThrownBy(() ->
             reviewService.resolve(
-                reviewCase.getId(), P4kReviewResolution.HIDE, null, kept.version(), ADMIN))
+                reviewCase.getId(), P4kReviewResolution.HIDE, null, null, kept.version(), ADMIN))
         .isInstanceOf(BadRequestException.class);
   }
 }

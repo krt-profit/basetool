@@ -219,6 +219,7 @@ class P4kImportJobRunnerTest {
         zero,
         zero,
         zero,
+        zero,
         0,
         UUID.randomUUID(),
         List.of());
@@ -349,7 +350,7 @@ class P4kImportJobRunnerTest {
     var enriched = new P4kImportResultDto.Counts(null, 1, 1, 0, 0, 0, 0, 0);
     var result =
         new P4kImportResultDto(
-            false, false, null, zero, enriched, zero, zero, zero, zero, zero, zero, 0, job,
+            false, false, null, zero, enriched, zero, zero, zero, zero, zero, zero, zero, 0, job,
             List.of());
     when(jobService.loadPayload(job)).thenReturn(bytes);
     stubAdmin(job, false);

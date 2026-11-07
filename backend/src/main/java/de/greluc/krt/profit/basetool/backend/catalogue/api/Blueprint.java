@@ -50,10 +50,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
- * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint, keyed by {@link
- * #scwikiUuid}. It produces an output {@link GameItem} from ordered {@link BlueprintIngredient}s
- * and yields {@link BlueprintDismantleReturn}s when dismantled; it owns both child collections with
- * cascade and orphan removal.
+ * A crafting blueprint, keyed by its P4K GUID and its SC Wiki UUID. The P4K leads its recipe and
+ * the SC Wiki blueprint sync fills the gaps (REQ-P4K-027, ADR-0340). It produces an output {@link
+ * GameItem} from ordered {@link BlueprintIngredient}s and yields {@link BlueprintDismantleReturn}s
+ * when dismantled; it owns both child collections with cascade and orphan removal.
  */
 @Entity
 @Table(name = "blueprint")
@@ -62,6 +62,7 @@ import org.jetbrains.annotations.UnmodifiableView;
 @ToString(
     exclude = {
       "outputItem",
+      "category",
       "ingredients",
       "dismantleReturns",
       "requirementGroups",
@@ -75,12 +76,14 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** SC Wiki blueprint UUID — the cross-sync identity key. UNIQUE at the DB level. */
-  @Column(name = "scwiki_uuid", nullable = false, unique = true)
+  /** SC Wiki blueprint UUID, unique; {@code null} on a P4K-seeded row the Wiki has not listed. */
+  @Column(name = "scwiki_uuid", unique = true)
+  @Nullable
   private UUID scwikiUuid;
 
   /** SC Wiki internal key, e.g. {@code "BP_CRAFT_AMRS_LaserCannon_S1"}. */
   @Column(name = "scwiki_key")
+  @Nullable
   private String scwikiKey;
 
   /**
@@ -95,6 +98,7 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   /** Wiki display name of the output item (kept even when {@link #outputItem} is unresolved). */
   @Column(name = "output_name")
+  @Nullable
   private String outputName;
 
   /**
@@ -106,22 +110,65 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   private UUID producedItemGuid;
 
-  /** Wiki category UUID for the blueprint (informational; not resolved to an entity in R4). */
+  /** The SC Wiki's category UUID, kept as the Wiki serves it. */
   @Column(name = "category_uuid")
   private UUID categoryUuid;
 
+  /** The P4K blueprint category ({@code categoryGuid}), or {@code null}. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "category_id")
+  @Nullable
+  private BlueprintCategory category;
+
+  /**
+   * How many of the mandatory requirement groups one craft fills (a choose-n selection), or {@code
+   * null} when every group is required.
+   */
+  @Column(name = "required_group_count")
+  @Nullable
+  private Integer requiredGroupCount;
+
+  /** The P4K's craft time in seconds; the Wiki writes {@link #craftTimeSeconds} only without it. */
+  @Column(name = "p4k_craft_time_seconds")
+  @Nullable
+  private Integer p4kCraftTimeSeconds;
+
+  /** The P4K's {@code defaultAvailable}; the Wiki writes the flag only without it. */
+  @Column(name = "p4k_default_available")
+  @Nullable
+  private Boolean p4kDefaultAvailable;
+
+  /** The P4K's dismantle time in seconds; the Wiki writes the column only without it. */
+  @Column(name = "p4k_dismantle_time_seconds")
+  @Nullable
+  private Integer p4kDismantleTimeSeconds;
+
+  /** The P4K's dismantle efficiency; the Wiki writes the column and the returns only without it. */
+  @Column(name = "p4k_dismantle_efficiency")
+  @Nullable
+  private Double p4kDismantleEfficiency;
+
+  /**
+   * Whether the requirement groups and ingredient lines are the P4K's; the Wiki only fills them.
+   */
+  @Column(name = "p4k_recipe", nullable = false)
+  private boolean p4kRecipe;
+
   /** Craft time in seconds. */
   @Column(name = "craft_time_seconds")
+  @Nullable
   private Integer craftTimeSeconds;
 
   /**
    * Dismantle duration in seconds (Wiki {@code dismantle.time_seconds}); {@code null} if absent.
    */
   @Column(name = "dismantle_time_seconds")
+  @Nullable
   private Integer dismantleTimeSeconds;
 
   /** Fraction of inputs recovered on dismantle (Wiki {@code dismantle.efficiency}, e.g. 0.5). */
   @Column(name = "dismantle_efficiency")
+  @Nullable
   private Double dismantleEfficiency;
 
   /** Whether the recipe is unlocked by default (vs. mission-gated). */
@@ -295,6 +342,11 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   /** Removes the last dismantle-return line; orphan removal deletes it on flush. */
   public void removeLastDismantleReturn() {
     dismantleReturns.removeLast();
+  }
+
+  /** Clears all dismantle-return lines; orphan removal deletes them on flush. */
+  public void clearDismantleReturns() {
+    dismantleReturns.clear();
   }
 
   /**

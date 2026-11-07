@@ -62,7 +62,7 @@
 
                                     <span class="bp-slider"
                                           th:if="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}"
-                                          th:attr="data-qmin=${m.effectiveQualityMin()},data-qmax=${m.effectiveQualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()},data-vrt=${m.valueRangeType()}">
+                                          th:attr="data-qmin=${m.effectiveQualityMin()},data-qmax=${m.effectiveQualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()},data-vrt=${m.valueRangeType()},data-vkind=${m.valueKind()}">
                                         <span class="bp-seg" th:each="seg : ${m.segments()}"
                                               th:attr="data-qmin=${seg.qualityMin()},data-qmax=${seg.qualityMax()},data-vstart=${seg.modifierAtStart()},data-vend=${seg.modifierAtEnd()}"></span>
                                         <span class="bp-slider-row">
@@ -80,7 +80,7 @@
                                     <span class="bp-dep"
                                           th:unless="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}">
                                         <span class="bp-dep-val" th:if="${m.modifierAtMaxQuality() != null}"
-                                              th:text="'×' + ${#numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'DEFAULT')}">&times;1.05</span>
+                                              th:text="${(m.valueKind() == 'ADDITIVE' ? (m.modifierAtMaxQuality() >= 0 ? '+' : '') : '×') + #numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'DEFAULT')}">&times;1.05</span>
                                         <span class="bp-empty-hint" th:unless="${m.modifierAtMaxQuality() != null}">&ndash;</span>
                                     </span>
                                 </span>

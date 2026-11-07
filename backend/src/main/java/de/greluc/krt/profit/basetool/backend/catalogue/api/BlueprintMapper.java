@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import java.util.List;
 import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -89,6 +90,7 @@ public interface BlueprintMapper {
    * @return the effective lower quality bound, or {@code null} when neither segments nor the raw
    *     bound provide one
    */
+  @Nullable
   default Double effectiveQualityMin(@NotNull BlueprintRequirementModifier modifier) {
     List<BlueprintModifierSegment> segments = modifier.getSegments();
     if (segments == null || segments.isEmpty()) {
@@ -109,6 +111,7 @@ public interface BlueprintMapper {
    * @return the effective upper quality bound, or {@code null} when neither segments nor the raw
    *     bound provide one
    */
+  @Nullable
   default Double effectiveQualityMax(@NotNull BlueprintRequirementModifier modifier) {
     List<BlueprintModifierSegment> segments = modifier.getSegments();
     if (segments == null || segments.isEmpty()) {
