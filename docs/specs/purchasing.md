@@ -156,6 +156,9 @@ The deal's HB records deliveries of a `FUNDED` or `IN_DELIVERY` deal; each is at
 undelivered amount (`PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED`). The first moves the deal to
 `IN_DELIVERY`; the raising unit's lead and Logisticians are noticed (N5).
 
+**Storage place (REQ-P4K-039):** a delivery names only a place a picker offers; a hidden or
+reference-only one is a `400` `LOCATION_NOT_OFFERED`.
+
 **Enforced by:** `PurchasingDeliveryServiceTest` · **Code:** `purchasing/internal/PurchasingDeliveryService#record`
 
 ### REQ-PUR-016 — Acceptance
@@ -167,6 +170,9 @@ transaction it is booked into the unit's pool through `StockCommands.bookIntoPoo
 the location the acceptor names and credited to the need. The HB never accepts their own delivery
 (`PURCHASING_SELF_ACCEPTANCE`) and never writes stock. When the accepted amount covers the deal the
 delivery closes by itself, otherwise the HB closes it; a close with nothing accepted fails the deal.
+
+**Storage place (REQ-P4K-039):** the acceptance books into only a place a picker offers; a hidden or
+reference-only one is a `400` `LOCATION_NOT_OFFERED`.
 
 **Enforced by:** `PurchasingDeliveryServiceTest` · **Code:** `purchasing/internal/PurchasingDeliveryService#accept`
 

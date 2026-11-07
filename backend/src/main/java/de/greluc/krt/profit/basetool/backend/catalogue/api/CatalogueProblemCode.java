@@ -32,6 +32,9 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum CatalogueProblemCode implements ProblemCode {
 
+  /** A squadron write named a storage place no picker offers (REQ-P4K-039). */
+  LOCATION_NOT_OFFERED(HttpStatus.BAD_REQUEST),
+
   /** The P4K upload gate refused the catalogue (REQ-P4K-001, REQ-P4K-002). */
   P4K_UPLOAD_REJECTED(HttpStatus.BAD_REQUEST);
 

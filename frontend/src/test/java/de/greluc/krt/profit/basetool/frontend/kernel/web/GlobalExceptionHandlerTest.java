@@ -379,6 +379,25 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void locationNotOffered400_mapsToDedicatedKey_notUnexpected() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "hidden place", null, 400, "LOCATION_NOT_OFFERED", "corr-loc", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("LOCATION_NOT_OFFERED", body.get("code"));
+    assertEquals("error.location.notOffered", body.get("message"));
+    assertEquals(Boolean.FALSE, body.get("reloadHint"));
+  }
+
+  @Test
   void noResourceFound_setsModelAttributes_andReturnsErrorView() {
     Model model = new ConcurrentModel();
 

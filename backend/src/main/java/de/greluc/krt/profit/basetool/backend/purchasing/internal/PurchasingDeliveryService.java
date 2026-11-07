@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
@@ -110,8 +111,11 @@ public class PurchasingDeliveryService {
           PurchasingProblemCode.PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED,
           "The delivery is more than the deal still lacks");
     }
-    if (request.locationId() != null && !locationRepository.existsById(request.locationId())) {
-      throw new BadRequestException("Location not found");
+    if (request.locationId() != null) {
+      OfferedLocations.requireOffered(
+          locationRepository
+              .findById(request.locationId())
+              .orElseThrow(() -> new BadRequestException("Location not found")));
     }
     PurchasingDealDelivery delivery = new PurchasingDealDelivery();
     delivery.setDealId(dealId);
@@ -306,7 +310,8 @@ public class PurchasingDeliveryService {
       throw new BadRequestException("The accepted goods need a stock location");
     }
     Location location =
-        Entities.require(locationRepository.findById(request.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(request.locationId()), "Location not found");
     StockLot lot = new StockLot(deal.getMaterial(), deal.getGameItem(), location, quality, false);
     stockCommands.lockLots(me, List.of(lot.key()));
     delivery.setBookedRowId(

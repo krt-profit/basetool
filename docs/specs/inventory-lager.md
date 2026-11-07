@@ -1706,6 +1706,9 @@ the web maps a refusal to its existing problem, a command to its refusal value.
 - **Lot rebooking:** the rules and order of REQ-INV-060; the decision also names the amount each
   source row gives.
 - **Whole units** are counted in one place: game-item stock and `PIECE` materials.
+- **Storage place (REQ-P4K-039):** Einbuchen, transfer and the bulk Umbuchung set only a place a
+  picker offers; a hidden or reference-only one is a `400` `LOCATION_NOT_OFFERED`. An entry whose
+  place does not change keeps it.
 - The HTTP status, the problem detail and the refusal values stay as each surface defines them, and
   each mutation keeps its audit event (REQ-AUDIT-001). A command answers a fraction of piece or item
   stock as `UNIT_MISMATCH`, also in a dry run. Both surfaces compare an amount with the row's amount

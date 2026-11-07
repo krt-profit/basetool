@@ -26,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -73,6 +76,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -438,6 +443,49 @@ class InventoryItemServiceBookOutTest {
                   newDto(1.0, null, targetLocationId, CheckoutType.TRANSFER, null, null, 1L),
                   OWNER_ID,
                   false));
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void targetLocationNoPickerOffers_isRefused(Location place) {
+      InventoryItem item = newItem(10.0, 1L);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+      assertThrows(
+          LocationNotOfferedException.class,
+          () ->
+              service.bookOutInventoryItem(
+                  ITEM_ID,
+                  newDto(1.0, null, place.getId(), CheckoutType.TRANSFER, null, null, 1L),
+                  OWNER_ID,
+                  false));
+      assertEquals(10.0, item.getAmount(), "source amount must be unchanged");
+      verify(inventoryItemRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void transferToAnotherMember_keepingAPlaceNoPickerOffers_moves(Location place) {
+      User bob = new User();
+      bob.setId(UUID.randomUUID());
+      bob.setUsername("bob");
+      InventoryItem item = newItem(10.0, 1L);
+      item.setLocation(place);
+      when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
+      when(userRepository.findById(bob.getId())).thenReturn(Optional.of(bob));
+      when(inventoryItemRepository.save(any(InventoryItem.class)))
+          .thenAnswer(inv -> inv.getArgument(0));
+
+      service.bookOutInventoryItem(
+          ITEM_ID,
+          newDto(3.0, bob.getId(), place.getId(), CheckoutType.TRANSFER, null, null, 1L),
+          OWNER_ID,
+          false);
+
+      verify(locationRepository, never()).findById(any());
+      verify(inventoryItemRepository, atLeastOnce())
+          .save(argThat(row -> row.getUser() == bob && row.getLocation() == place));
     }
 
     @Test

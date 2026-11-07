@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
@@ -66,6 +67,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -175,6 +178,23 @@ class InventoryCheckoutServiceBulkRebookTest {
     verify(offerRatchet, never()).beforeDelete(List.of(already.getId()), StockChangeReason.REBOOK);
     verify(inventoryItemRepository).delete(moving);
     verify(inventoryItemRepository, never()).delete(already);
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void bulkRebook_location_ontoAPlaceNoPickerOffers_isRefusedBeforeAnyWrite(Location there) {
+    InventoryItem moving = row(UUID.randomUUID(), location(UUID.randomUUID(), "Area18"), 12.0);
+    lenient()
+        .when(inventoryItemRepository.findByIdForRebook(moving.getId()))
+        .thenReturn(Optional.of(moving));
+    when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
+
+    BulkRebookRequest request = toLocation(List.of(moving.getId()), there.getId());
+
+    assertThrows(
+        LocationNotOfferedException.class, () -> checkoutService.bulkRebook(request, OWNER_ID));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+    verify(inventoryItemRepository, never()).delete(any(InventoryItem.class));
   }
 
   @Test

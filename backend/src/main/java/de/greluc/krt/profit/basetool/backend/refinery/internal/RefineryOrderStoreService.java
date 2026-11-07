@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -121,9 +122,10 @@ public class RefineryOrderStoreService {
               () -> "Material not found: " + itemDto.materialId());
 
       final Location loc =
-          Entities.require(
-              locationRepository.findById(itemDto.locationId()),
-              () -> "Location not found: " + itemDto.locationId());
+          OfferedLocations.requireOffered(
+              Entities.require(
+                  locationRepository.findById(itemDto.locationId()),
+                  () -> "Location not found: " + itemDto.locationId()));
 
       final UUID targetUserId =
           itemDto.userId() != null

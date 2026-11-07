@@ -117,6 +117,9 @@ composition over the REQ-INV-026 merge helper), and is audited as
 null-tolerant window (null ⇒ legacy no-stock behaviour) closed when the modal's
 book-in section shipped.
 
+**Storage place (REQ-P4K-039):** the book-in takes only a place a picker offers; a hidden or
+reference-only one is a `400` `LOCATION_NOT_OFFERED`.
+
 **On-behalf gate (2026-09-22, APPSEC-01).** The endpoint's own gate
 (`canEditJobOrder`) answers for the *order*, not for the member whose ledger receives
 the stock. An explicit `bookIn.ownerUserId` other than the caller therefore needs the

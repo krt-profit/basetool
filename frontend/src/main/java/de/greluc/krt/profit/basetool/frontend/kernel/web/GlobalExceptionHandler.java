@@ -685,6 +685,7 @@ public class GlobalExceptionHandler {
     m.put("BANK_JUSTIFICATION_REQUIRED", "error.bank.justificationRequired");
     m.put("BANK_FEE_EXCEEDS_AMOUNT", "error.bank.feeExceedsAmount");
     m.put("DUPLICATE_ENTITY", "error.conflict.duplicate");
+    m.put("LOCATION_NOT_OFFERED", "error.location.notOffered");
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
     m.put(BackendServiceException.CODE_UNKNOWN, "error.unexpected");

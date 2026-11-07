@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
@@ -385,7 +386,8 @@ public class InventoryItemService {
             ? Entities.require(gameItemRepository.findById(dto.gameItemId()), "GameItem not found")
             : null;
     final Location location =
-        Entities.require(locationRepository.findById(dto.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(dto.locationId()), "Location not found");
 
     if ((material == null) == (gameItem == null)) {
       throw new BadRequestException("Exactly one of materialId and gameItemId must be set");

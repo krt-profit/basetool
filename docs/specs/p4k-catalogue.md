@@ -1325,6 +1325,17 @@ The owner's decision (@greluc, 2026-11-05) fixes the edges:
   `…/admin/{userId}/locations`) offers every non-hidden, non-reference-only location plus every
   location one of the owner's own items already references. A write accepts exactly those, so every
   existing row stays editable, including one on a reference-only or hidden place.
+- **A squadron write takes only an offered place** (@greluc, 2026-11-07). A write that sets a
+  storage place no picker offers — a hidden or a reference-only one — is a `400` with code
+  `LOCATION_NOT_OFFERED`, which the frontend shows as `error.location.notOffered`. An entry whose
+  place does not change stays editable whatever that place has become. The rule covers the Lager's
+  Einbuchen, transfer and bulk Umbuchung (REQ-INV-065), the production book-in (REQ-INV-032), the
+  purchasing delivery and its acceptance (REQ-PUR-015, REQ-PUR-016), the supply receipt and the
+  recorded donation (REQ-SUP-009, REQ-SUP-011), the refinery order's create, update and store
+  (REQ-REFINERY-020, REQ-INV-035), and the hangar's ship create, update and home location; an
+  exchange undo does not put a ship back on such a place unless it is still there. The exchange
+  resolver finds no such place by GUID, UEX link or name. Every path runs the one guard
+  `catalogue.api.OfferedLocations`; the personal inventory keeps the member picker's rule above.
 - **An unresolvable row stays.** A row whose UEX id resolves to no city or station keeps its
   snapshot with a `null` key; an update may keep it so, while dropping the key of a row that has one
   is a `400`. The API shows such a row with `locationId` and `locationType` `null`.
@@ -1344,9 +1355,18 @@ The owner's decision (@greluc, 2026-11-05) fixes the edges:
   the marker of a place that becomes live.
 - [x] The member picker and the write accept an offered location or one the owner already uses, and
   nothing else.
+- [x] Every squadron write refuses a hidden and a reference-only place with `LOCATION_NOT_OFFERED`,
+  keeps an entry's unchanged place, and accepts an offered one; the exchange resolver and the ship
+  undo find no such place.
 
 **Enforced by:** `V344MigrationTest`, `LocationRepositoryTest`, `UexUniverseSyncServiceTest`,
-`PersonalInventoryItemRepositoryTest`, `PersonalInventoryItemServiceTest` · **ADR:**
+`PersonalInventoryItemRepositoryTest`, `PersonalInventoryItemServiceTest`, `OfferedLocationsTest`,
+`InventoryItemServiceTest`, `InventoryItemServiceBookOutTest`,
+`InventoryCheckoutServiceBulkRebookTest`, `JobOrderItemProductionServiceTest`,
+`PurchasingDeliveryServiceTest`, `SupplyDonationServiceTest`, `RefineryOrderServiceLifecycleTest`,
+`RefineryOrderStoreServiceTest`, `HangarServiceTest`, `ExchangeLocationGuidIntegrationTest`,
+`ExchangeJournalStateTest`, `DomainProblemContractTest` · **Code:**
+`catalogue.api.OfferedLocations`, `catalogue.api.LocationNotOfferedException` · **ADR:**
 [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3043
 
 ## Loadouts and paints
