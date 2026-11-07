@@ -42,15 +42,15 @@ class P4kUploadGateTest {
 
   private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
-  private P4kUploadGate gate(long decompressedLimit) {
+  private P4kUploadGate gate(long decompressedLimit, long heldLimit) {
     return new P4kUploadGate(
         new P4kCatalogueReader(JsonMapper.builder().build()),
-        new P4kImportProperties(decompressedLimit),
+        new P4kImportProperties(decompressedLimit, heldLimit),
         new P4kRejections(meters));
   }
 
   private P4kUploadGate gate() {
-    return gate(1_000_000_000L);
+    return gate(1_000_000_000L, 128_000_000L);
   }
 
   private double rejected(@NotNull P4kRejectionReason reason) {
@@ -167,10 +167,36 @@ class P4kUploadGateTest {
   void contentAboveTheDecompressedLimit_isRefused_evenWhenItsHeadIsFine() {
     byte[] zstd = P4kTestCatalogues.zstd(P4kTestCatalogues.fixtureBytes());
 
-    assertThatThrownBy(() -> gate(10_000).check(zstd))
+    assertThatThrownBy(() -> gate(10_000, 128_000_000L).check(zstd))
         .isInstanceOfSatisfying(
             P4kUploadRejectedException.class,
             e -> assertThat(e.getReason()).isEqualTo(P4kRejectionReason.TOO_LARGE));
     assertThat(rejected(P4kRejectionReason.TOO_LARGE)).isEqualTo(1.0);
+  }
+
+  @Test
+  void heldKindsAboveTheHeldLimit_areRefusedAsTooLarge() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD)
+        .put("className", "A".repeat(20_000));
+    byte[] zstd = P4kTestCatalogues.zstd(P4kTestCatalogues.bytes(root));
+
+    assertThatThrownBy(() -> gate(1_000_000_000L, 10_000).check(zstd))
+        .isInstanceOfSatisfying(
+            P4kUploadRejectedException.class,
+            e -> assertThat(e.getReason()).isEqualTo(P4kRejectionReason.TOO_LARGE));
+    assertThat(rejected(P4kRejectionReason.TOO_LARGE)).isEqualTo(1.0);
+  }
+
+  @Test
+  void kindsTheImportSkips_doNotCountAgainstTheHeldLimit() {
+    byte[] fixture = P4kTestCatalogues.fixtureBytes();
+    ObjectNode root = P4kTestCatalogues.tree();
+    root.put("unreadTail", "L".repeat(fixture.length * 4));
+
+    P4kAcceptedUpload accepted =
+        gate(1_000_000_000L, fixture.length).check(P4kTestCatalogues.bytes(root));
+
+    assertThat(accepted.uploadedBytes()).isGreaterThan(fixture.length * 4);
   }
 }

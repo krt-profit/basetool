@@ -231,11 +231,12 @@ public class P4kImportService {
    *
    * @param payload the stored upload, compressed
    * @return the catalogue
-   * @throws BadRequestException when it cannot be read or passes the decompressed limit
+   * @throws BadRequestException when it cannot be read or passes a size limit
    */
   @NotNull
   private P4kCatalogue read(byte @NotNull [] payload) {
-    return Objects.requireNonNull(read(payload, reader::read));
+    return Objects.requireNonNull(
+        read(payload, in -> reader.read(in, properties.heldLimitBytes())));
   }
 
   /**
@@ -245,7 +246,7 @@ public class P4kImportService {
    * @param step reads the decompressed content
    * @param <T> what the step returns
    * @return the step's result
-   * @throws BadRequestException when it cannot be read or passes the decompressed limit
+   * @throws BadRequestException when it cannot be read or passes a size limit
    */
   @Nullable
   private <T> T read(byte @NotNull [] payload, @NotNull Function<InputStream, T> step) {
@@ -255,7 +256,7 @@ public class P4kImportService {
     } catch (P4kCatalogueFormatException e) {
       throw new BadRequestException("The stored catalogue is not readable catalogue JSON.", e);
     } catch (P4kContentTooLargeException e) {
-      throw new BadRequestException("The stored catalogue exceeds the decompressed limit.", e);
+      throw new BadRequestException("The stored catalogue exceeds a size limit.", e);
     } catch (IOException e) {
       throw new UncheckedIOException("Reading an in-memory catalogue failed.", e);
     }

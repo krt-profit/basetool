@@ -20,18 +20,32 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import java.io.Serial;
+import org.jetbrains.annotations.NotNull;
 
-/** Thrown while reading when the decompressed catalogue passes its size limit. */
+/**
+ * Thrown while reading when the decompressed catalogue, or the part of it the import holds in
+ * memory, passes its size limit.
+ */
 public final class P4kContentTooLargeException extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;
 
   /**
-   * Creates the exception.
+   * Creates the exception for the decompressed limit.
    *
    * @param limitBytes the decompressed limit in bytes that was passed
    */
   public P4kContentTooLargeException(long limitBytes) {
-    super("The decompressed catalogue exceeds " + limitBytes + " bytes.");
+    this("The decompressed catalogue", limitBytes);
+  }
+
+  /**
+   * Creates the exception for a limit on a named part of the catalogue.
+   *
+   * @param measured what was measured, the subject of the message
+   * @param limitBytes the limit in bytes that was passed
+   */
+  public P4kContentTooLargeException(@NotNull String measured, long limitBytes) {
+    super(measured + " exceeds " + limitBytes + " bytes.");
   }
 }

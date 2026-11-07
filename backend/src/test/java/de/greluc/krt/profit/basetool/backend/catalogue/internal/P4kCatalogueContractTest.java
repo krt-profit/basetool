@@ -47,7 +47,7 @@ class P4kCatalogueContractTest {
   private final P4kCatalogueReader reader = new P4kCatalogueReader(JsonMapper.builder().build());
 
   private P4kCatalogue read(byte[] bytes) {
-    return reader.read(new ByteArrayInputStream(bytes));
+    return reader.read(new ByteArrayInputStream(bytes), Long.MAX_VALUE);
   }
 
   @Test

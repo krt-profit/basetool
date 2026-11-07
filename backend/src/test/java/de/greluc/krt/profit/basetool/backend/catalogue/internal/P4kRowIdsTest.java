@@ -47,7 +47,7 @@ class P4kRowIdsTest {
   void everyReconcilerOfARun_sharesOneReadOfAKind() {
     P4kCatalogue catalogue =
         new P4kCatalogueReader(JsonMapper.builder().build())
-            .read(new ByteArrayInputStream(P4kTestCatalogues.fixtureBytes()));
+            .read(new ByteArrayInputStream(P4kTestCatalogues.fixtureBytes()), Long.MAX_VALUE);
     P4kImportContext context = P4kImportContext.forPreview(catalogue, Instant.now(), Set.of());
     UUID guid = UUID.randomUUID();
     UUID id = UUID.randomUUID();

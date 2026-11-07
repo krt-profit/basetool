@@ -86,8 +86,16 @@ The upload limit is the contract's `UPLOAD_LIMIT`, 64,000,000 bytes (`P4kUploadG
 multipart `max-file-size` of the frontend and the backend is the same 64,000,000 bytes, so a larger
 file is refused by the frontend as `413` and the admin page names the limit in its toast; the
 decompressed limit is `krt.p4k-import.decompressed-limit-bytes` (`P4kImportProperties`,
-1,000,000,000 bytes). The gate drains the decompressed stream once to enforce that limit. A plain
-upload is stored gzipped, a compressed one as it came. zstd-jni extracts its library to
+1,000,000,000 bytes). A third limit bounds what the import holds in memory: the kinds and crafting
+records the reader binds whole (everything but the streamed loadouts and the skipped kinds) may span
+at most `krt.p4k-import.held-limit-bytes` of catalogue JSON (`P4kImportProperties`, 128,000,000
+bytes). The reader counts them after every record, so a preview or APPLY never holds more than that
+plus one record. On the real LIVE export (change 12913470, 214 MB decompressed) the held kinds are
+about 33 MB of JSON and about 40 MB of heap; an APPLY peaks about 135 MB of live heap above the
+application's baseline, a preview about 50 MB; the loadouts (108 MB there) stream and do not count.
+The gate drains the decompressed stream once to enforce the decompressed limit and, in the same
+pass and without binding a record, the held limit; a file over either is refused as `too_large`.
+A plain upload is stored gzipped, a compressed one as it came. zstd-jni extracts its library to
 `java.io.tmpdir` on first use; the backend's `/tmp` is the container runtime's tmpfs, writable
 and without `noexec`. A host that mounts it `noexec` sets `-DZstdTempFolder=<exec-allowed dir>`.
 
@@ -98,9 +106,11 @@ and without `noexec`. A host that mounts it `noexec` sets `-DZstdTempFolder=<exe
 - [x] A compressed file above 64 MB, and one whose decompressed content passes 1 GB, is refused with
   `too_large` before the content is read to the end.
 - [x] A LIVE-sized `.json.zst` fixture imports with a heap bound well below its decompressed size.
+- [x] A file whose held kinds pass the held limit is refused with `too_large` by the gate, and the
+  reader stops before the end of the content; kinds the import skips do not count.
 
 **Enforced by:** `P4kCatalogueStreamTest`, `P4kUploadGateTest` · **Code:** `P4kCompression`,
-`P4kCatalogueReader` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
+`P4kCatalogueReader`, `P4kImportProperties` · **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) ·
 **Issues:** #2887
 
 ### REQ-P4K-003 — the import reads the contract's additive rules and nothing of the old format

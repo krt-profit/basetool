@@ -48,7 +48,7 @@ class P4kCatalogueStreamTest {
 
   private P4kCatalogue read(byte @NotNull [] upload, long limit) throws IOException {
     try (InputStream in = P4kCompression.openDecompressed(upload, limit)) {
-      return reader.read(in);
+      return reader.read(in, Long.MAX_VALUE);
     }
   }
 
@@ -96,13 +96,30 @@ class P4kCatalogueStreamTest {
   }
 
   @Test
+  void heldKindsPastTheHeldLimit_stopTheReadBeforeTheEnd() throws IOException {
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD)
+        .put("className", "A".repeat(200_000));
+    root.put("unreadTail", "L".repeat(1_000_000));
+    byte[] plain = P4kTestCatalogues.bytes(root);
+
+    try (LiveHeapSampler counted =
+        new LiveHeapSampler(P4kCompression.openDecompressed(plain, Long.MAX_VALUE))) {
+      assertThatThrownBy(() -> reader.read(counted, 100_000))
+          .isInstanceOf(P4kContentTooLargeException.class)
+          .hasMessageContaining("held in memory");
+      assertThat(counted.bytesRead).isLessThan(plain.length - 500_000L);
+    }
+  }
+
+  @Test
   void liveSizedZstdCatalogue_readsWithAHeapBoundWellBelowItsSize() throws IOException {
     byte[] zstd = liveSizedZstd();
     System.gc();
     long before = liveHeap();
     try (LiveHeapSampler sampler =
         new LiveHeapSampler(P4kCompression.openDecompressed(zstd, 1_000_000_000L))) {
-      P4kCatalogue catalogue = reader.read(sampler);
+      P4kCatalogue catalogue = reader.read(sampler, P4kTestCatalogues.fixtureBytes().length);
 
       assertThat(catalogue.items()).hasSize(9);
       assertThat(sampler.bytesRead).isGreaterThan(LIVE_SIZE_BYTES - 1024);
