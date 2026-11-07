@@ -487,6 +487,8 @@ between two rows, such as one the SC Wiki / UEX duplicate merge refuses (`P4kMer
 is one case per GUID about the row holding it, naming the row it collides with in `other_row_id`.
 A hide and an assignment evict the P4K-written caches after the commit and publish the global
 `CATALOGUE` event, as a committed APPLY does (REQ-DATA-011, `P4kCatalogueChange`).
+`/admin/p4k-import` reloads the resource groups and materials a case can assign before it renders
+the cases again, so a case an APPLY opened offers what that APPLY created.
 
 **Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**

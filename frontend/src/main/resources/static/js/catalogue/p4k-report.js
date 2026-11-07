@@ -332,6 +332,16 @@ function loadMaterials() {
     );
 }
 
+/**
+ * Reloads the resource groups and materials the cases can assign, then one page of the cases, so a
+ * case an APPLY opened offers the groups and materials it created (REQ-P4K-024, REQ-P4K-025).
+ *
+ * @param {number} page the zero-based page
+ */
+function loadCasesWithOptions(page) {
+    Promise.all([loadResourceGroups(), loadMaterials()]).then(() => loadCases(page));
+}
+
 /** The reasons of a resource that joins no single commodity, resolved by assigning a material. */
 const RESOURCE_JOIN_REASONS = ['RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'];
 
@@ -463,7 +473,7 @@ function init() {
     const cases = $('krt-p4k-cases');
     if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
-    Promise.all([loadResourceGroups(), loadMaterials()]).then(() => loadCases(0));
+    loadCasesWithOptions(0);
     refreshDueBanner();
 }
 
@@ -473,7 +483,7 @@ function init() {
 export function refreshAfterApply() {
     refreshDueBanner();
     loadRuns(runsPage);
-    loadCases(casesPage);
+    loadCasesWithOptions(casesPage);
     if (reportTarget) loadReport(reportPage);
 }
 

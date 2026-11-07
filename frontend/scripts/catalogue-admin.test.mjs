@@ -265,6 +265,58 @@ await test('a target emptied without a read drops the answer still pending', asy
     assert.equal(await pendingRead, null);
 });
 
+/**
+ * Loads the P4K report module with a transport whose reads the test settles by URL.
+ */
+function p4kReport() {
+    const reads = [];
+    const page = load(
+        'catalogue/p4k-report.js',
+        {},
+        (url) => {
+            const read = pending();
+            reads.push({ url, ...read });
+            return read.promise;
+        },
+        {
+            '/js/catalogue/catalogue-link-admin.js': LINK_ADMIN_AS_IMPORTED,
+            '/js/catalogue/p4k-due.js':
+                'function refreshDueBanner() { __ui.banners = (__ui.banners || 0) + 1; }',
+        },
+    );
+    const answer = async (path, body) => {
+        const read = reads.find((r) => r.url.startsWith(`/admin/p4k-import${path}`) && !r.done);
+        assert.ok(read, `a read of ${path}`);
+        read.done = true;
+        read.resolve(body);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    return { fn: page.fn, reads, answer, ui: page.ui };
+}
+
+await test('after an APPLY the assignment options reload before the refreshed cases render', async () => {
+    const report = p4kReport();
+    report.fn('refreshAfterApply')();
+    const paths = () => report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
+    assert.ok(paths().includes('/resource-groups'), 'the resource groups reload');
+    assert.ok(paths().includes('/materials'), 'the materials reload');
+    assert.ok(
+        !paths().some((p) => p.startsWith('/review-cases')),
+        'the cases wait for the options',
+    );
+    await report.answer('/resource-groups', [{ id: 'g-new', name: 'New group' }]);
+    await report.answer('/materials', [{ id: 'm-new', name: 'New ore' }]);
+    assert.ok(paths().some((p) => p.startsWith('/review-cases')));
+    assert.deepEqual(
+        report.fn('resourceGroups').map((g) => g.id),
+        ['g-new'],
+    );
+    assert.deepEqual(
+        report.fn('materials').map((m) => m.id),
+        ['m-new'],
+    );
+});
+
 if (failures > 0) {
     console.error(`${failures} catalogue admin test(s) failed`);
     process.exit(1);
