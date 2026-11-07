@@ -34,6 +34,9 @@ public enum P4kSweepOutcome {
   /** A GUID occurred twice within the kind, which voids the census. */
   SKIPPED_DUPLICATE_GUID,
 
-  /** The sweep would have stamped more than 5 % of the kind and the admin did not override. */
+  /**
+   * The sweep would have stamped more than {@value P4kSweeper#MASS_GUARD_PERCENT} % of the kind and
+   * the admin did not override.
+   */
   SKIPPED_MASS_GUARD
 }

@@ -682,7 +682,7 @@ public class CatalogueBackendClient {
    *
    * @param id the preview job
    * @param createItemsAndShips whether the run creates playable items and ships that match no row
-   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @return the enqueued apply job, or {@code null} when the backend sent no body
    */
   @Nullable

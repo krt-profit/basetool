@@ -119,7 +119,7 @@ public class P4kImportJobService {
    *
    * @param previewJobId the SUCCEEDED preview job to apply
    * @param createItemsAndShips whether unmatched playable items and ships are created
-   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted apply job
    * @throws NotFoundException if no job has the given id

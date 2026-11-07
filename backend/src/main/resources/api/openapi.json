@@ -89216,6 +89216,10 @@
           "manufacturers" : {
             "$ref" : "#/components/schemas/Counts"
           },
+          "massGuardPercent" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "resourceGroups" : {
             "$ref" : "#/components/schemas/Counts"
           },

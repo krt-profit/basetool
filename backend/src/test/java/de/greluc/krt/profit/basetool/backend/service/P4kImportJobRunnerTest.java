@@ -222,7 +222,8 @@ class P4kImportJobRunnerTest {
         zero,
         0,
         UUID.randomUUID(),
-        List.of());
+        List.of(),
+        5);
   }
 
   private static P4kImportService.P4kPreview somePreview() {
@@ -351,7 +352,7 @@ class P4kImportJobRunnerTest {
     var result =
         new P4kImportResultDto(
             false, false, null, zero, enriched, zero, zero, zero, zero, zero, zero, zero, 0, job,
-            List.of());
+            List.of(), 5);
     when(jobService.loadPayload(job)).thenReturn(bytes);
     stubAdmin(job, false);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))

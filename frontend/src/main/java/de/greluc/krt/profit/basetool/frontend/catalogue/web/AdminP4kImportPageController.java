@@ -141,7 +141,7 @@ public class AdminP4kImportPageController {
    *
    * @param id the preview job to apply
    * @param createItemsAndShips whether the run creates playable items and ships that match no row
-   * @param overrideMassGuard whether a kind is swept even above the 5 % mass guard (REQ-P4K-012)
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")

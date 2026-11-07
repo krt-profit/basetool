@@ -160,8 +160,9 @@ public class AdminP4kImportController {
    * @param id the SUCCEEDED preview job to apply
    * @param createItemsAndShips {@code true} to create unmatched playable items and ships
    *     (REQ-P4K-009); {@code false} (default) creates nothing
-   * @param overrideMassGuard {@code true} to sweep a kind even when the sweep would stamp more than
-   *     5 % of it (REQ-P4K-012); {@code false} (default) skips that kind's sweep
+   * @param overrideMassGuard {@code true} to sweep a kind even when the sweep would stamp more of
+   *     it than the mass guard allows (REQ-P4K-012); {@code false} (default) skips that kind's
+   *     sweep
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
    * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued apply job

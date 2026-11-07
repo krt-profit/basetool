@@ -706,6 +706,11 @@ function renderMassGuard(result) {
         (s) => s.outcome === 'SKIPPED_MASS_GUARD',
     );
     if (wrap) wrap.hidden = held.length === 0;
+    const hint = $('krt-p4k-mass-guard-hint');
+    if (hint) {
+        const percent = result && result.massGuardPercent != null ? result.massGuardPercent : '';
+        hint.textContent = (hint.dataset.template || '').replace('{0}', String(percent));
+    }
     if (!list) return;
     krtHtml.set(
         list,

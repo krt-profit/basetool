@@ -50,6 +50,8 @@ import java.util.List;
  * @param runId id of the recorded import run, or {@code null} for a preview
  * @param sweeps what the sweep did per kind, or {@code null} in a result stored before the sweep
  *     existed
+ * @param massGuardPercent the share of a kind's known rows above which the sweep holds the kind
+ *     back, or {@code null} when the result names none
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @DtoMirror
@@ -68,14 +70,15 @@ public record P4kImportResultDto(
     Counts blueprintCategories,
     long ingredientsResolved,
     String runId,
-    List<Sweep> sweeps) {
+    List<Sweep> sweeps,
+    Integer massGuardPercent) {
 
   /**
    * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
    *
    * @param kind the kind
    * @param outcome {@code SWEPT} or why the sweep was skipped, or {@code null}
-   * @param known the kind's P4K-known rows, the base of the 5 % mass guard
+   * @param known the kind's P4K-known rows, the base of the mass guard
    * @param toStamp the rows the sweep stamps, or would have stamped
    * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
    * @param reappeared stamped rows the run matched again

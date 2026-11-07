@@ -73,8 +73,8 @@ public class P4kImportJob extends AbstractEntity<UUID> {
   private boolean createItemsAndShips;
 
   /**
-   * For an APPLY run: whether a kind is swept even when the sweep would stamp more than 5 % of it
-   * (REQ-P4K-012).
+   * For an APPLY run: whether a kind is swept even when the sweep would stamp more of it than the
+   * mass guard allows (REQ-P4K-012).
    */
   @Column(name = "override_mass_guard", nullable = false)
   private boolean overrideMassGuard;

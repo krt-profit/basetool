@@ -50,6 +50,9 @@ import org.jetbrains.annotations.Nullable;
  * @param runId the {@code p4k_import_run} of an APPLY, {@code null} for a preview
  * @param sweeps the sweep result per kind (REQ-P4K-011, REQ-P4K-012), in the order of the kinds;
  *     {@code null} in a result stored before the sweep existed
+ * @param massGuardPercent the share of a kind's P4K-known rows above which the sweep holds the kind
+ *     back unless the admin overrides it ({@link P4kSweeper#MASS_GUARD_PERCENT}, REQ-P4K-012);
+ *     {@code null} in a result that names none
  */
 public record P4kImportResultDto(
     boolean dryRun,
@@ -66,14 +69,15 @@ public record P4kImportResultDto(
     @Nullable Counts blueprintCategories,
     int ingredientsResolved,
     @Nullable UUID runId,
-    @Nullable List<Sweep> sweeps) {
+    @Nullable List<Sweep> sweeps,
+    @Nullable Integer massGuardPercent) {
 
   /**
    * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
    *
    * @param kind the kind
    * @param outcome whether it swept or why it skipped
-   * @param known the kind's P4K-known rows, the base of the 5 % mass guard
+   * @param known the kind's P4K-known rows, the base of the mass guard
    * @param toStamp the rows the sweep stamps, or would have stamped
    * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
    * @param reappeared stamped rows the run matched again

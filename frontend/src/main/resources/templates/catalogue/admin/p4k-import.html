@@ -80,7 +80,7 @@
             <p class="form-hint" th:text="#{admin.p4kImport.createNew.hint}">Angelegt werden nur spielbare Datensätze.</p>
         </div>
         <div id="krt-p4k-mass-guard-wrap" class="form-group" hidden>
-            <p class="form-hint" th:text="#{admin.p4kImport.massGuard.hint}">Der Abgleich würde mehr als 5 % dieser Typen markieren:</p>
+            <p id="krt-p4k-mass-guard-hint" class="form-hint" th:data-template="#{admin.p4kImport.massGuard.hint('{0}')}"></p>
             <ul id="krt-p4k-mass-guard"></ul>
             <label>
                 <input type="checkbox" id="krt-p4k-mark-anyway">

@@ -93,8 +93,8 @@ public class P4kImportService {
    * @param jobId the APPLY job
    * @param createdBy the administrator who uploaded the catalogue
    * @param createItemsAndShips whether unmatched playable items and ships are created
-   * @param overrideMassGuard whether a kind is swept even when the sweep would stamp more than 5 %
-   *     of it (REQ-P4K-012)
+   * @param overrideMassGuard whether a kind is swept even when the sweep would stamp more of it
+   *     than the mass guard allows (REQ-P4K-012)
    */
   public record P4kApplyRequest(
       @NotNull UUID jobId,
@@ -400,7 +400,8 @@ public class P4kImportService {
         report.counts(P4kKind.BLUEPRINT_CATEGORY, completeness(head, P4kKind.BLUEPRINT_CATEGORY)),
         ingredientsResolved,
         context.getRunId(),
-        Arrays.stream(P4kKind.values()).map(report::sweepResult).toList());
+        Arrays.stream(P4kKind.values()).map(report::sweepResult).toList(),
+        P4kSweeper.MASS_GUARD_PERCENT);
   }
 
   /**
