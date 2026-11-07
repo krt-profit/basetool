@@ -60,10 +60,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
- * hands each kind to its reconciler in dependency order (manufacturers before items and ships,
- * items, commodities and blueprint categories before blueprints, resource groups before
- * commodities, the starmap tree before the UEX locations' links to it) and, on APPLY, records the
- * run, its counts per kind, its change report and its {@code CATALOGUE} audit event (REQ-P4K-046).
+ * hands it to the reconcilers ({@link P4kReconcilers}), sweeps the complete kinds and, on APPLY,
+ * records the run, its counts per kind, its change report and its {@code CATALOGUE} audit event
+ * (REQ-P4K-046).
  *
  * <ul>
  *   <li>{@link #previewImport(byte[])} computes everything and writes nothing.
@@ -79,21 +78,7 @@ public class P4kImportService {
 
   private final P4kCatalogueReader reader;
   private final P4kImportProperties properties;
-  private final P4kManufacturerReconciler manufacturerReconciler;
-  private final P4kItemReconciler itemReconciler;
-  private final P4kItemStatReconciler itemStatReconciler;
-  private final P4kShipReconciler shipReconciler;
-  private final P4kResourceGroupReconciler resourceGroupReconciler;
-  private final P4kCommodityReconciler commodityReconciler;
-  private final P4kMaterialGroupReview materialGroupReview;
-  private final P4kBlueprintCategoryReconciler blueprintCategoryReconciler;
-  private final P4kBlueprintReconciler blueprintReconciler;
-  private final P4kPaintReconciler paintReconciler;
-  private final P4kLoadoutReconciler loadoutReconciler;
-  private final P4kStarmapReconciler starmapReconciler;
-  private final P4kStarmapLinker starmapLinker;
-  private final P4kShopReconciler shopReconciler;
-  private final P4kShopLinker shopLinker;
+  private final P4kReconcilers reconcilers;
   private final P4kSweeper sweeper;
   private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
@@ -138,7 +123,7 @@ public class P4kImportService {
   public P4kPreview previewImport(byte @NotNull [] payload) {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
-    P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
+    P4kImportContext context = P4kImportContext.forPreview(catalogue, Instant.now());
     int ingredientsResolved = reconcile(payload, catalogue, context);
     sweepAndFollow(catalogue, context, false);
     return new P4kPreview(
@@ -170,20 +155,14 @@ public class P4kImportService {
         runRepository.save(newRun(catalogue.head(), build, changeNumber, request, now));
     run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
     P4kImportContext context =
-        new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
+        P4kImportContext.forApply(catalogue, now, run.getId(), request.createItemsAndShips());
     int ingredientsResolved = reconcile(payload, catalogue, context);
     List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
     overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
-    syncReportService.logP4kEvent(
-        run.getId(),
-        SyncEventType.SYNC_RUN_SUMMARY,
-        "catalog",
-        null,
-        null,
-        summary(result, context.getReport()));
+    syncReportService.logP4kRunSummary(run.getId(), summary(result, context.getReport()));
     auditRecorder.record(
         AuditEventType.CATALOGUE_P4K_APPLIED,
         run.getId(),
@@ -216,11 +195,7 @@ public class P4kImportService {
   }
 
   /**
-   * Reconciles the five kinds, the resource groups and the blueprint categories in dependency
-   * order, then links the paints and stores the ship loadouts, which refer to the items and ships
-   * (REQ-P4K-040, REQ-P4K-041), and imports the starmap tree and links the UEX locations to it when
-   * the catalogue lists starmap objects (REQ-P4K-034, REQ-P4K-035), and the shops with their item
-   * lists and terminal links when it lists shops (REQ-P4K-042…044).
+   * Reconciles every kind of a catalogue, streaming its loadouts from the stored upload again.
    *
    * @param payload the stored upload, streamed again for the loadouts
    * @param catalogue the catalogue
@@ -231,19 +206,8 @@ public class P4kImportService {
       byte @NotNull [] payload,
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kImportContext context) {
-    manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
-    itemReconciler.reconcile(catalogue.items(), context);
-    itemStatReconciler.reconcile(catalogue, context);
-    shipReconciler.reconcile(catalogue, context);
-    manufacturerReconciler.finish(context);
-    resourceGroupReconciler.reconcile(catalogue, context);
-    context.setAdminCategoriesRetired(
-        materialGroupReview.review(commodityReconciler.reconcile(catalogue, context), context));
-    blueprintCategoryReconciler.reconcile(catalogue.blueprintCategories(), context);
-    final int ingredientsResolved = blueprintReconciler.reconcile(catalogue, context);
-    paintReconciler.reconcile(
-        catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
-    loadoutReconciler.reconcile(
+    return reconcilers.reconcile(
+        catalogue,
         action ->
             read(
                 payload,
@@ -251,15 +215,7 @@ public class P4kImportService {
                   reader.readLoadouts(in, action);
                   return null;
                 }),
-        catalogue,
         context);
-    if (!catalogue.starmapObjects().isEmpty()) {
-      starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
-    }
-    if (!catalogue.shops().isEmpty()) {
-      shopLinker.link(shopReconciler.reconcile(catalogue.shops(), context), context);
-    }
-    return ingredientsResolved;
   }
 
   /**

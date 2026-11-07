@@ -59,6 +59,9 @@ public class SyncReportService {
   /** §8.8 retention: keep the last 30 runs per source. */
   public static final int RUNS_TO_KEEP = 30;
 
+  /** The aggregate of a P4K run's summary event. */
+  private static final String P4K_RUN_AGGREGATE = "catalog";
+
   private final ExternalSyncReportRepository repository;
   private final MeterRegistry meterRegistry;
   private final AdminDashboardLiveSync adminDashboardLiveSync;
@@ -278,6 +281,17 @@ public class SyncReportService {
             .build());
     countSyncEvent(source, SyncEventType.P4K_DISAGREEMENT);
     return true;
+  }
+
+  /**
+   * Records the summary of one P4K APPLY: its counts per kind, as the run's {@code
+   * SYNC_RUN_SUMMARY} event of the {@code catalog} aggregate.
+   *
+   * @param runId the run
+   * @param summary the one-line counts per kind
+   */
+  public void logP4kRunSummary(@NotNull UUID runId, @NotNull String summary) {
+    logP4kEvent(runId, SyncEventType.SYNC_RUN_SUMMARY, P4K_RUN_AGGREGATE, null, null, summary);
   }
 
   /**

@@ -27,7 +27,7 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > REQ-P4K-028 (#3038), REQ-P4K-029 (#3039), REQ-P4K-030 (#3040), REQ-P4K-031 and REQ-P4K-032
 > (#3042), REQ-P4K-033 (#3041), REQ-P4K-034…038 (#3044), REQ-P4K-039 (#3043), REQ-P4K-040 and
 > REQ-P4K-041 (#3045), REQ-P4K-042…044 (#3046), REQ-P4K-046 (#3032) and REQ-P4K-047 (#3034). The
-> import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
+> import is `P4kImportService`, which hands the kinds to `P4kReconcilers` in dependency order, with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
 > `P4kBlueprintCategoryReconciler`, `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then
 > `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the rows the base kinds matched,

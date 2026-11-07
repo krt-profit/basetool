@@ -117,6 +117,37 @@ public final class P4kImportContext {
   private final Map<P4kKind, Set<String>> repeatedKeys = new EnumMap<>(P4kKind.class);
 
   /**
+   * Creates the context of a preview: it writes nothing, has no run and counts what "create new
+   * items and ships" would create (REQ-P4K-009).
+   *
+   * @param catalogue the catalogue, scanned for repeated class names and names
+   * @param now the time the preview runs at
+   * @return the context
+   */
+  @NotNull
+  public static P4kImportContext forPreview(@NotNull P4kCatalogue catalogue, @NotNull Instant now) {
+    return new P4kImportContext(catalogue, false, now, null, true);
+  }
+
+  /**
+   * Creates the context of an APPLY.
+   *
+   * @param catalogue the catalogue, scanned for repeated class names and names
+   * @param now the apply time stamped on matched rows
+   * @param runId the run being recorded
+   * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @return the context
+   */
+  @NotNull
+  public static P4kImportContext forApply(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull Instant now,
+      @NotNull UUID runId,
+      boolean createItemsAndShips) {
+    return new P4kImportContext(catalogue, true, now, runId, createItemsAndShips);
+  }
+
+  /**
    * Creates the context of one run.
    *
    * @param catalogue the catalogue, scanned for repeated class names and names
@@ -125,7 +156,7 @@ public final class P4kImportContext {
    * @param runId the run of an APPLY, {@code null} for a preview
    * @param createItemsAndShips whether unmatched playable items and ships are created
    */
-  public P4kImportContext(
+  private P4kImportContext(
       @NotNull P4kCatalogue catalogue,
       boolean apply,
       @NotNull Instant now,
@@ -213,37 +244,6 @@ public final class P4kImportContext {
     return Map.copyOf(stamped.getOrDefault(kind, Map.of()));
   }
 
-  /**
-   * Indexes a matched manufacturer for the items and ships of the run.
-   *
-   * @param guid the manufacturer's GUID
-   * @param manufacturer the manufacturer
-   */
-  public void indexManufacturer(@NotNull UUID guid, @NotNull Manufacturer manufacturer) {
-    manufacturerByGuid.put(guid, manufacturer);
-  }
-
-  /**
-   * Returns a manufacturer the run matched.
-   *
-   * @param guid the manufacturer's GUID text, or {@code null}
-   * @return the manufacturer, or {@code null}
-   */
-  @Nullable
-  public Manufacturer manufacturer(@Nullable String guid) {
-    UUID parsed = P4kGuids.parse(guid);
-    return parsed == null ? null : manufacturerByGuid.get(parsed);
-  }
-
-  /**
-   * Indexes a matched or created resource group for the commodities of the run.
-   *
-   * @param guid the group's GUID
-   * @param group the group
-   */
-  public void indexResourceGroup(@NotNull UUID guid, @NotNull MaterialCategory group) {
-    resourceGroupByGuid.put(guid, group);
-  }
   /**
    * Keeps the manufacturer rows the manufacturer reconciler loaded for the rest of the run.
    *
@@ -342,6 +342,37 @@ public final class P4kImportContext {
     return rows;
   }
 
+  /**
+   * Indexes a matched manufacturer for the items and ships of the run.
+   *
+   * @param guid the manufacturer's GUID
+   * @param manufacturer the manufacturer
+   */
+  public void indexManufacturer(@NotNull UUID guid, @NotNull Manufacturer manufacturer) {
+    manufacturerByGuid.put(guid, manufacturer);
+  }
+
+  /**
+   * Returns a manufacturer the run matched.
+   *
+   * @param guid the manufacturer's GUID text, or {@code null}
+   * @return the manufacturer, or {@code null}
+   */
+  @Nullable
+  public Manufacturer manufacturer(@Nullable String guid) {
+    UUID parsed = P4kGuids.parse(guid);
+    return parsed == null ? null : manufacturerByGuid.get(parsed);
+  }
+
+  /**
+   * Indexes a matched or created resource group for the commodities of the run.
+   *
+   * @param guid the group's GUID
+   * @param group the group
+   */
+  public void indexResourceGroup(@NotNull UUID guid, @NotNull MaterialCategory group) {
+    resourceGroupByGuid.put(guid, group);
+  }
 
   /**
    * Returns a resource group the run matched or created.
