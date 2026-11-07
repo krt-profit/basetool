@@ -1163,6 +1163,14 @@ roles and role changes propagate only via interactive login. `KeycloakService.fe
 than the generic fetch-failure message, so the daily failure is diagnosable from one log line. See
 [`docs/keycloak/README.md`](../keycloak/README.md) for the exact grant command.
 
+**Admin API audience and scope are required alongside roles.** The `backend-service` client has
+`kc-admin-api` as a default client scope, so its client-credentials access tokens carry the realm's
+Admin REST API audience and the `kc-admin-api` scope claim. Keycloak 26.8.2 requires both for custom
+Admin API clients. REQ-OPS-033's provisioner assigns the existing built-in scope; it does not disable
+Keycloak's audience check or grant that scope to browser, gateway or exchange clients. The generated
+sandbox/E2E realms enforce the same assignment and mapper, and the disconnect E2Es exercise the
+real protected Admin API.
+
 **A role-membership read failure is fail-safe: it skips the run, never degrades the write.** Because a
 role-stripped set would misclassify holders — creating a brand-new admin `PENDING` instead of
 `ACTIVE` (and, before REQ-SEC-053, mapping it to the since-removed `Guest` fallback), or

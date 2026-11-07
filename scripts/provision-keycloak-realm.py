@@ -54,6 +54,7 @@ PRODUCTION_HOST_MARKERS = ("profit-base.online", "krt-profit.de")
 AUDIENCE_SCOPES = ("extractor-ingest", "extractor-ingest-only")
 
 OFFLINE_ACCESS = "offline_access"
+ADMIN_API_SCOPE = "kc-admin-api"
 
 SESSION_WINDOWS_FILE = Path(__file__).resolve().parent / "keycloak" / "session-windows.json"
 
@@ -429,7 +430,7 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             },
             redirect_uris=[],
             web_origins=[],
-            default_scopes=[*_STANDARD_DEFAULT, "service_account"],
+            default_scopes=[*_STANDARD_DEFAULT, "service_account", ADMIN_API_SCOPE],
             optional_scopes=list(_OPTIONAL_WITHOUT_OFFLINE),
             withheld_scopes=[OFFLINE_ACCESS],
             withheld_scope_reason=_NO_OFFLINE_SESSION,
@@ -752,6 +753,9 @@ class Planner:
 
     def plan(self) -> None:
         """Build the whole plan in write order."""
+        self.preflight_builtin_scopes()
+        if self.problems:
+            return
         self.plan_realm_settings()
         self.plan_realm_roles()
         self.plan_offline_access()
@@ -761,6 +765,18 @@ class Planner:
         self.plan_retired()
         self.plan_retired_realm_roles()
         self.plan_reports()
+
+    def preflight_builtin_scopes(self) -> None:
+        """Report missing required Keycloak scopes before any managed realm write."""
+        existing = self.scopes_by_name()
+        managed = {scope.name for scope in SCOPES}
+        for spec in self.specs:
+            required = set(spec.default_scopes) | set(spec.optional_scopes)
+            for name in sorted(required - existing.keys() - managed):
+                self.problems.append(
+                    f"{spec.client_id}: scope '{name}' does not exist in this realm. It is a "
+                    f"Keycloak built-in; upgrade the realm to the required Keycloak version "
+                    f"before assigning it. No built-in scope is created or modified.")
 
     def plan_realm_settings(self) -> None:
         changes = self.section("realm token and session settings")
@@ -1185,18 +1201,10 @@ class Planner:
     def _plan_scope_assignments(self, spec: ClientSpec, uuid: str) -> list[Change]:
         changes: list[Change] = []
         default, optional = self._assigned_scopes(uuid)
-        existing = self.scopes_by_name()
-        planned = {s.name for s in SCOPES}
         for kind, wanted, have, other in (("default", spec.default_scopes, default, optional),
                                           ("optional", spec.optional_scopes, optional, default)):
             for name in wanted:
                 if name in have:
-                    continue
-                if name not in existing and name not in planned:
-                    self.problems.append(
-                        f"{spec.client_id}: scope '{name}' does not exist in this realm, so it "
-                        f"cannot be assigned as {kind}. It is a Keycloak built-in; a realm "
-                        f"without it predates the Keycloak version production runs.")
                     continue
                 if name in other:
                     changes.append(Change(

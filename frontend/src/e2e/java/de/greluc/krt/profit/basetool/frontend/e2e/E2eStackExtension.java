@@ -284,9 +284,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
     seeder.seedCatalog();
     seeder.seedSql("/supply-e2e-seed.sql");
     seeder.seedSql("/purchasing-e2e-seed.sql");
-    // The frontend caches the price matrix, and JDBC-seeded prices never evict it: a priced row
-    // must exist before the first page of the run fills that cache.
-    seeder.seedSql("/materials-matrix-e2e-seed.sql");
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_IMPORT);
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_REFINERY);
     seeder.ensureRefineryMaterialWithRefinedOutput(
