@@ -193,7 +193,7 @@ public class P4kManufacturerReconciler {
     writer.lead(
         "abbreviation", row.getAbbreviation(), stripped(manufacturer.code()), row::setAbbreviation);
     writer.lead(
-        "name_de",
+        P4kReportColumns.NAME_DE,
         row.getNameDe(),
         P4kFields.germanName(manufacturer.name()),
         row::setNameDe);

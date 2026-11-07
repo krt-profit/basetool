@@ -94,7 +94,7 @@ class P4kShipBaseData {
       @NotNull P4kImportContext context) {
     leadName(row, ship, writer, context);
     writer.lead(
-        "class_name",
+        P4kReportColumns.CLASS_NAME,
         row.getClassName(),
         StringNormalization.blankToNull(ship.className()),
         row::setClassName,

@@ -121,13 +121,13 @@ public class P4kResourceGroupReconciler {
       @NotNull P4kResourceGroupDto group) {
     writer.lead("name", row.getName(), group.displayName(), row::setName, Function.identity());
     writer.lead(
-        "name_de",
+        P4kReportColumns.NAME_DE,
         row.getNameDe(),
         P4kLocalisedText.deOf(group.name()),
         row::setNameDe,
         Function.identity());
     writer.lead(
-        "class_name",
+        P4kReportColumns.CLASS_NAME,
         row.getClassName(),
         group.className(),
         row::setClassName,
@@ -192,7 +192,7 @@ public class P4kResourceGroupReconciler {
         .changed(
             P4kKind.RESOURCE_GROUP,
             group,
-            "parent_id",
+            P4kReportColumns.PARENT_ID,
             current == null ? null : current.getName(),
             parent == null ? null : parent.getName());
   }

@@ -216,7 +216,8 @@ two rows would claim (also two catalogue records sharing a name, as three commod
 the admin merges or splits; the import never merges. The Wiki/UEX duplicate merge
 (`ItemReconciliationService.mergeExisting`, ADR-0349) keeps the same rule: it never joins two items
 with different P4K GUIDs but opens a `GUID_CONFLICT` case for each GUID and leaves both rows as they
-are; a GUID only the retired row holds moves with its P4K columns onto the survivor before the
+are; a GUID only the retired row holds moves with all its P4K columns (`P4kItemParticipation`, the
+admin's hide included) onto the survivor before the
 retired row is archived; and a survivor with a P4K GUID, like a P4K-seeded one, keeps its name and
 manufacturer against the UEX values. `p4k_uuid` becomes unique per kind in the
 same release (V343): the migration first clears `p4k_uuid` on every row of a duplicate group, then
@@ -234,7 +235,8 @@ adds the unique index, and the next APPLY matches those rows again.
   moves a GUID only the retired row holds, and keeps a P4K-matched survivor's name.
 
 **Enforced by:** `P4kIdentityCleanupTest`, `V343MigrationTest`, `ItemReconciliationServiceTest`,
-`P4kMergeConflictRecorderTest` · **Code:** `P4kRowMatcher`, `P4kMergeConflictRecorder` ·
+`P4kMergeConflictRecorderTest`, `P4kRowIndexTest`, `P4kItemParticipationTest` · **Code:**
+`P4kRowMatcher`, `P4kRowIndex`, `P4kItemParticipation`, `P4kMergeConflictRecorder` ·
 **ADR:** [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #3029
 
 ## Matching and seeding

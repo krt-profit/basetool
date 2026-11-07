@@ -173,7 +173,10 @@ final class P4kFields {
   @NotNull
   static String disagreement(
       @NotNull String column, @Nullable String stored, @Nullable String source) {
-    return "column=" + column + ";stored=" + stored + ";source=" + source;
+    return SyncReportDetails.of("column", column)
+        .with("stored", stored)
+        .with("source", source)
+        .toString();
   }
 
   /**

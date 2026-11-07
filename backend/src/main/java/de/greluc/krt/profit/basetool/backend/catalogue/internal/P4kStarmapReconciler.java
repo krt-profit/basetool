@@ -114,7 +114,11 @@ public class P4kStarmapReconciler {
     }
     StarmapObject target = row;
     P4kRowWriter writer = new P4kRowWriter(context, KIND, record);
-    writer.mirror("class_name", target.getClassName(), record.className(), target::setClassName);
+    writer.mirror(
+        P4kReportColumns.CLASS_NAME,
+        target.getClassName(),
+        record.className(),
+        target::setClassName);
     writer.mirror(
         "record_path", target.getRecordPath(), record.recordPath(), target::setRecordPath);
     writer.mirror("type", target.getType(), record.type(), target::setType);
@@ -130,7 +134,10 @@ public class P4kStarmapReconciler {
     writer.leadGameText(
         "name", target.getName(), P4kLocalisedText.enOf(record.name()), target::setName);
     writer.leadGameText(
-        "name_de", target.getNameDe(), P4kFields.germanName(record.name()), target::setNameDe);
+        P4kReportColumns.NAME_DE,
+        target.getNameDe(),
+        P4kFields.germanName(record.name()),
+        target::setNameDe);
     return new Pending(record, target, writer);
   }
 
@@ -165,7 +172,10 @@ public class P4kStarmapReconciler {
       }
       return;
     }
-    pending.writer().mirror("parent_id", current, parentGuid, _ -> row.setParentId(idOf(parent)));
+    pending
+        .writer()
+        .mirror(
+            P4kReportColumns.PARENT_ID, current, parentGuid, _ -> row.setParentId(idOf(parent)));
   }
 
   /**

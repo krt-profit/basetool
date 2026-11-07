@@ -181,7 +181,11 @@ public class P4kShipReconciler {
       @NotNull ShipType row, @NotNull P4kShipDto ship, @NotNull P4kImportContext context) {
     P4kRowWriter writer = new P4kRowWriter(context, P4kKind.SHIP, ship);
     baseData.lead(row, ship, writer, context);
-    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(ship.name()), row::setNameDe);
+    writer.lead(
+        P4kReportColumns.NAME_DE,
+        row.getNameDe(),
+        P4kFields.germanName(ship.name()),
+        row::setNameDe);
     writer.fillGameText(
         "description_en",
         row.getDescriptionEn(),

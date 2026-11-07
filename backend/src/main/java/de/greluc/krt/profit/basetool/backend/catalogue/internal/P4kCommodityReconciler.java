@@ -94,7 +94,7 @@ public class P4kCommodityReconciler {
         P4kRowWriter writer = new P4kRowWriter(context, P4kKind.COMMODITY, commodity);
         enrich(writer, row, commodity, guid, context);
         writer.lead(
-            "name_de",
+            P4kReportColumns.NAME_DE,
             row.getNameDe(),
             P4kFields.germanName(commodity.name()),
             row::setNameDe);

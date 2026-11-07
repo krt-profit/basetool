@@ -66,14 +66,14 @@ public class P4kBlueprintCategoryReconciler {
       }
       P4kRowWriter writer = new P4kRowWriter(context, P4kKind.BLUEPRINT_CATEGORY, category);
       writer.lead(
-          "class_name",
+          P4kReportColumns.CLASS_NAME,
           row.getClassName(),
           category.className(),
           row::setClassName,
           Function.identity());
       writer.lead("name", row.getName(), category.nameEn(), row::setName, Function.identity());
       writer.lead(
-          "name_de",
+          P4kReportColumns.NAME_DE,
           row.getNameDe(),
           P4kFields.germanName(category.name()),
           row::setNameDe,

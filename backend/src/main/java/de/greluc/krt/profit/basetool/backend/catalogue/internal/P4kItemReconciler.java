@@ -211,7 +211,8 @@ public class P4kItemReconciler {
       @NotNull P4kItemValues values,
       @NotNull P4kImportContext context) {
     P4kRowWriter writer = new P4kRowWriter(context, P4kKind.ITEM, item);
-    writer.fill("class_name", row.getClassName(), item.className(), row::setClassName);
+    writer.fill(
+        P4kReportColumns.CLASS_NAME, row.getClassName(), item.className(), row::setClassName);
     writer.lead("name", row.getName(), values.name(), row::setName);
     writer.lead(
         "manufacturer_id",
@@ -219,7 +220,11 @@ public class P4kItemReconciler {
         values.manufacturer(),
         row::setManufacturer,
         Manufacturer::getName);
-    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(item.name()), row::setNameDe);
+    writer.lead(
+        P4kReportColumns.NAME_DE,
+        row.getNameDe(),
+        P4kFields.germanName(item.name()),
+        row::setNameDe);
     writer.lead("wiki_type", row.getWikiType(), values.type(), row::setWikiType);
     writer.lead("wiki_sub_type", row.getWikiSubType(), values.subType(), row::setWikiSubType);
     writer.lead("size_class", row.getSizeClass(), values.size(), row::setSizeClass);

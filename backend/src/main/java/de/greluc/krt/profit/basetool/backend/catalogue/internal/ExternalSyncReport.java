@@ -55,6 +55,9 @@ import org.jetbrains.annotations.Nullable;
 @Builder
 public class ExternalSyncReport {
 
+  /** The {@link #aggregate} of an event about a {@code game_item} row. */
+  public static final String GAME_ITEM = "game_item";
+
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;

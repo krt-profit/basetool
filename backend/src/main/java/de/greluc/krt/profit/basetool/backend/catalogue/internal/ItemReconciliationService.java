@@ -115,16 +115,16 @@ public class ItemReconciliationService {
       reports.logScwikiEvent(
           runId,
           SyncEventType.SOURCE_IDENTITY_CONFLICT,
-          "game_item",
+          ExternalSyncReport.GAME_ITEM,
           target.getExternalUuid(),
           target.getName(),
-          "retiredItem=" + uexItemId + ";survivorItem=" + target.getId() + ";p4kGuidConflict");
+          mergeDetails(uexItemId, target).flag("p4kGuidConflict").toString());
       return null;
     }
     final String archive = redirects.snapshot(uexItemId, target.getId());
-    final P4kParticipation moved =
+    final P4kItemParticipation moved =
         retiredGuid != null && survivorGuid == null
-            ? P4kParticipation.detach(source, retiredGuid)
+            ? P4kItemParticipation.detach(source, retiredGuid)
             : null;
     source.setUexItemId(null);
     items.saveAndFlush(source);
@@ -155,10 +155,10 @@ public class ItemReconciliationService {
     reports.logScwikiEvent(
         runId,
         SyncEventType.SOURCE_RECORDS_MERGED,
-        "game_item",
+        ExternalSyncReport.GAME_ITEM,
         target.getExternalUuid(),
         target.getName(),
-        "retiredItem=" + uexItemId + ";survivorItem=" + target.getId());
+        mergeDetails(uexItemId, target).toString());
     return target;
   }
 
@@ -178,68 +178,16 @@ public class ItemReconciliationService {
       @Nullable String className) {}
 
   /**
-   * The P4K columns of a row (REQ-P4K-005, REQ-P4K-007, REQ-P4K-017), carried from a retired row
-   * onto a survivor that the P4K never matched.
+   * Starts the details of a merge event: the retired and the surviving item.
    *
-   * @param p4kUuid the P4K GUID
-   * @param nameKey the {@code global.ini} name key
-   * @param nameDe the German name the P4K wrote (REQ-P4K-023)
-   * @param syncedAt the last P4K touch
-   * @param deletedAt the P4K soft-delete marker
-   * @param seenRunId the run that last matched the row
-   * @param values the P4K's values of the attributes it leads
+   * @param retiredId the retired row
+   * @param survivor the surviving row
+   * @return the details
    */
-  private record P4kParticipation(
-      @NotNull UUID p4kUuid,
-      @Nullable String nameKey,
-      @Nullable String nameDe,
-      @Nullable Instant syncedAt,
-      @Nullable Instant deletedAt,
-      @Nullable UUID seenRunId,
-      @NotNull P4kItemValues values) {
-
-    /**
-     * Takes the P4K columns off a row; the GUID is unique, so it must leave before it lands.
-     *
-     * @param row the row that holds a P4K GUID
-     * @param guid the row's P4K GUID
-     * @return the removed columns
-     */
-    static @NotNull P4kParticipation detach(@NotNull GameItem row, @NotNull UUID guid) {
-      final P4kParticipation taken =
-          new P4kParticipation(
-              guid,
-              row.getNameKey(),
-              row.getNameDe(),
-              row.getP4kSyncedAt(),
-              row.getP4kDeletedAt(),
-              row.getP4kSeenRunId(),
-              P4kItemValues.of(row));
-      row.setP4kUuid(null);
-      row.setNameKey(null);
-      row.setNameDe(null);
-      row.setP4kSyncedAt(null);
-      row.setP4kDeletedAt(null);
-      row.setP4kSeenRunId(null);
-      P4kItemValues.NONE.storeOn(row);
-      return taken;
-    }
-
-    /**
-     * Writes the columns onto a row; the P4K's values lead the row's displayed attributes.
-     *
-     * @param row the survivor
-     */
-    void attachTo(@NotNull GameItem row) {
-      row.setP4kUuid(p4kUuid);
-      row.setNameKey(nameKey);
-      row.setNameDe(nameDe);
-      row.setP4kSyncedAt(syncedAt);
-      row.setP4kDeletedAt(deletedAt);
-      row.setP4kSeenRunId(seenRunId);
-      values.storeOn(row);
-      values.leadOnto(row);
-    }
+  @NotNull
+  private static SyncReportDetails mergeDetails(
+      @NotNull UUID retiredId, @NotNull GameItem survivor) {
+    return SyncReportDetails.of("retiredItem", retiredId).with("survivorItem", survivor.getId());
   }
 
   private static void copyUexColumns(GameItem from, GameItem to) {
