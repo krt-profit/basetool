@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -36,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection.LineDemand;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -71,7 +72,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderItemService {
 
   private final BlueprintRepository blueprintRepository;
-  private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final MaterialRepository materialRepository;
   private final MaterialMapper materialMapper;
   private final QualityTierService qualityTierService;
@@ -86,6 +87,7 @@ public class JobOrderItemService {
    * @return a populated {@link JobOrderItem} with its {@link JobOrderItemMaterial} children
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
+   * @throws RetiredGameItemException when the P4K retired the ordered game item
    */
   @NotNull
   public JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line) {
@@ -105,12 +107,11 @@ public class JobOrderItemService {
    * @param line the payload with game item, blueprint, amount and quality choices
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
+   * @throws RetiredGameItemException when the P4K retired the ordered game item, also on a line
+   *     that keeps it
    */
   public void applyItemLine(JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
-    GameItem gameItem =
-        Entities.require(
-            gameItemRepository.findById(line.gameItemId()),
-            () -> "GameItem not found: " + line.gameItemId());
+    GameItem gameItem = selectableGameItems.require(line.gameItemId());
     Blueprint blueprint =
         Entities.require(
             blueprintRepository.findById(line.blueprintId()),

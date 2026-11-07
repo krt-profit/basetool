@@ -269,8 +269,9 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes),
   `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`) and
-  `catalogue.api.CatalogueProblemCode` (`P4K_UPLOAD_REJECTED`, REQ-P4K-001). Names and wire
-  values did not change when they left `CoreProblemCode`; the registry holds 82 codes across the
+  `catalogue.api.CatalogueProblemCode` (`P4K_UPLOAD_REJECTED`, REQ-P4K-001;
+  `CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). Names and wire
+  values did not change when they left `CoreProblemCode`; the registry holds 83 codes across the
   eleven enums. Two are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app

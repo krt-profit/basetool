@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_BLUEPRINT;
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_ITEM;
+
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -39,6 +42,33 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
+
+  /**
+   * The {@code WHERE} clause of the Lager item picker over a game item aliased {@code gi}: an
+   * output of a live active blueprint, itself listed, whose name contains {@code :q}.
+   */
+  String BOOKABLE_ITEM_FILTER =
+      " EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL"
+          + " AND"
+          + LISTED_BLUEPRINT
+          + ") AND"
+          + LISTED_ITEM
+          + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'";
+
+  /**
+   * The {@code WHERE} clause of the item-order picker over a game item aliased {@code gi}: an
+   * output of a live active blueprint with a resolved RESOURCE ingredient, itself listed, whose
+   * name contains {@code :q}.
+   */
+  String ORDERABLE_ITEM_FILTER =
+      " EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi"
+          + " AND b.scwikiDeletedAt IS NULL AND"
+          + LISTED_BLUEPRINT
+          + "AND i.kind ="
+          + " de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE"
+          + " AND i.material IS NOT NULL) AND"
+          + LISTED_ITEM
+          + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'";
 
   /**
    * Finds the local blueprint for an SC Wiki blueprint UUID, the blueprint sync's upsert key.
@@ -89,9 +119,10 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       """
       SELECT b FROM Blueprint b
       WHERE b.scwikiKey = :scwikiKey AND b.scwikiUuid IS NULL AND b.p4kUuid IS NOT NULL
-      ORDER BY CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN 0 ELSE 1 END,
-      b.p4kUuid ASC
-      """)
+      ORDER BY CASE WHEN\
+      """
+          + LISTED_BLUEPRINT
+          + "THEN 0 ELSE 1 END, b.p4kUuid ASC")
   List<Blueprint> findP4kSeededByScwikiKey(@Param("scwikiKey") String scwikiKey);
 
   /**
@@ -136,11 +167,10 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return a page of matching active blueprints
    */
   @Query(
-      """
-      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
-      AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-      OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
-      """)
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND"
+          + LISTED_BLUEPRINT
+          + "AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'"
+          + " OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')")
   Page<Blueprint> searchActive(@Param("q") String q, Pageable pageable);
 
   /**
@@ -151,8 +181,9 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return active blueprints whose {@code outputItem} is that game item
    */
   @Query(
-      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL"
-          + " AND b.p4kHiddenAt IS NULL AND (b.outputItem.id = :gameItemId"
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND"
+          + LISTED_BLUEPRINT
+          + "AND (b.outputItem.id = :gameItemId"
           + " OR b.outputItem.id = (SELECT r.canonicalItem.id FROM GameItemRedirect r"
           + " WHERE r.id = :gameItemId))")
   List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
@@ -183,23 +214,13 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       value =
-          """
-          SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
-          (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
-          b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
-          de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
-          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-          """,
+          "SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
+              + " LEFT JOIN FETCH gi.manufacturer WHERE"
+              + ORDERABLE_ITEM_FILTER,
       countQuery =
-          """
-          SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
-          EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi
-          AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
-          de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
-          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-          """)
+          "SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
+              + " WHERE"
+              + ORDERABLE_ITEM_FILTER)
   Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
 
   /**
@@ -213,19 +234,13 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       value =
-          """
-          SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi
-          LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
-          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
-          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
-          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-          """,
+          "SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
+              + " LEFT JOIN FETCH gi.manufacturer WHERE"
+              + BOOKABLE_ITEM_FILTER,
       countQuery =
-          """
-          SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
-          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
-          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-          """)
+          "SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
+              + " WHERE"
+              + BOOKABLE_ITEM_FILTER)
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
@@ -257,10 +272,11 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
-      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
-      AND b.outputName IS NOT NULL
-      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
-      """)
+      WHERE b.scwikiDeletedAt IS NULL AND\
+      """
+          + LISTED_BLUEPRINT
+          + "AND b.outputName IS NOT NULL"
+          + " AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'")
   List<BlueprintProductRow> findOfferableProductRows(@Param("q") String q);
 
   /**
@@ -275,12 +291,14 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow(b.id,
-      b.outputName, b.producedItemGuid,
-      CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN false ELSE true END)
-      FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
-      ORDER BY CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN 0 ELSE 1 END,
-      b.outputName ASC, b.scwikiKey ASC, b.id ASC
-      """)
+      b.outputName, b.producedItemGuid, CASE WHEN\
+      """
+          + LISTED_BLUEPRINT
+          + "THEN false ELSE true END)"
+          + " FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL"
+          + " ORDER BY CASE WHEN"
+          + LISTED_BLUEPRINT
+          + "THEN 0 ELSE 1 END, b.outputName ASC, b.scwikiKey ASC, b.id ASC")
   List<BlueprintIdNameRow> findActiveIdNameRows();
 
   /**
@@ -300,12 +318,13 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       b.outputName, b.producedItemGuid, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid,
       oi.uexItemId, oi.nameKey)
       FROM Blueprint b LEFT JOIN b.outputItem oi
-      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
-      AND b.outputName IS NOT NULL
-      AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR b.producedItemGuid IN :guids
-      OR oi.externalUuid IN :guids
-      OR oi.p4kUuid IN :guids OR oi.uexItemId IN :uexIds OR LOWER(oi.nameKey) IN :nameKeys)
-      """)
+      WHERE b.scwikiDeletedAt IS NULL AND\
+      """
+          + LISTED_BLUEPRINT
+          + "AND b.outputName IS NOT NULL"
+          + " AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR b.producedItemGuid IN :guids"
+          + " OR oi.externalUuid IN :guids OR oi.p4kUuid IN :guids OR oi.uexItemId IN :uexIds"
+          + " OR LOWER(oi.nameKey) IN :nameKeys)")
   List<ExchangeBlueprintKeyRow> findExchangeKeyRows(
       @Param("guids") Collection<UUID> guids,
       @Param("uexIds") Collection<Integer> uexIds,

@@ -47,7 +47,8 @@ A Logistician of a unit with `may_raise_needs`, the lead included, and an admin 
 material xor a game item, an amount above zero (whole units for pieces and game items), a quality
 tier for a material (the base tier when omitted), a priority and an optional job order of that unit.
 Any other caller receives 403. The catalogue entry and the tier of a need are fixed; a different one
-is a new need. A unit's leadership seat always confers the contextual Logistician authority of that
+is a new need. A game item the P4K retired cannot be raised, and a need that holds one cannot be
+edited, only withdrawn (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). A unit's leadership seat always confers the contextual Logistician authority of that
 unit (`hasRoleInOrgUnit(unit, LOGISTICIAN)`), so the lead is no separate case and no gate evaluates
 the two differently.
 
@@ -61,7 +62,8 @@ The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses 
 opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for a game item),
 `needTier` and `needAmount` query parameters of `/supply/needs`.
 
-**Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`), `SupplyNeedOrderRenderTest`
+**Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`,
+`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`
 · **Code:** `supply/internal/SupplyNeedService`, `supply/needs.html`,
 `static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002
 
@@ -103,7 +105,9 @@ credited to, `PARTIAL` the open needs credited in part. The page total counts th
 Any member pledges a donation of a material or a game item, a quality and an amount above zero to a
 unit with `accepts_donations`, optionally credited to one of that unit's open needs and optionally from
 one of the member's own Lager rows, picked in the dialog (REQ-SUP-025). A pledge credited to a need
-takes the unit and the catalogue entry from the need and must satisfy its tier.
+takes the unit and the catalogue entry from the need and must satisfy its tier. A pledge or a
+recorded donation (REQ-SUP-011) of a game item the P4K retired is refused, whichever of the request,
+the need or the Lager row names it (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
 **Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService#pledge`
 

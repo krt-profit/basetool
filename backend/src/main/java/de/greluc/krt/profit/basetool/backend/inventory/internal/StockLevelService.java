@@ -22,11 +22,12 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelAllocation.Fill;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
@@ -75,7 +76,7 @@ public class StockLevelService {
   private final StockLevelFigures figures;
   private final OrgUnitRepository orgUnitRepository;
   private final MaterialRepository materialRepository;
-  private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final QualityTierRepository qualityTierRepository;
   private final RequestScopeResolver requestScopeResolver;
   private final StockLevelAccessPolicy accessPolicy;
@@ -181,6 +182,7 @@ public class StockLevelService {
    * @throws DuplicateEntityException when the unit already has a level for the entry and tier
    * @throws BadRequestException when not exactly one of material and game item is given, a game
    *     item carries a tier, or the amounts are invalid
+   * @throws RetiredGameItemException when the P4K retired the game item
    */
   @Transactional
   public @NotNull StockLevelDto create(@NotNull StockLevelCreateRequest request) {
@@ -205,8 +207,7 @@ public class StockLevelService {
           null);
       level.setMaterial(material);
     } else {
-      GameItem item =
-          Entities.require(gameItemRepository.findById(request.gameItemId()), "Item not found");
+      GameItem item = selectableGameItems.require(request.gameItemId());
       requireFreeKey(stockLevelRepository.findByItemKey(unit.getId(), item.getId()), null);
       level.setGameItem(item);
     }
@@ -234,10 +235,14 @@ public class StockLevelService {
    *     stale
    * @throws DuplicateEntityException when the new tier collides with another level
    * @throws BadRequestException when a game-item level is given a tier or the amounts are invalid
+   * @throws RetiredGameItemException when the P4K retired the level's game item
    */
   @Transactional
   public @NotNull StockLevelDto update(@NotNull UUID id, @NotNull StockLevelUpdateRequest request) {
     StockLevel level = requireVersioned(id, request.version());
+    if (level.getGameItem() != null) {
+      selectableGameItems.requireSelectable(level.getGameItem());
+    }
     final QualityTier before = level.getQualityTier();
     final double minimumBefore = level.getMinimum();
     final double targetBefore = level.getTarget();

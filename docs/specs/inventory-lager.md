@@ -1758,6 +1758,8 @@ hold.
   and stays until a Logistician changes it. Its edit dialog still offers that tier, selected and
   marked „Stufe inaktiv", so a change of minimum or target keeps the floor; the tier is not offered
   to a new level.
+- **Retired game item.** A level cannot be set for a game item the P4K retired, and a level that
+  holds one cannot be changed, only removed (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
 **Acceptance**
 
@@ -1771,6 +1773,8 @@ hold.
   requested and leave the low state unchanged. *`StockLevelIntegrationTest`.*
 - [x] A game-item level counts the item's free stock in whole units and takes no tier.
   *`StockLevelIntegrationTest`.*
+- [x] A retired game item is refused on create and change with `400`; its level can still be
+  removed. *`StockLevelIntegrationTest`.*
 
 **Enforced by:** `StockLevelAllocationTest` (pure allocation over plain rows),
 `StockLevelIntegrationTest` · **Code:** `inventory/internal/StockLevelAllocation`,

@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
@@ -88,6 +90,7 @@ public class SupplyDonationService {
   private final SupplyNeedService needService;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final LocationRepository locationRepository;
   private final UserRepository userRepository;
   private final OrgUnitRepository orgUnitRepository;
@@ -151,6 +154,7 @@ public class SupplyDonationService {
    *
    * @param request the pledge
    * @return the pledged donation
+   * @throws RetiredGameItemException when the P4K retired the donated game item
    */
   @Transactional
   public @NotNull DonationDto pledge(@NotNull PledgeRequest request) {
@@ -175,10 +179,14 @@ public class SupplyDonationService {
               stockCommands.lockRow(request.sourceInventoryItemId()), "Stock row not found");
     } else if (need == null) {
       material = request.materialId() == null ? null : requireMaterial(request.materialId());
-      item = request.gameItemId() == null ? null : requireGameItem(request.gameItemId());
+      item =
+          request.gameItemId() == null ? null : selectableGameItems.require(request.gameItemId());
     }
     if ((material == null) == (item == null)) {
       throw new BadRequestException("Name exactly one of material and game item");
+    }
+    if (item != null) {
+      selectableGameItems.requireSelectable(item);
     }
     if (need != null) {
       requireFitsNeed(need, material, item, quality);
@@ -228,6 +236,7 @@ public class SupplyDonationService {
    *
    * @param request the received donation
    * @return the recorded donation
+   * @throws RetiredGameItemException when the P4K retired the donated game item
    */
   @Transactional
   public @NotNull DonationDto record(@NotNull RecordDonationRequest request) {
@@ -248,9 +257,14 @@ public class SupplyDonationService {
     GameItem item =
         need != null
             ? need.getGameItem()
-            : request.gameItemId() == null ? null : requireGameItem(request.gameItemId());
+            : request.gameItemId() == null
+                ? null
+                : selectableGameItems.require(request.gameItemId());
     if ((material == null) == (item == null)) {
       throw new BadRequestException("Name exactly one of material and game item");
+    }
+    if (item != null) {
+      selectableGameItems.requireSelectable(item);
     }
     Integer quality = material == null ? null : request.quality() == null ? 0 : request.quality();
     if (need != null) {
@@ -675,10 +689,6 @@ public class SupplyDonationService {
 
   private @NotNull Material requireMaterial(@NotNull UUID id) {
     return Entities.require(materialRepository.findById(id), "Material not found");
-  }
-
-  private @NotNull GameItem requireGameItem(@NotNull UUID id) {
-    return Entities.require(gameItemRepository.findById(id), "Game item not found");
   }
 
   private @NotNull OrgUnit requireUnit(@NotNull UUID id) {
