@@ -227,6 +227,10 @@ Optional channels ship as safe no-ops until configured: transactional e-mail (SM
 
 **The Keycloak realm is not delivered.** It lives in each host's database, so a new host's realm — or a testing realm that has fallen behind — is brought to production's shape (the Basetool's clients, audience scopes, service-account roles, token settings) by [`scripts/provision-keycloak-realm.py`](scripts/provision-keycloak-realm.py): dry run by default, additive apart from deleting the retired Android client and its DPoP policy and profile, never printing a secret. Procedure: [docs/archive/INGEST_KEYCLOAK_SETUP.md → *New or out-of-date realm*](docs/archive/INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
 
+For Keycloak 26.8.2, the provisioner assigns the built-in `kc-admin-api` scope to `backend-service`;
+its tokens need both the Admin API audience and scope for user synchronization and connected-app
+disconnects. See [the service-account contract](docs/keycloak/README.md#backend-service-service-account-roles-admin-api).
+
 The multi-squadron / multi-OrgUnit rollout is long complete; its current model is the living spec [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md), and the historical audit trail is in [CHANGELOG.md](CHANGELOG.md).
 
 ### Running the local test stack
