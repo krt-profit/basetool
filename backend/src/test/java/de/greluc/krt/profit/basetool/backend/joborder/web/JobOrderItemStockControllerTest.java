@@ -23,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderInventoryOwnerRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockReadService;
@@ -37,15 +35,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029): delegation and the
- * owner/location redaction for a requesting-side viewer.
+ * Unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029): delegation with owner
+ * and location passed through to every viewer of the order.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemStockControllerTest {
 
   @Mock private JobOrderStockReadService jobOrderStockReadService;
-  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
-  @Mock private JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   @InjectMocks private JobOrderItemStockController controller;
 
@@ -70,39 +66,23 @@ class JobOrderItemStockControllerTest {
   }
 
   @Test
-  void getItemStock_responsibleSideViewer_returnsListUnredacted() {
+  void getItemStock_returnsListWithOwnerAndLocationUnchanged() {
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> expected = List.of(sampleGroup());
     when(jobOrderStockReadService.getItemStockForJobOrder(jobOrderId)).thenReturn(expected);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
 
     assertSame(expected, result, "controller must return the service's list unmodified");
-    verify(jobOrderStockReadService).getItemStockForJobOrder(jobOrderId);
-    verifyNoInteractions(inventoryOwnerRedactor);
-  }
-
-  @Test
-  void getItemStock_requestingSideViewer_returnsRedactedList() {
-    UUID jobOrderId = UUID.randomUUID();
-    List<JobOrderItemStockGroupDto> raw = List.of(sampleGroup());
-    List<JobOrderItemStockGroupDto> redacted = List.of(sampleGroup());
-    when(jobOrderStockReadService.getItemStockForJobOrder(jobOrderId)).thenReturn(raw);
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(false);
-    when(inventoryOwnerRedactor.redactItemStockGroups(raw)).thenReturn(redacted);
-
-    List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
-
-    assertSame(redacted, result, "a requesting-side viewer must get the redacted list");
-    verify(inventoryOwnerRedactor).redactItemStockGroups(raw);
+    JobOrderItemStockEntryDto entry = result.getFirst().entries().getFirst();
+    assertEquals("alice", entry.ownerName());
+    assertEquals("Lorville", entry.location());
   }
 
   @Test
   void getItemStock_emptyResult_isReturnedAsIs() {
     UUID jobOrderId = UUID.randomUUID();
     when(jobOrderStockReadService.getItemStockForJobOrder(jobOrderId)).thenReturn(List.of());
-    when(jobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);
 
     List<JobOrderItemStockGroupDto> result = controller.getItemStock(jobOrderId);
 

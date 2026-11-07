@@ -1130,12 +1130,76 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
   }
 
   @Test
-  void itemOrder_redactedOwnerLocation_rendersDash() throws Exception {
+  void itemOrder_readOnlyViewer_seesPerUnitDemandButNoBookingControls() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    Map<UUID, JobOrderItemStockGroupDto> stock = new LinkedHashMap<>();
+    stock.put(gameItemId, itemStockGroup(UUID.randomUUID(), gameItemId));
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(oneLineItemOrder(orderId, gameItemId))
+                .currentUserId(userId)
+                .itemStock(stock)
+                .build());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("expand chevron on the item row")
+        .contains("data-trigger=\"od-toggle-demand\"");
+    assertThat(html)
+        .as("per-unit demand line shown to a viewer who may not edit the order")
+        .contains("class=\"od-prod-demand-body\"")
+        .contains("Bedarf je Stück")
+        .contains("4,000 SCU");
+    assertThat(html).as("inline earmarked stock beside it").contains("od-item-stock-inline");
+    assertThat(html)
+        .as("no production booking for a read-only viewer")
+        .doesNotContain("data-trigger=\"od-open-production\"");
+  }
+
+  @Test
+  void itemOrder_readOnlyViewer_withoutStock_stillExpandsToDemand() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            JobOrderPageStubs.detail(oneLineItemOrder(orderId)).currentUserId(userId).build());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .as("a line with materials is expandable for a read-only viewer")
+        .contains("data-trigger=\"od-toggle-demand\"")
+        .contains("Bedarf je Stück");
+  }
+
+  @Test
+  void itemOrder_missingOwnerLocation_rendersDash() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID entryId = UUID.randomUUID();
     UUID gameItemId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto redacted =
+    de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto withoutOwner =
         new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto(
             new de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto(
                 gameItemId, "Cirrus Optic Scope", "Behring", "WEAPON_ATTACHMENT"),
@@ -1145,7 +1209,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             List.of(
                 new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockEntryDto(
                     entryId, 7L, null, null, null, null, 4L, 3L, false)));
-    stubDetail(orderId, userId, oneLineItemOrder(orderId, gameItemId), List.of(redacted));
+    stubDetail(orderId, userId, oneLineItemOrder(orderId, gameItemId), List.of(withoutOwner));
 
     String html =
         mockMvc
@@ -1161,8 +1225,8 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
     assertThat(html)
         .as("inline earmarked stock still renders")
         .contains("class=\"od-item-stock-inline\"");
-    assertThat(html).as("blanked owner/location render as a dash").contains("<td>—</td>");
-    assertThat(html).as("progress is kept on a redacted row").contains("von 4 im Bestand");
+    assertThat(html).as("a missing owner/location renders as a dash").contains("<td>—</td>");
+    assertThat(html).as("progress is kept on a row without owner").contains("von 4 im Bestand");
   }
 
   @Test
