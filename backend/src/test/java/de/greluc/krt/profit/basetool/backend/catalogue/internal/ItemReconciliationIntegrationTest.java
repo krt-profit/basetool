@@ -647,7 +647,8 @@ class ItemReconciliationIntegrationTest {
             "blueprint_external_alias.output_item_id", "inventory_item.game_item_id",
             "inventory_stock_level.game_item_id", "job_order_item.game_item_id",
             "supply_need.game_item_id", "supply_donation.game_item_id",
-            "purchasing_deal.game_item_id", "game_item_redirect.canonical_id");
+            "purchasing_deal.game_item_id", "game_item_redirect.canonical_id",
+            "ship_type_loadout_port.game_item_id", "ship_type_paint.game_item_id");
   }
 
   @Test

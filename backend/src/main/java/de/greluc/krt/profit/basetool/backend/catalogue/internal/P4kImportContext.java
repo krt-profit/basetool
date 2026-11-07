@@ -77,6 +77,9 @@ public final class P4kImportContext {
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
 
+  /** The rows the run matched or created, per kind and P4K GUID. */
+  private final Map<P4kKind, Map<UUID, P4kKeyedRow>> stamped = new EnumMap<>(P4kKind.class);
+
   /** The lower-cased match keys several records of a kind share; they never match by fallback. */
   private final Map<P4kKind, Set<String>> repeatedKeys = new EnumMap<>(P4kKind.class);
 
@@ -145,6 +148,7 @@ public final class P4kImportContext {
       @NotNull P4kRecord record,
       @NotNull P4kKeyedRow row,
       @NotNull UUID guid) {
+    stamped.computeIfAbsent(kind, _ -> new HashMap<>()).put(guid, row);
     if (row.getP4kDeletedAt() != null) {
       report.reappeared(kind, record);
       if (apply) {
@@ -159,6 +163,19 @@ public final class P4kImportContext {
     }
     row.setP4kSyncedAt(now);
     row.setP4kSeenRunId(runId);
+  }
+
+  /**
+   * Returns the rows the run matched or created so far, by P4K GUID; a preview holds the rows it
+   * matched although it writes no GUID onto them.
+   *
+   * @param kind the kind
+   * @return the rows by GUID; a row created by an APPLY has its id once it is saved
+   */
+  @NotNull
+  @Unmodifiable
+  public Map<UUID, P4kKeyedRow> stampedRows(@NotNull P4kKind kind) {
+    return Map.copyOf(stamped.getOrDefault(kind, Map.of()));
   }
 
   /**

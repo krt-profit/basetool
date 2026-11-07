@@ -24,8 +24,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The parts of a version-2 catalogue the import reads: the head, the five base kinds and the
- * curated ship store slugs. Every other kind of the file is skipped while reading.
+ * The parts of a version-2 catalogue the import holds in memory: the head, the five base kinds, the
+ * curated ship store slugs and the paints. The loadouts are streamed in a pass of their own ({@link
+ * P4kCatalogueReader#readLoadouts}); every other kind of the file is skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param commodities the commodities, empty when the file has none
  * @param blueprints the blueprints, empty when the file has none
  * @param shipStoreSlugs the curated ship store slugs, empty when the file has none
+ * @param paints the paints, empty when the file has none
  */
 public record P4kCatalogue(
     @NotNull P4kCatalogueHead head,
@@ -42,7 +44,14 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kShipDto> ships,
     @NotNull @Unmodifiable List<P4kCommodityDto> commodities,
     @NotNull @Unmodifiable List<P4kBlueprintDto> blueprints,
-    @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs) {
+    @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs,
+    @NotNull @Unmodifiable List<P4kPaintDto> paints) {
+
+  /** The top-level field holding the paints, also its completeness key. */
+  public static final String PAINTS = "paints";
+
+  /** The top-level field holding the loadouts, also its completeness key. */
+  public static final String LOADOUTS = "loadouts";
 
   /**
    * Copies every list.
@@ -54,6 +63,7 @@ public record P4kCatalogue(
    * @param commodities the commodities
    * @param blueprints the blueprints
    * @param shipStoreSlugs the ship store slugs
+   * @param paints the paints
    */
   public P4kCatalogue {
     manufacturers = List.copyOf(manufacturers);
@@ -62,6 +72,7 @@ public record P4kCatalogue(
     commodities = List.copyOf(commodities);
     blueprints = List.copyOf(blueprints);
     shipStoreSlugs = List.copyOf(shipStoreSlugs);
+    paints = List.copyOf(paints);
   }
 
   /**

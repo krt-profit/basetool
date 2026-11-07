@@ -24,6 +24,7 @@ const TYPES = [
     'IDENTITY_MISMATCH',
     'UNKNOWN_VALUE',
     'SWEEP_SKIPPED',
+    'LOADOUT_ISSUES',
 ];
 
 /** @type {P4kReportTarget | null} */
@@ -289,7 +290,8 @@ function fieldLabel(row) {
 }
 
 /**
- * The value column of a report row: old → new, or the counts of a skipped sweep.
+ * The value column of a report row: old → new, the counts of a skipped sweep, or the unresolved
+ * ports and issue codes of an incomplete loadout.
  *
  * @param {P4kChange} row the row
  * @returns {string} the text
@@ -299,6 +301,11 @@ function valueChange(row) {
         return t('sweepCounts')
             .replace('{0}', row.newValue || '0')
             .replace('{1}', row.oldValue || '0');
+    }
+    if (row.changeType === 'LOADOUT_ISSUES') {
+        return t('loadoutIssues')
+            .replace('{0}', row.newValue || '0')
+            .replace('{1}', row.oldValue || '–');
     }
     if (row.oldValue == null && row.newValue == null) return '';
     return `${row.oldValue == null ? '∅' : row.oldValue} → ${row.newValue == null ? '∅' : row.newValue}`;

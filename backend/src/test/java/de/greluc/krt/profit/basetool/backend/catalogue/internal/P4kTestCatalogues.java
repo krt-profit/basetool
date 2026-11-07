@@ -38,7 +38,9 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>{@code p4k/catalogue-v2-live-trimmed.json} is a subset of a real LIVE export of p4kx 0.4.2
  * (change 12913470): its head unchanged, a few records of every kind the import reads, game texts
- * shortened, and one record of a few skipped kinds. It validates against {@code
+ * shortened, and one record of a few skipped kinds. Its loadouts are an item loadout, the player
+ * ship's with four of its ports and the special ship's with one unresolved port; its one paint is
+ * an Avenger paint whose item is not among its items. It validates against {@code
  * p4k/basetool-catalog.schema.json}. The gzip and zstd forms are made here, so they always match
  * the JSON.
  */
