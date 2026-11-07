@@ -665,6 +665,84 @@
    }
   },
   {
+   "guid": "4ec3037b-4b6f-4837-b00d-cd9b4836a82a",
+   "className": "COOL_AEGS_S01_Bracer_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/cooler/cool_aegs_s01_bracer_scitem",
+   "name": {
+    "key": "@item_NameCOOL_AEGS_S01_Bracer",
+    "en": "Bracer",
+    "de": "Bracer"
+   },
+   "description": {
+    "key": "@item_DescCOOL_AEGS_S01_Bracer",
+    "en": "Item Type: Cooler\nManufacturer: Aegis Dynamics \nSize: 1\nGrade: C\nClass: Military\n\nFor those looking for a solid, dependable mid-line cooler, you can’t do much better than Aegis’ Bracer. This small-frame cooler system offers solid performance and durability to keep your ship firing on all cylinders.",
+    "de": "Hersteller: Aegis Dynamics\nGegenstand: Kühler\nGröße: 1\nStufe: C\nKlasse: militärisch\n\nWer nach einem soliden und zuverlässigen Kühler der Mittelklasse sucht, kommt nicht um den Bracer von Aegis herum. Dieses kompakte Kühlersystem bietet solide Leistung und Haltbarkeit, die dein Schiff weiterhin auf Hochtouren laufen lassen."
+   },
+   "type": "Cooler",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 3,
+   "mass": 210.0,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_Cooler",
+    "en": "Cooler",
+    "de": "Kühler"
+   },
+   "itemClass": "Military",
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": {
+     "coolingRate": 34.0,
+     "unit": "SStandardResourceUnit"
+    },
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 180.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1490.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 7260.0,
+       "decayRate": 0.5
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Coolant",
+        "amount": 34.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 3.0,
+        "unit": "SPowerSegmentResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
    "guid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
    "className": "cds_armor_heavy_arms_01_01_01",
    "recordPath": "libs/foundry/records/entities/scitem/characters/human/armor/pu_armor/heavy/arms/cds_armor_heavy_arms_01_01_01",

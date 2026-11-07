@@ -46,7 +46,7 @@ class P4kItemClassShareTest {
             .findById(runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId())
             .orElseThrow();
 
-    assertThat(run.getItemClassNullShare()).isEqualTo(0.75d);
+    assertThat(run.getItemClassNullShare()).isEqualTo(6d / 9d);
   }
 
   @Test
@@ -61,6 +61,6 @@ class P4kItemClassShareTest {
             .findById(runs.apply(P4kTestCatalogues.bytes(root), false).runId())
             .orElseThrow();
 
-    assertThat(run.getItemClassNullShare()).isEqualTo(0.875d);
+    assertThat(run.getItemClassNullShare()).isEqualTo(7d / 9d);
   }
 }

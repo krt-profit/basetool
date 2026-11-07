@@ -940,9 +940,9 @@ A blueprint modifier names a gameplay property (`propertyGuid`), joined to the `
 contract's fixed table "From a gameplay property to a stat field". `game_item_stat` gains a `source`
 column (`P4K`, `SCWIKI`):
 
-- the import writes the base value from `stats` for every item a catalogue blueprint produces
-  (`P4kItemStatReconciler`), replacing an SC Wiki value; a P4K value the catalogue no longer
-  carries is removed;
+- the import writes the base value from `stats` for every item the catalogue covers
+  (`P4kItemStatReconciler`), replacing an SC Wiki value; a P4K value an item no longer carries is
+  removed while the catalogue's `items` are `complete`;
 - the SC Wiki writes only where no P4K value exists; a Wiki value that differs from the P4K value by
   more than **1 % relative** goes to `external_sync_report` as one `P4K_DISAGREEMENT` event of the
   Wiki run, its `detail` `column=game_item_stat.<property>;stored=…;source=…`;

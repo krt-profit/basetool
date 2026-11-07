@@ -212,10 +212,10 @@ class GameItemStatWriterTest {
   void theP4kValue_replacesAWikiValueAndTakesItsSource() {
     GameItemStat shield =
         stored(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3000.0, GameItemStatSource.SCWIKI);
-    when(gameItemStatRepository.findByGameItemId(item.getId())).thenReturn(List.of(shield));
 
     boolean changed =
-        writer.writeP4k(item, Map.of(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0));
+        writer.writeP4k(
+            item, Map.of(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0), List.of(shield), true);
 
     assertTrue(changed);
     assertEquals(3168.0, shield.getBaseValue());
@@ -223,26 +223,36 @@ class GameItemStatWriterTest {
   }
 
   @Test
-  void aP4kValueTheCatalogueNoLongerCarries_isRemoved_whileAWikiValueStays() {
+  void aP4kValueACompleteCatalogueNoLongerCarries_isRemoved_whileAWikiValueStays() {
     GameItemStat shield =
         stored(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0, GameItemStatSource.P4K);
     GameItemStat health =
         stored(BlueprintStatProperty.HEALTH_MAX_HEALTH, 210.0, GameItemStatSource.SCWIKI);
-    when(gameItemStatRepository.findByGameItemId(item.getId())).thenReturn(List.of(shield, health));
 
-    assertTrue(writer.writeP4k(item, Map.of()));
+    assertTrue(writer.writeP4k(item, Map.of(), List.of(shield, health), true));
 
     verify(gameItemStatRepository).delete(shield);
     verify(gameItemStatRepository, never()).delete(health);
   }
 
   @Test
+  void aP4kValueAPartialCatalogueDoesNotCarry_stays() {
+    GameItemStat shield =
+        stored(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0, GameItemStatSource.P4K);
+
+    assertFalse(writer.writeP4k(item, Map.of(), List.of(shield), false));
+
+    verify(gameItemStatRepository, never()).delete(any());
+  }
+
+  @Test
   void anUnchangedP4kValue_changesNothing() {
     GameItemStat shield =
         stored(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0, GameItemStatSource.P4K);
-    when(gameItemStatRepository.findByGameItemId(item.getId())).thenReturn(List.of(shield));
 
-    assertFalse(writer.writeP4k(item, Map.of(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0)));
+    assertFalse(
+        writer.writeP4k(
+            item, Map.of(BlueprintStatProperty.SHIELD_MAX_HEALTH, 3168.0), List.of(shield), true));
     verify(gameItemStatRepository, never()).save(any());
   }
 }
