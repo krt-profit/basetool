@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
 import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -61,16 +62,14 @@ public record ItemShopAvailabilityDto(
   }
 
   /**
-   * Returns the place name in a locale: the German one for German, else the English one.
+   * Returns the place name in a locale: the German one for German when it is not blank, else the
+   * English one.
    *
    * @param locale the page locale
    * @return the place name, or {@code null} when the shop has no place
    */
   @Nullable
   public String placeName(@NotNull Locale locale) {
-    if (Locale.GERMAN.getLanguage().equals(locale.getLanguage()) && placeNameDe != null) {
-      return placeNameDe;
-    }
-    return placeName;
+    return LocalisedNames.display(placeName, placeNameDe, locale);
   }
 }

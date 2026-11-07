@@ -26,8 +26,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.StarmapPlaceLinkDt
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.StarmapVisibilityRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -45,9 +43,6 @@ public class StarmapBackendClient {
 
   /** The admin starmap base path. */
   private static final String BASE = "/api/v1/catalog/admin/starmap";
-
-  /** The paging query every list carries. */
-  private static final String PAGING = "?page={page}&size={size}";
 
   private static final ParameterizedTypeReference<PageResponse<StarmapObjectAdminDto>> OBJECT_PAGE =
       new ParameterizedTypeReference<>() {};
@@ -75,21 +70,14 @@ public class StarmapBackendClient {
       @Nullable String query,
       int page,
       int size) {
-    StringBuilder uri = new StringBuilder(BASE).append("/objects").append(PAGING);
-    List<Object> variables = new ArrayList<>(List.of(page, size));
-    if (starSystem != null) {
-      uri.append("&starSystem={starSystem}");
-      variables.add(starSystem);
-    }
-    if (type != null) {
-      uri.append("&type={type}");
-      variables.add(type);
-    }
-    if (query != null) {
-      uri.append("&query={query}");
-      variables.add(query);
-    }
-    return backendApiClient.get(uri.toString(), OBJECT_PAGE, variables.toArray());
+    QueryTemplate uri =
+        new QueryTemplate(BASE + "/objects")
+            .param("page", page)
+            .param("size", size)
+            .param("starSystem", starSystem)
+            .param("type", type)
+            .param("query", query);
+    return backendApiClient.get(uri.template(), OBJECT_PAGE, uri.variables());
   }
 
   /**
@@ -119,11 +107,13 @@ public class StarmapBackendClient {
   @Nullable
   public PageResponse<StarmapPlaceLinkDto> places(
       @NotNull String kind, @Nullable String query, boolean unlinkedOnly, int page, int size) {
-    String template = BASE + "/places/{kind}" + PAGING + "&unlinkedOnly={unlinkedOnly}";
-    return query == null
-        ? backendApiClient.get(template, PLACE_PAGE, kind, page, size, unlinkedOnly)
-        : backendApiClient.get(
-            template + "&query={query}", PLACE_PAGE, kind, page, size, unlinkedOnly, query);
+    QueryTemplate uri =
+        new QueryTemplate(BASE + "/places/{kind}", kind)
+            .param("page", page)
+            .param("size", size)
+            .param("unlinkedOnly", unlinkedOnly)
+            .param("query", query);
+    return backendApiClient.get(uri.template(), PLACE_PAGE, uri.variables());
   }
 
   /**
