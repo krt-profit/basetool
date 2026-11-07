@@ -137,7 +137,9 @@ public class ExchangeResolveService {
     if (request.kind() == ExchangeCatalogKind.BLUEPRINT) {
       long btRefs = refs.stream().filter(r -> r.bt() != null).count();
       if (btRefs > 0) {
-        meterRegistry.counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS).increment(btRefs);
+        meterRegistry
+            .counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS)
+            .increment((double) btRefs);
       }
     }
     Catalog catalog =
