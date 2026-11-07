@@ -75,7 +75,8 @@ public class P4kShopReconciler {
     shopRepository.findAll().forEach(s -> byGuid.put(s.getP4kUuid(), s));
     P4kRowIds items = P4kRowIds.load(entityManager, P4kKind.ITEM, context);
     P4kRowIds objects = P4kRowIds.load(entityManager, P4kKind.STARMAP_OBJECT, context);
-    Map<UUID, Set<UUID>> storedItems = storedItems();
+    Map<UUID, Map<UUID, ShopItem>> storedItems = storedItems();
+    List<ShopItem> gone = new ArrayList<>();
     Map<UUID, Reconciled> run = new LinkedHashMap<>();
     for (P4kShopDto record : records) {
       String key = record.key();
@@ -91,9 +92,13 @@ public class P4kShopReconciler {
       context.stamp(KIND, record, row, guid);
       run.put(guid, new Reconciled(record, row));
       if (context.isApply()) {
-        relinkItems(row, itemIds(record, items), storedItems.getOrDefault(row.getId(), Set.of()));
+        Map<UUID, ShopItem> current = storedItems.getOrDefault(row.getId(), Map.of());
+        P4kLinkDiff<UUID> diff = P4kLinkDiff.of(itemIds(record, items), current.keySet());
+        diff.removed().forEach(itemId -> gone.add(current.get(itemId)));
+        diff.added().forEach(itemId -> entityManager.persist(new ShopItem(row.getId(), itemId)));
       }
     }
+    P4kLinkDiff.deleteInChunks(gone, itemRepository::deleteAllInBatch);
     return List.copyOf(run.values());
   }
 
@@ -210,41 +215,18 @@ public class P4kShopReconciler {
   }
 
   /**
-   * Reads the stored item rows, grouped by shop.
+   * Reads the stored item rows, grouped by shop and item.
    *
-   * @return the item ids per shop
+   * @return the item rows per shop and item
    */
   @NotNull
-  private Map<UUID, Set<UUID>> storedItems() {
-    Map<UUID, Set<UUID>> stored = new HashMap<>();
+  private Map<UUID, Map<UUID, ShopItem>> storedItems() {
+    Map<UUID, Map<UUID, ShopItem>> stored = new HashMap<>();
     for (ShopItem link : itemRepository.findAll()) {
-      stored.computeIfAbsent(link.getShopId(), _ -> new HashSet<>()).add(link.getGameItemId());
+      stored
+          .computeIfAbsent(link.getShopId(), _ -> new HashMap<>())
+          .put(link.getGameItemId(), link);
     }
     return stored;
-  }
-
-  /**
-   * Sets the item rows of one shop: deletes those its list no longer names and adds the new ones.
-   *
-   * @param shop the shop, saved
-   * @param items the items its list names
-   * @param current its stored items
-   */
-  private void relinkItems(
-      @NotNull Shop shop, @NotNull Set<UUID> items, @NotNull Set<UUID> current) {
-    List<UUID> gone = new ArrayList<>();
-    for (UUID itemId : current) {
-      if (!items.contains(itemId)) {
-        gone.add(itemId);
-      }
-    }
-    if (!gone.isEmpty()) {
-      itemRepository.deleteItems(shop.getId(), gone);
-    }
-    for (UUID itemId : items) {
-      if (!current.contains(itemId)) {
-        entityManager.persist(new ShopItem(shop.getId(), itemId));
-      }
-    }
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kPaintDto;
 import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +60,7 @@ class P4kPaintReconciler {
     P4kRowIds ships = P4kRowIds.load(entityManager, P4kKind.SHIP, context);
     Map<UUID, Map<UUID, ShipTypePaint>> stored = storedLinks();
     Set<UUID> listed = new HashSet<>();
+    List<ShipTypePaint> gone = new ArrayList<>();
     for (P4kPaintDto paint : paints) {
       UUID itemId = items.id(paint.itemGuid());
       if (itemId == null || !listed.add(itemId)) {
@@ -73,16 +75,20 @@ class P4kPaintReconciler {
       }
       context.getReport().paintLinked(fits.size());
       if (context.isApply()) {
-        relink(itemId, fits, stored.getOrDefault(itemId, Map.of()));
+        Map<UUID, ShipTypePaint> current = stored.getOrDefault(itemId, Map.of());
+        P4kLinkDiff<UUID> diff = P4kLinkDiff.of(fits, current.keySet());
+        diff.removed().forEach(shipId -> gone.add(current.get(shipId)));
+        diff.added().forEach(shipId -> entityManager.persist(new ShipTypePaint(shipId, itemId)));
       }
     }
     if (context.isApply() && complete && !paints.isEmpty()) {
       stored.forEach((itemId, links) -> {
         if (!listed.contains(itemId)) {
-          links.values().forEach(paintRepository::delete);
+          gone.addAll(links.values());
         }
       });
     }
+    P4kLinkDiff.deleteInChunks(gone, paintRepository::deleteAllInBatch);
   }
 
   /**
@@ -99,26 +105,5 @@ class P4kPaintReconciler {
           .put(link.getShipTypeId(), link);
     }
     return stored;
-  }
-
-  /**
-   * Sets the links of one paint: deletes those it no longer fits and adds the new ones.
-   *
-   * @param itemId the paint item
-   * @param fits the ship types the paint fits
-   * @param current the paint's stored links by ship type
-   */
-  private void relink(
-      @NotNull UUID itemId, @NotNull Set<UUID> fits, @NotNull Map<UUID, ShipTypePaint> current) {
-    current.forEach((shipId, link) -> {
-      if (!fits.contains(shipId)) {
-        paintRepository.delete(link);
-      }
-    });
-    for (UUID shipId : fits) {
-      if (!current.containsKey(shipId)) {
-        entityManager.persist(new ShipTypePaint(shipId, itemId));
-      }
-    }
   }
 }

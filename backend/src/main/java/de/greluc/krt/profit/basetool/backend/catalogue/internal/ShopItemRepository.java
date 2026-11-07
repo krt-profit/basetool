@@ -19,24 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import java.util.Collection;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 /** Reads and stores the items of the shops' known item lists (REQ-P4K-044). */
-public interface ShopItemRepository extends JpaRepository<ShopItem, ShopItem.Key> {
-
-  /**
-   * Removes items from a shop's list.
-   *
-   * @param shopId the shop
-   * @param gameItemIds the items its list no longer names
-   * @return the rows removed
-   */
-  @Modifying(flushAutomatically = true)
-  @Query("DELETE FROM ShopItem si WHERE si.shopId = :shopId AND si.gameItemId IN :gameItemIds")
-  int deleteItems(@Param("shopId") UUID shopId, @Param("gameItemIds") Collection<UUID> gameItemIds);
-}
+public interface ShopItemRepository extends JpaRepository<ShopItem, ShopItem.Key> {}
