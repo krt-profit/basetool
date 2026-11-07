@@ -1349,11 +1349,11 @@ re-imports and is an audit event (REQ-P4K-046). An unlinked shop stays usable on
 - [x] A shop whose place holds one terminal of the matching name is linked; two candidates open a
   review case.
 - [x] A manual link survives the next APPLY.
+- [x] A shop whose record names no place is reported `UNMATCHED` and opens no review case.
 
 A terminal's place is its own starmap link, else the link of its nearest linked UEX parent
 (REQ-P4K-035); the candidates are the terminals whose place is the shop's starmap object. The name
 match reads UEX's `<shop> - <place>` naming: a terminal's part before its first ` - `, normalised
-- [x] A shop whose record names no place is reported `UNMATCHED` and opens no review case.
 like a starmap name and without spaces, at least three characters, matches when the shop's
 registry name, entity name or brand, compacted the same way, contains it; the longest match wins
 (`ShopTerminalNames`). One candidate links; several or none leave the shop unlinked, one
