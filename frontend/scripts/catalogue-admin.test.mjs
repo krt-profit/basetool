@@ -192,6 +192,79 @@ await test('the storage-place dialog starts with an empty name, never the game-t
     assert.deepEqual(page.ui.opened, ['starmap-storage-modal']);
 });
 
+/**
+ * A read the test settles by hand.
+ *
+ * @returns {{ promise: Promise<unknown>, resolve: (v: unknown) => void, reject: (e: unknown) => void }}
+ */
+function pending() {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}
+
+/**
+ * Loads the shared link-admin module with a transport whose reads the test settles in any order.
+ */
+function linkAdmin() {
+    const reads = [];
+    const page = load('catalogue/catalogue-link-admin.js', {}, (url, opts) => {
+        const read = pending();
+        reads.push({ url, key: opts.key, ...read });
+        return read.promise;
+    });
+    return { readJson: page.fn('readJson'), forgetRead: page.fn('forgetRead'), reads, ui: page.ui };
+}
+
+await test('a slower earlier read of a render target never overwrites the newer one', async () => {
+    const admin = linkAdmin();
+    const older = admin.readJson('/a?page=0', 'load failed', 'list');
+    const newer = admin.readJson('/a?page=1', 'load failed', 'list');
+    assert.deepEqual(
+        admin.reads.map((r) => r.key),
+        ['list', 'list'],
+        'both reads carry the supersede key',
+    );
+    admin.reads[1].resolve({ page: 1 });
+    admin.reads[0].resolve({ page: 0 });
+    assert.deepEqual(await newer, { page: 1 });
+    assert.equal(await older, null, 'the superseded answer is dropped');
+    assert.deepEqual(admin.ui.errors, []);
+});
+
+await test('a superseded read that fails shows no toast; a current one does', async () => {
+    const admin = linkAdmin();
+    const older = admin.readJson('/a', 'load failed', 'list');
+    const newer = admin.readJson('/b', 'load failed', 'list');
+    admin.reads[0].reject(new Error('AbortError'));
+    admin.reads[1].reject(new Error('boom'));
+    assert.equal(await older, null);
+    assert.equal(await newer, null);
+    assert.deepEqual(admin.ui.errors, ['load failed']);
+});
+
+await test('reads of different render targets do not supersede each other', async () => {
+    const admin = linkAdmin();
+    const objects = admin.readJson('/objects', 'load failed', 'objects');
+    const places = admin.readJson('/places', 'load failed', 'places');
+    admin.reads[1].resolve(['p']);
+    admin.reads[0].resolve(['o']);
+    assert.deepEqual(await objects, ['o']);
+    assert.deepEqual(await places, ['p']);
+});
+
+await test('a target emptied without a read drops the answer still pending', async () => {
+    const admin = linkAdmin();
+    const pendingRead = admin.readJson('/terminals?query=a', 'load failed', 'terminals');
+    admin.forgetRead('terminals');
+    admin.reads[0].resolve(['late']);
+    assert.equal(await pendingRead, null);
+});
+
 if (failures > 0) {
     console.error(`${failures} catalogue admin test(s) failed`);
     process.exit(1);

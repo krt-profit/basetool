@@ -75,13 +75,15 @@ function fmtTime(iso) {
 }
 
 /**
- * Reads a JSON list answer, or null when it is no data.
+ * Reads a JSON answer for one render target, or null when it is no data or a later read of the
+ * target superseded it.
  *
  * @param {string} url the proxy URL
+ * @param {string} target the render target
  * @returns {Promise<any>} the parsed body, or null
  */
-function readJson(url) {
-    return readJsonOr(url, t('error'));
+function readJson(url, target) {
+    return readJsonOr(url, t('error'), target);
 }
 
 /** @returns {{ previous: string, next: string }} the pager button names */
@@ -119,32 +121,35 @@ function runCounts(run) {
  * @param {number} page the zero-based page
  */
 function loadRuns(page) {
-    readJson(pageUrl(`/runs?page=${page}`)).then((/** @type {P4kRunsView | null} */ view) => {
-        if (!view || !view.runs) return;
-        runsPage = page;
-        const body = $('krt-p4k-runs');
-        const empty = $('krt-p4k-runs-empty');
-        const rows = view.runs.content || [];
-        if (empty) empty.hidden = rows.length > 0;
-        if (body) {
-            krtHtml.set(
-                body,
-                rows.map(
-                    (run) =>
-                        krtHtml`<tr data-testid="p4k-run-row"><td><span class="cell-title">${fmtTime(
-                            run.appliedAt,
-                        )}</span><span class="cell-sub">${
-                            (run.createdBy && view.adminNames[run.createdBy]) || t('adminUnknown')
-                        }</span></td><td class="data-value--mono">${run.buildBranch} · ${
-                            run.changeNumber
-                        }</td><td>${runCounts(run)}</td><td class="cell-actions"><button type="button" class="btn btn-ghost btn-xs" data-run-id="${
-                            run.id
-                        }" data-run-title="${run.buildVersion}">${t('actionReport')}</button></td></tr>`,
-                ),
-            );
-        }
-        renderPager($('krt-p4k-runs-pager'), view.runs, pagerLabels());
-    });
+    readJson(pageUrl(`/runs?page=${page}`), 'p4k-runs').then(
+        (/** @type {P4kRunsView | null} */ view) => {
+            if (!view || !view.runs) return;
+            runsPage = page;
+            const body = $('krt-p4k-runs');
+            const empty = $('krt-p4k-runs-empty');
+            const rows = view.runs.content || [];
+            if (empty) empty.hidden = rows.length > 0;
+            if (body) {
+                krtHtml.set(
+                    body,
+                    rows.map(
+                        (run) =>
+                            krtHtml`<tr data-testid="p4k-run-row"><td><span class="cell-title">${fmtTime(
+                                run.appliedAt,
+                            )}</span><span class="cell-sub">${
+                                (run.createdBy && view.adminNames[run.createdBy]) ||
+                                t('adminUnknown')
+                            }</span></td><td class="data-value--mono">${run.buildBranch} · ${
+                                run.changeNumber
+                            }</td><td>${runCounts(run)}</td><td class="cell-actions"><button type="button" class="btn btn-ghost btn-xs" data-run-id="${
+                                run.id
+                            }" data-run-title="${run.buildVersion}">${t('actionReport')}</button></td></tr>`,
+                    ),
+                );
+            }
+            renderPager($('krt-p4k-runs-pager'), view.runs, pagerLabels());
+        },
+    );
 }
 
 /**
@@ -182,12 +187,14 @@ function loadReport(page) {
     const url = pageUrl(
         `/${reportTarget.source}/${encodeURIComponent(reportTarget.id)}/changes?${params}`,
     );
-    readJson(url).then((/** @type {ApiPage<'P4kImportChangeDto'> | null} */ result) => {
-        if (!result) return;
-        reportPage = page;
-        renderReport(result.content || []);
-        renderPager($('krt-p4k-report-pager'), result, pagerLabels());
-    });
+    readJson(url, 'p4k-report').then(
+        (/** @type {ApiPage<'P4kImportChangeDto'> | null} */ result) => {
+            if (!result) return;
+            reportPage = page;
+            renderReport(result.content || []);
+            renderPager($('krt-p4k-report-pager'), result, pagerLabels());
+        },
+    );
 }
 
 /**
@@ -258,7 +265,7 @@ function valueChange(row) {
  * @param {number} page the zero-based page
  */
 function loadCases(page) {
-    readJson(pageUrl(`/review-cases?page=${page}`)).then(
+    readJson(pageUrl(`/review-cases?page=${page}`), 'p4k-cases').then(
         (/** @type {ApiPage<'P4kReviewCaseDto'> | null} */ result) => {
             if (!result) return;
             casesPage = page;
@@ -302,9 +309,9 @@ let resourceGroups = [];
  * @returns {Promise<void>} settles once the groups are known
  */
 function loadResourceGroups() {
-    return readJson(pageUrl('/resource-groups')).then(
+    return readJson(pageUrl('/resource-groups'), 'p4k-resource-groups').then(
         (/** @type {{ id: string, name: string }[] | null} */ result) => {
-            resourceGroups = Array.isArray(result) ? result : [];
+            if (Array.isArray(result)) resourceGroups = result;
         },
     );
 }
@@ -318,9 +325,9 @@ let materials = [];
  * @returns {Promise<void>} settles once the materials are known
  */
 function loadMaterials() {
-    return readJson(pageUrl('/materials')).then(
+    return readJson(pageUrl('/materials'), 'p4k-materials').then(
         (/** @type {{ id: string, name: string }[] | null} */ result) => {
-            materials = Array.isArray(result) ? result : [];
+            if (Array.isArray(result)) materials = result;
         },
     );
 }

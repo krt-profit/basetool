@@ -92,13 +92,15 @@ function pagerLabels() {
 }
 
 /**
- * Reads a JSON answer, or null after the page's load-error toast.
+ * Reads a JSON answer for one render target, or null after the page's load-error toast or when a
+ * later read of the target superseded it.
  *
  * @param {string} url the proxy URL
+ * @param {string} target the render target
  * @returns {Promise<any>} the parsed body, or null
  */
-function readJson(url) {
-    return readJsonOr(url, t('loadError'));
+function readJson(url, target) {
+    return readJsonOr(url, t('loadError'), target);
 }
 /**
  * The name a list shows for an object: its P4K name in the page language, else its class name.
@@ -184,7 +186,7 @@ function loadObjects(page) {
     if (query) params.set('query', query);
     if (system) params.set('starSystem', system);
     if (type) params.set('type', type);
-    readJson(`${PAGE_URL}/objects?${params}`).then(
+    readJson(`${PAGE_URL}/objects?${params}`, 'starmap-objects').then(
         (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) => {
             if (!result) return;
             objectsPage = page;
@@ -373,20 +375,21 @@ function loadPlaces(page) {
     if (query) params.set('query', query);
     if (unlinked instanceof HTMLInputElement && unlinked.checked)
         params.set('unlinkedOnly', 'true');
-    readJson(`${PAGE_URL}/places/${encodeURIComponent(currentKind())}?${params}`).then(
-        (/** @type {ApiPage<'StarmapPlaceLinkDto'> | null} */ result) => {
-            if (!result) return;
-            placesPage = page;
-            const rows = result.content || [];
-            shownPlaces.clear();
-            rows.forEach((p) => shownPlaces.set(idOf(p), p));
-            const body = $('starmap-links');
-            const empty = $('starmap-links-empty');
-            if (empty) empty.hidden = rows.length > 0;
-            if (body) krtHtml.set(body, rows.map(placeRow));
-            renderPager($('starmap-links-pager'), result, pagerLabels());
-        },
-    );
+    readJson(
+        `${PAGE_URL}/places/${encodeURIComponent(currentKind())}?${params}`,
+        'starmap-places',
+    ).then((/** @type {ApiPage<'StarmapPlaceLinkDto'> | null} */ result) => {
+        if (!result) return;
+        placesPage = page;
+        const rows = result.content || [];
+        shownPlaces.clear();
+        rows.forEach((p) => shownPlaces.set(idOf(p), p));
+        const body = $('starmap-links');
+        const empty = $('starmap-links-empty');
+        if (empty) empty.hidden = rows.length > 0;
+        if (body) krtHtml.set(body, rows.map(placeRow));
+        renderPager($('starmap-links-pager'), result, pagerLabels());
+    });
 }
 
 /**
@@ -460,12 +463,13 @@ function loadCandidates() {
     const query = filterValue('starmap-link-search');
     const params = new URLSearchParams({ page: '0' });
     if (query) params.set('query', query);
-    readJson(`${PAGE_URL}/objects?${params}`).then(
-        (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) =>
+    readJson(`${PAGE_URL}/objects?${params}`, 'starmap-candidates').then(
+        (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) => {
+            if (!result) return;
             showCandidates(
                 'starmap-link-candidates',
                 'starmap-link-empty',
-                (result ? result.content || [] : []).map(
+                (result.content || []).map(
                     (o) =>
                         krtHtml`<li data-testid="starmap-link-candidate"><span><span class="cell-title">${objectName(
                             o,
@@ -475,7 +479,8 @@ function loadCandidates() {
                             o.id
                         }">${t('pick')}</button></li>`,
                 ),
-            ),
+            );
+        },
     );
 }
 

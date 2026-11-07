@@ -1238,7 +1238,10 @@ case is never visible. The override is `starmap_object.visibility_override` (`VI
 object's version and audited `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` (`visibility=VISIBLE|HIDDEN|RULE`).
 The admin page `/admin/starmap` lists the objects with their visibility and the UEX rows with their
 links; a peer admin's link, visibility or storage-place change and an APPLY reload both lists in
-place through the `catalogue-admin` room's `starmap` section (REQ-FE-010).
+place through the `catalogue-admin` room's `starmap` section (REQ-FE-010). Every list read of the admin
+starmap, shops and P4K import pages names its render target (`catalogue-link-admin.js`,
+`readJson`): a later read of the target aborts the earlier one through the `krtFetch` supersede
+key, and an answer that still arrives after it is dropped (REQ-FE-013).
 
 **Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest`,
 `CatalogueAdminLiveSyncTest`, `LiveSyncSectionMapParityTest` · **Code:** `StarmapVisibility`,

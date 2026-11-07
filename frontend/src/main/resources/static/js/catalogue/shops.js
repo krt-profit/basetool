@@ -28,6 +28,7 @@ import {
     changeLink as sendLinkChange,
     dictionaryLabels,
     filterValue,
+    forgetRead,
     idOf,
     readJson as readJsonOr,
     showCandidates,
@@ -72,13 +73,15 @@ const sections = krtPageSections.create({
 });
 
 /**
- * Reads a JSON answer, or null after the page's load-error toast.
+ * Reads a JSON answer for one render target, or null after the page's load-error toast or when a
+ * later read of the target superseded it.
  *
  * @param {string} url the proxy URL
+ * @param {string} target the render target
  * @returns {Promise<any>} the parsed body, or null
  */
-function readJson(url) {
-    return readJsonOr(url, t('loadError'));
+function readJson(url, target) {
+    return readJsonOr(url, t('loadError'), target);
 }
 
 /**
@@ -145,7 +148,7 @@ function loadShops(page) {
     if (system) params.set('starSystem', system);
     if (unlinked instanceof HTMLInputElement && unlinked.checked)
         params.set('unlinkedOnly', 'true');
-    readJson(`${PAGE_URL}/entries?${params}`).then(
+    readJson(`${PAGE_URL}/entries?${params}`, 'shops-entries').then(
         (/** @type {ApiPage<'ShopAdminDto'> | null} */ result) => {
             if (!result) return;
             shopsPage = page;
@@ -248,11 +251,14 @@ function loadCandidates() {
             ),
         );
     if (!query) {
+        forgetRead('shops-terminals');
         show([]);
         return;
     }
-    readJson(`${PAGE_URL}/terminals?${new URLSearchParams({ query })}`).then((result) =>
-        show(Array.isArray(result) ? result : []),
+    readJson(`${PAGE_URL}/terminals?${new URLSearchParams({ query })}`, 'shops-terminals').then(
+        (result) => {
+            if (Array.isArray(result)) show(result);
+        },
     );
 }
 

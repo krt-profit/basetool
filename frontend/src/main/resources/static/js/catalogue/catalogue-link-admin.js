@@ -63,17 +63,44 @@ export function filterValue(id) {
 }
 
 /**
- * Reads a JSON answer, or null after a toast when it is no data.
+ * The newest read of each render target; an answer whose read a later one replaced is dropped.
+ *
+ * @type {Map<string, object>}
+ */
+const latestReads = new Map();
+
+/**
+ * Reads a JSON answer for one render target (REQ-FE-013): a later read of the same target aborts
+ * this one through the krtFetch supersede key, and an answer that still arrives after it is
+ * dropped, so a slower earlier read never overwrites a newer one.
  *
  * @param {string} url the proxy URL
  * @param {string} errorLabel the toast shown when the read fails
- * @returns {Promise<any>} the parsed body, or null
+ * @param {string} target the render target the answer fills, unique on the page
+ * @returns {Promise<any>} the parsed body; null after a toast when it is no data, and null without
+ *     one when a later read of the target superseded it
  */
-export function readJson(url, errorLabel) {
-    return krtFetch.getJson(url).catch(() => {
-        showFrontendErrorToast(errorLabel);
-        return null;
-    });
+export function readJson(url, errorLabel, target) {
+    const ticket = {};
+    latestReads.set(target, ticket);
+    const current = () => latestReads.get(target) === ticket;
+    return krtFetch.getJson(url, { key: target }).then(
+        (body) => (current() ? body : null),
+        () => {
+            if (current()) showFrontendErrorToast(errorLabel);
+            return null;
+        },
+    );
+}
+
+/**
+ * Drops the answer of the read still pending for a render target, for a target the page empties
+ * without reading.
+ *
+ * @param {string} target the render target
+ */
+export function forgetRead(target) {
+    latestReads.set(target, {});
 }
 
 /**
