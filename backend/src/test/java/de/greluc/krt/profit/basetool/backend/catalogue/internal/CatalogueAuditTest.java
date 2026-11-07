@@ -46,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias;
@@ -130,7 +129,6 @@ class CatalogueAuditTest {
   @InjectMocks private ManufacturerService manufacturerService;
   @InjectMocks private ShipTypeService shipTypeService;
   @InjectMocks private MaterialService materialService;
-  @InjectMocks private MaterialCategoryService materialCategoryService;
   @InjectMocks private StarSystemService starSystemService;
   @InjectMocks private FrequencyTypeService frequencyTypeService;
   @InjectMocks private JobTypeService jobTypeService;
@@ -340,27 +338,6 @@ class CatalogueAuditTest {
     materialService.deleteMaterial(ID);
     verify(auditRecorder)
         .record(AuditEventType.CATALOGUE_MATERIAL_DELETED, ID, "Quantainium", null, null);
-  }
-
-  @Test
-  void materialCategory_createUpdateDelete() {
-    MaterialCategory category = new MaterialCategory();
-    category.setId(ID);
-    category.setName("Metals");
-    when(materialCategoryRepository.save(category)).thenReturn(category);
-    when(materialCategoryRepository.findById(ID)).thenReturn(Optional.of(category));
-    MaterialCategory renamed = new MaterialCategory();
-    renamed.setName("Ores");
-
-    materialCategoryService.create(category);
-    materialCategoryService.update(ID, renamed);
-    materialCategoryService.delete(ID);
-
-    verify(auditRecorder)
-        .record(AuditEventType.CATALOGUE_MATERIAL_CATEGORY_CREATED, ID, "Metals", null, null);
-    verifyEvent(AuditEventType.CATALOGUE_MATERIAL_CATEGORY_UPDATED, "Ores", "changed=name");
-    verify(auditRecorder)
-        .record(AuditEventType.CATALOGUE_MATERIAL_CATEGORY_DELETED, ID, "Ores", null, null);
   }
 
   @Test

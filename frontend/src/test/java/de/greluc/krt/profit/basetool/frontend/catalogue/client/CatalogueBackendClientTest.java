@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendC
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasWriteRequest;
@@ -154,8 +153,6 @@ class CatalogueBackendClientTest {
     backend.answerEmpty();
     backend.answerJson("[]");
     backend.answerJson("{}");
-    backend.answerJson("{}");
-    backend.answerEmpty();
 
     client.materialPage(3);
     client.createMaterial(
@@ -168,8 +165,6 @@ class CatalogueBackendClientTest {
             4L));
     client.materialCategories();
     client.materialCategory(OTHER);
-    client.createMaterialCategory(new MaterialCategoryDto(null, "Ores", null));
-    client.deleteMaterialCategory(OTHER);
 
     backend.expect("GET", "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=3");
     assertThat(bodyOf(backend.expect("POST", "/api/v1/materials")))
@@ -178,9 +173,6 @@ class CatalogueBackendClientTest {
         .contains("\"name\":\"Gold\"", "\"version\":4");
     backend.expect("GET", "/api/v1/material-categories");
     backend.expect("GET", "/api/v1/material-categories/" + OTHER);
-    backend.expect(
-        "POST", "/api/v1/material-categories", "{\"id\":null,\"name\":\"Ores\",\"version\":null}");
-    backend.expect("DELETE", "/api/v1/material-categories/" + OTHER, null);
   }
 
   @Test

@@ -1,6 +1,6 @@
 # ADR-0339 — The P4K catalogue leads commodities and its resource groups become the commodity categories
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted (implementation pending: the category mapping migration of decision 6)
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-024…026), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -59,5 +59,6 @@ refinery yields. Instability lives on the `mineableElements` kind, not on the co
 - The commodity categories follow the game's resource groups; the admin category editor goes away
   and the migration maps the existing categories.
 - A commodity a blueprint needs exists even when UEX does not list it.
-- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`. Implementation is
-  pending.
+- The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`. Decisions 1–5 and 7
+  are implemented (#3037); of decision 6 the import of the groups and the end of the admin category
+  editor are, the mapping migration of the remaining admin categories is pending.

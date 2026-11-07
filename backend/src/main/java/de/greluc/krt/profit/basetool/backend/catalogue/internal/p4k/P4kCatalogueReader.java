@@ -78,7 +78,7 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head and the five base kinds, skipping everything else.
+   * Reads the head, the five base kinds and the resource groups, skipping everything else.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -107,7 +107,8 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.ITEM, P4kItemDto.class),
           listOf(kinds, P4kKind.SHIP, P4kShipDto.class),
           listOf(kinds, P4kKind.COMMODITY, P4kCommodityDto.class),
-          listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class));
+          listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class),
+          listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class));
     } catch (JacksonException e) {
       throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
     }
@@ -219,6 +220,7 @@ public class P4kCatalogueReader {
       case SHIP -> P4kShipDto.class;
       case COMMODITY -> P4kCommodityDto.class;
       case BLUEPRINT -> P4kBlueprintDto.class;
+      case RESOURCE_GROUP -> P4kResourceGroupDto.class;
     };
   }
 

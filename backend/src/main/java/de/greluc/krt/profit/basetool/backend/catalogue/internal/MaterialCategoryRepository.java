@@ -20,10 +20,47 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for Material Category. */
+/** Spring Data repository for the commodity categories (resource groups). */
 @Repository
-public interface MaterialCategoryRepository extends JpaRepository<MaterialCategory, UUID> {}
+public interface MaterialCategoryRepository extends JpaRepository<MaterialCategory, UUID> {
+
+  /**
+   * Finds the category holding a P4K GUID.
+   *
+   * @param p4kUuid the GUID
+   * @return the category, if any
+   */
+  Optional<MaterialCategory> findByP4kUuid(UUID p4kUuid);
+
+  /**
+   * Finds the categories of a class name, ignoring case.
+   *
+   * @param className the class name
+   * @return every category carrying it
+   */
+  List<MaterialCategory> findByClassNameIgnoreCase(String className);
+
+  /**
+   * Finds the categories of a name, ignoring case.
+   *
+   * @param name the name
+   * @return every category carrying it
+   */
+  List<MaterialCategory> findByNameIgnoreCase(String name);
+
+  /**
+   * Lists the categories a picker offers: neither stamped by the P4K sweep nor hidden
+   * (REQ-P4K-013).
+   *
+   * @param sort the order
+   * @return the live categories
+   */
+  List<MaterialCategory> findByP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Sort sort);
+}

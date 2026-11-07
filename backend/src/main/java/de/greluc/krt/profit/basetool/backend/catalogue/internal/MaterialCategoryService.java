@@ -19,10 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -31,17 +27,14 @@ import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached CRUD service for the admin-defined {@code material_category} reference table.
- *
- * <p>Lists are sorted alphabetically; every mutator evicts {@link
- * CacheConfig#MATERIAL_CATEGORIES_CACHE}.
+ * Cached reads of the commodity categories. The P4K import owns them (REQ-P4K-025): admins no
+ * longer create, rename or delete a category.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,17 +43,20 @@ public class MaterialCategoryService {
 
   private final MaterialCategoryRepository repository;
   private final MaterialCategoryMapper mapper;
-  private final AuditRecorder auditRecorder;
 
   /**
-   * Returns all categories sorted by name ascending. Cached as a single entry keyed by the empty
-   * argument list because the sort is fixed.
+   * Returns the categories a picker offers, sorted by name: a group the P4K sweep stamped or an
+   * admin hid is left out (REQ-P4K-013).
    *
-   * @return all category read models sorted by name ascending
+   * @return the live categories sorted by name ascending
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE)
   public List<MaterialCategoryDto> findAll() {
-    return repository.findAll(Sort.by("name").ascending()).stream().map(mapper::toDto).toList();
+    return repository
+        .findByP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Sort.by("name").ascending())
+        .stream()
+        .map(mapper::toDto)
+        .toList();
   }
 
   /**
@@ -72,77 +68,6 @@ public class MaterialCategoryService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE)
   public MaterialCategoryDto findById(UUID id) {
-    return mapper.toDto(requireById(id));
-  }
-
-  /**
-   * Loads the managed category entity a mutator edits; it never comes from the cache.
-   *
-   * @param id category primary key
-   * @return the managed entity
-   */
-  private MaterialCategory requireById(UUID id) {
-    return Entities.require(repository.findById(id), "MaterialCategory not found");
-  }
-
-  /**
-   * Persists a new category.
-   *
-   * @param category transient entity
-   * @return the persisted category
-   */
-  @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
-  public MaterialCategory create(MaterialCategory category) {
-    MaterialCategory saved = repository.save(category);
-    auditRecorder.record(
-        AuditEventType.CATALOGUE_MATERIAL_CATEGORY_CREATED,
-        saved.getId(),
-        saved.getName(),
-        null,
-        null);
-    return saved;
-  }
-
-  /**
-   * Updates the name of an existing category. Only {@code name} is mutable; description and
-   * structural fields stay untouched.
-   *
-   * @param id category primary key
-   * @param category transient entity carrying the new name
-   * @return the persisted category
-   */
-  @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
-  public MaterialCategory update(UUID id, MaterialCategory category) {
-    MaterialCategory existing = requireById(id);
-    AuditChangedFields changed =
-        AuditChangedFields.create().compare("name", existing.getName(), category.getName());
-    existing.setName(category.getName());
-    if (!changed.isEmpty()) {
-      auditRecorder.record(
-          AuditEventType.CATALOGUE_MATERIAL_CATEGORY_UPDATED,
-          id,
-          existing.getName(),
-          null,
-          changed.toDetails());
-    }
-    return repository.save(existing);
-  }
-
-  /**
-   * Deletes a category. The backend rejects the delete with {@link
-   * de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException} when any material still
-   * references the category.
-   *
-   * @param id category primary key
-   */
-  @Transactional
-  @CacheEvict(cacheNames = CacheConfig.MATERIAL_CATEGORIES_CACHE, allEntries = true)
-  public void delete(UUID id) {
-    MaterialCategory existing = requireById(id);
-    repository.delete(existing);
-    auditRecorder.record(
-        AuditEventType.CATALOGUE_MATERIAL_CATEGORY_DELETED, id, existing.getName(), null, null);
+    return mapper.toDto(Entities.require(repository.findById(id), "MaterialCategory not found"));
   }
 }

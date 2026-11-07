@@ -474,9 +474,11 @@ The coverage list holds the **Katalog** area
     id, recorded in the transaction that stores the run's outcome, with `source`, `aggregate`,
     `status`, the committed counts (`fetched`, `applied`, `skipped`, `failed`) and `sweep`; the
     detail stays in `external_sync_report`;
-  - every catalogue master-data mutation: materials, material categories and material external
-    aliases (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_CATEGORY_*`, `CATALOGUE_MATERIAL_ALIAS_*`:
-    created, updated, deleted); manufacturer, ship-type and terminal visibility
+  - every catalogue master-data mutation: materials and material external aliases
+    (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_ALIAS_*`: created, updated, deleted; the material
+    categories are the P4K resource groups, written only by the P4K APPLY of
+    `CATALOGUE_P4K_APPLIED`, REQ-P4K-025, and `CATALOGUE_MATERIAL_CATEGORY_*` labels only earlier
+    entries of the retired admin editor); manufacturer, ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -30,10 +31,12 @@ public interface MaterialCategoryMapper {
   MaterialCategoryDto toDto(MaterialCategory entity);
 
   /**
-   * Builds a new {@link MaterialCategory} entity from the inbound DTO. Timestamps are owned by the
-   * persistence provider and ignored.
+   * Builds the category reference a material write names: id, version and name only; the P4K
+   * columns belong to the import.
    */
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "updatedAt", ignore = true)
+  @BeanMapping(ignoreByDefault = true)
+  @Mapping(target = "id", source = "id")
+  @Mapping(target = "version", source = "version")
+  @Mapping(target = "name", source = "name")
   MaterialCategory toEntity(MaterialCategoryDto dto);
 }

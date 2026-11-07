@@ -291,7 +291,7 @@ blocked what lay beneath it, and because it turned hit-testable 100 ms after it 
 could take the second half of a click already in progress.
 
 **Enforced by:** code/design review only for the native-dialog ban; the toast's pointer
-transparency by `MaterialsCategoryEmptyStateInPlaceE2eTest`. The native-dialog rule is grep-able, but ESLint's `no-alert` is **not**
+transparency has no automated test (see Open questions). The native-dialog rule is grep-able, but ESLint's `no-alert` is **not**
 enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questions.
 
 ### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918; one shape, #1891)

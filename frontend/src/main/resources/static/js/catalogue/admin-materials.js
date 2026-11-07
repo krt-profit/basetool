@@ -17,14 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
+/* global CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
-import { showKrtConfirm } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtHtml } from '/js/kernel/krt-html.js';
 import { bindCatalogueList } from '/js/catalogue/catalogue-list.js';
 
 /** @type {string[]} */
@@ -49,173 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('filterMaterials')
     );
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
-
-    /**
-     * Appends a new category to every category select.
-     *
-     * @param {Required<ApiDto<'MaterialCategoryDto'>>} cat the created category
-     */
-    function addCategoryOption(cat) {
-        document
-            .querySelectorAll('select[data-update-type="CATEGORY"], #cm-category')
-            .forEach((sel) => {
-                const opt = document.createElement('option');
-                opt.value = cat.id;
-                opt.textContent = cat.name;
-                sel.appendChild(opt);
-            });
-    }
-    /**
-     * Removes a category from every category select.
-     *
-     * @param {string} id the deleted category's id
-     */
-    function removeCategoryOption(id) {
-        /** @type {NodeListOf<HTMLOptionElement>} */ (
-            document.querySelectorAll(
-                'select[data-update-type="CATEGORY"] option, #cm-category option',
-            )
-        ).forEach((opt) => {
-            if (opt.value === id) {
-                opt.remove();
-            }
-        });
-    }
-
-    /**
-     * Builds the table row of a created category, including its delete form.
-     *
-     * @param {Required<ApiDto<'MaterialCategoryDto'>>} cat the created category
-     * @returns {HTMLTableRowElement} the new row
-     */
-    function buildCategoryRow(cat) {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-category-row', '');
-        const nameTd = document.createElement('td');
-        const title = document.createElement('span');
-        title.className = 'cell-title';
-        title.textContent = cat.name;
-        nameTd.appendChild(title);
-        const actionTd = document.createElement('td');
-        actionTd.className = 'cell-actions';
-        const form = document.createElement('form');
-        form.method = 'post';
-        form.action = `/admin/materials/categories/${encodeURIComponent(cat.id)}/delete`;
-        form.className = 'm-0';
-        form.setAttribute('data-krt-confirm', '');
-        form.setAttribute('data-krt-confirm-message', CAT_MSG.deleteConfirm);
-        form.setAttribute('data-category-id', cat.id);
-        const btn = document.createElement('button');
-        btn.type = 'submit';
-        btn.className = 'btn btn-quiet-danger btn-icon';
-        btn.title = CAT_MSG.deleteTitle;
-        btn.setAttribute('aria-label', CAT_MSG.deleteTitle);
-        krtHtml.set(
-            btn,
-            krtHtml`<svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>`,
-        );
-        form.appendChild(btn);
-        actionTd.appendChild(form);
-        tr.appendChild(nameTd);
-        tr.appendChild(actionTd);
-        return tr;
-    }
-
-    /**
-     * Shows the category table while it holds a row and the empty state otherwise.
-     */
-    function syncCategoryEmpty() {
-        const tableWrap = document.querySelector('[data-category-table]');
-        const emptyState = document.querySelector('[data-category-empty]');
-        const hasRows = !!document.querySelector('[data-category-table] tr[data-category-row]');
-        if (tableWrap instanceof HTMLElement) {
-            tableWrap.hidden = !hasRows;
-        }
-        if (emptyState instanceof HTMLElement) {
-            emptyState.hidden = hasRows;
-        }
-    }
-
-    document.addEventListener('submit', (event) => {
-        const form = /** @type {HTMLFormElement | null} */ (
-            /** @type {Element} */ (event.target).closest('form[data-category-create]')
-        );
-        if (!form) {
-            return;
-        }
-        event.preventDefault();
-
-        const nameInput = /** @type {HTMLInputElement | null} */ (
-            form.querySelector('input[name="name"]')
-        );
-        const name = nameInput ? nameInput.value.trim() : '';
-        if (!name) {
-            if (nameInput) {
-                nameInput.focus();
-            }
-            return;
-        }
-        krtFetch.write({
-            method: 'POST',
-            url: /** @type {string} */ (form.getAttribute('action')),
-            payload: { name },
-            successMessage: CAT_MSG.createSuccess,
-            errorMessage: CAT_MSG.createError,
-            conflict: CAT_CONFLICT,
-            onSuccess(created) {
-                if (!created || created.id == null) {
-                    return;
-                }
-                addCategoryOption(created);
-                const tbody = document.querySelector('[data-category-table] tbody');
-                if (tbody) {
-                    tbody.appendChild(buildCategoryRow(created));
-                    syncCategoryEmpty();
-                }
-                if (nameInput) {
-                    nameInput.value = '';
-                }
-            },
-        });
-    });
-
-    document.addEventListener('submit', (event) => {
-        const form = /** @type {HTMLFormElement | null} */ (
-            /** @type {Element} */ (event.target).closest('form[data-krt-confirm]')
-        );
-        if (!form || form.dataset.krtConfirmed === 'true') {
-            return;
-        }
-        event.preventDefault();
-        const message = form.getAttribute('data-krt-confirm-message') || '';
-        const proceed = showKrtConfirm(null, message);
-        proceed.then((ok) => {
-            if (!ok) {
-                return;
-            }
-            const categoryId = form.getAttribute('data-category-id');
-            if (categoryId) {
-                krtFetch.write({
-                    method: 'POST',
-                    url: /** @type {string} */ (form.getAttribute('action')),
-                    successMessage: CAT_MSG.deleteSuccess,
-                    errorMessage: CAT_MSG.deleteError,
-                    conflict: CAT_CONFLICT,
-                    onSuccess() {
-                        removeCategoryOption(categoryId);
-                        const row = form.closest('tr');
-                        if (row) {
-                            row.remove();
-                        }
-                        syncCategoryEmpty();
-                    },
-                });
-                return;
-            }
-            form.dataset.krtConfirmed = 'true';
-            form.submit();
-        });
-    });
 });
 
 bindCatalogueList({

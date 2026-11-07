@@ -37,5 +37,19 @@ public enum P4kReviewReason {
   /**
    * A GUID that several rows would claim, or a row that several GUIDs would claim (REQ-P4K-007).
    */
-  GUID_CONFLICT
+  GUID_CONFLICT,
+
+  /**
+   * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that no commodity
+   * record carries as its {@code subtypeGuid} (REQ-P4K-024); the case's GUID is that {@code
+   * ResourceType}.
+   */
+  RESOURCE_JOIN_NONE,
+
+  /**
+   * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that several
+   * commodity records share as their {@code subtypeGuid}, so none is created or linked
+   * (REQ-P4K-024, REQ-P4K-026); the case's GUID is that {@code ResourceType}.
+   */
+  RESOURCE_JOIN_SEVERAL
 }

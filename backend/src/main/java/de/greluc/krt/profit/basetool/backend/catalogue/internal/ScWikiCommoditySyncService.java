@@ -198,7 +198,7 @@ public class ScWikiCommoditySyncService {
     if (material == null) {
       material = createWikiOnlyMaterial(dto, runId);
     }
-    applyWikiFields(material, dto, now);
+    applyWikiFields(material, dto, now, runId);
     if (material.getSourceSystems() == MaterialSourceSystem.UEX_ONLY) {
       material.setSourceSystems(MaterialSourceSystem.BOTH);
     }
@@ -364,20 +364,32 @@ public class ScWikiCommoditySyncService {
 
   /**
    * Writes only the Wiki-owned columns onto a material; the UEX-canonical name, code, kind, type,
-   * prices and {@code is_*} flags are never touched.
+   * prices and {@code is_*} flags are never touched. The density of a row the P4K matched stays the
+   * P4K's, and a different Wiki density is reported (REQ-P4K-024).
    *
    * @param material the row to update
    * @param dto the Wiki commodity row
    * @param now timestamp for {@code scwiki_synced_at}
+   * @param runId current run id for event logging
    */
   private void applyWikiFields(
-      @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now) {
+      @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now, UUID runId) {
     material.setMiningData(dto.miningData());
     material.setScwikiUuid(dto.uuid());
     material.setScwikiKey(dto.key());
     material.setScwikiSlug(dto.slug());
-    if (dto.densityGramPerCc() != null) {
-      material.setDensityGramPerCc(dto.densityGramPerCc());
+    Double density = dto.densityGramPerCc();
+    if (material.getP4kUuid() == null) {
+      if (density != null) {
+        material.setDensityGramPerCc(density);
+      }
+    } else if (density != null && !density.equals(material.getDensityGramPerCc())) {
+      syncReportService.logCommodityEvent(
+          runId,
+          SyncEventType.P4K_VALUE_DIFFERS,
+          dto.uuid(),
+          dto.name(),
+          "density_g_per_cc: Wiki " + density + ", P4K " + material.getDensityGramPerCc());
     }
     material.setScwikiSyncedAt(now);
     material.setScwikiDeletedAt(null);

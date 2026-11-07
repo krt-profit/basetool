@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
@@ -599,14 +598,6 @@ class CatalogueCachedReadsTest {
             () -> refiningMethodController.getRefiningMethod(refiningMethodId),
             this::renameRefiningMethodWithoutActor,
             node -> pinFields(node, Map.of("/name", "Cat Method Renamed " + tag))));
-    evictions.add(
-        new Eviction(
-            "material categories",
-            () -> materialCategoryController.getById(categoryId),
-            () ->
-                materialCategoryController.update(
-                    categoryId, new MaterialCategoryDto(categoryId, "Cat Ores Renamed " + tag, 0L)),
-            node -> pinFields(node, Map.of("/name", "Cat Ores Renamed " + tag))));
     evictions.add(
         new Eviction(
             "materials",

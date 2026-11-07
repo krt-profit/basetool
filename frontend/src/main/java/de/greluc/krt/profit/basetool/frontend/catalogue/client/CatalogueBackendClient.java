@@ -401,27 +401,6 @@ public class CatalogueBackendClient {
   }
 
   /**
-   * Creates a material category.
-   *
-   * @param category the category, its name set
-   * @return the created category, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public MaterialCategoryDto createMaterialCategory(@NotNull MaterialCategoryDto category) {
-    return backendApiClient.post(
-        "/api/v1/material-categories", category, MaterialCategoryDto.class);
-  }
-
-  /**
-   * Deletes a material category; the backend refuses with {@code 409} while a material uses it.
-   *
-   * @param id the category
-   */
-  public void deleteMaterialCategory(@NotNull UUID id) {
-    backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
-  }
-
-  /**
    * Lists every material external alias.
    *
    * @return the aliases, or {@code null} when the backend sent no body

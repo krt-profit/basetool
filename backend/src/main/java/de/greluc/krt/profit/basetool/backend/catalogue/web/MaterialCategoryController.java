@@ -19,31 +19,20 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.web;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the material-category reference table. Reads need authentication; mutations are
- * ADMIN-only.
- *
- * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
- * gate takes precedence (REQ-SEC-052).
+ * Read-only REST surface of the commodity categories; the P4K import maintains them (REQ-P4K-025),
+ * so no endpoint creates, renames or deletes one.
  */
 @RestController
 @RequestMapping("/api/v1/material-categories")
@@ -52,12 +41,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MaterialCategoryController {
 
   private final MaterialCategoryService service;
-  private final MaterialCategoryMapper mapper;
 
   /**
-   * Returns all categories sorted alphabetically.
+   * Returns the live categories sorted alphabetically.
    *
-   * @return all categories sorted alphabetically
+   * @return the categories a picker offers
    */
   @GetMapping
   public List<MaterialCategoryDto> getAll() {
@@ -73,48 +61,5 @@ public class MaterialCategoryController {
   @GetMapping("/{id}")
   public MaterialCategoryDto getById(@PathVariable UUID id) {
     return service.findById(id);
-  }
-
-  /**
-   * Creates a new category.
-   *
-   * @param dto create payload
-   * @return the persisted DTO
-   */
-  @PostMapping
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MaterialCategoryDto create(@RequestBody @Valid MaterialCategoryDto dto) {
-    MaterialCategory category = mapper.toEntity(dto);
-    category.setId(null);
-    category.setVersion(null);
-    MaterialCategory saved = service.create(category);
-    return mapper.toDto(saved);
-  }
-
-  /**
-   * Updates an existing category.
-   *
-   * @param id category id
-   * @param dto update payload
-   * @return the persisted DTO
-   */
-  @PutMapping("/{id}")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public MaterialCategoryDto update(
-      @PathVariable UUID id, @RequestBody @Valid MaterialCategoryDto dto) {
-    MaterialCategory category = mapper.toEntity(dto);
-    MaterialCategory updated = service.update(id, category);
-    return mapper.toDto(updated);
-  }
-
-  /**
-   * Deletes a category. Rejected with 409 when any material still references it.
-   *
-   * @param id category id
-   */
-  @DeleteMapping("/{id}")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public void delete(@PathVariable UUID id) {
-    service.delete(id);
   }
 }

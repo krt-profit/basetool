@@ -36,6 +36,8 @@ import java.util.List;
  * @param ships per-kind tallies for ships
  * @param commodities per-kind tallies for commodities
  * @param blueprints per-kind tallies for blueprints
+ * @param resourceGroups per-kind tallies for the commodity categories, or {@code null} in a result
+ *     stored before they were imported
  * @param ingredientsResolved number of blueprint ingredient links repaired
  * @param runId id of the recorded import run, or {@code null} for a preview
  * @param sweeps what the sweep did per kind, or {@code null} in a result stored before the sweep
@@ -52,6 +54,7 @@ public record P4kImportResultDto(
     Counts ships,
     Counts commodities,
     Counts blueprints,
+    Counts resourceGroups,
     long ingredientsResolved,
     String runId,
     List<Sweep> sweeps) {

@@ -129,6 +129,7 @@ class MasterDataCacheEvictionServiceTest {
     assertEquals(
         List.of(
             CacheConfig.MATERIALS_CACHE,
+            CacheConfig.MATERIAL_CATEGORIES_CACHE,
             CacheConfig.MATERIAL_BY_ID_CACHE,
             CacheConfig.MANUFACTURERS_CACHE,
             CacheConfig.SHIP_TYPES_CACHE,

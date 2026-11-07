@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -33,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param name the localised name
  * @param producedItemGuid the GUID of the item the blueprint produces, or {@code null}
  * @param craftTimeSeconds the craft time of the default tier in seconds, or {@code null}
+ * @param ingredients the cost lines of the default tier, {@code null} when the file has none
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kBlueprintDto(
@@ -42,5 +44,16 @@ public record P4kBlueprintDto(
     @Nullable String key,
     @Nullable P4kLocalisedText name,
     @Nullable String producedItemGuid,
-    @Nullable Integer craftTimeSeconds)
-    implements P4kRecord {}
+    @Nullable Integer craftTimeSeconds,
+    @Nullable List<Ingredient> ingredients)
+    implements P4kRecord {
+
+  /**
+   * One cost line of a blueprint, bound to the commodity join (REQ-P4K-026).
+   *
+   * @param resourceGuid the {@code ResourceType} of a resource line, joined to a commodity's {@code
+   *     subtypeGuid}; {@code null} on an item line
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Ingredient(@Nullable String resourceGuid) {}
+}

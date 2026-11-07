@@ -24,8 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The parts of a version-2 catalogue the import reads: the head and the five base kinds. Every
- * other kind of the file is skipped while reading.
+ * The parts of a version-2 catalogue the import reads: the head, the five base kinds and the
+ * resource groups. Every other kind of the file is skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param ships the ships, empty when the file has none
  * @param commodities the commodities, empty when the file has none
  * @param blueprints the blueprints, empty when the file has none
+ * @param resourceGroups the resource groups, empty when the file has none
  */
 public record P4kCatalogue(
     @NotNull P4kCatalogueHead head,
@@ -40,7 +41,8 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kItemDto> items,
     @NotNull @Unmodifiable List<P4kShipDto> ships,
     @NotNull @Unmodifiable List<P4kCommodityDto> commodities,
-    @NotNull @Unmodifiable List<P4kBlueprintDto> blueprints) {
+    @NotNull @Unmodifiable List<P4kBlueprintDto> blueprints,
+    @NotNull @Unmodifiable List<P4kResourceGroupDto> resourceGroups) {
 
   /**
    * Copies every list.
@@ -51,6 +53,7 @@ public record P4kCatalogue(
    * @param ships the ships
    * @param commodities the commodities
    * @param blueprints the blueprints
+   * @param resourceGroups the resource groups
    */
   public P4kCatalogue {
     manufacturers = List.copyOf(manufacturers);
@@ -58,6 +61,7 @@ public record P4kCatalogue(
     ships = List.copyOf(ships);
     commodities = List.copyOf(commodities);
     blueprints = List.copyOf(blueprints);
+    resourceGroups = List.copyOf(resourceGroups);
   }
 
   /**
@@ -75,6 +79,7 @@ public record P4kCatalogue(
       case SHIP -> ships;
       case COMMODITY -> commodities;
       case BLUEPRINT -> blueprints;
+      case RESOURCE_GROUP -> resourceGroups;
     };
   }
 }

@@ -10,7 +10,7 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
 /** The kinds a report filters by, in display order. */
-const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT'];
+const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP'];
 
 /** The change types a report filters by, in display order. */
 const TYPES = [

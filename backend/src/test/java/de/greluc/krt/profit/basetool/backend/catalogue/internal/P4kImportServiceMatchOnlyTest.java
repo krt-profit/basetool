@@ -33,14 +33,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.node.ObjectNode;
 
-/** The import matches and enriches; a record without a match creates nothing (REQ-P4K-008). */
+/**
+ * The import matches and enriches; a record without a match creates nothing (REQ-P4K-008). The
+ * catalogue carries no blueprint ingredients, so the commodity seeding of REQ-P4K-026 creates
+ * nothing either.
+ */
 @SpringBootTest
 @Transactional
 class P4kImportServiceMatchOnlyTest {
 
   private static final List<String> TABLES =
-      List.of("game_item", "ship_type", "manufacturer", "material", "blueprint");
+      List.of(
+          "game_item", "ship_type", "manufacturer", "material", "material_category", "blueprint");
 
   @Autowired private P4kImportService service;
   @Autowired private P4kImportJobRepository jobRepository;
@@ -64,11 +70,17 @@ class P4kImportServiceMatchOnlyTest {
                 t -> t, t -> jdbcTemplate.queryForObject("SELECT count(*) FROM " + t, Long.class)));
   }
 
+  private static byte[] withoutIngredients() {
+    ObjectNode root = P4kTestCatalogues.tree();
+    root.get("blueprints").forEach(blueprint -> ((ObjectNode) blueprint).remove("ingredients"));
+    return P4kTestCatalogues.bytes(root);
+  }
+
   @Test
   void anApplyWithoutTheCheckbox_createsNoRow_andListsEveryUnmatchedRecord() {
     Map<String, Long> before = rowCounts();
 
-    P4kImportResultDto result = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kImportResultDto result = runs.apply(withoutIngredients(), false);
 
     assertThat(rowCounts()).isEqualTo(before);
     assertThat(result.items().created()).isZero();

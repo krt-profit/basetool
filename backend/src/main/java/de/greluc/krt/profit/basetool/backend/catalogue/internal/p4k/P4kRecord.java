@@ -68,6 +68,18 @@ public interface P4kRecord {
   }
 
   /**
+   * Returns the name a row created from the record shows: the English name, or the class name while
+   * the name is unknown or a placeholder.
+   *
+   * @return the display name, or {@code null} when the record has neither
+   */
+  @Nullable
+  default String displayName() {
+    String en = nameEn();
+    return en == null || en.isBlank() ? className() : en;
+  }
+
+  /**
    * Parses {@link #guid()}.
    *
    * @return the GUID, or {@code null} when absent or not a UUID

@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
-
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueListBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
@@ -40,7 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +54,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Controller for the admin material catalog ({@code /admin/materials}): renders the full material
@@ -140,98 +136,6 @@ public class AdminMaterialsPageController {
 
     List<MaterialCategoryDto> categories = catalogueClient.materialCategories();
     model.addAttribute("categories", categories);
-  }
-
-  /**
-   * Creates a material category and redirects back with a flash toast.
-   *
-   * @param name category name, unique across categories
-   * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/materials}
-   */
-  @NotNull
-  @PostMapping("/categories")
-  public String createCategory(@RequestParam String name, RedirectAttributes redirectAttributes) {
-    try {
-      catalogueClient.createMaterialCategory(new MaterialCategoryDto(null, name, null));
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (BackendServiceException e) {
-      BackendErrorLogging.warn(log, "POST /api/v1/material-categories", e);
-      redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
-    } catch (Exception e) {
-      log.error("Create category failed", e);
-      redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
-    }
-    return "redirect:/admin/materials";
-  }
-
-  /**
-   * Deletes a material category; the backend refuses with 409 while a material references it.
-   *
-   * @param id category id
-   * @param redirectAttributes flash attributes carrier
-   * @return redirect to {@code /admin/materials}
-   */
-  @NotNull
-  @PostMapping("/categories/{id}/delete")
-  public String deleteCategory(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
-    try {
-      catalogueClient.deleteMaterialCategory(id);
-      redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
-    } catch (BackendServiceException e) {
-      BackendErrorLogging.warn(log, "DELETE /api/v1/material-categories", id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
-    } catch (Exception e) {
-      log.error("Delete category failed", e);
-      redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
-    }
-    return "redirect:/admin/materials";
-  }
-
-  /**
-   * In-place twin of {@link #createCategory}: returns the created {@link MaterialCategoryDto} so
-   * the page can add it to the table and every category dropdown.
-   *
-   * @param request body carrying the new category {@code name}
-   * @return the created {@link MaterialCategoryDto}, {@code 400} for a blank name, the relayed
-   *     backend status on a conflict, or {@code 500} on an unexpected error
-   */
-  @ResponseBody
-  @PostMapping(value = "/categories", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> createCategoryAjax(
-      @NotNull @RequestBody Map<String, Object> request) {
-    Object nameValue = request.get("name");
-    if (!(nameValue instanceof String name) || name.isBlank()) {
-      return ResponseEntity.badRequest().build();
-    }
-    return relay(
-        log,
-        "create category (ajax)",
-        () -> {
-          MaterialCategoryDto created =
-              catalogueClient.createMaterialCategory(new MaterialCategoryDto(null, name, null));
-          return ResponseEntity.ok(created);
-        });
-  }
-
-  /**
-   * In-place twin of {@link #deleteCategory}; a 409 for a still-referenced category is relayed so
-   * the client shows the reason.
-   *
-   * @param id category id
-   * @return {@code 200} on success, the relayed backend status on a conflict, or {@code 500} on an
-   *     unexpected error
-   */
-  @ResponseBody
-  @PostMapping(value = "/categories/{id}/delete", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> deleteCategoryAjax(@PathVariable UUID id) {
-    return relay(
-        log,
-        "delete category (ajax)",
-        () -> {
-          catalogueClient.deleteMaterialCategory(id);
-          return ResponseEntity.ok().build();
-        });
   }
 
   /**

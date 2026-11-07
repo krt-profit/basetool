@@ -104,5 +104,11 @@ public enum SyncEventType {
   SOURCE_RECORDS_MERGED,
 
   /** A complete all-asset census restored known records excluded from the player-relevant list. */
-  SOURCE_RECORDS_RESTORED
+  SOURCE_RECORDS_RESTORED,
+
+  /**
+   * UEX or SC Wiki sync: a value differs from the one the P4K leads on a row the P4K matched; the
+   * P4K value stays (REQ-P4K-024).
+   */
+  P4K_VALUE_DIFFERS
 }

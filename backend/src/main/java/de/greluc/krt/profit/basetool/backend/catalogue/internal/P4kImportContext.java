@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
@@ -42,8 +43,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The state one P4K run shares across its per-kind reconcilers: whether it writes, its run, the
- * "create new items and ships" choice, the report, the manufacturer index, the rows claimed so far
- * and the class names and names the catalogue repeats within a kind.
+ * "create new items and ships" choice, the report, the manufacturer and resource-group indexes, the
+ * rows claimed so far and the class names and names the catalogue repeats within a kind.
  */
 public final class P4kImportContext {
 
@@ -64,6 +65,9 @@ public final class P4kImportContext {
 
   /** The matched manufacturers by P4K GUID, for the items and ships of the run. */
   private final Map<UUID, Manufacturer> manufacturerByGuid = new HashMap<>();
+
+  /** The matched or created resource groups by P4K GUID, for the commodities of the run. */
+  private final Map<UUID, MaterialCategory> resourceGroupByGuid = new HashMap<>();
 
   /** The GUID that claimed each row in this run, per kind. */
   private final Map<P4kKind, Map<UUID, UUID>> claims = new EnumMap<>(P4kKind.class);
@@ -95,6 +99,7 @@ public final class P4kImportContext {
     repeatedKeys.put(P4kKind.SHIP, repeated(catalogue.ships()));
     repeatedKeys.put(P4kKind.COMMODITY, repeated(catalogue.commodities()));
     repeatedKeys.put(P4kKind.BLUEPRINT, repeated(catalogue.blueprints()));
+    repeatedKeys.put(P4kKind.RESOURCE_GROUP, repeated(catalogue.resourceGroups()));
   }
 
   /**
@@ -172,6 +177,28 @@ public final class P4kImportContext {
   public Manufacturer manufacturer(@Nullable String guid) {
     UUID parsed = P4kGuids.parse(guid);
     return parsed == null ? null : manufacturerByGuid.get(parsed);
+  }
+
+  /**
+   * Indexes a matched or created resource group for the commodities of the run.
+   *
+   * @param guid the group's GUID
+   * @param group the group
+   */
+  public void indexResourceGroup(@NotNull UUID guid, @NotNull MaterialCategory group) {
+    resourceGroupByGuid.put(guid, group);
+  }
+
+  /**
+   * Returns a resource group the run matched or created.
+   *
+   * @param guid the group's GUID text, or {@code null}
+   * @return the group, or {@code null}
+   */
+  @Nullable
+  public MaterialCategory resourceGroup(@Nullable String guid) {
+    UUID parsed = P4kGuids.parse(guid);
+    return parsed == null ? null : resourceGroupByGuid.get(parsed);
   }
 
   /**

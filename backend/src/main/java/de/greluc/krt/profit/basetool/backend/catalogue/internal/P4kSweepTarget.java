@@ -26,8 +26,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * The table of each P4K kind as the sweep (REQ-P4K-011) and the review hide (REQ-P4K-016) reach it:
- * the JPA entity name and how a P4K-known row and its liveness in UEX and the SC Wiki read. A
- * kind's category table joins here when its area adds the P4K stamp.
+ * the JPA entity name and how a P4K-known row and its liveness in UEX and the SC Wiki read.
  */
 @RequiredArgsConstructor
 @Getter
@@ -75,7 +74,10 @@ enum P4kSweepTarget {
       "Blueprint",
       "e.scwikiKey",
       "e.outputName",
-      "e.scwikiSyncedAt IS NOT NULL AND e.scwikiDeletedAt IS NULL");
+      "e.scwikiSyncedAt IS NOT NULL AND e.scwikiDeletedAt IS NULL"),
+
+  /** {@code material_category}: no other source lists a resource group. */
+  RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0");
 
   /** The kind. */
   @NotNull private final P4kKind kind;
@@ -106,6 +108,7 @@ enum P4kSweepTarget {
       case MANUFACTURER -> MANUFACTURER;
       case COMMODITY -> COMMODITY;
       case BLUEPRINT -> BLUEPRINT;
+      case RESOURCE_GROUP -> RESOURCE_GROUP;
     };
   }
 

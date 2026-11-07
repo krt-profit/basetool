@@ -11355,7 +11355,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           }
         }, {
           "in" : "query",
@@ -11901,7 +11901,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           }
         }, {
           "in" : "query",
@@ -27312,223 +27312,9 @@
         },
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
-      },
-      "post" : {
-        "operationId" : "create_6",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialCategoryDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialCategoryDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
       }
     },
     "/api/v1/material-categories/{id}" : {
-      "delete" : {
-        "operationId" : "delete_4",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
-      },
       "get" : {
         "operationId" : "getById",
         "parameters" : [ {
@@ -27567,126 +27353,6 @@
           },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
-      },
-      "put" : {
-        "operationId" : "update_7",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialCategoryDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialCategoryDto"
-                }
-              }
-            },
-            "description" : "OK"
           },
           "400" : {
             "content" : {
@@ -43544,7 +43210,7 @@
     },
     "/api/v1/notifications/{id}" : {
       "delete" : {
-        "operationId" : "delete_5",
+        "operationId" : "delete_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -84620,7 +84286,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           },
           "matched" : {
             "type" : "integer",
@@ -87971,7 +87637,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           },
           "nameEn" : {
             "type" : "string"
@@ -88070,6 +87736,9 @@
           "manufacturers" : {
             "$ref" : "#/components/schemas/Counts"
           },
+          "resourceGroups" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
           "runId" : {
             "type" : "string",
             "format" : "uuid"
@@ -88152,7 +87821,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           },
           "lastRunId" : {
             "type" : "string",
@@ -88167,7 +87836,7 @@
           },
           "reason" : {
             "type" : "string",
-            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT" ]
+            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT", "RESOURCE_JOIN_NONE", "RESOURCE_JOIN_SEVERAL" ]
           },
           "resolution" : {
             "type" : "string",
@@ -93083,7 +92752,7 @@
         "properties" : {
           "kind" : {
             "type" : "string",
-            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT" ]
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "RESOURCE_GROUP" ]
           },
           "known" : {
             "type" : "integer",

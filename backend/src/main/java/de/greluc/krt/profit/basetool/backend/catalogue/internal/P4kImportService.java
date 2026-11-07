@@ -58,8 +58,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
  * hands each kind to its reconciler in dependency order (manufacturers before items and ships,
- * items before blueprints) and, on APPLY, records the run, its counts per kind, its change report
- * and its {@code CATALOGUE} audit event (REQ-P4K-046).
+ * resource groups before commodities, items and commodities before blueprints) and, on APPLY,
+ * records the run, its counts per kind, its change report and its {@code CATALOGUE} audit event
+ * (REQ-P4K-046).
  *
  * <ul>
  *   <li>{@link #previewImport(byte[])} computes everything and writes nothing.
@@ -78,6 +79,7 @@ public class P4kImportService {
   private final P4kManufacturerReconciler manufacturerReconciler;
   private final P4kItemReconciler itemReconciler;
   private final P4kShipReconciler shipReconciler;
+  private final P4kResourceGroupReconciler resourceGroupReconciler;
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
   private final P4kSweeper sweeper;
@@ -174,7 +176,7 @@ public class P4kImportService {
   }
 
   /**
-   * Reconciles the five kinds in dependency order.
+   * Reconciles the kinds in dependency order.
    *
    * @param catalogue the catalogue
    * @param context the run
@@ -184,7 +186,8 @@ public class P4kImportService {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
     shipReconciler.reconcile(catalogue.ships(), context);
-    commodityReconciler.reconcile(catalogue.commodities(), context);
+    resourceGroupReconciler.reconcile(catalogue, context);
+    commodityReconciler.reconcile(catalogue, context);
     return blueprintReconciler.reconcile(catalogue.blueprints(), context);
   }
 
@@ -350,6 +353,7 @@ public class P4kImportService {
         report.counts(P4kKind.SHIP, completeness(head, P4kKind.SHIP)),
         report.counts(P4kKind.COMMODITY, completeness(head, P4kKind.COMMODITY)),
         report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
+        report.counts(P4kKind.RESOURCE_GROUP, completeness(head, P4kKind.RESOURCE_GROUP)),
         ingredientsResolved,
         context.getRunId(),
         Arrays.stream(P4kKind.values()).map(report::sweepResult).toList());
@@ -399,7 +403,8 @@ public class P4kImportService {
                 "items" + counts(result.items()),
                 "ships" + counts(result.ships()),
                 "commodities" + counts(result.commodities()),
-                "blueprints" + counts(result.blueprints()))
+                "blueprints" + counts(result.blueprints()),
+                "resourceGroups" + counts(result.resourceGroups()))
             .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
@@ -425,6 +430,7 @@ public class P4kImportService {
         .with("ships", counts(result.ships()))
         .with("commodities", counts(result.commodities()))
         .with("blueprints", counts(result.blueprints()))
+        .with("resourceGroups", counts(result.resourceGroups()))
         .with("ingredientsResolved", result.ingredientsResolved());
   }
 

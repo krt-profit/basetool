@@ -208,7 +208,7 @@ class P4kImportJobRunnerTest {
   private static P4kImportResultDto someResult() {
     P4kImportResultDto.Counts zero = new P4kImportResultDto.Counts(null, 0, 0, 0, 0, 0, 0, 0);
     return new P4kImportResultDto(
-        true, true, null, zero, zero, zero, zero, zero, 0, UUID.randomUUID(), List.of());
+        true, true, null, zero, zero, zero, zero, zero, zero, 0, UUID.randomUUID(), List.of());
   }
 
   private static P4kImportService.P4kPreview somePreview() {
@@ -336,7 +336,7 @@ class P4kImportJobRunnerTest {
     var enriched = new P4kImportResultDto.Counts(null, 1, 1, 0, 0, 0, 0, 0);
     var result =
         new P4kImportResultDto(
-            false, false, null, zero, enriched, zero, zero, zero, 0, job, List.of());
+            false, false, null, zero, enriched, zero, zero, zero, zero, 0, job, List.of());
     when(jobService.loadPayload(job)).thenReturn(bytes);
     stubAdmin(job, false);
     when(importService.applyImport(eq(bytes), any(P4kImportService.P4kApplyRequest.class)))
