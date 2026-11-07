@@ -26,8 +26,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * The table of each P4K kind as the sweep (REQ-P4K-011) and the review hide (REQ-P4K-016) reach it:
- * the JPA entity name and how a P4K-known row and its liveness in UEX and the SC Wiki read. A
- * kind's category table joins here when its area adds the P4K stamp.
+ * the JPA entity name and how a P4K-known row and its liveness in UEX and the SC Wiki read.
  */
 @RequiredArgsConstructor
 @Getter
@@ -85,7 +84,10 @@ enum P4kSweepTarget {
       P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL"),
 
   /** {@code shop}; its entity name stands in for a class name, and no other source lists it. */
-  SHOP(P4kKind.SHOP, "Shop", "e.entityName", "e.registryName", "e.id IS NULL");
+  SHOP(P4kKind.SHOP, "Shop", "e.entityName", "e.registryName", "e.id IS NULL"),
+
+  /** {@code material_category}: no other source lists a resource group. */
+  RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0");
 
   /** The kind. */
   @NotNull private final P4kKind kind;
@@ -118,6 +120,7 @@ enum P4kSweepTarget {
       case BLUEPRINT -> BLUEPRINT;
       case STARMAP_OBJECT -> STARMAP_OBJECT;
       case SHOP -> SHOP;
+      case RESOURCE_GROUP -> RESOURCE_GROUP;
     };
   }
 

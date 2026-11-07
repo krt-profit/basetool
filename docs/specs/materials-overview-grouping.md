@@ -22,7 +22,8 @@ Both `GET /materials` and `GET /materials/overview` expose a control labelled
 `filter.groupByCategory` ("Nach Kategorie gruppieren" / "Group by category") that switches
 the listing between two views:
 
-- **Grouped (default):** entries are grouped under the admin-defined material categories —
+- **Grouped (default):** entries are grouped under the material categories (the P4K resource
+  groups, REQ-P4K-025) —
   the collapsible accordion on `/materials`, the category header rows on the matrix. This
   is the historical behaviour and the initial state for a user who has never toggled it.
 - **Flat:** the category grouping (and its headers) is hidden and every entry is shown in

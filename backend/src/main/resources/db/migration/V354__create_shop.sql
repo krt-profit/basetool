@@ -53,17 +53,17 @@ ALTER TABLE p4k_import_run_kind DROP CONSTRAINT chk_p4k_import_run_kind_kind;
 ALTER TABLE p4k_import_run_kind
     ADD CONSTRAINT chk_p4k_import_run_kind_kind
         CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT',
-                        'SHOP'));
+                        'SHOP', 'RESOURCE_GROUP'));
 ALTER TABLE p4k_import_change DROP CONSTRAINT chk_p4k_import_change_kind;
 ALTER TABLE p4k_import_change
     ADD CONSTRAINT chk_p4k_import_change_kind
         CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT',
-                        'SHOP'));
+                        'SHOP', 'RESOURCE_GROUP'));
 ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_kind;
 ALTER TABLE p4k_review_case
     ADD CONSTRAINT chk_p4k_review_case_kind
         CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT',
-                        'SHOP'));
+                        'SHOP', 'RESOURCE_GROUP'));
 
 -- A shop the APPLY links to several UEX terminals of its place or to none; the case's guid is the
 -- shop's p4k_uuid.
@@ -73,4 +73,5 @@ ALTER TABLE p4k_review_case
         CHECK (reason IN ('UNCLEAR_PLAYABILITY', 'SEEDED_NOT_CREATABLE', 'GUID_CONFLICT',
                           'NAME_CONFLICT', 'PRODUCT_KEY_UNRESOLVED', 'PRODUCT_KEY_AMBIGUOUS',
                           'STARMAP_LINK_AMBIGUOUS', 'STARMAP_LINK_NOT_FOUND',
-                          'SHOP_LINK_AMBIGUOUS', 'SHOP_LINK_NOT_FOUND'));
+                          'SHOP_LINK_AMBIGUOUS', 'SHOP_LINK_NOT_FOUND', 'RESOURCE_JOIN_NONE',
+                          'RESOURCE_JOIN_SEVERAL', 'NO_RESOURCE_GROUP'));

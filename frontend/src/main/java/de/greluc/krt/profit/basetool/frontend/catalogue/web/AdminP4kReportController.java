@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.P4kReportBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
@@ -157,8 +158,19 @@ public class AdminP4kReportController {
   }
 
   /**
-   * Resolves a review case as keep or hide; a stale version is relayed as the backend's {@code 409}
-   * problem.
+   * Lists the resource groups a missing-group review case can assign.
+   *
+   * @return the live resource groups
+   */
+  @GetMapping("/resource-groups")
+  @Nullable
+  public List<MaterialCategoryDto> resourceGroups() {
+    return withBackendStatus(reportClient::resourceGroups);
+  }
+
+  /**
+   * Resolves a review case as keep, hide or by assigning a resource group; a stale version is
+   * relayed as the backend's {@code 409} problem.
    *
    * @param id the case
    * @param request the resolution and the case version the admin saw

@@ -109,7 +109,6 @@ its back/forward cache.
   re-read fresh (the optimistic-lock version) belong inside it.
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
-`MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) +
 `MaterialCollectionTransferInPlaceE2eTest` (row re-keyed after a transfer) +
 `JobOrderReactivatePriorityInPlaceE2eTest` (header refreshed on reactivate) · **Code:**
 `krt-fetch.js`, the converted page handlers · **Issues:** #571, #572

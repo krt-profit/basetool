@@ -89,15 +89,18 @@ ALTER TABLE location
 ALTER TABLE p4k_import_run_kind DROP CONSTRAINT chk_p4k_import_run_kind_kind;
 ALTER TABLE p4k_import_run_kind
     ADD CONSTRAINT chk_p4k_import_run_kind_kind
-        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT'));
+        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP',
+                        'STARMAP_OBJECT'));
 ALTER TABLE p4k_import_change DROP CONSTRAINT chk_p4k_import_change_kind;
 ALTER TABLE p4k_import_change
     ADD CONSTRAINT chk_p4k_import_change_kind
-        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT'));
+        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP',
+                        'STARMAP_OBJECT'));
 ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_kind;
 ALTER TABLE p4k_review_case
     ADD CONSTRAINT chk_p4k_review_case_kind
-        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT'));
+        CHECK (kind IN ('MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'RESOURCE_GROUP',
+                        'STARMAP_OBJECT'));
 
 -- A UEX location row the APPLY links to several starmap objects or to none; the case's guid is a
 -- name-based UUID of the row.
@@ -105,5 +108,6 @@ ALTER TABLE p4k_review_case DROP CONSTRAINT chk_p4k_review_case_reason;
 ALTER TABLE p4k_review_case
     ADD CONSTRAINT chk_p4k_review_case_reason
         CHECK (reason IN ('UNCLEAR_PLAYABILITY', 'SEEDED_NOT_CREATABLE', 'GUID_CONFLICT',
-                          'NAME_CONFLICT', 'PRODUCT_KEY_UNRESOLVED', 'PRODUCT_KEY_AMBIGUOUS',
+                          'NAME_CONFLICT', 'RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL',
+                          'NO_RESOURCE_GROUP', 'PRODUCT_KEY_UNRESOLVED', 'PRODUCT_KEY_AMBIGUOUS',
                           'STARMAP_LINK_AMBIGUOUS', 'STARMAP_LINK_NOT_FOUND'));

@@ -41,6 +41,7 @@ import org.jetbrains.annotations.Nullable;
  *     starmap was imported
  * @param shops the shop counts; {@code unmatched} and {@code review} count the shops left without a
  *     UEX terminal (REQ-P4K-043); {@code null} in a result stored before shops were imported
+ * @param resourceGroups the resource-group counts
  * @param ingredientsResolved blueprint ingredient lines whose material or item the run resolved
  * @param runId the {@code p4k_import_run} of an APPLY, {@code null} for a preview
  * @param sweeps the sweep result per kind (REQ-P4K-011, REQ-P4K-012), in the order of the kinds;
@@ -57,6 +58,7 @@ public record P4kImportResultDto(
     Counts blueprints,
     @Nullable Counts starmapObjects,
     @Nullable Counts shops,
+    Counts resourceGroups,
     int ingredientsResolved,
     @Nullable UUID runId,
     @Nullable List<Sweep> sweeps) {

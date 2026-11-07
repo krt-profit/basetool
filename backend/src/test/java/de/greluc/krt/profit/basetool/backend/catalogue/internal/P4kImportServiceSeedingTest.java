@@ -22,6 +22,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
@@ -37,7 +41,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Items and ships are seeded only when playable, behind a per-run checkbox, and earlier seeded rows
- * are reviewed (REQ-P4K-003, REQ-P4K-009, REQ-P4K-010, REQ-P4K-016).
+ * are reviewed; a commodity is created only when a record of the run references it (REQ-P4K-003,
+ * REQ-P4K-009, REQ-P4K-010, REQ-P4K-016, REQ-P4K-026).
  */
 @SpringBootTest
 @Transactional
@@ -51,6 +56,7 @@ class P4kImportServiceSeedingTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private P4kReviewCaseRepository reviewCaseRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
+  @Autowired private MaterialRepository materialRepository;
 
   private P4kImportRuns runs;
 
@@ -159,5 +165,34 @@ class P4kImportServiceSeedingTest {
             reviewCaseRepository.findByKindAndGuidAndReason(
                 P4kKind.ITEM, P4kTestCatalogues.SPECIAL_ITEM, P4kReviewReason.UNCLEAR_PLAYABILITY))
         .isPresent();
+  }
+
+  @Test
+  void anIngredientNamingAnUnknownResourceType_createsThatMaterialVisible_andNothingElse() {
+    P4kImportResultDto result = runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    Material aslarite = materialRepository.findByP4kUuid(P4kTestCatalogues.ASLARITE).orElseThrow();
+    assertThat(aslarite.getName()).isEqualTo("Aslarite");
+    assertThat(aslarite.getIsVisible()).isTrue();
+    assertThat(aslarite.getSourceSystems()).isEqualTo(MaterialSourceSystem.P4K);
+    assertThat(aslarite.getType()).isEqualTo(MaterialType.NO_REFINE);
+    assertThat(aslarite.getP4kSubtypeUuid()).isEqualTo(P4kTestCatalogues.ASLARITE);
+    assertThat(materialRepository.findByNameIgnoreCase("Borase")).isEmpty();
+    assertThat(result.commodities().created()).isEqualTo(2);
+  }
+
+  @Test
+  void aMaterialAnEarlierSeedingCreatedInvisible_turnsVisibleWhenAnIngredientReferencesIt() {
+    Material seeded = new Material();
+    seeded.setName("Aslarite");
+    seeded.setType(MaterialType.NO_REFINE);
+    seeded.setSourceSystems(MaterialSourceSystem.P4K);
+    seeded.setIsVisible(false);
+    materialRepository.save(seeded);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(seeded.getP4kUuid()).isEqualTo(P4kTestCatalogues.ASLARITE);
+    assertThat(seeded.getIsVisible()).isTrue();
   }
 }

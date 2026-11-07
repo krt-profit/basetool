@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kKeyedRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -49,9 +51,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The P4K review list (REQ-P4K-016, ADR-0336): lists the open cases and resolves one as keep or
- * hide. A hide stamps {@code p4k_hidden_at} on the row, which drops it out of every picker like the
- * sweep's stamp (REQ-P4K-013), and no later match lifts it. Each resolution stores the admin and
- * the time and records one {@code CATALOGUE} audit event (REQ-P4K-046).
+ * hide, or a material's missing resource group by assigning an existing group (REQ-P4K-025). A hide
+ * stamps {@code p4k_hidden_at} on the row, which drops it out of every picker like the sweep's
+ * stamp (REQ-P4K-013), and no later match lifts it. Each resolution stores the admin and the time
+ * and records one {@code CATALOGUE} audit event (REQ-P4K-046).
  */
 @Service
 @RequiredArgsConstructor
@@ -62,6 +65,8 @@ public class P4kReviewService {
   private final P4kImportChangeRepository changeRepository;
   private final EntityManager entityManager;
   private final AuditRecorder auditRecorder;
+  private final MaterialRepository materialRepository;
+  private final MaterialCategoryRepository categoryRepository;
 
   /**
    * Pages the open cases, oldest first.
@@ -79,16 +84,19 @@ public class P4kReviewService {
   }
 
   /**
-   * Resolves an open case as keep or hide.
+   * Resolves an open case as keep or hide, or a {@code NO_RESOURCE_GROUP} case by assigning a
+   * resource group to its material.
    *
    * @param caseId the case
-   * @param resolution keep or hide
+   * @param resolution keep, hide or assign
+   * @param categoryId the resource group an {@code ASSIGN} gives the material, else {@code null}
    * @param version the case version the admin saw
    * @param adminId the resolving admin
    * @return the resolved case
    * @throws NotFoundException when no case has the id
-   * @throws BadRequestException when the case is already resolved or the resolution is {@code
-   *     RESOLVED}, which only a run sets
+   * @throws BadRequestException when the case is already resolved, the resolution is {@code
+   *     RESOLVED}, which only a run sets, or {@code ASSIGN} does not meet a {@code
+   *     NO_RESOURCE_GROUP} case and a live resource group
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
@@ -97,6 +105,7 @@ public class P4kReviewService {
   public P4kReviewCaseDto resolve(
       @NotNull UUID caseId,
       @NotNull P4kReviewResolution resolution,
+      @Nullable UUID categoryId,
       long version,
       @NotNull UUID adminId) {
     if (resolution == P4kReviewResolution.RESOLVED) {
@@ -109,6 +118,12 @@ public class P4kReviewService {
     if (reviewCase.getStatus() != P4kReviewStatus.OPEN) {
       throw new BadRequestException("The review case is already resolved.");
     }
+    boolean groupCase = reviewCase.getReason() == P4kReviewReason.NO_RESOURCE_GROUP;
+    if (groupCase != (resolution == P4kReviewResolution.ASSIGN)) {
+      throw new BadRequestException(
+          "A missing resource group is resolved by assigning a group, and only such a case is.");
+    }
+    final MaterialCategory group = groupCase ? liveGroup(categoryId) : null;
     Instant now = Instant.now();
     reviewCase.setStatus(P4kReviewStatus.REVIEWED);
     reviewCase.setResolution(resolution);
@@ -117,21 +132,44 @@ public class P4kReviewService {
     if (resolution == P4kReviewResolution.HIDE && reviewCase.getRowId() != null) {
       hide(reviewCase.getKind(), reviewCase.getRowId(), now);
     }
+    if (group != null && reviewCase.getRowId() != null) {
+      materialRepository.findById(reviewCase.getRowId()).ifPresent(m -> m.setCategory(group));
+    }
     caseRepository.saveAndFlush(reviewCase);
+    AuditDetails details =
+        AuditDetails.of("kind", reviewCase.getKind().name())
+            .with("reason", reviewCase.getReason().name())
+            .with("rowId", reviewCase.getRowId());
     auditRecorder.record(
         switch (resolution) {
           case KEEP -> AuditEventType.CATALOGUE_P4K_REVIEW_KEPT;
           case HIDE -> AuditEventType.CATALOGUE_P4K_REVIEW_HIDDEN;
+          case ASSIGN -> AuditEventType.CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED;
           case RESOLVED -> throw new IllegalStateException("A run's resolution reached an admin.");
         },
         reviewCase.getId(),
         reviewCase.getGuid().toString(),
         null,
-        AuditDetails.of("kind", reviewCase.getKind().name())
-            .with("reason", reviewCase.getReason().name())
-            .with("rowId", reviewCase.getRowId()));
+        group == null ? details : details.with("groupId", group.getId()));
     List<P4kReviewCase> resolved = List.of(reviewCase);
     return toDto(reviewCase, rowNames(resolved), reviewRows(resolved));
+  }
+
+  /**
+   * Loads the resource group an {@code ASSIGN} names: a P4K group neither stamped nor hidden.
+   *
+   * @param categoryId the group, or {@code null}
+   * @return the group
+   * @throws BadRequestException when the id names no live resource group
+   */
+  @NotNull
+  private MaterialCategory liveGroup(@Nullable UUID categoryId) {
+    MaterialCategory found =
+        categoryId == null ? null : categoryRepository.findById(categoryId).orElse(null);
+    if (found == null || found.getP4kUuid() == null || found.isP4kRetired()) {
+      throw new BadRequestException("Assign an existing resource group.");
+    }
+    return found;
   }
 
   /**

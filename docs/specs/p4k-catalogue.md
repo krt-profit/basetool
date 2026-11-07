@@ -22,22 +22,23 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category tables
-> join with their areas), REQ-P4K-017…019 are implemented (#3035),
-> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
-> REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
-> implemented (#3043), REQ-P4K-034…038 are implemented (#3044), REQ-P4K-040 and REQ-P4K-041 are
-> implemented (#3045), REQ-P4K-042…044 are implemented (#3046), REQ-P4K-047 is implemented
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's blueprint category
+> table joins with its area), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented (#3037), REQ-P4K-029
+> is implemented (#3039), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
+> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-034…038 are implemented
+> (#3044), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-042…044 are implemented
+> (#3046), REQ-P4K-047 is implemented
 > (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
-> `P4kItemReconciler`, `P4kShipReconciler`, `P4kCommodityReconciler`, `P4kBlueprintReconciler`)
-> sharing `P4kRowMatcher`, then `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the
-> rows the base kinds matched, the starmap tree and its UEX links (`P4kStarmapReconciler`,
-> `P4kStarmapLinker`), and the shops and their UEX terminal links (`P4kShopReconciler`,
-> `P4kShopLinker`); the wire format is `catalogue.internal.p4k`.
+> `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
+> `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then `P4kPaintReconciler` and
+> `P4kLoadoutReconciler`, which link to the rows the base kinds matched, the starmap tree and its
+> UEX links (`P4kStarmapReconciler`, `P4kStarmapLinker`), and the shops and their UEX terminal
+> links (`P4kShopReconciler`, `P4kShopLinker`); the wire format is `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -182,9 +183,13 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
 
 The run is `p4k_import_run` (V342) with one `p4k_import_run_kind` row per kind (completeness, its
 Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, `starmap_object` and
-`shop`; the category tables add it with their areas.
+`shop`, and on the commodity categories (`material_category`, V348); the blueprint category
+table adds it with its area.
 
-**Enforced by:** `P4kImportRunTest` · **ADR:**
+Each enum column of the run, change, review, shop, starmap and loadout tables carries a `CHECK`
+that lists exactly the constants of the enum it stores.
+
+**Enforced by:** `P4kImportRunTest`, `P4kEnumCheckConstraintTest` · **ADR:**
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
 
 ### REQ-P4K-006 — a partial catalogue is imported, and only its complete kinds are swept
@@ -328,15 +333,16 @@ move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PART
 `SWEEP_SKIPPED` report row with the kind's P4K-known rows and the rows it would have stamped.
 
 The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
-names them by class name, and no other source lists them.
+names them by class name, and no other source lists them. The commodity categories are the target
+`RESOURCE_GROUP` (`material_category`); no other source lists a resource group either.
 
 The shops are the target `SHOP`, keyed by the name-based UUID of their `key`; a report row names a
 shop by its entity name, and no other source lists them.
 
-> [!note] Planned — the category tables
-> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027) do not exist yet; each
-> joins the sweep as one `P4kSweepTarget` when its area adds the table with `p4k_uuid`,
-> `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
+> [!note] Planned — the blueprint category table
+> The blueprint category table (REQ-P4K-027) does not exist yet; it joins the sweep as one
+> `P4kSweepTarget` when its area adds the table with `p4k_uuid`, `p4k_seen_run_id`,
+> `p4k_deleted_at` and `p4k_hidden_at`.
 
 **Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
 `P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
@@ -455,7 +461,10 @@ cases. A case arises from:
 - an unmatched item or ship of unclear playability (REQ-P4K-009);
 - a manufacturer name conflict (REQ-P4K-020) and a GUID conflict (REQ-P4K-007);
 - a starmap link and a shop link that is ambiguous or not found (REQ-P4K-035, REQ-P4K-043);
-- a blueprint ingredient whose `resourceGuid` matches several commodities (REQ-P4K-024);
+- a blueprint ingredient's `resourceGuid` or a `refinedSubtypeGuid` that joins no commodity or
+  several (REQ-P4K-024);
+- a material without a resource group after an APPLY, resolved by assigning a group
+  (REQ-P4K-025);
 - a personal-blueprint row that resolves to no produced-item GUID or to several (REQ-P4K-029).
 
 An admin resolves a case as **keep** or **hide**. Hide works like the P4K stamp (REQ-P4K-013): the
@@ -731,34 +740,76 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
 
 **Acceptance**
 
-- [ ] Three commodities sharing one `subtypeGuid` import as three rows keyed by their `guid`.
-- [ ] An ingredient whose `resourceGuid` matches two commodities, or none, opens a review case; the
-  admin's assignment survives the next APPLY.
-- [ ] A UEX commodity sync leaves the P4K name and density of a P4K-known material and reports a
+- [x] Three commodities sharing one `subtypeGuid` import as three rows keyed by their `guid`.
+- [x] An ingredient whose `resourceGuid` matches two commodities, or none, opens a review case.
+- [ ] The admin's assignment of such an ingredient survives the next APPLY (with the P4K recipe
+  import of REQ-P4K-027; until then the import writes no ingredient link by `resourceGuid`).
+- [x] A UEX commodity sync leaves the P4K name and density of a P4K-known material and reports a
   different name.
-- [ ] A material UEX does not know becomes RAW when it has `refinedSubtypeGuid` and its target
+- [x] A material UEX does not know becomes RAW when it has `refinedSubtypeGuid` and its target
   REFINED; a material UEX knows keeps the UEX type.
 
-**Enforced by (planned):** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest` · **ADR:**
+`P4kCommodityReconciler` writes the led values through `P4kRowWriter.lead` (a `CHANGED` row each);
+`subtypeGuid` is `material.p4k_subtype_uuid`, and the join is `P4kCommodityJoin`. The two review
+reasons are `RESOURCE_JOIN_NONE` and `RESOURCE_JOIN_SEVERAL`, one case per `ResourceType` GUID.
+Several catalogue records sharing a name (three "SLAM") match no row by name; each opens a
+`GUID_CONFLICT` case. A name the P4K leads that another material already holds is not written and
+opens a `GUID_CONFLICT` case on the row. `material.type` is never `null`: "stays `null`" means
+it keeps its value, and a created row starts as `NO_REFINE`. A UEX name or SC Wiki density that
+differs on a row with a `p4k_uuid` is reported as `P4K_DISAGREEMENT`. The P4K also leads
+`material.name_de` (REQ-P4K-023).
+
+**Enforced by:** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest` · **Code:**
+`P4kCommodityReconciler`, `P4kCommodityJoin` · **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
 
 ### REQ-P4K-025 — the resource groups are the commodity categories
 
 The `resourceGroups` kind becomes the commodity categories: P4K GUID as identity, `name` /
 `name_de` from the P4K (the `className` when the name is a placeholder and `en` is `null`),
-`parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). A one-off
-migration maps every admin-maintained category onto a group and removes the admin categories;
-admins no longer create or rename categories. A group that vanishes from a complete kind is stamped
-like any other P4K row (REQ-P4K-011).
+`parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). The
+admin-maintained categories are not mapped onto groups: each P4K-matched material takes its group
+from its catalogue record on APPLY (`typeGuid`, REQ-P4K-024). A material that has no group after an
+APPLY (the P4K matched no record, or its record names no group) opens a review case "no resource
+group", which an admin resolves by assigning an existing group; admins never create or rename a
+group or a category. An admin category is retired once no material references it; until then it
+stays readable, so no material shows without a category. A group that vanishes from a complete
+kind is stamped like any other P4K row (REQ-P4K-011). (Owner decision on #3037: production's two
+admin categories "Erz" and "Raffiniertes Erz" each spread over three resource groups, so no
+category-to-group mapping holds.)
 
 **Acceptance**
 
-- [ ] A group with a placeholder name shows its `className`.
-- [ ] Two groups listing each other are imported without a cycle.
-- [ ] After the migration every material that had a category has its mapped group, and no admin
-  endpoint creates or renames a category.
+- [x] A group with a placeholder name shows its `className`.
+- [x] Two groups listing each other are imported without a cycle.
+- [x] A P4K-matched material takes the group its record names, and an admin category no material
+  references any longer is gone after the APPLY.
+- [x] A material without a group after an APPLY opens one case, the admin's assignment of an
+  existing group resolves it with an audit event, and an admin category or a keep is refused.
+- [x] No admin endpoint creates or renames a category.
 
-**Enforced by (planned):** `P4kResourceGroupImportTest`, the category migration test · **ADR:**
+The groups are the rows of `material_category` (V348: `p4k_uuid`, `class_name`, `name_de`,
+`parent_id` and the P4K stamps; the name is no longer unique, as two groups are "Man-made"). They
+match like every kind (REQ-P4K-007): the GUID, then a class name and a name that each identify one
+row and one record, so an admin category named like a group becomes that group and keeps its
+materials. A group is created when a commodity record of the run names it as `typeGuid`, or when
+it is an ancestor of such a group; every other unmatched group is listed `UNMATCHED`. A commodity's
+category is its group. A parent link that would make a group its own ancestor is left out, so of
+two groups listing each other the first in record order keeps the link. The pickers offer no
+stamped or hidden group. `MaterialCategoryController` is read-only, and the admin page has no
+category editor.
+
+The case is `NO_RESOURCE_GROUP` (kind `COMMODITY`, one per live material, its GUID a name-based
+UUID of the material's name); a later run closes it as `RESOLVED` once the material has a group.
+It is resolved only as `ASSIGN` with a live resource group from
+`GET /api/v1/catalog/admin/import/p4k/resource-groups` (`CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED`); keep
+and hide do not apply. An admin category is a `material_category` row without `p4k_uuid`; the
+APPLY deletes the unreferenced ones (it is no P4K row, so REQ-P4K-013's stamp does not apply) and
+records the number as `adminCategoriesRetired` on `CATALOGUE_P4K_APPLIED`.
+
+**Enforced by:** `P4kResourceGroupImportTest`, `P4kMaterialGroupReviewTest`,
+`MaterialCategoryControllerTest` · **Code:** `P4kResourceGroupReconciler`, `P4kMaterialGroupReview`
+· **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891, #2825
 
 ### REQ-P4K-026 — a commodity is created only when a record of the same run references it
@@ -771,10 +822,13 @@ Every other unmatched commodity stays match-only and appears in the report's unm
 
 **Acceptance**
 
-- [ ] An ingredient naming an unknown `ResourceType` creates that material; an unreferenced
+- [x] An ingredient naming an unknown `ResourceType` creates that material; an unreferenced
   unmatched commodity creates nothing.
 
-**Enforced by (planned):** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
+A created material has `source_systems = P4K` and `is_visible = true`; a material an earlier
+seeding created invisible turns visible when the run would create it.
+
+**Enforced by:** `P4kImportServiceSeedingTest` · **ADR:** [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
 
 ## Blueprints
 

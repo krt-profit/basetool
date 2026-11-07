@@ -22,13 +22,18 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An admin's resolution of a P4K review case (REQ-P4K-016), relayed to the backend.
  *
- * @param resolution {@code KEEP} or {@code HIDE}
+ * @param resolution {@code KEEP}, {@code HIDE}, or {@code ASSIGN} for a missing resource group
+ * @param categoryId the resource group an {@code ASSIGN} gives the material, else {@code null}
  * @param version the case version the admin saw
  */
 @DtoMirror
 public record P4kReviewResolveRequest(
-    @NotNull @BackendEnumAsString String resolution, @NotNull Long version) {}
+    @NotNull @BackendEnumAsString String resolution,
+    @Nullable UUID categoryId,
+    @NotNull Long version) {}

@@ -79,5 +79,25 @@ public enum P4kReviewReason {
    * A shop whose place is unknown or holds no UEX terminal of the matching name (REQ-P4K-043); the
    * case's GUID is the shop's.
    */
-  SHOP_LINK_NOT_FOUND
+  SHOP_LINK_NOT_FOUND,
+
+  /**
+   * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that no commodity
+   * record carries as its {@code subtypeGuid} (REQ-P4K-024); the case's GUID is that {@code
+   * ResourceType}.
+   */
+  RESOURCE_JOIN_NONE,
+
+  /**
+   * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that several
+   * commodity records share as their {@code subtypeGuid}, so none is created or linked
+   * (REQ-P4K-024, REQ-P4K-026); the case's GUID is that {@code ResourceType}.
+   */
+  RESOURCE_JOIN_SEVERAL,
+
+  /**
+   * A material without a resource group after the APPLY: the P4K matched no record, or its record
+   * names no group (REQ-P4K-025); the case's GUID is a name-based UUID of the material.
+   */
+  NO_RESOURCE_GROUP
 }

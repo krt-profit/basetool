@@ -657,6 +657,8 @@ public enum AuditEventType {
   CATALOGUE_P4K_REVIEW_KEPT(AuditDomain.CATALOGUE),
   /** An admin resolved a P4K review case by hiding the row (REQ-P4K-016). */
   CATALOGUE_P4K_REVIEW_HIDDEN(AuditDomain.CATALOGUE),
+  /** An admin resolved a material's missing resource group by picking one (REQ-P4K-025). */
+  CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED(AuditDomain.CATALOGUE),
   /** An admin linked a UEX location to a starmap object by hand (REQ-P4K-035). */
   CATALOGUE_STARMAP_LINK_SET(AuditDomain.CATALOGUE),
   /** An admin unlinked a UEX location from the starmap by hand (REQ-P4K-035). */

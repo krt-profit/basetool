@@ -82,8 +82,8 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs and
-   * the paints, skipping everything else, the loadouts included.
+   * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs, the
+   * paints and the resource groups, skipping everything else, the loadouts included.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -123,7 +123,8 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
           listOf(kinds, P4kKind.SHOP, P4kShopDto.class),
           storeSlugs,
-          paints);
+          paints,
+          listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class));
     } catch (JacksonException e) {
       throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
     }
@@ -267,6 +268,7 @@ public class P4kCatalogueReader {
       case BLUEPRINT -> P4kBlueprintDto.class;
       case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
       case SHOP -> P4kShopDto.class;
+      case RESOURCE_GROUP -> P4kResourceGroupDto.class;
     };
   }
 

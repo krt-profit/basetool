@@ -253,6 +253,14 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   private String nameKey;
 
+  /**
+   * The P4K {@code subtypeGuid}: the commodity's {@code ResourceType}, an n:1 join for blueprint
+   * ingredients and refined-from links and never a key (REQ-P4K-024).
+   */
+  @Column(name = "p4k_subtype_uuid")
+  @Nullable
+  private UUID p4kSubtypeUuid;
+
   /** Wiki-owned mining and cargo enrichment, independent of UEX market data. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "wiki_mining_data", columnDefinition = "jsonb")

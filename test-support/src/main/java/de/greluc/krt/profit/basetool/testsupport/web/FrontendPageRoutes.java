@@ -151,6 +151,7 @@ public final class FrontendPageRoutes {
           "/admin/p4k-import/jobs",
           "/admin/p4k-import/runs",
           "/admin/p4k-import/review-cases",
+          "/admin/p4k-import/resource-groups",
           "/admin/starmap/objects",
           "/admin/shops/entries",
           "/admin/shops/terminals",

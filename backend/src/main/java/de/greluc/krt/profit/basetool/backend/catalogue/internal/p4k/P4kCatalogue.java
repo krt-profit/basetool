@@ -25,9 +25,9 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The parts of a version-2 catalogue the import holds in memory: the head, the five base kinds, the
- * starmap objects, the shops, the curated ship store slugs and the paints. The loadouts are
- * streamed in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every other kind of
- * the file is skipped while reading.
+ * starmap objects, the shops, the curated ship store slugs, the paints and the resource groups. The
+ * loadouts are streamed in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every
+ * other kind of the file is skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -39,6 +39,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param shops the shops, empty when the file has none
  * @param shipStoreSlugs the curated ship store slugs, empty when the file has none
  * @param paints the paints, empty when the file has none
+ * @param resourceGroups the resource groups, empty when the file has none
  */
 public record P4kCatalogue(
     @NotNull P4kCatalogueHead head,
@@ -50,7 +51,8 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kStarmapObjectDto> starmapObjects,
     @NotNull @Unmodifiable List<P4kShopDto> shops,
     @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs,
-    @NotNull @Unmodifiable List<P4kPaintDto> paints) {
+    @NotNull @Unmodifiable List<P4kPaintDto> paints,
+    @NotNull @Unmodifiable List<P4kResourceGroupDto> resourceGroups) {
 
   /** The top-level field holding the paints, also its completeness key. */
   public static final String PAINTS = "paints";
@@ -71,6 +73,7 @@ public record P4kCatalogue(
    * @param shops the shops
    * @param shipStoreSlugs the ship store slugs
    * @param paints the paints
+   * @param resourceGroups the resource groups
    */
   public P4kCatalogue {
     manufacturers = List.copyOf(manufacturers);
@@ -82,6 +85,7 @@ public record P4kCatalogue(
     shops = List.copyOf(shops);
     shipStoreSlugs = List.copyOf(shipStoreSlugs);
     paints = List.copyOf(paints);
+    resourceGroups = List.copyOf(resourceGroups);
   }
 
   /**
@@ -101,6 +105,7 @@ public record P4kCatalogue(
       case BLUEPRINT -> blueprints;
       case STARMAP_OBJECT -> starmapObjects;
       case SHOP -> shops;
+      case RESOURCE_GROUP -> resourceGroups;
     };
   }
 }

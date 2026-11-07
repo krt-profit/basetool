@@ -52,10 +52,6 @@
 /admin/material-aliases/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialAliasesPageController#deleteAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/materials GET -> AdminMaterialsPageController#listMaterials gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/ajax POST -> AdminMaterialsPageController#createMaterialAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories POST -> AdminMaterialsPageController#createCategory gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#createCategoryAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories/{id}/delete POST -> AdminMaterialsPageController#deleteCategory gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#deleteCategoryAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/{id}/ajax PUT -> AdminMaterialsPageController#updateMaterialAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/members/{userId}/export/json GET -> DataExportProxyController#adminJson gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/export/pdf GET -> DataExportProxyController#adminPdf gate=method:hasRole('ADMIN') layout=no
@@ -109,6 +105,7 @@
 /admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/apply POST -> AdminP4kImportPageController#applyJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/changes GET -> AdminP4kReportController#previewChanges gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/resource-groups GET -> AdminP4kReportController#resourceGroups gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases GET -> AdminP4kReportController#openReviewCases gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases/{id}/resolve POST -> AdminP4kReportController#resolve gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/runs GET -> AdminP4kReportController#runs gate=class:hasRole('ADMIN') layout=no

@@ -15,7 +15,16 @@ import {
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
 /** The kinds a report filters by, in display order. */
-const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT', 'SHOP'];
+const KINDS = [
+    'MANUFACTURER',
+    'ITEM',
+    'SHIP',
+    'COMMODITY',
+    'BLUEPRINT',
+    'STARMAP_OBJECT',
+    'SHOP',
+    'RESOURCE_GROUP',
+];
 
 /** The change types a report filters by, in display order. */
 const TYPES = [
@@ -313,17 +322,64 @@ function renderCases(cases) {
                     c.nameEn || c.className || c.guid
                 }</span><span class="cell-sub data-value--mono">${c.guid}</span></td><td>${
                     c.rowName || t('noRow')
-                }</td><td>${fmtTime(c.createdAt)}</td><td class="cell-actions"><button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
-                    'actionKeep',
-                )}</button> <button type="button" class="btn btn-quiet-danger btn-xs" data-resolution="HIDE">${t(
-                    'actionHide',
-                )}</button></td></tr>`,
+                }</td><td>${fmtTime(c.createdAt)}</td><td class="cell-actions">${caseActions(c)}</td></tr>`,
         ),
     );
 }
 
+/** @type {{ id: string, name: string }[]} */
+let resourceGroups = [];
+
 /**
- * Resolves the case of a clicked keep or hide button and removes its row in place.
+ * Loads the resource groups a missing-group case can assign (REQ-P4K-025).
+ *
+ * @returns {Promise<void>} settles once the groups are known
+ */
+function loadResourceGroups() {
+    return readJson(pageUrl('/resource-groups')).then(
+        (/** @type {{ id: string, name: string }[] | null} */ result) => {
+            resourceGroups = Array.isArray(result) ? result : [];
+        },
+    );
+}
+
+/**
+ * The action cell of a case: a group picker for a missing resource group, keep and hide otherwise.
+ *
+ * @param {P4kCase} c the case
+ * @returns {ReturnType<typeof krtHtml>} the cell content
+ */
+function caseActions(c) {
+    if (c.reason === 'NO_RESOURCE_GROUP') {
+        return krtHtml`<select class="form-input" data-group-pick aria-label="${t('pickGroup')}"><option value="">${t(
+            'pickGroup',
+        )}</option>${resourceGroups.map(
+            (g) => krtHtml`<option value="${g.id}">${g.name}</option>`,
+        )}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
+            'actionAssign',
+        )}</button>`;
+    }
+    return krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
+        'actionKeep',
+    )}</button> <button type="button" class="btn btn-quiet-danger btn-xs" data-resolution="HIDE">${t(
+        'actionHide',
+    )}</button>`;
+}
+
+/**
+ * The toast of a resolution.
+ *
+ * @param {string} resolution the resolution sent
+ * @returns {string} the message
+ */
+function resolvedToast(resolution) {
+    if (resolution === 'HIDE') return t('toastHidden');
+    if (resolution === 'ASSIGN') return t('toastAssigned');
+    return t('toastKept');
+}
+
+/**
+ * Resolves the case of a clicked keep, hide or assign button and removes its row in place.
  *
  * @param {MouseEvent} e the click
  */
@@ -334,11 +390,21 @@ function onCasesClick(e) {
     if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
     const caseId = row.dataset.caseId || '';
     const resolution = btn.dataset.resolution || '';
+    const pick = row.querySelector('select[data-group-pick]');
+    const categoryId = pick instanceof HTMLSelectElement ? pick.value : '';
+    if (resolution === 'ASSIGN' && !categoryId) {
+        if (pick instanceof HTMLSelectElement) pick.focus();
+        return;
+    }
     krtFetch
         .write({
             method: 'POST',
             url: pageUrl(`/review-cases/${encodeURIComponent(caseId)}/resolve`),
-            payload: { resolution, version: Number(row.dataset.caseVersion) },
+            payload: {
+                resolution,
+                categoryId: categoryId || null,
+                version: Number(row.dataset.caseVersion),
+            },
             submitter: btn,
             toast: false,
             onConflict() {
@@ -349,7 +415,7 @@ function onCasesClick(e) {
         })
         .then((result) => {
             if (!result.ok) return;
-            showFrontendSuccessToast(resolution === 'HIDE' ? t('toastHidden') : t('toastKept'));
+            showFrontendSuccessToast(resolvedToast(resolution));
             loadCases(casesPage);
         });
 }
@@ -389,7 +455,7 @@ function init() {
     const cases = $('krt-p4k-cases');
     if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
-    loadCases(0);
+    loadResourceGroups().then(() => loadCases(0));
     refreshDueBanner();
 }
 

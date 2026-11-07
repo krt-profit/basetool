@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.web;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kChangeType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueDto;
@@ -40,6 +42,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -79,6 +82,7 @@ public class AdminP4kImportReportController {
   private final P4kImportReportService reportService;
   private final P4kReviewService reviewService;
   private final P4kImportDueService dueService;
+  private final MaterialCategoryService categoryService;
 
   /**
    * Tells whether a P4K import is due: the UEX or the SC Wiki game version is newer than the patch
@@ -99,11 +103,12 @@ public class AdminP4kImportReportController {
   /**
    * An admin's resolution of a review case.
    *
-   * @param resolution keep or hide
+   * @param resolution keep, hide, or assign for a {@code NO_RESOURCE_GROUP} case
+   * @param categoryId the resource group an {@code ASSIGN} gives the material, else {@code null}
    * @param version the case version the admin saw
    */
   public record P4kReviewResolveRequest(
-      @NotNull P4kReviewResolution resolution, @NotNull Long version) {}
+      @NotNull P4kReviewResolution resolution, @Nullable UUID categoryId, @NotNull Long version) {}
 
   /**
    * Pages the applied runs, newest first.
@@ -224,6 +229,22 @@ public class AdminP4kImportReportController {
       @PathVariable("id") UUID id,
       @RequestBody @Valid P4kReviewResolveRequest request,
       @CurrentUserId UUID adminUserId) {
-    return reviewService.resolve(id, request.resolution(), request.version(), adminUserId);
+    return reviewService.resolve(
+        id, request.resolution(), request.categoryId(), request.version(), adminUserId);
+  }
+
+  /**
+   * Lists the resource groups an admin may assign to a material without one (REQ-P4K-025).
+   *
+   * @return the live P4K resource groups, sorted by name
+   */
+  @GetMapping("/resource-groups")
+  @Operation(summary = "List the resource groups a missing-group review case can assign.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "The live resource groups."),
+    @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
+  })
+  public List<MaterialCategoryDto> resourceGroups() {
+    return categoryService.findResourceGroups();
   }
 }

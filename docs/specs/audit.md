@@ -467,8 +467,9 @@ The coverage list holds the **Katalog** area
     authentication, so the APPLY names that admin as actor;
   - `CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN`, one event per kind whose sweep ran on the admin's "apply
     marking anyway" override, with the kind, the rows to stamp and their share in percent; and the
-    resolution of a review case, `CATALOGUE_P4K_REVIEW_KEPT` or `CATALOGUE_P4K_REVIEW_HIDDEN`, one
-    event per case. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
+    resolution of a review case, `CATALOGUE_P4K_REVIEW_KEPT`, `CATALOGUE_P4K_REVIEW_HIDDEN` or, for a
+    material without a resource group, `CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED` (with `groupId`,
+    REQ-P4K-025), one event per case; the APPLY event carries `adminCategoriesRetired`. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
     record them;
   - the starmap ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
     REQ-P4K-035…038): `CATALOGUE_STARMAP_LINK_SET`, `CATALOGUE_STARMAP_LINK_CLEARED` and
@@ -490,9 +491,11 @@ The coverage list holds the **Katalog** area
     id, recorded in the transaction that stores the run's outcome, with `source`, `aggregate`,
     `status`, the committed counts (`fetched`, `applied`, `skipped`, `failed`) and `sweep`; the
     detail stays in `external_sync_report`;
-  - every catalogue master-data mutation: materials, material categories and material external
-    aliases (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_CATEGORY_*`, `CATALOGUE_MATERIAL_ALIAS_*`:
-    created, updated, deleted); manufacturer, ship-type and terminal visibility
+  - every catalogue master-data mutation: materials and material external aliases
+    (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_ALIAS_*`: created, updated, deleted; the material
+    categories are the P4K resource groups, written only by the P4K APPLY of
+    `CATALOGUE_P4K_APPLIED`, REQ-P4K-025, and `CATALOGUE_MATERIAL_CATEGORY_*` labels only earlier
+    entries of the retired admin editor); manufacturer, ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,
