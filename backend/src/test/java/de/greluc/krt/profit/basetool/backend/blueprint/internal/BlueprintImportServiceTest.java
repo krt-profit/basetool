@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,14 +38,18 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportEntryDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportStatus;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportSuggestionDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +57,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -64,6 +70,8 @@ class BlueprintImportServiceTest {
 
   private static final UUID SUB = UUID.fromString("0e000001-0000-4000-8000-000000000001");
   private static final BlueprintExternalAliasSource SCMDB = BlueprintExternalAliasSource.SCMDB;
+  private static final String LIGHT_GUID = "de20695c-eb2f-4b68-be6f-9806cbd205a7";
+  private static final String HEAVY_GUID = "bef9cd69-24f0-434a-ba7a-2bf751228093";
 
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private BlueprintExternalAliasRepository aliasRepository;
@@ -79,7 +87,7 @@ class BlueprintImportServiceTest {
         new BlueprintImportService(
             JsonMapper.builder().build(),
             blueprintProductService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             aliasRepository,
             personalBlueprintRepository,
@@ -89,6 +97,17 @@ class BlueprintImportServiceTest {
 
   private static ResolvedProduct product(String key, String name) {
     return new ResolvedProduct(key, name, null);
+  }
+
+  private static Map<String, List<ResolvedProduct>> byName(List<ResolvedProduct> products) {
+    Map<String, List<ResolvedProduct>> index = new LinkedHashMap<>();
+    for (ResolvedProduct p : products) {
+      index
+          .computeIfAbsent(
+              new BlueprintNameNormalizer().normalize(p.productName()), _ -> new ArrayList<>())
+          .add(p);
+    }
+    return index;
   }
 
   private static MultipartFile upload(String json) {
@@ -105,8 +124,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_exactNameMatches() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -121,8 +140,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_aliasMatches_whenNoExactButAliasExists() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     BlueprintExternalAlias alias = new BlueprintExternalAlias();
     alias.setSourceSystem(SCMDB);
     alias.setExternalName("Arc-Light Pistol");
@@ -143,8 +162,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_aliasFallsBackToSnapshotWhenProductGoneFromMaster() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     BlueprintExternalAlias alias = new BlueprintExternalAlias();
     alias.setSourceSystem(SCMDB);
     alias.setExternalName("Gone Product");
@@ -167,8 +186,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_matchesAPackTaggedNameByItsUntaggedName() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("cirrus", "Cirrus"), product("citadel", "Citadel")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("cirrus", "Cirrus"), product("citadel", "Citadel"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -188,8 +207,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_matchesAPackTaggedNameThroughTheAliasOfItsUntaggedName() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     BlueprintExternalAlias alias = new BlueprintExternalAlias();
     alias.setSourceSystem(SCMDB);
     alias.setExternalName("Arc-Light Pistol");
@@ -211,8 +230,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_aTaggedNameWithoutAnUntaggedMatchIsSuggestedFromTheUntaggedName() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -225,8 +244,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_fuzzySuggestsForCloseTypo() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -241,8 +260,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_unmatchedWhenNothingClose() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -254,8 +273,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_alreadyOwnedOverridesMatched() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     PersonalBlueprint owned =
         PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();
     when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
@@ -272,8 +291,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_dedupesByNameAndKeepsEarliestTimestamp() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"blueprints\":["
@@ -288,8 +307,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBareArrayForm() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(SUB, upload("[{\"productName\":\"Arclight Pistol\"}]"));
@@ -299,8 +318,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsFullScmdbWatcherDocumentShape() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
 
     String json =
         "{\"exportSchemaVersion\":1,\"watcherVersion\":\"0.1.7\",\"channel\":\"LIVE\","
@@ -320,8 +339,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBpExtractorReceivedAtFormat() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
@@ -340,8 +359,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBpExtractorWithAdditionalSourceFolders() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
@@ -361,8 +380,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBpExtractorWithNullAdditionalSourceFolders() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
@@ -379,8 +398,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsScmdbNetNameAlias() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(SUB, upload("{\"blueprints\":[{\"name\":\"Arclight Pistol\"}]}"));
@@ -395,8 +414,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsFullScmdbNetProfileExportIgnoringMissions() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("p8-ar rifle", "P8-AR Rifle")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("p8-ar rifle", "P8-AR Rifle"))));
 
     String json =
         "{\"version\":3,\"exportedAt\":\"2026-06-21T17:47:57.354Z\","
@@ -418,11 +437,12 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_skipsNotCompletedScmdbNetEntries() {
-    when(blueprintProductService.allProducts())
+    when(blueprintProductService.productsByNameKey())
         .thenReturn(
-            List.of(
-                product("arclight pistol", "Arclight Pistol"),
-                product("p8-ar rifle", "P8-AR Rifle")));
+            byName(
+                List.of(
+                    product("arclight pistol", "Arclight Pistol"),
+                    product("p8-ar rifle", "P8-AR Rifle"))));
 
     String json =
         "{\"blueprints\":["
@@ -437,8 +457,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_matchesByTagWhenNameWouldNotMatch() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("antium arms maroon", "Antium Arms Maroon")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("antium arms maroon", "Antium Arms Maroon"))));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
         .thenReturn(Map.of("bp_craft_qrt_specialist_heavy_arms_01_01_13", "antium arms maroon"));
 
@@ -457,8 +477,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_tagMatchIsCaseInsensitive() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
         .thenReturn(Map.of("bp_craft_amrs_lasercannon_s1", "arclight pistol"));
 
@@ -473,8 +493,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_tagMissFallsBackToNameChain() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     when(blueprintProductService.scwikiKeyToProductKeyIndex()).thenReturn(Map.of());
 
     String json =
@@ -488,8 +508,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBareArrayOfScmdbNetEntries() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -504,11 +524,12 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_keepsDistinctTagsUnderSameName() {
-    when(blueprintProductService.allProducts())
+    when(blueprintProductService.productsByNameKey())
         .thenReturn(
-            List.of(
-                product("antium core jet", "Antium Core Jet"),
-                product("antium helmet jet", "Antium Helmet Jet")));
+            byName(
+                List.of(
+                    product("antium core jet", "Antium Core Jet"),
+                    product("antium helmet jet", "Antium Helmet Jet"))));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
         .thenReturn(
             Map.of(
@@ -532,8 +553,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_prefersTsOverReceivedAtWhenBothPresent() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"blueprints\":[{\"productName\":\"Arclight Pistol\",\"ts\":1700000000.0,"
@@ -546,8 +567,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_dedupesBpExtractorEntriesKeepingEarliestReceivedAt() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     String json =
         "{\"blueprints\":["
@@ -562,8 +583,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_ignoresUnparseableReceivedAt() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportPreviewDto preview =
         service.previewImport(
@@ -611,13 +632,62 @@ class BlueprintImportServiceTest {
 
     assertThrows(
         BadRequestException.class, () -> service.previewImport(SUB, upload(json.toString())));
-    verify(blueprintProductService, never()).allProducts();
+    verify(blueprintProductService, never()).productsByNameKey();
+  }
+
+  @Test
+  void preview_aNameOfOneGuidProductMatchesUnderTheGuidKey() {
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product(LIGHT_GUID, "Light Arms"))));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(SUB, upload("{\"blueprints\":[{\"productName\":\"Light Arms\"}]}"));
+
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.MATCHED, entry.status());
+    assertEquals(LIGHT_GUID, entry.productKey());
+  }
+
+  @Test
+  void preview_aNameOfSeveralGuidProductsIsSuggestedWithEveryCandidate() {
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(
+            byName(List.of(product(LIGHT_GUID, "Twin Arms"), product(HEAVY_GUID, "Twin Arms"))));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(SUB, upload("{\"blueprints\":[{\"productName\":\"Twin Arms\"}]}"));
+
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.SUGGESTED, entry.status());
+    assertNull(entry.productKey());
+    assertThat(entry.suggestions())
+        .extracting(BlueprintImportSuggestionDto::productKey)
+        .containsExactlyInAnyOrder(LIGHT_GUID, HEAVY_GUID);
+  }
+
+  @Test
+  void apply_aPickAmongSeveralGuidProductsIsLearnedAsAnAlias() {
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(
+            byName(List.of(product(LIGHT_GUID, "Twin Arms"), product(HEAVY_GUID, "Twin Arms"))));
+    when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    BlueprintImportResultDto result =
+        service.applyImport(
+            SUB, List.of(new BlueprintImportResolutionDto("Twin Arms", HEAVY_GUID, null, null)));
+
+    assertEquals(1, result.added());
+    assertEquals(1, result.aliasesLearned());
+    ArgumentCaptor<BlueprintExternalAlias> alias =
+        ArgumentCaptor.forClass(BlueprintExternalAlias.class);
+    verify(aliasRepository).save(alias.capture());
+    assertEquals(HEAVY_GUID, alias.getValue().getProductKey());
   }
 
   @Test
   void apply_addsRowAndLearnsAliasForManualPick() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     BlueprintImportResultDto result =
@@ -638,8 +708,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_doesNotLearnAliasWhenNameAlreadyNormalizesToKey() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     BlueprintImportResultDto result =
@@ -656,8 +726,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_skipsBlankAndUnresolvableKeys() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
 
     BlueprintImportResultDto result =
         service.applyImport(
@@ -674,11 +744,12 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_countsAlreadyOwnedAndDedupesWithinRequest() {
-    when(blueprintProductService.allProducts())
+    when(blueprintProductService.productsByNameKey())
         .thenReturn(
-            List.of(
-                product("arclight pistol", "Arclight Pistol"),
-                product("calico legs", "Calico Legs")));
+            byName(
+                List.of(
+                    product("arclight pistol", "Arclight Pistol"),
+                    product("calico legs", "Calico Legs"))));
     PersonalBlueprint owned =
         PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();
     when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(eq(SUB), any()))
@@ -700,8 +771,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_isBulkSafe_savesEachNewRowExactlyOnce() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("a", "A"), product("b", "B"), product("c", "C")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("a", "A"), product("b", "B"), product("c", "C"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     BlueprintImportResultDto result =
@@ -718,8 +789,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_doesNotDuplicateAliasWhenOneAlreadyExists() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(
             SCMDB, "Calico Legs (Tactical)"))
@@ -739,8 +810,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_doesNotDuplicateAliasWhenCaseVariantAlreadyExists() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(
             SCMDB, "CALICO LEGS (TACTICAL)"))
@@ -760,8 +831,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_suppressesCaseVariantDuplicateWithinSameRequest() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("calico legs tactical", "Calico Legs Tactical"))));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     BlueprintImportResultDto result =
@@ -780,8 +851,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_refreshesAcquiredAtEarlierOnReimportWithoutDuplicating() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     Instant later = Instant.parse("2026-03-26T16:00:00Z");
     Instant earlier = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
@@ -809,8 +880,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_keepsAcquiredAtWhenReimportIsLater() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     Instant earlier = Instant.parse("2025-01-01T00:00:00Z");
     Instant later = Instant.parse("2026-03-26T16:00:00Z");
     PersonalBlueprint owned =
@@ -835,8 +906,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_keepsAcquiredAtWhenReimportHasNoTimestamp() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     Instant existing = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
         PersonalBlueprint.builder()
@@ -860,8 +931,8 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_fillsAcquiredAtWhenOwnedRowHasNone() {
-    when(blueprintProductService.allProducts())
-        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    when(blueprintProductService.productsByNameKey())
+        .thenReturn(byName(List.of(product("arclight pistol", "Arclight Pistol"))));
     Instant incoming = Instant.parse("2025-01-01T00:00:00Z");
     PersonalBlueprint owned =
         PersonalBlueprint.builder().ownerUserId(SUB).productKey("arclight pistol").build();

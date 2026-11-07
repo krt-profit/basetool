@@ -37,5 +37,17 @@ public enum P4kReviewReason {
   /**
    * A GUID that several rows would claim, or a row that several GUIDs would claim (REQ-P4K-007).
    */
-  GUID_CONFLICT
+  GUID_CONFLICT,
+
+  /**
+   * A personal-blueprint name key that no active blueprint's produced-item GUID resolves
+   * (REQ-P4K-029); the case's GUID is a name-based UUID of the key.
+   */
+  PRODUCT_KEY_UNRESOLVED,
+
+  /**
+   * A personal-blueprint name key that resolves to several produced-item GUIDs (REQ-P4K-029); the
+   * case's GUID is a name-based UUID of the key.
+   */
+  PRODUCT_KEY_AMBIGUOUS
 }

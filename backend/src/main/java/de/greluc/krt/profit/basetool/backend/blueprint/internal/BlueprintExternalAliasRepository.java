@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -43,4 +46,20 @@ public interface BlueprintExternalAliasRepository
    */
   Optional<BlueprintExternalAlias> findBySourceSystemAndExternalNameIgnoreCase(
       BlueprintExternalAliasSource sourceSystem, String externalName);
+
+  /**
+   * Returns every product key an alias points at.
+   *
+   * @return the distinct {@code product_key} values; never {@code null}
+   */
+  @Query("SELECT DISTINCT a.productKey FROM BlueprintExternalAlias a")
+  Set<String> findAllDistinctProductKeys();
+
+  /**
+   * Returns the aliases of one product.
+   *
+   * @param productKey the product key
+   * @return the aliases
+   */
+  List<BlueprintExternalAlias> findAllByProductKey(String productKey);
 }

@@ -45,9 +45,8 @@ import org.jetbrains.annotations.Nullable;
  * A blueprint product unlocked by default on every Star Citizen account and therefore granted to
  * every user as a {@link PersonalBlueprint} (REQ-INV-016).
  *
- * <p>The admin-curated source of the default set (REQ-INV-017). Identity is the unique normalized
- * {@link #productKey}, which makes adding a default idempotent; {@link #outputItem} is
- * informational only.
+ * <p>The admin-curated source of the default set (REQ-INV-017). Identity is the unique {@link
+ * #productKey}, which makes adding a default idempotent; {@link #outputItem} is informational only.
  */
 @Entity
 @Table(
@@ -70,8 +69,8 @@ public class DefaultBlueprint extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * Normalized product identity (lowercased, collapsed whitespace, normalized punctuation of the SC
-   * Wiki output name). Matches {@link PersonalBlueprint#getProductKey()}; unique across the table.
+   * Product identity, a produced-item GUID or a fallback name key ({@code ProductKeys}). Matches
+   * {@link PersonalBlueprint#getProductKey()}; unique across the table.
    */
   @Column(name = "product_key", nullable = false, length = 255)
   private String productKey;

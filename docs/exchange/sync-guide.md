@@ -13,7 +13,8 @@ resource pages have the details of each route.
    and store `installationId`.
 3. Run the [account check](resources/connect.md#account-check--post-exchangev1meaccount-check) with
    the handle from the game log. Sync only on `match`, or after the member confirmed the account.
-4. Settle names with [`catalog/resolve`](resources/catalog.md) and keep the `bt` it answers.
+4. Settle names with [`catalog/resolve`](resources/catalog.md) and keep the `guid` it answers for a
+   blueprint, else the `bt`.
 
 ## The baseline
 

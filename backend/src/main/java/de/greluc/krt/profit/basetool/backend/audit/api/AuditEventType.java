@@ -513,6 +513,15 @@ public enum AuditEventType {
   BLUEPRINT_AUDIT_EXPORTED(AuditDomain.BLUEPRINT),
   /** Blueprint audit rows older than an admin-chosen cutoff were purged (retention). */
   BLUEPRINT_AUDIT_PURGED(AuditDomain.BLUEPRINT),
+  /**
+   * A P4K run moved blueprint product name keys onto their produced items' GUID keys; one event per
+   * run (REQ-INV-070).
+   */
+  BLUEPRINT_PRODUCT_KEYS_UPGRADED(AuditDomain.BLUEPRINT),
+  /**
+   * A member's fallback blueprint row merged into the GUID row of the same product (REQ-INV-070).
+   */
+  BLUEPRINT_PRODUCT_MERGED(AuditDomain.BLUEPRINT),
   /** An exchange client was registered (REQ-XCH-003). */
   EXCHANGE_CLIENT_CREATED(AuditDomain.CONNECTED_APPS),
   /** A registry client's fields or capabilities changed; the details name what changed. */

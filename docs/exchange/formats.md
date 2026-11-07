@@ -20,7 +20,8 @@ entry:
 
 | Field | What it is |
 | --- | --- |
-| `bt` | The Basetool's own key, as the feed and `catalog/resolve` answer it. Always wins. |
+| `guid` | A blueprint product's key: the DataForge GUID of the item it produces. Always wins. Blueprints only. |
+| `bt` | The Basetool's own key, as the feed and `catalog/resolve` answer it. Deprecated for blueprints (see below). |
 | `scRecord` | The DataForge record name (the scmdb `tag`), case-insensitive. Not unique. |
 | `scGuid` | The game entity GUID. |
 | `uexId` | The UEX id. |
@@ -29,8 +30,14 @@ entry:
 
 When no field resolves to exactly one entry, the first that resolved to several decides: the answer
 is `ambiguous` with at most ten candidates `{bt, name}`. Fuzzy suggestions are always `ambiguous`,
-even a single one, because they are never taken without the member. Store the `bt` the server answers
-and send it from then on.
+even a single one, because they are never taken without the member. Store the `guid` the server
+answers for a blueprint, and the `bt` for any other entry, and send it from then on.
+
+**`bt` on a blueprint is deprecated.** A blueprint product is keyed by the GUID of the item it
+produces, and the server answers it as `guid`. A blueprint's `bt` keeps working, including a
+name key a client stored earlier, for 90 days from the release that added `guid`; the
+[changelog](changelog.md) announces the removal with its date. A blueprint still known only by
+its name carries no `guid` until the Basetool resolves it; keep its `bt` until then.
 
 `POST /exchange/v1/catalog/resolve` resolves up to 500 references of one `kind` (`BLUEPRINT`,
 `ITEM`, `MATERIAL`, `SHIP_TYPE`) at a time. A reference with a `locKey` whose key fields, the

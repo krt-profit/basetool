@@ -160,6 +160,7 @@ installation.schema.json#/properties/label CLIENT_DATA
 installation.schema.json#/properties/lastSeenAt FACT_VALUE
 item-ref.schema.json#/properties/bt IDENTIFIER
 item-ref.schema.json#/properties/extensions CLIENT_DATA
+item-ref.schema.json#/properties/guid IDENTIFIER
 item-ref.schema.json#/properties/locKey IDENTIFIER
 item-ref.schema.json#/properties/name SHORT_NAME
 item-ref.schema.json#/properties/nameLocale IDENTIFIER

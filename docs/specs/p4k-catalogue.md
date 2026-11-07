@@ -24,7 +24,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > [!note] Partly implemented
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
 > and shop tables join with their areas), REQ-P4K-033 is
-> implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
+> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-029 is implemented (#3039);
+> every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -731,11 +732,18 @@ REQ-INV-019, REQ-XCH-012's blueprint reference).
 
 **Acceptance**
 
-- [ ] A matched blueprint stores its `producedItemGuid`, also when no `game_item` carries that GUID.
-- [ ] A fallback row whose product resolves in a later run is upgraded to the GUID key and its
+- [x] A matched blueprint stores its `producedItemGuid`, also when no `game_item` carries that GUID.
+- [x] A fallback row whose product resolves in a later run is upgraded to the GUID key and its
   review case closed.
 
-**Enforced by (planned):** `P4kBlueprintImportTest`, `PersonalBlueprintKeyBackfillTest` · **ADR:**
+The import writes `blueprint.produced_item_guid` as a P4K-owned column. A fallback name key's
+case is a `BLUEPRINT` case with the reason `PRODUCT_KEY_UNRESOLVED` (no GUID) or
+`PRODUCT_KEY_AMBIGUOUS` (several), keyed by a name-based UUID of the name key; its report row
+names the key as class name and the product as English name. A run that resolves the key
+closes the case as `RESOLVED`, which only a run sets. Only an APPLY moves keys and opens or
+closes cases; a preview reports the same `REVIEW` rows, read against the GUIDs already stored.
+
+**Enforced by:** `PersonalBlueprintKeyBackfillTest` · **ADR:**
 [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md) · **Issues:** #2893
 
 ### REQ-P4K-030 — a crafted item's blueprint stat base values come from the P4K, and the SC Wiki fills gaps

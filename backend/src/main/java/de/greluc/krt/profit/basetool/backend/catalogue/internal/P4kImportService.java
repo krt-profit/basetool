@@ -81,6 +81,7 @@ public class P4kImportService {
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
   private final P4kSweeper sweeper;
+  private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
   private final P4kImportRecorder recorder;
   private final P4kRejections rejections;
@@ -126,14 +127,15 @@ public class P4kImportService {
     P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
     int ingredientsResolved = reconcile(catalogue, context);
     sweeper.sweep(catalogue, context, false);
+    productKeyReview.follow(context, context.getNow());
     return new P4kPreview(
         result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
   }
 
   /**
    * Applies an import in one transaction: refuses an older Build, records the run, reconciles every
-   * kind, stamps the matched rows with the run, sweeps the complete kinds and stores the change
-   * report.
+   * kind, stamps the matched rows with the run, sweeps the complete kinds, moves the personal
+   * blueprints onto the produced-item GUIDs (REQ-P4K-029) and stores the change report.
    *
    * @param payload the stored upload
    * @param request the job, the uploader and the admin's choices
@@ -156,6 +158,7 @@ public class P4kImportService {
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
     int ingredientsResolved = reconcile(catalogue, context);
     List<P4kKind> overridden = sweeper.sweep(catalogue, context, request.overrideMassGuard());
+    productKeyReview.follow(context, now);
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);

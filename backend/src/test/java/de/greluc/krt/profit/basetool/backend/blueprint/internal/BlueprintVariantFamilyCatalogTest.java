@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
@@ -56,11 +57,11 @@ class BlueprintVariantFamilyCatalogTest {
   void setUp() {
     catalog =
         new BlueprintVariantFamilyCatalog(
-            blueprintRepository, new BlueprintNameNormalizer(), resolver);
+            blueprintRepository, new ProductKeys(new BlueprintNameNormalizer()), resolver);
   }
 
   private static BlueprintProductRow row(String outputName) {
-    return new BlueprintProductRow(outputName, null, null, null);
+    return new BlueprintProductRow(outputName, null, null, null, null);
   }
 
   @Test

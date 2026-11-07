@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -57,11 +58,25 @@ public record ExchangeResolveResponse(List<Result> results, @Nullable List<Warni
   /**
    * A catalogue entry.
    *
-   * @param bt the Basetool's own key
+   * @param guid a blueprint product's produced-item GUID, its key (REQ-INV-070), or {@code null}
+   *     for every other entry
+   * @param bt the Basetool's own key, deprecated for blueprints in favour of {@code guid}
    * @param name the entry's display name
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  public record Entry(String bt, String name) {}
+  public record Entry(@Nullable UUID guid, String bt, String name) {
+
+    /**
+     * Creates an entry without a produced-item GUID: an item, material or ship type, or a blueprint
+     * product still keyed by its name.
+     *
+     * @param bt the Basetool's own key
+     * @param name the entry's display name
+     */
+    public Entry(String bt, String name) {
+      this(null, bt, name);
+    }
+  }
 
   /**
    * A warning about one field of the request.

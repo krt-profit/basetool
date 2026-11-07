@@ -3,6 +3,18 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-07
+
+- **New: blueprints carry `guid`.** A blueprint product is keyed by the DataForge GUID of the
+  item it produces. The blueprint feed, `catalog/resolve` and its candidates answer it as
+  `ref.guid`, and an item reference accepts `guid`, which wins over every other field
+  ([formats](formats.md)). Once the Basetool moves a product onto its GUID, its feed `key`
+  becomes the GUID: the feed removes the old key and adds the new one.
+- **Deprecated: `bt` on blueprint references.** A blueprint's `bt`, including a name key stored
+  earlier, keeps resolving for 90 days from the release that adds `guid`; a later entry here
+  announces its removal with the date. Switch to `guid`. `bt` of items, materials and ship
+  types is unchanged.
+
 ## 2026-11-05
 
 - **New: `Date` is readable cross-origin.** The gateway exposes `Date` to approved extensions on

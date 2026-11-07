@@ -27,10 +27,13 @@ import java.util.UUID;
 
 /**
  * One reference to resolve, in the shape of the published {@code item-ref.schema.json}; the server
- * tries its fields in the order {@code bt}, {@code scRecord}, {@code scGuid}, {@code uexId}, {@code
- * locKey}, {@code name} (REQ-XCH-012).
+ * tries its fields in the order {@code guid}, {@code bt}, {@code scRecord}, {@code scGuid}, {@code
+ * uexId}, {@code locKey}, {@code name} (REQ-XCH-012).
  *
- * @param bt the Basetool's own key, or {@code null}
+ * @param guid a blueprint product's produced-item DataForge GUID, its key (REQ-INV-070), or {@code
+ *     null}; other catalogues ignore it
+ * @param bt the Basetool's own key, deprecated for blueprints in favour of {@code guid}, or {@code
+ *     null}
  * @param scRecord the DataForge record name, compared case-insensitively, or {@code null}
  * @param scGuid the game entity GUID, or {@code null}
  * @param uexId the UEX id, or {@code null}
@@ -40,6 +43,7 @@ import java.util.UUID;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ExchangeItemRef(
+    UUID guid,
     @Size(min = 1, max = 128) String bt,
     @Size(min = 1, max = 200) String scRecord,
     UUID scGuid,

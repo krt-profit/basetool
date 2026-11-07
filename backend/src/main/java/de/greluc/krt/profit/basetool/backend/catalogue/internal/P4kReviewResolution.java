@@ -26,5 +26,8 @@ public enum P4kReviewResolution {
   KEEP,
 
   /** The row leaves every picker, like a P4K stamp, and no later match lifts it. */
-  HIDE
+  HIDE,
+
+  /** A later run resolved the case itself; never an admin's choice. */
+  RESOLVED
 }

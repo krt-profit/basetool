@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * Payload adding one blueprint to the caller's owned set; the server resolves display name and
  * output item.
  *
- * @param productKey normalized product key of the blueprint, max 255 chars
+ * @param productKey product key of the blueprint, max 255 chars
  * @param acquiredAt optional in-game acquisition time
  * @param note optional free-form note, max 2000 chars
  */

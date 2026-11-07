@@ -91,6 +91,38 @@ final class P4kRowWriter {
   }
 
   /**
+   * Writes a value the P4K catalogue owns: replaces the row's value whenever the catalogue holds a
+   * different one, and keeps it when the catalogue holds none.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param <V> the value type
+   */
+  <V> void lead(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter) {
+    if (incoming == null || incoming.equals(current)) {
+      return;
+    }
+    if (context.isApply()) {
+      setter.accept(incoming);
+    }
+    changed = true;
+    context
+        .getReport()
+        .changed(
+            kind,
+            record,
+            column,
+            current == null ? null : String.valueOf(current),
+            String.valueOf(incoming));
+  }
+
+  /**
    * Fills a game text where the row holds none; the report names the column only (REQ-P4K-033).
    *
    * @param column the column written

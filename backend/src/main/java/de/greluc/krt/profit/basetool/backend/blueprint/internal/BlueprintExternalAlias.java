@@ -44,7 +44,7 @@ import lombok.ToString;
  * Curated mapping of an external catalogue's blueprint name onto a local product, used by the
  * personal-blueprint import when a normalized exact match fails.
  *
- * <p>Points at a product by its normalized {@link #productKey} rather than a single recipe. {@code
+ * <p>Points at a product by its {@link #productKey} rather than a single recipe. {@code
  * (source_system, LOWER(external_name))} is unique in the database, so a duplicate add, including a
  * case-only variant, returns HTTP 409 (REQ-INV-020).
  */
@@ -75,8 +75,7 @@ public class BlueprintExternalAlias extends AbstractEntity<UUID> {
   private String externalName;
 
   /**
-   * Normalized product key this external name resolves to (matches {@link
-   * PersonalBlueprint#getProductKey()}).
+   * Product key this external name resolves to (matches {@link PersonalBlueprint#getProductKey()}).
    */
   @Column(name = "product_key", nullable = false, length = 255)
   private String productKey;

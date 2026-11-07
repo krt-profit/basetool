@@ -332,7 +332,7 @@ class ExchangeStockWriteConcurrencyIntegrationTest {
     return new ExchangeStockChangeSet.Op(
         "q" + quality,
         "set-quantity",
-        new ExchangeItemRef(material.toString(), null, null, null, null, null, null),
+        new ExchangeItemRef(null, material.toString(), null, null, null, null, null, null),
         new ExchangeLocationRef(locationName, null),
         quality,
         false,

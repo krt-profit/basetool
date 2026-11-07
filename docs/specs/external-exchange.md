@@ -8,9 +8,9 @@
 > [ADR-0220](../adr/0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md),
 > [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md),
 > [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md),
-> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md);
+> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md);
 > planned: [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
 
 # External client exchange
@@ -745,7 +745,7 @@ The formats are JSON Schema 2020-12 files. Their source is
 `ingest/src/main/resources/exchange/v1/schemas/`; the gateway serves each one anonymously at its
 permanent `$id`, `https://ingest.profit-base.online/exchange/v1/schemas/<name>.schema.json` (owner
 decision 2026-09-26), and a `$id` is never changed once published. The schemas are:
-`item-ref` (precedence `bt` › `scRecord` › `scGuid` › `uexId` › `locKey` › `name` + `nameLocale`),
+`item-ref` (precedence `guid` › `bt` › `scRecord` › `scGuid` › `uexId` › `locKey` › `name` + `nameLocale`),
 `quantity` (`{amount, unit: SCU|PIECE}`, PIECE whole; an SCU amount is not limited in its decimals — the backend rounds it half-up to three, and so does every comparison with `expectedQuantity`), `quality` (integer
 0–1000, stored as sent for every material), `location-ref`, `provenance` (`log|manual|import|default|other`,
 `observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`, and the optional UEX
@@ -795,8 +795,8 @@ blueprint takes from its output item; a `locKey` that resolves to no single entr
 the name with a warning. Places resolve against the Lager's `location` table; a
 place without a row is `LOCATION_UNKNOWN`.
 
-A reference takes the first of its fields, in the order `bt`, `scRecord`, `scGuid`, `uexId`,
-`locKey`, `name`, that resolves to exactly one entry; if none does, the first that resolved to
+A reference takes the first of its fields, in the order `guid`, `bt`, `scRecord`, `scGuid`,
+`uexId`, `locKey`, `name`, that resolves to exactly one entry; if none does, the first that resolved to
 several is the answer, so an ambiguous `scRecord` still yields to a name that resolves. `ambiguous`
 lists at most ten candidates as `{bt, name}`; fuzzy suggestions are always `ambiguous`, even when
 there is only one, because they are never taken without the member. `LOC_KEY_UNRESOLVED` points at
@@ -805,7 +805,7 @@ not resolve; a response carries at most 50 warnings. Per catalogue:
 
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
-| `BLUEPRINT` | the product key (normalized output name) | `blueprint.scwiki_key` | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's `name_key` | the web import's chain: exact, alias, pack-tag strip, fuzzy |
+| `BLUEPRINT` | the product key (the produced item's GUID, else the normalized output name), or a name key a client stored before its product moved to the GUID (deprecated) | `blueprint.scwiki_key` | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's `name_key` | the web import's chain: exact, alias, pack-tag strip, fuzzy |
 | `ITEM` | the item id | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
 | `MATERIAL` | the material id | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
 | `SHIP_TYPE` | the ship type id | `class_name` | Wiki UUID | UEX vehicle id | `name_key` | the hangar import's `ShipTypeMatcher` |
@@ -828,12 +828,10 @@ not resolve; a response carries at most 50 warnings. Per catalogue:
 > records it after a check against `docs/exchange/versioning.md` (REQ-XCH-026, ADR-0219), and
 > `ExchangeResolveServiceTest` covers the precedence, duplicate names and a variant's class name.
 
-> [!note] Planned amendment — a blueprint reference carries its produced item's GUID (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
-> A blueprint reference gains the field `guid`: the DataForge GUID of the produced item, the key of
-> a personal blueprint, never a Wiki UUID. `bt` stays readable for 90 days from the release that
-> adds `guid`, deprecated and announced in the exchange documentation, then it is removed
-> (REQ-XCH-015).
+A blueprint reference carries `guid`: the DataForge GUID of the produced item, the key of a
+personal blueprint (REQ-INV-070), never a Wiki UUID. It is the first field tried, matched against
+the products' keys; the other catalogues ignore it. Every blueprint entry the resolver answers
+carries it when the product is GUID-keyed ([ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md)).
 
 The backend answers on `POST /api/v1/exchange/catalog/resolve` for any exchange capability; the
 gateway reports unknown request fields as `UNKNOWN_FIELD` warnings (WP 3.2).
@@ -926,19 +924,21 @@ Ops are `add` and `remove` of products. Default-granted blueprints cannot be rem
 Blueprints domain with the external client. An `add` records the client and the source its
 `provenance` names, and the feed publishes a recorded source as `provenance.source` (REQ-INV-054).
 
-A blueprint's `key` and its `ref.bt` are the same value: the normalised product key, or `h:` and
-its SHA-256 in hex when that is longer than 128 characters. The display name is cut to 200. The
-resolver (REQ-XCH-012) answers a blueprint with the same `bt` and accepts it back.
+A blueprint's `key` and its `ref.bt` are the same value: the product key, or `h:` and its SHA-256
+in hex when that is longer than 128 characters. The display name is cut to 200. The resolver
+(REQ-XCH-012) answers a blueprint with the same `bt` and accepts it back.
 
-> [!note] Planned amendment — blueprints carry `guid`, and `bt` is deprecated (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
-> A personal blueprint is keyed by its produced item's DataForge GUID (REQ-INV-070). A blueprint
-> reference gains `guid`, additive in the v1 schemas (REQ-XCH-026). `bt` is deprecated: it stays
-> for 90 days from the release that adds `guid`, the exchange documentation (`docs/exchange/`)
-> announces it, a usage metric under bounded labels (REQ-OBS-011) watches it, and then it is
-> removed. The
-> change feed's entity key and the journal move to the GUID key in the same step as the member's
-> rows, so the system holds one key and no translation layer.
+A personal blueprint is keyed by its produced item's DataForge GUID (REQ-INV-070, [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md)),
+and its `ref` carries that GUID as `guid`, additive in the v1 schemas (REQ-XCH-026). A blueprint's
+`bt` is deprecated: it keeps resolving, a name key a client stored before the product moved to
+its GUID included (in a reference and as a remove op's `key`), for 90 days from the release that
+adds `guid`; `docs/exchange/changelog.md` announces it, and
+`basetool_exchange_blueprint_bt_refs_total` counts the references that still carry it
+(REQ-OBS-011). Its removal is a later change that the changelog dates. When a product moves to
+its GUID, the earlier change-feed entries and the journal move with the member's rows, so a
+removal elsewhere stays a live tombstone of the GUID key; the move itself appears in the feed as
+the name key's removal and the GUID key's arrival, so a client converges without a translation
+layer.
 
 **Acceptance**
 
