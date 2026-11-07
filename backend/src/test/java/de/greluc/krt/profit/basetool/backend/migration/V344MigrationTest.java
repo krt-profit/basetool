@@ -58,10 +58,16 @@ class V344MigrationTest {
     jdbc.execute("ALTER TABLE personal_inventory_item DROP COLUMN location_id");
     jdbc.execute("ALTER TABLE location DROP COLUMN reference_only");
     jdbc.execute(
-        "ALTER TABLE personal_inventory_item ADD COLUMN location_uex_id INTEGER,"
-            + " ADD COLUMN location_type VARCHAR(20),"
+        "ALTER TABLE personal_inventory_item DROP COLUMN IF EXISTS location_uex_id,"
+            + " DROP COLUMN IF EXISTS location_type");
+    jdbc.execute(
+        "ALTER TABLE personal_inventory_item ADD COLUMN location_uex_id INTEGER NOT NULL DEFAULT 0,"
+            + " ADD COLUMN location_type VARCHAR(20) NOT NULL DEFAULT 'CITY',"
             + " ADD CONSTRAINT ck_personal_inventory_item_location_type"
             + " CHECK (location_type IN ('CITY', 'SPACE_STATION'))");
+    jdbc.execute(
+        "ALTER TABLE personal_inventory_item ALTER COLUMN location_uex_id DROP DEFAULT,"
+            + " ALTER COLUMN location_type DROP DEFAULT");
     owner = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)", owner, "v344-" + owner);
@@ -130,14 +136,29 @@ class V344MigrationTest {
   }
 
   @Test
-  void theOldColumnsGoAndTheKeyIsAnIndexedForeignKeyThatClearsOnDelete() throws IOException {
+  void theOldColumnsStayNullableAndKeepTheirValuesAndTheKeyIsAnIndexedForeignKey()
+      throws IOException {
+    UUID item = item(990_344_05, "CITY", "V344 Kept Key");
+
     runScript();
 
     assertThat(
             count(
                 "SELECT count(*) FROM information_schema.columns"
                     + " WHERE table_name = 'personal_inventory_item'"
-                    + " AND column_name IN ('location_uex_id', 'location_type')"))
+                    + " AND column_name IN ('location_uex_id', 'location_type')"
+                    + " AND is_nullable = 'YES'"))
+        .isEqualTo(2);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT location_uex_id, location_type FROM personal_inventory_item WHERE id = ?",
+                item))
+        .containsEntry("location_uex_id", 990_344_05)
+        .containsEntry("location_type", "CITY");
+    assertThat(
+            count(
+                "SELECT count(*) FROM pg_constraint"
+                    + " WHERE conname = 'ck_personal_inventory_item_location_type'"))
         .isZero();
     assertThat(
             count(

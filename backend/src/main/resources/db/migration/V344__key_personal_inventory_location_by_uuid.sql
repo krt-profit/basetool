@@ -71,11 +71,19 @@ ALTER TABLE personal_inventory_item
 
 CREATE INDEX idx_personal_inventory_item_location ON personal_inventory_item (location_id);
 
-ALTER TABLE personal_inventory_item DROP CONSTRAINT ck_personal_inventory_item_location_type;
+-- Phase 1 of the two-phase drop (README): the code no longer reads or writes the UEX key, which
+-- stays nullable and unconstrained so a rollback and an unresolved row keep it.
+ALTER TABLE personal_inventory_item DROP CONSTRAINT IF EXISTS ck_personal_inventory_item_location_type;
 
-ALTER TABLE personal_inventory_item DROP COLUMN location_uex_id;
+ALTER TABLE personal_inventory_item ALTER COLUMN location_uex_id DROP NOT NULL;
 
-ALTER TABLE personal_inventory_item DROP COLUMN location_type;
+ALTER TABLE personal_inventory_item ALTER COLUMN location_type DROP NOT NULL;
+
+COMMENT ON COLUMN personal_inventory_item.location_uex_id IS
+    'Legacy UEX id of the place, unread by the application. location_id is the reference.';
+
+COMMENT ON COLUMN personal_inventory_item.location_type IS
+    'Legacy kind of location_uex_id (CITY or SPACE_STATION), unread by the application.';
 
 COMMENT ON COLUMN personal_inventory_item.location_id IS
     'The storage place (location.id). NULL when the place no longer resolves, location_name_snapshot still names it.';

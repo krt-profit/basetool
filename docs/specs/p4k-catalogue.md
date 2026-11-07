@@ -1257,6 +1257,10 @@ The owner's decision (@greluc, 2026-11-05) fixes the edges:
   is a `400`. The API shows such a row with `locationId` and `locationType` `null`.
 - `locationType` (`CITY`, `SPACE_STATION`, `OTHER`) is derived from the location's link for the
   marker only and is no longer stored.
+- **The legacy columns follow the two-phase drop** (migration README). V344 keeps
+  `location_uex_id` and `location_type` nullable and without their check constraint, and the code
+  neither maps nor writes them, so a rollback and an unresolved row keep the UEX key; a migration of
+  a later release drops them.
 
 **Acceptance**
 
