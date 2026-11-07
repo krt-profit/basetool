@@ -77,16 +77,6 @@ public record GameItemReferenceDto(
   }
 
   /**
-   * Returns the name the page shows.
-   *
-   * @param locale the page locale
-   * @return the German name on a German page when there is one, else the name
-   */
-  public String displayName(@Nullable Locale locale) {
-    return LocalisedNames.display(name, nameDe, locale);
-  }
-
-  /**
    * Builds a reference without component data, for items that are no ship component.
    *
    * @param id the game item's id
@@ -117,5 +107,15 @@ public record GameItemReferenceDto(
       String grade,
       String itemClass) {
     this(id, name, kind, componentType, size, grade, itemClass, false);
+  }
+
+  /**
+   * Returns the name the page shows.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
   }
 }

@@ -89,7 +89,8 @@ class P4kManufacturerPrecedenceTest {
     Manufacturer row = manufacturer("Gorgon Old Name", "GOR");
     row.setP4kUuid(GORGON);
     ObjectNode root = P4kTestCatalogues.tree();
-    ObjectNode record = named(root, GORGON, "Gorgon Defender Industries P4K", "Gorgon Verteidigung");
+    ObjectNode record =
+        named(root, GORGON, "Gorgon Defender Industries P4K", "Gorgon Verteidigung");
     ObjectNode description = (ObjectNode) record.get("description");
     description.put("en", "English text");
     description.put("de", "Deutscher Text");
@@ -118,7 +119,8 @@ class P4kManufacturerPrecedenceTest {
     assertThat(
             reviewCaseRepository.findByKindAndGuidAndReason(
                 P4kKind.MANUFACTURER, GORGON, P4kReviewReason.NAME_CONFLICT))
-        .hasValueSatisfying(reviewCase -> assertThat(reviewCase.getRowId()).isEqualTo(known.getId()));
+        .hasValueSatisfying(
+            reviewCase -> assertThat(reviewCase.getRowId()).isEqualTo(known.getId()));
     assertThat(changeRepository.findByRunId(run))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.REVIEW)
         .extracting(P4kImportChange::getGuid)

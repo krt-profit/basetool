@@ -40,8 +40,7 @@ public record MaterialDto(
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable
-        CommodityMiningData miningData,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable CommodityMiningData miningData,
     @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable String nameDe) {
 
   /** Creates a material without a German name; {@code nameDe} is written by the P4K only. */

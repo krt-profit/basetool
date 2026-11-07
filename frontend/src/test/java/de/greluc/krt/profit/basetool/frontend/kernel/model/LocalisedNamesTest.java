@@ -24,7 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
-/** A German page shows the German name when there is one, every other page the name (REQ-P4K-023). */
+/**
+ * A German page shows the German name when there is one, every other page the name (REQ-P4K-023).
+ */
 class LocalisedNamesTest {
 
   @Test

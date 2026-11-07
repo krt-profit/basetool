@@ -245,7 +245,13 @@ public class UexManufacturerService {
     } else {
       UUID runId = syncReportService.beginRun();
       syncReportService.logP4kDisagreement(
-          SyncSourceSystem.UEX, runId, AGGREGATE, p4kUuid, "name", manufacturer.getName(), dto.name());
+          SyncSourceSystem.UEX,
+          runId,
+          AGGREGATE,
+          p4kUuid,
+          "name",
+          manufacturer.getName(),
+          dto.name());
       syncReportService.logP4kDisagreement(
           SyncSourceSystem.UEX,
           runId,

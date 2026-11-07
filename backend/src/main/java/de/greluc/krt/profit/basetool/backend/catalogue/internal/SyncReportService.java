@@ -275,7 +275,13 @@ public class SyncReportService {
             .externalUuid(p4kUuid)
             .externalName(p4kValue)
             .detail(
-                column + ": " + source.name() + " '" + sourceValue.strip() + "', P4K '" + p4kValue
+                column
+                    + ": "
+                    + source.name()
+                    + " '"
+                    + sourceValue.strip()
+                    + "', P4K '"
+                    + p4kValue
                     + "'")
             .build());
     countSyncEvent(source, SyncEventType.P4K_VALUE_DISAGREEMENT);

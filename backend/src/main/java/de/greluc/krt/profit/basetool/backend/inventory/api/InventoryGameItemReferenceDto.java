@@ -77,8 +77,7 @@ public record InventoryGameItemReferenceDto(
       @Nullable String grade,
       @Nullable String itemClass,
       boolean noLongerInGame) {
-    this(
-        id, name, manufacturer, kind, componentType, size, grade, itemClass, noLongerInGame, null);
+    this(id, name, manufacturer, kind, componentType, size, grade, itemClass, noLongerInGame, null);
   }
 
   /**

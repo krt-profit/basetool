@@ -46,8 +46,8 @@ public class P4kManufacturerReconciler {
   private final ManufacturerRepository manufacturerRepository;
 
   /**
-   * Reconciles every manufacturer and holds the unmatched ones for {@link #forSeededRow} and
-   * {@link #finish}.
+   * Reconciles every manufacturer and holds the unmatched ones for {@link #forSeededRow} and {@link
+   * #finish}.
    *
    * @param manufacturers the catalogue's manufacturers
    * @param context the run

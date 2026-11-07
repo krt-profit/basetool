@@ -85,16 +85,6 @@ public record MaterialDto(
         null);
   }
 
-  /**
-   * Returns the name the page shows (REQ-P4K-023).
-   *
-   * @param locale the page locale
-   * @return the German name on a German page when there is one, else the name
-   */
-  public String displayName(@Nullable Locale locale) {
-    return LocalisedNames.display(name, nameDe, locale);
-  }
-
   /** Creates an editable material summary without source-owned mining data. */
   public MaterialDto(
       UUID id,
@@ -129,5 +119,15 @@ public record MaterialDto(
         isVisible,
         version,
         null);
+  }
+
+  /**
+   * Returns the name the page shows (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
   }
 }

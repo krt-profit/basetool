@@ -41,8 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The P4K import writes the German name of items, ships and commodities, never a missing-translation
- * marker, the DTOs carry it, and search keeps running on the name (REQ-P4K-023).
+ * The P4K import writes the German name of items, ships and commodities, never a
+ * missing-translation marker, the DTOs carry it, and search keeps running on the name
+ * (REQ-P4K-023).
  */
 @SpringBootTest
 @Transactional
@@ -100,8 +101,8 @@ class P4kNamesTest {
     assertThat(borase.getNameDe()).isEqualTo("Borase DE");
     assertThat(materialMapper.toDto(borase).nameDe()).isEqualTo("Borase DE");
     assertThat(shipTypeRepository.findByP4kUuid(P4kTestCatalogues.PLAYER_SHIP))
-        .hasValueSatisfying(
-            row -> assertThat(shipTypeMapper.toDto(row).nameDe()).isEqualTo("Aegis Avenger Titan DE"));
+        .hasValueSatisfying(row ->
+            assertThat(shipTypeMapper.toDto(row).nameDe()).isEqualTo("Aegis Avenger Titan DE"));
   }
 
   @Test
@@ -114,12 +115,14 @@ class P4kNamesTest {
 
     assertThat(
             materialRepository
-                .searchPicker("Nur Deutsch Suchtest", false, MaterialType.RAW, false, PageRequest.of(0, 10))
+                .searchPicker(
+                    "Nur Deutsch Suchtest", false, MaterialType.RAW, false, PageRequest.of(0, 10))
                 .getContent())
         .isEmpty();
     assertThat(
             materialRepository
-                .searchPicker("Borase Search Test", false, MaterialType.RAW, false, PageRequest.of(0, 10))
+                .searchPicker(
+                    "Borase Search Test", false, MaterialType.RAW, false, PageRequest.of(0, 10))
                 .getContent())
         .isNotEmpty();
   }
