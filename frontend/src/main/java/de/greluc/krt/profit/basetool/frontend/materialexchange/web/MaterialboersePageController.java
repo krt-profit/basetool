@@ -89,6 +89,9 @@ public class MaterialboersePageController {
   /** Cap on the number of catalogue materials the material-request type-ahead requests. */
   private static final int MATERIAL_PICKER_LIMIT = 25;
 
+  /** Model attribute: whether the detail entry was asked for, not the first-entry fallback. */
+  private static final String SELECTION_EXPLICIT = "selectionExplicit";
+
   /** Sends the board reads, the writes and the picker searches. */
   private final MaterialExchangeBackendClient materialExchangeClient;
 
@@ -166,8 +169,9 @@ public class MaterialboersePageController {
     if (requests) {
       List<MaterialRequestDto> reqs = loadRequests(activeTab, q, minQuality, minAmount, activeSort);
       model.addAttribute("requests", reqs);
-      model.addAttribute(
-          "selectedRequest", loadRequestDetail(pickSelectedRequestId(reqs, selected)));
+      String pickedRequestId = pickSelectedRequestId(reqs, selected);
+      model.addAttribute("selectedRequest", loadRequestDetail(pickedRequestId));
+      model.addAttribute(SELECTION_EXPLICIT, isExplicitSelection(pickedRequestId, selected));
       if ("board".equals(fragment)) {
         return "materialexchange/materialboerse :: board";
       }
@@ -180,7 +184,9 @@ public class MaterialboersePageController {
     List<MaterialExchangeOfferDto> offers =
         loadOffers(activeTab, q, minQuality, minAmount, activeSort, excludeStolen);
     model.addAttribute("offers", offers);
-    model.addAttribute("selectedOffer", loadDetail(pickSelectedId(offers, selected)));
+    String pickedOfferId = pickSelectedId(offers, selected);
+    model.addAttribute("selectedOffer", loadDetail(pickedOfferId));
+    model.addAttribute(SELECTION_EXPLICIT, isExplicitSelection(pickedOfferId, selected));
     if ("board".equals(fragment)) {
       return "materialexchange/materialboerse :: board";
     }
@@ -585,6 +591,19 @@ public class MaterialboersePageController {
       return requested;
     }
     return requests.isEmpty() ? null : requests.get(0).id().toString();
+  }
+
+  /**
+   * Tells whether the entry shown in the detail pane is the one the caller asked for, rather than
+   * the first entry picked as a fallback; only an explicit selection opens the detail on a narrow
+   * screen (REQ-MARKET-009).
+   *
+   * @param picked the id shown in the detail pane, or {@code null} for an empty list.
+   * @param requested the id the caller asked for, or {@code null}.
+   * @return {@code true} when both are present and equal.
+   */
+  private static boolean isExplicitSelection(@Nullable String picked, @Nullable String requested) {
+    return picked != null && picked.equals(requested);
   }
 
   /**

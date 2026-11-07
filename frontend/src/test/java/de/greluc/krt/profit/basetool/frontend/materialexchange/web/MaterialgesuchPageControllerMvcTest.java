@@ -120,6 +120,34 @@ class MaterialgesuchPageControllerMvcTest {
         0L);
   }
 
+  /** Without a picked request the board opens on the list: the first-entry fallback is no pick. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_requestsWithoutSelected_rendersNoOpenDetail() throws Exception {
+    stubBoard(materialRequest());
+
+    mockMvc
+        .perform(get("/materialboerse").param("view", "requests"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("master-detail mb-md")))
+        .andExpect(content().string(not(containsString("has-sel"))));
+  }
+
+  /** A picked request in the list opens its detail on a narrow screen. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_requestsWithSelected_rendersOpenDetail() throws Exception {
+    stubBoard(materialRequest());
+
+    mockMvc
+        .perform(
+            get("/materialboerse")
+                .param("view", "requests")
+                .param("selected", requestId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("master-detail mb-md has-sel")));
+  }
+
   /**
    * The full request board renders the material name, the tabs, the Markdown description + badge.
    */

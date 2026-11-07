@@ -75,10 +75,20 @@
         padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
     }
     .mission-head-sticky {
+        --mission-head-top: var(--krt-header-height, 0px);
+        --mission-head-mini-height: calc(var(--touch-target) + var(--space-2));
+        --mission-facts-gap: 22px;
+
         position: sticky;
-        top: var(--krt-header-height, 0);
+        top: var(--mission-head-top);
         z-index: var(--z-sticky-head);
         background-color: var(--surface-canvas);
+    }
+    .mission-head-mini {
+        display: none;
+    }
+    .tab-nav .tab-label-short {
+        display: none;
     }
     @media (width >= 1440px) {
         .page-wrapper {
@@ -104,7 +114,7 @@
         margin-bottom: 0;
     }
     .mission-head-sticky .facts-bar {
-        gap: 22px;
+        gap: var(--mission-facts-gap);
         padding: 12px var(--page-gutter);
         font-size: 0.95rem;
         align-items: center;
@@ -132,8 +142,120 @@
         font-weight: 400;
         color: var(--color-gray-2-text);
     }
-    .mission-head-sticky > .tab-nav {
+    .mission-head-dock > .tab-nav {
         padding-inline: calc(var(--page-gutter) - 4px);
+    }
+
+    /* Phone class (REQ-MISSION-033): the head scrolls away, the dock with the tabs stays pinned below
+       the site header and reserves the strip above itself for the condensed mini bar. */
+    @media (width <= 768px) {
+        .mission-head-sticky {
+            --mission-facts-gap: var(--space-4);
+
+            display: contents;
+        }
+        .mission-head-sticky > .page-head {
+            padding-block: var(--space-2);
+        }
+        .mission-head-sticky .facts-bar {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-block: var(--space-2);
+        }
+        .mission-head-sticky .facts-bar .fact {
+            flex: none;
+            white-space: nowrap;
+        }
+        .mission-head-sticky .facts-bar .fact--end {
+            margin-inline-start: calc(var(--space-1) - var(--mission-facts-gap));
+        }
+        .mission-head-sticky .facts-bar .fact--end > .krt-icon {
+            display: none;
+        }
+        .mission-head-sticky .facts-bar .fact--end::before {
+            content: '\2013';
+            color: var(--color-gray-2-text);
+        }
+        .mission-head-sticky .facts-bar .fact-k,
+        .mission-head-action-label {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+        .mission-head-dock {
+            position: sticky;
+            top: calc(var(--mission-head-top) + var(--mission-head-mini-height));
+            z-index: var(--z-sticky-head);
+            background-color: var(--surface-canvas);
+        }
+        .mission-head-dock > .tab-nav {
+            flex-wrap: nowrap;
+        }
+        .mission-head-dock > .tab-nav .tab {
+            flex: none;
+            white-space: nowrap;
+        }
+        .tab-nav .tab-label-long {
+            display: none;
+        }
+        .tab-nav .tab-label-short {
+            display: inline;
+        }
+        .mission-head-mini {
+            position: absolute;
+            inset-inline: 0;
+            bottom: 100%;
+            box-sizing: border-box;
+            height: var(--mission-head-mini-height);
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--page-gutter);
+            background-color: var(--color-bg-dark-gray);
+            border-bottom: var(--border-hairline);
+            visibility: hidden;
+            opacity: 0;
+            transition:
+                opacity 120ms ease,
+                visibility 0s linear 120ms;
+        }
+        .mission-head-dock.is-condensed > .mission-head-mini {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity 120ms ease;
+        }
+        .mission-head-mini__title {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: var(--touch-target);
+            padding: 0;
+            border: 0;
+            background: none;
+            overflow: hidden;
+            text-align: start;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--font-headline);
+            font-size: var(--fs-body);
+            font-weight: var(--fw-bold);
+            text-transform: uppercase;
+            color: var(--color-primary);
+            cursor: pointer;
+        }
+        .mission-head-mini__status,
+        .mission-head-mini__cta {
+            flex: none;
+        }
+        .mission-head-mini__cta {
+            min-width: var(--touch-target);
+            padding-inline: var(--space-3);
+        }
     }
     .tab-panes {
         padding: 14px var(--page-gutter) 18px;

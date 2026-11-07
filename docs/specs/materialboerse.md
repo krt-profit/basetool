@@ -326,6 +326,11 @@ interaction updates the DOM in place through `krtFetch` (no full-page reload on 
 renders server-side via the `@markdown` bean into `.markdown-content`, and there are no native
 dialogs (KRT modal + `showKrtConfirm` + toasts).
 Complies with `docs/specs/frontend-ajax-mutations.md` (REQ-FE-001…014).
+On a wide screen the detail pane shows the first entry until the member picks one. At 1024 px and
+below, where list and detail share one column, the board opens on the **list**: the detail replaces
+it only for an entry the member picked (a row tap or a `selected` id that is in the list), and
+„Liste" returns to the list and drops that pick, so a later refresh keeps the list in view. This
+holds on both views.
 
 *Amended 2026-10-03 (website overhaul phase 3): the four tabs „Alle/Meine Angebote/Gesuche" became
 two tabs plus the scope segment, the four create buttons one menu per tab, the filter row a toolbar
@@ -340,6 +345,8 @@ fallbacks.*
   release / item / request dialogs.
 - [ ] The remark is server-rendered Markdown; the CTA/modal use no `confirm/alert/prompt`.
 - [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
+- [x] Without a picked entry the board renders without `has-sel`, so a phone or tablet opens on the
+  list; a `selected` id in the list renders `has-sel` (both views).
 
 **Enforced by:** `MaterialboersePageControllerMvcTest`, `MaterialboersePatternRenderTest`, CI
 Playwright (e2e) · **Code:** `MaterialboersePageController#board`, `materialexchange/materialboerse.html`,

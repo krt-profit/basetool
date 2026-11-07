@@ -32,7 +32,7 @@
             </div>
             <div class="page-actions">
                 <button th:if="${mission.canEdit or mission.canManageManagers}" id="mission-edit-btn" type="button" class="btn btn-ghost"
-                        data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
+                        data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false" th:title="#{mission.edit.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span class="mission-head-action-label" th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
                 <button id="add-participant-btn" type="button" class="btn btn--cta" data-testid="page-head-primary"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
                 <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
@@ -48,17 +48,27 @@
             </div>
         </div>
         <div class="facts-bar">
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-headset"/></svg><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.end}">Ende</span><span id="facts-planned-end" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
-            <span class="fact" th:if="${!#strings.isEmpty(mission.meetingPoint)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-map-pin"/></svg><span class="fact-k" th:text="#{mission.meeting_point}">Treffpunkt</span><span class="fact-v" th:text="${mission.meetingPoint}">&mdash;</span></span>
-            <span class="fact"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-leader" class="fact-v" th:text="${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')}">&mdash;</span></span>
+            <span class="fact" th:title="#{mission.facts.ts}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-headset"/></svg><span class="fact-k" th:text="#{mission.facts.ts}">TS</span><span id="facts-ts" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.meetingTime != null ? mission.meetingTime.toEpochMilli() : 'null'}" th:text="${mission.meetingTime != null ? #temporals.format(mission.meetingTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact fact--join" th:title="#{mission.facts.server_join}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.server_join}">Server-Join</span><span id="facts-planned-start" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedStartTime != null ? mission.plannedStartTime.toEpochMilli() : 'null'}" th:text="${mission.plannedStartTime != null ? #temporals.format(mission.plannedStartTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact fact--end" th:title="#{mission.facts.end}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-clock"/></svg><span class="fact-k" th:text="#{mission.facts.end}">Ende</span><span id="facts-planned-end" class="fact-v krt-local-dt" data-format="time" th:attr="data-utc=${mission.plannedEndTime != null ? mission.plannedEndTime.toEpochMilli() : 'null'}" th:text="${mission.plannedEndTime != null ? #temporals.format(mission.plannedEndTime, 'HH:mm', 'UTC') + ' UTC' : '&mdash;'}">&mdash;</span></span>
+            <span class="fact" th:if="${!#strings.isEmpty(mission.meetingPoint)}" th:title="#{mission.meeting_point}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-map-pin"/></svg><span class="fact-k" th:text="#{mission.meeting_point}">Treffpunkt</span><span class="fact-v" th:text="${mission.meetingPoint}">&mdash;</span></span>
+            <span class="fact" th:title="#{mission.facts.lead}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user"/></svg><span class="fact-k" th:text="#{mission.facts.lead}">Leiter</span><span id="facts-leader" class="fact-v" th:text="${!#strings.isEmpty(factLeaderName) ? factLeaderName : #messages.msg('general.none')}">&mdash;</span></span>
             <span class="fact" th:title="#{mission.participants.count.tooltip}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg><span class="fact-k" th:text="#{mission.participants}">Teilnehmer</span><span class="fact-v"><span id="facts-registered" th:text="${mission.registeredParticipants}">0</span><span class="facts-checked-in-suffix"> &middot; <span id="facts-checked-in" th:text="${mission.checkedInParticipants}">0</span> <span th:text="#{mission.facts.checked_in_suffix}">eingecheckt</span></span></span></span>
         </div>
-        <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
-            <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
-            <button class="tab" id="tab-crew" type="button" role="tab" aria-selected="false" aria-controls="pane-crew" data-tab="crew"><span th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span> <span class="tab-count" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|" th:title="#{mission.participants.count.tooltip}">0/0</span></button>
-            <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span> <span id="finance-tab-count" class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
+        <div class="mission-head-dock" id="mission-head-dock">
+            <div class="mission-head-mini" id="mission-head-mini" data-testid="mission-head-mini">
+                <button type="button" id="mission-head-mini-title" class="mission-head-mini__title" th:title="#{mission.head.mini.top}" th:text="${mission.name}">Mission Name</button>
+                <span id="mission-head-mini-status" aria-hidden="true"
+                      th:class="${'status-badge mission-head-mini__status status-' + #strings.toLowerCase(mission.status)}"
+                      th:text="${#messages.msgOrNull('mission.status.' + #strings.toLowerCase(mission.status)) ?: mission.status}">GEPLANT</span>
+                <button type="button" id="mission-head-mini-cta" class="btn btn--cta mission-head-mini__cta" data-testid="mission-head-mini-cta"
+                        th:title="#{mission.participant.add}" th:aria-label="#{mission.participant.add}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg></button>
+            </div>
+            <div class="tab-nav" role="tablist" th:aria-label="#{mission.details}">
+                <button class="tab" id="tab-ueb" type="button" role="tab" aria-selected="false" aria-controls="pane-ueb" data-tab="ueb" th:text="#{mission.tab.overview}">&Uuml;bersicht</button>
+                <button class="tab" id="tab-crew" type="button" role="tab" aria-selected="false" aria-controls="pane-crew" data-tab="crew"><span class="tab-label-long" th:text="#{mission.tab.crew}">Teilnehmer &amp; Einheiten</span><span class="tab-label-short" th:text="#{mission.tab.crew.short}">Teilnehmer</span> <span class="tab-count" th:text="|${mission.checkedInParticipants}/${mission.registeredParticipants}|" th:title="#{mission.participants.count.tooltip}">0/0</span></button>
+                <button class="tab" id="tab-fin" type="button" role="tab" aria-selected="false" aria-controls="pane-fin" data-tab="fin"><span class="tab-label-long" th:text="#{mission.tab.finance}">Finanzen &amp; Auszahlung</span><span class="tab-label-short" th:text="#{mission.tab.finance.short}">Finanzen</span> <span id="finance-tab-count" class="tab-count" th:if="${financeSum != null}" th:text="${financeIncomeCount + financeExpenseCount}">0</span></button>
+            </div>
         </div>
     </div>
 
@@ -1622,6 +1632,7 @@
 <script type="module" th:src="@{/js/mission/mission-detail-participants.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-actions.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-tabs.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/mission/mission-detail-head.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-presence.js}" th:attr="nonce=${cspNonce}"></script>
 <script th:if="${!isNew and authUserId != null}" th:attr="nonce=${cspNonce}" th:inline="javascript">
     window.MISSION_PRESENCE_I18N = {
