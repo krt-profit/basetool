@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCompressi
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kContentTooLargeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -125,7 +124,7 @@ public class P4kUploadGate {
         return Inspection.refused(headRefusal);
       }
       try (InputStream in = P4kCompression.openDecompressed(upload, limit)) {
-        in.transferTo(OutputStream.nullOutputStream());
+        reader.drainCountingHeld(in, properties.heldLimitBytes());
       }
       return new Inspection(null, head.build());
     } catch (P4kContentTooLargeException _) {

@@ -30,8 +30,12 @@ import org.springframework.validation.annotation.Validated;
  * @param decompressedLimitBytes the most bytes a catalogue may hold once decompressed; the
  *     contract's {@code DECOMPRESSED_LIMIT}, 1,000,000,000 by default, also the guard against
  *     decompression bombs
+ * @param heldLimitBytes the most bytes of catalogue JSON the kinds the reader holds in memory may
+ *     span together, 128,000,000 by default; it bounds the heap of a preview or APPLY where the
+ *     decompressed limit alone would not
  */
 @Validated
 @ConfigurationProperties(prefix = "krt.p4k-import")
 public record P4kImportProperties(
-    @DefaultValue("1000000000") @Min(1) long decompressedLimitBytes) {}
+    @DefaultValue("1000000000") @Min(1) long decompressedLimitBytes,
+    @DefaultValue("128000000") @Min(1) long heldLimitBytes) {}

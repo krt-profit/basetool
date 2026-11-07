@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -65,6 +68,15 @@ public class P4kCatalogueReader {
   /** The crafting globals holding the dismantle exclusions. */
   private static final String CRAFTING_GLOBAL = "craftingGlobal";
 
+  /** The fields besides the kinds that {@link #read} holds in memory. */
+  private static final Set<String> HELD_EXTRAS =
+      Set.of(
+          SHIP_STORE_SLUGS,
+          P4kCatalogue.PAINTS,
+          GAMEPLAY_PROPERTIES,
+          DISMANTLE_PROCESSES,
+          CRAFTING_GLOBAL);
+
   private final ObjectMapper objectMapper;
 
   /**
@@ -93,17 +105,22 @@ public class P4kCatalogueReader {
   /**
    * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs, the
    * paints, the resource groups, the blueprint categories and the crafting records the blueprints
-   * refer to, skipping everything else, the loadouts included.
+   * refer to, skipping everything else, the loadouts included. The held fields are counted against
+   * {@code heldLimitBytes} after every record, so the memory they take stays bounded by that limit
+   * plus one record.
    *
    * @param in the decompressed catalogue
+   * @param heldLimitBytes the most bytes of catalogue JSON the held fields may span together
    * @return the catalogue
    * @throws P4kCatalogueFormatException when the content is not catalogue JSON
-   * @throws P4kContentTooLargeException when the content passes the decompressed limit
+   * @throws P4kContentTooLargeException when the content passes the decompressed limit or the held
+   *     fields pass {@code heldLimitBytes}
    */
   @NotNull
-  public P4kCatalogue read(@NotNull InputStream in) {
+  public P4kCatalogue read(@NotNull InputStream in, long heldLimitBytes) {
     try (JsonParser parser = openObject(in)) {
       HeadBuilder head = new HeadBuilder();
+      HeldBudget budget = new HeldBudget(heldLimitBytes);
       Map<P4kKind, List<? extends P4kRecord>> kinds = new EnumMap<>(P4kKind.class);
       List<P4kShipStoreSlug> storeSlugs = List.of();
       List<P4kPaintDto> paints = List.of();
@@ -118,17 +135,19 @@ public class P4kCatalogueReader {
         P4kKind kind = kindOf(field);
         parser.nextToken();
         if (kind != null) {
-          kinds.put(kind, readArray(parser, recordType(kind)));
+          kinds.put(kind, readArray(parser, recordType(kind), budget));
         } else if (SHIP_STORE_SLUGS.equals(field)) {
-          storeSlugs = readArray(parser, P4kShipStoreSlug.class);
+          storeSlugs = readArray(parser, P4kShipStoreSlug.class, budget);
         } else if (P4kCatalogue.PAINTS.equals(field)) {
-          paints = readArray(parser, P4kPaintDto.class);
+          paints = readArray(parser, P4kPaintDto.class, budget);
         } else if (GAMEPLAY_PROPERTIES.equals(field)) {
-          properties = readArray(parser, P4kGameplayPropertyDto.class);
+          properties = readArray(parser, P4kGameplayPropertyDto.class, budget);
         } else if (DISMANTLE_PROCESSES.equals(field)) {
-          processes = readArray(parser, P4kDismantleProcessDto.class);
+          processes = readArray(parser, P4kDismantleProcessDto.class, budget);
         } else if (CRAFTING_GLOBAL.equals(field)) {
+          budget.open(parser);
           craftingGlobal = bind(parser, P4kCraftingGlobalDto.class);
+          budget.close(parser);
         } else {
           parser.skipChildren();
         }
@@ -147,6 +166,38 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class),
           listOf(kinds, P4kKind.BLUEPRINT_CATEGORY, P4kBlueprintCategoryDto.class),
           P4kCraftingReferences.of(properties, processes, craftingGlobal));
+    } catch (JacksonException e) {
+      throw notCatalogue(e);
+    }
+  }
+
+  /**
+   * Reads the content to its end without binding a record, counting the bytes the fields {@link
+   * #read} holds span.
+   *
+   * @param in the decompressed catalogue
+   * @param heldLimitBytes the most bytes of catalogue JSON the held fields may span together
+   * @throws IOException when the stream cannot be read
+   * @throws P4kCatalogueFormatException when the content is not catalogue JSON
+   * @throws P4kContentTooLargeException when the content passes the decompressed limit or the held
+   *     fields pass {@code heldLimitBytes}
+   */
+  public void drainCountingHeld(@NotNull InputStream in, long heldLimitBytes) throws IOException {
+    try (JsonParser parser = openObject(in)) {
+      HeldBudget budget = new HeldBudget(heldLimitBytes);
+      while (parser.nextToken() == JsonToken.PROPERTY_NAME) {
+        boolean held = isHeld(parser.currentName());
+        parser.nextToken();
+        if (held) {
+          budget.open(parser);
+        }
+        parser.skipChildren();
+        if (held) {
+          budget.close(parser);
+        }
+      }
+      // Bytes after the root object still count against the decompressed limit.
+      in.transferTo(OutputStream.nullOutputStream());
     } catch (JacksonException e) {
       throw notCatalogue(e);
     }
@@ -220,27 +271,44 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Binds the array the parser stands on, one element at a time.
+   * Binds the held array the parser stands on, one element at a time, charging each element to the
+   * budget.
    *
    * @param parser the parser on the array's first token
    * @param type the element type
+   * @param budget the budget of the held fields
    * @param <T> the element type
    * @return the elements; empty for {@code null}
+   * @throws P4kContentTooLargeException when the held fields pass the budget
    */
   @NotNull
-  private <T> List<T> readArray(@NotNull JsonParser parser, @NotNull Class<T> type) {
+  private <T> List<T> readArray(
+      @NotNull JsonParser parser, @NotNull Class<T> type, @NotNull HeldBudget budget) {
     List<T> out = new ArrayList<>();
+    budget.open(parser);
     if (parser.currentToken() != JsonToken.START_ARRAY) {
       parser.skipChildren();
-      return out;
-    }
-    while (parser.nextToken() != JsonToken.END_ARRAY) {
-      T element = bind(parser, type);
-      if (element != null) {
-        out.add(element);
+    } else {
+      while (parser.nextToken() != JsonToken.END_ARRAY) {
+        T element = bind(parser, type);
+        budget.charge(parser);
+        if (element != null) {
+          out.add(element);
+        }
       }
     }
+    budget.close(parser);
     return out;
+  }
+
+  /**
+   * Whether {@link #read} holds a top-level field.
+   *
+   * @param field the field name
+   * @return {@code true} for a kind or one of the extra fields the import holds
+   */
+  private static boolean isHeld(@Nullable String field) {
+    return kindOf(field) != null || HELD_EXTRAS.contains(field);
   }
 
   /**
@@ -312,6 +380,66 @@ public class P4kCatalogueReader {
       case RESOURCE_GROUP -> P4kResourceGroupDto.class;
       case BLUEPRINT_CATEGORY -> P4kBlueprintCategoryDto.class;
     };
+  }
+
+  /**
+   * Counts the bytes of catalogue JSON the held fields span, from the parser's byte offsets, and
+   * refuses once they pass the limit.
+   */
+  private static final class HeldBudget {
+
+    /** The most bytes the held fields may span together. */
+    private final long limitBytes;
+
+    /** The bytes of the held fields already closed. */
+    private long closedBytes;
+
+    /** The byte offset where the open held field starts. */
+    private long fieldStart;
+
+    /**
+     * Creates an empty budget.
+     *
+     * @param limitBytes the most bytes the held fields may span together
+     */
+    private HeldBudget(long limitBytes) {
+      this.limitBytes = limitBytes;
+    }
+
+    /**
+     * Opens a held field at the token the parser stands on, its value's first token.
+     *
+     * @param parser the parser
+     */
+    private void open(@NotNull JsonParser parser) {
+      fieldStart = parser.currentTokenLocation().getByteOffset();
+    }
+
+    /**
+     * Checks the closed fields plus the open one up to the parser's position against the limit.
+     *
+     * @param parser the parser
+     * @return the bytes counted so far
+     * @throws P4kContentTooLargeException when they pass the limit
+     */
+    private long charge(@NotNull JsonParser parser) {
+      long used = closedBytes + parser.currentLocation().getByteOffset() - fieldStart;
+      if (used > limitBytes) {
+        throw new P4kContentTooLargeException(
+            "The part of the catalogue held in memory", limitBytes);
+      }
+      return used;
+    }
+
+    /**
+     * Closes the open field at the parser's position, the end of its value.
+     *
+     * @param parser the parser
+     * @throws P4kContentTooLargeException when the held fields pass the limit
+     */
+    private void close(@NotNull JsonParser parser) {
+      closedBytes = charge(parser);
+    }
   }
 
   /** Collects the head fields as the parser meets them. */
