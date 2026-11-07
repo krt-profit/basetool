@@ -53,37 +53,6 @@ import org.springframework.stereotype.Repository;
 public interface InventoryItemRepository
     extends JpaRepository<InventoryItem, UUID>, InventoryLotLockRepository {
 
-  /** A member's lots, personal and shared, with what the exchange shows of them (REQ-XCH-016). */
-  String EXCHANGE_LOTS =
-      """
-      SELECT lots.anchor AS anchor, lots.lot_key AS lotKey, lots.material_id AS materialId,
-        m.name AS materialName, m.type AS materialType, m.quantity_type AS quantityType,
-        (m.id IS NOT NULL AND m.id_commodity IS NOT NULL) AS commodity, m.is_raw AS raw,
-        m.is_mineral AS mineral, m.is_harvestable AS harvestable, m.is_refined AS refined,
-        m.is_buyable AS buyable, m.is_sellable AS sellable, lots.game_item_id AS gameItemId,
-        g.name AS gameItemName, g.wiki_type AS gameItemWikiType, g.size_class AS gameItemSize,
-        g.grade AS gameItemGrade, g.item_class AS gameItemClass, l.name AS locationName,
-        c.id_city AS uexCityId, s.id_space_station AS uexSpaceStationId,
-        COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid) AS locationGuid, lots.quality AS quality,
-        lots.stolen AS stolen, lots.amount AS amount
-      FROM (SELECT CAST(MIN(CAST(i.id AS text)) AS uuid) AS anchor,
-                   exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
-                                          i.quality, i.stolen) AS lot_key,
-                   i.material_id, i.game_item_id, i.location_id,
-                   COALESCE(i.quality, 0) AS quality, i.stolen, SUM(i.amount) AS amount
-            FROM inventory_item i
-            WHERE i.user_id = :member
-            GROUP BY i.material_id, i.game_item_id, i.location_id, i.quality, i.stolen) lots
-      LEFT JOIN material m ON m.id = lots.material_id
-      LEFT JOIN game_item g ON g.id = lots.game_item_id
-      JOIN location l ON l.id = lots.location_id
-      LEFT JOIN city c ON c.id = l.city_id
-      LEFT JOIN space_station s ON s.id = l.space_station_id
-      LEFT JOIN starmap_object lso ON lso.id = l.starmap_object_id
-      LEFT JOIN starmap_object cso ON cso.id = c.starmap_object_id
-      LEFT JOIN starmap_object sso ON sso.id = s.starmap_object_id
-      """;
-
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.
    *
@@ -93,53 +62,10 @@ public interface InventoryItemRepository
    * @return the lots
    */
   @Query(
-      value = EXCHANGE_LOTS + " WHERE lots.anchor > :after ORDER BY lots.anchor LIMIT :limit",
+      value = ExchangeLotSql.LOTS + " WHERE lots.anchor > :after ORDER BY lots.anchor LIMIT :limit",
       nativeQuery = true)
   List<ExchangeStockLotRow> findExchangeLots(
       @Param("member") UUID member, @Param("after") UUID after, @Param("limit") int limit);
-
-  /** The shared lots of the given units' pools with their earmarks (REQ-XCH-042). */
-  String EXCHANGE_ORG_LOTS =
-      """
-      SELECT lots.anchor AS anchor, lots.lot_key AS lotKey, lots.unit_id AS unitId,
-        lots.material_id AS materialId, m.name AS materialName, m.type AS materialType,
-        (m.id IS NOT NULL AND m.id_commodity IS NOT NULL) AS commodity, m.is_raw AS raw,
-        m.is_mineral AS mineral, m.is_harvestable AS harvestable, m.is_refined AS refined,
-        m.is_buyable AS buyable, m.is_sellable AS sellable, m.quantity_type AS quantityType,
-        lots.game_item_id AS gameItemId, g.name AS gameItemName, g.grade AS gameItemGrade,
-        g.wiki_type AS gameItemWikiType, g.size_class AS gameItemSize, l.name AS locationName,
-        g.item_class AS gameItemClass, c.id_city AS uexCityId, lots.quality AS quality,
-        s.id_space_station AS uexSpaceStationId, lots.stolen AS stolen, lots.amount AS amount,
-        lots.job_order_earmarked AS jobOrderEarmarked, lots.mission_earmarked AS missionEarmarked,
-        COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid) AS locationGuid
-      FROM (SELECT CAST(MIN(CAST(i.id AS text)) AS uuid) AS anchor,
-                   'u:' || i.owning_org_unit_id || '|'
-                       || exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
-                                                 COALESCE(i.quality, 0), i.stolen) AS lot_key,
-                   i.owning_org_unit_id AS unit_id, i.material_id, i.game_item_id,
-                   i.location_id, COALESCE(i.quality, 0) AS quality, i.stolen,
-                   SUM(i.amount) AS amount,
-                   COALESCE(SUM(jo.amount), 0) AS job_order_earmarked,
-                   COALESCE(SUM(mi.amount), 0) AS mission_earmarked
-            FROM inventory_item i
-            LEFT JOIN LATERAL (SELECT SUM(a.amount) AS amount
-                               FROM inventory_item_job_order_allocation a
-                               WHERE a.inventory_item_id = i.id) jo ON TRUE
-            LEFT JOIN LATERAL (SELECT SUM(a.amount) AS amount
-                               FROM inventory_item_mission_allocation a
-                               WHERE a.inventory_item_id = i.id) mi ON TRUE
-            WHERE NOT i.personal AND i.owning_org_unit_id IN (:units)
-            GROUP BY i.owning_org_unit_id, i.material_id, i.game_item_id, i.location_id,
-                     COALESCE(i.quality, 0), i.stolen) lots
-      LEFT JOIN material m ON m.id = lots.material_id
-      LEFT JOIN game_item g ON g.id = lots.game_item_id
-      JOIN location l ON l.id = lots.location_id
-      LEFT JOIN city c ON c.id = l.city_id
-      LEFT JOIN space_station s ON s.id = l.space_station_id
-      LEFT JOIN starmap_object lso ON lso.id = l.starmap_object_id
-      LEFT JOIN starmap_object cso ON cso.id = c.starmap_object_id
-      LEFT JOIN starmap_object sso ON sso.id = s.starmap_object_id
-      """;
 
   /**
    * Returns one snapshot page of the shared lots of the given units' pools, ordered by their lowest
@@ -151,7 +77,8 @@ public interface InventoryItemRepository
    * @return the lots
    */
   @Query(
-      value = EXCHANGE_ORG_LOTS + " WHERE lots.anchor > :after ORDER BY lots.anchor LIMIT :limit",
+      value =
+          ExchangeLotSql.ORG_LOTS + " WHERE lots.anchor > :after ORDER BY lots.anchor LIMIT :limit",
       nativeQuery = true)
   List<ExchangeOrgStockLotRow> findExchangeOrgLots(
       @Param("units") Collection<UUID> units,
@@ -166,7 +93,7 @@ public interface InventoryItemRepository
    * @param keys the org-stock lot keys
    * @return the lots that still hold rows
    */
-  @Query(value = EXCHANGE_ORG_LOTS + " WHERE lots.lot_key IN (:keys)", nativeQuery = true)
+  @Query(value = ExchangeLotSql.ORG_LOTS + " WHERE lots.lot_key IN (:keys)", nativeQuery = true)
   List<ExchangeOrgStockLotRow> findExchangeOrgLotsByKeys(
       @Param("units") Collection<UUID> units, @Param("keys") Collection<String> keys);
 
@@ -230,7 +157,7 @@ public interface InventoryItemRepository
    * @param keys the lot keys
    * @return the lots that still hold rows
    */
-  @Query(value = EXCHANGE_LOTS + " WHERE lots.lot_key IN (:keys)", nativeQuery = true)
+  @Query(value = ExchangeLotSql.LOTS + " WHERE lots.lot_key IN (:keys)", nativeQuery = true)
   List<ExchangeStockLotRow> findExchangeLotsByKeys(
       @Param("member") UUID member, @Param("keys") Collection<String> keys);
 

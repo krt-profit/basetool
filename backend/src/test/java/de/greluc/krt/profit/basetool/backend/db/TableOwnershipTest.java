@@ -201,7 +201,29 @@ class TableOwnershipTest {
                   Set.of("exchange_change", "app_user", "ship", "inventory_item"),
                   "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
                       + " pool, read from ship and inventory_item, so a client never keeps a stale"
-                      + " unit (REQ-XCH-017, REQ-XCH-042).")));
+                      + " unit (REQ-XCH-017, REQ-XCH-042).")),
+          Map.entry("trg_location_exchange_change", locationReannouncement("place")),
+          Map.entry("trg_city_exchange_change", locationReannouncement("city")),
+          Map.entry("trg_space_station_exchange_change", locationReannouncement("space station")),
+          Map.entry(
+              "trg_starmap_object_exchange_change", locationReannouncement("starmap object")));
+
+  /**
+   * The crossing of a V359 trigger that re-announces the entries at the places a catalogue row
+   * changes the location reference of.
+   *
+   * @param row what changed, as the reason names it
+   * @return the crossing into the change feed and the tables holding the entries
+   */
+  private static @NotNull Crossing locationReannouncement(@NotNull String row) {
+    return new Crossing(
+        Set.of("exchange_change", "app_user", "ship", "inventory_item", "org_unit"),
+        "V359 change feed: a "
+            + row
+            + " whose change alters a place's location reference re-announces the ships, stock"
+            + " lots and org-stock lots at that place, read from ship and inventory_item"
+            + " (REQ-XCH-018).");
+  }
 
   /**
    * The native statements that reach another module's tables, keyed {@code Owner#member}: a

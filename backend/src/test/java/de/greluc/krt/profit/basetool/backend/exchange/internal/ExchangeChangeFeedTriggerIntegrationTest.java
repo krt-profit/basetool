@@ -67,7 +67,11 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "org_unit_membership",
           "app_user",
           "exchange_name_withholding",
-          "mission");
+          "mission",
+          "location",
+          "city",
+          "space_station",
+          "starmap_object");
 
   @Autowired private JdbcTemplate jdbc;
 

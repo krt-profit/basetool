@@ -12,6 +12,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   ([formats](formats.md#place--location-ref)). `uex` stays and is not deprecated; `name` stays the
   warehouse's own name. `location.schema.json` and `location-ref.schema.json` gain the optional
   `guid`.
+- **New: a changed location brings its entries back into the feeds.** When the `name`, `uex` or
+  `guid` of a warehouse location changes, the stock, org-stock and ship feeds deliver every lot and
+  ship at that location again, each under its unchanged key, so replace the `location` you hold. No
+  schema changes.
 - **Changed: a `SHIP_TYPE` name several ship types share is `ambiguous`.** It resolved to one of
   them before; it now answers `ambiguous` with at most ten candidates, so let the member pick one or
   send a key field. No schema changes: `ambiguous` with its candidates has always been a possible

@@ -161,6 +161,17 @@ class ExchangeLocationGuidIntegrationTest {
     assertThat(byName).doesNotContainKey("Xch Guid Starmap Text");
   }
 
+  @Test
+  void theStockFeedCarriesNoGuidOfAHiddenStarmapObject() {
+    UUID member = member();
+    stock(member, material(), onLinkedCity);
+    jdbc.update("UPDATE starmap_object SET p4k_hidden_at = now() WHERE p4k_uuid = ?", CITY_GUID);
+
+    assertThat(stockFeedService.page(member, null, 100).items())
+        .singleElement()
+        .satisfies(lot -> assertThat(lot.location().guid()).isNull());
+  }
+
   /**
    * Stores a UEX city.
    *
