@@ -313,6 +313,39 @@ def inputs() -> tuple[ModuleType, dict, list[dict]]:
     return provisioner, base, builtin
 
 
+def admin_api_problems(clients: dict[str, dict], scopes: dict[str, dict],
+                       realm: dict, scope_name: str) -> list[str]:
+    """Require the backend's scoped Admin API audience without granting it to other clients.
+
+    :param clients: clients indexed by client ID
+    :param scopes: client scopes indexed by name
+    :param realm: synthetic realm configuration
+    :param scope_name: Keycloak's built-in Admin API scope name
+    :return: one diagnostic per broken Admin API contract
+    """
+    found = []
+    backend = clients.get("backend-service", {})
+    if (scope_name not in backend.get("defaultClientScopes", [])
+            or scope_name in backend.get("optionalClientScopes", [])):
+        found.append(f"backend-service lacks the default {scope_name} scope")
+    for client_id, client in clients.items():
+        assigned = client.get("defaultClientScopes", []) + client.get("optionalClientScopes", [])
+        if client_id != "backend-service" and scope_name in assigned:
+            found.append(f"{client_id} is assigned the backend's {scope_name} scope")
+    for key in ("defaultDefaultClientScopes", "defaultOptionalClientScopes"):
+        if scope_name in realm.get(key, []):
+            found.append(f"{key} exposes {scope_name} to every client")
+    scope = scopes.get(scope_name, {})
+    if scope.get("attributes", {}).get("include.in.token.scope") != "true":
+        found.append(f"{scope_name} is missing from its access token scope claim")
+    mappers = scope.get("protocolMappers", [])
+    if not any(mapper.get("protocolMapper") == "oidc-admin-api-audience-mapper"
+               and mapper.get("config", {}).get("access.token.claim") == "true"
+               for mapper in mappers):
+        found.append(f"{scope_name} lacks its Admin API access token audience mapper")
+    return found
+
+
 def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
     """List every way a realm breaks its target's invariants.
 
@@ -327,7 +360,8 @@ def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
         if marker in text:
             found.append(f"the realm names the production host {marker}")
     clients = {c["clientId"]: c for c in realm.get("clients", [])}
-    scopes = {s["name"] for s in realm.get("clientScopes", [])}
+    scopes = {s["name"]: s for s in realm.get("clientScopes", [])}
+    found.extend(admin_api_problems(clients, scopes, realm, provisioner.ADMIN_API_SCOPE))
     for client_id, client in clients.items():
         secret = client.get("secret")
         if not client.get("publicClient") and (not secret or THROWAWAY not in secret):
@@ -415,6 +449,30 @@ def selftest() -> int:
         expect(f"{prefix} the generated realm is sound", not caught(realm))
         expect(f"{prefix} two builds are byte-identical",
                render(realm) == render(build_realm(provisioner, base, builtin, target)))
+
+        broken = copy.deepcopy(realm)
+        backend = next(c for c in broken["clients"] if c["clientId"] == "backend-service")
+        backend["defaultClientScopes"].remove(provisioner.ADMIN_API_SCOPE)
+        expect(f"{prefix} a backend without the Admin API scope is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        scope = next(s for s in broken["clientScopes"] if s["name"] == provisioner.ADMIN_API_SCOPE)
+        scope["attributes"]["include.in.token.scope"] = "false"
+        expect(f"{prefix} an omitted Admin API scope claim is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        scope = next(s for s in broken["clientScopes"] if s["name"] == provisioner.ADMIN_API_SCOPE)
+        scope["protocolMappers"] = []
+        expect(f"{prefix} a missing Admin API audience mapper is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        client = next(c for c in broken["clients"] if c["clientId"] == GATEWAY_CLIENT)
+        client["defaultClientScopes"].append(provisioner.ADMIN_API_SCOPE)
+        expect(f"{prefix} a non-admin client with the Admin API scope is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        broken["defaultDefaultClientScopes"].append(provisioner.ADMIN_API_SCOPE)
+        expect(f"{prefix} a realm-wide default Admin API scope is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
         client_id = target.third_party[0]["clientId"]

@@ -370,7 +370,9 @@ Its Basetool-owned part is therefore code too, applied by an operator rather tha
 for one named retirement — it deletes the Android app's client and its DPoP policy and profile
 where they remain (ADR-0202, amended 2026-10-17) — and
 `scripts/keycloak-config-snapshot.sql` is the diff that shows whether two realms still agree
-(`REQ-OPS-033`, ADR-0202).
+(`REQ-OPS-033`, ADR-0202). The provisioner also assigns the version-required Admin API scope to
+`backend-service`; [the service-account contract](../keycloak/README.md#backend-service-service-account-roles-admin-api)
+keeps the owned client and generated test realms aligned with Keycloak's audience check.
 
 **The testing host deliberately differs in one client and one setting.** Its realm carries the
 seed client `basetool-seed` (`--seed-client`) and its `basetool.env` lets the backend accept that client, so

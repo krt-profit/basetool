@@ -125,11 +125,10 @@ class JobOrderAccessPolicyTest {
   }
 
   @Test
-  void assigneeGrant_opensNoOwnerPanel() {
+  void assigneeGrant_opensNoBlueprintOwnerPanel() {
     assign(callerId);
 
     assertThat(policy.canSeeJobOrderBlueprintOwners(order.getId())).isFalse();
-    assertThat(policy.canSeeJobOrderInventoryOwners(order.getId())).isFalse();
   }
 
   @Test

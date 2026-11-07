@@ -30,9 +30,11 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -40,8 +42,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the material or item of the lots a client writes: each reference as a material first,
- * and as an item where no material matched (REQ-XCH-016, REQ-XCH-045).
+ * Resolves the material or item of the lots a client writes: each reference as an exact material
+ * first, and as an exact item where no material matched exactly (REQ-XCH-016, REQ-XCH-045).
  */
 @Component
 @RequiredArgsConstructor
@@ -58,7 +60,9 @@ public class ExchangeLotCatalogue {
   private final GameItemRepository gameItemRepository;
 
   /**
-   * Resolves each reference, materials first, then items for those no material matched.
+   * Resolves each reference: an exact material, else an exact item, else {@code ambiguous} where
+   * either catalogue answered ambiguous (several matches or fuzzy suggestions), else {@code
+   * unmatched}. A fuzzy material suggestion never hides an exact item.
    *
    * @param refs the references, in op order
    * @return the material or item, or the result that ends the op, by the reference's index
@@ -68,16 +72,15 @@ public class ExchangeLotCatalogue {
         resolveService.resolve(new ExchangeResolveRequest(ExchangeCatalogKind.MATERIAL, refs));
     Map<Integer, Entry> byIndex = new HashMap<>();
     List<Integer> retry = new ArrayList<>();
+    Set<Integer> ambiguousMaterial = new HashSet<>();
     for (ExchangeResolveResponse.Result result : materials.results()) {
       if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
-        Material material =
-            materialRepository
-                .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
-                .orElseThrow();
+        Material material = materialRepository.findById(resolvedId(result)).orElseThrow();
         byIndex.put(result.index(), Entry.of(material));
-      } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
-        byIndex.put(result.index(), Entry.skip(AMBIGUOUS, "AMBIGUOUS"));
       } else {
+        if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
+          ambiguousMaterial.add(result.index());
+        }
         retry.add(result.index());
       }
     }
@@ -89,12 +92,10 @@ public class ExchangeLotCatalogue {
       for (ExchangeResolveResponse.Result result : items.results()) {
         int index = retry.get(result.index());
         if (result.status() == ExchangeResolveResponse.Status.RESOLVED) {
-          GameItem item =
-              gameItemRepository
-                  .findById(UUID.fromString(Objects.requireNonNull(result.ref()).bt()))
-                  .orElseThrow();
+          GameItem item = gameItemRepository.findById(resolvedId(result)).orElseThrow();
           byIndex.put(index, Entry.of(item));
-        } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS) {
+        } else if (result.status() == ExchangeResolveResponse.Status.AMBIGUOUS
+            || ambiguousMaterial.contains(index)) {
           byIndex.put(index, Entry.skip(AMBIGUOUS, "AMBIGUOUS"));
         } else {
           byIndex.put(index, Entry.skip(UNMATCHED, "UNMATCHED"));
@@ -102,6 +103,16 @@ public class ExchangeLotCatalogue {
       }
     }
     return byIndex;
+  }
+
+  /**
+   * Reads the Basetool id of a resolved result.
+   *
+   * @param result a result whose status is {@code RESOLVED}
+   * @return the id of the entry it resolved to
+   */
+  private static @NotNull UUID resolvedId(@NotNull ExchangeResolveResponse.Result result) {
+    return UUID.fromString(Objects.requireNonNull(result.ref()).bt());
   }
 
   /**

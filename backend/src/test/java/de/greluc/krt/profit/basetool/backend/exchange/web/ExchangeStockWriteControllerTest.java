@@ -310,6 +310,79 @@ class ExchangeStockWriteControllerTest {
   }
 
   @Test
+  void anItemWhoseNameResemblesAMaterialResolvesToTheItemByNameBtOrScRecord() throws Exception {
+    String tag = tag();
+    UUID mirage = item("Mirage " + tag, "SHLD_ASAS_S01_Mirage_SCItem_" + tag);
+    UUID megaFlux = item("MegaFlux " + tag, null);
+    UUID coverAll = item("CoverAll " + tag, null);
+    namedMaterial("Mirages " + tag, "SCU");
+    namedMaterial("MegaFluxs " + tag, "SCU");
+    namedMaterial("CoverAlls " + tag, "SCU");
+    String place = locationName(location(null));
+
+    change(
+            "{\"ops\":["
+                + refOp("{\"name\":\"CoverAll " + tag + "\"}", place, "PIECE")
+                + ","
+                + refOp(
+                    "{\"bt\":\"" + megaFlux + "\",\"name\":\"MegaFlux " + tag + "\"}",
+                    place,
+                    "PIECE")
+                + ","
+                + refOp(
+                    "{\"scRecord\":\"SHLD_ASAS_S01_Mirage_SCItem_"
+                        + tag
+                        + "\",\"name\":\"Mirage "
+                        + tag
+                        + "\"}",
+                    place,
+                    "PIECE")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(3))
+        .andExpect(jsonPath("$.results.length()").value(0));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT game_item_id FROM inventory_item WHERE user_id = ? AND material_id IS NULL",
+                UUID.class,
+                member))
+        .containsExactlyInAnyOrder(coverAll, megaFlux, mirage);
+  }
+
+  @Test
+  void anExactMaterialWinsOverAnItemOfTheSameName() throws Exception {
+    String name = "Okunis " + tag();
+    UUID okunis = namedMaterial(name, "SCU");
+    item(name, null);
+    String place = locationName(location(null));
+
+    change("{\"ops\":[" + refOp("{\"name\":\"" + name + "\"}", place, "SCU") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(total(okunis)).isEqualTo(3.0);
+  }
+
+  @Test
+  void aNameOnlyResemblingAMaterialIsAmbiguousAndOneMatchingNothingIsUnmatched() throws Exception {
+    String tag = tag();
+    namedMaterial("Okunisx " + tag, "SCU");
+    String place = locationName(location(null));
+
+    change(
+            "{\"ops\":["
+                + refOp("{\"name\":\"Okunis " + tag + "\"}", place, "PIECE")
+                + ","
+                + refOp("{\"name\":\"" + "q".repeat(48) + "\"}", place, "PIECE")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("ambiguous"))
+        .andExpect(jsonPath("$.results[0].reason").value("AMBIGUOUS"))
+        .andExpect(jsonPath("$.results[1].result").value("unmatched"))
+        .andExpect(jsonPath("$.results[1].reason").value("UNMATCHED"));
+  }
+
+  @Test
   void aWrongUnitAndAnUnknownPlaceAreRejected() throws Exception {
     UUID laranite = material("SCU", null);
     String area18 = locationName(location(null));
@@ -706,6 +779,32 @@ class ExchangeStockWriteControllerTest {
   }
 
   /**
+   * Builds one set-quantity op of three units at quality 0 into an empty lot.
+   *
+   * @param materialRef the op's material reference as JSON
+   * @param place the location name
+   * @param unit the unit of the quantities
+   * @return the op as JSON
+   */
+  private static @NotNull String refOp(
+      @NotNull String materialRef, @NotNull String place, @NotNull String unit) {
+    return """
+    {"op":"set-quantity","material":%s,"location":{"name":"%s"},"quality":0,"stolen":false,
+     "quantity":{"amount":3,"unit":"%s"},"expectedQuantity":{"amount":0,"unit":"%s"}}\
+    """
+        .formatted(materialRef, place, unit, unit);
+  }
+
+  /**
+   * Makes a short random tag that keeps seeded names apart from every other catalogue entry.
+   *
+   * @return eight hex characters
+   */
+  private static @NotNull String tag() {
+    return UUID.randomUUID().toString().substring(0, 8);
+  }
+
+  /**
    * Posts a change set as the test client.
    *
    * @param json the change set
@@ -847,6 +946,33 @@ class ExchangeStockWriteControllerTest {
    */
   private @NotNull UUID material(@NotNull String unit, @Nullable Integer commodity) {
     UUID id = UUID.randomUUID();
+    insertMaterial(id, "Stock write " + id, unit, commodity);
+    return id;
+  }
+
+  /**
+   * Seeds a material with the given name and no UEX commodity.
+   *
+   * @param name the name
+   * @param unit the unit
+   * @return its id
+   */
+  private @NotNull UUID namedMaterial(@NotNull String name, @NotNull String unit) {
+    UUID id = UUID.randomUUID();
+    insertMaterial(id, name, unit, null);
+    return id;
+  }
+
+  /**
+   * Inserts a visible material and registers it for clean-up.
+   *
+   * @param id the id
+   * @param name the name
+   * @param unit the unit
+   * @param commodity the UEX commodity id, or {@code null}
+   */
+  private void insertMaterial(
+      @NotNull UUID id, @NotNull String name, @NotNull String unit, @Nullable Integer commodity) {
     jdbc.update(
         """
         INSERT INTO material (id, name, type, quantity_type, id_commodity, is_manual_raw_material,
@@ -854,11 +980,10 @@ class ExchangeStockWriteControllerTest {
         VALUES (?, ?, 'REFINED', ?, ?, false, false, true, 'UEX_ONLY')
         """,
         id,
-        "Stock write " + id,
+        name,
         unit,
         commodity);
     materials.add(id);
-    return id;
   }
 
   /**
@@ -867,12 +992,24 @@ class ExchangeStockWriteControllerTest {
    * @return its id
    */
   private @NotNull UUID item() {
+    return item("Helmet " + UUID.randomUUID(), null);
+  }
+
+  /**
+   * Seeds a game item with the given name and game-file class name.
+   *
+   * @param name the name
+   * @param className the game-file class name, or {@code null}
+   * @return its id
+   */
+  private @NotNull UUID item(@NotNull String name, @Nullable String className) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO game_item (id, name, kind, source_systems) VALUES (?, ?, 'GENERIC',"
-            + " 'UEX_ONLY')",
+        "INSERT INTO game_item (id, name, class_name, kind, source_systems) VALUES (?, ?, ?,"
+            + " 'GENERIC', 'UEX_ONLY')",
         id,
-        "Helmet " + id);
+        name,
+        className);
     items.add(id);
     return id;
   }

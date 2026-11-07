@@ -100,6 +100,7 @@ class ExchangeOrgStockWriteControllerTest {
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> items = new ArrayList<>();
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> missions = new ArrayList<>();
   private final List<UUID> jobOrders = new ArrayList<>();
@@ -155,6 +156,7 @@ class ExchangeOrgStockWriteControllerTest {
     users.forEach(id -> jdbc.update("DELETE FROM app_user WHERE id = ?", id));
     orgUnits.reversed().forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     materials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
+    items.forEach(id -> jdbc.update("DELETE FROM game_item WHERE id = ?", id));
     locations.forEach(id -> jdbc.update("DELETE FROM location WHERE id = ?", id));
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
@@ -211,6 +213,40 @@ class ExchangeOrgStockWriteControllerTest {
     assertThat(journal.get("before_state")).isNull();
     assertThat((String) journal.get("after_state")).contains(holder.toString());
     assertThat(writes("applied")).isEqualTo(applied + 1);
+  }
+
+  @Test
+  void aBookInNamingAnItemThatResemblesAMaterialBooksInTheItem() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    UUID mirage = item("Mirage " + tag);
+    material("Mirages " + tag, "SCU");
+    UUID area18 = location();
+    UUID placeholder = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        bookIn(staffel, ref(staffel, holder), placeholder, area18, "2", "PIECE")
+                            .replace(
+                                "{\"bt\":\"" + placeholder + "\"}",
+                                "{\"name\":\"Mirage " + tag + "\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results.length()").value(0));
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT amount FROM inventory_item WHERE user_id = ? AND game_item_id = ?",
+                Double.class,
+                holder,
+                mirage))
+        .containsExactly(2.0);
   }
 
   @Test
@@ -2004,6 +2040,30 @@ class ExchangeOrgStockWriteControllerTest {
    */
   private @NotNull UUID material(@NotNull String quantityType) {
     UUID id = UUID.randomUUID();
+    return material(id, "Writes " + id, quantityType);
+  }
+
+  /**
+   * Seeds a material with the given name.
+   *
+   * @param name the name
+   * @param quantityType {@code SCU} or {@code PIECE}
+   * @return its id
+   */
+  private @NotNull UUID material(@NotNull String name, @NotNull String quantityType) {
+    return material(UUID.randomUUID(), name, quantityType);
+  }
+
+  /**
+   * Inserts a visible material and registers it for clean-up.
+   *
+   * @param id the id
+   * @param name the name
+   * @param quantityType {@code SCU} or {@code PIECE}
+   * @return its id
+   */
+  private @NotNull UUID material(
+      @NotNull UUID id, @NotNull String name, @NotNull String quantityType) {
     jdbc.update(
         """
         INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material,
@@ -2011,9 +2071,26 @@ class ExchangeOrgStockWriteControllerTest {
         VALUES (?, ?, 'RAW', ?, false, false, true, 'UEX_ONLY')
         """,
         id,
-        "Writes " + id,
+        name,
         quantityType);
     materials.add(id);
+    return id;
+  }
+
+  /**
+   * Seeds a game item.
+   *
+   * @param name the name
+   * @return its id
+   */
+  private @NotNull UUID item(@NotNull String name) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO game_item (id, name, kind, source_systems) VALUES (?, ?, 'GENERIC',"
+            + " 'UEX_ONLY')",
+        id,
+        name);
+    items.add(id);
     return id;
   }
 

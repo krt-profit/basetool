@@ -2091,6 +2091,10 @@ to the shared group and restores the defect exactly.
   subset of the full one (ADR-0312).
 - [ ] The `Exchange changes carry the e2e label` job runs on `opened`, `synchronize`, `reopened` and
   on `labeled` only for the `e2e` label; any other label starts no runner for it (ADR-0311).
+- [ ] Isolated E2E stacks disable the UEX and SC Wiki schedulers through their canonical Spring
+  properties. Catalogue-dependent flows bootstrap their own synthetic prices, terminals and location
+  choices before the first cached read; neither a live upstream feed nor another test's side effects
+  supply their preconditions.
 - [ ] Every E2E and smoke test method runs under a three-minute timeout, so a browser call that is
   never answered fails that one test and names it, instead of holding the cell until the job's
   45-minute limit; a method that legitimately runs longer carries its own `@Timeout`.
@@ -2412,6 +2416,12 @@ there.
   `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the
   service-account roles; the realm's token and session settings. What production carries that looks
   unintended is reproduced and marked `PROD-AS-IS`, and changes in production first.
+- **Admin API tokens target the Admin API.** The owned `backend-service` client receives the
+  built-in `kc-admin-api` client scope as a default scope. On Keycloak 26.8.2 this supplies both the
+  realm's Admin API audience and the required scope claim. The provisioner references the existing
+  built-in scope without creating or changing it, assigns it to no other Basetool client, and keeps
+  the upstream audience check enabled. Generated sandbox/E2E realms preserve the same contract with
+  synthetic fixtures; the existing realm-management role grants remain required.
 - **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
   production hostname is written into another realm.
 - **The realm is named `basetool`**, default role `default-roles-basetool`, in every environment.

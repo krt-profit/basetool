@@ -12,6 +12,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 - **Changed: `EXCHANGE_BUDGET_EXHAUSTED` waits as long as it must.** Its `Retry-After` is no longer
   capped at 3600; it is never shorter than the time until the write fits the budget as it stands
   ([errors](errors.md)).
+- **Fixed: an item is no longer refused `AMBIGUOUS` because a material's name resembles it.** A
+  stock or org-stock op's `material` resolves as an exact material, else as an exact item, and only
+  then as `AMBIGUOUS` or `UNMATCHED`, whether the item is sent by `name` alone or with `bt` or
+  `scRecord` ([stock](resources/stock.md#how-material-resolves)).
 
 ## 2026-11-05
 
