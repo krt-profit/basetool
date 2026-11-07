@@ -184,10 +184,6 @@ class JobOrderAccessPolicyDifferentialTest {
             ScopeHubJobOrderGates::canSeeJobOrderBlueprintOwners,
             JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners),
         new Gate(
-            "canSeeJobOrderInventoryOwners",
-            ScopeHubJobOrderGates::canSeeJobOrderInventoryOwners,
-            JobOrderAccessPolicy::canSeeJobOrderInventoryOwners),
-        new Gate(
             "canSeeJobOrderAsRequester",
             ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
             JobOrderAccessPolicy::canSeeJobOrderAsRequester),
@@ -336,10 +332,6 @@ class JobOrderAccessPolicyDifferentialTest {
     }
 
     boolean canSeeJobOrderBlueprintOwners(UUID id) {
-      return responsibleVisible(id);
-    }
-
-    boolean canSeeJobOrderInventoryOwners(UUID id) {
       return responsibleVisible(id);
     }
 

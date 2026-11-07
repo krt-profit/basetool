@@ -24,8 +24,8 @@ presentation (`REQ-ORDERS-026`) — plus the order-detail **inline item stock** 
 item stock earmarked to the order (`REQ-ORDERS-028`, the item sibling of the material drill-down),
 the **Itemsammelübersicht** page where the earmarked units are collected (`REQ-ORDERS-031`, the item
 sibling of the Materialsammlung) and
-the **owner/location redaction** that hides the fulfilling side's inventory owner and Standort from a
-requesting-side viewer of an SK-public order (`REQ-ORDERS-029`, ADR-0107). It further governs the two
+the **linked-stock owner/location visibility** that shows every viewer of an order who holds its
+earmarked stock and where (`REQ-ORDERS-029`, ADR-0350). It further governs the two
 invariants that keep a booked `manufacturedAmount` trustworthy over time: an **edit must re-derive the
 ordered-item lines in place** rather than recreate them (`REQ-ORDERS-032`, ADR-0121), and an
 ordered-item line whose **blueprint drifted away from the ordered item** must be detected and surfaced
@@ -307,8 +307,10 @@ default, mirroring the bank request table's Notiz/Begründung detail row, so a m
 no longer widens the row) and, as the last column, a *Herstellung erfassen* button that opens the
 booking modal. Manufactured and delivered each render a progress bar. The machine-readable
 per-material demand the modal consumes stays on the main row, so booking is unaffected; a booking
-re-renders the *Items* section rather than a separate production section. Requesters/read-only
-viewers see the plain status columns without the chevron, demand sub-row or button.
+re-renders the *Items* section rather than a separate production section. The chevron and the
+demand sub-row (with the line's earmarked *Item-Bestand*) are shown to every non-requester viewer,
+editor or not; only the *Herstellung erfassen* button and the booking demand need the LOGISTICIAN+
+editor. Requesters see the plain status columns without chevron, sub-row or button.
 
 **Columns of the aggregated *Materialien* pane.** The pane lists, per material+quality bucket,
 *Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
@@ -362,9 +364,9 @@ on the *Items* tab.*
   *Offen* column, and the *Eintragen* action sits inside *Eingetragen*; the claim modal still offers
   the full-requirement remainder as its maximum. The *Bedarf* table of a material order keeps its
   *Offen*.
-- [ ] The *Items* tab shows the chevron/demand sub-row and the *Herstellung erfassen* button only
-  for a LOGISTICIAN+ editor of an `ITEM` order; a read-only or requester viewer sees only the plain
-  status columns. The *Hersteller* tab books nothing.
+- [ ] The *Items* tab shows the chevron/demand sub-row (*Bedarf je Stück*) to every non-requester
+  viewer of an `ITEM` order and the *Herstellung erfassen* button only to a LOGISTICIAN+ editor; a
+  requester sees only the plain status columns. The *Hersteller* tab books nothing.
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
@@ -397,7 +399,7 @@ An `ITEM` order's detail page MUST surface the **game-item stock earmarked to th
 ([`inventory-items.md`](inventory-items.md) REQ-INV-029/031) — the item sibling of the material
 drill-down — **inline in each ordered item's expand row** on the *Items* tab. The leading
 expand chevron is available to every non-requester viewer; expanding a line reveals, beneath the
-per-unit material demand (logisticians only), a read-only **earmarked-stock** block listing the game
+per-unit material demand, a read-only **earmarked-stock** block listing the game
 item's linked rows: each row shows owner, location and the **THIS-order earmark slice** in whole
 units (with the entry's total stock as context when the row is only partially earmarked). A line
 with neither material demand nor earmarked stock has no chevron; a line with stock but no demand is
@@ -432,10 +434,9 @@ silently skipped.
 **Redaction.** The inline stock renders only for an `ITEM` order and is omitted from the
 requester-redacted view (REQ-ORDERS-023), mirroring the aggregated *Materialien* pane — a
 requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all
-(`canSeeJobOrder` → 403). For a caller who *can* see the order but is on the **requesting** side of
-an **SK-public** order, the per-entry owner and location are blanked by the backend (REQ-ORDERS-029,
-ADR-0107) — the inline stock still renders the amounts, with owner/location shown as `—`. A line
-with no earmarked item stock renders no stock block (no empty-state message).
+(`canSeeJobOrder` → 403). Every caller who *can* see the order gets each entry's owner and location
+(REQ-ORDERS-029); an entry without owner or location renders `—`. A line with no earmarked item
+stock renders no stock block (no empty-state message).
 
 **Acceptance**
 
@@ -444,7 +445,7 @@ with no earmarked item stock renders no stock block (no empty-state message).
   entry total as context on a partial earmark); a `MATERIAL` order renders no inline stock (and the
   frontend never fetches the endpoint for it); a line without earmarks shows no stock block.
 - [ ] The expand chevron is available to every non-requester viewer; a line with only material
-  demand (logistician) or only earmarked stock is still expandable.
+  demand or only earmarked stock is still expandable.
 - [ ] The inline stock is read-only — no delivered toggle; collecting (owner/location transfer +
   delivered) happens on the Itemsammelübersicht page (REQ-ORDERS-031).
 - [ ] `GET /api/v1/orders/{id}/item-stock` is reachable only by a caller who can see the order
@@ -464,73 +465,49 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 `inventory-common.js` (`broadcastOrdersChanged`) · **Issues:** — · **Design:**
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md) §10 PR 4 / §11.2
 
-### REQ-ORDERS-029 — Requesting-side viewers see redacted inventory owner/location
+### REQ-ORDERS-029 — Every order viewer sees the linked-stock owner/location; unreadable missions stay anonymised
 
 The four per-order reads that expose the **owner identity and location** of the stock linked to a
 job order — the inline item stock (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
 collection (`GET /orders/{id}/material-collection`), and the two inventory pickers
-(`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/allocations/orphaned`) — MUST blank
-the per-entry owner and location for a caller who can see the order but is **not entitled to its
-responsible (processing) side**. Concretely: on a Spezialkommando-responsible (SK-public) order,
-`canSeeJobOrder` admits every profit-eligible member — including members of the merely **requesting**
-squadron — but the fulfilling side's owner/Standort must not leak to the requesting side (owner
-decision 2026-07-17, ADR-0107).
-
-**Gate.** `JobOrderAccessPolicy.canSeeJobOrderInventoryOwners(jobOrderId)` — identical to
-`canSeeJobOrderBlueprintOwners`: membership of the order's responsible org unit (or an admin with
-matching scope), **no SK-public escape**. For a squadron-responsible order it coincides with
-`canSeeJobOrder`, so the redaction only ever engages on the SK-public path; a `null` responsible unit
-or unknown order returns `false` (redact by default).
-
-**Redactor.** When the gate is `false` the endpoint passes its projection through
-`JobOrderInventoryOwnerRedactor`, which blanks **only** the owner (`ownerName`/`ownerId`, and the
-nested `user` + `owningSquadron` on the picker `InventoryItemDto`) and the location
-(`location`/`locationId`) — amounts, quality, the delivered marker and the ordered/manufactured
-context are always kept, so the requesting side still sees the order's progress. The redactor
-reconstructs each record field-by-field (never a wither) so a newly added owner/location field is a
-compile error until it is classified (mirrors `MissionPeerRedactor`, REQ-SEC-007). The frontend
-renders a blanked owner/location as `—` (inline item stock, Itemsammelübersicht + material-collection
-pages); the JS drill-down / orphaned / Herstellung surfaces already fall back to a dash.
+(`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/allocations/orphaned`) — MUST
+return each entry's owner and location to **every caller who may read the order**
+(`canSeeJobOrder`). On a Spezialkommando-responsible (SK-public) order that is every profit-eligible
+member, requesting side and uninvolved squadrons included; on a squadron-responsible order it is the
+responsible squadron, its LOGISTICIAN grantees and the order's assignees (owner decision 2026-11-07,
+ADR-0350, superseding ADR-0107).
 
 A requester-**only** viewer (`redacted == true`, i.e. `!canSeeJobOrder`) is refused all four
-endpoints with `403` and never reaches the redactor at all.
+endpoints with `403`. The frontend renders an entry without owner or location as `—` (inline item
+stock, Itemsammelübersicht and material-collection pages; the JS drill-down / orphaned /
+Herstellung surfaces fall back to a dash as well).
 
 **Mission slices.** The two pickers also carry the mission slices of each row (REQ-INV-027). For
-every caller, whatever the owner gate says, a slice whose mission the caller may not read (the
-mission detail rule, `MissionVisibility`, REQ-MISSION-008) is anonymised by
-`JobOrderMissionAllocationRedactor`: the slice and its amount stay so the row's sums remain
-traceable, the mission's name and planned start are dropped (the frontend renders its „unknown
-mission" label). Access to the order — including the assignee grant of REQ-ORDERS-047 — never
-widens access to a mission referenced by its stock.
-
-**Accepted trade-off.** A cross-unit LOGISTICIAN processing an SK-public order (requesting-squadron
-member, not in the responsible SK) also sees `—` for owner/location in the pickers. Nothing breaks
-functionally (production books by `inventoryItemId` + slice + version, never by owner/location); it
-is deliberately kept uniform rather than widening the picker gate to `… or canEditJobOrder`.
+every caller, a slice whose mission the caller may not read (the mission detail rule,
+`MissionVisibility`, REQ-MISSION-008) is anonymised by `JobOrderMissionAllocationRedactor`: the
+slice and its amount stay so the row's sums remain traceable, the mission's name and planned start
+are dropped (the frontend renders its „unknown mission" label). Access to the order — including the
+assignee grant of REQ-ORDERS-047 — never widens access to a mission referenced by its stock.
 
 **Acceptance**
 
-- [ ] On an SK-public order, a member of only the requesting squadron gets owner/location blanked on
-  all four endpoints (amounts/delivered kept); a member of the responsible SK and an admin see them.
-- [ ] A squadron-responsible order is unaffected — every viewer who passes `canSeeJobOrder` sees
-  owner/location.
+- [ ] Every caller who passes `canSeeJobOrder` gets owner and location on all four endpoints,
+  including a member of an uninvolved squadron on an SK-public order.
 - [ ] A requester-only viewer (`redacted`) gets `403` on all four endpoints.
 - [ ] A caller who may read the order but not an internal mission earmarked on its linked stock sees
   that slice without name and start on both pickers; a caller who may read the mission sees both.
-- [ ] The redacted inline item stock / Itemsammelübersicht / material-collection page render `—`
-  for owner/location.
+- [ ] An entry without owner or location renders `—` on the inline item stock, the
+  Itemsammelübersicht and the material-collection page.
 
-**Enforced by:** `ScopeKernelTest.CanSeeJobOrderInventoryOwnersTests` (the gate — squadron /
-SK-member / requesting-side / admin / unknown), `JobOrderInventoryOwnerRedactorTest` (the three
-redaction passes blank owner/location, keep the rest, null-safe),
+**Enforced by:** `JobOrderItemStockControllerTest` + `MaterialCollectionControllerTest` +
+`JobOrderMaterialControllerTest` (owner and location passed through, the pickers only mission-safe),
 `JobOrderMissionAllocationRedactorTest` + `JobOrderLinkedStockMissionAllocationIntegrationTest` (the
-assignee of another unit gets the internal mission's slice anonymised over HTTP), `JobOrderItemStockControllerTest`
-+ `MaterialCollectionControllerTest` + `JobOrderControllerTest` (redaction wiring: unredacted when
-entitled, redactor output otherwise) · **Code:**
-`JobOrderAccessPolicy.canSeeJobOrderInventoryOwners`,
-`JobOrderInventoryOwnerRedactor`, `JobOrderItemStockController` / `MaterialCollectionController` /
-`JobOrderController` (the two pickers), `joborder/orders-detail.html` + `joborder/material-collection.html` (`—`
-fallbacks) · **Issues:** — · **ADR:** [ADR-0107](../adr/0107-job-order-inventory-owner-redaction.md)
+assignee of another unit gets the internal mission's slice anonymised over HTTP),
+`JobOrderItemDetailRenderTest` (`—` fallback) · **Code:** `JobOrderItemStockController` /
+`MaterialCollectionController` / `JobOrderMaterialController` (the two pickers),
+`JobOrderMissionAllocationRedactor`, `joborder/orders-detail.html` +
+`joborder/material-collection.html` (`—` fallbacks) · **Issues:** — · **ADR:**
+[ADR-0350](../adr/0350-every-order-viewer-sees-the-linked-stock-owner-and-location.md)
 
 ### REQ-ORDERS-030 — Item delivery consumes the order's earmarked item stock (best-effort)
 
@@ -640,9 +617,8 @@ earmarked-stock projection the order-detail inline stock renders — flattening 
 groups to one row per earmarked entry (owner, location, the game item, the this-order slice in whole
 units with the entry's total stock as context, and a delivered toggle).
 `ItemCollectionPageController` (`isAuthenticated()`) loads the stock and the cached location lookup,
-tolerating partial failure; the backend read stays gated on `canSeeJobOrder` with the REQ-ORDERS-029
-owner/location redaction, so a requesting-side viewer of an SK-public order sees the amounts with
-owner/location as `—`.
+tolerating partial failure; the backend read stays gated on `canSeeJobOrder` and returns owner and
+location to every such viewer (REQ-ORDERS-029); a row without owner or location renders `—`.
 
 **Writes.** The two row controls reuse the existing generic inventory endpoints, exactly like the
 Materialsammlung: an owner/location change POSTs `/inventory/{id}/transfer` (`type=TRANSFER`) moving
@@ -672,8 +648,8 @@ move re-fetches the page's `collectionResults` fragment in place.
 - [ ] Flipping the delivered toggle persists via `PATCH /inventory/{id}/delivered` with the order id
   + version, and reaches a peer viewing the same order / the order-detail inline stock without a
     reload.
-- [ ] A requesting-side viewer of an SK-public order sees the amounts with owner/location as `—`
-  (REQ-ORDERS-029).
+- [ ] Every viewer of the order sees each row's owner and location, including a member of an
+  uninvolved squadron on an SK-public order (REQ-ORDERS-029).
 
 **Enforced by:** `ItemCollectionPageControllerTest` (model + fragment + partial-failure),
 `ItemCollectionRenderTest` (flattened rows + empty state), `InventoryItemServiceBookOutTest`
