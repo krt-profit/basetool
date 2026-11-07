@@ -53,6 +53,7 @@
 /admin/materials GET -> AdminMaterialsPageController#listMaterials gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/ajax POST -> AdminMaterialsPageController#createMaterialAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/{id}/ajax PUT -> AdminMaterialsPageController#updateMaterialAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/{id}/p4k-overrides/{field}/ajax DELETE headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsRelayController#releaseP4kOverride gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/export/json GET -> DataExportProxyController#adminJson gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/export/pdf GET -> DataExportProxyController#adminPdf gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar GET -> MemberHangarPageController#viewMemberHangar gate=class:hasRole('ADMIN') layout=yes

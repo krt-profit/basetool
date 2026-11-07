@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialP4kOverride;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostRepository;
@@ -550,6 +551,20 @@ class CachedCatalogueEntityInvariantTest {
                 details.setIsVisible(false);
                 materialService.updateMaterial(id, details);
               });
+        });
+    cases.put(
+        "MaterialService#releaseP4kOverride",
+        () -> {
+          UUID id = material();
+          JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+          jdbc.update("UPDATE material SET resource_group_manual = TRUE WHERE id = ?", id);
+          long version =
+              jdbc.queryForObject("SELECT version FROM material WHERE id = ?", Long.class, id);
+          return new Case(
+              () -> materialService.getMaterial(id),
+              () ->
+                  materialService.releaseP4kOverride(
+                      id, MaterialP4kOverride.RESOURCE_GROUP, version));
         });
     cases.put(
         "MaterialService#deleteMaterial",
