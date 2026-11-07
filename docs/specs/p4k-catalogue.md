@@ -21,19 +21,13 @@ of p4kx, `schemaVersion` 2. Field names below are the contract's.
 The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, #2901, #2902,
 #2927, #3027–#3029).
 
-> [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033), REQ-P4K-017…019 are
-> implemented (#3035), REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented
-> (#3037), REQ-P4K-027 and REQ-P4K-028 are implemented (#3038), REQ-P4K-029 is implemented
-> (#3039), REQ-P4K-030 is implemented (#3040), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
-> implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-034…038 are implemented
-> (#3044), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-042…044 are implemented
-> (#3046), REQ-P4K-047 is implemented
-> (#3034); every other
-> requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
-> included. The order of delivery is the map's migration order: the gate, the run record and the
-> UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
-> by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
+> [!note] Implemented
+> Every requirement of this spec is implemented: REQ-P4K-001…016 and REQ-P4K-045 (#3031, #3033),
+> REQ-P4K-017…019 (#3035), REQ-P4K-020…023 (#3036), REQ-P4K-024…026 (#3037), REQ-P4K-027 and
+> REQ-P4K-028 (#3038), REQ-P4K-029 (#3039), REQ-P4K-030 (#3040), REQ-P4K-031 and REQ-P4K-032
+> (#3042), REQ-P4K-033 (#3041), REQ-P4K-034…038 (#3044), REQ-P4K-039 (#3043), REQ-P4K-040 and
+> REQ-P4K-041 (#3045), REQ-P4K-042…044 (#3046), REQ-P4K-046 (#3032) and REQ-P4K-047 (#3034). The
+> import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
 > `P4kBlueprintCategoryReconciler`, `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then
 > `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the rows the base kinds matched,
@@ -1431,7 +1425,7 @@ the never-pruned detail record; the audit event carries no free text.
 
 - [x] A P4K preview enqueued and an APPLY each write exactly one `CATALOGUE` event with the job or
   run id as subject, the Build and, for the APPLY, the counts per kind.
-- [ ] Each mass-guard override, review resolution, manual starmap or shop link, visibility
+- [x] Each mass-guard override, review resolution, manual starmap or shop link, visibility
   override and storage place writes exactly one `CATALOGUE` event with the row UUID as subject;
   the event types of the override and the review resolution exist.
 
@@ -1441,9 +1435,11 @@ The starmap's events are recorded: `CATALOGUE_STARMAP_LINK_SET`, `…_LINK_CLEAR
 `CATALOGUE_STORAGE_PLACE_CREATED`; the shop's are `CATALOGUE_SHOP_LINK_SET`, `…_LINK_CLEARED` and
 `…_LINK_RELEASED` (subject the shop, details `terminalId`, `previousTerminalId`).
 
-**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
-`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`, `P4kShopTerminalLinkTest` ·
-**Enforced by (planned):** further cases in `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
+**Enforced by:** `CatalogueAuditTest` (the catalogue admin edits), `P4kImportAuditTest`,
+`P4kImportJobServiceTest`, `P4kImportJobRunnerTest`, `P4kImportServiceSweepTest` (the mass-guard
+override), `P4kReviewServiceTest` (the review
+resolutions), `P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`,
+`P4kShopTerminalLinkTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901, #3032
 
 ### REQ-P4K-047 — the import is monitored and says when it is due
 
