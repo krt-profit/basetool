@@ -29,10 +29,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The SC Wiki and UEX side of the columns the P4K import leads on one row (REQ-P4K-031): a row
- * without a P4K GUID, or one whose column is still empty, takes the source value; on a P4K-known
- * row a stored value stays, and a source value that differs is collected as a disagreement for
- * {@code external_sync_report}.
+ * The SC Wiki and UEX side of the columns the P4K import leads on one row (REQ-P4K-017,
+ * REQ-P4K-024, REQ-P4K-031): the source writes a led column only while the P4K holds no value for
+ * it, and a source value that differs from the kept one is collected as a disagreement for {@code
+ * external_sync_report}; values agree by {@link P4kFields#agrees}.
  */
 final class P4kLedColumns {
 
@@ -52,7 +52,8 @@ final class P4kLedColumns {
   }
 
   /**
-   * Writes a source value into a led column.
+   * Writes a source value into a led column whose P4K value is the row's own: a row without a P4K
+   * GUID, or one whose column is still empty, takes the source value.
    *
    * @param column the column
    * @param current the row's value
@@ -69,7 +70,8 @@ final class P4kLedColumns {
   }
 
   /**
-   * Writes a source value into a led column, rendering a disagreement with a label.
+   * Writes a source value into a led column whose P4K value is the row's own, rendering a
+   * disagreement with a label.
    *
    * @param column the column
    * @param current the row's value
@@ -88,10 +90,29 @@ final class P4kLedColumns {
       setter.accept(incoming);
       return;
     }
-    if (incoming != null && !P4kFields.sameValue(current, incoming)) {
-      disagreements.add(
-          P4kFields.disagreement(column, label.apply(current), label.apply(incoming)));
+    compare(column, current, incoming, label);
+  }
+
+  /**
+   * Writes a source value into a displayed column whose P4K value is kept in a column of its own:
+   * while the P4K's value is {@code null} the source value is written, a {@code null} included.
+   *
+   * @param column the displayed column
+   * @param p4kValue the P4K's own value of the column
+   * @param incoming the source value
+   * @param setter writes the displayed column
+   * @param <V> the value type
+   */
+  <V> void fillGap(
+      @NotNull String column,
+      @Nullable V p4kValue,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter) {
+    if (p4kValue == null) {
+      setter.accept(incoming);
+      return;
     }
+    compare(column, p4kValue, incoming, String::valueOf);
   }
 
   /**
@@ -103,5 +124,24 @@ final class P4kLedColumns {
   @Unmodifiable
   List<String> disagreements() {
     return List.copyOf(disagreements);
+  }
+
+  /**
+   * Collects a source value that differs from the kept one.
+   *
+   * @param column the column
+   * @param kept the value that stays
+   * @param incoming the source value
+   * @param label renders a value
+   * @param <V> the value type
+   */
+  private <V> void compare(
+      @NotNull String column,
+      @NotNull V kept,
+      @Nullable V incoming,
+      @NotNull Function<V, String> label) {
+    if (incoming != null && !P4kFields.agrees(kept, incoming)) {
+      disagreements.add(P4kFields.disagreement(column, label.apply(kept), label.apply(incoming)));
+    }
   }
 }

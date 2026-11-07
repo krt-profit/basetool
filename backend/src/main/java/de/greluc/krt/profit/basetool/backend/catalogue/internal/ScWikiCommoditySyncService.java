@@ -364,8 +364,9 @@ public class ScWikiCommoditySyncService {
 
   /**
    * Writes only the Wiki-owned columns onto a material; the UEX-canonical name, code, kind, type,
-   * prices and {@code is_*} flags are never touched. The density of a row the P4K matched stays the
-   * P4K's, and a different Wiki density is reported (REQ-P4K-024).
+   * prices and {@code is_*} flags are never touched. The density is P4K-led ({@link
+   * P4kLedColumns#write}): on a row the P4K matched the Wiki fills it only while it is empty, and a
+   * different Wiki density is reported (REQ-P4K-024).
    *
    * @param material the row to update
    * @param dto the Wiki commodity row
@@ -379,19 +380,21 @@ public class ScWikiCommoditySyncService {
     material.setScwikiKey(dto.key());
     material.setScwikiSlug(dto.slug());
     Double density = dto.densityGramPerCc();
-    if (material.getP4kUuid() == null) {
-      if (density != null) {
-        material.setDensityGramPerCc(density);
-      }
-    } else if (density != null && !density.equals(material.getDensityGramPerCc())) {
-      syncReportService.logP4kDisagreement(
-          SyncSourceSystem.SCWIKI,
-          runId,
-          "commodity",
-          material.getP4kUuid(),
+    if (density != null) {
+      P4kLedColumns led = new P4kLedColumns(material);
+      led.write(
           "density_g_per_cc",
-          String.valueOf(material.getDensityGramPerCc()),
-          String.valueOf(density));
+          material.getDensityGramPerCc(),
+          density,
+          material::setDensityGramPerCc);
+      for (String disagreement : led.disagreements()) {
+        syncReportService.logCommodityEvent(
+            runId,
+            SyncEventType.P4K_DISAGREEMENT,
+            material.getP4kUuid(),
+            material.getName(),
+            disagreement);
+      }
     }
     material.setScwikiSyncedAt(now);
     material.setScwikiDeletedAt(null);

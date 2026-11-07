@@ -146,6 +146,23 @@ class ScWikiItemFieldWriterTest {
   }
 
   @Test
+  void aWikiDescription_isWritten_butAMissingOrBlankLocaleKeepsTheStoredText() {
+    GameItem item = item();
+    item.setDescriptionEn("Stored English");
+    item.setDescriptionDe("Vom P4K gefüllt");
+
+    writer.apply(
+        item,
+        dto("\"description\":{\"en_EN\":\"Wiki English\",\"fr_FR\":\" \"}"),
+        RUN,
+        Instant.now());
+    writer.apply(item, dto("\"description\":{\"de_DE\":\"  \"}"), RUN, Instant.now());
+
+    assertThat(item.getDescriptionEn()).isEqualTo("Wiki English");
+    assertThat(item.getDescriptionDe()).isEqualTo("Vom P4K gefüllt");
+  }
+
+  @Test
   void anUnknownWikiClass_countsOnce() {
     GameItem item = item();
 

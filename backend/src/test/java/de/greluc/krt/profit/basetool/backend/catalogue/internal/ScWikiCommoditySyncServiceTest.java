@@ -139,6 +139,45 @@ class ScWikiCommoditySyncServiceTest {
   }
 
   @Test
+  void aP4kKnownMaterial_takesTheWikiDensityOnlyWhileItHasNone_andAnotherIsReported() {
+    ScWikiCommodityDto empty = commodity("Agricium");
+    ScWikiCommodityDto held = commodity("Borase");
+    Material withoutDensity = uexMaterial("Agricium");
+    withoutDensity.setScwikiUuid(empty.uuid());
+    withoutDensity.setP4kUuid(UUID.randomUUID());
+    Material withDensity = uexMaterial("Borase");
+    withDensity.setScwikiUuid(held.uuid());
+    withDensity.setP4kUuid(UUID.randomUUID());
+    withDensity.setDensityGramPerCc(999.0);
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("commodities")))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(empty, held)));
+    when(materialRepository.findAll()).thenReturn(List.of(withoutDensity, withDensity));
+    when(materialRepository.findByScwikiUuid(empty.uuid())).thenReturn(Optional.of(withoutDensity));
+    when(materialRepository.findByScwikiUuid(held.uuid())).thenReturn(Optional.of(withDensity));
+    when(materialRepository.save(any(Material.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.syncCommodities();
+
+    assertEquals(empty.densityGramPerCc(), withoutDensity.getDensityGramPerCc());
+    assertEquals(999.0, withDensity.getDensityGramPerCc());
+    verify(syncReportService)
+        .logCommodityEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq(withDensity.getP4kUuid()),
+            eq("Borase"),
+            eq("column=density_g_per_cc;stored=999.0;source=" + held.densityGramPerCc()));
+    verify(syncReportService, never())
+        .logCommodityEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq(withoutDensity.getP4kUuid()),
+            any(),
+            any());
+  }
+
+  @Test
   void isCommodityHardJunk_dropsHtmlUnderscorePlaceholderAndAtmosphere() {
     assertTrue(ScWikiCommoditySyncService.isCommodityHardJunk(commodity("<= PLACEHOLDER =>")));
     assertTrue(ScWikiCommoditySyncService.isCommodityHardJunk(commodity("CO<font>2</font>")));

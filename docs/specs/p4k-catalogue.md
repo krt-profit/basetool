@@ -547,7 +547,9 @@ displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4
 manufacturer only while `p4k_manufacturer_id` is `null`, and the Wiki/UEX duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
 disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;stored=…;source=…`; strings
 compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
-writes nothing. The import writes `name_de` by REQ-P4K-023.
+writes nothing. The import writes `name_de` by REQ-P4K-023. The descriptions stay with the Wiki:
+the import fills `description_en` / `_de` only where they are empty or blank, and the Wiki writes a
+locale only when it carries a non-blank text, so a locale the Wiki lacks keeps the P4K's text.
 
 **Enforced by:** `P4kItemPrecedenceTest`, `GameItemNamePrecedenceTest`, `ScWikiItemFieldWriterTest`,
 `UexItemSyncServiceTest`, `ItemReconciliationServiceTest`, `V346MigrationTest` · **Code:**
@@ -752,7 +754,8 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
   and the identity stays the commodity's `guid`.
 - **The P4K leads** `name`, `name_de`, the group (`typeGuid`), the density
   (`densityGramsPerCubicCentimetre`) and the one-step refined-from link (`refinedSubtypeGuid`). The
-  Wiki and UEX write these only on rows without a P4K GUID; a disagreement goes to
+  Wiki and UEX write these only on rows without a P4K GUID, and the Wiki fills the density of a
+  P4K-known row while it is empty (`P4kLedColumns`); a disagreement goes to
   `external_sync_report`.
 - **UEX keeps** trade flags, prices, terminals, stock, refinery yields and the RAW / REFINED type. On
   a row UEX does not know, the import sets RAW on a commodity that has a `refinedSubtypeGuid` and
