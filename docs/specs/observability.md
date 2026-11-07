@@ -1636,13 +1636,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   The counter covers the cross-kind item sweep. The durable source/aggregate attempt metrics above
   record skipped sweeps and incomplete outcomes for vehicle, commodity, blueprint and manufacturer
   slices as well; `CatalogueAttemptIncomplete` covers those independently of this item-only counter.
-- `basetool_catalogue_item_class_unknown_total` counter (untagged, `ScWikiItemSyncService`), bumped
-  once per SC Wiki item whose `class` value is no `ShipComponentClass` (REQ-DATA-024, ADR-0283).
-  The item is still written, with no class, so without the meter a new in-game class would only
-  show as components missing their chip. The value itself is unbounded upstream text and goes to
-  the WARN log once per value, never into a label. Registered at zero by every enabled item sync, so
-  the first increment is visible to `increase()`. Backs `ScWikiItemClassUnknown` (> 0 in 24h for
-  1h, warning).
+- `basetool_catalogue_item_class_unknown_total` counter (untagged, `ItemClassResolver`), bumped
+  once per SC Wiki item and once per item of a P4K APPLY whose class value is no
+  `ShipComponentClass` (REQ-OBS-023, ADR-0337). The item is still written, with no class, so
+  without the meter a new in-game class would only show as components missing their chip. The value
+  itself is unbounded upstream text and goes to the WARN log once per value, never into a label.
+  Registered at zero when the backend starts, so the first increment is visible to `increase()`.
+  Backs `ScWikiItemClassUnknown` (> 0 in 24h for 1h, warning).
 - `basetool_catalogue_items_with_stats` gauge (untagged, `ScWikiItemSyncService`), the number of
   game items with a stored blueprint stat base value (REQ-DATA-027, ADR-0309), registered by every
   enabled item sync and set from `game_item_stat` at the end of the run. The values come from stat
@@ -4116,9 +4116,9 @@ uploads the gate refused.
 
 ### REQ-OBS-023 — The catalogue's precedence is visible: unknown grades and classes, stat sources
 
-> [!note] Planned — implementation pending (#2889, #2927; ADR-0337, ADR-0342)
-> Nothing below is built. Until it is, the `basetool_catalogue_item_class_unknown_total` and
-> `basetool_catalogue_items_with_stats` bullets of REQ-OBS-011 describe what runs.
+> [!note] Partly implemented (#2889; ADR-0337) — the unknown class and grade are built; the stat
+> sources wait for ADR-0342 (#2927), until then the `basetool_catalogue_items_with_stats` bullet
+> of REQ-OBS-011 describes what runs.
 
 The P4K catalogue leads a game item's attributes and its blueprint stat base values, and the SC Wiki
 fills gaps
@@ -4130,8 +4130,8 @@ These meters show where that precedence meets values it cannot place:
   whose class value is no `ShipComponentClass`, read by the P4K import or the SC Wiki item sync. The
   item is stored with no class; the value goes to the WARN log once per value, never into a label.
 - **Unknown grade.** `basetool_catalogue_item_grade_unknown_total` (untagged) counts every matched
-  item whose raw P4K grade is an unknown value (5 to 7 on `WeaponAttachment`, and anything above).
-  The letter stays `null` and `p4k_grade_raw` keeps the integer.
+  item whose raw P4K grade is an unknown value (5 to 7 on `WeaponAttachment`, and anything above),
+  once per APPLY. The letter stays `null` and `p4k_grade_raw` keeps the integer.
 - **Stat sources.** `basetool_catalogue_items_with_stats{source}` counts the game items with a
   stored blueprint stat base value per source, `source` being the bounded `P4K` / `SCWIKI` of
   `game_item_stat.source`.
@@ -4139,10 +4139,11 @@ These meters show where that precedence meets values it cannot place:
 
 **Acceptance**
 
-- [ ] An unknown class from either source and an unknown raw grade each bump their counter once;
+- [x] An unknown class from either source and an unknown raw grade each bump their counter once;
   neither carries the value as a label.
 - [ ] `basetool_catalogue_items_with_stats` carries `source` with exactly `P4K` and `SCWIKI`.
 - [ ] `ScWikiItemStatsMissing` stays silent while the P4K source covers the items and fires when
   neither source does (promtool rule test).
 
-**Enforced by:** — (planned) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927
+**Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` (unknown class and grade);
+the stat sources planned · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927

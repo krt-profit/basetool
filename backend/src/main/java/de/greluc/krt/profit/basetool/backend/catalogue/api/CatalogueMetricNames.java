@@ -36,8 +36,17 @@ public final class CatalogueMetricNames {
   public static final String CATALOGUE_ORPHAN_SWEEP_SKIPPED =
       "basetool.catalogue.orphan.sweep.skipped";
 
-  /** Untagged counter of SC Wiki items with an unknown {@code class} value (REQ-DATA-024). */
+  /**
+   * Untagged counter of items whose SC Wiki {@code class} or P4K {@code itemClass} is no {@link
+   * ShipComponentClass} (REQ-OBS-023).
+   */
   public static final String CATALOGUE_ITEM_CLASS_UNKNOWN = "basetool.catalogue.item.class.unknown";
+
+  /**
+   * Untagged counter of matched items whose raw P4K grade lies outside 1 to 4 (REQ-OBS-023), one
+   * per item and APPLY.
+   */
+  public static final String CATALOGUE_ITEM_GRADE_UNKNOWN = "basetool.catalogue.item.grade.unknown";
 
   /** Untagged gauge of game items with a stored blueprint stat base value (REQ-DATA-027). */
   public static final String CATALOGUE_ITEMS_WITH_STATS = "basetool.catalogue.items.with.stats";

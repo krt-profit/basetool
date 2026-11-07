@@ -104,5 +104,11 @@ public enum SyncEventType {
   SOURCE_RECORDS_MERGED,
 
   /** A complete all-asset census restored known records excluded from the player-relevant list. */
-  SOURCE_RECORDS_RESTORED
+  SOURCE_RECORDS_RESTORED,
+
+  /**
+   * Wiki item sync: the Wiki serves a value for an attribute the P4K leads that differs from the
+   * P4K's; the P4K value stays and {@code detail} names the column and both values (REQ-P4K-017).
+   */
+  P4K_DISAGREEMENT
 }
