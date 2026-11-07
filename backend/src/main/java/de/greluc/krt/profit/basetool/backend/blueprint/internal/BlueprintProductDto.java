@@ -22,10 +22,10 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One searchable blueprint product: all active recipes whose output name normalizes to the same
- * {@link #productKey}, collapsed into one entry.
+ * One searchable blueprint product: all active recipes with the same {@link #productKey}, collapsed
+ * into one entry.
  *
- * @param productKey normalized product identity (matches {@code personal_blueprint.product_key})
+ * @param productKey product identity (matches {@code personal_blueprint.product_key})
  * @param name display name of the product (original SC Wiki spelling)
  * @param variantCount number of active blueprint recipes that produce this product
  * @param manufacturerName manufacturer of the produced item, or {@code null} if unresolved

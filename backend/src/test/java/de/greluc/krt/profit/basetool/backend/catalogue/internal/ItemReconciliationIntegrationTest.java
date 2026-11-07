@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
@@ -56,6 +58,7 @@ class ItemReconciliationIntegrationTest {
   @Autowired private ItemReconciliationService reconciliation;
   @Autowired private ObjectMapper mapper;
   @Autowired private JobOrderItemService orderItems;
+  @Autowired private BlueprintProducts blueprintProducts;
 
   @Test
   void everyReferenceSurvivesAndBothSourceStatesRemainArchived() {
@@ -524,6 +527,45 @@ class ItemReconciliationIntegrationTest {
     assertThat(result.getName()).isEqualTo("P4K Name");
     assertThat(result.getMass()).isEqualTo(100d);
     assertThat(result.getUexItemId()).isEqualTo(pair.uexId());
+  }
+
+  @Test
+  void aGuidKeyedPersonalBlueprintStillResolvesToTheSurvivingItem() {
+    Pair pair = pair();
+    UUID guid = UUID.randomUUID();
+    jdbc.update("UPDATE game_item SET p4k_uuid = ? WHERE id = ?", guid, pair.retired());
+    jdbc.update(
+        "INSERT INTO blueprint (id, scwiki_uuid, output_item_id, output_name, produced_item_guid)"
+            + " VALUES (?, ?, ?, 'Survivor Arms', ?)",
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        pair.retired(),
+        guid);
+    UUID owner = member();
+    jdbc.update(
+        "INSERT INTO personal_blueprint (id, owner_user_id, product_key, product_name,"
+            + " output_item_id) VALUES (?, ?, ?, 'Survivor Arms', ?)",
+        UUID.randomUUID(),
+        owner,
+        guid.toString(),
+        pair.retired());
+    GameItem canonical = items.findById(pair.canonical()).orElseThrow();
+
+    reconciliation.mergeExisting(canonical, pair.retired(), UUID.randomUUID(), evidence());
+    entityManager.clear();
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT product_key, output_item_id FROM personal_blueprint"
+                    + " WHERE owner_user_id = ?",
+                owner))
+        .containsEntry("product_key", guid.toString())
+        .containsEntry("output_item_id", pair.canonical());
+    assertThat(items.findById(pair.canonical()).orElseThrow().getP4kUuid()).isEqualTo(guid);
+    assertThat(blueprintProducts.resolveByProductKey(guid.toString()))
+        .get()
+        .extracting(ResolvedProduct::outputItemId)
+        .isEqualTo(pair.canonical());
   }
 
   @Test

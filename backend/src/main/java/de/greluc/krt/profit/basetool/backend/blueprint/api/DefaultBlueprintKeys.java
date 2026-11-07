@@ -25,10 +25,9 @@ import org.jetbrains.annotations.Nullable;
 public interface DefaultBlueprintKeys {
 
   /**
-   * Tells whether the given normalized product key belongs to the default set, which a member
-   * cannot remove.
+   * Tells whether the given product key belongs to the default set, which a member cannot remove.
    *
-   * @param productKey the normalized product key, or {@code null}
+   * @param productKey the product key, or {@code null}
    * @return {@code true} iff the key is a default product key
    */
   boolean isDefault(@Nullable String productKey);

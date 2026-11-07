@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasSource;
@@ -55,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +94,7 @@ class ExchangeResolveServiceTest {
         new BlueprintImportService(
             JsonMapper.builder().build(),
             blueprintProductService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintAliasRepository,
             personalBlueprintRepository,
@@ -102,7 +104,7 @@ class ExchangeResolveServiceTest {
         new ExchangeResolveService(
             blueprintProductService,
             importService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintRepository,
             gameItemRepository,
@@ -127,6 +129,35 @@ class ExchangeResolveServiceTest {
 
     assertThat(only(response).ref().bt()).isEqualTo("arclight pistol");
     verifyNoInteractions(blueprintRepository);
+  }
+
+  @Test
+  void aGuidResolvesItsProductAndTheAnswerCarriesTheGuid() {
+    UUID guid = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
+    products(guid.toString(), "Light Arms", "gallant rifle", "Gallant Rifle");
+
+    Result result =
+        only(
+            resolve(
+                ExchangeCatalogKind.BLUEPRINT,
+                new ExchangeItemRef(guid, null, null, null, null, null, "Gallant Rifle", null)));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().guid()).isEqualTo(guid);
+    assertThat(result.ref().bt()).isEqualTo(guid.toString());
+  }
+
+  @Test
+  void aDeprecatedNameKeyBtStillResolvesToItsGuidProductAndIsCounted() {
+    UUID guid = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
+    products(guid.toString(), "Light Arms");
+
+    Result result = only(resolve(ExchangeCatalogKind.BLUEPRINT, ref("light arms", null, null)));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().guid()).isEqualTo(guid);
+    assertThat(meterRegistry.counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS).count())
+        .isEqualTo(1.0);
   }
 
   @Test
@@ -183,8 +214,8 @@ class ExchangeResolveServiceTest {
     ExchangeResolveResponse response =
         resolve(
             ExchangeCatalogKind.BLUEPRINT,
-            new ExchangeItemRef("arclight pistol", null, null, null, "item_a", null, null),
-            new ExchangeItemRef(null, null, null, null, "item_b", "Arclight Pistol", "en"));
+            new ExchangeItemRef(null, "arclight pistol", null, null, null, "item_a", null, null),
+            new ExchangeItemRef(null, null, null, null, null, "item_b", "Arclight Pistol", "en"));
 
     assertThat(response.results()).allMatch(r -> r.status() == Status.RESOLVED);
     assertThat(response.warnings())
@@ -210,16 +241,24 @@ class ExchangeResolveServiceTest {
         resolve(
             ExchangeCatalogKind.SHIP_TYPE,
             new ExchangeItemRef(
-                null, null, null, null, "VEHICLE_NameDRAK_Cutlass_Black", "Something Else", null));
+                null,
+                null,
+                null,
+                null,
+                null,
+                "VEHICLE_NameDRAK_Cutlass_Black",
+                "Something Else",
+                null));
     ExchangeResolveResponse unknown =
         resolve(
             ExchangeCatalogKind.MATERIAL,
             new ExchangeItemRef(
-                null, null, null, null, "items_commodities_nope", "Agricium", null));
+                null, null, null, null, null, "items_commodities_nope", "Agricium", null));
     ExchangeResolveResponse known =
         resolve(
             ExchangeCatalogKind.MATERIAL,
-            new ExchangeItemRef(null, null, null, null, "items_commodities_agricium", null, null));
+            new ExchangeItemRef(
+                null, null, null, null, null, "items_commodities_agricium", null, null));
 
     assertThat(only(ship).ref().name()).isEqualTo("Cutlass Black");
     assertThat(ship.warnings()).isNull();
@@ -234,7 +273,7 @@ class ExchangeResolveServiceTest {
     products("arclight pistol", "Arclight Pistol");
     List<ExchangeItemRef> refs = new ArrayList<>();
     for (int i = 0; i < 60; i++) {
-      refs.add(new ExchangeItemRef(null, null, null, null, "item_" + i, null, null));
+      refs.add(new ExchangeItemRef(null, null, null, null, null, "item_" + i, null, null));
     }
 
     ExchangeResolveResponse response =
@@ -394,7 +433,7 @@ class ExchangeResolveServiceTest {
             resolve(
                 ExchangeCatalogKind.SHIP_TYPE,
                 new ExchangeItemRef(
-                    null, null, titan.getP4kUuid(), null, null, "Cutlass Black", null)));
+                    null, null, null, titan.getP4kUuid(), null, null, "Cutlass Black", null)));
 
     assertThat(result.ref().bt()).isEqualTo(titan.getId().toString());
   }
@@ -424,7 +463,14 @@ class ExchangeResolveServiceTest {
     for (int i = 0; i + 1 < keysAndNames.length; i += 2) {
       products.add(new ResolvedProduct(keysAndNames[i], keysAndNames[i + 1], null));
     }
-    lenient().when(blueprintProductService.allProducts()).thenReturn(products);
+    Map<String, List<ResolvedProduct>> byName = new LinkedHashMap<>();
+    for (ResolvedProduct p : products) {
+      byName
+          .computeIfAbsent(
+              new BlueprintNameNormalizer().normalize(p.productName()), _ -> new ArrayList<>())
+          .add(p);
+    }
+    lenient().when(blueprintProductService.productsByNameKey()).thenReturn(byName);
   }
 
   /**
@@ -449,7 +495,7 @@ class ExchangeResolveServiceTest {
    */
   private static @NotNull ExchangeItemRef ref(
       @Nullable String bt, @Nullable String scRecord, @Nullable String name) {
-    return new ExchangeItemRef(bt, scRecord, null, null, null, name, null);
+    return new ExchangeItemRef(null, bt, scRecord, null, null, null, name, null);
   }
 
   /**

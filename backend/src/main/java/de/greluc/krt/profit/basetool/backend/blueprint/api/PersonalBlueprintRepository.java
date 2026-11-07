@@ -96,7 +96,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * the {@code (owner_user_id, product_key)} unique constraint fires.
    *
    * @param ownerUserId {@code app_user.id} of the owner
-   * @param productKey normalized product key
+   * @param productKey product key
    * @return the entry if the owner already owns the product, empty otherwise
    */
   Optional<PersonalBlueprint> findByOwnerUserIdAndProductKey(UUID ownerUserId, String productKey);
@@ -106,7 +106,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * 409 before hitting the unique constraint.
    *
    * @param ownerUserId {@code app_user.id} of the owner
-   * @param productKey normalized product key
+   * @param productKey product key
    * @return {@code true} if the owner already owns the product
    */
   boolean existsByOwnerUserIdAndProductKey(UUID ownerUserId, String productKey);
@@ -157,7 +157,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   /**
    * Returns the rows of the given owners that own one product; backs the availability drill-down.
    *
-   * @param productKey the normalized product key to match
+   * @param productKey the product key to match
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
    * @return the matching rows (one per owning in-scope member); never {@code null}
    */
@@ -171,7 +171,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * <p>ADMIN-ONLY: scoped callers use {@link #findAllByProductKeyAndOwnerUserIdIn(String,
    * Collection)} to keep owner isolation.
    *
-   * @param productKey the normalized product key to match
+   * @param productKey the product key to match
    * @return every owned-blueprint row for the product, across all owners; never {@code null}
    */
   List<PersonalBlueprint> findAllByProductKey(String productKey);
@@ -183,7 +183,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * <p>ADMIN-ONLY: scoped callers use {@link #findAllByProductKeyInAndOwnerUserIdIn(Collection,
    * Collection)} to keep owner isolation.
    *
-   * @param productKeys the normalized product keys making up the family
+   * @param productKeys the product keys making up the family
    * @return every owned-blueprint row for any of the products, across all owners; never {@code
    *     null}
    */
@@ -193,7 +193,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    * Returns the rows of the given owners for any product of a variant family; backs the scoped
    * family drill-down.
    *
-   * @param productKeys the normalized product keys making up the family
+   * @param productKeys the product keys making up the family
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
    * @return the matching rows (one per owning in-scope member × owned family product); never {@code
    *     null}
@@ -203,12 +203,12 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
 
   /**
    * Bulk owner + product lookup — backs the item job-order blueprint-coverage view: given the
-   * {@code app_user.id}s of every member of the order's responsible org unit and the set of
-   * normalized product keys the order's item lines resolve to, returns exactly the owned-blueprint
-   * rows that match both, so the service can group them by owner and by product in one query.
+   * {@code app_user.id}s of every member of the order's responsible org unit and the set of product
+   * keys the order's item lines resolve to, returns exactly the owned-blueprint rows that match
+   * both, so the service can group them by owner and by product in one query.
    *
    * @param ownerUserIds the {@code app_user.id}s of the responsible org unit's members
-   * @param productKeys the normalized product keys of the order's required items
+   * @param productKeys the product keys of the order's required items
    * @return the matching rows (one per owning member × owned required product); never {@code null}
    */
   List<PersonalBlueprint> findAllByOwnerUserIdInAndProductKeyIn(
@@ -223,6 +223,15 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
    */
   @Query("SELECT DISTINCT pb.ownerUserId FROM PersonalBlueprint pb")
   Set<UUID> findAllDistinctOwnerUserIds();
+
+  /**
+   * Returns every product key a member's blueprint carries, GUID and fallback name keys alike
+   * (REQ-INV-070).
+   *
+   * @return the distinct {@code product_key} values; never {@code null}, possibly empty
+   */
+  @Query("SELECT DISTINCT pb.productKey FROM PersonalBlueprint pb")
+  Set<String> findAllDistinctProductKeys();
 
   /**
    * Bulk-removes every removable owned blueprint of one user, keeping the auto-granted defaults

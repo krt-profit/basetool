@@ -351,7 +351,9 @@ public class AdminAuditLogPageController {
                   "BLUEPRINT_DEFAULT_REMOVED",
                   "BLUEPRINT_DEFAULTS_GRANTED",
                   "BLUEPRINT_AUDIT_EXPORTED",
-                  "BLUEPRINT_AUDIT_PURGED")),
+                  "BLUEPRINT_AUDIT_PURGED",
+                  "BLUEPRINT_PRODUCT_KEYS_UPGRADED",
+                  "BLUEPRINT_PRODUCT_MERGED")),
           Map.entry(
               "CONNECTED_APPS",
               List.of(

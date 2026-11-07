@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -72,4 +74,15 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   @Query("SELECT MIN(c.createdAt) FROM P4kReviewCase c WHERE c.status = :status")
   @Nullable
   Instant findOldestCreatedAtByStatus(@Param("status") P4kReviewStatus status);
+
+  /**
+   * Finds the cases of one status, kind and set of reasons.
+   *
+   * @param status the status
+   * @param kind the kind
+   * @param reasons the reasons
+   * @return the cases
+   */
+  List<P4kReviewCase> findByStatusAndKindAndReasonIn(
+      P4kReviewStatus status, P4kKind kind, Collection<P4kReviewReason> reasons);
 }

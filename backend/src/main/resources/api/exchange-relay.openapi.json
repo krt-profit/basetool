@@ -2521,6 +2521,10 @@
           "bt" : {
             "type" : "string"
           },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string"
           }
@@ -2918,6 +2922,10 @@
             "maxLength" : 128,
             "minLength" : 1
           },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "locKey" : {
             "type" : "string",
             "maxLength" : 200,
@@ -2954,6 +2962,10 @@
         "properties" : {
           "bt" : {
             "type" : "string"
+          },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "name" : {
             "type" : "string"

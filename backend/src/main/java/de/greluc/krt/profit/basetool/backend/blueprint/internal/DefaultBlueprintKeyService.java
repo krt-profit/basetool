@@ -30,7 +30,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 /**
- * In-memory cache of the normalized product keys in the default-blueprint set (REQ-INV-016/017).
+ * In-memory cache of the product keys in the default-blueprint set (REQ-INV-016/017).
  *
  * <p>Answers whether an owned blueprint is a default, which marks a {@link
  * de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse} non-removable and
@@ -45,10 +45,9 @@ public class DefaultBlueprintKeyService implements DefaultBlueprintKeys {
   private final AtomicReference<Set<String>> cache = new AtomicReference<>();
 
   /**
-   * Whether the given normalized product key belongs to the default set (and is therefore
-   * non-removable).
+   * Whether the given product key belongs to the default set (and is therefore non-removable).
    *
-   * @param productKey normalized product key, may be {@code null}
+   * @param productKey product key, may be {@code null}
    * @return {@code true} if the key is a default product key
    */
   @Override

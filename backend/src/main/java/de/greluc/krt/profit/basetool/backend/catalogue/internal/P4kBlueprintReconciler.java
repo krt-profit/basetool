@@ -39,8 +39,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Reconciles the catalogue's {@code blueprints} with {@code blueprint}: match by P4K GUID, SC Wiki
- * UUID and {@code scwiki_key}, fill the empty key, output item and craft time, stamp, and link the
- * still-unresolved ingredient lines of a matched blueprint. An unmatched blueprint creates nothing.
+ * UUID and {@code scwiki_key}, fill the empty key, output item and craft time, write the produced
+ * item's GUID (REQ-P4K-029), stamp, and link the still-unresolved ingredient lines of a matched
+ * blueprint. An unmatched blueprint creates nothing.
  */
 @Component
 @RequiredArgsConstructor
@@ -86,6 +87,11 @@ public class P4kBlueprintReconciler {
             producedItem(blueprint.producedItemGuid()),
             row::setOutputItem,
             GameItem::getName);
+        writer.lead(
+            "produced_item_guid",
+            row.getProducedItemGuid(),
+            P4kGuids.parse(blueprint.producedItemGuid()),
+            row::setProducedItemGuid);
         writer.fill(
             "craft_time_seconds",
             row.getCraftTimeSeconds(),

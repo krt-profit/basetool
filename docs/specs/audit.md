@@ -238,7 +238,11 @@ web, naming its client (REQ-AUDIT-005):
   (`BLUEPRINT_DEFAULT_ADDED` / `_REMOVED`, REQ-INV-017) and default-grant provisioning
   (`BLUEPRINT_DEFAULTS_GRANTED`, one summary event per run — per member at the roster sync,
   across all members at startup, on the nightly task and after a default was added — never one
-  per granted row). The admin paths on another member's set write the same events. The subject is
+  per granted row), and the move of the product keys onto the produced items' GUIDs after a P4K
+  APPLY (`BLUEPRINT_PRODUCT_KEYS_UPGRADED`, one summary event per run with counts, and
+  `BLUEPRINT_PRODUCT_MERGED`, one per member whose fallback row merged into the GUID row, the
+  details naming the old and the new key; REQ-INV-070). Events written before such a move keep
+  the key they recorded. The admin paths on another member's set write the same events. The subject is
   the owned or default blueprint, labelled by its **catalogue product name**; the owner is the
   target; the details hold the product key and counts, never the note.
 - **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`, `AuditDomain.CONNECTED_APPS`,

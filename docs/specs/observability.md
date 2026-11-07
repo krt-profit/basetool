@@ -2003,6 +2003,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `ambiguous` / `unmatched`), registered at zero for every pair. It shows how well external
   clients' references meet the catalogue; no alert, since an unmatched reference is the
   client's input, not a fault (REQ-XCH-012).
+- `basetool_exchange_blueprint_bt_refs_total` counter, one per blueprint reference
+  `catalog/resolve` received with the deprecated `bt` (a change set's references count too,
+  since they resolve the same way), registered at zero and shown beside the resolutions on the
+  operations dashboard. It watches the 90-day deprecation window of a blueprint's `bt`, which is
+  removed once the line stays at zero; no alert (REQ-XCH-015, ADR-0343).
 - `basetool_exchange_registry_changes_total{action}` counter, one per committed registry change
   (`action` = `created` / `updated` / `suspended` / `activated` / `switch_on` / `switch_off`, the
   bounded `ExchangeRegistryAction`), registered at zero for every action. It backs

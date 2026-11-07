@@ -344,4 +344,27 @@ public interface MaterialExchangeOfferRepository
      */
     UUID getOwnerId();
   }
+
+  /**
+   * Returns every blueprint product key an item offer names.
+   *
+   * @return the distinct {@code item_product_key} values
+   */
+  @Query(
+      "SELECT DISTINCT e.itemProductKey FROM MaterialExchangeOffer e WHERE e.itemProductKey IS NOT"
+          + " NULL")
+  Set<String> findAllDistinctItemProductKeys();
+
+  /**
+   * Moves every row from one product key to another and bumps its version (REQ-INV-070).
+   *
+   * @param from the name key
+   * @param to the GUID key
+   * @return the rows moved
+   */
+  @Modifying
+  @Query(
+      "UPDATE MaterialExchangeOffer e SET e.itemProductKey = :to, e.version = e.version + 1"
+          + " WHERE e.itemProductKey = :from")
+  int moveItemProductKey(@Param("from") String from, @Param("to") String to);
 }

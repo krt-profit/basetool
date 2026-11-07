@@ -27,6 +27,6 @@ import java.util.List;
  * Batch of product keys to add to the caller's owned blueprints; already-owned or unresolvable keys
  * are skipped (see {@link PersonalBlueprintBatchResult}).
  *
- * @param productKeys the normalized product keys; at least one, each non-blank
+ * @param productKeys the product keys; at least one, each non-blank
  */
 public record PersonalBlueprintBatchCreateRequest(@NotEmpty List<@NotBlank String> productKeys) {}

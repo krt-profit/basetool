@@ -249,7 +249,12 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
 4. **Sweep.** In the same transaction `P4kSweeper` stamps `p4k_deleted_at` on the P4K-known rows a
    complete kind no longer lists, on a valid census and within the 5 % mass guard unless the admin
    ticked "apply marking anyway"; a matched stamped row is cleared. Every outcome is a report row
-   (REQ-P4K-011…014).
+   (REQ-P4K-011…014). Then, still in that transaction, `P4kProductKeyReview` hands the blueprints'
+   produced-item GUIDs to the `ProducedItemGuidFollower`s: `PersonalBlueprintKeyUpgrade` moves every
+   personal-blueprint name key that names exactly one GUID product onto that GUID — aliases, default
+   set, `ProductKeyChangeParticipant`s (Materialbörse, exchange feed and journal), then the members'
+   rows, merging a member's fallback row into an existing GUID row — and the name keys left over
+   become `BLUEPRINT` review cases (REQ-P4K-029, REQ-INV-070).
 5. **Review.** The run list, each run's report and the open review cases are read through
    `P4kImportReportService` and `P4kReviewService`; resolving a case as keep or hide is audited, and
    a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,

@@ -87,7 +87,8 @@ public class P4kReviewService {
    * @param adminId the resolving admin
    * @return the resolved case
    * @throws NotFoundException when no case has the id
-   * @throws BadRequestException when the case is already resolved
+   * @throws BadRequestException when the case is already resolved or the resolution is {@code
+   *     RESOLVED}, which only a run sets
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
    */
@@ -98,6 +99,9 @@ public class P4kReviewService {
       @NotNull P4kReviewResolution resolution,
       long version,
       @NotNull UUID adminId) {
+    if (resolution == P4kReviewResolution.RESOLVED) {
+      throw new BadRequestException("A review case is resolved as keep or hide.");
+    }
     P4kReviewCase reviewCase =
         Entities.require(
             caseRepository.findById(caseId), () -> "P4K review case " + caseId + " was not found.");
@@ -118,6 +122,7 @@ public class P4kReviewService {
         switch (resolution) {
           case KEEP -> AuditEventType.CATALOGUE_P4K_REVIEW_KEPT;
           case HIDE -> AuditEventType.CATALOGUE_P4K_REVIEW_HIDDEN;
+          case RESOLVED -> throw new IllegalStateException("A run's resolution reached an admin.");
         },
         reviewCase.getId(),
         reviewCase.getGuid().toString(),

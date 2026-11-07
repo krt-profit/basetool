@@ -32,8 +32,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ParsedEntry;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
@@ -80,9 +80,12 @@ public class BlueprintImportService implements BlueprintImports {
   /** External catalogue every import row and learned alias belongs to. */
   private static final BlueprintExternalAliasSource SOURCE = BlueprintExternalAliasSource.SCMDB;
 
+  /** The score of a suggestion whose name matches the external name exactly. */
+  private static final double FULL_MATCH = 1.0;
+
   private final ObjectMapper objectMapper;
   private final BlueprintProductService blueprintProductService;
-  private final BlueprintNameNormalizer normalizer;
+  private final ProductKeys productKeys;
   private final FuzzyNameMatcher fuzzyMatcher;
   private final BlueprintExternalAliasRepository aliasRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
@@ -116,8 +119,7 @@ public class BlueprintImportService implements BlueprintImports {
   @NotNull
   public BlueprintImportPreviewDto previewEntries(
       @NotNull UUID ownerUserId, @NotNull List<ParsedEntry> parsed) {
-    Map<String, ResolvedProduct> productByKey = productIndex();
-    List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
+    Products products = products();
     Map<String, String> tagIndex =
         parsed.stream().anyMatch(e -> e.tag() != null)
             ? blueprintProductService.scwikiKeyToProductKeyIndex()
@@ -126,7 +128,7 @@ public class BlueprintImportService implements BlueprintImports {
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
     for (ParsedEntry entry : parsed) {
-      Resolution resolution = resolve(entry, productByKey, allProducts, tagIndex);
+      Resolution resolution = resolve(entry, products, tagIndex);
       resolutions.add(resolution);
       if (resolution.product != null) {
         resolvedKeys.add(resolution.product.productKey());
@@ -193,12 +195,10 @@ public class BlueprintImportService implements BlueprintImports {
     if (names.isEmpty()) {
       return List.of();
     }
-    Map<String, ResolvedProduct> productByKey = productIndex();
-    List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
+    Products products = products();
     List<NameResolution> resolutions = new ArrayList<>(names.size());
     for (String name : names) {
-      Resolution resolution =
-          resolve(new ParsedEntry(name, null, null), productByKey, allProducts, Map.of());
+      Resolution resolution = resolve(new ParsedEntry(name, null, null), products, Map.of());
       resolutions.add(
           new NameResolution(resolution.status, resolution.product, resolution.suggestions));
     }
@@ -219,7 +219,8 @@ public class BlueprintImportService implements BlueprintImports {
   @NotNull
   public BlueprintImportResultDto applyImport(
       @NotNull UUID ownerUserId, @NotNull List<BlueprintImportResolutionDto> resolutions) {
-    Map<String, ResolvedProduct> productByKey = productIndex();
+    Products products = products();
+    Map<String, ResolvedProduct> productByKey = products.byKey();
 
     int added = 0;
     int aliasesLearned = 0;
@@ -244,7 +245,7 @@ public class BlueprintImportService implements BlueprintImports {
         continue;
       }
 
-      if (learnAliasIfManual(ownerUserId, externalName, product, aliasNamesSeen)) {
+      if (learnAliasIfManual(ownerUserId, externalName, product, products, aliasNamesSeen)) {
         aliasesLearned++;
       }
 
@@ -291,11 +292,13 @@ public class BlueprintImportService implements BlueprintImports {
 
   /**
    * Persists an alias for a manual resolution unless one already exists for that name,
-   * case-insensitively (REQ-INV-020).
+   * case-insensitively (REQ-INV-020). A pick among the several products one name names is manual
+   * too, so the member's choice is learned (REQ-INV-070).
    *
    * @param ownerUserId the {@code app_user.id} stamped as creator
    * @param externalName the external name being resolved (trimmed)
    * @param product the chosen product
+   * @param products the master products
    * @param aliasNamesSeen lower-cased names already aliased in this request (mutated)
    * @return {@code true} if a new alias row was persisted
    */
@@ -303,8 +306,10 @@ public class BlueprintImportService implements BlueprintImports {
       @NotNull UUID ownerUserId,
       @NotNull String externalName,
       @NotNull ResolvedProduct product,
+      @NotNull Products products,
       @NotNull Set<String> aliasNamesSeen) {
-    if (externalName.isEmpty() || normalizer.normalize(externalName).equals(product.productKey())) {
+    if (externalName.isEmpty()
+        || products.named(productKeys.nameKey(externalName)).equals(List.of(product))) {
       return false;
     }
     if (!aliasNamesSeen.add(externalName.toLowerCase(Locale.ROOT))
@@ -334,78 +339,58 @@ public class BlueprintImportService implements BlueprintImports {
   /**
    * Resolves one entry by structural tag (REQ-INV-019), exact name, alias, the same two without a
    * localisation pack's class tag (REQ-INV-050), then fuzzy match; the owned flag is applied later
-   * by the caller.
+   * by the caller. A name that names several products — recipes of one name producing items with
+   * different GUIDs — is {@code SUGGESTED} with those products, unless an alias decides it
+   * (REQ-INV-070).
    *
    * @param entry the parsed name, tag and acquisition suggestion
-   * @param productByKey master products by normalized key
-   * @param allProducts master products as the fuzzy candidate set
-   * @param tagIndex lower-cased {@code scwiki_key} to normalized product key
+   * @param products the master products
+   * @param tagIndex lower-cased {@code scwiki_key} to product key
    * @return the resolution (status, product, suggestions)
    */
   @NotNull
   private Resolution resolve(
       @NotNull ParsedEntry entry,
-      @NotNull Map<String, ResolvedProduct> productByKey,
-      @NotNull List<ResolvedProduct> allProducts,
+      @NotNull Products products,
       @NotNull Map<String, String> tagIndex) {
-    ResolvedProduct viaTag = resolveViaTag(entry.tag(), productByKey, tagIndex);
+    ResolvedProduct viaTag = resolveViaTag(entry.tag(), products.byKey(), tagIndex);
     if (viaTag != null) {
-      return new Resolution(
-          entry.externalName(),
-          BlueprintImportStatus.MATCHED,
-          viaTag,
-          entry.suggestedAcquiredAt(),
-          List.of());
+      return matched(entry, BlueprintImportStatus.MATCHED, viaTag);
     }
 
-    String normalized = normalizer.normalize(entry.externalName());
-
-    ResolvedProduct exact = productByKey.get(normalized);
-    if (exact != null) {
-      return new Resolution(
-          entry.externalName(),
-          BlueprintImportStatus.MATCHED,
-          exact,
-          entry.suggestedAcquiredAt(),
-          List.of());
+    String nameKey = productKeys.nameKey(entry.externalName());
+    List<ResolvedProduct> exact = products.named(nameKey);
+    if (exact.size() == 1) {
+      return matched(entry, BlueprintImportStatus.MATCHED, exact.getFirst());
     }
-
-    ResolvedProduct viaAlias = resolveViaAlias(entry.externalName(), productByKey);
+    ResolvedProduct viaAlias = resolveViaAlias(entry.externalName(), products.byKey());
     if (viaAlias != null) {
-      return new Resolution(
-          entry.externalName(),
-          BlueprintImportStatus.MATCHED_BY_ALIAS,
-          viaAlias,
-          entry.suggestedAcquiredAt(),
-          List.of());
+      return matched(entry, BlueprintImportStatus.MATCHED_BY_ALIAS, viaAlias);
+    }
+    if (exact.size() > 1) {
+      return ambiguous(entry, exact);
     }
 
     String untagged = BlueprintPackTags.strip(entry.externalName());
+    String untaggedKey = untagged == null ? null : productKeys.nameKey(untagged);
     if (untagged != null) {
-      ResolvedProduct viaUntagged = productByKey.get(normalizer.normalize(untagged));
-      if (viaUntagged != null) {
-        return new Resolution(
-            entry.externalName(),
-            BlueprintImportStatus.MATCHED,
-            viaUntagged,
-            entry.suggestedAcquiredAt(),
-            List.of());
+      List<ResolvedProduct> viaUntagged = products.named(untaggedKey);
+      if (viaUntagged.size() == 1) {
+        return matched(entry, BlueprintImportStatus.MATCHED, viaUntagged.getFirst());
       }
-      ResolvedProduct viaUntaggedAlias = resolveViaAlias(untagged, productByKey);
+      ResolvedProduct viaUntaggedAlias = resolveViaAlias(untagged, products.byKey());
       if (viaUntaggedAlias != null) {
-        return new Resolution(
-            entry.externalName(),
-            BlueprintImportStatus.MATCHED_BY_ALIAS,
-            viaUntaggedAlias,
-            entry.suggestedAcquiredAt(),
-            List.of());
+        return matched(entry, BlueprintImportStatus.MATCHED_BY_ALIAS, viaUntaggedAlias);
+      }
+      if (viaUntagged.size() > 1) {
+        return ambiguous(entry, viaUntagged);
       }
     }
 
     List<BlueprintImportSuggestionDto> suggestions =
         topSuggestions(
-            untagged != null ? normalizer.normalize(untagged) : normalized,
-            allProducts,
+            untaggedKey != null ? untaggedKey : nameKey,
+            products.all(),
             FuzzyNameMatcher.DEFAULT_LIMIT,
             FuzzyNameMatcher.DEFAULT_THRESHOLD);
     return new Resolution(
@@ -417,11 +402,56 @@ public class BlueprintImportService implements BlueprintImports {
   }
 
   /**
+   * Builds the resolution of an entry that resolved to one product.
+   *
+   * @param entry the entry
+   * @param status {@code MATCHED} or {@code MATCHED_BY_ALIAS}
+   * @param product the product
+   * @return the resolution
+   */
+  @NotNull
+  private static Resolution matched(
+      @NotNull ParsedEntry entry,
+      @NotNull BlueprintImportStatus status,
+      @NotNull ResolvedProduct product) {
+    return new Resolution(
+        entry.externalName(), status, product, entry.suggestedAcquiredAt(), List.of());
+  }
+
+  /**
+   * Builds the {@code SUGGESTED} resolution of a name that names several products, each a full
+   * match; the member's pick is learned as an alias on apply.
+   *
+   * @param entry the entry
+   * @param candidates the products the name names
+   * @return the resolution
+   */
+  @NotNull
+  private static Resolution ambiguous(
+      @NotNull ParsedEntry entry, @NotNull List<ResolvedProduct> candidates) {
+    List<BlueprintImportSuggestionDto> suggestions =
+        candidates.stream()
+            .sorted(
+                Comparator.comparing(
+                    ResolvedProduct::productName,
+                    Comparator.nullsLast(String::compareToIgnoreCase)))
+            .limit(FuzzyNameMatcher.DEFAULT_LIMIT)
+            .map(p -> new BlueprintImportSuggestionDto(p.productKey(), p.productName(), FULL_MATCH))
+            .toList();
+    return new Resolution(
+        entry.externalName(),
+        BlueprintImportStatus.SUGGESTED,
+        null,
+        entry.suggestedAcquiredAt(),
+        suggestions);
+  }
+
+  /**
    * Resolves a structural {@code tag} case-insensitively to a master product (REQ-INV-019).
    *
    * @param tag the raw structural blueprint key, or {@code null}
    * @param productByKey master products by normalized key
-   * @param tagIndex lower-cased {@code scwiki_key} to normalized product key
+   * @param tagIndex lower-cased {@code scwiki_key} to product key
    * @return the product, or {@code null} when the tag is absent, unknown, ambiguous or unresolvable
    */
   @Nullable
@@ -467,17 +497,48 @@ public class BlueprintImportService implements BlueprintImports {
   }
 
   /**
-   * Builds the master product index keyed by normalized product key, in master-scan order.
+   * Loads the master products, by product key and by name key, in master-scan order.
    *
-   * @return the product index
+   * @return the products
    */
   @NotNull
-  private Map<String, ResolvedProduct> productIndex() {
-    Map<String, ResolvedProduct> map = new LinkedHashMap<>();
-    for (ResolvedProduct product : blueprintProductService.allProducts()) {
-      map.putIfAbsent(product.productKey(), product);
+  private Products products() {
+    Map<String, List<ResolvedProduct>> byName = blueprintProductService.productsByNameKey();
+    Map<String, ResolvedProduct> byKey = new LinkedHashMap<>();
+    byName.values().forEach(list -> list.forEach(p -> byKey.putIfAbsent(p.productKey(), p)));
+    return new Products(byKey, byName);
+  }
+
+  /**
+   * The master products of one request.
+   *
+   * @param byKey the products by product key
+   * @param byName the products each name key names
+   */
+  private record Products(
+      @NotNull Map<String, ResolvedProduct> byKey,
+      @NotNull Map<String, List<ResolvedProduct>> byName) {
+
+    /**
+     * Returns the products a name key names.
+     *
+     * @param nameKey the name key, or {@code null}
+     * @return the products; empty when the key names none
+     */
+    @NotNull
+    List<ResolvedProduct> named(@Nullable String nameKey) {
+      return nameKey == null ? List.of() : byName.getOrDefault(nameKey, List.of());
     }
-    return map;
+
+    /**
+     * Returns every product, the fuzzy candidate set.
+     *
+     * @return the products
+     */
+    @NotNull
+    List<ResolvedProduct> all() {
+      return List.copyOf(byKey.values());
+    }
   }
 
   /**
@@ -594,7 +655,7 @@ public class BlueprintImportService implements BlueprintImports {
         .topMatches(
             normalizedQuery,
             candidates,
-            ResolvedProduct::productKey,
+            p -> productKeys.nameKey(p.productName()),
             Comparator.comparing(
                 ResolvedProduct::productName, Comparator.nullsLast(String::compareToIgnoreCase)),
             limit,
