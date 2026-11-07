@@ -265,7 +265,7 @@ public class UexVehicleService {
   /**
    * Copies every UEX-sourced column from the DTO onto the entity; a field missing upstream clears
    * the local value to {@code null}. Cargo, maximum crew and mass go through the P4K precedence
-   * (REQ-P4K-031).
+   * (REQ-P4K-031), and the minimum crew never stays above the kept maximum.
    *
    * @param shipType local row being updated
    * @param dto inbound DTO
@@ -279,6 +279,7 @@ public class UexVehicleService {
     UexValues.CrewRange crew = UexValues.parseCrew(dto.crew());
     shipType.setCrewMin(crew.min());
     led.write("crew_max", shipType.getCrewMax(), crew.max(), shipType::setCrewMax);
+    shipType.capCrewMinAtCrewMax();
     led.write("mass", shipType.getMass(), dto.mass(), shipType::setMass);
     shipType.setWidth(dto.width());
     shipType.setHeight(dto.height());

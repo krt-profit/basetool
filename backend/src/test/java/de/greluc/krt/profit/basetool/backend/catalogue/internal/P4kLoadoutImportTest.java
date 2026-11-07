@@ -296,6 +296,23 @@ class P4kLoadoutImportTest {
   }
 
   @Test
+  void aNegativePortSizeIsStoredAsNoneAndTheApplySucceeds() {
+    ShipType titan = ship("Avenger Titan", "AEGS_Avenger_Titan");
+    ObjectNode root = P4kTestCatalogues.tree();
+    ((ObjectNode) loadout(root, P4kTestCatalogues.PLAYER_SHIP).get("ports").get(2))
+        .put("minSize", -1)
+        .put("maxSize", -4);
+
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+    List<ShipTypeLoadoutPort> ports = ports(titan);
+
+    assertThat(ports).hasSize(6);
+    ShipTypeLoadoutPort nose = port(ports, "hardpoint_weapon_class2_nose", null);
+    assertThat(nose.getMinSize()).isNull();
+    assertThat(nose.getMaxSize()).isNull();
+  }
+
+  @Test
   void aMergedItemKeepsTheDefaultItemOfItsPorts() {
     ShipType titan = ship("Avenger Titan", "AEGS_Avenger_Titan");
     GameItem retired = item(GIMBAL, "Gimbal Mount S4");

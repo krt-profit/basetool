@@ -79,8 +79,8 @@ class P4kShipBaseData {
   }
 
   /**
-   * Writes the led columns of a matched ship, logging each change, and reports a cargo value it
-   * keeps and a name it cannot take.
+   * Writes the led columns of a matched ship, logging each change, lowers a minimum crew above the
+   * crew size to it, and reports a cargo value it keeps and a name it cannot take.
    *
    * @param row the matched ship
    * @param ship the record
@@ -106,6 +106,9 @@ class P4kShipBaseData {
         row::setManufacturer,
         Manufacturer::getName);
     facts(row, ship, writer::lead);
+    if (context.isApply()) {
+      row.capCrewMinAtCrewMax();
+    }
     BigDecimal cargo = cargo(ship);
     if (cargo == null) {
       return;
@@ -157,8 +160,12 @@ class P4kShipBaseData {
     sink.put("career", row.getCareer(), text(ship.career()), row::setCareer, Function.identity());
     sink.put("mass", row.getMass(), ship.mass(), row::setMass, String::valueOf);
     sink.put("health", row.getHealth(), ship.hullHealth(), row::setHealth, String::valueOf);
-    Integer size = ship.size() == null || ship.size() < 0 ? null : ship.size();
-    sink.put("size_class", row.getSizeClass(), size, row::setSizeClass, String::valueOf);
+    sink.put(
+        "size_class",
+        row.getSizeClass(),
+        P4kFields.nonNegative(ship.size()),
+        row::setSizeClass,
+        String::valueOf);
     sink.put(
         "vehicle_kind", row.getVehicleKind(), vehicleKind(ship), row::setVehicleKind, Enum::name);
     P4kShipInsurance insurance = ship.insurance();

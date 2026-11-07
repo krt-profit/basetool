@@ -165,6 +165,25 @@ class ExchangeDraftRouteTest {
             eq(222L),
             any());
     assertThat(handoffs(HandoffKind.BLUEPRINT) - before).isEqualTo(1.0);
+    verify(relay).countPassedOn("versekit");
+    verify(relay, never()).countContractBroken(anyString());
+  }
+
+  @Test
+  void aDraftResultThatBreaksItsSchemaIsA502CountedAsABrokenAnswer() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(PREVIEW));
+    when(stagingService.stagedBytes(eq(HandoffKind.BLUEPRINT), anyString())).thenReturn(222L);
+    when(stagingService.stageDraft(
+            eq("versekit"), eq(member), eq(HandoffKind.BLUEPRINT), anyString(), eq(10)))
+        .thenReturn(
+            new HandoffStagingService.Staged("h".repeat(129), "ingest:handoff:x:long", 222L));
+
+    post("/exchange/v1/me/drafts/blueprints", example("blueprint-draft/valid/corpus-slice.json"))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
+
+    verify(relay).countContractBroken("versekit");
+    verify(relay, never()).countPassedOn(anyString());
   }
 
   @Test
@@ -358,6 +377,7 @@ class ExchangeDraftRouteTest {
     verify(stagingService, never())
         .stageDraft(anyString(), anyString(), any(), anyString(), anyInt());
     verify(idempotency, never()).store(anyString(), any());
+    verify(relay, never()).countPassedOn(anyString());
   }
 
   @Test
