@@ -217,8 +217,9 @@ sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`),
 and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
 repository and the integration properties sit in `catalogue.internal`. The P4K import there is an
 orchestrator (`P4kImportService`) over one reconciler per catalogue kind and the shared
-`P4kRowMatcher`, behind the upload gate `P4kUploadGate`, followed by the orphan sweep
-`P4kSweeper`; `P4kImportReportService` and `P4kReviewService` serve the run list, the change
+`P4kRowMatcher`, behind the upload gate `P4kUploadGate`, followed by the paint links and the ship
+loadout trees, which point at the rows the base kinds matched (the loadouts streamed in a second
+pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportReportService` and `P4kReviewService` serve the run list, the change
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
 (REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
 `P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
