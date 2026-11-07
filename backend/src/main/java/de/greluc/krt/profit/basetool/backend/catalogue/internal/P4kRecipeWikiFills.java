@@ -34,13 +34,17 @@ import org.jetbrains.annotations.Unmodifiable;
  * The SC Wiki's values on a blueprint's stored recipe, captured before the P4K rewrites it, so the
  * new rows keep what the Wiki filled where the P4K delivers {@code null} (REQ-P4K-027): a slot's
  * name, a stat's label, key and direction, and a line's name, Wiki identities and links. A group
- * matches by its key ignoring case, a modifier by its stat within the group, and a line by its kind
- * and resource or item identity within the group, as {@link ScWikiBlueprintGapFiller} matches them.
+ * matches by its key ignoring case, a modifier by its stat within the group (a recipe-wide modifier
+ * among the recipe-wide ones), and a line by its kind and resource or item identity within the
+ * group, as {@link ScWikiBlueprintGapFiller} matches them.
  */
 final class P4kRecipeWikiFills {
 
   /** The stored groups with their modifiers. */
   @NotNull @Unmodifiable private final List<StoredGroup> groups;
+
+  /** The stored recipe-wide modifiers. */
+  @NotNull @Unmodifiable private final List<BlueprintRequirementModifier> recipeModifiers;
 
   /** The stored lines with their group's key. */
   @NotNull @Unmodifiable private final List<StoredLine> lines;
@@ -49,10 +53,15 @@ final class P4kRecipeWikiFills {
    * Captures the stored values.
    *
    * @param groups the stored groups
+   * @param recipeModifiers the stored recipe-wide modifiers
    * @param lines the stored lines
    */
-  private P4kRecipeWikiFills(@NotNull List<StoredGroup> groups, @NotNull List<StoredLine> lines) {
+  private P4kRecipeWikiFills(
+      @NotNull List<StoredGroup> groups,
+      @NotNull List<BlueprintRequirementModifier> recipeModifiers,
+      @NotNull List<StoredLine> lines) {
     this.groups = List.copyOf(groups);
+    this.recipeModifiers = List.copyOf(recipeModifiers);
     this.lines = List.copyOf(lines);
   }
 
@@ -97,7 +106,7 @@ final class P4kRecipeWikiFills {
                         : line.getRequirementGroup().getGroupKey(),
                     line))
             .toList();
-    return new P4kRecipeWikiFills(groups, lines);
+    return new P4kRecipeWikiFills(groups, blueprint.getRecipeModifiers(), lines);
   }
 
   /**
@@ -124,10 +133,31 @@ final class P4kRecipeWikiFills {
    */
   void fillModifier(@Nullable String groupKey, @NotNull BlueprintRequirementModifier modifier) {
     StoredGroup stored = group(groupKey);
-    if (stored == null) {
-      return;
+    if (stored != null) {
+      fillFrom(stored.modifiers(), modifier);
     }
-    stored.modifiers().stream()
+  }
+
+  /**
+   * Fills a new recipe-wide modifier's label, stat key and direction from the stored recipe-wide
+   * modifier of its stat.
+   *
+   * @param modifier the new recipe-wide modifier
+   */
+  void fillRecipeModifier(@NotNull BlueprintRequirementModifier modifier) {
+    fillFrom(recipeModifiers, modifier);
+  }
+
+  /**
+   * Fills a new modifier's label, stat key and direction from the stored modifier of its stat.
+   *
+   * @param stored the stored modifiers to match against
+   * @param modifier the new modifier
+   */
+  private static void fillFrom(
+      @NotNull List<BlueprintRequirementModifier> stored,
+      @NotNull BlueprintRequirementModifier modifier) {
+    stored.stream()
         .filter(old -> sameStat(modifier, old))
         .findFirst()
         .ifPresent(old -> {

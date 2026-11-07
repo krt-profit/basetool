@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * @param variantCount number of recipe variants collapsing into the product
  * @param requirementGroups the representative recipe's build slots with ingredients + stat
  *     modifiers
+ * @param recipeModifiers the stat modifiers that apply to the whole recipe rather than one slot
  * @param ingredients flat ingredient list used as the fallback when {@code requirementGroups} is
  *     empty
  * @param baseStats the crafted item's stat base values per property key; empty when none is stored
@@ -41,6 +42,7 @@ public record PersonalBlueprintRecipeDto(
     String productName,
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
+    List<BlueprintRequirementModifierDto> recipeModifiers,
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintStatBaseDto> baseStats,
     @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

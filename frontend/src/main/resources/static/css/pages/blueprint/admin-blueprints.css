@@ -126,6 +126,13 @@
         color: var(--color-gray-2-text);
         font-style: italic;
     }
+    .bp-recipe-wide {
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-2xs);
+        font-weight: var(--fw-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
     .pager {
         display: flex;
         gap: 1rem;

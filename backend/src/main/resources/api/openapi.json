@@ -81021,6 +81021,12 @@
           "outputName" : {
             "type" : "string"
           },
+          "recipeModifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
+          },
           "requirementGroups" : {
             "type" : "array",
             "items" : {
@@ -91649,6 +91655,12 @@
           },
           "productName" : {
             "type" : "string"
+          },
+          "recipeModifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
           },
           "requirementGroups" : {
             "type" : "array",

@@ -903,6 +903,8 @@ seeding created invisible turns visible when the run would create it.
 
 - [x] A line with `quantityScu` 2 and `quantityMultiplier` 1.15 stores 2.3 SCU.
 - [x] A choose-2-of-3 selection is stored as one selection with three options.
+- [x] A choose-n root's own modifiers are stored as recipe-wide modifiers, an unchanged one is not
+  rewritten, the admin recipe view shows them for the whole recipe, and they set no slot's floor.
 - [x] A Wiki craft time that differs from the P4K value leaves the P4K value and is reported; on a
   P4K-unknown blueprint the Wiki writes it.
 
@@ -912,8 +914,13 @@ is the blueprint's `required_group_count` when it lets the player leave options 
 every option is required). Each option becomes a `blueprint_requirement_group` (its `slot` the
 `group_key`, its `count` the `required_count`, the modifiers of the option and of its nested
 selections the group's modifiers) with the resource and item lines under it, depth first, as its
-`blueprint_ingredient` lines; each optional cost becomes a group with `is_optional`, which the
-craftability and item orders leave out. Both select through `RecipeGroupSelection`: the
+`blueprint_ingredient` lines. The root selection's own modifiers belong to no option: they are the
+blueprint's recipe-wide modifiers, `blueprint_requirement_modifier` rows owned by `blueprint_id`
+instead of a group (exactly one owner is set), compared, rewritten and carried over like a group's.
+The blueprint DTOs expose them as `recipeModifiers`, the recipe views show them as applying to the
+whole recipe, and they set no slot's quality floor: the craftability reads only a slot's own
+modifiers, and an item order snapshots lines, not modifiers. Each optional cost becomes a group
+with `is_optional`, which the craftability and item orders leave out. Both select through `RecipeGroupSelection`: the
 craftability counts, of a choose-n recipe, the `n` option groups the member's inventory covers best
 (REQ-INV-048), and an item order snapshots the `n` groups the same selection picks against no
 stock, the ones with the smallest demand (REQ-ORDERS-025), and the recipe views show an `ADDITIVE` modifier's
@@ -949,8 +956,10 @@ lists before a retired one, then by P4K GUID. The categories are `blueprint_cate
 category is created. The SC Wiki's `category_uuid` stays as the Wiki serves it.
 
 **Enforced by:** `P4kBlueprintImportTest`, `ScWikiBlueprintSyncServiceTest`,
-`BlueprintCraftabilityServiceTest`, `JobOrderItemServiceTest` · **Code:**
-`P4kBlueprintReconciler`, `P4kBlueprintRecipeReader`, `P4kBlueprintCategoryReconciler`,
+`BlueprintCraftabilityServiceTest`, `JobOrderItemServiceTest`, `BlueprintMapperTest`,
+`AdminBlueprintsPageControllerMvcTest` · **Code:**
+`P4kBlueprintReconciler`, `P4kBlueprintRecipeReader`, `P4kBlueprintRecipe`, `P4kRecipeWikiFills`,
+`P4kBlueprintCategoryReconciler`,
 `ScWikiBlueprintGapFiller`, `RecipeGroupSelection` · **ADR:**
 [ADR-0340](../adr/0340-the-p4k-catalogue-leads-blueprints-and-the-sc-wiki-blueprint-sync-fills-gaps.md) · **Issues:** #2892
 

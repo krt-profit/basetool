@@ -300,7 +300,7 @@ public class PersonalBlueprintService {
         .resolveRecipe(entity.getProductKey())
         .orElseGet(() ->
             new PersonalBlueprintRecipeResponse(
-                entity.getProductName(), 0, List.of(), List.of(), List.of(), null));
+                entity.getProductName(), 0, List.of(), List.of(), List.of(), List.of(), null));
   }
 
   /**

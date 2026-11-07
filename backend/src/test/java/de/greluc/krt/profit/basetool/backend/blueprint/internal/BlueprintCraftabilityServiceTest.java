@@ -115,6 +115,28 @@ class BlueprintCraftabilityServiceTest {
     assertEquals(600.0, dto.groups().get(1).effectiveQuality(), 1e-9);
   }
 
+  @Test
+  void aRecipeWideModifier_setsNoSlotsQualityFloor() {
+    Blueprint bp = twoSlotBlueprint();
+    bp.addRecipeModifier(higher(0.5, 1.5));
+    stubOwned(owned("widget", "Widget"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", bp));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 1000, 25.0),
+                new CraftabilitySlice(MAT_A, 300, 100.0),
+                new CraftabilitySlice(MAT_B, 400, 12.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(500, material(dto, MAT_A).qualityFloor());
+    assertEquals(0, material(dto, MAT_B).qualityFloor());
+    assertEquals(12.0, material(dto, MAT_B).availableScu(), 1e-9);
+    assertEquals(2, dto.craftable());
+  }
+
   /**
    * The LIVE choose-2-of-3 blueprint {@code BP_CRAFT_thp_light_legs_01_01_01} as the P4K import
    * stores it (see {@code p4k/blueprint-choose-2-of-3-live.json}): three option groups of which a

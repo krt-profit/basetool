@@ -229,6 +229,7 @@ public class BlueprintProductService implements BlueprintProducts {
             Objects.requireNonNull(representative.outputName()),
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
+            blueprintMapper.toModifierDtos(recipe.getRecipeModifiers()),
             blueprintMapper.toIngredientDtos(recipe.getIngredients()),
             baseStats(recipe.getOutputItem()),
             recipe.getWikiMetadata()));

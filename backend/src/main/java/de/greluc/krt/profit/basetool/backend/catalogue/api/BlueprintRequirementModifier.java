@@ -58,12 +58,15 @@ import org.jetbrains.annotations.UnmodifiableView;
  * <p>When {@link #getSegments()} is non-empty the stat does NOT move linearly between those two
  * endpoints — it follows the ordered, contiguous {@link BlueprintModifierSegment}s (a stepped /
  * piecewise-linear curve). Consumers must prefer the segments over the endpoint pair when present.
+ *
+ * <p>Exactly one owner is set: the {@link #requirementGroup} of a slot modifier, or the {@link
+ * #blueprint} of a recipe-wide modifier (the P4K's choose-n root selection, REQ-P4K-027).
  */
 @Entity
 @Table(name = "blueprint_requirement_modifier")
 @Getter
 @Setter
-@ToString(exclude = {"requirementGroup", "segments"})
+@ToString(exclude = {"requirementGroup", "blueprint", "segments"})
 @NoArgsConstructor
 public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
 
@@ -72,12 +75,19 @@ public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** Owning requirement group. */
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "requirement_group_id", nullable = false)
+  /** Owning requirement group of a slot modifier; {@code null} on a recipe-wide modifier. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "requirement_group_id")
+  @Nullable
   private BlueprintRequirementGroup requirementGroup;
 
-  /** Position within the group's modifier list (drives {@code @OrderBy}). */
+  /** Owning blueprint of a recipe-wide modifier; {@code null} on a slot modifier. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "blueprint_id")
+  @Nullable
+  private Blueprint blueprint;
+
+  /** Position within the owner's modifier list (drives {@code @OrderBy}). */
   @Column(name = "order_index", nullable = false)
   private Integer orderIndex;
 

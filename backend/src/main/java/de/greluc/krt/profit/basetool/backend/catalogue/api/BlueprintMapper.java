@@ -37,8 +37,8 @@ public interface BlueprintMapper {
 
   /**
    * Maps a blueprint aggregate to its DTO, including the requirement groups (with their modifiers
-   * and ingredients), the flat ingredient list, the summary-property roll-up and the dismantle
-   * returns.
+   * and ingredients), the recipe-wide modifiers, the flat ingredient list, the summary-property
+   * roll-up and the dismantle returns.
    *
    * @param entity the blueprint entity
    * @return the blueprint DTO
@@ -68,6 +68,16 @@ public interface BlueprintMapper {
    * @return the ingredient DTOs, or {@code null} when {@code ingredients} is {@code null}
    */
   List<BlueprintRequirementIngredientDto> toIngredientDtos(List<BlueprintIngredient> ingredients);
+
+  /**
+   * Maps modifiers element-wise via {@link #toModifierDto(BlueprintRequirementModifier)}, e.g. a
+   * blueprint's recipe-wide modifiers.
+   *
+   * @param modifiers the modifier entities (may be {@code null})
+   * @return the modifier DTOs, or {@code null} when {@code modifiers} is {@code null}
+   */
+  List<BlueprintRequirementModifierDto> toModifierDtos(
+      List<BlueprintRequirementModifier> modifiers);
 
   /**
    * Maps a requirement modifier to its DTO, with the effective quality band derived from its

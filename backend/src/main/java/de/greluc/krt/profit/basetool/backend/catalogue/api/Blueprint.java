@@ -66,6 +66,7 @@ import org.jetbrains.annotations.UnmodifiableView;
       "ingredients",
       "dismantleReturns",
       "requirementGroups",
+      "recipeModifiers",
       "summaryProperties"
     })
 @NoArgsConstructor
@@ -272,6 +273,21 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @BatchSize(size = 64)
   private List<BlueprintRequirementGroup> requirementGroups = new ArrayList<>();
 
+  /**
+   * Ordered recipe-wide stat modifiers: those of the P4K's choose-n root selection, which belong to
+   * no single slot (REQ-P4K-027). Owned, cascade + orphan.
+   */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @OneToMany(
+      mappedBy = "blueprint",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
+  private List<BlueprintRequirementModifier> recipeModifiers = new ArrayList<>();
+
   /** Ordered summary stat roll-up (which stats this blueprint affects). Owned, cascade + orphan. */
   @Getter(AccessLevel.NONE)
   @Setter(AccessLevel.NONE)
@@ -374,6 +390,33 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   /** Clears all requirement groups; orphan removal deletes them (and their modifiers) on flush. */
   public void clearRequirementGroups() {
     requirementGroups.clear();
+  }
+
+  /**
+   * Returns the ordered recipe-wide modifiers as an unmodifiable view. Mutate through {@link
+   * #addRecipeModifier} / {@link #clearRecipeModifiers}.
+   *
+   * @return an unmodifiable view of the recipe-wide modifiers
+   */
+  @NotNull
+  @UnmodifiableView
+  public List<BlueprintRequirementModifier> getRecipeModifiers() {
+    return Collections.unmodifiableList(recipeModifiers);
+  }
+
+  /**
+   * Appends a recipe-wide modifier and sets its back-reference to this blueprint.
+   *
+   * @param modifier the modifier to add
+   */
+  public void addRecipeModifier(@NotNull BlueprintRequirementModifier modifier) {
+    modifier.setBlueprint(this);
+    recipeModifiers.add(modifier);
+  }
+
+  /** Clears all recipe-wide modifiers; orphan removal deletes them on flush. */
+  public void clearRecipeModifiers() {
+    recipeModifiers.clear();
   }
 
   /**
