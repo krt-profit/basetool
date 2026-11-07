@@ -40,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  *     component
  * @param noLongerInGame whether the P4K stamped the item as gone from the game or an admin hid it;
  *     the reference then shows the "no longer in the game" notice (REQ-P4K-013)
+ * @param nameDe the item's German name, or {@code null} (REQ-P4K-023)
  */
 public record GameItemReferenceDto(
     UUID id,
@@ -49,7 +50,32 @@ public record GameItemReferenceDto(
     @Nullable Integer size,
     @Nullable String grade,
     @Nullable String itemClass,
-    boolean noLongerInGame) {
+    boolean noLongerInGame,
+    @Nullable String nameDe) {
+
+  /**
+   * Builds a reference without a German name.
+   *
+   * @param id the game item's primary key
+   * @param name the item's display name
+   * @param kind the {@code GameItemKind} name
+   * @param componentType the component type, or {@code null}
+   * @param size the component size, or {@code null}
+   * @param grade the component grade, or {@code null}
+   * @param itemClass the component class, or {@code null}
+   * @param noLongerInGame whether the item is gone from the game or hidden
+   */
+  public GameItemReferenceDto(
+      UUID id,
+      String name,
+      @Nullable String kind,
+      @Nullable String componentType,
+      @Nullable Integer size,
+      @Nullable String grade,
+      @Nullable String itemClass,
+      boolean noLongerInGame) {
+    this(id, name, kind, componentType, size, grade, itemClass, noLongerInGame, null);
+  }
 
   /**
    * Builds a reference to an item still in the game without component data.
@@ -99,7 +125,15 @@ public record GameItemReferenceDto(
     boolean retired = gameItem.isP4kRetired();
     if (componentType == null) {
       return new GameItemReferenceDto(
-          gameItem.getId(), gameItem.getName(), kind, null, null, null, null, retired);
+          gameItem.getId(),
+          gameItem.getName(),
+          kind,
+          null,
+          null,
+          null,
+          null,
+          retired,
+          gameItem.getNameDe());
     }
     ShipComponentClass itemClass = gameItem.getItemClass();
     return new GameItemReferenceDto(
@@ -110,6 +144,7 @@ public record GameItemReferenceDto(
         gameItem.getSizeClass(),
         StringNormalization.trimToNull(gameItem.getGrade()),
         itemClass == null ? null : itemClass.name(),
-        retired);
+        retired,
+        gameItem.getNameDe());
   }
 }

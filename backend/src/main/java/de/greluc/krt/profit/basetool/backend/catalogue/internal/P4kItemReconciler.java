@@ -50,6 +50,7 @@ public class P4kItemReconciler {
   private static final String PLAYABILITY = "playability";
 
   private final GameItemRepository gameItemRepository;
+  private final P4kManufacturerReconciler manufacturerReconciler;
 
   /**
    * Reconciles every item; the manufacturers must be reconciled first.
@@ -107,6 +108,7 @@ public class P4kItemReconciler {
         row::setManufacturer,
         Manufacturer::getName);
     writer.fill("mass", row.getMass(), item.mass(), row::setMass);
+    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(item.name()), row::setNameDe);
     writer.fillGameText(
         "description_en",
         row.getDescriptionEn(),
@@ -143,11 +145,14 @@ public class P4kItemReconciler {
       seeding.notCreated(P4kKind.ITEM, item, guid, context);
       return;
     }
+    Manufacturer manufacturer =
+        manufacturerReconciler.forSeededRow(item.manufacturerGuid(), context);
     if (context.isApply()) {
       GameItem row = new GameItem();
       row.setName(name.strip());
+      row.setNameDe(P4kFields.germanName(item.name()));
       row.setClassName(StringNormalization.blankToNull(item.className()));
-      row.setManufacturer(context.manufacturer(item.manufacturerGuid()));
+      row.setManufacturer(manufacturer);
       Double mass = item.mass();
       if (mass != null) {
         row.setMass(mass);

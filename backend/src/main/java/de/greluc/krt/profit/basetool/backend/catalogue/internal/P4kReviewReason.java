@@ -37,5 +37,11 @@ public enum P4kReviewReason {
   /**
    * A GUID that several rows would claim, or a row that several GUIDs would claim (REQ-P4K-007).
    */
-  GUID_CONFLICT
+  GUID_CONFLICT,
+
+  /**
+   * A manufacturer whose P4K name another row already holds; the import does not rename it
+   * (REQ-P4K-020).
+   */
+  NAME_CONFLICT
 }

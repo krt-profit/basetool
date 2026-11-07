@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,6 +82,18 @@ class ShipDataPageControllerMvcTest {
    * @param empty whether both catalogues come back empty
    */
   private void stubCatalogue(boolean empty) {
+    stubCatalogue(empty, null, null);
+  }
+
+  /**
+   * Stubs one manufacturer and one ship type with German names, or none of either.
+   *
+   * @param empty whether both catalogues come back empty
+   * @param manufacturerNameDe the manufacturer's German name, or {@code null}
+   * @param shipTypeNameDe the ship type's German name, or {@code null}
+   */
+  private void stubCatalogue(
+      boolean empty, @Nullable String manufacturerNameDe, @Nullable String shipTypeNameDe) {
     ManufacturerDto manufacturer =
         new ManufacturerDto(
             UUID.randomUUID(),
@@ -89,10 +102,20 @@ class ShipDataPageControllerMvcTest {
             "Aegis",
             "https://example/aegis",
             "Mil-style",
-            false);
+            false,
+            manufacturerNameDe,
+            UUID.randomUUID());
     ShipTypeDto shipType =
         new ShipTypeDto(
-            UUID.randomUUID(), "Avenger Titan", manufacturer, "Titan", new BigDecimal("8"), true);
+            UUID.randomUUID(),
+            "Avenger Titan",
+            manufacturer,
+            "Titan",
+            new BigDecimal("8"),
+            true,
+            null,
+            false,
+            shipTypeNameDe);
     List<ManufacturerDto> manufacturers = empty ? List.of() : List.of(manufacturer);
     List<ShipTypeDto> shipTypes = empty ? List.of() : List.of(shipType);
     PageResponse<ManufacturerDto> manufacturersPage =
@@ -138,6 +161,64 @@ class ShipDataPageControllerMvcTest {
         .andExpect(content().string(containsString("src=\"/js/catalogue/ship-data.js\"")))
         .andExpect(PageStylesheets.content(containsString(".sd-row--hidden")))
         .andExpect(content().string(containsString("</html>")));
+  }
+
+  /**
+   * A German page shows the German names, an English page the names, and a manufacturer without a
+   * Fan Kit logo shows its abbreviation badge (REQ-P4K-022, REQ-P4K-023).
+   *
+   * @throws Exception if a request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void germanNamesShowOnAGermanPage_andAManufacturerWithoutALogoShowsItsBadge() throws Exception {
+    stubCatalogue(false, "Aegis Dynamik", "Avenger Titan DE");
+
+    String german =
+        mockMvc
+            .perform(get("/ship-data").param("lang", "de"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String english =
+        mockMvc
+            .perform(get("/ship-data").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(german)
+        .contains("class=\"cell-title\">Aegis Dynamik</span>")
+        .contains("class=\"cell-title\">Avenger Titan DE</span>")
+        .contains("data-testid=\"manufacturer-badge\"")
+        .doesNotContain("data-testid=\"manufacturer-logo\"");
+    assertThat(english)
+        .contains("class=\"cell-title\">Aegis Dynamics</span>")
+        .contains("class=\"cell-title\">Avenger Titan</span>")
+        .doesNotContain("Aegis Dynamik");
+  }
+
+  /**
+   * A German page shows the name of a row without a German name.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aGermanPage_showsTheNameOfARowWithoutAGermanName() throws Exception {
+    stubCatalogue(false);
+
+    String german =
+        mockMvc
+            .perform(get("/ship-data").param("lang", "de"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(german).contains("class=\"cell-title\">Aegis Dynamics</span>");
   }
 
   /**

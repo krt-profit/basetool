@@ -70,8 +70,8 @@
                     </thead>
                     <tbody>
                         <tr th:each="ship : ${ships}" data-testid="member-hangar-row"
-                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
-                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
+                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.displayName(#locale) : ''},
+                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.displayName(#locale) : ''},
                                      hull=${#strings.trim(makerName + ' ' + typeName)},
                                      named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
                                      ready=${ship.fitted == true},
@@ -167,14 +167,14 @@
                     <label for="member-ship-manufacturer" th:text="#{hangar.ship.manufacturer}">Hersteller</label>
                     <select id="member-ship-manufacturer" name="manufacturerId">
                         <option value="" th:text="#{hangar.ship.select_manufacturer}">Alle Hersteller</option>
-                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.name}"></option>
+                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.displayName(#locale)}"></option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="member-ship-type" th:text="#{hangar.ship.type}">Schiffstyp</label>
                     <select id="member-ship-type" name="shipTypeId" required data-testid="member-hangar-type">
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte w&auml;hlen...</option>
-                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
+                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
                 </div>
                 <div class="form-group">

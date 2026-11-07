@@ -27,13 +27,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompanyRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexManufacturerService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexCompanyDto;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +67,7 @@ class UexManufacturerServiceTest {
 
   @Mock private ObjectProvider<UexManufacturerService> self;
   @Mock private SyncRunProgress progress;
+  @Mock private SyncReportService syncReportService;
 
   @InjectMocks private UexManufacturerService uexManufacturerService;
 
@@ -147,6 +151,68 @@ class UexManufacturerServiceTest {
         .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(any());
     assertEquals("AEGS-New", existing.getAbbreviation());
     assertEquals("Aerospace-New", existing.getIndustry());
+  }
+
+  @Test
+  void aP4kKnownManufacturer_keepsTheP4kNameAndCode_andTheDifferenceIsReported() {
+    UexCompanyDto dto =
+        UexCompanyDto.builder().id(42).name("Aegis Dynamics UEX").nickname("AEGS").build();
+    UUID guid = UUID.randomUUID();
+    UUID run = UUID.randomUUID();
+    Manufacturer known = new Manufacturer();
+    known.setName("Aegis Dynamics");
+    known.setAbbreviation("AEG");
+    known.setUexCompanyId(42);
+    known.setP4kUuid(guid);
+
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
+    when(aliasRepository.findManufacturerByUexCompanyId(42)).thenReturn(Optional.of(known));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(syncReportService.beginRun()).thenReturn(run);
+
+    uexManufacturerService.syncManufacturers();
+
+    assertEquals("Aegis Dynamics", known.getName());
+    assertEquals("AEG", known.getAbbreviation());
+    verify(syncReportService)
+        .logP4kDisagreement(
+            SyncSourceSystem.UEX,
+            run,
+            "manufacturer",
+            guid,
+            "name",
+            "Aegis Dynamics",
+            "Aegis Dynamics UEX");
+    verify(syncReportService)
+        .logP4kDisagreement(
+            SyncSourceSystem.UEX, run, "manufacturer", guid, "abbreviation", "AEG", "AEGS");
+  }
+
+  @Test
+  void aUexSync_neverWritesTheDescription() {
+    UexCompanyDto dto =
+        UexCompanyDto.builder()
+            .id(42)
+            .name("Aegis Dynamics")
+            .nickname("AEGS")
+            .industry("Aerospace")
+            .wiki("wiki-link")
+            .build();
+    Manufacturer existing = new Manufacturer();
+    existing.setName("Aegis Dynamics");
+    existing.setAbbreviation("AEGS");
+    existing.setUexCompanyId(42);
+    existing.setDescription("P4K text");
+
+    when(uexClient.getCompanies()).thenReturn(fetched(List.of(dto)));
+    when(aliasRepository.findManufacturerByUexCompanyId(42)).thenReturn(Optional.of(existing));
+    when(manufacturerRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    uexManufacturerService.syncManufacturers();
+
+    assertEquals("P4K text", existing.getDescription());
+    assertEquals("Aerospace", existing.getIndustry());
+    verifyNoInteractions(syncReportService);
   }
 
   @Test

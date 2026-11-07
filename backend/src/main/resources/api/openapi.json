@@ -82947,6 +82947,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "noLongerInGame" : {
             "type" : "boolean"
           },
@@ -83238,6 +83241,9 @@
             "type" : "string"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "noLongerInGame" : {
@@ -84947,8 +84953,15 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "nickname" : {
             "type" : "string"
+          },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "wiki" : {
             "type" : "string"
@@ -85246,6 +85259,10 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string",
+            "readOnly" : true
           },
           "quantityType" : {
             "type" : "string"
@@ -88167,7 +88184,7 @@
           },
           "reason" : {
             "type" : "string",
-            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT" ]
+            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT", "NAME_CONFLICT" ]
           },
           "resolution" : {
             "type" : "string",
@@ -92541,6 +92558,9 @@
             "$ref" : "#/components/schemas/ManufacturerDto"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "noLongerInGame" : {

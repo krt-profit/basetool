@@ -179,6 +179,7 @@ public class ItemReconciliationService {
    *
    * @param p4kUuid the P4K GUID
    * @param nameKey the {@code global.ini} name key
+   * @param nameDe the German name the P4K wrote (REQ-P4K-023)
    * @param syncedAt the last P4K touch
    * @param deletedAt the P4K soft-delete marker
    * @param seenRunId the run that last matched the row
@@ -186,6 +187,7 @@ public class ItemReconciliationService {
   private record P4kParticipation(
       @NotNull UUID p4kUuid,
       @Nullable String nameKey,
+      @Nullable String nameDe,
       @Nullable Instant syncedAt,
       @Nullable Instant deletedAt,
       @Nullable UUID seenRunId) {
@@ -202,11 +204,13 @@ public class ItemReconciliationService {
           new P4kParticipation(
               guid,
               row.getNameKey(),
+              row.getNameDe(),
               row.getP4kSyncedAt(),
               row.getP4kDeletedAt(),
               row.getP4kSeenRunId());
       row.setP4kUuid(null);
       row.setNameKey(null);
+      row.setNameDe(null);
       row.setP4kSyncedAt(null);
       row.setP4kDeletedAt(null);
       row.setP4kSeenRunId(null);
@@ -221,6 +225,7 @@ public class ItemReconciliationService {
     void attachTo(@NotNull GameItem row) {
       row.setP4kUuid(p4kUuid);
       row.setNameKey(nameKey);
+      row.setNameDe(nameDe);
       row.setP4kSyncedAt(syncedAt);
       row.setP4kDeletedAt(deletedAt);
       row.setP4kSeenRunId(seenRunId);

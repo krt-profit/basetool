@@ -204,7 +204,16 @@ public abstract class InventoryItemMapper {
     ShipComponentType componentType = ShipComponentType.fromWikiType(gameItem.getWikiType());
     if (componentType == null) {
       return new InventoryGameItemReferenceDto(
-          gameItem.getId(), gameItem.getName(), manufacturer, kind, gameItem.isP4kRetired());
+          gameItem.getId(),
+          gameItem.getName(),
+          manufacturer,
+          kind,
+          null,
+          null,
+          null,
+          null,
+          gameItem.isP4kRetired(),
+          gameItem.getNameDe());
     }
     ShipComponentClass itemClass = gameItem.getItemClass();
     return new InventoryGameItemReferenceDto(
@@ -216,7 +225,8 @@ public abstract class InventoryItemMapper {
         gameItem.getSizeClass(),
         StringNormalization.trimToNull(gameItem.getGrade()),
         itemClass != null ? itemClass.name() : null,
-        gameItem.isP4kRetired());
+        gameItem.isP4kRetired(),
+        gameItem.getNameDe());
   }
 
   /**

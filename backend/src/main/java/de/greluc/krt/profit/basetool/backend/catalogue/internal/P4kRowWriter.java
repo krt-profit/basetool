@@ -110,6 +110,45 @@ final class P4kRowWriter {
   }
 
   /**
+   * Writes a short text the catalogue leads: a present value replaces a different one, an absent
+   * one leaves the row's.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   */
+  void lead(
+      @NotNull String column,
+      @Nullable String current,
+      @Nullable String incoming,
+      @NotNull Consumer<String> setter) {
+    if (P4kFields.replaceIfPresent(current, incoming, setter, context.isApply())) {
+      changed = true;
+      context.getReport().changed(kind, record, column, current, incoming);
+    }
+  }
+
+  /**
+   * Writes a game text the catalogue leads; the report names the column only (REQ-P4K-033).
+   *
+   * @param column the column written
+   * @param current the row's text
+   * @param incoming the catalogue's text
+   * @param setter writes the text
+   */
+  void leadGameText(
+      @NotNull String column,
+      @Nullable String current,
+      @Nullable String incoming,
+      @NotNull Consumer<String> setter) {
+    if (P4kFields.replaceIfPresent(current, incoming, setter, context.isApply())) {
+      changed = true;
+      context.getReport().changed(kind, record, column, null, null);
+    }
+  }
+
+  /**
    * Replaces the row's name key with the catalogue's usable one.
    *
    * @param current the row's name key

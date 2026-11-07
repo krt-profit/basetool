@@ -49,6 +49,7 @@ public class P4kShipReconciler {
   private static final String PLAYABILITY = "playability";
 
   private final ShipTypeRepository shipTypeRepository;
+  private final P4kManufacturerReconciler manufacturerReconciler;
 
   /**
    * Reconciles every ship; the manufacturers must be reconciled first.
@@ -105,6 +106,7 @@ public class P4kShipReconciler {
         context.manufacturer(ship.manufacturerGuid()),
         row::setManufacturer,
         Manufacturer::getName);
+    writer.lead("name_de", row.getNameDe(), P4kFields.germanName(ship.name()), row::setNameDe);
     writer.fillGameText(
         "description_en",
         row.getDescriptionEn(),
@@ -143,11 +145,14 @@ public class P4kShipReconciler {
       seeding.notCreated(P4kKind.SHIP, ship, guid, context);
       return;
     }
+    Manufacturer manufacturer =
+        manufacturerReconciler.forSeededRow(ship.manufacturerGuid(), context);
     if (context.isApply()) {
       ShipType row = new ShipType();
       row.setName(name.strip());
+      row.setNameDe(P4kFields.germanName(ship.name()));
       row.setClassName(StringNormalization.blankToNull(ship.className()));
-      row.setManufacturer(context.manufacturer(ship.manufacturerGuid()));
+      row.setManufacturer(manufacturer);
       row.setDescriptionEn(
           StringNormalization.blankToNull(P4kLocalisedText.enOf(ship.description())));
       row.setDescriptionDe(

@@ -104,8 +104,8 @@
                     </thead>
                     <tbody>
                         <tr th:each="ship : ${myShips}" data-testid="hangar-ship-row"
-                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.name : ''},
-                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.name : ''},
+                            th:with="typeName=${ship.shipType != null and ship.shipType.name != null ? ship.shipType.displayName(#locale) : ''},
+                                     makerName=${ship.shipType != null and ship.shipType.manufacturer != null and ship.shipType.manufacturer.name != null ? ship.shipType.manufacturer.displayName(#locale) : ''},
                                      hull=${#strings.trim(makerName + ' ' + typeName)},
                                      named=${ship.name != null and !#strings.isEmpty(#strings.trim(ship.name))},
                                      ready=${ship.fitted == true},
@@ -122,6 +122,7 @@
                                            th:aria-label="#{hangar.bulk.select(${named ? ship.name : hull})}"></label>
                                     <span class="hangar-row__name">
                                         <span class="cell-title" th:text="${named ? ship.name : hull}">Iron Mule</span>
+                                        <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${ship.shipType?.manufacturer})}"></span>
                                         <span th:if="${ship.shipType != null and ship.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                                         <span class="cell-sub"><span th:text="${named ? hull : #messages.msg('hangar.ship.unnamed')}">Drake Cutlass Black</span><span
                                               class="hangar-row__loc" th:if="${locName != null}" th:text="' · ' + ${locName}"> · Area18</span></span>
@@ -239,10 +240,11 @@
                                                        th:attr="aria-controls=${groupId},aria-label=#{hangar.squadron.owners.toggle(${item.shipType.name})},title=#{hangar.squadron.owners.toggle(${item.shipType.name})}"
                                               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></button></span>
                                         <span class="hangar-tree__name">
-                                            <span class="cell-title" th:text="${item.shipType.name}">Cutlass Black</span>
+                                            <span class="cell-title" th:text="${item.shipType.displayName(#locale)}">Cutlass Black</span>
                                             <span th:if="${item.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                                             <span class="cell-sub" th:if="${item.shipType.manufacturer != null}"
-                                                  th:text="${item.shipType.manufacturer.name}">Drake</span>
+                                                  th:text="${item.shipType.manufacturer.displayName(#locale)}">Drake</span>
+                                            <span th:replace="~{catalogue/fragments/manufacturer-mark :: mark(${item.shipType.manufacturer})}"></span>
                                         </span>
                                     </div>
                                 </td>
@@ -298,14 +300,14 @@
                     <label for="ship-manufacturer" th:text="#{hangar.ship.manufacturer}">Hersteller</label>
                     <select id="ship-manufacturer" name="manufacturerId">
                         <option value="" th:text="#{hangar.ship.select_manufacturer}">Alle Hersteller</option>
-                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.name}"></option>
+                        <option th:each="man : ${manufacturers}" th:value="${man.id}" th:text="${man.displayName(#locale)}"></option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="ship-type" th:text="#{hangar.ship.type}">Schiffstyp</label>
                     <select id="ship-type" name="shipTypeId" th:field="*{shipTypeId}" required>
                         <option value="" disabled selected th:text="#{hangar.ship.select_type}">Bitte wählen...</option>
-                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.name}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
+                        <option th:each="st : ${shipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}" th:data-manufacturer-id="${st.manufacturer != null ? st.manufacturer.id : ''}"></option>
                     </select>
                     <div th:if="${#fields.hasErrors('shipTypeId')}" th:errors="*{shipTypeId}" class="field-error"></div>
                 </div>

@@ -59,6 +59,14 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
   private String name;
 
   /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
+
+  /**
    * Short display code (e.g. {@code "AEGS"}). Not unique: several UEX company records of one brand
    * reduce to the same code and are merged onto one row (ADR-0023). Identity lives on {@link
    * #uexCompanyId} / {@link #scwikiUuid} / {@link #name}.
@@ -74,6 +82,12 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   @GameText
   private String description;
+
+  /** The German description, written by the P4K import only (REQ-P4K-020). */
+  @Column(name = "description_de", columnDefinition = "TEXT")
+  @Nullable
+  @GameText
+  private String descriptionDe;
 
   private boolean hidden = false;
 

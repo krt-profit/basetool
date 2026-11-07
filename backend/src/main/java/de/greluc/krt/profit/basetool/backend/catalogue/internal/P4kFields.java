@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
@@ -32,6 +33,9 @@ final class P4kFields {
 
   /** The shape of a stored name key: no {@code @}, no whitespace. */
   private static final Pattern NAME_KEY = Pattern.compile("^[^@\\s]+$");
+
+  /** The prefix the game's localisation writes in place of a missing translation. */
+  static final String MISSING_TRANSLATION = "!";
 
   /** Non-instantiable holder of static helpers. */
   private P4kFields() {}
@@ -58,6 +62,48 @@ final class P4kFields {
       setter.accept(incoming);
     }
     return true;
+  }
+
+  /**
+   * Writes a value the catalogue leads: a present value replaces a different one, and an absent or
+   * blank one never clears the row's.
+   *
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param apply whether to write or only report
+   * @param <V> the value type
+   * @return whether the row's value changes
+   */
+  static <V> boolean replaceIfPresent(
+      @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
+    if (incoming == null || incoming.equals(current)) {
+      return false;
+    }
+    if (incoming instanceof String s && s.isBlank()) {
+      return false;
+    }
+    if (apply) {
+      setter.accept(incoming);
+    }
+    return true;
+  }
+
+  /**
+   * Returns the usable German name of a record.
+   *
+   * @param name the record's localised name, or {@code null}
+   * @return the stripped German text, or {@code null} when it is absent, blank or the game's
+   *     missing-translation marker (a text starting with {@value #MISSING_TRANSLATION})
+   */
+  @Nullable
+  static String germanName(@Nullable P4kLocalisedText name) {
+    String de = P4kLocalisedText.deOf(name);
+    if (de == null) {
+      return null;
+    }
+    String stripped = de.strip();
+    return stripped.isEmpty() || stripped.startsWith(MISSING_TRANSLATION) ? null : stripped;
   }
 
   /**

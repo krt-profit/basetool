@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendC
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.ItemPickerOption;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -42,6 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -271,7 +271,7 @@ public class InventoryPageController {
         items.stream()
             .map(InventoryItemDto::gameItem)
             .filter(Objects::nonNull)
-            .map(InventoryGameItemReferenceDto::name)
+            .map(item -> item.displayName(LocaleContextHolder.getLocale()))
             .findFirst()
             .orElseGet(() -> catalogue.map(ItemCatalogueDetailsDto::name).orElse(null)));
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {

@@ -76,7 +76,7 @@ class GameTextClassificationTest {
   private static final Map<String, List<String>> IMPORTED_GAME_TEXTS =
       Map.of(
           "/$defs/Manufacturer/properties/description",
-          List.of("Manufacturer.description"),
+          List.of("Manufacturer.description", "Manufacturer.descriptionDe"),
           "/$defs/Item/properties/description",
           List.of("GameItem.descriptionEn", "GameItem.descriptionDe"),
           "/$defs/Ship/properties/description",

@@ -2570,6 +2570,20 @@
         border-color: var(--krt-item-class-competition);
     }
 
+    /* A manufacturer's Fan Kit logo or abbreviation badge (REQ-P4K-022). */
+    .manufacturer-mark {
+        display: inline-flex;
+        align-items: center;
+        vertical-align: middle;
+    }
+
+    .manufacturer-mark__logo {
+        width: auto;
+        height: 1.25rem;
+        max-width: 4rem;
+        object-fit: contain;
+    }
+
     .section-title {
         margin: 2rem 0 1rem;
         padding-bottom: 0.5rem;

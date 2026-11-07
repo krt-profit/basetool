@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="de">
+<body>
+<!--/* A manufacturer's Fan Kit logo by P4K GUID, else its abbreviation badge (REQ-P4K-022). */-->
+<span th:fragment="mark(manufacturer)" th:if="${manufacturer != null}" class="manufacturer-mark"
+      th:with="logo=${@manufacturerLogos.path(manufacturer.p4kUuid)}"><img th:if="${logo != null}"
+      class="manufacturer-mark__logo" data-testid="manufacturer-logo" th:src="@{${logo}}"
+      th:alt="${manufacturer.displayName(#locale)}" loading="lazy" alt=""><span th:if="${logo == null}"
+      class="chip chip--muted manufacturer-mark__badge" data-testid="manufacturer-badge"
+      th:title="${manufacturer.displayName(#locale)}" th:text="${manufacturer.abbreviation}">AEGS</span></span>
+</body>
+</html>

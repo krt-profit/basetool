@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -55,10 +56,14 @@ public class UexManufacturerService {
    */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
+  /** The aggregate the disagreement events of this sync name. */
+  private static final String AGGREGATE = "manufacturer";
+
   private final UexClient uexClient;
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerUexCompanyRepository aliasRepository;
   private final SyncRunProgress progress;
+  private final SyncReportService syncReportService;
 
   /**
    * Self-reference, resolved lazily so each per-company upsert runs through the Spring transaction
@@ -223,31 +228,38 @@ public class UexManufacturerService {
 
   /**
    * Writes the canonical display identity + UEX cross-reference columns onto the row. Only the
-   * canonical company of a brand calls this; duplicates leave these fields untouched.
+   * canonical company of a brand calls this; duplicates leave these fields untouched. On a row the
+   * P4K knows, the P4K leads the name and abbreviation: they stay, and a differing UEX value is
+   * reported (REQ-P4K-020). The description is never written; the P4K leads it.
    *
    * @param manufacturer the row being stamped
    * @param dto inbound UEX row
    * @param abbreviation derived short code
    */
-  private static void applyCanonicalFields(
+  private void applyCanonicalFields(
       @NotNull Manufacturer manufacturer, @NotNull UexCompanyDto dto, String abbreviation) {
-    manufacturer.setName(dto.name());
-    manufacturer.setAbbreviation(abbreviation);
+    UUID p4kUuid = manufacturer.getP4kUuid();
+    if (p4kUuid == null) {
+      manufacturer.setName(dto.name());
+      manufacturer.setAbbreviation(abbreviation);
+    } else {
+      UUID runId = syncReportService.beginRun();
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.UEX, runId, AGGREGATE, p4kUuid, "name", manufacturer.getName(), dto.name());
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.UEX,
+          runId,
+          AGGREGATE,
+          p4kUuid,
+          "abbreviation",
+          manufacturer.getAbbreviation(),
+          abbreviation);
+    }
     if (StringUtils.hasText(dto.nickname())) {
       manufacturer.setNickname(dto.nickname());
     }
     if (StringUtils.hasText(dto.wiki())) {
       manufacturer.setWiki(dto.wiki());
-    }
-    StringBuilder description = new StringBuilder();
-    if (StringUtils.hasText(dto.industry())) {
-      description.append("Industry: ").append(dto.industry()).append("\n");
-    }
-    if (StringUtils.hasText(dto.wiki())) {
-      description.append("Wiki: ").append(dto.wiki());
-    }
-    if (!description.isEmpty()) {
-      manufacturer.setDescription(description.toString().trim());
     }
     manufacturer.setUexCompanyId(dto.id());
     manufacturer.setIndustry(dto.industry());
