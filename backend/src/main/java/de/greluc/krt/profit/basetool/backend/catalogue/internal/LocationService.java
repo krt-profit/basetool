@@ -72,6 +72,7 @@ public class LocationService {
   private final StarmapObjectRepository starmapObjectRepository;
   private final StarmapVisibility starmapVisibility;
   private final StarmapPlaceRows starmapPlaceRows;
+  private final CatalogueAdminLiveSync adminLiveSync;
 
   /**
    * Returns cached page of locations.
@@ -206,6 +207,7 @@ public class LocationService {
         saved.getName(),
         null,
         AuditDetails.of("starmapObjectId", objectId).with("hidden", saved.getHidden()));
+    adminLiveSync.starmapChanged();
     return saved;
   }
 

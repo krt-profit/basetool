@@ -17,22 +17,28 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
-import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
+import {
+    bindCandidateClick,
+    bindTypedFilter,
+    byId as $,
+    changeLink as sendLinkChange,
+    dictionaryLabels,
+    filterValue,
+    idOf,
+    readJson as readJsonOr,
+    showCandidates,
+    swapRow,
+} from '/js/catalogue/catalogue-link-admin.js';
 
 /** @typedef {ApiDto<'ShopAdminDto'>} Shop */
-/** @typedef {'SET' | 'CLEAR' | 'RELEASE'} LinkAction */
+/** @typedef {import('/js/catalogue/catalogue-link-admin.js').LinkAction} LinkAction */
 
 /** The page and proxy base path. */
 const PAGE_URL = '/admin/shops';
-
-/** Milliseconds a typed filter waits before the list reloads. */
-const TYPING_DELAY_MS = 300;
 
 /**
  * The shops the list shows, by id, so a row can be re-rendered after a write.
@@ -46,61 +52,33 @@ let shopsPage = 0;
 /** @type {Shop | null} */
 let linkTarget = null;
 
-const sections = krtPageSections.create({});
+/** Reads one label of the page's dictionary. */
+const t = dictionaryLabels(() => window.krtShopsI18n, 'krtShopsI18n');
 
 /**
- * Looks up an element by id.
- *
- * @param {string} id the element id
- * @returns {HTMLElement | null} the element, or null
+ * The page's section seam: writes go through it, and a peer admin's change or an APPLY, announced in
+ * the admin room's `shops` section, reloads the list on its current page.
  */
-function $(id) {
-    return document.getElementById(id);
-}
+const sections = krtPageSections.create({
+    topicClass: 'CATALOGUE_ADMIN',
+    topic: 'catalogue-admin',
+    sections: { shops: { container: '#shops-rows' } },
+    receiver: {
+        coalesceMs: 1500,
+        refresh() {
+            loadShops(shopsPage);
+        },
+    },
+});
 
 /**
- * Reads one label of the page's dictionary.
- *
- * @param {string} key the dictionary key
- * @returns {string} the label
- */
-function t(key) {
-    const dict = window.krtShopsI18n || {};
-    return krtI18nText(dict[key], `krtShopsI18n.${key}`);
-}
-
-/**
- * Reads the trimmed value of a filter input.
- *
- * @param {string} id the input id
- * @returns {string} the value, empty when the input is missing
- */
-function filterValue(id) {
-    const el = $(id);
-    return el instanceof HTMLInputElement ? el.value.trim() : '';
-}
-
-/**
- * Reads a JSON answer, or null when it is no data.
+ * Reads a JSON answer, or null after the page's load-error toast.
  *
  * @param {string} url the proxy URL
  * @returns {Promise<any>} the parsed body, or null
  */
 function readJson(url) {
-    return krtFetch.getJson(url).catch(() => {
-        showFrontendErrorToast(t('loadError'));
-        return null;
-    });
-}
-
-/**
- * The id of a listed shop, as the map keys and URLs use it.
- *
- * @param {{ id?: string }} entry the shop
- * @returns {string} the id, empty when the entry carries none
- */
-function idOf(entry) {
-    return entry.id || '';
+    return readJsonOr(url, t('loadError'));
 }
 
 /**
@@ -154,19 +132,6 @@ function shopRow(s) {
 }
 
 /**
- * Replaces one rendered row by fresh markup, in place.
- *
- * @param {Element} row the row to replace
- * @param {KrtHtml} markup the new row's markup
- */
-function swapRow(row, markup) {
-    const holder = document.createElement('tbody');
-    krtHtml.set(holder, markup);
-    const fresh = holder.firstElementChild;
-    if (fresh) row.replaceWith(fresh);
-}
-
-/**
  * Loads one page of the shops with the current filters.
  *
  * @param {number} page the zero-based page
@@ -210,35 +175,25 @@ function loadShops(page) {
  * @returns {Promise<boolean>} whether the change was saved
  */
 function changeLink(s, action, terminalId, submitter) {
-    return sections
-        .write({
-            method: 'POST',
-            url: `${PAGE_URL}/${encodeURIComponent(idOf(s))}/terminal-link`,
-            payload: {
-                action,
-                terminalId,
-                expectedTerminalId: s.terminalId || null,
-                expectedManual: s.manual === true,
-            },
-            submitter,
-            toast: false,
-            errorMessage: t('error'),
-            onConflict() {
-                showFrontendErrorToast(t('conflict'));
-                loadShops(shopsPage);
-                return true;
-            },
-        })
-        .then((result) => {
-            if (!result.ok) return false;
-            const updated = /** @type {Shop} */ (result.body);
+    return sendLinkChange({
+        sections,
+        url: `${PAGE_URL}/${encodeURIComponent(idOf(s))}/terminal-link`,
+        payload: {
+            action,
+            terminalId,
+            expectedTerminalId: s.terminalId || null,
+            expectedManual: s.manual === true,
+        },
+        action,
+        submitter,
+        t,
+        reload: () => loadShops(shopsPage),
+        show(/** @type {Shop} */ updated) {
             shownShops.set(idOf(updated), updated);
             const row = document.querySelector(`tr[data-shop-id="${CSS.escape(idOf(updated))}"]`);
             if (row) swapRow(row, shopRow(updated));
-            const toasts = { SET: 'toastLinked', CLEAR: 'toastCleared', RELEASE: 'toastReleased' };
-            showFrontendSuccessToast(t(toasts[action]));
-            return true;
-        });
+        },
+    });
 }
 
 /**
@@ -279,13 +234,10 @@ function openLinkDialog(s) {
 /** Loads the terminals matching the picker's search as link candidates. */
 function loadCandidates() {
     const query = filterValue('shops-link-search');
-    const list = $('shops-link-candidates');
-    const empty = $('shops-link-empty');
-    const show = (/** @type {ApiDto<'ShopTerminalOptionDto'>[]} */ rows) => {
-        if (empty) empty.hidden = rows.length > 0;
-        if (!list) return;
-        krtHtml.set(
-            list,
+    const show = (/** @type {ApiDto<'ShopTerminalOptionDto'>[]} */ rows) =>
+        showCandidates(
+            'shops-link-candidates',
+            'shops-link-empty',
             rows.map(
                 (o) =>
                     krtHtml`<li data-testid="shops-link-candidate"><span><span class="cell-title">${
@@ -295,7 +247,6 @@ function loadCandidates() {
                     }">${t('pick')}</button></li>`,
             ),
         );
-    };
     if (!query) {
         show([]);
         return;
@@ -306,36 +257,18 @@ function loadCandidates() {
 }
 
 /**
- * Links the picker's shop to the clicked terminal.
+ * Links the picker's shop to the picked terminal.
  *
- * @param {MouseEvent} e the click
+ * @param {string | null} terminalId the terminal
+ * @param {HTMLButtonElement} btn the pick button
  */
-function onCandidateClick(e) {
-    const target = e.target instanceof Element ? e.target : null;
-    const btn = target ? target.closest('button[data-candidate-id]') : null;
+function pickCandidate(terminalId, btn) {
     const s = linkTarget;
-    if (!(btn instanceof HTMLButtonElement) || !s) return;
-    changeLink(s, 'SET', btn.dataset.candidateId || null, btn).then((saved) => {
+    if (!s) return;
+    changeLink(s, 'SET', terminalId, btn).then((saved) => {
         if (!saved) return;
         linkTarget = null;
         krtModal.close('shops-link-modal');
-    });
-}
-
-/**
- * Reloads a list shortly after a text filter stops changing.
- *
- * @param {string} id the input id
- * @param {() => void} load reloads the list
- */
-function bindTypedFilter(id, load) {
-    const el = $(id);
-    if (!el) return;
-    /** @type {number | undefined} */
-    let timer;
-    el.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = window.setTimeout(load, TYPING_DELAY_MS);
     });
 }
 
@@ -350,8 +283,7 @@ function initShops() {
     bindPager($('shops-pager'), loadShops);
     const rows = $('shops-rows');
     if (rows) rows.addEventListener('click', onShopsClick);
-    const candidates = $('shops-link-candidates');
-    if (candidates) candidates.addEventListener('click', onCandidateClick);
+    bindCandidateClick('shops-link-candidates', pickCandidate);
     loadShops(0);
 }
 

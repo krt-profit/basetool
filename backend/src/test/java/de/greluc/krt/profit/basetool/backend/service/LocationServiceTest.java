@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueAdminLiveSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapObject;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapObjectRepository;
@@ -69,6 +70,7 @@ class LocationServiceTest {
   @Mock private StarmapVisibility starmapVisibility;
 
   @Mock private StarmapPlaceRows starmapPlaceRows;
+  @Mock private CatalogueAdminLiveSync adminLiveSync;
 
   private LocationService locationService;
 
@@ -82,7 +84,8 @@ class LocationServiceTest {
             auditRecorder,
             starmapObjectRepository,
             starmapVisibility,
-            starmapPlaceRows);
+            starmapPlaceRows,
+            adminLiveSync);
   }
 
   @Test
@@ -109,6 +112,7 @@ class LocationServiceTest {
     assertNotNull(savedLocation);
     assertEquals("Port Olisar", savedLocation.getName());
     verify(locationRepository, times(1)).save(inputLocation);
+    verify(adminLiveSync).starmapChanged();
   }
 
   @Test

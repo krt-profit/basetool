@@ -1219,10 +1219,12 @@ case is never visible. The override is `starmap_object.visibility_override` (`VI
 `null` for the rule), set at `PUT /api/v1/catalog/admin/starmap/objects/{id}/visibility` with the
 object's version and audited `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` (`visibility=VISIBLE|HIDDEN|RULE`).
 The admin page `/admin/starmap` lists the objects with their visibility and the UEX rows with their
-links.
+links; a peer admin's link, visibility or storage-place change and an APPLY reload both lists in
+place through the `catalogue-admin` room's `starmap` section (REQ-FE-010).
 
-**Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest` · **Code:**
-`StarmapVisibility`, `StarmapAdminService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902, #3044
+**Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest`,
+`CatalogueAdminLiveSyncTest`, `LiveSyncSectionMapParityTest` · **Code:** `StarmapVisibility`,
+`StarmapAdminService`, `CatalogueAdminLiveSync` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902, #3044
 
 ### REQ-P4K-039 — no feature references a location by an external id
 
@@ -1370,7 +1372,8 @@ only by `ShopRepository`'s statements. An admin sets (`SET`), clears (`CLEAR`) o
 import (`RELEASE`) a link at `PUT /api/v1/catalog/admin/shops/{id}/terminal-link`, echoing the link
 and the manual flag seen (`409` when either changed); `SET` and `CLEAR` mark the link manual, which
 every APPLY leaves alone. The admin page `/admin/shops` lists the shops with their links and finds
-terminals by name (`GET …/admin/shops/terminals`).
+terminals by name (`GET …/admin/shops/terminals`); a peer admin's link change and an APPLY reload
+the list in place through the `catalogue-admin` room's `shops` section (REQ-FE-010).
 
 **Enforced by:** `P4kShopTerminalLinkTest`, `ShopTerminalNamesTest`, `AdminShopsControllerMvcTest`
 · **Code:** `P4kShopLinker`, `ShopTerminalNames`, `ShopAdminService` · **ADR:**

@@ -1284,6 +1284,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
 | `blueprints:{userId}`    | list                                                                                                                          | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
 | `catalogue` (global) | catalogue | no | `ROLE_ADMIN`, `ROLE_LOGISTICIAN` or `ROLE_KRT_MEMBER` (local check, matching the member catalogue reads) |
+| `catalogue-admin` (global) | starmap, shops (the admin starmap and shops pages, REQ-P4K-035, REQ-P4K-038, REQ-P4K-043) | no | `ROLE_ADMIN` (local check; the backend publishes it after an admin's link, visibility or storage-place change and after an APPLY) |
 
 Catalogue reconciliation is a backend writer into the existing `order:{id}` room. After committed
 item-reference replacements, `JobOrderItemReassignment` publishes `items`, `item-stock`,

@@ -1,12 +1,13 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
-import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
+import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
 import {
-    bindPager as bindListPager,
-    renderPager as renderListPager,
-} from '/js/catalogue/catalogue-pager.js';
+    byId as $,
+    dictionaryLabels,
+    readJson as readJsonOr,
+} from '/js/catalogue/catalogue-link-admin.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
@@ -47,26 +48,8 @@ let reportPage = 0;
 let runsPage = 0;
 let casesPage = 0;
 
-/**
- * Looks up an element by id.
- *
- * @param {string} id the element id
- * @returns {HTMLElement | null} the element, or null
- */
-function $(id) {
-    return document.getElementById(id);
-}
-
-/**
- * Reads one label of the page's dictionary.
- *
- * @param {string} key the dictionary key
- * @returns {string} the label
- */
-function t(key) {
-    const dict = window.krtP4kImportI18n || {};
-    return krtI18nText(dict[key], `krtP4kImportI18n.${key}`);
-}
+/** Reads one label of the page's dictionary. */
+const t = dictionaryLabels(() => window.krtP4kImportI18n, 'krtP4kImportI18n');
 
 /**
  * Builds a proxy URL of the page.
@@ -98,30 +81,12 @@ function fmtTime(iso) {
  * @returns {Promise<any>} the parsed body, or null
  */
 function readJson(url) {
-    return krtFetch.getJson(url).catch(() => {
-        showFrontendErrorToast(t('error'));
-        return null;
-    });
+    return readJsonOr(url, t('error'));
 }
 
-/**
- * Renders a previous/next pager below a list, or hides it on a single page.
- *
- * @param {HTMLElement | null} nav the pager element
- * @param {{ page?: number, totalPages?: number } | null} page the page the list shows
- */
-function renderPager(nav, page) {
-    renderListPager(nav, page, { previous: t('pagePrevious'), next: t('pageNext') });
-}
-
-/**
- * Makes a pager load the page its buttons ask for.
- *
- * @param {string} id the pager's element id
- * @param {(page: number) => void} load loads a page of its list
- */
-function bindPager(id, load) {
-    bindListPager($(id), load);
+/** @returns {{ previous: string, next: string }} the pager button names */
+function pagerLabels() {
+    return { previous: t('pagePrevious'), next: t('pageNext') };
 }
 
 /**
@@ -178,7 +143,7 @@ function loadRuns(page) {
                 ),
             );
         }
-        renderPager($('krt-p4k-runs-pager'), view.runs);
+        renderPager($('krt-p4k-runs-pager'), view.runs, pagerLabels());
     });
 }
 
@@ -221,7 +186,7 @@ function loadReport(page) {
         if (!result) return;
         reportPage = page;
         renderReport(result.content || []);
-        renderPager($('krt-p4k-report-pager'), result);
+        renderPager($('krt-p4k-report-pager'), result, pagerLabels());
     });
 }
 
@@ -298,7 +263,7 @@ function loadCases(page) {
             if (!result) return;
             casesPage = page;
             renderCases(result.content || []);
-            renderPager($('krt-p4k-cases-pager'), result);
+            renderPager($('krt-p4k-cases-pager'), result, pagerLabels());
         },
     );
 }
@@ -477,9 +442,9 @@ function init() {
             }
         });
     }
-    bindPager('krt-p4k-runs-pager', loadRuns);
-    bindPager('krt-p4k-report-pager', loadReport);
-    bindPager('krt-p4k-cases-pager', loadCases);
+    bindPager($('krt-p4k-runs-pager'), loadRuns);
+    bindPager($('krt-p4k-report-pager'), loadReport);
+    bindPager($('krt-p4k-cases-pager'), loadCases);
     const close = $('krt-p4k-report-close');
     if (close) {
         close.addEventListener('click', () => {

@@ -2313,7 +2313,7 @@ counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` la
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
-`catalogue`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
+`catalogue`, the admin starmap and shops room `catalogue_admin`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 The backend and frontend share the `catalogue` section allow-list. Committed source changes publish

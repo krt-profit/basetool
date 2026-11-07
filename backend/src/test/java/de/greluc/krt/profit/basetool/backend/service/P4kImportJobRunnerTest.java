@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueAdminLiveSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
@@ -81,6 +82,7 @@ class P4kImportJobRunnerTest {
   @Mock private P4kImportService importService;
   @Mock private MasterDataCacheEvictionService cacheEvictionService;
   @Mock private LiveSyncPublisher catalogueUpdates;
+  @Mock private CatalogueAdminLiveSync adminLiveSync;
 
   private final AuthHelperService authHelperService = new AuthHelperService(roleHierarchy());
 
@@ -113,7 +115,8 @@ class P4kImportJobRunnerTest {
             JsonMapper.builder().build(),
             authHelperService,
             catalogueUpdates,
-            syncCoordinator);
+            syncCoordinator,
+            adminLiveSync);
   }
 
   @Test
@@ -278,6 +281,7 @@ class P4kImportJobRunnerTest {
     verify(jobService).deletePayload(id);
     verify(jobService).pruneOldJobs();
     verify(cacheEvictionService).evictP4kSyncedMasterData();
+    verify(adminLiveSync).applied();
   }
 
   @Test

@@ -280,7 +280,8 @@ class CatalogueAuditTest {
             auditRecorder,
             mock(StarmapObjectRepository.class),
             mock(StarmapVisibility.class),
-            mock(StarmapPlaceRows.class));
+            mock(StarmapPlaceRows.class),
+            mock(CatalogueAdminLiveSync.class));
     Location location = new Location();
     location.setId(ID);
     location.setName("Home");
@@ -307,7 +308,8 @@ class CatalogueAuditTest {
             auditRecorder,
             mock(StarmapObjectRepository.class),
             mock(StarmapVisibility.class),
-            mock(StarmapPlaceRows.class));
+            mock(StarmapPlaceRows.class),
+            mock(CatalogueAdminLiveSync.class));
     Location location = new Location();
     location.setId(ID);
     location.setName("Home");

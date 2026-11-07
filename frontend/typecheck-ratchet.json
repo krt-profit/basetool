@@ -40,6 +40,7 @@
       "catalogue/admin-materials.js",
       "catalogue/admin-quality-tiers.js",
       "catalogue/admin-squadrons.js",
+      "catalogue/catalogue-link-admin.js",
       "catalogue/catalogue-list.js",
       "catalogue/catalogue-pager.js",
       "catalogue/locations.js",

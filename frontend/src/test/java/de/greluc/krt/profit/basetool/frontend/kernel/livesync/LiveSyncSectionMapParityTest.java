@@ -397,6 +397,21 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void adminStarmapAndShopsSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
+    String starmap = readResource("/static/js/catalogue/starmap.js");
+    String shops = readResource("/static/js/catalogue/shops.js");
+    Set<String> jsKeys = new LinkedHashSet<>();
+    jsKeys.addAll(seamMapKeys("/static/js/catalogue/starmap.js", "sections"));
+    jsKeys.addAll(seamMapKeys("/static/js/catalogue/shops.js", "sections"));
+
+    assertThat(starmap).contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");
+    assertThat(shops).contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");
+    assertThat(jsKeys)
+        .as("sections keys of starmap.js and shops.js vs LiveSyncTopicClass.CATALOGUE_ADMIN")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.CATALOGUE_ADMIN.allowedSections());
+  }
+
+  @Test
   void dashboardLiveRooms_nameOnlyWhitelistedSectionsOfExistingGlobalRooms() throws IOException {
     String js = readResource("/static/js/dashboard/dashboard-widgets.js");
     String block = js.substring(js.indexOf("const LIVE_ROOMS = {"));

@@ -46,7 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The admin side of the P4K shops (REQ-P4K-042, REQ-P4K-043, ADR-0347): lists the shops with their
  * UEX terminal links, finds terminals to link to, and sets, clears or releases a link by hand.
- * Every link change records one {@code CATALOGUE} audit event (REQ-P4K-046).
+ * Every link change records one {@code CATALOGUE} audit event (REQ-P4K-046) and pokes the admin
+ * room's {@code shops} section.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,6 +62,7 @@ public class ShopAdminService {
   private final StarmapObjectRepository objectRepository;
   private final StarmapPlaceRows placeRows;
   private final AuditRecorder auditRecorder;
+  private final CatalogueAdminLiveSync adminLiveSync;
   private final EntityManager entityManager;
 
   /**
@@ -158,6 +160,7 @@ public class ShopAdminService {
         shop.getEntityName(),
         null,
         AuditDetails.of("terminalId", target).with("previousTerminalId", previous));
+    adminLiveSync.shopsChanged();
     entityManager.refresh(shop);
     List<Shop> one = List.of(shop);
     return toDto(shop, terminalNames(one), placeNames(one));

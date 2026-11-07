@@ -68,6 +68,7 @@ public class P4kImportJobRunner {
   private final AuthHelperService authHelperService;
   private final LiveSyncPublisher catalogueUpdates;
   private final SyncCoordinator syncCoordinator;
+  private final CatalogueAdminLiveSync adminLiveSync;
 
   /**
    * Executes one import job asynchronously on the {@code importExecutor}. Never throws: every
@@ -132,6 +133,7 @@ public class P4kImportJobRunner {
           safely(
               cacheEvictionService::evictP4kSyncedMasterData,
               "evict P4K-synced master-data caches");
+          safely(adminLiveSync::applied, "publish starmap and shop link change");
         }
         if (changedCatalogue) {
           safely(

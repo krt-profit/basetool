@@ -53,7 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
  * The admin side of the starmap (REQ-P4K-034…038, ADR-0345): lists the objects with their
  * visibility, sets or clears an object's visibility override, lists the UEX location rows with
  * their links, and sets, clears or releases a link by hand. Every mutation records one {@code
- * CATALOGUE} audit event (REQ-P4K-046).
+ * CATALOGUE} audit event (REQ-P4K-046) and pokes the admin room's {@code starmap} section.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,6 +65,7 @@ public class StarmapAdminService {
   private final StarmapVisibility visibility;
   private final LocationRepository locationRepository;
   private final AuditRecorder auditRecorder;
+  private final CatalogueAdminLiveSync adminLiveSync;
 
   /**
    * Pages the starmap objects, each with its visibility and storage place.
@@ -120,6 +121,7 @@ public class StarmapAdminService {
           object.getClassName(),
           null,
           AuditDetails.of("visibility", override == null ? "RULE" : override.name()));
+      adminLiveSync.starmapChanged();
     }
     List<StarmapObject> one = List.of(object);
     return toDto(object, visibility.liveSystems(), storagePlaces(one).get(object.getId()));
@@ -224,6 +226,7 @@ public class StarmapAdminService {
         AuditDetails.of("kind", kind.name())
             .with("starmapObjectId", targetId)
             .with("previousStarmapObjectId", row.starmapObjectId()));
+    adminLiveSync.starmapChanged();
     StarmapPlaceRow after = requireRow(kind, id);
     return toDto(after, target);
   }

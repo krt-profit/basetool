@@ -45,6 +45,12 @@ public enum LiveSyncTopicClass {
   /** Shared member-readable catalogue enrichment and reference-data room. */
   CATALOGUE("catalogue", false, "catalogue"),
 
+  /**
+   * Global admin room of the starmap and shops admin pages: the backend pokes {@code starmap} or
+   * {@code shops} when an admin's change or an APPLY changed what the page lists.
+   */
+  CATALOGUE_ADMIN("catalogue-admin", false, "catalogue_admin"),
+
   /** A job-order detail page, keyed by the order identity. */
   ORDER("order", true, "order_detail"),
 
@@ -85,6 +91,7 @@ public enum LiveSyncTopicClass {
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
   private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board");
+  private static final Set<String> CATALOGUE_ADMIN_SECTIONS = Set.of("starmap", "shops");
   private static final Set<String> ADMIN_DASHBOARD_SECTIONS =
       Set.of(
           AdminDashboardLiveSync.DELETION_REQUESTS,
@@ -126,6 +133,7 @@ public enum LiveSyncTopicClass {
     return switch (this) {
       case INVENTORY_ALL -> INVENTORY_ALL_SECTIONS;
       case CATALOGUE -> Set.of("catalogue");
+      case CATALOGUE_ADMIN -> CATALOGUE_ADMIN_SECTIONS;
       case ORDER ->
           Set.of(
               "header",

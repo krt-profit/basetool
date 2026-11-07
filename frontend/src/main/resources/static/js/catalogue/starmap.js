@@ -18,23 +18,30 @@
  */
 
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
-import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
+import {
+    bindCandidateClick,
+    bindTypedFilter,
+    byId as $,
+    changeLink as sendLinkChange,
+    dictionaryLabels,
+    filterValue,
+    idOf,
+    readJson as readJsonOr,
+    showCandidates,
+    swapRow,
+} from '/js/catalogue/catalogue-link-admin.js';
 
 /** @typedef {ApiDto<'StarmapObjectAdminDto'>} StarmapObject */
 /** @typedef {ApiDto<'StarmapPlaceLinkDto'>} StarmapPlace */
-/** @typedef {'SET' | 'CLEAR' | 'RELEASE'} LinkAction */
+/** @typedef {import('/js/catalogue/catalogue-link-admin.js').LinkAction} LinkAction */
 
 /** The page and proxy base path. */
 const PAGE_URL = '/admin/starmap';
-
-/** Milliseconds a typed filter waits before the list reloads. */
-const TYPING_DELAY_MS = 300;
 
 /**
  * The objects the object list shows, by id, so a row can be re-rendered after a write.
@@ -59,28 +66,25 @@ let storageTarget = null;
 /** @type {StarmapPlace | null} */
 let linkTarget = null;
 
-const sections = krtPageSections.create({});
-
 /**
- * Looks up an element by id.
- *
- * @param {string} id the element id
- * @returns {HTMLElement | null} the element, or null
+ * The page's section seam: writes go through it, and a peer admin's change or an APPLY, announced in
+ * the admin room's `starmap` section, reloads both lists on their current pages.
  */
-function $(id) {
-    return document.getElementById(id);
-}
+const sections = krtPageSections.create({
+    topicClass: 'CATALOGUE_ADMIN',
+    topic: 'catalogue-admin',
+    sections: { starmap: { container: '#starmap-objects' } },
+    receiver: {
+        coalesceMs: 1500,
+        refresh() {
+            loadObjects(objectsPage);
+            loadPlaces(placesPage);
+        },
+    },
+});
 
-/**
- * Reads one label of the page's dictionary.
- *
- * @param {string} key the dictionary key
- * @returns {string} the label
- */
-function t(key) {
-    const dict = window.krtStarmapI18n || {};
-    return krtI18nText(dict[key], `krtStarmapI18n.${key}`);
-}
+/** Reads one label of the page's dictionary. */
+const t = dictionaryLabels(() => window.krtStarmapI18n, 'krtStarmapI18n');
 
 /** @returns {{ previous: string, next: string }} the pager button names */
 function pagerLabels() {
@@ -88,29 +92,14 @@ function pagerLabels() {
 }
 
 /**
- * Reads the trimmed value of a filter input.
- *
- * @param {string} id the input id
- * @returns {string} the value, empty when the input is missing
- */
-function filterValue(id) {
-    const el = $(id);
-    return el instanceof HTMLInputElement || el instanceof HTMLSelectElement ? el.value.trim() : '';
-}
-
-/**
- * Reads a JSON list answer, or null when it is no data.
+ * Reads a JSON answer, or null after the page's load-error toast.
  *
  * @param {string} url the proxy URL
  * @returns {Promise<any>} the parsed body, or null
  */
 function readJson(url) {
-    return krtFetch.getJson(url).catch(() => {
-        showFrontendErrorToast(t('loadError'));
-        return null;
-    });
+    return readJsonOr(url, t('loadError'));
 }
-
 /**
  * The name a list shows for an object: its P4K name in the page language, else its class name.
  *
@@ -119,16 +108,6 @@ function readJson(url) {
  */
 function objectName(o) {
     return localisedName(o.name, o.nameDe) || o.className || o.guid || '';
-}
-
-/**
- * The id of a listed object or row, as the map keys and URLs use it.
- *
- * @param {{ id?: string }} entry the object or row
- * @returns {string} the id, empty when the entry carries none
- */
-function idOf(entry) {
-    return entry.id || '';
 }
 
 /**
@@ -190,21 +169,6 @@ function selectCurrentOverrides(root) {
             select.value = select.dataset.current || '';
         }
     });
-}
-
-/**
- * Replaces one rendered row by fresh markup, in place.
- *
- * @param {Element} row the row to replace
- * @param {KrtHtml} markup the new row's markup
- * @returns {Element | null} the new row
- */
-function swapRow(row, markup) {
-    const holder = document.createElement('tbody');
-    krtHtml.set(holder, markup);
-    const fresh = holder.firstElementChild;
-    if (fresh) row.replaceWith(fresh);
-    return fresh;
 }
 
 /**
@@ -435,37 +399,26 @@ function loadPlaces(page) {
  * @returns {Promise<boolean>} whether the change was saved
  */
 function changeLink(p, action, objectId, submitter) {
-    return sections
-        .write({
-            method: 'POST',
-            url: `${PAGE_URL}/places/${encodeURIComponent(p.kind || currentKind())}/${encodeURIComponent(idOf(p))}/link`,
-            payload: {
-                action,
-                starmapObjectId: objectId,
-                expectedStarmapObjectId: p.starmapObjectId || null,
-                expectedManual: p.manual === true,
-            },
-            submitter,
-            toast: false,
-            errorMessage: t('error'),
-            onConflict() {
-                showFrontendErrorToast(t('conflict'));
-                loadPlaces(placesPage);
-                return true;
-            },
-        })
-        .then((result) => {
-            if (!result.ok) return false;
-            const updated = /** @type {StarmapPlace} */ (result.body);
+    return sendLinkChange({
+        sections,
+        url: `${PAGE_URL}/places/${encodeURIComponent(p.kind || currentKind())}/${encodeURIComponent(idOf(p))}/link`,
+        payload: {
+            action,
+            starmapObjectId: objectId,
+            expectedStarmapObjectId: p.starmapObjectId || null,
+            expectedManual: p.manual === true,
+        },
+        action,
+        submitter,
+        t,
+        reload: () => loadPlaces(placesPage),
+        show(/** @type {StarmapPlace} */ updated) {
             shownPlaces.set(idOf(updated), updated);
             const row = document.querySelector(`tr[data-place-id="${CSS.escape(idOf(updated))}"]`);
             if (row) swapRow(row, placeRow(updated));
-            const toasts = { SET: 'toastLinked', CLEAR: 'toastCleared', RELEASE: 'toastReleased' };
-            showFrontendSuccessToast(t(toasts[action]));
-            return true;
-        });
+        },
+    });
 }
-
 /**
  * Handles the link list's clicks: the picker opener and the clear and release actions.
  *
@@ -507,15 +460,11 @@ function loadCandidates() {
     const params = new URLSearchParams({ page: '0' });
     if (query) params.set('query', query);
     readJson(`${PAGE_URL}/objects?${params}`).then(
-        (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) => {
-            const list = $('starmap-link-candidates');
-            const empty = $('starmap-link-empty');
-            const rows = result ? result.content || [] : [];
-            if (empty) empty.hidden = rows.length > 0;
-            if (!list) return;
-            krtHtml.set(
-                list,
-                rows.map(
+        (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) =>
+            showCandidates(
+                'starmap-link-candidates',
+                'starmap-link-empty',
+                (result ? result.content || [] : []).map(
                     (o) =>
                         krtHtml`<li data-testid="starmap-link-candidate"><span><span class="cell-title">${objectName(
                             o,
@@ -525,45 +474,25 @@ function loadCandidates() {
                             o.id
                         }">${t('pick')}</button></li>`,
                 ),
-            );
-        },
+            ),
     );
 }
 
 /**
- * Links the picker's row to the clicked candidate.
+ * Links the picker's row to the picked object.
  *
- * @param {MouseEvent} e the click
+ * @param {string | null} objectId the object
+ * @param {HTMLButtonElement} btn the pick button
  */
-function onCandidateClick(e) {
-    const target = e.target instanceof Element ? e.target : null;
-    const btn = target ? target.closest('button[data-candidate-id]') : null;
+function pickCandidate(objectId, btn) {
     const p = linkTarget;
-    if (!(btn instanceof HTMLButtonElement) || !p) return;
-    changeLink(p, 'SET', btn.dataset.candidateId || null, btn).then((saved) => {
+    if (!p) return;
+    changeLink(p, 'SET', objectId, btn).then((saved) => {
         if (!saved) return;
         linkTarget = null;
         krtModal.close('starmap-link-modal');
     });
 }
-
-/**
- * Reloads a list shortly after its text filter stops changing.
- *
- * @param {string} id the input id
- * @param {() => void} load reloads the list
- */
-function bindTypedFilter(id, load) {
-    const el = $(id);
-    if (!el) return;
-    /** @type {number | undefined} */
-    let timer;
-    el.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = window.setTimeout(load, TYPING_DELAY_MS);
-    });
-}
-
 /**
  * Keeps a filter form from submitting; its fields reload the list in place.
  *
@@ -604,8 +533,7 @@ function initStarmap() {
     }
     const places = $('starmap-links');
     if (places) places.addEventListener('click', onPlacesClick);
-    const candidates = $('starmap-link-candidates');
-    if (candidates) candidates.addEventListener('click', onCandidateClick);
+    bindCandidateClick('starmap-link-candidates', pickCandidate);
     const storageForm = $('starmap-storage-form');
     if (storageForm) storageForm.addEventListener('submit', onStorageSubmit);
 
