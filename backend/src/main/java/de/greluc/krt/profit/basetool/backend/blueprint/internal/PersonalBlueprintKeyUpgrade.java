@@ -79,13 +79,13 @@ public class PersonalBlueprintKeyUpgrade implements ProducedItemGuidFollower {
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   public List<UnresolvedProductKey> followProducedItemGuids(boolean apply) {
-    Map<String, List<ResolvedProduct>> byName = productService.productsByNameKey();
     Set<String> memberKeys = nameKeys(personalRepository.findAllDistinctProductKeys());
     Set<String> heldKeys = new TreeSet<>(memberKeys);
     heldKeys.addAll(nameKeys(defaultRepository.findAllProductKeys()));
     heldKeys.addAll(nameKeys(aliasRepository.findAllDistinctProductKeys()));
     participants.forEach(p -> heldKeys.addAll(nameKeys(p.referencedProductKeys())));
 
+    Map<String, List<ResolvedProduct>> byName = productService.productsByNameKey();
     Tally tally = new Tally();
     List<UnresolvedProductKey> unresolved = new ArrayList<>();
     for (String nameKey : heldKeys) {

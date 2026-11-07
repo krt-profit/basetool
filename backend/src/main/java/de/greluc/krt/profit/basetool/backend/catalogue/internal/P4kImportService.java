@@ -126,8 +126,7 @@ public class P4kImportService {
     P4kBuild build = requireBuild(catalogue.head());
     P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
     int ingredientsResolved = reconcile(catalogue, context);
-    sweeper.sweep(catalogue, context, false);
-    productKeyReview.follow(context, context.getNow());
+    sweepAndFollow(catalogue, context, false);
     return new P4kPreview(
         result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
   }
@@ -157,8 +156,7 @@ public class P4kImportService {
     P4kImportContext context =
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
     int ingredientsResolved = reconcile(catalogue, context);
-    List<P4kKind> overridden = sweeper.sweep(catalogue, context, request.overrideMassGuard());
-    productKeyReview.follow(context, now);
+    List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
@@ -174,6 +172,25 @@ public class P4kImportService {
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
     log.info("P4K import applied (run {}): {}", run.getId(), summary(result));
     return result;
+  }
+
+  /**
+   * Sweeps the complete kinds, then hands the blueprints' produced-item GUIDs to the modules keyed
+   * by them (REQ-P4K-029).
+   *
+   * @param catalogue the catalogue
+   * @param context the run
+   * @param overrideMassGuard whether a kind is swept past the mass guard
+   * @return the kinds swept only because of the override
+   */
+  @NotNull
+  private List<P4kKind> sweepAndFollow(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context,
+      boolean overrideMassGuard) {
+    List<P4kKind> overridden = sweeper.sweep(catalogue, context, overrideMassGuard);
+    productKeyReview.follow(context, context.getNow());
+    return overridden;
   }
 
   /**

@@ -99,13 +99,9 @@ public class P4kReviewService {
       @NotNull P4kReviewResolution resolution,
       long version,
       @NotNull UUID adminId) {
-    AuditEventType auditType =
-        switch (resolution) {
-          case KEEP -> AuditEventType.CATALOGUE_P4K_REVIEW_KEPT;
-          case HIDE -> AuditEventType.CATALOGUE_P4K_REVIEW_HIDDEN;
-          case RESOLVED ->
-              throw new BadRequestException("A review case is resolved as keep or hide.");
-        };
+    if (resolution == P4kReviewResolution.RESOLVED) {
+      throw new BadRequestException("A review case is resolved as keep or hide.");
+    }
     P4kReviewCase reviewCase =
         Entities.require(
             caseRepository.findById(caseId), () -> "P4K review case " + caseId + " was not found.");
@@ -123,7 +119,11 @@ public class P4kReviewService {
     }
     caseRepository.saveAndFlush(reviewCase);
     auditRecorder.record(
-        auditType,
+        switch (resolution) {
+          case KEEP -> AuditEventType.CATALOGUE_P4K_REVIEW_KEPT;
+          case HIDE -> AuditEventType.CATALOGUE_P4K_REVIEW_HIDDEN;
+          case RESOLVED -> throw new IllegalStateException("A run's resolution reached an admin.");
+        },
         reviewCase.getId(),
         reviewCase.getGuid().toString(),
         null,
