@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -721,9 +722,9 @@ class ItemReconciliationIntegrationTest {
   }
 
   private UUID location() {
-    return insert(
-        "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)",
-        "Catalogue " + UUID.randomUUID());
+    UUID id = UUID.randomUUID();
+    TestPlaces.insertLocation(jdbc, id, "Catalogue " + id);
+    return id;
   }
 
   private UUID floor(UUID unit, UUID item, double minimum, double target) {

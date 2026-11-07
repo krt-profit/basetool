@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,9 @@ class InventoryTransferNotificationIntegrationTest {
   private static final long POLL_MILLIS = 100;
 
   @Autowired private InventoryCheckoutService checkoutService;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -267,7 +272,7 @@ class InventoryTransferNotificationIntegrationTest {
   private Location location(String name) {
     Location location = new Location();
     location.setName(name + "-" + UUID.randomUUID());
-    Location saved = locationRepository.save(location);
+    Location saved = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     locations.add(saved.getId());
     return saved;
   }

@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,8 +118,8 @@ class LocationRepositoryTest {
     assertThat(repository.findByCityId(city.getId())).contains(marked);
   }
 
-  private static Location loc(String name, boolean homeLocation, boolean hidden) {
-    Location location = new Location();
+  private Location loc(String name, boolean homeLocation, boolean hidden) {
+    Location location = TestPlaces.onOwnCity(new Location(), cityRepository);
     location.setName(name);
     location.setHomeLocation(homeLocation);
     location.setHidden(hidden);

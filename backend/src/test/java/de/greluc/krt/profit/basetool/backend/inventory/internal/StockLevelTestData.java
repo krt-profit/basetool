@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -103,7 +104,7 @@ final class StockLevelTestData {
   @NotNull
   UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Loc " + id);
+    TestPlaces.insertLocation(jdbc, id, "Loc " + id);
     return id;
   }
 

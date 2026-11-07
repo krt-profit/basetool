@@ -1229,6 +1229,536 @@
    "entityName": null,
    "placedUnderGuid": null,
    "position": null
+  },
+  {
+   "guid": "02a373c1-566a-475f-9534-113d3d742d6a",
+   "className": "IasiPlatformStanton1b_2",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton4/events/iasiplatformstanton1b_2",
+   "name": {
+    "key": "@Iasi_Location_Name",
+    "en": "RSI Event Platform",
+    "de": null
+   },
+   "type": "PointOfInterest",
+   "typeGuid": "4969b9e4-4b1e-45b4-b335-506bbf7af476",
+   "parentGuid": "f8f07f5b-1c0e-47c9-aa50-46963065bf18",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "IasiPlatform_1b_002",
+   "placedUnderGuid": "f8f07f5b-1c0e-47c9-aa50-46963065bf18",
+   "position": [
+    12905712296.826,
+    41180565.304,
+    150568.633
+   ]
+  },
+  {
+   "guid": "1aacc387-4c9a-41d4-bba3-8a728eae07c6",
+   "className": "JumpPoint_Stanton_Magnus",
+   "recordPath": "libs/foundry/records/starmap/pu/jumppoint_stanton_magnus",
+   "name": {
+    "key": "@Stanton_JumpPoint_Magnus",
+    "en": "Stanton - Magnus Jump Point",
+    "de": "Stanton-Magnus-Sprungpunkt"
+   },
+   "type": "JumpPoint",
+   "typeGuid": "65b8ee34-7fbc-432a-afca-834b16fa22f5",
+   "parentGuid": "e1501a68-09e5-472e-93a4-01efcde8c8f8",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "OOC_JumpPoint_stanton_magnus",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    -62284282868.185,
+    23467602586.872,
+    20198396608.0
+   ]
+  },
+  {
+   "guid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "className": "StantonStar",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stantonstar/starmapobject.stantonstar",
+   "name": {
+    "key": "@StantonStar",
+    "en": "Stanton",
+    "de": "Stanton"
+   },
+   "type": "Star",
+   "typeGuid": "80846bb9-e389-411f-b50f-f65f3b639b1d",
+   "parentGuid": null,
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton",
+   "placedUnderGuid": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "guid": "468d4102-a210-47b5-8bc3-084f791a173c",
+   "className": "Nyx_Levski",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/delamar/landingzone/nyx_levski",
+   "name": {
+    "key": "@ui_pregame_port_Levski_name",
+    "en": "Levski",
+    "de": "Levski"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": "nyx",
+   "entityName": "levski_all-001",
+   "placedUnderGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "position": [
+    -9641672902.905,
+    -11490734473.54,
+    -93642.551
+   ]
+  },
+  {
+   "guid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "className": "Stanton1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/starmapobject.stanton1",
+   "name": {
+    "key": "@Stanton1",
+    "en": "Hurston",
+    "de": "Hurston"
+   },
+   "type": "Planet",
+   "typeGuid": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton_1_Hurston",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    12850457093.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "guid": "59485d8c-7947-4e00-871c-d35f6451aab8",
+   "className": "RR_ARC_L1",
+   "recordPath": "libs/foundry/records/starmap/pu/station/reststop/rr_arc_l1",
+   "name": {
+    "key": "@RR_ARC_L1",
+    "en": "ARC-L1 Wide Forest Station",
+    "de": "ARC-L1-Wide-Forest-Station"
+   },
+   "type": "Manmade_VisibleOnInteraction",
+   "typeGuid": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "LOC_RR_S3_L1",
+   "placedUnderGuid": "0b8b226a-076f-44fb-a522-dee6b0c4be4c",
+   "position": [
+    16729220034.958,
+    -19942048185.735,
+    2239765.215
+   ]
+  },
+  {
+   "guid": "5de4be76-7d6c-47e3-ab7b-9d344d27f506",
+   "className": "JumpPoint_Pyro_Stanton",
+   "recordPath": "libs/foundry/records/starmap/pu/system/pyro/jumppoint_pyro_stanton",
+   "name": {
+    "key": "@Pyro_JumpPoint_Stanton",
+    "en": "Pyro-Stanton Jump Point",
+    "de": "Pyro-Stanton-Sprungpunkt"
+   },
+   "type": "Anomaly",
+   "typeGuid": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "parentGuid": "a1b8a311-6465-45dc-873d-e8d06d4372df",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "jumppoint_pyro_stanton",
+   "placedUnderGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "position": [
+    34178643295.763,
+    40591998290.601,
+    0.0
+   ]
+  },
+  {
+   "guid": "ab29f65e-c792-4b1f-b23d-5810cb0ef416",
+   "className": "RR_HUR_LEO",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/orbiting/rr_hur_leo",
+   "name": {
+    "key": "@Stanton1_Transfer",
+    "en": "Everus Harbor",
+    "de": "Everus-Hafen"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ObjectContainer_RestStop",
+   "placedUnderGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "position": [
+    12849949350.688,
+    -903464.438,
+    496489.063
+   ]
+  },
+  {
+   "guid": "c9c137cf-c520-47ee-9e6d-5d653dfbe201",
+   "className": "StantonSolarSystem",
+   "recordPath": "libs/foundry/records/starmap/pu/stantonsolarsystem",
+   "name": {
+    "key": "@StantonSystem",
+    "en": "Stanton System",
+    "de": null
+   },
+   "type": "SolarSystem",
+   "typeGuid": "32ed44de-920b-43ce-b55d-82cc4ef9fa59",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "dc34b5af-e417-48d2-b47b-98b56eedf0a7",
+   "className": "Stanton2b_ShubinMining_SCD1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton2b/outpost/stanton2b_shubinmining_scd1",
+   "name": {
+    "key": "@Stanton2b_Shubin_001",
+    "en": "Shubin Mining Facility SCD-1",
+    "de": "Shubin-Bergbauanlage SCD-1"
+   },
+   "type": "Outpost",
+   "typeGuid": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "parentGuid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "shubin_cluster_001_sand_{B8AA34E0-BBDC-4000-A3AE-3705210EE06E}.socpak",
+   "placedUnderGuid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "position": [
+    -18930413514.363,
+    -2610308346.968,
+    221253.344
+   ]
+  },
+  {
+   "guid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "className": "Stanton2b",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton2b/starmapobject.stanton2b",
+   "name": {
+    "key": "@Stanton2b",
+    "en": "Daymar",
+    "de": "Daymar"
+   },
+   "type": "Moon",
+   "typeGuid": "4af1132e-d980-482d-823f-f713a196b9aa",
+   "parentGuid": "c15033ab-2eb3-4d6d-b882-0cb336e67ed8",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton_2b_Daymar",
+   "placedUnderGuid": "c15033ab-2eb3-4d6d-b882-0cb336e67ed8",
+   "position": [
+    -18930539539.535,
+    -2610158765.499,
+    0.0
+   ]
+  },
+  {
+   "guid": "f1759f46-e3c0-4dc1-94bc-c94488b58913",
+   "className": "Stanton1_Lorville",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/landingzone/stanton1_lorville",
+   "name": {
+    "key": "@ui_pregame_port_Lorville_name",
+    "en": "Lorville",
+    "de": "Lorville"
+   },
+   "type": "LandingZone",
+   "typeGuid": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "parentGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ObjectContainer_Lorville_City",
+   "placedUnderGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "position": [
+    12850128103.835,
+    -752434.616,
+    572120.274
+   ]
+  },
+  {
+   "guid": "f1d0e8d9-1e3a-47a2-98e7-02a220ba8f14",
+   "className": "Race_TimeTrial_Stanton4c_Icebreaker",
+   "recordPath": "libs/foundry/records/starmap/pu/race_timetrial_stanton4c_icebreaker",
+   "name": {
+    "key": "@Stanton4c_Racetrack_Icebreaker",
+    "en": "The Icebreaker",
+    "de": null
+   },
+   "type": "NavPoint",
+   "typeGuid": "c7f1393f-8cb3-4ac8-9dc7-75671c1b07fe",
+   "parentGuid": "732dedf3-9530-4972-98ab-2fcae64669db",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "racing_static_st4c_icebreaker",
+   "placedUnderGuid": "732dedf3-9530-4972-98ab-2fcae64669db",
+   "position": [
+    22488067631.75,
+    37081321702.622,
+    66610.567
+   ]
+  },
+  {
+   "guid": "f5c47a9e-0b4c-49ee-adf4-a5f65f3c3929",
+   "className": "Pyro1_ASD_RF_LazarusComplex_Tithonus_2A",
+   "recordPath": "libs/foundry/records/starmap/pu/pyro1_asd_rf_lazaruscomplex_tithonus_2a",
+   "name": {
+    "key": "@Pyro1_ASD_Research_Facility_2A",
+    "en": "Lazarus Complex Tithonus-I",
+    "de": null
+   },
+   "type": "Outpost_InvalidQT",
+   "typeGuid": "7949a092-c8c3-447e-b417-156403cf27f0",
+   "parentGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "STMGN_ResearchLab_04_RastarLE",
+   "placedUnderGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "position": [
+    -7921241397.301,
+    -2387126929.586,
+    -211553.669
+   ]
+  },
+  {
+   "guid": "00506b11-4482-4d8a-9363-8d767875aed8",
+   "className": "PrivateMiningPoint_Stanton4_L4_002",
+   "recordPath": "libs/foundry/records/starmap/pu/privateminingpoint_stanton4_l4_002",
+   "name": {
+    "key": "@MiningClaim_S4L4_002",
+    "en": "Mining Claim #LX4-224",
+    "de": "Bergbau-Claim #LX4-224"
+   },
+   "type": "Asteroid",
+   "typeGuid": "e60452a5-b85c-4ab1-97e7-9cefb466f87b",
+   "parentGuid": "5e71e60c-52cc-42b9-806a-d8d2a236df28",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "PrivateMiningAsteroid_S4_L4-002",
+   "placedUnderGuid": "604eea8b-24e4-4425-806d-922a277ff308",
+   "position": [
+    -20968722133.82,
+    38056068134.811,
+    -11846444.619
+   ]
+  },
+  {
+   "guid": "00e7f077-e8c8-4775-afeb-e4921c4da7c0",
+   "className": "Stanton3b_ASD_Delve_Facility_006",
+   "recordPath": "libs/foundry/records/starmap/pu/stanton3b_asd_delve_facility_006",
+   "name": {
+    "key": "@Stanton3b_ASD_Delving_Facility_006",
+    "en": "Onyx Facility S3B6",
+    "de": null
+   },
+   "type": "Outpost",
+   "typeGuid": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "parentGuid": "d6f1ccd9-fbfb-4086-9608-8466ef2c1c93",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "s3b_asd_facility_006",
+   "placedUnderGuid": "d6f1ccd9-fbfb-4086-9608-8466ef2c1c93",
+   "position": [
+    18379568197.306,
+    -22000201126.959,
+    55102.039
+   ]
+  },
+  {
+   "guid": "02069d4a-e37a-474c-9229-691ce013bdc1",
+   "className": "TheCollectorAsteroid_Stanton1",
+   "recordPath": "libs/foundry/records/starmap/pu/thecollectorasteroid_stanton1",
+   "name": {
+    "key": "@Collector_Station_01_Name",
+    "en": "Wikelo Emporium Dasi Station",
+    "de": null
+   },
+   "type": "Manmade_VisibleOnInteraction",
+   "typeGuid": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ab_collector_gas_Stanton1",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    14333387186.509,
+    2001161588.504,
+    0.0
+   ]
+  },
+  {
+   "guid": "02a62832-2087-45cf-8861-cbf0bd310be7",
+   "className": "PARTY_MEMBER_QT_Beacon",
+   "recordPath": "libs/foundry/records/starmap/pu/player_related/party_member_qt_beacon",
+   "name": {
+    "key": "@starmap_partymember",
+    "en": "Party Member",
+    "de": "Party-Mitglied"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "0c39de63-bb45-496e-8029-0ed91580c84a",
+   "className": "Delamar",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/delamar/starmapobject.delamar",
+   "name": {
+    "key": "@Delamar",
+    "en": "Delamar",
+    "de": "Delamar"
+   },
+   "type": "Moon",
+   "typeGuid": "4af1132e-d980-482d-823f-f713a196b9aa",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "122e8057-831d-4517-a23b-0eb8382b90a2",
+   "className": "Stanton4_NewBabbage",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton4/landingzone/stanton4_newbabbage",
+   "name": {
+    "key": "@ui_pregame_port_NewBabbage_name",
+    "en": "New Babbage",
+    "de": "New Babbage"
+   },
+   "type": "LandingZone",
+   "typeGuid": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "parentGuid": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "NewBabbage_LOC",
+   "placedUnderGuid": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+   "position": [
+    22461564529.493,
+    37185325600.517,
+    743654.685
+   ]
+  },
+  {
+   "guid": "15c0678a-5240-4866-9e67-52c8e2baa74c",
+   "className": "JumpPoint_Pyro_Cano",
+   "recordPath": "libs/foundry/records/starmap/pu/system/pyro/jumppoint_pyro_cano",
+   "name": {
+    "key": "@Pyro_JumpPoint_Cano",
+    "en": "Pyro - Cano Jump Point",
+    "de": "Pyro-Cano-Sprungpunkt"
+   },
+   "type": "Anomaly",
+   "typeGuid": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "parentGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "17092f34-d9c8-4d50-89f6-a92940b9cd52",
+   "className": "NyxSolarSystem",
+   "recordPath": "libs/foundry/records/starmap/pu/nyxsolarsystem",
+   "name": {
+    "key": "@NyxSystem",
+    "en": "Nyx System",
+    "de": null
+   },
+   "type": "SolarSystem",
+   "typeGuid": "32ed44de-920b-43ce-b55d-82cc4ef9fa59",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "26afa18b-af55-44a5-8a19-ceb06c3f69ba",
+   "className": "Pyro1_ASD_RF_LazarusComplex_Tithonus_2B",
+   "recordPath": "libs/foundry/records/starmap/pu/pyro1_asd_rf_lazaruscomplex_tithonus_2b",
+   "name": {
+    "key": "@Pyro1_ASD_Research_Facility_2B",
+    "en": "Lazarus Complex Tithonus-II",
+    "de": null
+   },
+   "type": "Outpost_InvalidQT",
+   "typeGuid": "7949a092-c8c3-447e-b417-156403cf27f0",
+   "parentGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "STMGN_ResearchLab_05_RastarLE",
+   "placedUnderGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "position": [
+    -7921185041.995,
+    -2387210335.247,
+    -212216.799
+   ]
+  },
+  {
+   "guid": "2a8a3554-b2f2-489d-a50c-5adff46cbf1b",
+   "className": "Nyx1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/nyx1/nyx1",
+   "name": {
+    "key": "@Nyx1",
+    "en": "Nyx I",
+    "de": "Nyx I"
+   },
+   "type": "Planet",
+   "typeGuid": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": "nyx",
+   "entityName": "Nyx1",
+   "placedUnderGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "position": [
+    6495194198.506,
+    -3749995462.199,
+    0.0
+   ]
+  },
+  {
+   "guid": "d08d892a-6e6f-4b14-9f1f-f05c76551ea7",
+   "className": "Race_TimeTrial_Stanton3_XGRClubTrack",
+   "recordPath": "libs/foundry/records/starmap/pu/race_timetrial_stanton3_xgrclubtrack",
+   "name": {
+    "key": "@Stanton3_Racetrack_SkyScraper",
+    "en": "The Sky Scraper",
+    "de": null
+   },
+   "type": "NavPoint",
+   "typeGuid": "c7f1393f-8cb3-4ac8-9dc7-75671c1b07fe",
+   "parentGuid": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "racing_static_st3_xgrclubtrack",
+   "placedUnderGuid": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+   "position": [
+    18586918467.856,
+    -22152072356.313,
+    -245264.0
+   ]
   }
  ],
  "contracts": [],

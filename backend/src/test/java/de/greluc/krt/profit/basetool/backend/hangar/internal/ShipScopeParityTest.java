@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeParityCallers;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -52,6 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 class ShipScopeParityTest {
 
   @Autowired private ShipRepository shipRepository;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
@@ -124,6 +129,6 @@ class ShipScopeParityTest {
   private Location location() {
     Location location = new Location();
     location.setName("Parity-L-" + UUID.randomUUID());
-    return locationRepository.save(location);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 }

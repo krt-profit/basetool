@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserAccountMergeService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -101,6 +103,8 @@ class UserAccountMergeEndStateTest {
   }
 
   @Autowired private UserAccountMergeService mergeService;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -275,7 +279,7 @@ class UserAccountMergeEndStateTest {
   private void fixtures() {
     Location place = new Location();
     place.setName("Merge Hub " + tag);
-    location = locationRepository.save(place).getId();
+    location = locationRepository.save(TestPlaces.onOwnCity(place, cityRepository)).getId();
     Material ore = new Material();
     ore.setName("Merge Ore " + tag);
     ore.setType(MaterialType.RAW);

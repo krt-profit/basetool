@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -235,8 +236,7 @@ class ExchangeChangeRetentionServiceTest {
    */
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Retention " + id);
+    TestPlaces.insertLocation(jdbc, id, "Retention " + id);
     return id;
   }
 

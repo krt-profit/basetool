@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
@@ -33,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -73,6 +75,9 @@ class ExchangeStockWriteConcurrencyIntegrationTest {
   private static final String OTHER_CLIENT = "versekit-lock-other";
 
   @Autowired private ExchangeStockWriteService service;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private ExchangeUndoService undoService;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private DataSource dataSource;
@@ -111,7 +116,7 @@ class ExchangeStockWriteConcurrencyIntegrationTest {
     locationName = "lock-order-" + UUID.randomUUID();
     Location place = new Location();
     place.setName(locationName);
-    location = locationRepository.saveAndFlush(place).getId();
+    location = locationRepository.saveAndFlush(TestPlaces.onOwnCity(place, cityRepository)).getId();
     stock(1);
     stock(2);
     client = new ExchangeClient();

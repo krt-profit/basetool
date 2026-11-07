@@ -102,7 +102,7 @@ class V344MigrationTest {
 
   @Test
   void aTakenNameFallsBackToTheNameWithItsUexId() throws IOException {
-    location("V344 Twin", null, null);
+    location("V344 Twin", city(990_344_93, "V344 Other Twin", true), null);
     UUID city = city(990_344_03, "V344 Twin", false);
     UUID item = item(990_344_03, "CITY", "V344 Twin");
 

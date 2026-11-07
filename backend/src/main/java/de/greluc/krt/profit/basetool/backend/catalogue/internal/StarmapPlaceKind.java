@@ -31,21 +31,21 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The nine UEX location tables that link to the starmap tree (REQ-P4K-035, ADR-0345), in linking
  * order, parents first. Each names the starmap types it can link to, as type families (the type's
- * lower-case name up to its first {@code _}, so {@code Outpost_InvalidQT} is {@code outpost}), and
- * the denormalised parent-name columns the UEX feed gives it, nearest parent first.
+ * lower-case name up to its first {@code _}, so {@code Outpost_InvalidQT} is {@code outpost}) taken
+ * from the LIVE catalogue's types, and the denormalised parent-name columns the UEX feed gives it,
+ * nearest parent first.
  */
 @RequiredArgsConstructor
 @Getter
 public enum StarmapPlaceKind {
 
-  /** {@code star_system}; its own name is its system. */
-  STAR_SYSTEM("star_system", ImmutableSet.of("solarsystem", "star", "system"), ImmutableList.of()),
+  /** {@code star_system}: the system's star, which carries its name ({@code Stanton}). */
+  STAR_SYSTEM("star_system", ImmutableSet.of("star", "solarsystem"), ImmutableList.of()),
 
-  /** {@code orbit}: a body or point UEX treats as an orbit. */
-  ORBIT(
-      "orbit",
-      ImmutableSet.of("planet", "lagrange", "lagrangepoint", "jumppoint"),
-      ImmutableList.of()),
+  /**
+   * {@code orbit}: a planet or a jump point ({@code JumpPoint}, {@code Anomaly} in Pyro and Nyx).
+   */
+  ORBIT("orbit", ImmutableSet.of("planet", "jumppoint", "anomaly"), ImmutableList.of()),
 
   /** {@code planet}. */
   PLANET("planet", ImmutableSet.of("planet"), ImmutableList.of()),
@@ -53,16 +53,16 @@ public enum StarmapPlaceKind {
   /** {@code moon}. */
   MOON("moon", ImmutableSet.of("moon"), ImmutableList.of(Parent.PLANET, Parent.ORBIT)),
 
-  /** {@code city}. */
+  /** {@code city}: a {@code LandingZone}, or a {@code Manmade} city such as Levski. */
   CITY(
       "city",
-      ImmutableSet.of("landingzone", "city"),
+      ImmutableSet.of("landingzone", "manmade"),
       ImmutableList.of(Parent.MOON, Parent.PLANET, Parent.ORBIT)),
 
-  /** {@code space_station}. */
+  /** {@code space_station}: {@code Manmade} and {@code Manmade_VisibleOnInteraction} stations. */
   SPACE_STATION(
       "space_station",
-      ImmutableSet.of("spacestation", "station", "manmade", "landingzone"),
+      ImmutableSet.of("manmade", "landingzone"),
       ImmutableList.of(Parent.MOON, Parent.PLANET, Parent.ORBIT)),
 
   /** {@code outpost}. */
@@ -74,8 +74,7 @@ public enum StarmapPlaceKind {
   /** {@code poi}. */
   POI(
       "poi",
-      ImmutableSet.of(
-          "pointofinterest", "poi", "manmade", "outpost", "asteroid", "anomaly", "cave"),
+      ImmutableSet.of("pointofinterest", "outpost", "manmade", "asteroid", "navpoint", "anomaly"),
       ImmutableList.of(
           Parent.CITY,
           Parent.SPACE_STATION,

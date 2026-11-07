@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -51,6 +52,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.*;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +70,8 @@ import org.springframework.web.context.WebApplicationContext;
 class OperationDeletionIntegrationTest {
 
   @Autowired private WebApplicationContext context;
+
+  @Autowired private CityRepository cityRepository;
 
   private MockMvc mockMvc;
 
@@ -147,7 +151,7 @@ class OperationDeletionIntegrationTest {
 
     Location location = new Location();
     location.setName("Test Moon");
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     InventoryItem item = new InventoryItem();
     item.setUser(adminUser);

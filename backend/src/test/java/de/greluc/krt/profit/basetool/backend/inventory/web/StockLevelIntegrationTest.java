@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
@@ -840,7 +841,7 @@ class StockLevelIntegrationTest {
 
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Stock " + id);
+    TestPlaces.insertLocation(jdbc, id, "Stock " + id);
     return id;
   }
 

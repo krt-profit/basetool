@@ -26,8 +26,7 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
 > REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
 > REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
-> implemented (#3043), REQ-P4K-034…038 are implemented (#3044; REQ-P4K-036's database refusal is
-> open), REQ-P4K-047 is implemented (#3034); every other
+> implemented (#3043), REQ-P4K-034…038 are implemented (#3044), REQ-P4K-047 is implemented (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
@@ -998,11 +997,13 @@ event (REQ-P4K-046).
 The tables are linked parents first, in the order above. A name is normalised to lower case without
 accents, every other run of characters one space, and compared with the object's English name. The
 type is compared as a family, the type's lower-case name up to its first `_` (`Outpost_InvalidQT` is
-`outpost`): `star_system` takes `solarsystem`, `star`, `system`; `orbit` `planet`, `lagrange`,
-`lagrangepoint`, `jumppoint`; `planet` `planet`; `moon` `moon`; `city` `landingzone`, `city`;
-`space_station` `spacestation`, `station`, `manmade`, `landingzone`; `outpost` `outpost`, `manmade`;
-`poi` `pointofinterest`, `poi`, `manmade`, `outpost`, `asteroid`, `anomaly`, `cave`; `terminal`
-`manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
+`outpost`), taken from the types of the LIVE catalogue: `star_system` takes `star` (the star
+carries the system's name, `Stanton`) and `solarsystem`; `orbit` `planet`, `jumppoint` and
+`anomaly` (the jump points of Pyro and Nyx); `planet` `planet`; `moon` `moon`; `city`
+`landingzone` and `manmade` (Levski); `space_station` `manmade` (Everus Harbor) and
+`manmade_visibleoninteraction`'s family `manmade` (the Lagrange stations), and `landingzone`;
+`outpost` `outpost`, `manmade`; `poi` `pointofinterest`, `outpost`, `manmade`, `asteroid`,
+`navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
 (UEX's `*_name` columns: city, space station, outpost, moon, planet, orbit, then the star system)
 that is linked; a candidate must lie below it at any depth, and with no linked parent every object of
 the name and type is a candidate. A stamped or hidden object links nothing new. A row left unlinked
@@ -1018,7 +1019,8 @@ manual flag the admin saw and is a `409` when either changed meanwhile, so it ne
 edit of the row's UEX data. `SET` and `CLEAR` mark the link manual (`starmap_link_manual`), which
 every APPLY leaves alone.
 
-**Enforced by:** `P4kStarmapLinkTest` · **Code:** `P4kStarmapLinker`, `StarmapPlaceKind`,
+**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest` · **Code:** `P4kStarmapLinker`,
+`StarmapPlaceKind`,
 `StarmapPlaceRows`, `StarmapAdminService`, `P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-036 — a storage place can sit on any visible starmap node an admin picks
@@ -1031,16 +1033,15 @@ exchange `uex` reference keep running through city and station.
 
 **Acceptance**
 
-- [ ] A `location` with none of the three references is refused by the database.
+- [x] A `location` with none of the three references is refused by the database.
 - [x] An admin creates a storage place on a visible outpost; a hidden object is refused.
 - [x] An APPLY creates no `location` row.
 
 `POST /api/v1/locations` creates a storage place only on a starmap object (`starmapObjectId`, `400`
 without one or on an object that is not visible) that carries none yet and that no city or space
 station links to (`409`), audited `CATALOGUE_STORAGE_PLACE_CREATED`; one node carries at most one
-place (`uq_location_starmap_object`). The node is set on create only. The service enforces the rule;
-the database does not refuse a row with none of the three yet, because the test fixtures and older
-rows hold such locations.
+place (`uq_location_starmap_object`). The node is set on create only. The database refuses a row
+with none of the three (`ck_location_place`, V352).
 
 **Enforced by:** `LocationStarmapNodeTest`, `LocationServiceTest`, `P4kStarmapImportTest` · **Code:**
 `LocationService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
@@ -62,6 +64,8 @@ class ExchangeStockWritePathCharacterisationTest {
   private static final int QUALITY = 3;
 
   @Autowired private ExchangeStockWriteService service;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private UserRepository userRepository;
   @Autowired private LocationRepository locationRepository;
@@ -95,7 +99,7 @@ class ExchangeStockWritePathCharacterisationTest {
     locationName = "write-path-" + UUID.randomUUID();
     Location place = new Location();
     place.setName(locationName);
-    location = locationRepository.saveAndFlush(place).getId();
+    location = locationRepository.saveAndFlush(TestPlaces.onOwnCity(place, cityRepository)).getId();
   }
 
   @Test

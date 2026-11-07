@@ -80,6 +80,11 @@ CREATE INDEX idx_terminal_starmap_object ON terminal (starmap_object_id);
 ALTER TABLE location ADD COLUMN starmap_object_id UUID REFERENCES starmap_object (id);
 CREATE UNIQUE INDEX uq_location_starmap_object ON location (starmap_object_id);
 
+-- A location names a city, a space station or a starmap node.
+ALTER TABLE location
+    ADD CONSTRAINT ck_location_place
+        CHECK (city_id IS NOT NULL OR space_station_id IS NOT NULL OR starmap_object_id IS NOT NULL);
+
 -- The starmap kind joins the run, the change report and the review list.
 ALTER TABLE p4k_import_run_kind DROP CONSTRAINT chk_p4k_import_run_kind_kind;
 ALTER TABLE p4k_import_run_kind

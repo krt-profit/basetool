@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -200,10 +201,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
           "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)",
           fixture.member(),
           "catalogue-lock-" + fixture.member());
-      jdbc.update(
-          "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)",
-          fixture.location(),
-          "Catalogue Lock " + fixture.location());
+      TestPlaces.insertLocation(jdbc, fixture.location(), "Catalogue Lock " + fixture.location());
       jdbc.update(
           "INSERT INTO game_item (id, name, uex_name, uex_item_id, kind, source_systems)"
               + " VALUES (?, 'Contended Item', 'Contended Item', ?, 'GENERIC', 'UEX_ONLY')",

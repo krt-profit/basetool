@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -36,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -56,6 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
 class MaterialExchangeOfferClampDataTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private GameItemRepository gameItemRepository;
@@ -181,7 +185,7 @@ class MaterialExchangeOfferClampDataTest {
 
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     GameItem gameItem = new GameItem();
     gameItem.setName("Item-" + UUID.randomUUID());
@@ -227,7 +231,7 @@ class MaterialExchangeOfferClampDataTest {
 
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     Material material = new Material();
     material.setName("Component-" + UUID.randomUUID());

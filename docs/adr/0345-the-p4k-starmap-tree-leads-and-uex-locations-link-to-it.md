@@ -85,5 +85,5 @@ released object; the contract leaves the decision to the Basetool from `system`,
   nine UEX tables link through `starmap_object_id` and `starmap_link_manual`, columns only the
   linker and the admin's compare-and-set write, so a UEX sync never overwrites a link. A row left
   unlinked is a review case of kind `STARMAP_OBJECT` that a later run closes once the row links. A
-  storage place on a node is created by an admin through `POST /api/v1/locations`; the service, not
-  yet the database, refuses a location without a place (REQ-P4K-036).
+  storage place on a node is created by an admin through `POST /api/v1/locations`, and the
+  database refuses a location without a city, a station or a node (`ck_location_place`).

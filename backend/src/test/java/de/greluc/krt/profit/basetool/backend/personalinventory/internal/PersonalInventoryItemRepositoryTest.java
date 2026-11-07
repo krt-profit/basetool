@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +49,8 @@ class PersonalInventoryItemRepositoryTest {
   private static final UUID OWNER_B = UUID.fromString("bbbbbbbb-0000-0000-0000-00000000000b");
 
   @Autowired private PersonalInventoryItemRepository repository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private EntityManager entityManager;
@@ -182,7 +186,7 @@ class PersonalInventoryItemRepositoryTest {
     location.setName(name);
     location.setHidden(hidden);
     location.setReferenceOnly(referenceOnly);
-    return locationRepository.save(location);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private static PersonalInventoryItem item(UUID ownerUserId, String name) {
