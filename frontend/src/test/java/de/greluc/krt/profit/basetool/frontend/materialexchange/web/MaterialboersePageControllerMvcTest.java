@@ -132,6 +132,44 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(containsString(">ALP<")));
   }
 
+  /** Without a picked offer the board opens on the list: the first-entry fallback is no pick. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_withoutSelected_rendersNoOpenDetail() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("master-detail mb-md")))
+        .andExpect(content().string(containsString("Agricium")))
+        .andExpect(content().string(not(containsString("has-sel"))));
+  }
+
+  /** A picked offer in the list opens its detail on a narrow screen. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_withSelected_rendersOpenDetail() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse").param("selected", offerId.toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("master-detail mb-md has-sel")));
+  }
+
+  /** An unknown picked id falls back to the first offer without opening the detail. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_withUnknownSelected_rendersNoOpenDetail() throws Exception {
+    stubBoard();
+
+    mockMvc
+        .perform(get("/materialboerse").param("selected", UUID.randomUUID().toString()))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("has-sel"))));
+  }
+
   /** The default offers page renders only the offers board, never the Gesuche board. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")

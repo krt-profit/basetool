@@ -10,7 +10,7 @@
         </div>
     </th:block>
     <div th:unless="${#lists.isEmpty(requests)}" class="master-detail mb-md"
-         th:classappend="${selectedRequest != null} ? 'has-sel'">
+         th:classappend="${selectedRequest != null and selectionExplicit} ? 'has-sel'">
         <div class="master-list mb-mlist">
             <button th:each="request : ${requests}" type="button"
                     class="master-row mb-mrow" data-testid="mb-request-row"
