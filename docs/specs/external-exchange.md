@@ -866,7 +866,9 @@ purged position as the horizon, below which a cursor has expired.
   the shared rows of a pool, keyed by unit lot), both allocation tables and `org_unit_membership`
   (the org stock of REQ-XCH-042), `app_user`, `exchange_name_withholding` and `mission` (a holder's
   name, its withholding and an earmarked mission's name in the details of REQ-XCH-043), `ship` and
-  `org_unit` (the ships and lots of a renamed unit) — to their triggers and runs bulk deletes,
+  `org_unit` (the ships and lots of a renamed unit), and `location`, `city`, `space_station` and
+  `starmap_object` (the entries at a place whose reference changed, REQ-XCH-018) — to their
+  triggers and runs bulk deletes,
   owner reassignment, a move to another place, a rebooking between personal and shared or between
   pools that keeps the lot's key and changes its split (`V304`), and user deletion through them.
   `V260` announced every lot holding shared rows once, as a `system` change, so a cursor taken
@@ -1261,6 +1263,20 @@ the exact name, always among the non-hidden, non-reference-only places; a value 
 nothing falls through to the next, and among several places with one `guid` a place linked to the
 object itself wins, then the name decides.
 
+**A change of what a place's reference serialises to re-announces the entries that carry it.**
+When the `name`, `uex` or `guid` of a place changes — its curated name, its city or space station,
+that city's or station's UEX id, the starmap link of the place, its city or its station, or the
+GUID the linked object gives (a new GUID, the sweep's stamp, an admin's hiding or un-hiding) — the
+ship, stock and org-stock feeds re-announce every ship, stock lot and org-stock lot at that place,
+so a client never keeps a stale reference. A change that leaves `{name, uex, guid}` as it was (a
+city's display name, a starmap object's game text, a link shadowed by the place's own node) announces
+nothing. The triggers of `V359` on `location`, `city`, `space_station` and `starmap_object` compare
+the reference before and after (`exchange_location_ref`) and write the entries set-based through
+`exchange_record_location_entries`, which skips an entry the writing transaction already announced:
+an APPLY that relinks, hides and renames many places in one transaction announces each entry once.
+The stock lots read the place's GUID through `LocationRepository.EXCHANGE_GUID`, so a lot carries no
+GUID of a stamped or hidden object, like the location list and the ship feed.
+
 The backend serves the demand as `GET /api/v1/exchange/me/org-demand` (`exchange.demand.read`): the
 open and in-progress orders a unit of the member's memberships is responsible for. A material line
 is the gap per material, quality floor (650 for „gut", else 0) and source, computed exactly as the
@@ -1310,6 +1326,12 @@ demand.*
   *`ExchangeCatalogControllerTest.aLinkedPlaceCarriesItsStarmapGuidAndCuratedName`,
   `ExchangeLocationGuidIntegrationTest`; the schemas' fixtures
   `location-ref/valid/by-guid.json` and `location-ref/invalid/guid-upper-case.json`.*
+- [x] A rename, a UEX relink, a starmap relink and a stamped or hidden starmap object each
+  re-announce exactly the ships, stock lots and org-stock lots at the places whose reference
+  changed; a change that leaves the reference as it was announces nothing; an APPLY that relinks,
+  hides and renames 200 places in one transaction announces each of their entries once.
+  *`ExchangeLocationReannounceIntegrationTest`; a hidden object's GUID leaves the stock feed —
+  `ExchangeLocationGuidIntegrationTest.theStockFeedCarriesNoGuidOfAHiddenStarmapObject`.*
 
 **Status:** the backend location list is built — WP 3.1 (#2083); the backend's demand and the
 gateway's demand route (`GET /exchange/v1/me/org-demand`) are built — WP 4.3 (#2095); the

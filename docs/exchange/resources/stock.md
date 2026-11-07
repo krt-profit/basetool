@@ -111,6 +111,8 @@ stock is all booked out, or moved to another member, arrives as a tombstone. Reb
 personal and shared, in the web or anywhere else, or moving shared stock to another pool, keeps the
 lot's `key` and `quantity` and brings the lot into the feed with its new `split`. A lot whose stock
 changes while a snapshot is read may move to a later page; its change follows in the feed either way.
+A lot is in the feed again when the `name`, `uex` or `guid` of its `location` changes, under the
+same `key`, so the `location` you hold is never stale.
 
 ## Changing the stock — `POST /exchange/v1/me/stock/changes`
 
