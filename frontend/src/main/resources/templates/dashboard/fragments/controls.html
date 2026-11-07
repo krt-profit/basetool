@@ -3,7 +3,7 @@
 <body>
 
 <div th:fragment="customise" class="home-top__actions" th:if="${dashboard.loaded()}">
-    <button type="button" class="btn btn-secondary" data-trigger="dashboard-customise" aria-pressed="false"
+    <button type="button" class="btn btn-ghost btn-xs" data-trigger="dashboard-customise" aria-pressed="false"
             aria-controls="dashboard-board" data-testid="dashboard-customise"
             th:attr="data-label-customise=#{dashboard.customise},data-label-done=#{dashboard.customise.done}"
             th:text="#{dashboard.customise}">Anpassen</button>

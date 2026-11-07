@@ -1,30 +1,29 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .home-head {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
-        margin-bottom: var(--space-6);
-        padding: 0;
-        background: none;
-        border: 0;
-    }
-
-    .home-head h1 {
-        margin: 0;
-    }
-
     .home-top {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-4);
-        align-items: flex-start;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-1) var(--space-4);
+        align-items: center;
+        margin-bottom: var(--space-6);
     }
 
     .home-top .home-head {
-        flex: 1 1 auto;
+        display: contents;
+    }
+
+    .home-top .page-eyebrow {
+        grid-area: 1 / 1;
+    }
+
+    .home-top h1 {
+        grid-area: 2 / 1 / auto / -1;
+        margin: 0;
+    }
+
+    .home-top__actions {
+        grid-area: 1 / 2;
     }
 
     .dash-hint,

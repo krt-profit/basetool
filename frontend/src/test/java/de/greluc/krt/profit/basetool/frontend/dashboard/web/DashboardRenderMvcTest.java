@@ -156,6 +156,21 @@ class DashboardRenderMvcTest {
   }
 
   @Test
+  @DisplayName("„Anpassen“ is a quiet ghost button in the page head, ahead of the board")
+  void customiseIsAQuietPageHeadAction() throws Exception {
+    stored(false, 0, widget(DashboardWidgetType.UPCOMING_DAYS, DashboardColumn.WIDE, null, null));
+
+    String html = home(member());
+
+    assertThat(html)
+        .containsPattern(
+            "class=\"home-top__actions\"[^>]*>\\s*<button type=\"button\" class=\"btn btn-ghost"
+                + " btn-xs\" data-trigger=\"dashboard-customise\"");
+    assertThat(html.indexOf("data-testid=\"dashboard-customise\""))
+        .isLessThan(html.indexOf("id=\"dashboard-board\""));
+  }
+
+  @Test
   @DisplayName("a widget pinned to another unit than the context renders greyed with the hint")
   void rendersAPinnedWidgetGreyed() throws Exception {
     UUID alpha = UUID.randomUUID();
