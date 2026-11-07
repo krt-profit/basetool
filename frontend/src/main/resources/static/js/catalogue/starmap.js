@@ -38,7 +38,7 @@ import {
 
 /** @typedef {ApiDto<'StarmapObjectAdminDto'>} StarmapObject */
 /** @typedef {ApiDto<'StarmapPlaceLinkDto'>} StarmapPlace */
-/** @typedef {import('/js/catalogue/catalogue-link-admin.js').LinkAction} LinkAction */
+/** @typedef {'SET' | 'CLEAR' | 'RELEASE'} LinkAction */
 
 /** The page and proxy base path. */
 const PAGE_URL = '/admin/starmap';

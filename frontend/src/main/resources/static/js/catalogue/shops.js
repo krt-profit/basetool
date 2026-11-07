@@ -35,7 +35,7 @@ import {
 } from '/js/catalogue/catalogue-link-admin.js';
 
 /** @typedef {ApiDto<'ShopAdminDto'>} Shop */
-/** @typedef {import('/js/catalogue/catalogue-link-admin.js').LinkAction} LinkAction */
+/** @typedef {'SET' | 'CLEAR' | 'RELEASE'} LinkAction */
 
 /** The page and proxy base path. */
 const PAGE_URL = '/admin/shops';
