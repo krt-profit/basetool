@@ -80,7 +80,8 @@ The erased partner is blocked.
 An active HB creates a draft deal for exactly one need: a partner, the amount (whole units for pieces and
 game items), the unit price in whole aUEC, the payment model (`ADVANCE`, `ON_DELIVERY`, `PARTIAL`), an
 escort wish and an optional Einsatz. The catalogue entry and the quality tier come from the need and
-cannot differ. The draft may be edited and cancelled by its HB; the deal is never deleted
+cannot differ; a need whose game item the P4K retired takes no new deal and its drafts cannot be
+edited, only cancelled (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). The draft may be edited and cancelled by its HB; the deal is never deleted
 (REQ-PUR-022). Every change is audited and carries the deal's own version.
 
 **Enforced by:** `PurchasingDealServiceTest` · **Code:** `purchasing/internal/PurchasingDealService`

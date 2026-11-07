@@ -335,6 +335,21 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void catalogueItemRetired400_mapsToTheRetiredItemKey() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "retired", null, 400, "CATALOGUE_ITEM_RETIRED", "corr-item", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("CATALOGUE_ITEM_RETIRED", body.get("code"));
+    assertEquals("error.catalogue.itemRetired", body.get("message"));
+  }
+
+  @Test
   void bankOwnerApprovalRequired409_mapsToDedicatedKey_notUnexpected() {
     BackendServiceException ex =
         new BackendServiceException(

@@ -39,6 +39,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
@@ -57,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -118,6 +121,7 @@ class SupplyDonationServiceTest {
             needService,
             materialRepository,
             gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             locationRepository,
             userRepository,
             orgUnitRepository,
@@ -219,6 +223,45 @@ class SupplyDonationServiceTest {
         .isInstanceOfSatisfying(
             SupplyProblemException.class,
             e -> assertThat(e.getProblemCode()).isEqualTo(SupplyProblemCode.SUPPLY_NEED_NOT_OPEN));
+  }
+
+  @Test
+  void aFreePledgeOfAGameItemTheP4kRetiredIsRefused() {
+    GameItem retired = retiredItem();
+    callerIs(DONOR);
+    unitAccepts(true);
+    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    assertThatThrownBy(() ->
+            service.pledge(
+                new PledgeRequest(null, unit.getId(), null, retired.getId(), null, 1.0, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(donationRepository, never()).save(any());
+  }
+
+  @Test
+  void aPledgeToANeedWhoseGameItemTheP4kRetiredIsRefused() {
+    SupplyNeed need = openNeed(0);
+    need.setMaterial(null);
+    need.setQualityTier(null);
+    need.setGameItem(retiredItem());
+    callerIs(DONOR);
+    when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
+    unitAccepts(true);
+
+    assertThatThrownBy(() ->
+            service.pledge(
+                new PledgeRequest(need.getId(), unit.getId(), null, null, null, 1.0, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(donationRepository, never()).save(any());
+  }
+
+  private static GameItem retiredItem() {
+    GameItem item = new GameItem();
+    item.setId(UUID.randomUUID());
+    item.setName("Retired gun");
+    item.setP4kHiddenAt(Instant.now());
+    return item;
   }
 
   @Test

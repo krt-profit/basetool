@@ -35,6 +35,9 @@ public enum CatalogueProblemCode implements ProblemCode {
   /** A squadron write named a storage place no picker offers (REQ-P4K-039). */
   LOCATION_NOT_OFFERED(HttpStatus.BAD_REQUEST),
 
+  /** A write would set or keep a game item the P4K retired on an entry (REQ-P4K-013). */
+  CATALOGUE_ITEM_RETIRED(HttpStatus.BAD_REQUEST),
+
   /** The P4K upload gate refused the catalogue (REQ-P4K-001, REQ-P4K-002). */
   P4K_UPLOAD_REJECTED(HttpStatus.BAD_REQUEST);
 

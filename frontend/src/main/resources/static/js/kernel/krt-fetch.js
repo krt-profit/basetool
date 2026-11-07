@@ -605,6 +605,11 @@ async function handleProblem(response, problem, opts) {
         errorToast(prefix + ownerRequired);
         return;
     }
+    const itemRetired = itemRetiredMessage(problem);
+    if (itemRetired) {
+        errorToast(prefix + itemRetired);
+        return;
+    }
     const generic = problem && problem.detail ? problem.detail : genericError;
     errorToast(prefix + generic);
 }
@@ -622,6 +627,20 @@ function ownerOrgUnitRequiredMessage(problem) {
     }
     const i18n = window.krtOwnerPickerI18n;
     return krtI18nText(i18n && i18n.required, 'krtOwnerPickerI18n.required');
+}
+
+/**
+ * Returns the localized message for a CATALOGUE_ITEM_RETIRED problem from
+ * `window.krtFetchI18n`, or null for any other problem (REQ-P4K-013).
+ *
+ * @param {any} problem the parsed RFC 7807 body, or null
+ * @returns {string | null} the localized message, or null when this is not that refusal
+ */
+function itemRetiredMessage(problem) {
+    if (!problem || typeof problem !== 'object' || problem.code !== 'CATALOGUE_ITEM_RETIRED') {
+        return null;
+    }
+    return krtI18nText(defaults().itemRetired, 'krtFetchI18n.itemRetired');
 }
 
 /**
@@ -1103,6 +1122,7 @@ export const krtFetch = {
     syncVersion,
     handleProblem,
     ownerOrgUnitRequiredMessage,
+    itemRetiredMessage,
     maybeReauthenticate,
     reauthRedirect,
     serialize: runSerialized,

@@ -18,15 +18,19 @@
  */
 
 /**
- * Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031): the transport is run
- * in a vm context with a scripted fetch and a recording location.
+ * Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031), and the problem
+ * wording helper page-local handlers read: the transport is run in a vm context with a scripted
+ * fetch and a recording location.
  */
 
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { flattenModule, UI_STUBS } from './flatten-module.mjs';
 
-const SOURCE = flattenModule('kernel/krt-fetch.js', UI_STUBS);
+const SOURCE = flattenModule('kernel/krt-fetch.js', {
+    ...UI_STUBS,
+    '/js/kernel/krt-i18n.js': 'function krtI18nText(value, key) { return value || key; }',
+});
 
 let failures = 0;
 
@@ -105,7 +109,7 @@ function harness(script = []) {
         getItem: (k) => (storage.has(k) ? storage.get(k) : null),
         setItem: (k, v) => storage.set(k, v),
     };
-    context.window.krtI18nText = (v, k) => v || k;
+    context.window.krtFetchI18n = { itemRetired: 'Item retired wording' };
     vm.createContext(context);
     vm.runInContext(SOURCE, context);
     return { krtFetch: context.krtFetch, calls, navigations };
@@ -230,6 +234,16 @@ await test('the caller signal aborts the read', async () => {
     const read = h.krtFetch.get('/a', { signal: controller.signal });
     controller.abort();
     await assert.rejects(read, (e) => e.name === 'AbortError');
+});
+
+await test('a retired-item refusal reads the page-wide wording and no other problem does', () => {
+    const h = harness();
+    assert.equal(
+        h.krtFetch.itemRetiredMessage({ code: 'CATALOGUE_ITEM_RETIRED', detail: 'backend' }),
+        'Item retired wording',
+    );
+    assert.equal(h.krtFetch.itemRetiredMessage({ code: 'VALIDATION_FAILED' }), null);
+    assert.equal(h.krtFetch.itemRetiredMessage(null), null);
 });
 
 if (failures > 0) {

@@ -429,6 +429,28 @@ class StockLevelIntegrationTest {
   }
 
   @Test
+  void aGameItemTheP4kRetiredIsRefusedOnCreateAndEditWhileTheLevelCanStillBeRemoved()
+      throws Exception {
+    String body = createItemLevel(1.0, null).andReturn().getResponse().getContentAsString();
+    UUID id = UUID.fromString(json.readTree(body).get("id").asString());
+    jdbc.update("UPDATE game_item SET p4k_hidden_at = now() WHERE id = ?", item);
+    entityManager.clear();
+
+    update(logistician, id, new StockLevelUpdateRequest(null, 2.0, null, 0L))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"))
+        .andExpect(jsonPath("$.gameItemId").value(item.toString()));
+    createItemLevel(3.0, null)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"));
+    assertThat(itemAudit("MIN_STOCK_LEVEL_CHANGED")).isEmpty();
+    mockMvc
+        .perform(
+            delete(PATH + "/" + id).param("version", "0").with(logisticianOf(logistician, unit)))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
   void aGameItemStillLiveAtOneSourceIsNotHidden() throws Exception {
     createItemLevel(1.0, null).andExpect(status().isCreated());
 

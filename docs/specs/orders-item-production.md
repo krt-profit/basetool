@@ -710,6 +710,11 @@ line with booked production renders its `id` as a hidden input, pins the amount 
 `manufacturedAmount`, drops its remove button, and shows how many units are already produced
 (`orders.create.item.producedLocked`).
 
+A line whose game item the P4K retired is refused on create and on every edit that keeps it, with
+HTTP 400 `CATALOGUE_ITEM_RETIRED` (REQ-P4K-013): the user picks another item. A line with booked
+production cannot change its item, so such an order can no longer be edited at all; reading it and
+the writes that take no item (status, production, handover) stay open.
+
 The editor MUST open with the order's stored **responsible** and **requesting** org units preselected.
 Both pickers are `required`, so an empty one makes the browser refuse the save before any request is
 sent — a line removal the user believes saved simply never reaches the server. The logistician update
@@ -727,6 +732,7 @@ with no error and no audit trace. The handover freeze did not cover it: it block
 `droppingALineWithBookedProduction_throwsBadRequest`,
 `loweringAmountBelowManufactured_throwsBadRequest`),
 `JobOrderItemServiceTest.applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction`,
+`JobOrderItemServiceTest.applyItemLineRefusesToKeepAnItemTheP4kHidSinceTheLineWasOrdered`,
 `JobOrderPageControllerItemEditMvcTest.editForm_itemOrder_preselectsStoredResponsibleAndRequestingOrgUnit` ·
 **Code:** `JobOrderService#reconcileItemLines` / `#assertLineEditable` / `#assertLineRemovable`,
 `JobOrderItemService#applyItemLine`, `CreateJobOrderItemLineDto#id`,

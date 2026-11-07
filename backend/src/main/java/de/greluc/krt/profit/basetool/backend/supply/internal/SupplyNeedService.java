@@ -22,13 +22,13 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -87,7 +87,7 @@ public class SupplyNeedService {
   private final SupplyNeedRepository needRepository;
   private final SupplyUnitSettingRepository unitSettingRepository;
   private final MaterialRepository materialRepository;
-  private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final QualityTierRepository qualityTierRepository;
   private final JobOrderRepository jobOrderRepository;
   private final SupplySettingsService settingsService;
@@ -176,6 +176,7 @@ public class SupplyNeedService {
    * @throws SupplyProblemException when the unit may not raise needs
    * @throws AccessDeniedException when the caller does not manage the unit
    * @throws BadRequestException when the request is inconsistent
+   * @throws RetiredGameItemException when the P4K retired the game item
    */
   @Transactional
   public @NotNull NeedDto create(@NotNull CreateNeedRequest request) {
@@ -220,6 +221,7 @@ public class SupplyNeedService {
    * @param id the need
    * @param request the new values and the echoed version
    * @return the edited need
+   * @throws RetiredGameItemException when the P4K retired the need's game item
    */
   @Transactional
   public @NotNull NeedDto update(@NotNull UUID id, @NotNull UpdateNeedRequest request) {
@@ -227,6 +229,9 @@ public class SupplyNeedService {
     SupplyNeed need = lockManaged(id, request.version());
     final boolean wasPurchasable = need.isPurchasable();
     requireOpenOrPaused(need);
+    if (need.getGameItem() != null) {
+      selectableGameItems.requireSelectable(need.getGameItem());
+    }
     double amount = validAmount(need, request.amount());
     if (amount + COVERED_TOLERANCE < need.getFulfilledAmount()) {
       throw new BadRequestException("The amount cannot fall below what is already covered");
@@ -435,9 +440,7 @@ public class SupplyNeedService {
       if (qualityTierId != null) {
         throw new BadRequestException("A game item has no quality tier");
       }
-      GameItem item =
-          Entities.require(gameItemRepository.findById(gameItemId), "Game item not found");
-      need.setGameItem(item);
+      need.setGameItem(selectableGameItems.require(gameItemId));
     }
   }
 

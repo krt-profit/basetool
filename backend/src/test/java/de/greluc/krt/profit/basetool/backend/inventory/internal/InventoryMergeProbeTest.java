@@ -82,6 +82,7 @@ class InventoryMergeProbeTest {
         null,
         null,
         null,
+        null,
         requestScopeResolver,
         orgUnitStampingService,
         inventoryAccessPolicy,

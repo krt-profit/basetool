@@ -402,6 +402,9 @@ prices and terminals.
 - [x] A stamped item is absent from the item pickers and searches; an inventory row referencing it
   still renders, with the notice.
 - [x] A stamped ship that UEX still lists is hidden and reported with the "still live" flag.
+- [x] A write that sets a retired game item on an entry, or keeps one on an entry it edits, is
+  refused with `400` and code `CATALOGUE_ITEM_RETIRED`; reading, listing and deleting the entry
+  still work.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager and item-order item pickers
@@ -417,7 +420,23 @@ the representative's liveness. The notice is `noLongerInGame` on
 `InventoryGameItemReferenceDto`, `GameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the
 hangar, the job-order items, handovers and item collection, and the mission units.
 
-**Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`
+**The backend refuses a retired game item on every write.** A create or edit that sets a retired
+item, or edits an entry that keeps one, answers `400` with code `CATALOGUE_ITEM_RETIRED` and the
+property `gameItemId`, and writes nothing; the user picks another item. This covers a Lager item
+stock booked in (REQ-INV-029), a minimum stock level set or changed (REQ-INV-067), a need raised or
+edited (REQ-SUP-003), a donation pledged or recorded (REQ-SUP-007, REQ-SUP-011), an item-order line
+added or edited (REQ-ORDERS-032) and a trade deal created or edited for a need (REQ-PUR-007). Reads,
+lists, deletes, withdrawals and the state changes of an existing entry (pause, resume, receive,
+decline) stay open. Every such write resolves the item through `SelectableGameItems` in
+`catalogue.api`; the JPQL queries that keep only listed items and recipes concatenate
+`P4kRetirementJpql`, the query form of `P4kKeyedRow.isP4kRetired()`. The frontend shows
+`error.catalogue.itemRetired` for the code (`krtFetch.itemRetiredMessage`). An exchange pool
+book-in (REQ-XCH-045) keeps the item its lot resolved.
+
+**Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
+`SelectableGameItemsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
+`SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
+`PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-014 — every run keeps a change report, and the report is never pruned
