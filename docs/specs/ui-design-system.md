@@ -2744,7 +2744,8 @@ the absence of a live push follow REQ-UI-032. The dashboards are part of the dat
 `navigationPreferences` section (REQ-SEC-058); in an account merge (REQ-SEC-046) both modes'
 dashboards — layout and instance options — are the target account's.
 
-**Editing.** „Anpassen" in the page head: per instance up/down (REQ-UI-031), column switch, remove
+**Editing.** „Anpassen" in the page head — a quiet `.btn-ghost btn-xs` on the eyebrow line, right
+of the date, with the title below; it never sits on the board or its first widget. Per instance up/down (REQ-UI-031), column switch, remove
 and an options dialog; a catalogue dialog adds, each entry a separate bordered card with a bold
 title, a muted description and its add button; „Standard wiederherstellen" restores the mode's
 default. Dialogs follow REQ-UI-013; edit controls follow the size rule of REQ-UI-032.
