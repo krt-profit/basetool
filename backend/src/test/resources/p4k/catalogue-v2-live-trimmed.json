@@ -386,7 +386,86 @@
    "itemClass": null,
    "playability": "player",
    "variantOf": null,
-   "stats": null
+   "stats": {
+    "weapon": {
+     "fireActions": [
+      {
+       "kind": "SWeaponActionFireRapidParams",
+       "name": "Rapid",
+       "fireRate": 800.0,
+       "pellets": 1,
+       "ammoCost": 1,
+       "heatPerShot": 4.0,
+       "chargeTime": null,
+       "overchargeTime": null,
+       "cooldownTime": null,
+       "hitType": null,
+       "fullDamageRange": null,
+       "zeroDamageRange": null,
+       "damagePerSecond": null,
+       "spread": {
+        "min": 0.5,
+        "max": 2.0,
+        "firstAttack": 0.4,
+        "attack": 0.8,
+        "decay": 4.5
+       }
+      },
+      {
+       "kind": "SWeaponActionFireChargedParams",
+       "name": "Charge",
+       "fireRate": 900.0,
+       "pellets": 1,
+       "ammoCost": 1,
+       "heatPerShot": 4.5,
+       "chargeTime": 3.0,
+       "overchargeTime": 4.0,
+       "cooldownTime": 0.8,
+       "hitType": null,
+       "fullDamageRange": null,
+       "zeroDamageRange": null,
+       "damagePerSecond": null,
+       "spread": {
+        "min": 0.5,
+        "max": 2.0,
+        "firstAttack": 0.08,
+        "attack": 0.08,
+        "decay": 8.0
+       }
+      }
+     ],
+     "ammoCapacity": 60,
+     "ammo": {
+      "speed": 600.0,
+      "lifetime": 2.0,
+      "damage": {
+       "physical": 0.0,
+       "energy": 13.0,
+       "distortion": 0.0,
+       "thermal": 0.0,
+       "biochemical": 0.0,
+       "stun": 0.0
+      },
+      "detonationDamage": null,
+      "detonationMinRadius": null,
+      "detonationMaxRadius": null
+     }
+    },
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
   },
   {
    "guid": "0306b7df-6adf-4da5-9ca8-839a5d41c1cc",
@@ -448,7 +527,54 @@
    "itemClass": "Industrial",
    "playability": "player",
    "variantOf": null,
-   "stats": null
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": {
+     "coolingRate": 46.0,
+     "unit": "SStandardResourceUnit"
+    },
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 550.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1980.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 9500.0,
+       "decayRate": 0.5
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Coolant",
+        "amount": 46.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 4.0,
+        "unit": "SPowerSegmentResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "guid": "339bd641-8dfb-4bc1-b273-5ffc5f702fbb",
@@ -479,7 +605,64 @@
    "itemClass": "Military",
    "playability": "player",
    "variantOf": null,
-   "stats": null
+   "stats": {
+    "weapon": null,
+    "shield": {
+     "maxHealth": 3168.0,
+     "maxRegen": 602.0,
+     "decayRatio": 0.25,
+     "downedRegenDelay": 11.5,
+     "damagedRegenDelay": 5.75
+    },
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 210.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1240.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 0.0,
+       "decayRate": 0.15
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Shield",
+        "amount": 602.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 3.0,
+        "unit": "SPowerSegmentResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConsumption",
+        "direction": "consumption",
+        "resource": "Coolant",
+        "amount": 0.0,
+        "unit": "SStandardResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
   },
   {
    "guid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
@@ -515,7 +698,70 @@
    "itemClass": null,
    "playability": "player",
    "variantOf": null,
-   "stats": null
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": {
+     "integrityMilestoneToBreak": 0.1,
+     "damageResistance": {
+      "ignoreMeleeDamage": false,
+      "physical": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "energy": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "distortion": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "thermal": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "biochemical": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "stun": {
+       "multiplier": 0.4,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      }
+     }
+    },
+    "clothing": {
+     "temperatureResistanceMin": -70.0,
+     "temperatureResistanceMax": 100.0,
+     "radiationCapacity": 26800.0,
+     "radiationDissipationRate": 145.8,
+     "gForceResistance": -0.125
+    },
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
   },
   {
    "guid": "de20695c-eb2f-4b68-be6f-9806cbd205a7",
@@ -551,7 +797,70 @@
    "itemClass": null,
    "playability": "player",
    "variantOf": "1036805c-1d16-43db-ae15-7f04f7c38a66",
-   "stats": null
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": {
+     "integrityMilestoneToBreak": 0.1,
+     "damageResistance": {
+      "ignoreMeleeDamage": false,
+      "physical": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "energy": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "distortion": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "thermal": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "biochemical": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "stun": {
+       "multiplier": 0.7,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      }
+     }
+    },
+    "clothing": {
+     "temperatureResistanceMin": -38.0,
+     "temperatureResistanceMax": 68.0,
+     "radiationCapacity": 26000.0,
+     "radiationDissipationRate": 145.8,
+     "gForceResistance": -0.03125
+    },
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
   }
  ],
  "ships": [

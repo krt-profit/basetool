@@ -25,7 +25,7 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033), REQ-P4K-017…019 are
 > implemented (#3035), REQ-P4K-020…023 are implemented (#3036), REQ-P4K-024…026 are implemented
 > (#3037), REQ-P4K-027 and REQ-P4K-028 are implemented (#3038), REQ-P4K-029 is implemented
-> (#3039), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
+> (#3039), REQ-P4K-030 is implemented (#3040), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
 > implemented (#3041), REQ-P4K-039 is implemented (#3043), REQ-P4K-034…038 are implemented
 > (#3044), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-042…044 are implemented
 > (#3046), REQ-P4K-047 is implemented
@@ -938,10 +938,21 @@ A blueprint modifier names a gameplay property (`propertyGuid`), joined to the `
 contract's fixed table "From a gameplay property to a stat field". `game_item_stat` gains a `source`
 column (`P4K`, `SCWIKI`):
 
-- the import writes the base value from `stats` for every item the catalogue covers;
+- the import writes the base value from `stats` for every item a catalogue blueprint produces
+  (`P4kItemStatReconciler`), replacing an SC Wiki value; a P4K value the catalogue no longer
+  carries is removed;
 - the SC Wiki writes only where no P4K value exists; a Wiki value that differs from the P4K value by
-  more than **1 % relative** goes to `external_sync_report`;
-- the three recoil keys stay without a source (p4kx maps recoil and reload to no stat field);
+  more than **1 % relative** goes to `external_sync_report` as one `P4K_DISAGREEMENT` event of the
+  Wiki run, its `detail` `column=game_item_stat.<property>;stored=…;source=…`;
+- a duplicate merge (REQ-DATA-032…038) keeps the retired row's P4K value over the survivor's Wiki
+  value of the same stat;
+- the three recoil keys stay without a source (p4kx maps recoil and reload to no stat field); the
+  spread (five numbers, no single base value) and the two crafter properties map to none either,
+  so 22 of the table's 29 class names map to a `BlueprintStatProperty`;
+- where the table names a list or a damage object, the value is one number: `GPP_Weapon_Damage`
+  is the sum of a gun's `weapon.ammo.damage` types, else of the mining beam's (`hitType`
+  `ElectricArc`) `damagePerSecond`; `GPP_Weapon_FireRate` is the first fire mode that states a
+  `fireRate`; `GPP_Armor_DamageMitigation` reads `physical.multiplier`, as the SC Wiki does;
 - the catalogue carries the raw damage multiplier; the `1 − multiplier` mitigation conversion stays
   in the Basetool for both sources;
 - the recipe view shows every value as REQ-INV-069 says, and its tooltip names the source (P4K or SC
@@ -951,15 +962,18 @@ column (`P4K`, `SCWIKI`):
 
 **Acceptance**
 
-- [ ] An item with a P4K shield `maxHealth` stores it with source `P4K`; a Wiki value 0.5 % off is
+- [x] An item with a P4K shield `maxHealth` stores it with source `P4K`; a Wiki value 0.5 % off is
   not reported, 2 % off is.
-- [ ] An item the catalogue does not cover takes the Wiki value with source `SCWIKI`.
-- [ ] The armour mitigation is `1 − multiplier` for both sources.
-- [ ] Every `className` of the contract's table maps to a `BlueprintStatProperty`.
+- [x] An item the catalogue does not cover takes the Wiki value with source `SCWIKI`.
+- [x] The armour mitigation is `1 − multiplier` for both sources.
+- [x] Every `className` of the contract's table maps to a `BlueprintStatProperty`, or to none
+  where the table names no stat field.
 
-**Enforced by (planned):** `P4kItemStatImportTest`, `BlueprintStatPropertyTest`,
-`GameItemStatWriterTest` · **ADR:** [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md) (supersedes [ADR-0309](../adr/0309-blueprint-stat-base-values-come-from-the-sc-wiki-item-payload.md)'s source decision; replaces
-REQ-DATA-027) · **Issues:** #2927
+**Enforced by:** `P4kItemStatImportTest`, `P4kItemStatExtractorTest`, `BlueprintStatPropertyTest`,
+`GameItemStatWriterTest`, `ScWikiItemStatExtractorTest`, `ItemReconciliationIntegrationTest` ·
+**Code:** `GameItemStatSource`, `P4kItemStatExtractor`, `P4kItemStatReconciler`,
+`GameItemStatWriter`, V356 · **ADR:** [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md) (supersedes [ADR-0309](../adr/0309-blueprint-stat-base-values-come-from-the-sc-wiki-item-payload.md)'s source decision; replaces
+REQ-DATA-027) · **Issues:** #2927, #3040
 
 ## Ships
 

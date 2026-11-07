@@ -48,7 +48,11 @@ public final class CatalogueMetricNames {
    */
   public static final String CATALOGUE_ITEM_GRADE_UNKNOWN = "basetool.catalogue.item.grade.unknown";
 
-  /** Untagged gauge of game items with a stored blueprint stat base value (REQ-DATA-027). */
+  /**
+   * Gauge {@code basetool_catalogue_items_with_stats} — tag {@code source} ({@link
+   * GameItemStatSource#name()}): the game items with a stored blueprint stat base value per source
+   * (REQ-OBS-023).
+   */
   public static final String CATALOGUE_ITEMS_WITH_STATS = "basetool.catalogue.items.with.stats";
 
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */

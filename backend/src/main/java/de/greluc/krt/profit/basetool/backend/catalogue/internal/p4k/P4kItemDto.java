@@ -42,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
  * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
  * @param playability {@code player}, {@code mission}, {@code special}, another value or {@code
  *     null}; read through {@link P4kClosedSet#parse} as a {@link P4kItemPlayability}
+ * @param stats the stat blocks the blueprint stat base values come from (REQ-P4K-030), or {@code
+ *     null} for an item without one
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kItemDto(
@@ -57,5 +59,6 @@ public record P4kItemDto(
     @Nullable String itemClass,
     @Nullable Double mass,
     @Nullable String manufacturerGuid,
-    @Nullable String playability)
+    @Nullable String playability,
+    @Nullable P4kItemStats stats)
     implements P4kRecord {}

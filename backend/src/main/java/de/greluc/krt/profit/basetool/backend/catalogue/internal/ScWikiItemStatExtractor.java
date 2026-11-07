@@ -31,7 +31,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Reads the base value of every {@link BlueprintStatProperty} from an SC Wiki item payload
- * (REQ-DATA-027, ADR-0309).
+ * (REQ-P4K-030, ADR-0342).
  *
  * <p>A missing, non-numeric or zero value yields no entry: quality cannot change a zero base.
  */
@@ -49,7 +49,7 @@ final class ScWikiItemStatExtractor {
     Map<BlueprintStatProperty, Double> values = new EnumMap<>(BlueprintStatProperty.class);
     for (BlueprintStatProperty property : BlueprintStatProperty.values()) {
       Double value = valueOf(property, dto);
-      if (value != null && value != 0.0 && Double.isFinite(value)) {
+      if (BlueprintStatValues.isStored(value)) {
         values.put(property, value);
       }
     }
@@ -111,6 +111,8 @@ final class ScWikiItemStatExtractor {
           firstOf(
               number(dto.temperatureResistance(), "max"),
               number(dto.clothing(), "temp_resistance_max"));
+      case ARMOR_RADIATION_CAPACITY ->
+          number(dto.radiationResistance(), "maximum_radiation_capacity");
       case ARMOR_RADIATION_DISSIPATION ->
           number(dto.radiationResistance(), "radiation_dissipation_rate");
     };
@@ -128,7 +130,7 @@ final class ScWikiItemStatExtractor {
         firstOf(
             number(dto.clothing(), "damage_resistance", "physical", "multiplier"),
             number(dto.suitArmor(), "damage_resistance", "physical", "multiplier"));
-    return multiplier == null ? null : 1.0 - multiplier;
+    return BlueprintStatValues.mitigation(multiplier);
   }
 
   /**

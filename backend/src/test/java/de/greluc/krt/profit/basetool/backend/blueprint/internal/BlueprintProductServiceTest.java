@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatUnit;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatSource;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -355,23 +356,27 @@ class BlueprintProductServiceTest {
     when(gameItemStatRepository.findByGameItemId(itemId))
         .thenReturn(
             List.of(
-                stat(BlueprintStatProperty.WEAPON_DAMAGE, 97.2),
-                stat(BlueprintStatProperty.HEALTH_MAX_HEALTH, 550.0)));
+                stat(BlueprintStatProperty.WEAPON_DAMAGE, 97.2, GameItemStatSource.SCWIKI),
+                stat(BlueprintStatProperty.HEALTH_MAX_HEALTH, 550.0, GameItemStatSource.P4K)));
 
     PersonalBlueprintRecipeResponse result =
         service.resolveRecipe("omnisky iii cannon").orElseThrow();
 
     assertEquals(
         List.of(
-            new BlueprintStatBaseDto("health_maxhealth", 550.0, BlueprintStatUnit.NONE),
-            new BlueprintStatBaseDto("weapon_damage", 97.2, BlueprintStatUnit.NONE)),
+            new BlueprintStatBaseDto(
+                "health_maxhealth", 550.0, BlueprintStatUnit.NONE, GameItemStatSource.P4K),
+            new BlueprintStatBaseDto(
+                "weapon_damage", 97.2, BlueprintStatUnit.NONE, GameItemStatSource.SCWIKI)),
         result.baseStats());
   }
 
-  private static GameItemStat stat(BlueprintStatProperty property, double value) {
+  private static GameItemStat stat(
+      BlueprintStatProperty property, double value, GameItemStatSource source) {
     GameItemStat stat = new GameItemStat();
     stat.setProperty(property);
     stat.setBaseValue(value);
+    stat.setSource(source);
     return stat;
   }
 

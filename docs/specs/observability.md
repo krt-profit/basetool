@@ -1643,12 +1643,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   itself is unbounded upstream text and goes to the WARN log once per value, never into a label.
   Registered at zero when the backend starts, so the first increment is visible to `increase()`.
   Backs `ScWikiItemClassUnknown` (> 0 in 24h for 1h, warning).
-- `basetool_catalogue_items_with_stats` gauge (untagged, `ScWikiItemSyncService`), the number of
-  game items with a stored blueprint stat base value (REQ-DATA-027, ADR-0309), registered by every
-  enabled item sync and set from `game_item_stat` at the end of the run. The values come from stat
-  blocks of the Wiki item payload, so a renamed block or field empties them while the sync keeps
-  succeeding; the gauge is what makes that visible. Backs `ScWikiItemStatsMissing` (== 0 for 48h,
-  warning); absent while the item sync is disabled.
+- `basetool_catalogue_items_with_stats{source}` gauge (`CatalogueStatBusinessGauges`, a
+  `BusinessGaugeSource`), the number of game items with a stored blueprint stat base value per
+  `game_item_stat.source` (`P4K`, `SCWIKI`; REQ-OBS-023, ADR-0342), registered at zero when the
+  backend starts and sampled from `game_item_stat` on the business-metrics interval. The values come
+  from stat blocks of the P4K catalogue and of the Wiki item payload, so a renamed block or field
+  empties them while the import or sync keeps succeeding; the gauge is what makes that visible.
+  Backs `ScWikiItemStatsMissing` (the maximum over both sources == 0 for 48h, warning).
 - `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
   `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
   it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
@@ -4153,9 +4154,7 @@ REQ-OBS-023 · **Issues:** #2895, #2896, #3034
 
 ### REQ-OBS-023 — The catalogue's precedence is visible: unknown grades and classes, stat sources
 
-> [!note] Partly implemented (#2889; ADR-0337) — the unknown class and grade are built; the stat
-> sources wait for ADR-0342 (#2927), until then the `basetool_catalogue_items_with_stats` bullet
-> of REQ-OBS-011 describes what runs.
+> [!note] Implemented (#2889, #3040; ADR-0337, ADR-0342).
 
 The P4K catalogue leads a game item's attributes and its blueprint stat base values, and the SC Wiki
 fills gaps
@@ -4178,9 +4177,10 @@ These meters show where that precedence meets values it cannot place:
 
 - [x] An unknown class from either source and an unknown raw grade each bump their counter once;
   neither carries the value as a label.
-- [ ] `basetool_catalogue_items_with_stats` carries `source` with exactly `P4K` and `SCWIKI`.
-- [ ] `ScWikiItemStatsMissing` stays silent while the P4K source covers the items and fires when
+- [x] `basetool_catalogue_items_with_stats` carries `source` with exactly `P4K` and `SCWIKI`.
+- [x] `ScWikiItemStatsMissing` stays silent while the P4K source covers the items and fires when
   neither source does (promtool rule test).
 
 **Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` (unknown class and grade);
-the stat sources planned · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927
+`CatalogueStatBusinessGaugesTest`, `BusinessMetricsCollectorTest`,
+`monitoring/prometheus/tests/scwiki_item_stats_missing_test.yml` (stat sources) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927, #3040

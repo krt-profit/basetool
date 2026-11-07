@@ -29,8 +29,10 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestSta
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueStatBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncRunRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportBusinessGauges;
@@ -103,6 +105,7 @@ class BusinessMetricsCollectorTest {
   @Mock private P4kStampedRows p4kStampedRows;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private MaterialExchangeRequestRepository materialExchangeRequestRepository;
+  @Mock private GameItemStatRepository gameItemStatRepository;
 
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
@@ -129,7 +132,8 @@ class BusinessMetricsCollectorTest {
                     p4kReviewCaseRepository,
                     p4kStampedRows),
                 new MaterialExchangeBusinessGauges(
-                    materialExchangeOfferRepository, materialExchangeRequestRepository)),
+                    materialExchangeOfferRepository, materialExchangeRequestRepository),
+                new CatalogueStatBusinessGauges(gameItemStatRepository)),
             new TaskMetrics(registry));
     collector.registerGauges();
   }

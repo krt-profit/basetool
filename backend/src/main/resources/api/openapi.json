@@ -81409,6 +81409,10 @@
           "propertyKey" : {
             "type" : "string"
           },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "P4K", "SCWIKI" ]
+          },
           "unit" : {
             "type" : "string",
             "enum" : [ "NONE", "PERCENT", "CELSIUS", "METER", "METER_PER_SECOND", "ROUNDS_PER_MINUTE" ]

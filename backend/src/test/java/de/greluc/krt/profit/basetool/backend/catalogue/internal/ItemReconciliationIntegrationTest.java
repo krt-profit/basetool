@@ -62,6 +62,24 @@ class ItemReconciliationIntegrationTest {
   @Autowired private BlueprintProducts blueprintProducts;
 
   @Test
+  void aDuplicateStatProperty_keepsTheRetiredRowsP4kValueOverTheSurvivorsWikiValue() {
+    Pair pair = pair();
+    stat(pair.retired(), 11, "P4K");
+    stat(pair.canonical(), 99, "SCWIKI");
+
+    GameItem canonical = items.findById(pair.canonical()).orElseThrow();
+    reconciliation.mergeExisting(canonical, pair.retired(), UUID.randomUUID(), evidence());
+    entityManager.clear();
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT base_value, source FROM game_item_stat WHERE game_item_id = ?",
+                pair.canonical()))
+        .containsEntry("base_value", 11d)
+        .containsEntry("source", "P4K");
+  }
+
+  @Test
   void everyReferenceSurvivesAndBothSourceStatesRemainArchived() {
     Pair pair = pair();
     jdbc.update(
@@ -202,8 +220,8 @@ class ItemReconciliationIntegrationTest {
     UUID terminal = insert("INSERT INTO terminal (id, name) VALUES (?, 'Catalogue Test Terminal')");
     price(pair.retired(), terminal, 11, 20);
     price(pair.canonical(), terminal, 22, 10);
-    stat(pair.retired(), 11);
-    stat(pair.canonical(), 99);
+    stat(pair.retired(), 11, "SCWIKI");
+    stat(pair.canonical(), 99, "SCWIKI");
     UUID oldest = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO game_item_redirect (id, canonical_id, retired_snapshot)"
@@ -757,12 +775,13 @@ class ItemReconciliationIntegrationTest {
         modified);
   }
 
-  private void stat(UUID item, double value) {
+  private void stat(UUID item, double value, String source) {
     insert(
-        "INSERT INTO game_item_stat (id, game_item_id, property, base_value)"
-            + " VALUES (?, ?, 'HEALTH_MAX_HEALTH', ?)",
+        "INSERT INTO game_item_stat (id, game_item_id, property, base_value, source)"
+            + " VALUES (?, ?, 'HEALTH_MAX_HEALTH', ?, ?)",
         item,
-        value);
+        value,
+        source);
   }
 
   private UUID insert(String sql, Object... values) {

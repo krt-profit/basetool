@@ -4,30 +4,48 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  - name: silent - items carry stat base values
+  - name: silent - both sources carry stat base values
     interval: 1m
     input_series:
-      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="P4K"}'
         values: "1500x4320"
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="SCWIKI"}'
+        values: "80x4320"
     alert_rule_test:
       - eval_time: 72h
         alertname: ScWikiItemStatsMissing
         exp_alerts: []
 
-  - name: silent - zero for less than two days, as during the first run after a deploy
+  - name: silent - the P4K source covers the items while the Wiki source has none
     interval: 1m
     input_series:
-      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="P4K"}'
+        values: "1500x4320"
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="SCWIKI"}'
+        values: "0x4320"
+    alert_rule_test:
+      - eval_time: 72h
+        alertname: ScWikiItemStatsMissing
+        exp_alerts: []
+
+  - name: silent - zero for less than two days, as before the first import after a deploy
+    interval: 1m
+    input_series:
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="P4K"}'
         values: "0x1440 1500x2880"
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="SCWIKI"}'
+        values: "0x4320"
     alert_rule_test:
       - eval_time: 72h
         alertname: ScWikiItemStatsMissing
         exp_alerts: []
 
-  - name: fires - no item has a stat base value for two days
+  - name: fires - neither source covers any item for two days
     interval: 1m
     input_series:
-      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend"}'
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="P4K"}'
+        values: "0x4320"
+      - series: 'basetool_catalogue_items_with_stats{job="basetool-backend",source="SCWIKI"}'
         values: "0x4320"
     alert_rule_test:
       - eval_time: 72h
@@ -37,9 +55,9 @@ tests:
               severity: warning
             exp_annotations:
               summary: "No game item carries a blueprint stat base value"
-              description: "After two days of SC-Wiki item syncs no game item has a row in game_item_stat, so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-DATA-027, ADR-0309). The sync reads the values from the item payload's stat blocks (durability, personal_weapon, vehicle_weapon, clothing, temperature_resistance, ...); a renamed block or field empties every value without failing the sync. Fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid}, compare its fields with ScWikiItemStatExtractor, and check that the item payload still says is_craftable=true. The series is absent while the item sync is disabled."
+              description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every item a catalogue blueprint produces from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
 
-  - name: silent - the series is absent (item sync disabled)
+  - name: silent - the series is absent (no scrape)
     interval: 1m
     input_series:
       - series: 'basetool_catalogue_item_class_unknown_total{job="basetool-backend"}'

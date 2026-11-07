@@ -706,15 +706,15 @@ names of all its rows in one registry query, and none when no row came from a cl
 ### REQ-INV-069 — The stat contribution shows the crafted item's values, not only the factor
 
 The recipe's stat chips (REQ-INV-009) show, for every stat whose crafted-item base value is stored
-(REQ-DATA-027), the base value and the value the slider's quality yields — „Integrity 550 → 605"
+(REQ-P4K-030), the base value and the value the slider's quality yields — „Integrity 550 → 605"
 with the factor's change „+10 %" beside it in grey. A stat without a stored base value shows that
 change alone.
 
 - **The data.** The recipe endpoint (`GET /api/v1/personal-blueprints/{id}/recipe`) carries
   `baseStats`: the representative recipe's crafted item's base values, each with its `propertyKey`,
-  `baseValue` and `unit` (`NONE`, `PERCENT`, `CELSIUS`, `METER`, `METER_PER_SECOND`,
-  `ROUNDS_PER_MINUTE`); empty when none is stored or the recipe names no crafted item. A chip finds
-  its value by the modifier's `propertyKey`.
+  `baseValue`, `unit` (`NONE`, `PERCENT`, `CELSIUS`, `METER`, `METER_PER_SECOND`,
+  `ROUNDS_PER_MINUTE`) and `source` (`P4K`, `SCWIKI`; REQ-P4K-030); empty when none is stored or
+  the recipe names no crafted item. A chip finds its value by the modifier's `propertyKey`.
 - **The value.** The value at a quality is the base value times the factor
   `computeModifierValue` yields (REQ-INV-009, unchanged), for every unit alike: a negative base —
   the lowest tolerated temperature — moves away from zero as the factor grows, which is the
@@ -723,29 +723,29 @@ change alone.
 - **The text.** The unit stands once, after the value („-61 → -67,1 °C", „30 → 36 %",
   „650 → 683 Schuss/min"); a percentage is a fraction scaled to 0–100. A number is whole from 100,
   has one decimal from 10, two from 1 and three significant digits below. The chip's tooltip adds
-  „Grundwert → Wert bei der gewählten Qualität" to the better-direction hint. Unit labels and the
-  tooltip come from the DE/EN bundles.
+  „Grundwert → Wert bei der gewählten Qualität" and the value's source, „Quelle: P4K" or „Quelle:
+  SC Wiki", to the better-direction hint; no build stamp stands beside the values. Unit labels and
+  the tooltip come from the DE/EN bundles.
 - **The factor.** Every factor in the recipe — beside a value, alone on a chip, and in the hint
   „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
   „±0 %", with at most one decimal.
 
-> [!note] Planned amendment — the tooltip names the value's source (#2927;
-> [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md))
-> A base value comes from the P4K catalogue, or from the SC Wiki where the catalogue has none. The
-> chip shows every value as above; its tooltip also names the source, „P4K" or „SC Wiki". No build
-> stamp stands beside the values.
+*Amended (#2927, #3040;
+[ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)):*
+a base value comes from the P4K catalogue, or from the SC Wiki where the catalogue has none
+(REQ-P4K-030), and the tooltip names that source.
 
 **Acceptance**
 
-- [x] The recipe response carries the crafted item's base values sorted by property key, and none
-  without a crafted item. *`BlueprintProductServiceTest`.*
+- [x] The recipe response carries the crafted item's base values with their source, sorted by
+  property key, and none without a crafted item. *`BlueprintProductServiceTest`.*
 - [x] The value is base times factor; the text is unit-aware and scales a percentage; a missing
   factor shows „?"; a factor reads as a signed percentage. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
 - [x] The frontend mirror follows the contract. *`FrontendDtoContractTest`.*
 
 **Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,
 `personal-inventory-blueprint-stats.js`, `personal-inventory-blueprints-recipe.js`
-`renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309
+`renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309, ADR-0342
 
 ### REQ-INV-070 — A personal blueprint is keyed by its produced item's GUID
 

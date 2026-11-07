@@ -143,8 +143,7 @@ class ScWikiItemSyncServiceBackfillTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            gameItemStatRepository,
-            new GameItemStatWriter(gameItemStatRepository),
+            new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
                 scWikiClient, properties, gameItemStatRepository, syncReportService),
             itemReconciliationService,
@@ -165,19 +164,16 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
-  void syncItems_backfill_fetchesBlueprintOutputsWithoutStatsInFullAndSetsTheGauge() {
+  void syncItems_backfill_fetchesBlueprintOutputsWithoutStatsInFull() {
     stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Behring P4-AR"));
     UUID output = UUID.randomUUID();
     when(gameItemStatRepository.findBlueprintOutputUuidsWithoutStats()).thenReturn(List.of(output));
-    when(gameItemStatRepository.countItemsWithStats()).thenReturn(42L);
     when(scWikiClient.fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any()))
         .thenReturn(null);
 
     service.syncItems();
 
     verify(scWikiClient).fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any());
-    assertEquals(
-        42.0, meterRegistry.get(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS).gauge().value());
   }
 
   @Test

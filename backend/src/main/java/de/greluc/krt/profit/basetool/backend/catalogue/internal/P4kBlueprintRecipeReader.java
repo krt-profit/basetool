@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierValueKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBlueprintDto;
@@ -412,7 +413,8 @@ final class P4kBlueprintRecipeReader {
   }
 
   /**
-   * Derives the stat key the SC Wiki uses from a gameplay property's class name.
+   * Resolves the stat key of a gameplay property: the {@link BlueprintStatProperty} of the
+   * contract's table, else the SC Wiki form derived from the class name.
    *
    * @param className e.g. {@code GPP_Weapon_Damage}
    * @return e.g. {@code weapon_damage}, or {@code null} without a class name
@@ -421,6 +423,10 @@ final class P4kBlueprintRecipeReader {
   static String propertyKey(@Nullable String className) {
     if (className == null || className.isBlank()) {
       return null;
+    }
+    BlueprintStatProperty mapped = BlueprintStatProperty.fromClassName(className).orElse(null);
+    if (mapped != null) {
+      return mapped.getPropertyKey();
     }
     String key =
         className.regionMatches(true, 0, PROPERTY_PREFIX, 0, PROPERTY_PREFIX.length())

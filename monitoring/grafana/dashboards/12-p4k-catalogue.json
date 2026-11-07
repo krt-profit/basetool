@@ -620,6 +620,49 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Game items with a stored blueprint stat base value per source; the P4K value wins and the SC Wiki fills gaps. ScWikiItemStatsMissing alerts when neither source has any for 48h. REQ-OBS-023, ADR-0342.",
+      "id": 14,
+      "title": "Items with stat base values per source",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (source) (basetool_catalogue_items_with_stats{job=\"basetool-backend\"})",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
