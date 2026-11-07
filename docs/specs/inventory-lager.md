@@ -1835,8 +1835,9 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 - **Lifecycle.** Deleting a material deletes its levels with it, one audit event each. A level of
   an inactive unit or of a catalogue entry the catalogue no longer lists stays stored, is not
   shown, raises no notice and does not count in the gauge; it returns with the unit or the entry. A
-  game item is hidden once every source that owns it has marked it deleted. A deactivated tier only
-  flags the level (REQ-INV-067). None of these sends a notice.
+  game item is hidden once every source that owns it has marked it deleted, and a material or game
+  item the P4K swept or an admin hid is hidden whatever the other sources say (REQ-P4K-013). A
+  deactivated tier only flags the level (REQ-INV-067). None of these sends a notice.
 - **Audit** in the Lager area (`AuditDomain.INVENTORY`, REQ-AUDIT-001): `MIN_STOCK_LEVEL_SET` on
   create, `MIN_STOCK_LEVEL_CHANGED` only when a field changed (from / to of minimum, target and tier
   code), `MIN_STOCK_LEVEL_REMOVED` on delete, `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE` per level the

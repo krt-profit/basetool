@@ -35,7 +35,8 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
 
   /**
    * The levels of active units and of catalogue entries that are still listed, catalogue entries
-   * loaded; the {@code WHERE} clause is open for further conditions.
+   * loaded; an entry the P4K swept or an admin hid is no longer listed, whatever the other sources
+   * say (REQ-P4K-013). The {@code WHERE} clause is open for further conditions.
    */
   String ACTIVE_LEVELS =
       """
@@ -46,6 +47,8 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
       LEFT JOIN FETCH l.qualityTier t
       WHERE u.active = true
         AND m.scwikiDeletedAt IS NULL
+        AND m.p4kDeletedAt IS NULL AND m.p4kHiddenAt IS NULL
+        AND g.p4kDeletedAt IS NULL AND g.p4kHiddenAt IS NULL
         AND (
           (g.scwikiDeletedAt IS NULL AND g.uexDeletedAt IS NULL)
           OR (g.scwikiSyncedAt IS NOT NULL AND g.scwikiDeletedAt IS NULL)
