@@ -650,6 +650,7 @@ public class GlobalExceptionHandler {
         BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
         "error.orgUnit.seatRequiresKrtMember");
     m.put("CATALOGUE_ITEM_RETIRED", "error.catalogue.itemRetired");
+    m.put("CATALOGUE_BLUEPRINT_RETIRED", "error.catalogue.blueprintRetired");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
     m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");

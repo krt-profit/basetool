@@ -715,6 +715,11 @@ HTTP 400 `CATALOGUE_ITEM_RETIRED` (REQ-P4K-013): the user picks another item. A 
 production cannot change its item, so such an order can no longer be edited at all; reading it and
 the writes that take no item (status, production, handover) stay open.
 
+A line whose blueprint the P4K retired is refused the same way, with HTTP 400
+`CATALOGUE_BLUEPRINT_RETIRED` and the property `blueprintId` (REQ-P4K-013): the user picks another
+blueprint of the item. A blueprint change is allowed on a line with booked production, so such an
+order stays editable once the line names a listed blueprint.
+
 The editor MUST open with the order's stored **responsible** and **requesting** org units preselected.
 Both pickers are `required`, so an empty one makes the browser refuse the save before any request is
 sent — a line removal the user believes saved simply never reaches the server. The logistician update
@@ -733,6 +738,8 @@ with no error and no audit trace. The handover freeze did not cover it: it block
 `loweringAmountBelowManufactured_throwsBadRequest`),
 `JobOrderItemServiceTest.applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction`,
 `JobOrderItemServiceTest.applyItemLineRefusesToKeepAnItemTheP4kHidSinceTheLineWasOrdered`,
+`JobOrderItemServiceTest.buildItemLineRefusesABlueprintTheP4kRetired`,
+`JobOrderItemServiceTest.applyItemLineRefusesToKeepABlueprintTheP4kHidSinceTheLineWasOrdered`,
 `JobOrderPageControllerItemEditMvcTest.editForm_itemOrder_preselectsStoredResponsibleAndRequestingOrgUnit` ·
 **Code:** `JobOrderService#reconcileItemLines` / `#assertLineEditable` / `#assertLineRemovable`,
 `JobOrderItemService#applyItemLine`, `CreateJobOrderItemLineDto#id`,

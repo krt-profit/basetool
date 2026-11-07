@@ -46,7 +46,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredBlueprintException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableBlueprints;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -84,6 +86,7 @@ class JobOrderItemServiceTest {
         new JobOrderItemService(
             blueprintRepository,
             new SelectableGameItems(gameItemRepository),
+            new SelectableBlueprints(blueprintRepository),
             materialRepository,
             materialMapper,
             qualityTierService,
@@ -355,6 +358,43 @@ class JobOrderItemServiceTest {
 
     assertThatThrownBy(() -> service.buildItemLine(line))
         .isInstanceOf(RetiredGameItemException.class);
+  }
+
+  @Test
+  void buildItemLineRefusesABlueprintTheP4kRetired() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Blueprint retired = blueprint(weapon);
+    retired.setP4kDeletedAt(Instant.now());
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    CreateJobOrderItemLineDto line =
+        new CreateJobOrderItemLineDto(
+            null, weapon.getId(), retired.getId(), 1, List.of(), null, null);
+
+    assertThatThrownBy(() -> service.buildItemLine(line))
+        .isInstanceOf(RetiredBlueprintException.class);
+  }
+
+  @Test
+  void applyItemLineRefusesToKeepABlueprintTheP4kHidSinceTheLineWasOrdered() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Blueprint hidden = blueprint(weapon);
+    JobOrderItem existing = JobOrderItem.builder().amount(2).build();
+    existing.setId(UUID.randomUUID());
+    existing.setGameItem(weapon);
+    existing.setBlueprint(hidden);
+    hidden.setP4kHiddenAt(Instant.now());
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+
+    assertThatThrownBy(() ->
+            service.applyItemLine(
+                existing,
+                new CreateJobOrderItemLineDto(
+                    existing.getId(), weapon.getId(), hidden.getId(), 3, List.of(), null, null)))
+        .isInstanceOf(RetiredBlueprintException.class);
+    assertThat(existing.getAmount()).isEqualTo(2);
   }
 
   @Test
