@@ -290,6 +290,38 @@ class MissionDetailPatternRenderTest {
                 + "\"");
   }
 
+  /**
+   * The tabs sit in the dock beside the condensed mini bar, which mirrors the name and status and
+   * carries an icon-only sign-up; the long tabs carry a short label and the facts a title
+   * (REQ-MISSION-033).
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rendersThePhoneHeadDockAndMiniBar() throws Exception {
+    stubMission(true);
+    String html = render("/missions/" + MISSION_ID);
+
+    String dock = between(html, "id=\"mission-head-dock\"", "id=\"tab-ueb\"");
+    assertThat(dock)
+        .contains("data-testid=\"mission-head-mini\"")
+        .containsPattern("id=\"mission-head-mini-title\"[^>]*>Salvage-Lauf<")
+        .containsPattern(
+            "id=\"mission-head-mini-status\"[^>]*class=\"status-badge mission-head-mini__status"
+                + " status-active\"[^>]*>AKTIV<")
+        .containsPattern("id=\"mission-head-mini-cta\"[^>]*aria-label=\"Anmelden\"")
+        .contains("role=\"tablist\"");
+    assertThat(between(html, "id=\"tab-crew\"", "id=\"tab-fin\""))
+        .contains("class=\"tab-label-long\">Teilnehmer &amp; Einheiten<")
+        .contains("class=\"tab-label-short\">Teilnehmer<");
+    assertThat(between(html, "id=\"tab-fin\"", "</button>"))
+        .contains("class=\"tab-label-short\">Finanzen<");
+    assertThat(between(html, "class=\"facts-bar\"", "id=\"mission-head-dock\""))
+        .contains("class=\"fact fact--join\" title=\"Server-Join\"")
+        .contains("class=\"fact fact--end\" title=\"Ende\"");
+    assertThat(between(html, "class=\"page-actions\"", "class=\"facts-bar\""))
+        .contains("class=\"mission-head-action-label\">Bearbeiten<");
+  }
+
   /** A member who may not edit sees neither the edit toggle nor the edit mode nor the delete. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")

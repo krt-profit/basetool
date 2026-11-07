@@ -192,16 +192,6 @@ function initMissionDetailTabs() {
     });
 
     apply(resolveInitial(true));
-
-    const sticky = document.getElementById('mission-head-sticky');
-    const pageHeader = /** @type {HTMLElement | null} */ (document.querySelector('body > header'));
-    function syncStickyOffset() {
-        if (sticky && pageHeader) {
-            sticky.style.top = `${pageHeader.offsetHeight}px`;
-        }
-    }
-    window.addEventListener('resize', syncStickyOffset);
-    syncStickyOffset();
 }
 
 initMissionDetailTabs();

@@ -123,6 +123,29 @@ lists instead of the summary strip; the details form is a numbered `.form-layout
 `MissionDetailPatternRenderTest`, `MissionTabsMockupCheckE2eTest` and
 `MissionDesignFixesCheckE2eTest`.
 
+### REQ-MISSION-033 — The mission head is compact on the phone class
+
+On the Smartphone class (`width <= 768px`, REQ-UI-009) the mission head must not hold the reading
+area hostage. From the Tablet class up the whole head (page head, facts bar, tabs) stays sticky as
+REQ-MISSION-004 describes; on the phone:
+
+- **The head scrolls away; the tabs stay.** The page head and the facts bar scroll with the content.
+  The tab dock `#mission-head-dock` (holding the `.tab-nav`) stays pinned below the site header.
+- **A condensed mini bar takes over once the dock is pinned.** `#mission-head-mini` shows the mission
+  name, its status badge and an icon-only „Anmelden" that triggers `#add-participant-btn`. It overlays
+  the strip directly above the dock, so showing or hiding it never shifts the page. The name is cut to
+  one line; tapping it scrolls back to the top, where the full name is shown. The bar mirrors
+  `#mission-title` and `#mission-status-badge`, so a live update of either reaches it too
+  (`mission-detail-head.js`).
+- **The facts bar is one line.** Its labels are hidden visually but kept for screen readers and as a
+  `title`. Server join and end read as one range („20:00–22:00"). The bar scrolls sideways instead
+  of wrapping.
+- **Compact actions and tabs.** „Bearbeiten" shows only its icon (the label stays for screen
+  readers). The tabs keep one row that scrolls sideways and use their short labels
+  (`mission.tab.crew.short`, `mission.tab.finance.short`).
+
+Guarded by `MissionDetailPatternRenderTest` and `MissionPhoneHeadE2eTest`.
+
 ### REQ-MISSION-005 — Crew board replaces the assign-crew modal (same backend)
 
 Participants and units render as an assign board: a "Ohne Einheit" pool plus one open
