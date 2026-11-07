@@ -28,6 +28,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   earlier, keeps resolving for 90 days from the release that adds `guid`; a later entry here
   announces its removal with the date. Switch to `guid`. `bt` of items, materials and ship
   types is unchanged.
+- **Fixed: an item is no longer refused `AMBIGUOUS` because a material's name resembles it.** A
+  stock or org-stock op's `material` resolves as an exact material, else as an exact item, and only
+  then as `AMBIGUOUS` or `UNMATCHED`, whether the item is sent by `name` alone or with `bt` or
+  `scRecord` ([stock](resources/stock.md#how-material-resolves)).
 
 ## 2026-11-05
 
