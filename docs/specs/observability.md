@@ -1925,7 +1925,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   missing gateway token) or `answer_contract_broken` (a 2xx answer that broke its response schema or
   carried a property the schema does not declare, answered `502 BACKEND_RELAY_FAILED`; REQ-XCH-050),
   registered at zero. A usable answer counts once, as `ok` or `answer_contract_broken`, after the
-  gateway checked its contract. `ExchangeRelayFailing` (warning) fires on more than three failures
+  gateway checked its contract; on a draft route that is the draft result, and a draft the gateway
+  refuses after the relay (too large, budget, staging) counts as neither. `ExchangeRelayFailing` (warning) fires on more than three failures
   in 15 minutes (REQ-XCH-011, REQ-XCH-028); `ExchangeAnswerContractBroken` (warning) fires per
   `client_id` on any broken answer, including a client's first, whose series starts at one; its WARN
   line `Exchange answer breaks` names the schema, the route and the JSON Pointers, never a value. A

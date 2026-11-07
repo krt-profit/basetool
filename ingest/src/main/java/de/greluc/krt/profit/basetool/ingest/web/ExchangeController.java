@@ -661,7 +661,7 @@ public class ExchangeController {
 
   /**
    * Checks a draft, relays it to the backend's preview, stages the answer for the member's review
-   * and answers where the member opens it.
+   * and answers where the member opens it, counting the relay outcome on that answer.
    *
    * @param resource the draft's path segment
    * @param schema the draft's schema
@@ -699,7 +699,6 @@ public class ExchangeController {
     if (!result.isOk()) {
       return problem(result.status(), result.code(), result.detail());
     }
-    relay.countPassedOn(context.clientId());
     String json = objectMapper.writeValueAsString(result.body());
     long bytes = stagingService.stagedBytes(kind, json);
     if (json.getBytes(StandardCharsets.UTF_8).length > ingestProperties.maxHandoffBytes()
@@ -742,7 +741,8 @@ public class ExchangeController {
         ingestProperties.frontendBaseUrl() + path + "?handoff=" + staged.handoffId());
     answer.put("handoffId", staged.handoffId());
     answer.put("kind", kind.name());
-    return answers.passes(answer, "draft-result.schema.json", request) ? ok(answer) : failed();
+    boolean passes = answers.passesRelayed(answer, "draft-result.schema.json", request, context);
+    return passes ? ok(answer) : failed();
   }
 
   /**
