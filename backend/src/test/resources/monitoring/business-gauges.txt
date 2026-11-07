@@ -14,6 +14,7 @@ GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=BLUEPRINT}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=COMMODITY}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=ITEM}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=MANUFACTURER}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=RESOURCE_GROUP}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=SHIP}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=SHOP}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=STARMAP_OBJECT}|null
@@ -47,6 +48,12 @@ GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=matched}|nul
 GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=reappeared}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=unmatched}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=vanished}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=added}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=changed}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=matched}|null
@@ -72,6 +79,7 @@ GAUGE|basetool.p4k.review.cases.open|{kind=BLUEPRINT}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=COMMODITY}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=ITEM}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=MANUFACTURER}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=RESOURCE_GROUP}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=SHIP}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=SHOP}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=STARMAP_OBJECT}|null
