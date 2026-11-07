@@ -986,6 +986,23 @@ val testBlueprintStatsJs =
     outputs.upToDateWhen { false }
   }
 
+val testCatalogueAdminJs =
+  tasks.register<NodeTask>("testCatalogueAdminJs") {
+    group = "verification"
+    description =
+      "Regression tests for the P4K catalogue admin pages: the storage-place name, read ordering and peer sync."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/catalogue-admin.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/catalogue-admin.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.dir(layout.projectDirectory.dir("src/main/resources/static/js/catalogue"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js")
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -1119,6 +1136,7 @@ tasks.named("check").configure {
     testNumberFormatJs,
     testNotificationBellLabelJs,
     testBlueprintStatsJs,
+    testCatalogueAdminJs,
     testEslintBans,
     testTypecheckRatchet,
     lintCss,

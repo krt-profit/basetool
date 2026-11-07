@@ -250,7 +250,8 @@ function onOverrideChange(select) {
 }
 
 /**
- * Opens the storage-place dialog for an object, the name prefilled with its P4K name.
+ * Opens the storage-place dialog for an object with an empty name: the P4K name is game text
+ * (REQ-P4K-033) and `location.name` reaches the exchange, so the admin types the curated name.
  *
  * @param {StarmapObject} o the object
  */
@@ -261,7 +262,7 @@ function openStorageDialog(o) {
     const objectLabel = $('starmap-storage-object');
     if (objectLabel) objectLabel.textContent = objectName(o);
     const name = $('starmap-storage-name');
-    if (name instanceof HTMLInputElement) name.value = localisedName(o.name, o.nameDe);
+    if (name instanceof HTMLInputElement) name.value = '';
     krtModal.open('starmap-storage-modal', { focus: name });
 }
 

@@ -1193,10 +1193,13 @@ write resolver tries `guid`, then `uex`, then the exact name (specified in
 
 A place is linked through its own node, else through its city's, else its space station's object.
 `LocationDto` carries the object's `p4kName` and `p4kNameDe` (read-only); the admin locations page
-shows the one of the page language under the curated name.
+shows the one of the page language under the curated name. The storage-place dialog of
+`/admin/starmap` names the object by its P4K name but opens with an empty name field: the admin
+types the curated name, and no P4K text is copied into `location.name`.
 
 **Enforced by:** `LocationNameDisplayTest`, `LocationStarmapNodeTest`,
-`ExchangeLocationGuidIntegrationTest`, `ExchangeCatalogControllerTest` · **ADR:**
+`ExchangeLocationGuidIntegrationTest`, `ExchangeCatalogControllerTest`,
+`frontend/scripts/catalogue-admin.test.mjs` · **ADR:**
 [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-038 — a starmap object is visible only inside a linked live star system
