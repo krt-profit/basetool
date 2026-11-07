@@ -111,7 +111,8 @@ public class ScWikiBlueprintGapFiller {
 
   /**
    * Fills the gaps of a recipe the P4K wrote from the Wiki's requirement groups, matching a group
-   * by its key, a modifier by its stat and a line by its position and kind within the group.
+   * by its key, a modifier by its stat and a line by its kind and resource or item identity within
+   * the group; a line no Wiki line names stays unfilled.
    *
    * @param blueprint the blueprint, whose recipe is the P4K's
    * @param dto the Wiki's blueprint detail
@@ -142,11 +143,34 @@ public class ScWikiBlueprintGapFiller {
             blueprint.getIngredients().stream()
                 .filter(line -> Objects.equals(line.getRequirementGroup(), group))
                 .toList();
-        for (int i = 0; i < wikiGroup.children().size() && i < lines.size(); i++) {
-          fillLine(blueprint, lines.get(i), wikiGroup.children().get(i), runId, resolvers);
+        for (BlueprintIngredient line : lines) {
+          wikiGroup.children().stream()
+              .filter(wiki -> sameIdentity(line, wiki))
+              .findFirst()
+              .ifPresent(wiki -> fillLine(blueprint, line, wiki, runId, resolvers));
         }
       }
     }
+  }
+
+  /**
+   * Whether a Wiki line names the resource or item of a P4K line: the Wiki's resource-type or item
+   * UUID equals the line's P4K GUID of that kind or the Wiki identity it already holds.
+   *
+   * @param line the P4K's line
+   * @param wiki the Wiki's line
+   * @return {@code true} when both are one kind and one identity
+   */
+  private static boolean sameIdentity(
+      @NotNull BlueprintIngredient line, @NotNull ScWikiBlueprintRequirementChildDto wiki) {
+    boolean wikiItem = "item".equalsIgnoreCase(wiki.kind());
+    if (wiki.uuid() == null || wikiItem != (line.getKind() == BlueprintIngredientKind.ITEM)) {
+      return false;
+    }
+    return wikiItem
+        ? wiki.uuid().equals(line.getP4kItemGuid()) || wiki.uuid().equals(line.getWikiItemUuid())
+        : wiki.uuid().equals(line.getP4kResourceGuid())
+            || wiki.uuid().equals(line.getWikiResourceUuid());
   }
 
   /**
@@ -197,7 +221,7 @@ public class ScWikiBlueprintGapFiller {
   }
 
   /**
-   * Fills a P4K line from the Wiki line at its position when both are of one kind, and reports a
+   * Fills a P4K line from the Wiki line of its identity ({@link #sameIdentity}), and reports a
    * differing quantity.
    *
    * @param blueprint the blueprint
@@ -212,10 +236,7 @@ public class ScWikiBlueprintGapFiller {
       @NotNull ScWikiBlueprintRequirementChildDto wiki,
       @NotNull UUID runId,
       @NotNull Resolvers resolvers) {
-    boolean wikiItem = "item".equalsIgnoreCase(wiki.kind());
-    if (wikiItem != (line.getKind() == BlueprintIngredientKind.ITEM)) {
-      return;
-    }
+    boolean wikiItem = line.getKind() == BlueprintIngredientKind.ITEM;
     if (line.getWikiNameSnapshot() == null) {
       line.setWikiNameSnapshot(wiki.name());
     }

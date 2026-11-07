@@ -81,6 +81,10 @@ import tools.jackson.databind.node.ObjectNode;
 @ExtendWith(MockitoExtension.class)
 class ScWikiBlueprintSyncServiceTest {
 
+  /** The resource-type UUID of the captured detail's FRAME line (Agricium). */
+  private static final UUID AGRICIUM_RESOURCE =
+      UUID.fromString("dc6fbcbb-5990-4ed5-82ee-93152dab7845");
+
   @Mock private ScWikiClient scWikiClient;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private MaterialRepository materialRepository;
@@ -870,6 +874,7 @@ class ScWikiBlueprintSyncServiceTest {
     canonical.setKind(BlueprintIngredientKind.RESOURCE);
     canonical.setOrderIndex(0);
     canonical.setQuantityScu(9.0);
+    canonical.setP4kResourceGuid(AGRICIUM_RESOURCE);
     canonical.setRequirementGroup(frame);
     bp.addIngredient(canonical);
     when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
@@ -882,9 +887,43 @@ class ScWikiBlueprintSyncServiceTest {
     assertEquals(9.0, canonical.getQuantityScu());
     assertSame(frame, bp.getRequirementGroups().getFirst());
     assertNotNull(frame.getName());
-    assertEquals(
-        UUID.fromString("dc6fbcbb-5990-4ed5-82ee-93152dab7845"), canonical.getWikiResourceUuid());
+    assertEquals(AGRICIUM_RESOURCE, canonical.getWikiResourceUuid());
     assertNotNull(bp.getWikiMetadata());
+  }
+
+  @Test
+  void aP4kLine_isFilledOnlyFromTheWikiLineOfItsOwnResource_whateverTheOrder() throws IOException {
+    ScWikiBlueprintDto detail = capturedDetail();
+    Blueprint bp = new Blueprint();
+    bp.setP4kUuid(UUID.randomUUID());
+    bp.setP4kRecipe(true);
+    BlueprintRequirementGroup frame = new BlueprintRequirementGroup();
+    frame.setOrderIndex(0);
+    frame.setGroupKey("frame");
+    bp.addRequirementGroup(frame);
+    BlueprintIngredient other = new BlueprintIngredient();
+    other.setKind(BlueprintIngredientKind.RESOURCE);
+    other.setOrderIndex(0);
+    other.setQuantityScu(1.0);
+    other.setP4kResourceGuid(UUID.randomUUID());
+    other.setRequirementGroup(frame);
+    bp.addIngredient(other);
+    BlueprintIngredient agricium = new BlueprintIngredient();
+    agricium.setKind(BlueprintIngredientKind.RESOURCE);
+    agricium.setOrderIndex(1);
+    agricium.setQuantityScu(0.36);
+    agricium.setP4kResourceGuid(AGRICIUM_RESOURCE);
+    agricium.setRequirementGroup(frame);
+    bp.addIngredient(agricium);
+    when(blueprintRepository.findByScwikiUuid(detail.uuid())).thenReturn(Optional.of(bp));
+
+    service.upsertBlueprintWithinTransaction(
+        detail.uuid(), detail, UUID.randomUUID(), Instant.now());
+
+    assertNull(other.getWikiResourceUuid());
+    assertNull(other.getWikiNameSnapshot());
+    assertNull(other.getMaterial());
+    assertEquals(AGRICIUM_RESOURCE, agricium.getWikiResourceUuid());
   }
 
   @Test

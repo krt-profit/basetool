@@ -897,7 +897,9 @@ The P4K's own value of each led scalar is kept beside it (`p4k_craft_time_second
 `p4k_recipe` marks a recipe the P4K wrote. The SC Wiki blueprint sync writes a led column only where
 that value is `null` and reports a differing value as `P4K_DISAGREEMENT`; on a P4K recipe it fills
 only the slot names, the stat labels and directions and the lines' Wiki identities and missing
-links, and reports a differing quantity. The categories are `blueprint_category` (`p4k_uuid`,
+links, and reports a differing quantity. A Wiki line fills only the P4K line of its slot whose
+`p4k_resource_guid` / `p4k_item_guid` (or Wiki identity) equals the Wiki's resource-type or item
+UUID; a P4K line no Wiki line names stays unfilled. The categories are `blueprint_category` (`p4k_uuid`,
 `class_name`, `name`, `name_de` and the P4K stamps), linked as `blueprint.category_id`; every listed
 category is created. The SC Wiki's `category_uuid` stays as the Wiki serves it.
 
