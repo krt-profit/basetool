@@ -108,6 +108,7 @@ exempt-column|blueprint_requirement_group.name
 exempt-column|blueprint_requirement_modifier.better_when
 exempt-column|blueprint_requirement_modifier.label
 exempt-column|blueprint_requirement_modifier.property_key
+exempt-column|blueprint_requirement_modifier.value_kind
 exempt-column|blueprint_requirement_modifier.value_range_type
 exempt-column|blueprint_summary_property.better_when
 exempt-column|blueprint_summary_property.label
@@ -163,7 +164,9 @@ exempt-column|job_order_handover_item.location_name
 exempt-column|job_type.archetype
 exempt-column|job_type.description
 exempt-column|job_type.name
+exempt-column|material_category.class_name
 exempt-column|material_category.name
+exempt-column|material_category.name_de
 exempt-column|material_exchange_offer.item_name
 exempt-column|material_exchange_offer.item_product_key
 exempt-column|material_exchange_offer.offer_kind
@@ -229,7 +232,6 @@ exempt-column|personal_blueprint.product_name
 exempt-column|personal_blueprint.source
 exempt-column|personal_blueprint.source_client_id
 exempt-column|personal_inventory_item.location_name_snapshot
-exempt-column|personal_inventory_item.location_type
 exempt-column|purchasing_deal.payment_model
 exempt-column|purchasing_deal.risk_class
 exempt-column|purchasing_deal.status
@@ -272,6 +274,7 @@ exempt-name-holder|p4k_import_job.error_message
 exempt-name-holder|p4k_import_job.result_json
 exempt-name-holder|p4k_import_job.source_filename
 exempt-table|blueprint
+exempt-table|blueprint_category
 exempt-table|city
 exempt-table|faction
 exempt-table|flyway_schema_history
@@ -285,12 +288,22 @@ exempt-table|material
 exempt-table|moon
 exempt-table|orbit
 exempt-table|outpost
+exempt-table|p4k_import_change
+exempt-table|p4k_import_run
+exempt-table|p4k_import_run_kind
+exempt-table|p4k_review_case
 exempt-table|planet
 exempt-table|poi
 exempt-table|refining_method
 exempt-table|ship_type
+exempt-table|ship_type_loadout_port
+exempt-table|ship_type_p4k_variant
+exempt-table|ship_type_paint
 exempt-table|ship_type_uex_alias
+exempt-table|shop
+exempt-table|shop_item
 exempt-table|space_station
 exempt-table|star_system
+exempt-table|starmap_object
 exempt-table|terminal
 exempt-table|uex_category

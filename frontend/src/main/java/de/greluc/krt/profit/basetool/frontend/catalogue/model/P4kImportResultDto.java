@@ -20,55 +20,120 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.List;
 
 /**
  * Frontend mirror of the backend {@code P4kImportResultDto}, shared by a P4K import preview and
- * apply and rendered as a per-type count table; unknown fields are ignored.
+ * apply and rendered as the Build line and a per-kind count table; unknown fields are ignored.
  *
  * @param dryRun {@code true} for a preview (nothing written), {@code false} for an applied import
- * @param seedingEnabled whether seeding of brand-new game rows was enabled for this run
- * @param manufacturers per-type tallies for manufacturers
- * @param items per-type tallies for items
- * @param ships per-type tallies for ships
- * @param commodities per-type tallies for commodities
- * @param blueprints per-type tallies for blueprints
+ * @param createItemsAndShips whether the run created unmatched playable items and ships
+ * @param build the Build the catalogue was exported from, or {@code null} when the result has none
+ * @param manufacturers per-kind tallies for manufacturers
+ * @param items per-kind tallies for items
+ * @param ships per-kind tallies for ships
+ * @param commodities per-kind tallies for commodities
+ * @param blueprints per-kind tallies for blueprints
+ * @param starmapObjects per-kind tallies for starmap objects, whose {@code unmatched} and {@code
+ *     review} count the UEX location rows left unlinked, or {@code null} in a result stored before
+ *     the starmap was imported
+ * @param shops per-kind tallies for shops, whose {@code unmatched} and {@code review} count the
+ *     shops left without a UEX terminal, or {@code null} in a result stored before shops were
+ *     imported
+ * @param resourceGroups per-kind tallies for the commodity categories, or {@code null} in a result
+ *     stored before they were imported
+ * @param blueprintCategories per-kind tallies for the blueprint categories, or {@code null} in a
+ *     result stored before they were imported
  * @param ingredientsResolved number of blueprint ingredient links repaired
- * @param runId id of the persisted import run, or {@code null} for a preview
+ * @param runId id of the recorded import run, or {@code null} for a preview
+ * @param sweeps what the sweep did per kind, or {@code null} in a result stored before the sweep
+ *     existed
+ * @param massGuardPercent the share of a kind's known rows above which the sweep holds the kind
+ *     back, or {@code null} when the result names none
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @DtoMirror
 public record P4kImportResultDto(
     boolean dryRun,
-    boolean seedingEnabled,
+    boolean createItemsAndShips,
+    Build build,
     Counts manufacturers,
     Counts items,
     Counts ships,
     Counts commodities,
     Counts blueprints,
+    Counts starmapObjects,
+    Counts shops,
+    Counts resourceGroups,
+    Counts blueprintCategories,
     long ingredientsResolved,
-    String runId) {
+    String runId,
+    List<Sweep> sweeps,
+    Integer massGuardPercent) {
 
   /**
-   * Per-type tallies for one catalog entity kind. Every game record is classified as exactly one of
-   * {@code matched} (an existing row enriched), {@code created} (a brand-new row seeded from the
-   * game) or {@code unmatched} (no match, not seeded). {@code uuidBackfilled}, {@code
-   * uuidConflicts} and {@code enriched} are sub-tallies over the matched set.
+   * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
    *
-   * @param matched existing rows matched and enriched
-   * @param uuidBackfilled matched rows that received a previously missing game UUID
-   * @param uuidConflicts matched rows whose game UUID disagreed with the stored one
-   * @param enriched matched rows whose fields were updated from the game data
-   * @param created brand-new rows seeded from the game (preview: would-be seeds; apply: opt-in
-   *     dependent)
-   * @param unmatched game records with no match that were not seeded
+   * @param kind the kind
+   * @param outcome {@code SWEPT} or why the sweep was skipped, or {@code null}
+   * @param known the kind's P4K-known rows, the base of the mass guard
+   * @param toStamp the rows the sweep stamps, or would have stamped
+   * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
+   * @param reappeared stamped rows the run matched again
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Sweep(
+      @BackendEnumAsString String kind,
+      @BackendEnumAsString String outcome,
+      long known,
+      long toStamp,
+      long vanished,
+      long reappeared) {}
+
+  /**
+   * The Build of the imported catalogue and the patch version derived from it.
+   *
+   * @param channel the Channel, always {@code LIVE}
+   * @param branch the build branch, e.g. {@code sc-alpha-4.10.2}
+   * @param version the build version, for display only
+   * @param changeNumber the Perforce change number as decimal text
+   * @param patchVersion the patch version, or {@code null} when it is unknown
+   * @param patchVersionOrigin {@code PUBLIC_PATCH}, {@code BRANCH_LOWER_BOUND}, or {@code null}
+   *     when the version is unknown
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record Build(
+      String channel,
+      String branch,
+      String version,
+      String changeNumber,
+      String patchVersion,
+      @BackendEnumAsString String patchVersionOrigin) {}
+
+  /**
+   * Per-kind tallies of one catalogue kind.
+   *
+   * @param completeness {@code COMPLETE} or {@code PARTIAL} as the catalogue states it, or {@code
+   *     null}
+   * @param matched records resolved to an existing row
+   * @param enriched matched rows whose fields were updated from the catalogue
+   * @param identityMismatches matched rows whose Wiki UUID differs from the P4K GUID
+   * @param created rows created from the catalogue (preview: the would-be count with the box
+   *     ticked)
+   * @param unmatched records with no row that were not created
+   * @param review review cases the run found
+   * @param unknownValues closed-set values the import did not know and read as {@code null}
    */
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Counts(
+      @BackendEnumAsString String completeness,
       long matched,
-      long uuidBackfilled,
-      long uuidConflicts,
       long enriched,
+      long identityMismatches,
       long created,
-      long unmatched) {}
+      long unmatched,
+      long review,
+      long unknownValues) {}
 }

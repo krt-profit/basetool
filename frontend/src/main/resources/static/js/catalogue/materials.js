@@ -117,7 +117,8 @@ function toggleKindGroup(toggle) {
 }
 
 /**
- * Shows the cards whose title contains the filter and hides the others.
+ * Shows the cards whose material name contains the filter and hides the others; the filter
+ * matches the name, not the German name a card may show (REQ-P4K-023).
  *
  * @param {ParentNode} scope the element holding the cards
  * @param {string} filter the upper-cased filter text
@@ -127,9 +128,8 @@ function filterCards(scope, filter) {
     let visibleCount = 0;
     /** @type {NodeListOf<HTMLElement>} */ (scope.querySelectorAll('.material-card')).forEach(
         (card) => {
-            const title = card.querySelector('.material-title');
-            const text = title ? title.textContent || '' : '';
-            const visible = text.toUpperCase().indexOf(filter) > -1;
+            const name = (card.dataset.materialName || '').toUpperCase();
+            const visible = name.indexOf(filter) > -1;
             card.hidden = !visible;
             if (visible) visibleCount++;
         },

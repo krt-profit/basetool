@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.PoiDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -44,6 +47,7 @@ public class PoiService {
 
   private final PoiRepository poiRepository;
   private final PoiMapper poiMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the paged POI catalogue.
@@ -92,6 +96,12 @@ public class PoiService {
     Poi poi = requirePoi(id);
     poi.setHasLoadingDock(value);
     poi.setHasLoadingDockOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN,
+        poi.getId(),
+        poi.getName(),
+        null,
+        AuditDetails.of("hasLoadingDock", value));
     return poiRepository.save(poi);
   }
 
@@ -107,6 +117,12 @@ public class PoiService {
   public Poi clearLoadingDockOverride(UUID id) {
     Poi poi = requirePoi(id);
     poi.setHasLoadingDockOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED,
+        poi.getId(),
+        poi.getName(),
+        null,
+        null);
     return poiRepository.save(poi);
   }
 }

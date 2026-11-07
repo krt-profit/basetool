@@ -195,7 +195,7 @@ public class ExchangeRelay {
   /** Backend codes the exchange contract names and a client may see as they are. */
   static final Set<String> PASSED_THROUGH = DETAILS.keySet();
 
-  /** Outcome: the backend answered 2xx and the answer was usable. */
+  /** Outcome: the backend answered 2xx and the gateway passed the answer on. */
   static final String OUTCOME_OK = "ok";
 
   /** Outcome: the backend refused with a code the client may see. */
@@ -203,6 +203,12 @@ public class ExchangeRelay {
 
   /** Outcome: the relay failed, answered {@code 502}. */
   static final String OUTCOME_FAILED = "failed";
+
+  /**
+   * Outcome: the backend answered 2xx, but the answer broke its response schema or carried a
+   * property the schema does not declare, so the gateway answered {@code 502} (REQ-XCH-050).
+   */
+  static final String OUTCOME_ANSWER_CONTRACT_BROKEN = "answer_contract_broken";
 
   private final RestClient backendRestClient;
   private final ServiceAccountTokenProvider tokenProvider;
@@ -247,7 +253,10 @@ public class ExchangeRelay {
   /** Registers the outcome counter at zero. */
   @PostConstruct
   void register() {
-    for (String outcome : new String[] {OUTCOME_OK, OUTCOME_REFUSED, OUTCOME_FAILED}) {
+    for (String outcome :
+        new String[] {
+          OUTCOME_OK, OUTCOME_REFUSED, OUTCOME_FAILED, OUTCOME_ANSWER_CONTRACT_BROKEN
+        }) {
       meterRegistry.counter(
           MetricNames.EXCHANGE_RELAY,
           MetricNames.TAG_OUTCOME,
@@ -392,7 +401,9 @@ public class ExchangeRelay {
    *
    * <p>A {@code 401} or {@code 403} without a code the client may see refuses the gateway's own
    * identity (ADR-0129), so the cached service-account token is dropped and the next relay mints a
-   * fresh one; a refusal with such a code concerns the member or the client and keeps it.
+   * fresh one; a refusal with such a code concerns the member or the client and keeps it. A usable
+   * answer is not counted here: the caller settles it with {@link #countPassedOn} or {@link
+   * #countContractBroken} once it has checked the answer's contract.
    *
    * @param raw the answer
    * @param backendPath the backend path, for the log
@@ -403,7 +414,6 @@ public class ExchangeRelay {
   Result interpret(@NotNull Raw raw, @NotNull String backendPath, @NotNull String client) {
     JsonNode node = parse(raw.body());
     if (raw.status() >= 200 && raw.status() < 300 && node != null) {
-      count(OUTCOME_OK, client);
       return Result.ok(node);
     }
     if (raw.status() >= 400 && raw.status() < 600 && node != null && node.isObject()) {
@@ -463,6 +473,25 @@ public class ExchangeRelay {
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)
         ? ExchangeGateFilter.RETRY_AFTER_SECONDS
         : null;
+  }
+
+  /**
+   * Counts a usable answer the gateway passed on as {@code ok}.
+   *
+   * @param client the admitted request's registry client id
+   */
+  public void countPassedOn(@NotNull String client) {
+    count(OUTCOME_OK, client);
+  }
+
+  /**
+   * Counts a usable answer the gateway refused because it broke its contract as {@code
+   * answer_contract_broken} (REQ-XCH-050).
+   *
+   * @param client the admitted request's registry client id
+   */
+  public void countContractBroken(@NotNull String client) {
+    count(OUTCOME_ANSWER_CONTRACT_BROKEN, client);
   }
 
   /**

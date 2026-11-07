@@ -146,7 +146,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
 | `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records | `SystemSettingController`, `SystemController`, `PingResponse` |
 | `exchange` | `ActingMemberAuthorities`, `IngestGatewayProperties`, the problem codes and the two events | the relay services, gates, mirrors and feed readers, the 14 entities and 10 repositories, `ActingMemberFilter`, the change-source transaction manager, the sandbox guard, the retention tasks; the relay wire records in `internal.dto` | the eight relay controllers under `/api/v1/exchange`, the registry and bulk-undo administration, `ConnectedAppsController` |
-| `personalinventory` | — (publishes nothing; the account deletion reaches the module through its `UserErasureParticipant`) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository, `PersonalInventoryItemService`, the mapper and records, `UexLocationDto` | `PersonalInventoryController`, `AdminPersonalInventoryController`, `UexLocationController` |
+| `personalinventory` | — (publishes nothing; the account deletion reaches the module through its `UserErasureParticipant`) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository (with the selectable-location queries of REQ-P4K-039), `PersonalInventoryItemService`, the mapper and records, `PersonalInventoryLocationOption` | `PersonalInventoryController`, `AdminPersonalInventoryController` |
 | `navigation` | — (a leaf: publishes nothing, since the frontend reaches it over REST; the account deletion reaches the rows through the `app_user` cascade) | `NavigationPreferences` (the per-member root), the repository, `NavigationPreferencesService` and its transactional `Writer`, the metrics and gauge, the export section and merge participant, the request and response records | `NavigationPreferencesController` |
 | `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task) and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
 | `supply` | the need and donation status enums, `SupplyProblemCode` and its exception, `NeedPriceAudience` (the SPI `purchasing` implements) and the notices | `SupplyNeed`, `SupplyDonation`, `SupplyUnitSetting`, their repositories, the need, donation, settings, unit-setting and stats services, `SupplyAccessPolicy`, `SupplyMapper`, `SupplyBusinessGauges` and the export, erasure, merge and person-search participants | `SupplyNeedController`, `SupplyDonationController`, `SupplyStatsController`, `SupplyStateController`, `SupplyAdminController` |
@@ -215,7 +215,20 @@ an entity of the catalogue. The six records no model class embeds (`CityDto`, `O
 modules call (`BlueprintNameNormalizer`, `MaterialNameCanonicalizer`) sit in `catalogue.api`; the
 sync infrastructure (`SyncCoordinator`, `SyncChunkWriter`, `SyncReportService`), the UEX, SC Wiki
 and P4K feed records (`catalogue.internal.uex`, `.scwiki`, `.p4k`), the sync report entity and its
-repository and the integration properties sit in `catalogue.internal`. The kernel types
+repository and the integration properties sit in `catalogue.internal`. The P4K import there is an
+orchestrator (`P4kImportService`) that hands the kinds in dependency order to `P4kReconcilers`, one
+reconciler per catalogue kind sharing `P4kRowMatcher` over the rows each kind loads once into a
+`P4kRowIndex`, behind the upload gate `P4kUploadGate`, followed by the paint links and the ship
+loadout trees, which point at the rows the base kinds matched (the loadouts streamed in a second
+pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportReportService` and `P4kReviewService` serve the run list, the change
+reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
+(REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
+`P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
+`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The shops
+(`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
+terminal of its place by name (`ShopTerminalNames`), and `ShopAdminService` serves the admin's
+manual links; `ItemCatalogueDetailsService` shows an item's shops as "available at"
+(REQ-P4K-042…044). The kernel types
 `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
 enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
 publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in

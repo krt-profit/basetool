@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -2101,7 +2102,7 @@ class ExchangeOrgStockWriteControllerTest {
    */
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Writes " + id);
+    TestPlaces.insertLocation(jdbc, id, "Writes " + id);
     locations.add(id);
     return id;
   }

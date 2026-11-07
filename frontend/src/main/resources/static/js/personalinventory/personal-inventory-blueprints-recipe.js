@@ -3,12 +3,14 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     computeModifierValue,
-    formatFactorPercent,
+    formatModifierChange,
     formatStatRange,
     indexBaseStats,
+    isAdditive,
 } from '/js/personalinventory/personal-inventory-blueprint-stats.js';
 
 /** @type {HTMLElement | null} */
@@ -530,6 +532,14 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
             titleParts.push(
                 krtI18nText(i18n().statValueTitle, 'krtBlueprintsRecipeI18n.statValueTitle'),
             );
+            if (base.source) {
+                titleParts.push(
+                    krtI18nText(
+                        i18n()[`statSource${base.source}`],
+                        `krtBlueprintsRecipeI18n.statSource${base.source}`,
+                    ),
+                );
+            }
         }
         const bw = betterWhenText(m.betterWhen);
         if (bw) {
@@ -603,7 +613,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatFactorPercent(banded[0].modifierAtMaxQuality, document.documentElement.lang)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatModifierChange(banded[0].modifierAtMaxQuality, isAdditive(banded[0]), null, document.documentElement.lang, statUnitLabels())}`,
             );
         }
         if (hintParts.length > 0) {
@@ -651,19 +661,23 @@ function statUnitLabels() {
 }
 
 /**
- * Writes a chip's value for a modifier factor: „base → value" with the factor beside it when the
- * crafted item's base value is known, the factor alone otherwise.
+ * Writes a chip's value for a modifier value: „base → value" with the change beside it when the
+ * crafted item's base value is known, the change alone otherwise. A factor shows as a signed
+ * percentage, a summand of an additive modifier as a signed value in the stat's unit.
  *
  * @param {StatChip} chip the chip
- * @param {number | null | undefined} factor the modifier factor, null when unknown
- * @param {string} missing the text for an unknown factor
+ * @param {number | null | undefined} factor the modifier value, null when unknown
+ * @param {string} missing the text for an unknown value
  * @returns {void}
  */
 function showChipValue(chip, factor, missing) {
     const lang = document.documentElement.lang;
-    const factorText = factor == null ? missing : formatFactorPercent(factor, lang);
+    const additive = isAdditive(chip.modifier);
+    const units = statUnitLabels();
+    const factorText =
+        factor == null ? missing : formatModifierChange(factor, additive, chip.base, lang, units);
     if (chip.base && chip.factorOut) {
-        chip.out.textContent = formatStatRange(chip.base, factor, lang, statUnitLabels());
+        chip.out.textContent = formatStatRange(chip.base, factor, lang, units, additive);
         chip.factorOut.textContent = ` ${factorText}`;
         return;
     }
@@ -841,22 +855,46 @@ function craftCount(data) {
 }
 
 /**
+ * The name the page shows for a material of the breakdown (REQ-P4K-023).
+ *
+ * @param {ApiDto<'CraftabilityMaterialDto'>} m the material's breakdown
+ * @returns {string} the German name on a German page when there is one, else the name, `?` when
+ *     both are absent
+ */
+function shownMaterialName(m) {
+    return localisedName(m.materialName, m.materialNameDe) || '?';
+}
+
+/**
+ * The breakdown rows the craft under the current refinery setting consumes: of a choose-n recipe
+ * the two settings may count different option groups (REQ-P4K-027).
+ *
+ * @param {any} data the blueprint's craftability
+ * @returns {ApiDto<'CraftabilityMaterialDto'>[]} the counted rows in recipe order
+ */
+function countedMaterials(data) {
+    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
+    const materials = data.materials || [];
+    return materials.filter((m) => (refineryOn ? m.countedWithRefinery : m.counted));
+}
+
+/**
  * The materials that cap the craftable count under the current refinery setting: every material
  * whose own count equals the blueprint's count.
  *
  * @param {any} data the blueprint's craftability
- * @returns {string[]} the limiting material names, in recipe order; empty when none caps the count
+ * @returns {string[]} the limiting material names as the page shows them, in recipe order; empty
+ *     when none caps the count
  */
 function limitingNames(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     const count = craftCount(data);
     const names = materials
         .filter((m) => {
             return (refineryOn ? m.craftableWithRefinery : m.craftable) === count;
         })
         .map((m) => {
-            return m.materialName || '?';
+            return shownMaterialName(m);
         });
     if (names.length > 0) {
         return names;
@@ -1004,8 +1042,7 @@ function renderKpi(data) {
  * @returns {HTMLElement | null} the section, or null when no material was evaluated
  */
 function renderIngredients(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     if (materials.length === 0) {
         return null;
     }
@@ -1050,7 +1087,7 @@ function renderIngredients(data) {
         const unit = ` ${unitLabel(qt)}`;
         const row = el('tr');
         const nameCell = el('td');
-        nameCell.appendChild(el('span', 'cell-title', m.materialName || '?'));
+        nameCell.appendChild(el('span', 'cell-title', shownMaterialName(m)));
         row.appendChild(nameCell);
         const need = el('td', 'num', fmtAmount(m.requiredScu, qt) + unit);
         need.setAttribute('data-label', dict.colNeed || '');
@@ -1058,7 +1095,7 @@ function renderIngredients(data) {
         let stockState = 'is-ok';
         if (missing > 0) {
             stockState = 'is-short';
-        } else if (limits.has(m.materialName || '?')) {
+        } else if (limits.has(shownMaterialName(m))) {
             stockState = 'is-limit';
         }
         const stock = el('td', `num krt-bp-ing-stock ${stockState}`, fmtAmount(avail, qt) + unit);

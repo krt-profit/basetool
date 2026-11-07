@@ -108,6 +108,16 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
   @Column(name = "wiki_item_uuid")
   private UUID wikiItemUuid;
 
+  /** The P4K {@code ResourceType} GUID of a RESOURCE line the P4K wrote. */
+  @Column(name = "p4k_resource_guid")
+  @Nullable
+  private UUID p4kResourceGuid;
+
+  /** The P4K entity GUID of an ITEM line the P4K wrote. */
+  @Column(name = "p4k_item_guid")
+  @Nullable
+  private UUID p4kItemGuid;
+
   /** Wiki display name of the ingredient at sync time — kept even when the FK resolves. */
   @Column(name = "wiki_name_snapshot")
   @Nullable
@@ -127,5 +137,6 @@ public class BlueprintIngredient extends AbstractEntity<UUID> {
    * Minimum quality tier the ingredient must have (Wiki {@code min_quality}); {@code null} if none.
    */
   @Column(name = "min_quality")
+  @Nullable
   private Integer minQuality;
 }

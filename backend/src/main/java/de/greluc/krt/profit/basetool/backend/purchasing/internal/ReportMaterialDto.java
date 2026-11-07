@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * @param boughtAmount the amount accepted
  * @param averageUnitPrice the unit price weighted by the deal amounts, in aUEC
  * @param uexReferencePrice the UEX buy price of a material, or {@code null}
+ * @param nameDe its German name, or {@code null} (REQ-P4K-023)
  */
 public record ReportMaterialDto(
     UUID catalogueId,
@@ -38,4 +39,26 @@ public record ReportMaterialDto(
     int dealCount,
     double boughtAmount,
     double averageUnitPrice,
-    @Nullable Double uexReferencePrice) {}
+    @Nullable Double uexReferencePrice,
+    @Nullable String nameDe) {
+
+  /**
+   * Builds a report row without a German name.
+   *
+   * @param catalogueId the material or game item
+   * @param name its name
+   * @param dealCount deals for it
+   * @param boughtAmount the amount accepted
+   * @param averageUnitPrice the unit price weighted by the deal amounts, in aUEC
+   * @param uexReferencePrice the UEX buy price of a material, or {@code null}
+   */
+  public ReportMaterialDto(
+      UUID catalogueId,
+      String name,
+      int dealCount,
+      double boughtAmount,
+      double averageUnitPrice,
+      @Nullable Double uexReferencePrice) {
+    this(catalogueId, name, dealCount, boughtAmount, averageUnitPrice, uexReferencePrice, null);
+  }
+}

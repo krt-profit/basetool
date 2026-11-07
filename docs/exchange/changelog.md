@@ -5,6 +5,29 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-07
 
+- **New: warehouse locations carry `guid`.** A location linked to a starmap object, itself or
+  through its city or space station, carries the object's DataForge GUID as `guid` in
+  `catalog/locations` and in the `location` of the stock, org-stock and ship feeds. A `location` in
+  a change set accepts `guid`, tried before `uex` and `name`; an unknown GUID falls back to them
+  ([formats](formats.md#place--location-ref)). `uex` stays and is not deprecated; `name` stays the
+  warehouse's own name. `location.schema.json` and `location-ref.schema.json` gain the optional
+  `guid`.
+- **Changed: a `SHIP_TYPE` name several ship types share is `ambiguous`.** It resolved to one of
+  them before; it now answers `ambiguous` with at most ten candidates, so let the member pick one or
+  send a key field. No schema changes: `ambiguous` with its candidates has always been a possible
+  answer in `v1`, so a tolerant client already handles it ([catalogue](resources/catalog.md)).
+- **New: more `SHIP_TYPE` keys resolve.** `scGuid` also matches the game-file GUID, the `scRecord`
+  of a variant without a ship type of its own resolves to its group's base, and `uexId` falls back
+  to the curated class-name alias ([catalogue](resources/catalog.md)).
+- **New: blueprints carry `guid`.** A blueprint product is keyed by the DataForge GUID of the
+  item it produces. The blueprint feed, `catalog/resolve` and its candidates answer it as
+  `ref.guid`, and an item reference accepts `guid`, which wins over every other field
+  ([formats](formats.md)). Once the Basetool moves a product onto its GUID, its feed `key`
+  becomes the GUID: the feed removes the old key and adds the new one.
+- **Deprecated: `bt` on blueprint references.** A blueprint's `bt`, including a name key stored
+  earlier, keeps resolving for 90 days from the release that adds `guid`; a later entry here
+  announces its removal with the date. Switch to `guid`. `bt` of items, materials and ship
+  types is unchanged.
 - **Changed: an `Idempotency-Key` is replayed for 1 hour instead of 24.** A retry under the same
   key later than that runs as a new write; retry within the hour, or re-read and send what is still
   missing ([sync guide](sync-guide.md#idempotency-keys)). A member's periodic sync no longer fills

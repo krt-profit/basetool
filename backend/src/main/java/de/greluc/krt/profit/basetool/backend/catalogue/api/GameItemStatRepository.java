@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for {@link GameItemStat}, the stored blueprint stat base values. */
@@ -38,6 +40,14 @@ public interface GameItemStatRepository extends JpaRepository<GameItemStat, UUID
   List<GameItemStat> findByGameItemId(UUID gameItemId);
 
   /**
+   * Returns every stored base value of several game items in one query.
+   *
+   * @param gameItemIds the game items' ids
+   * @return the items' stat rows, empty when none is stored
+   */
+  List<GameItemStat> findByGameItemIdIn(Collection<UUID> gameItemIds);
+
+  /**
    * Returns the in-game UUIDs of the items active blueprints craft that have no stored base value
    * yet, so the item sync can fetch their full Wiki payload.
    *
@@ -50,10 +60,11 @@ public interface GameItemStatRepository extends JpaRepository<GameItemStat, UUID
   List<UUID> findBlueprintOutputUuidsWithoutStats();
 
   /**
-   * Counts the game items that carry at least one stored base value.
+   * Counts the game items that carry at least one stored base value of a source.
    *
-   * @return the number of distinct items with a {@code game_item_stat} row
+   * @param source the source of the values
+   * @return the number of distinct items with a {@code game_item_stat} row of that source
    */
-  @Query("SELECT COUNT(DISTINCT s.gameItem) FROM GameItemStat s")
-  long countItemsWithStats();
+  @Query("SELECT COUNT(DISTINCT s.gameItem) FROM GameItemStat s WHERE s.source = :source")
+  long countItemsWithStatsBySource(@Param("source") GameItemStatSource source);
 }

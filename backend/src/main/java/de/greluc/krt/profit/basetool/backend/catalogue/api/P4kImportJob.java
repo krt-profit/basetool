@@ -37,8 +37,8 @@ import lombok.Setter;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One asynchronous KRT P4K Reader catalog-import run, either a {@link P4kImportJobKind#PREVIEW
- * PREVIEW} or an {@link P4kImportJobKind#APPLY APPLY} launched from a finished preview.
+ * One asynchronous P4K catalogue-import run, either a {@link P4kImportJobKind#PREVIEW PREVIEW} or
+ * an {@link P4kImportJobKind#APPLY APPLY} launched from a finished preview.
  *
  * <p>An {@code @Async} worker moves it from {@link P4kImportJobStatus#PENDING PENDING} through
  * {@link P4kImportJobStatus#RUNNING RUNNING} to {@link P4kImportJobStatus#SUCCEEDED SUCCEEDED}
@@ -68,9 +68,16 @@ public class P4kImportJob extends AbstractEntity<UUID> {
   @Column(name = "status", nullable = false, length = 16)
   private P4kImportJobStatus status;
 
-  /** For an APPLY run: whether brand-new unmatched player-facing rows are seeded. */
-  @Column(name = "seed_new", nullable = false)
-  private boolean seedNew;
+  /** For an APPLY run: whether unmatched playable items and ships are created (REQ-P4K-009). */
+  @Column(name = "create_items_and_ships", nullable = false)
+  private boolean createItemsAndShips;
+
+  /**
+   * For an APPLY run: whether a kind is swept even when the sweep would stamp more of it than the
+   * mass guard allows (REQ-P4K-012).
+   */
+  @Column(name = "override_mass_guard", nullable = false)
+  private boolean overrideMassGuard;
 
   /** Original upload filename, for display in the job list (forensic; may be {@code null}). */
   @Column(name = "source_filename", length = 255)

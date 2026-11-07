@@ -416,8 +416,6 @@ public class SecurityConfig {
                 .hasAnyRole(Roles.ADMIN, Roles.LOGISTICIAN, Roles.KRT_MEMBER)
                 .requestMatchers("/api/v1/personal-inventory", "/api/v1/personal-inventory/**")
                 .authenticated()
-                .requestMatchers("/api/v1/uex/locations/**")
-                .authenticated()
                 .requestMatchers("/api/v1/audit/**")
                 .hasRole(Roles.ADMIN)
                 .anyRequest()

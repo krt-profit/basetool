@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -51,6 +54,7 @@ public class SyncRunService {
   private final MeterRegistry registry;
   private final AdminDashboardLiveSync liveSync;
   private final LiveSyncPublisher catalogueUpdates;
+  private final AuditRecorder auditRecorder;
   private final TransactionTemplate transaction;
   private final ConcurrentHashMap<RunKey, AtomicLong> active = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<RunKey, AtomicLong> lastComplete = new ConcurrentHashMap<>();
@@ -66,6 +70,7 @@ public class SyncRunService {
    * @param registry bounded outcome and freshness metrics
    * @param liveSync notifies connected administration dashboards
    * @param catalogueUpdates notifies member catalogue views after committed source writes
+   * @param auditRecorder records the {@code CATALOGUE} summary of each finished run
    * @param transactionManager application transaction manager
    */
   public SyncRunService(
@@ -74,12 +79,14 @@ public class SyncRunService {
       MeterRegistry registry,
       AdminDashboardLiveSync liveSync,
       LiveSyncPublisher catalogueUpdates,
+      AuditRecorder auditRecorder,
       @NotNull PlatformTransactionManager transactionManager) {
     this.repository = repository;
     this.progress = progress;
     this.registry = registry;
     this.liveSync = liveSync;
     this.catalogueUpdates = catalogueUpdates;
+    this.auditRecorder = auditRecorder;
     transaction = new TransactionTemplate(transactionManager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -213,6 +220,7 @@ public class SyncRunService {
       run.setCensusComplete(snapshot.isFetchObserved() && snapshot.isCensusComplete());
       run.setSweepOutcome(snapshot.getSweepOutcome());
       repository.save(run);
+      recordSummary(run);
       liveSync.syncStatusChanged();
       if (key.aggregate() == SyncAggregate.CATALOGUE && snapshot.getApplied() > 0) {
         catalogueUpdates.publishAfterCommit(
@@ -236,6 +244,29 @@ public class SyncRunService {
               key, value -> gauge(value, CatalogueMetricNames.CATALOGUE_ATTEMPT_LAST_COMPLETE))
           .set(finishedAt.getEpochSecond());
     }
+  }
+
+  /**
+   * Records the run's {@code CATALOGUE} audit summary in the transaction that finishes it, so the
+   * event exists exactly when the run's outcome and counts are committed (REQ-AUDIT-001). The
+   * scheduled syncs run without an authentication, so the actor is {@code system}.
+   *
+   * @param run the finished run
+   */
+  private void recordSummary(@NotNull ExternalSyncRun run) {
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SYNC_RUN_FINISHED,
+        run.getId(),
+        run.getSourceSystem().name() + " " + run.getAggregate().name(),
+        null,
+        AuditDetails.of("source", run.getSourceSystem())
+            .with("aggregate", run.getAggregate())
+            .with("status", run.getStatus())
+            .with("fetched", run.getFetched())
+            .with("applied", run.getApplied())
+            .with("skipped", run.getSkipped())
+            .with("failed", run.getFailed())
+            .with("sweep", run.getSweepOutcome()));
   }
 
   private void publishStatus(RunKey key, SyncRunStatus currentStatus) {

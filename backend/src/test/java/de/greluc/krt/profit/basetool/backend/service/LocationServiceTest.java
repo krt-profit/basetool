@@ -23,17 +23,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueAdminLiveSync;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapObject;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapObjectRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapPlaceRows;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapVisibility;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,20 +63,47 @@ class LocationServiceTest {
 
   @Mock private LocationUsage orderUsage;
 
+  @Mock private AuditRecorder auditRecorder;
+
+  @Mock private StarmapObjectRepository starmapObjectRepository;
+
+  @Mock private StarmapVisibility starmapVisibility;
+
+  @Mock private StarmapPlaceRows starmapPlaceRows;
+  @Mock private CatalogueAdminLiveSync adminLiveSync;
+
   private LocationService locationService;
 
   @BeforeEach
   void setUp() {
     locationService =
-        new LocationService(locationRepository, locationMapper, List.of(orderUsage, shipUsage));
+        new LocationService(
+            locationRepository,
+            locationMapper,
+            List.of(orderUsage, shipUsage),
+            auditRecorder,
+            starmapObjectRepository,
+            starmapVisibility,
+            starmapPlaceRows,
+            adminLiveSync);
   }
 
   @Test
-  void createLocation_ShouldSaveDirectly() {
+  void createLocation_OnAVisibleStarmapObject_ShouldSave() {
+    StarmapObject node = new StarmapObject();
+    node.setId(UUID.randomUUID());
+    node.setHideInStarmap(false);
+    node.setStarSystem("stanton");
+    node.setPositionX(1.0);
+    node.setPositionY(2.0);
+    node.setPositionZ(3.0);
     Location inputLocation = new Location();
     inputLocation.setName("Port Olisar");
+    inputLocation.setStarmapObjectId(node.getId());
 
     when(locationRepository.existsByNameIgnoreCase("Port Olisar")).thenReturn(false);
+    when(starmapObjectRepository.findById(node.getId())).thenReturn(Optional.of(node));
+    when(starmapVisibility.liveSystems()).thenReturn(Set.of("stanton"));
     when(locationRepository.save(any(Location.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -77,6 +112,16 @@ class LocationServiceTest {
     assertNotNull(savedLocation);
     assertEquals("Port Olisar", savedLocation.getName());
     verify(locationRepository, times(1)).save(inputLocation);
+    verify(adminLiveSync).starmapChanged();
+  }
+
+  @Test
+  void createLocation_WithoutStarmapObject_ShouldBeRefused() {
+    Location inputLocation = new Location();
+    inputLocation.setName("Free");
+
+    assertThrows(BadRequestException.class, () -> locationService.createLocation(inputLocation));
+    verify(locationRepository, never()).save(any(Location.class));
   }
 
   @Test
@@ -183,15 +228,19 @@ class LocationServiceTest {
     orison.setName("Orison");
     Location lorville = new Location();
     lorville.setName("Lorville");
-    LocationDto orisonDto = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 0L);
-    LocationDto lorvilleDto = new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 0L);
-    when(locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc())
+    LocationDto orisonDto =
+        new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 0L, null, null, null);
+    LocationDto lorvilleDto =
+        new LocationDto(UUID.randomUUID(), "Lorville", null, false, true, 0L, null, null, null);
+    when(locationRepository
+            .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc())
         .thenReturn(List.of(orison, lorville));
     when(locationMapper.toDto(orison)).thenReturn(orisonDto);
     when(locationMapper.toDto(lorville)).thenReturn(lorvilleDto);
 
     assertEquals(List.of(orisonDto, lorvilleDto), locationService.getHomeLocations());
-    verify(locationRepository, times(1)).findByHomeLocationTrueAndHiddenFalseOrderByNameDesc();
+    verify(locationRepository, times(1))
+        .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc();
   }
 
   @Test
@@ -208,7 +257,7 @@ class LocationServiceTest {
     when(locationRepository.save(any(Location.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    LocationDto dto = new LocationDto(id, "Lorville", "Hurston", false, true, 1L);
+    LocationDto dto = new LocationDto(id, "Lorville", "Hurston", false, true, 1L, null, null, null);
     Location result = locationService.updateLocation(id, dto);
 
     assertTrue(result.getHomeLocation(), "updateLocation must copy the homeLocation flag from DTO");

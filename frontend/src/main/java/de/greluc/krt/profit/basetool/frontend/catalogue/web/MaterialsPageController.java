@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -45,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -220,8 +222,9 @@ public class MaterialsPageController {
    * Renders the matrix-overview shell ({@code /materials/overview}) with the full material-name and
    * star-system filter lists; the grid itself comes from {@link #getMatrixData}.
    *
-   * @param model Thymeleaf model populated with the {@code materialNames} and {@code starSystems}
-   *     filter source lists and the {@code uexAge} freshness hint
+   * @param model Thymeleaf model populated with the {@code materialLabels} (material name to shown
+   *     name, sorted by name) and {@code starSystems} filter sources and the {@code uexAge}
+   *     freshness hint
    * @return the {@code materials-overview} view name
    */
   @NotNull
@@ -231,7 +234,7 @@ public class MaterialsPageController {
     if (!SectionFallback.run(log, "materials-matrix-filters", () -> addMatrixFilters(model))) {
       model.addAttribute("error", "error.materials.matrix.load");
       model.addAttribute("starSystems", new TreeSet<>());
-      model.addAttribute("materialNames", new TreeSet<>());
+      model.addAttribute("materialLabels", new TreeMap<>());
     }
     return "catalogue/materials-overview";
   }
@@ -249,11 +252,16 @@ public class MaterialsPageController {
             .map(item -> item.starSystemName() != null ? item.starSystemName() : "")
             .filter(s -> !s.isEmpty())
             .collect(Collectors.toCollection(TreeSet::new)));
+    Locale locale = LocaleContextHolder.getLocale();
     model.addAttribute(
-        "materialNames",
+        "materialLabels",
         items.stream()
-            .map(MaterialMatrixItemDto::materialName)
-            .collect(Collectors.toCollection(TreeSet::new)));
+            .collect(
+                Collectors.toMap(
+                    MaterialMatrixItemDto::materialName,
+                    item -> item.materialDisplayName(locale),
+                    (first, _) -> first,
+                    TreeMap::new)));
   }
 
   /**
@@ -361,6 +369,7 @@ public class MaterialsPageController {
     Map<String, Map<String, MatrixGridDto.Cell>> pricesByMaterial = new HashMap<>();
     Map<String, String> kindByMaterial = new HashMap<>();
     Map<String, boolean[]> flagsByMaterial = new HashMap<>();
+    Map<String, String> nameDeByMaterial = new HashMap<>();
 
     for (MaterialMatrixItemDto item : items) {
       String effectiveSystem = item.starSystemName() != null ? item.starSystemName() : "";
@@ -386,6 +395,9 @@ public class MaterialsPageController {
                   && !item.category().name().isBlank()
               ? item.category().name()
               : "Unsortiert");
+      if (item.materialNameDe() != null) {
+        nameDeByMaterial.put(material, item.materialNameDe());
+      }
       boolean[] flags = flagsByMaterial.computeIfAbsent(material, _ -> new boolean[3]);
       if (Boolean.TRUE.equals(item.isIllegal())) {
         flags[0] = true;
@@ -439,7 +451,14 @@ public class MaterialsPageController {
       boolean[] flags = flagsByMaterial.getOrDefault(material, new boolean[3]);
       rowsByKind
           .computeIfAbsent(kindByMaterial.get(material), _ -> new ArrayList<>())
-          .add(new MatrixGridDto.Row(material, flags[0], flags[1], flags[2], entry.getValue()));
+          .add(
+              new MatrixGridDto.Row(
+                  material,
+                  flags[0],
+                  flags[1],
+                  flags[2],
+                  entry.getValue(),
+                  nameDeByMaterial.get(material)));
     }
     rowsByKind
         .values()

@@ -1636,19 +1636,20 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   The counter covers the cross-kind item sweep. The durable source/aggregate attempt metrics above
   record skipped sweeps and incomplete outcomes for vehicle, commodity, blueprint and manufacturer
   slices as well; `CatalogueAttemptIncomplete` covers those independently of this item-only counter.
-- `basetool_catalogue_item_class_unknown_total` counter (untagged, `ScWikiItemSyncService`), bumped
-  once per SC Wiki item whose `class` value is no `ShipComponentClass` (REQ-DATA-024, ADR-0283).
-  The item is still written, with no class, so without the meter a new in-game class would only
-  show as components missing their chip. The value itself is unbounded upstream text and goes to
-  the WARN log once per value, never into a label. Registered at zero by every enabled item sync, so
-  the first increment is visible to `increase()`. Backs `ScWikiItemClassUnknown` (> 0 in 24h for
-  1h, warning).
-- `basetool_catalogue_items_with_stats` gauge (untagged, `ScWikiItemSyncService`), the number of
-  game items with a stored blueprint stat base value (REQ-DATA-027, ADR-0309), registered by every
-  enabled item sync and set from `game_item_stat` at the end of the run. The values come from stat
-  blocks of the Wiki item payload, so a renamed block or field empties them while the sync keeps
-  succeeding; the gauge is what makes that visible. Backs `ScWikiItemStatsMissing` (== 0 for 48h,
-  warning); absent while the item sync is disabled.
+- `basetool_catalogue_item_class_unknown_total` counter (untagged, `ItemClassResolver`), bumped
+  once per SC Wiki item and once per item of a P4K APPLY whose class value is no
+  `ShipComponentClass` (REQ-OBS-023, ADR-0337). The item is still written, with no class, so
+  without the meter a new in-game class would only show as components missing their chip. The value
+  itself is unbounded upstream text and goes to the WARN log once per value, never into a label.
+  Registered at zero when the backend starts, so the first increment is visible to `increase()`.
+  Backs `ScWikiItemClassUnknown` (> 0 in 24h for 1h, warning).
+- `basetool_catalogue_items_with_stats{source}` gauge (`CatalogueStatBusinessGauges`, a
+  `BusinessGaugeSource`), the number of game items with a stored blueprint stat base value per
+  `game_item_stat.source` (`P4K`, `SCWIKI`; REQ-OBS-023, ADR-0342), registered at zero when the
+  backend starts and sampled from `game_item_stat` on the business-metrics interval. The values come
+  from stat blocks of the P4K catalogue and of the Wiki item payload, so a renamed block or field
+  empties them while the import or sync keeps succeeding; the gauge is what makes that visible.
+  Backs `ScWikiItemStatsMissing` (the maximum over both sources == 0 for 48h, warning).
 - `basetool_redis_fanout_subscribed{fanout}` gauge (`LiveSyncRedisConfig`,
   `NotificationRedisConfig`), 1 while the cross-instance pub/sub container is listening and 0 while
   it is not; `fanout` is the two-valued literal `livesync` / `notifications`. Exists because the
@@ -1918,12 +1919,18 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   ingest auth failures); the metric carries no client, so the Exchange dashboard's `client_id`
   variable does not filter it.
 - `basetool_ingest_exchange_relay_total{outcome,client_id}` counter — every admitted exchange request the
-  gateway relayed: `ok`, `refused` (the backend refused with a code of the exchange error registry,
-  passed on to the client) or `failed` (answered `502 BACKEND_RELAY_FAILED` — including a backend
-  that cannot be reached, an open circuit breaker and a missing gateway token), registered at zero.
-  `ExchangeRelayFailing` (warning) fires on more than three failures in 15 minutes (REQ-XCH-011,
-  REQ-XCH-028). A large change set refused for want of a slot is not relayed and not counted here
-  but as `relay_busy` on the refusal counter.
+  gateway relayed: `ok` (a usable answer the gateway passed on), `refused` (the backend refused with
+  a code of the exchange error registry, passed on to the client), `failed` (answered `502
+  BACKEND_RELAY_FAILED` — including a backend that cannot be reached, an open circuit breaker and a
+  missing gateway token) or `answer_contract_broken` (a 2xx answer that broke its response schema or
+  carried a property the schema does not declare, answered `502 BACKEND_RELAY_FAILED`; REQ-XCH-050),
+  registered at zero. A usable answer counts once, as `ok` or `answer_contract_broken`, after the
+  gateway checked its contract. `ExchangeRelayFailing` (warning) fires on more than three failures
+  in 15 minutes (REQ-XCH-011, REQ-XCH-028); `ExchangeAnswerContractBroken` (warning) fires per
+  `client_id` on any broken answer, including a client's first, whose series starts at one; its WARN
+  line `Exchange answer breaks` names the schema, the route and the JSON Pointers, never a value. A
+  large change set refused for want of a slot is not relayed and not counted here but as
+  `relay_busy` on the refusal counter.
 - The exchange relay's own Resilience4j circuit breaker `exchange` and its bulkhead
   `exchangeLargeChangeSets` (four change sets of more than 100 ops at once, REQ-XCH-023) report
   through `resilience4j_circuitbreaker_state{application="basetool-ingest",name}` and
@@ -1997,6 +2004,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `ambiguous` / `unmatched`), registered at zero for every pair. It shows how well external
   clients' references meet the catalogue; no alert, since an unmatched reference is the
   client's input, not a fault (REQ-XCH-012).
+- `basetool_exchange_blueprint_bt_refs_total` counter, one per blueprint reference
+  `catalog/resolve` received with the deprecated `bt` (a change set's references count too,
+  since they resolve the same way), registered at zero and shown beside the resolutions on the
+  operations dashboard. It watches the 90-day deprecation window of a blueprint's `bt`, which is
+  removed once the line stays at zero; no alert (REQ-XCH-015, ADR-0343).
 - `basetool_exchange_registry_changes_total{action}` counter, one per committed registry change
   (`action` = `created` / `updated` / `suspended` / `activated` / `switch_on` / `switch_off`, the
   bounded `ExchangeRegistryAction`), registered at zero for every action. It backs
@@ -2037,6 +2049,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `PurchasingSettlementOverdue` fires when a settlement has been overdue for 3 days (covered by a
   promtool test); the `PURCHASING` audit domain is excluded from `AuditDomainSilenceAnomaly` like
   `SUPPLY`, and the operations dashboard gains the purchasing panels.
+- The `CATALOGUE` audit domain (ADR-0346) is excluded from `AuditDomainSilenceAnomaly` as well;
+  its admin mutations are rare, and a sync outage is reported by the sync monitoring instead
+  (`audit_domain_silence_alerts_13_silent_catalogue_is_exempt_test.yml`).
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
@@ -2298,7 +2313,7 @@ counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` la
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
-`catalogue`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
+`catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 The backend and frontend share the `catalogue` section allow-list. Committed source changes publish
@@ -4035,23 +4050,24 @@ REQ-SEC-014, REQ-SEC-024
 
 ### REQ-OBS-022 — The P4K import reports when it is due, what each run did and every refused upload
 
-> [!note] Planned — implementation pending (#2895; ADR-0335, ADR-0336)
-> Nothing below is built. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
-> `basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` /
-> `P4kImportFailed` of REQ-OBS-011 stay as they are.
-
 The P4K catalogue import ([`p4k-catalogue.md`](p4k-catalogue.md),
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md),
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md))
 is observable on three axes: whether a new import is due, what the last applied run did, and which
-uploads the gate refused.
+uploads the gate refused. The queue gauge `basetool_p4k_import_job_pending_count`, the counter
+`basetool_p4k_import_jobs_total{outcome,kind}` and the alerts `P4kImportStuck` / `P4kImportFailed`
+of REQ-OBS-011 stay as they are; they are where a failed APPLY shows, since `p4k_import_run` holds
+successful runs only. A P4K APPLY writes no `external_sync_run` attempt, so the `CatalogueAttempt*`
+alerts never carry `source="P4K"`.
 
-- **"P4K import due".** The signal compares versions only; there is no age rule. Per source, UEX
-  and the SC Wiki, the current game version is the highest version, compared semantically as
-  major.minor.patch, among the rows that source's last successful sync wrote
-  (`game_item.uex_game_version_seen`, `game_item.scwiki_game_version_seen`,
-  `blueprint.game_version_seen`). The import is due when the UEX version **or** the Wiki version is
-  newer than the patch version of the last successful APPLY run with a known version.
+- **"P4K import due".** The signal compares versions only; there is no age rule. Versions compare
+  semantically as major.minor.patch (`P4kGameVersion`; `4.10.2-LIVE.12881860` reads as `4.10.2`,
+  `4.10` as `4.10.0`). The UEX version is the highest `game_item.uex_game_version_seen`; UEX
+  attempts carry no source-wide build. The SC Wiki version is the `game_version` of the newest
+  complete (`SUCCESS` / `UNCHANGED`) SC Wiki `CATALOGUE` attempt in `external_sync_run`
+  (REQ-OBS-011), the build the whole sweep was pinned to. The import is due when the UEX version
+  **or** the Wiki version is newer than the patch version of the last APPLY run with a known
+  version (`P4kImportDueService`).
 - **An APPLY run's patch version.** It is `source.build.publicPatch` of the
   [catalogue contract](https://github.com/p4kx-org/p4kx/blob/main/docs/basetool-catalog.md) when
   present. When that is `null`, the version of `source.build.branch` serves as a lower bound, only
@@ -4063,52 +4079,82 @@ uploads the gate refused.
   successful APPLY run of known version the import counts as due. The Build number
   (`changeNumber`) is never used in its place.
 - **Where it shows.** A "P4K import due" banner on `/admin/p4k-import` appears as soon as the
-  condition holds. A Prometheus alert (`severity: warning`) fires once the condition has held for
-  7 days, with an `absent()` companion for the case of no successful APPLY run. There is no
-  notification type for it.
-- **Per-run gauges.** A `BusinessGaugeSource` of the P4K module reads the last APPLY run from
-  `p4k_import_run` / `p4k_import_change`, sampled by `BusinessMetricsCollector` (REQ-OBS-011), and
-  publishes: the rows per kind and outcome (matched, unmatched, added, vanished, reappeared,
-  changed); the unknown grade values and unknown class values (REQ-OBS-023); the share of
-  `itemClass` `null` and its change against the previous run; the rows the sweep stamped, per kind;
-  the open review cases per kind and the age of the oldest open case. The starmap kind joins these
-  gauges with its rows, its unmatched UEX rows and its open link reviews
-  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). Labels are
+  condition holds; the page reads it from `GET /api/v1/catalog/admin/import/p4k/due` on load and
+  again after an APPLY finishes. The gauge `basetool_p4k_import_due` is `1` while the condition
+  holds, never-run included. The alert `P4kImportDue` (`severity: warning`) fires once it has held
+  for 7 days, with an `absent()` companion in the same rule for a backend that exports no due gauge.
+  There is no notification type for it.
+- **Per-run gauges.** `P4kCatalogueBusinessGauges`, a `BusinessGaugeSource` sampled by
+  `BusinessMetricsCollector` (REQ-OBS-011), reads the last two APPLY runs from `p4k_import_run` /
+  `p4k_import_change` and publishes:
+  - `basetool_p4k_import_last_run_rows{kind,outcome}`: the last run's rows per kind and outcome
+    (`matched`, `unmatched`, `added`, `vanished`, `reappeared`, `changed`); `vanished` is the rows
+    the run's sweep stamped. A kind the run did not list reads 0.
+  - `basetool_p4k_import_last_run_unknown_grades` and `basetool_p4k_import_last_run_unknown_classes`:
+    the last run's `UNKNOWN_VALUE` report rows of kind `ITEM` with `field_name` `grade` and
+    `itemClass` (REQ-OBS-023). The item reconciler reports them under those two field names.
+  - `basetool_p4k_import_last_run_item_class_null_ratio`: the share, 0 to 1, of the catalogue's
+    items whose `itemClass` is `null` or blank, stored per run in
+    `p4k_import_run.item_class_null_share` (an unknown value is a value, not a `null`); `NaN` before
+    the first run that recorded it. `basetool_p4k_import_last_run_item_class_null_ratio_change` is
+    the last run's share minus the previous run's, `0` when either is unknown.
+  - `basetool_p4k_catalogue_stamped_rows{kind}`: the P4K-known rows a sweep stamped as gone and no
+    later run matched again.
+  - `basetool_p4k_review_cases_open{kind}` and `basetool_p4k_review_case_open_oldest_age_seconds`.
+
+  The starmap kind is `kind="STARMAP_OBJECT"` in these gauges: its `matched`, `added` and
+  `changed` rows count the starmap objects, its `unmatched` rows the UEX location rows the run left
+  unlinked, and `basetool_p4k_review_cases_open` its open link reviews
+  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). The shop
+  kind is `kind="SHOP"`: its `matched`, `added` and `changed` rows count the shops, its `unmatched`
+  rows the shops the run left without a UEX terminal, and `basetool_p4k_review_cases_open` their
+  open link reviews
+  ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md)). The blueprint categories
+  are `kind="BLUEPRINT_CATEGORY"` (REQ-P4K-027). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
   change report records a skipped sweep.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the
   synchronous gate refuses, with `reason` one of `channel`, `schema_version`, `build_missing`,
-  `older_build` and `too_large`.
-- **Alerts.** All `severity: warning`, in `monitoring/prometheus/alerts/`, each with a rule test:
-  the import-due alert above; unknown grade or class values in the last run greater than 0; the
-  `itemClass` `null` share rose by more than 5 percentage points against the previous run; the
-  oldest open review case is older than 30 days; a `reason="channel"` refusal within 24 h, which
-  means a test-Channel catalogue was uploaded to production.
-- **Dashboard.** A Grafana dashboard of its own, "P4K catalogue", shows the panels above. They do
-  not go into `07-basetool-operations.json`.
+  `older_build` and `too_large`; every reason's series is registered at zero at start, so the first
+  refusal is an increase.
+- **Alerts.** All `severity: warning`, in `monitoring/prometheus/alerts/business.yml`, each with a
+  rule test in `monitoring/prometheus/tests/p4k_catalogue_alerts_test.yml`: `P4kImportDue` above;
+  `P4kImportUnknownValues`, unknown grade or class values in the last run greater than 0;
+  `P4kImportItemClassNullShareRose`, the `itemClass` `null` share rose by more than 5 percentage
+  points against the previous run; `P4kReviewCaseStale`, the oldest open review case is older than
+  30 days; `P4kImportChannelRejected`, a `reason="channel"` refusal within 24 h, which means a
+  test-Channel catalogue was uploaded to production.
+- **Dashboard.** The Grafana dashboard "P4K catalogue" (`12-p4k-catalogue.json`, uid
+  `basetool-p4k-catalogue`) shows the panels above. They do not go into
+  `07-basetool-operations.json`.
 
 **Acceptance**
 
-- [ ] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
-  stays off for an equal or older one, and holds with no successful APPLY run of known version.
-- [ ] A run's version is `publicPatch`, else the lower bound of an exact
+- [x] The due signal holds for a UEX or Wiki version newer than the last known APPLY version,
+  stays off for an equal or older one, and holds with no successful APPLY run of known version
+  (`P4kImportDueTest`).
+- [x] A run's version is `publicPatch`, else the lower bound of an exact
   `sc-alpha-<major>.<minor>.<patch>` branch, else unknown; the run records which it is, and a UEX
-  version above a branch lower bound reads as due.
-- [ ] The banner shows on `/admin/p4k-import` while the signal holds; the alert fires only after
-  7 days of it.
-- [ ] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
-  `kind` and `outcome`.
-- [ ] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once.
-- [ ] Every alert above has a promtool rule test that fires and stays silent.
+  version above a branch lower bound reads as due (`P4kImportRunTest`, `P4kImportDueTest`).
+- [x] The banner shows on `/admin/p4k-import` while the signal holds (`AdminP4kImportDueMvcTest`);
+  the alert fires only after 7 days of it (`p4k_catalogue_alerts_test.yml`).
+- [x] Every gauge above is registered, pinned in `monitoring/business-gauges.txt`, and carries only
+  `kind` and `outcome` (`BusinessMetricsCollectorTest`, `P4kCatalogueBusinessGaugesTest`).
+- [x] Each refusal reason of the gate bumps `basetool_p4k_import_rejected_total` once, and every
+  reason exists at zero before the first refusal (`P4kUploadGateTest`, `P4kRejectionsTest`).
+- [x] Every alert above has a promtool rule test that fires and stays silent.
 
-**Enforced by:** — (planned) · **Related:** REQ-OBS-006, REQ-OBS-011, REQ-OBS-023 · **Issues:**
-#2895, #2896
+**Enforced by:** `P4kImportDueService`, `P4kCatalogueBusinessGauges`, `P4kRejections`,
+`CatalogueMetricNames` · `P4kImportDueTest`, `P4kGameVersionTest`, `P4kItemClassShareTest`,
+`P4kCatalogueBusinessGaugesTest`, `P4kRejectionsTest`, `BusinessMetricsCollectorTest`,
+`AdminP4kImportDueMvcTest` · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/p4k_catalogue_alerts_test.yml`,
+`monitoring/grafana/dashboards/12-p4k-catalogue.json` · **Related:** REQ-OBS-006, REQ-OBS-011,
+REQ-OBS-023 · **Issues:** #2895, #2896, #3034
 
 ### REQ-OBS-023 — The catalogue's precedence is visible: unknown grades and classes, stat sources
 
-> [!note] Planned — implementation pending (#2889, #2927; ADR-0337, ADR-0342)
-> Nothing below is built. Until it is, the `basetool_catalogue_item_class_unknown_total` and
-> `basetool_catalogue_items_with_stats` bullets of REQ-OBS-011 describe what runs.
+> [!note] Implemented (#2889, #3040; ADR-0337, ADR-0342).
 
 The P4K catalogue leads a game item's attributes and its blueprint stat base values, and the SC Wiki
 fills gaps
@@ -4120,8 +4166,8 @@ These meters show where that precedence meets values it cannot place:
   whose class value is no `ShipComponentClass`, read by the P4K import or the SC Wiki item sync. The
   item is stored with no class; the value goes to the WARN log once per value, never into a label.
 - **Unknown grade.** `basetool_catalogue_item_grade_unknown_total` (untagged) counts every matched
-  item whose raw P4K grade is an unknown value (5 to 7 on `WeaponAttachment`, and anything above).
-  The letter stays `null` and `p4k_grade_raw` keeps the integer.
+  item whose raw P4K grade is an unknown value (5 to 7 on `WeaponAttachment`, and anything above),
+  once per APPLY. The letter stays `null` and `p4k_grade_raw` keeps the integer.
 - **Stat sources.** `basetool_catalogue_items_with_stats{source}` counts the game items with a
   stored blueprint stat base value per source, `source` being the bounded `P4K` / `SCWIKI` of
   `game_item_stat.source`.
@@ -4129,10 +4175,12 @@ These meters show where that precedence meets values it cannot place:
 
 **Acceptance**
 
-- [ ] An unknown class from either source and an unknown raw grade each bump their counter once;
+- [x] An unknown class from either source and an unknown raw grade each bump their counter once;
   neither carries the value as a label.
-- [ ] `basetool_catalogue_items_with_stats` carries `source` with exactly `P4K` and `SCWIKI`.
-- [ ] `ScWikiItemStatsMissing` stays silent while the P4K source covers the items and fires when
+- [x] `basetool_catalogue_items_with_stats` carries `source` with exactly `P4K` and `SCWIKI`.
+- [x] `ScWikiItemStatsMissing` stays silent while the P4K source covers the items and fires when
   neither source does (promtool rule test).
 
-**Enforced by:** — (planned) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927
+**Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` (unknown class and grade);
+`CatalogueStatBusinessGaugesTest`, `BusinessMetricsCollectorTest`,
+`monitoring/prometheus/tests/scwiki_item_stats_missing_test.yml` (stat sources) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927, #3040

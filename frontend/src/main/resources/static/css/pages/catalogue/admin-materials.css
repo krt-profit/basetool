@@ -73,12 +73,6 @@
     .admin-materials-table select {
         min-width: 8.5rem;
     }
-    .admin-materials-category-form {
-        margin-bottom: var(--space-3);
-    }
-    .admin-materials-categories .data-table {
-        margin-top: 0;
-    }
     @media (width <= 768px) {
         .admin-materials-table td:not(:first-child) {
             flex: 1 1 100%;

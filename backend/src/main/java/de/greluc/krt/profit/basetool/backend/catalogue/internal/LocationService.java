@@ -19,12 +19,17 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationUsage;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException;
@@ -32,7 +37,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -48,8 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Cached CRUD service for the admin-curated {@code location} reference table.
  *
- * <p>{@code hidden} removes a row from normal dropdowns; {@code delete} is rejected with {@link
- * EntityInUseException} while any registered {@link LocationUsage} reports the location in use.
+ * <p>{@code hidden} removes a row from normal dropdowns; a reference-only row (REQ-P4K-039) appears
+ * in no list at all; {@code delete} is rejected with {@link EntityInUseException} while any
+ * registered {@link LocationUsage} reports the location in use.
  */
 @Service
 @RequiredArgsConstructor
@@ -59,6 +68,11 @@ public class LocationService {
   private final LocationRepository locationRepository;
   private final LocationMapper locationMapper;
   private final List<LocationUsage> locationUsages;
+  private final AuditRecorder auditRecorder;
+  private final StarmapObjectRepository starmapObjectRepository;
+  private final StarmapVisibility starmapVisibility;
+  private final StarmapPlaceRows starmapPlaceRows;
+  private final CatalogueAdminLiveSync adminLiveSync;
 
   /**
    * Returns cached page of locations.
@@ -69,10 +83,10 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public Page<LocationDto> getAllLocations(@NotNull Pageable pageable, boolean includeHidden) {
-    return (includeHidden
-            ? locationRepository.findAll(pageable)
-            : locationRepository.findByHiddenFalse(pageable))
-        .map(locationMapper::toDto);
+    return withP4kNames(
+        includeHidden
+            ? locationRepository.findByReferenceOnlyFalse(pageable)
+            : locationRepository.findByHiddenFalseAndReferenceOnlyFalse(pageable));
   }
 
   /**
@@ -86,10 +100,12 @@ public class LocationService {
    */
   public Page<LocationDto> searchLocations(
       @NotNull String query, boolean includeHidden, @NotNull Pageable pageable) {
-    return (includeHidden
-            ? locationRepository.findByNameContainingIgnoreCase(query, pageable)
-            : locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(query, pageable))
-        .map(locationMapper::toDto);
+    return withP4kNames(
+        includeHidden
+            ? locationRepository.findByReferenceOnlyFalseAndNameContainingIgnoreCase(
+                query, pageable)
+            : locationRepository.findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase(
+                query, pageable));
   }
 
   /**
@@ -124,7 +140,7 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public LocationDto getLocation(@NotNull UUID id) {
-    return locationMapper.toDto(requireLocation(id));
+    return withP4kNames(List.of(locationMapper.toDto(requireLocation(id)))).getFirst();
   }
 
   /**
@@ -145,9 +161,10 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'refineries'")
   public List<LocationDto> getRefineryLocations() {
-    return locationRepository.findLocationsWithRefinery().stream()
-        .map(locationMapper::toDto)
-        .toList();
+    return withP4kNames(
+        locationRepository.findLocationsWithRefinery().stream()
+            .map(locationMapper::toDto)
+            .toList());
   }
 
   /**
@@ -159,16 +176,20 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE, key = "'homeLocations'")
   public List<LocationDto> getHomeLocations() {
-    return locationRepository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc().stream()
-        .map(locationMapper::toDto)
-        .toList();
+    return withP4kNames(
+        locationRepository
+            .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc()
+            .stream()
+            .map(locationMapper::toDto)
+            .toList());
   }
 
   /**
-   * Persists a new location. Case-insensitive duplicate name throws {@link
+   * Creates a storage place on a visible starmap object an admin picked (REQ-P4K-036); cities and
+   * space stations get theirs from the UEX sync. Case-insensitive duplicate name throws {@link
    * DuplicateEntityException} → 409 before the DB unique-constraint would.
    *
-   * @param location transient entity
+   * @param location transient entity naming its starmap object
    * @return the persisted location
    */
   @Transactional
@@ -178,7 +199,44 @@ public class LocationService {
       throw new DuplicateEntityException(
           "A Location with the name '" + location.getName() + "' already exists.");
     }
-    return locationRepository.save(location);
+    UUID objectId = requirePlaceableNode(location.getStarmapObjectId());
+    Location saved = locationRepository.save(location);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_STORAGE_PLACE_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        AuditDetails.of("starmapObjectId", objectId).with("hidden", saved.getHidden()));
+    adminLiveSync.starmapChanged();
+    return saved;
+  }
+
+  /**
+   * Checks that a new storage place may sit on a starmap object (REQ-P4K-036): the object exists,
+   * is visible (REQ-P4K-038), carries no storage place yet and is not linked by a city or space
+   * station, whose places the UEX sync creates.
+   *
+   * @param objectId the starmap object the admin picked, or {@code null}
+   * @return the object's id
+   * @throws BadRequestException when none is given or the object is not visible
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when it does not exist
+   * @throws DuplicateEntityException when it already carries a storage place
+   */
+  @NotNull
+  private UUID requirePlaceableNode(@Nullable UUID objectId) {
+    if (objectId == null) {
+      throw new BadRequestException("A storage place is created on a starmap object.");
+    }
+    StarmapObject object =
+        Entities.require(starmapObjectRepository.findById(objectId), "Starmap object not found");
+    if (!StarmapVisibility.isVisible(object, starmapVisibility.liveSystems())) {
+      throw new BadRequestException("Only a visible starmap object can carry a storage place.");
+    }
+    if (locationRepository.existsByStarmapObjectId(objectId)
+        || starmapPlaceRows.isLinkedByCityOrSpaceStation(objectId)) {
+      throw new DuplicateEntityException("The starmap object already carries a storage place.");
+    }
+    return objectId;
   }
 
   /**
@@ -201,11 +259,24 @@ public class LocationService {
 
     OptimisticLock.check(location.getVersion(), locationDto.version(), Location.class, id);
 
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", location.getName(), locationDto.name())
+            .compare("description", location.getDescription(), locationDto.description())
+            .compare("hidden", location.getHidden(), locationDto.hidden())
+            .compare("homeLocation", location.getHomeLocation(), locationDto.homeLocation());
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_LOCATION_UPDATED,
+          id,
+          locationDto.name(),
+          null,
+          changed.toDetails());
+    }
     location.setName(locationDto.name());
     location.setDescription(locationDto.description());
     location.setHidden(locationDto.hidden());
     location.setHomeLocation(locationDto.homeLocation());
-
     return locationRepository.save(location);
   }
 
@@ -229,5 +300,52 @@ public class LocationService {
     }
     Location location = requireLocation(id);
     locationRepository.delete(location);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_LOCATION_DELETED, id, location.getName(), null, null);
   }
+
+  /**
+   * Adds the P4K names of the linked starmap objects to a page of locations (REQ-P4K-037).
+   *
+   * @param page the page of entities
+   * @return the page of DTOs
+   */
+  @NotNull
+  private Page<LocationDto> withP4kNames(@NotNull Page<Location> page) {
+    List<LocationDto> dtos = page.getContent().stream().map(locationMapper::toDto).toList();
+    return new PageImpl<>(withP4kNames(dtos), page.getPageable(), page.getTotalElements());
+  }
+
+  /**
+   * Adds the P4K names of the linked starmap objects to locations, in one query.
+   *
+   * @param dtos the locations
+   * @return the locations, each linked one with its P4K names
+   */
+  @NotNull
+  private List<LocationDto> withP4kNames(@NotNull List<LocationDto> dtos) {
+    if (dtos.isEmpty()) {
+      return dtos;
+    }
+    Map<UUID, P4kNames> names = new HashMap<>();
+    for (Object[] tuple :
+        starmapObjectRepository.findP4kNamesOfLocations(
+            dtos.stream().map(LocationDto::id).toList())) {
+      names.put((UUID) tuple[0], new P4kNames((String) tuple[1], (String) tuple[2]));
+    }
+    return dtos.stream()
+        .map(dto -> {
+          P4kNames linked = names.get(dto.id());
+          return linked == null ? dto : dto.withP4kNames(linked.name(), linked.nameDe());
+        })
+        .toList();
+  }
+
+  /**
+   * The P4K names of a location's starmap object.
+   *
+   * @param name the English name
+   * @param nameDe the German name
+   */
+  private record P4kNames(@Nullable String name, @Nullable String nameDe) {}
 }

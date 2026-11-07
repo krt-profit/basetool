@@ -401,27 +401,6 @@ public class CatalogueBackendClient {
   }
 
   /**
-   * Creates a material category.
-   *
-   * @param category the category, its name set
-   * @return the created category, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public MaterialCategoryDto createMaterialCategory(@NotNull MaterialCategoryDto category) {
-    return backendApiClient.post(
-        "/api/v1/material-categories", category, MaterialCategoryDto.class);
-  }
-
-  /**
-   * Deletes a material category; the backend refuses with {@code 409} while a material uses it.
-   *
-   * @param id the category
-   */
-  public void deleteMaterialCategory(@NotNull UUID id) {
-    backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
-  }
-
-  /**
    * Lists every material external alias.
    *
    * @return the aliases, or {@code null} when the backend sent no body
@@ -695,23 +674,20 @@ public class CatalogueBackendClient {
    */
   @Nullable
   public P4kImportJobDto p4kImportJob(@NotNull UUID id) {
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        JOBS_URI + "/{id}",
-        webClient ->
-            webClient.get().uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id)),
-        spec -> spec.bodyToMono(P4kImportJobDto.class));
+    return backendApiClient.get(JOBS_URI + "/{id}", P4kImportJobDto.class, id);
   }
 
   /**
    * Enqueues the apply job of a finished P4K preview.
    *
    * @param id the preview job
-   * @param seedNew whether to insert game rows that match no existing row
+   * @param createItemsAndShips whether the run creates playable items and ships that match no row
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @return the enqueued apply job, or {@code null} when the backend sent no body
    */
   @Nullable
-  public P4kImportJobDto applyP4kImportJob(@NotNull UUID id, boolean seedNew) {
+  public P4kImportJobDto applyP4kImportJob(
+      @NotNull UUID id, boolean createItemsAndShips, boolean overrideMassGuard) {
     return backendApiClient.execute(
         HttpMethod.POST,
         JOBS_URI + "/{id}/apply",
@@ -721,7 +697,8 @@ public class CatalogueBackendClient {
                 .uri(uriBuilder ->
                     uriBuilder
                         .path(JOBS_URI + "/{id}/apply")
-                        .queryParam("seedNew", seedNew)
+                        .queryParam("createItemsAndShips", createItemsAndShips)
+                        .queryParam("overrideMassGuard", overrideMassGuard)
                         .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
   }

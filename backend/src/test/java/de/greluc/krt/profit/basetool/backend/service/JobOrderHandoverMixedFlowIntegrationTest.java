@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -67,6 +69,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class JobOrderHandoverMixedFlowIntegrationTest {
 
   @Autowired private JobOrderHandoverService jobOrderHandoverService;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -90,7 +95,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
       Location location = new Location();
       location.setName("Hub-" + UUID.randomUUID());
-      location = locationRepository.save(location);
+      location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
       Material aslarite = new Material();
       aslarite.setName("Aslarite-" + UUID.randomUUID());

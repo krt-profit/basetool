@@ -20,11 +20,24 @@
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A short reference to a catalogue entry or an org unit, enough to label it.
  *
  * @param id the entry's id
- * @param name the entry's display name
+ * @param name the entry's name
+ * @param nameDe the entry's German name, or {@code null} (REQ-P4K-023)
  */
-public record SupplyRefDto(UUID id, String name) {}
+public record SupplyRefDto(UUID id, String name, @Nullable String nameDe) {
+
+  /**
+   * Builds a reference without a German name.
+   *
+   * @param id the entry's id
+   * @param name the entry's name
+   */
+  public SupplyRefDto(UUID id, String name) {
+    this(id, name, null);
+  }
+}

@@ -23,8 +23,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportSugges
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImports;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.NameResolution;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository.ExchangeBlueprintKeyRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -45,6 +45,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Result;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Status;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse.Warning;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeLinks;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeMatch;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeMatcher;
 import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -96,7 +98,7 @@ public class ExchangeResolveService {
 
   private final BlueprintProducts blueprintProductService;
   private final BlueprintImports blueprintImportService;
-  private final BlueprintNameNormalizer normalizer;
+  private final ProductKeys productKeys;
   private final FuzzyNameMatcher fuzzyMatcher;
   private final BlueprintRepository blueprintRepository;
   private final GameItemRepository gameItemRepository;
@@ -105,9 +107,13 @@ public class ExchangeResolveService {
   private final ShipTypeRepository shipTypeRepository;
   private final MeterRegistry meterRegistry;
 
-  /** Registers the resolution counter for every catalogue and outcome at zero. */
+  /**
+   * Registers the resolution counter for every catalogue and outcome, and the blueprint {@code bt}
+   * usage counter, at zero.
+   */
   @PostConstruct
   void registerCounters() {
+    meterRegistry.counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS);
     for (ExchangeCatalogKind kind : ExchangeCatalogKind.values()) {
       for (Status status : Status.values()) {
         counter(kind, status);
@@ -117,8 +123,8 @@ public class ExchangeResolveService {
 
   /**
    * Resolves every reference of a request against its catalogue. A reference takes the first of its
-   * fields, in the order {@code bt}, {@code scRecord}, {@code scGuid}, {@code uexId}, {@code
-   * locKey}, {@code name}, that resolves to exactly one entry; failing that, the first that
+   * fields, in the order {@code guid}, {@code bt}, {@code scRecord}, {@code scGuid}, {@code uexId},
+   * {@code locKey}, {@code name}, that resolves to exactly one entry; failing that, the first that
    * resolved to several.
    *
    * @param request the kind and the references
@@ -128,6 +134,14 @@ public class ExchangeResolveService {
   @Transactional(readOnly = true)
   public ExchangeResolveResponse resolve(@NotNull ExchangeResolveRequest request) {
     List<ExchangeItemRef> refs = request.refs();
+    if (request.kind() == ExchangeCatalogKind.BLUEPRINT) {
+      long btRefs = refs.stream().filter(r -> r.bt() != null).count();
+      if (btRefs > 0) {
+        meterRegistry
+            .counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS)
+            .increment((double) btRefs);
+      }
+    }
     Catalog catalog =
         switch (request.kind()) {
           case BLUEPRINT -> blueprintCatalog(refs);
@@ -179,17 +193,20 @@ public class ExchangeResolveService {
   @NotNull
   private static Outcome byKeys(@NotNull Catalog catalog, @NotNull ExchangeItemRef ref) {
     List<Outcome> steps = new ArrayList<>(4);
+    if (ref.guid() != null) {
+      steps.add(Outcome.of(catalog.byGuid().get(ref.guid())));
+    }
     if (ref.bt() != null) {
       steps.add(catalog.byBt(ref.bt()));
     }
     if (ref.scRecord() != null) {
-      steps.add(Outcome.of(catalog.byScRecord().get(lower(ref.scRecord()))));
+      steps.add(Outcome.of(catalog.byScRecord().apply(lower(ref.scRecord()))));
     }
     if (ref.scGuid() != null) {
-      steps.add(Outcome.of(catalog.byScGuid().get(ref.scGuid())));
+      steps.add(Outcome.of(catalog.byScGuid().apply(ref.scGuid())));
     }
     if (ref.uexId() != null) {
-      steps.add(Outcome.of(catalog.byUexId().get(ref.uexId())));
+      steps.add(Outcome.of(catalog.byUexId().apply(ref.uexId())));
     }
     if (ref.locKey() != null) {
       steps.add(Outcome.of(catalog.byLocKey().get(lower(ref.locKey()))));
@@ -250,8 +267,10 @@ public class ExchangeResolveService {
   }
 
   /**
-   * Builds the blueprint catalogue: products keyed by their normalized product key, the Wiki keys,
-   * the blueprint and output-item GUIDs, the output items' UEX ids and the import's name chain.
+   * Builds the blueprint catalogue: products by their produced-item GUID and by their key, a
+   * fallback name key as {@code bt} also resolving through the names it stands for (the deprecated
+   * {@code bt} of REQ-XCH-015), the Wiki keys, the blueprint and output-item GUIDs, the output
+   * items' UEX ids and the import's name chain.
    *
    * @param refs the references, to load only the key indexes they use
    * @return the catalogue
@@ -259,12 +278,24 @@ public class ExchangeResolveService {
   @NotNull
   private Catalog blueprintCatalog(@NotNull List<ExchangeItemRef> refs) {
     Map<String, Entry> products = new LinkedHashMap<>();
-    Map<String, Entry> byBt = new HashMap<>();
-    for (ResolvedProduct product : blueprintProductService.allProducts()) {
-      Entry entry = toEntry(product);
-      products.putIfAbsent(product.productKey(), entry);
-      byBt.putIfAbsent(entry.bt(), entry);
+    Map<String, Set<Entry>> byBt = new HashMap<>();
+    Map<UUID, Set<Entry>> byGuid = new HashMap<>();
+    Map<String, List<ResolvedProduct>> byNameKey = blueprintProductService.productsByNameKey();
+    for (List<ResolvedProduct> named : byNameKey.values()) {
+      for (ResolvedProduct product : named) {
+        Entry entry = toEntry(product);
+        if (products.putIfAbsent(product.productKey(), entry) == null) {
+          add(byBt, entry.bt(), entry);
+          add(byGuid, entry.guid(), entry);
+        }
+      }
     }
+    byNameKey.forEach((nameKey, named) -> {
+      String legacyBt = ExchangeBlueprintFeedService.keyOf(nameKey);
+      if (!byBt.containsKey(legacyBt)) {
+        named.forEach(product -> add(byBt, legacyBt, products.get(product.productKey())));
+      }
+    });
 
     Map<String, Set<Entry>> byScRecord = new HashMap<>();
     if (refs.stream().anyMatch(r -> r.scRecord() != null)) {
@@ -287,7 +318,7 @@ public class ExchangeResolveService {
       for (ExchangeBlueprintKeyRow row :
           blueprintRepository.findExchangeKeyRows(
               orElse(guids, NO_UUID), orElse(uexIds, NO_UEX_ID), orElse(locKeys, NO_TEXT))) {
-        Entry entry = products.get(normalizer.normalize(row.outputName()));
+        Entry entry = products.get(productKeys.of(row.producedItemGuid(), row.outputName()));
         add(byScGuid, row.blueprintScwikiUuid(), entry);
         add(byScGuid, row.blueprintP4kUuid(), entry);
         add(byScGuid, row.itemExternalUuid(), entry);
@@ -298,10 +329,11 @@ public class ExchangeResolveService {
     }
 
     return new Catalog(
-        bt -> Outcome.ofOne(byBt.get(bt)),
-        byScRecord,
-        byScGuid,
-        byUexId,
+        byGuid,
+        bt -> Outcome.of(byBt.get(bt)),
+        byScRecord::get,
+        byScGuid::get,
+        byUexId::get,
         byLocKey,
         names ->
             blueprintImportService.resolveNames(names).stream()
@@ -383,10 +415,11 @@ public class ExchangeResolveService {
       }
     });
     return new Catalog(
+        Map.of(),
         bt -> Outcome.of(byId.get(parseUuid(bt))),
-        byScRecord,
-        byScGuid,
-        byUexId,
+        byScRecord::get,
+        byScGuid::get,
+        byUexId::get,
         byLocKey,
         batch -> batch.stream().map(name -> Outcome.of(byName.get(lower(name)))).toList());
   }
@@ -432,10 +465,11 @@ public class ExchangeResolveService {
       }
     }
     return new Catalog(
+        Map.of(),
         bt -> Outcome.of(byId.get(parseUuid(bt))),
-        byScRecord,
-        byScGuid,
-        byUexId,
+        byScRecord::get,
+        byScGuid::get,
+        byUexId::get,
         byLocKey,
         names ->
             names.stream()
@@ -490,8 +524,9 @@ public class ExchangeResolveService {
   }
 
   /**
-   * Builds the ship-type catalogue: class name, Wiki UUID, UEX vehicle id, and names through the
-   * hangar import's {@link ShipTypeMatcher}.
+   * Builds the ship-type catalogue on the {@link ShipTypeMatcher} the hangar import uses
+   * (REQ-P4K-032): class name else variant base, P4K GUID or Wiki UUID, UEX vehicle id else the
+   * curated alias, and the name as the last step, where a duplicate is ambiguous.
    *
    * @return the catalogue
    */
@@ -499,30 +534,39 @@ public class ExchangeResolveService {
   private Catalog shipTypeCatalog() {
     List<ShipType> shipTypes = shipTypeRepository.findAll();
     Map<UUID, Set<Entry>> byId = new HashMap<>();
-    Map<String, Set<Entry>> byScRecord = new HashMap<>();
-    Map<UUID, Set<Entry>> byScGuid = new HashMap<>();
-    Map<Integer, Set<Entry>> byUexId = new HashMap<>();
     Map<String, Set<Entry>> byLocKey = new HashMap<>();
     for (ShipType shipType : shipTypes) {
       Entry entry = toEntry(shipType);
       add(byId, shipType.getId(), entry);
-      add(byScRecord, lower(shipType.getClassName()), entry);
-      add(byScGuid, shipType.getExternalUuid(), entry);
-      add(byUexId, shipType.getUexVehicleId(), entry);
       add(byLocKey, lower(shipType.getNameKey()), entry);
     }
-    ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(shipTypes);
+    ShipTypeMatcher.ShipTypeIndex index =
+        ShipTypeMatcher.buildIndex(
+            shipTypes,
+            ShipTypeLinks.of(
+                shipTypeRepository.findVariantBaseRefs(), shipTypeRepository.findUexAliasRefs()));
     return new Catalog(
+        Map.of(),
         bt -> Outcome.of(byId.get(parseUuid(bt))),
-        byScRecord,
-        byScGuid,
-        byUexId,
+        className -> entries(ShipTypeMatcher.resolveClassName(index, className)),
+        guid -> entries(ShipTypeMatcher.resolveGuid(index, guid)),
+        uexId -> entries(ShipTypeMatcher.resolveUexId(index, uexId)),
         byLocKey,
         names ->
             names.stream()
-                .map(name -> ShipTypeMatcher.resolve(index, name, null))
-                .map(hit -> Outcome.ofOne(hit == null ? null : toEntry(hit)))
+                .map(name -> Outcome.of(entries(ShipTypeMatcher.resolveName(index, name))))
                 .toList());
+  }
+
+  /**
+   * Maps the ship types of a match to their entries.
+   *
+   * @param match the match
+   * @return the entries, in the match's order
+   */
+  @NotNull
+  private static List<Entry> entries(@NotNull ShipTypeMatch match) {
+    return match.candidates().stream().map(ExchangeResolveService::toEntry).toList();
   }
 
   /**
@@ -544,15 +588,17 @@ public class ExchangeResolveService {
 
   /**
    * Builds a blueprint's entry with the key the blueprint feed issues as {@code bt}: the product
-   * key, or its hash when it is longer than the published limit (REQ-XCH-015).
+   * key, or its hash when it is longer than the published limit (REQ-XCH-015), and the produced
+   * item's GUID of a GUID-keyed product as {@code guid} (REQ-INV-070).
    *
-   * @param productKey the normalized product key
+   * @param productKey the product key
    * @param productName the display name
    * @return the entry, its name cut to the published limit
    */
   @NotNull
   private static Entry blueprintEntry(@NotNull String productKey, @NotNull String productName) {
     return new Entry(
+        ProductKeys.guidOf(productKey),
         ExchangeBlueprintFeedService.keyOf(productKey),
         productName.length() > MAX_NAME ? productName.substring(0, MAX_NAME) : productName);
   }
@@ -675,18 +721,21 @@ public class ExchangeResolveService {
   /**
    * A catalogue's lookups for one request.
    *
+   * @param byGuid entries by produced-item GUID, blueprints only
    * @param byBtLookup resolves the Basetool's own key
-   * @param byScRecord entries by lower-cased DataForge record name
-   * @param byScGuid entries by game GUID
-   * @param byUexId entries by UEX id
+   * @param byScRecord finds the entries of a lower-cased DataForge record name, {@code null} for
+   *     none
+   * @param byScGuid finds the entries of a game GUID, {@code null} for none
+   * @param byUexId finds the entries of a UEX id, {@code null} for none
    * @param byLocKey entries by lower-cased {@code global.ini} name key
    * @param byNamesLookup resolves a batch of names, one outcome per name in order
    */
   private record Catalog(
+      @NotNull Map<UUID, Set<Entry>> byGuid,
       @NotNull Function<String, Outcome> byBtLookup,
-      @NotNull Map<String, Set<Entry>> byScRecord,
-      @NotNull Map<UUID, Set<Entry>> byScGuid,
-      @NotNull Map<Integer, Set<Entry>> byUexId,
+      @NotNull Function<String, Collection<Entry>> byScRecord,
+      @NotNull Function<UUID, Collection<Entry>> byScGuid,
+      @NotNull Function<Integer, Collection<Entry>> byUexId,
       @NotNull Map<String, Set<Entry>> byLocKey,
       @NotNull Function<List<String>, List<Outcome>> byNamesLookup) {
 

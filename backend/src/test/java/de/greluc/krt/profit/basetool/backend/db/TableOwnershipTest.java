@@ -211,20 +211,24 @@ class TableOwnershipTest {
       Map.of(
           "InventoryItemRepository#findExchangeLots",
           new Crossing(
-              Set.of("city", "game_item", "location", "material", "space_station"),
+              Set.of(
+                  "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "Read-only join of catalogue names into the exchange's stock lots; a downward read"
                   + " into catalogue."),
           "InventoryItemRepository#findExchangeLotsByKeys",
           new Crossing(
-              Set.of("city", "game_item", "location", "material", "space_station"),
+              Set.of(
+                  "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "The keyed variant of findExchangeLots; the same downward read into catalogue."),
           "InventoryItemRepository#findExchangeOrgLots",
           new Crossing(
-              Set.of("city", "game_item", "location", "material", "space_station"),
+              Set.of(
+                  "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "The org-stock variant of findExchangeLots; the same downward read into catalogue."),
           "InventoryItemRepository#findExchangeOrgLotsByKeys",
           new Crossing(
-              Set.of("city", "game_item", "location", "material", "space_station"),
+              Set.of(
+                  "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "The keyed variant of findExchangeOrgLots; the same downward read into catalogue."),
           "PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers",
           new Crossing(
@@ -245,7 +249,9 @@ class TableOwnershipTest {
           "de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover",
           "Re-points the member-referencing columns the modules declare during an account merge.",
           "de.greluc.krt.profit.basetool.backend.exchange.internal.ChangeSourceTransactionManager",
-          "Binds the change-source setting the V252 triggers read; names no table.");
+          "Binds the change-source setting the V252 triggers read; names no table.",
+          "de.greluc.krt.profit.basetool.backend.catalogue.internal.StarmapPlaceRows",
+          "Reads and writes the starmap link of the nine UEX location tables, all of catalogue.");
 
   private static final String BASE_PACKAGE = "de.greluc.krt.profit.basetool.backend";
 

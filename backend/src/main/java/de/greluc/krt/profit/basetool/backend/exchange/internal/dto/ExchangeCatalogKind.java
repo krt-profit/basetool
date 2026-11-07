@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 /** The catalogue a {@code catalog/resolve} request looks its references up in (REQ-XCH-012). */
 public enum ExchangeCatalogKind {
 
-  /** A blueprint product, keyed by its normalized product key. */
+  /** A blueprint product, keyed by its product key. */
   BLUEPRINT,
 
   /** A game item, keyed by its id. */

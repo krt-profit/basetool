@@ -41,7 +41,6 @@ public class PersonalInventoryMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull Set<String> exemptColumns() {
-    return Set.of(
-        "personal_inventory_item.location_name_snapshot", "personal_inventory_item.location_type");
+    return Set.of("personal_inventory_item.location_name_snapshot");
   }
 }

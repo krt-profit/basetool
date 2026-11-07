@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -49,6 +53,7 @@ public class MaterialExternalAliasService {
   private final MaterialExternalAliasRepository repository;
   private final MaterialRepository materialRepository;
   private final AuthHelperService authHelperService;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns every alias sorted by external name. Drives the admin table view.
@@ -124,6 +129,12 @@ public class MaterialExternalAliasService {
     applyWritableFields(alias, material, source, request);
     alias.setCreatedBy(currentPrincipalNameOrSystem());
     MaterialExternalAlias saved = repository.save(alias);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_ALIAS_CREATED,
+        saved.getId(),
+        saved.getExternalName(),
+        null,
+        AuditDetails.of("source", source));
     log.info(
         "Admin alias created: source={} externalName='{}' material={} by={}",
         source,
@@ -155,8 +166,25 @@ public class MaterialExternalAliasService {
             () -> "Material " + request.materialId() + " does not exist.");
     assertNoAliasConflict(source, request.externalName(), id);
 
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("material", alias.getMaterial().getId(), material.getId())
+            .compare("source", alias.getSourceSystem(), source)
+            .compare("externalName", alias.getExternalName(), request.externalName())
+            .compare("externalKey", alias.getExternalKey(), request.externalKey())
+            .compare("externalUuid", alias.getExternalUuid(), request.externalUuid())
+            .compare("externalCode", alias.getExternalCode(), request.externalCode())
+            .compare("note", alias.getNote(), request.note());
     applyWritableFields(alias, material, source, request);
     MaterialExternalAlias saved = repository.saveAndFlush(alias);
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_MATERIAL_ALIAS_UPDATED,
+          id,
+          saved.getExternalName(),
+          null,
+          changed.toDetails());
+    }
     log.info("Admin alias updated: id={} by={}", saved.getId(), currentPrincipalNameOrSystem());
     return saved;
   }
@@ -172,6 +200,12 @@ public class MaterialExternalAliasService {
   public void delete(UUID id) {
     MaterialExternalAlias alias = findById(id);
     repository.delete(alias);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_ALIAS_DELETED,
+        id,
+        alias.getExternalName(),
+        null,
+        AuditDetails.of("source", alias.getSourceSystem()));
     log.info("Admin alias deleted: id={} by={}", id, currentPrincipalNameOrSystem());
   }
 

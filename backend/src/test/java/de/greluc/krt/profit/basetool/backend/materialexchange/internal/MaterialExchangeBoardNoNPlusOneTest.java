@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -64,6 +66,9 @@ class MaterialExchangeBoardNoNPlusOneTest {
   private static final int STATEMENT_BOUND = 15;
 
   @Autowired private MaterialExchangeBoardService boardService;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private MaterialExchangeOfferRepository offerRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
@@ -150,7 +155,7 @@ class MaterialExchangeBoardNoNPlusOneTest {
     created.add(owner);
     Location location = new Location();
     location.setName("Board Depot " + tag);
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     created.add(location);
     List<MaterialExchangeOffer> seeded = new ArrayList<>();
     for (int i = 0; i < offers; i++) {

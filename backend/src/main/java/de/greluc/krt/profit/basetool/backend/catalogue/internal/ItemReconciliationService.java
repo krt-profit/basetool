@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import java.time.Instant;
 import java.util.Comparator;
@@ -55,9 +56,13 @@ public class ItemReconciliationService {
   private final GameItemStatRepository stats;
   private final List<GameItemReassignmentParticipant> participants;
   private final SyncReportService reports;
+  private final P4kMergeConflictRecorder p4kConflicts;
 
   /**
    * Consolidates a uniquely matched uuid-less UEX row into an existing Wiki identity.
+   *
+   * <p>The merge respects P4K identity (REQ-P4K-007): rows with different P4K GUIDs stay apart and
+   * go to the P4K review list; a GUID only the retired row holds moves onto the survivor.
    *
    * @param wikiItem managed Wiki item
    * @param uexItemId uuid-less source row's local id
@@ -103,10 +108,30 @@ public class ItemReconciliationService {
     if (uexId == null) {
       return null;
     }
+    UUID retiredGuid = source.getP4kUuid();
+    UUID survivorGuid = target.getP4kUuid();
+    if (retiredGuid != null && survivorGuid != null && !retiredGuid.equals(survivorGuid)) {
+      p4kConflicts.record(source, retiredGuid, target, survivorGuid);
+      reports.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_IDENTITY_CONFLICT,
+          ExternalSyncReport.GAME_ITEM,
+          target.getExternalUuid(),
+          target.getName(),
+          mergeDetails(uexItemId, target).flag("p4kGuidConflict").toString());
+      return null;
+    }
     final String archive = redirects.snapshot(uexItemId, target.getId());
+    final P4kItemParticipation moved =
+        retiredGuid != null && survivorGuid == null
+            ? P4kItemParticipation.detach(source, retiredGuid)
+            : null;
     source.setUexItemId(null);
     items.saveAndFlush(source);
     copyUexColumns(source, target);
+    if (moved != null) {
+      moved.attachTo(target);
+    }
     target.setUexItemId(uexId);
     items.saveAndFlush(target);
     for (GameItemReassignmentParticipant participant : participants) {
@@ -114,6 +139,9 @@ public class ItemReconciliationService {
     }
     recipes.blueprints(uexItemId, target.getId());
     recipes.ingredients(uexItemId, target.getId());
+    recipes.loadoutPorts(uexItemId, target.getId());
+    recipes.paints(uexItemId, target.getId());
+    recipes.shopItems(uexItemId, target.getId());
     movePrices(source, target);
     moveStats(source, target);
     redirects.repoint(uexItemId, target.getId());
@@ -127,10 +155,10 @@ public class ItemReconciliationService {
     reports.logScwikiEvent(
         runId,
         SyncEventType.SOURCE_RECORDS_MERGED,
-        "game_item",
+        ExternalSyncReport.GAME_ITEM,
         target.getExternalUuid(),
         target.getName(),
-        "retiredItem=" + uexItemId + ";survivorItem=" + target.getId());
+        mergeDetails(uexItemId, target).toString());
     return target;
   }
 
@@ -149,10 +177,23 @@ public class ItemReconciliationService {
       @Nullable Manufacturer manufacturer,
       @Nullable String className) {}
 
+  /**
+   * Starts the details of a merge event: the retired and the surviving item.
+   *
+   * @param retiredId the retired row
+   * @param survivor the surviving row
+   * @return the details
+   */
+  @NotNull
+  private static SyncReportDetails mergeDetails(
+      @NotNull UUID retiredId, @NotNull GameItem survivor) {
+    return SyncReportDetails.of("retiredItem", retiredId).with("survivorItem", survivor.getId());
+  }
+
   private static void copyUexColumns(GameItem from, GameItem to) {
     to.setUexName(from.getUexName() == null ? from.getName() : from.getUexName());
     GameItemNamePrecedence.applyUexName(to, from.getName());
-    if (to.getSourceSystems() != GameItemSourceSystem.P4K && from.getManufacturer() != null) {
+    if (to.getP4kManufacturer() == null && from.getManufacturer() != null) {
       to.setManufacturer(from.getManufacturer());
     }
     to.setKind(GameItemKind.mergeMoreSpecific(to.getKind(), from.getKind()));
@@ -218,7 +259,14 @@ public class ItemReconciliationService {
         stats.findByGameItemId(to.getId()).stream()
             .collect(Collectors.toMap(GameItemStat::getProperty, Function.identity()));
     for (GameItemStat source : stats.findByGameItemId(from.getId())) {
-      if (targetStats.containsKey(source.getProperty())) {
+      GameItemStat target = targetStats.get(source.getProperty());
+      if (target != null) {
+        if (source.getSource() == GameItemStatSource.P4K
+            && target.getSource() != GameItemStatSource.P4K) {
+          target.setBaseValue(source.getBaseValue());
+          target.setSource(GameItemStatSource.P4K);
+          stats.save(target);
+        }
         stats.delete(source);
       } else {
         source.setGameItem(to);

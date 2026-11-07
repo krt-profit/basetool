@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportEntryD
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportPreviewDto;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintImportStatus;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasRepository;
@@ -53,8 +54,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -84,23 +88,24 @@ class ExchangeResolveCorpusTest {
 
   @Test
   void theCorpusResolvesTheSameThroughTheExchangeAndTheWebImport() throws IOException {
-    when(blueprintProductService.allProducts())
+    when(blueprintProductService.productsByNameKey())
         .thenReturn(
-            List.of(
-                product("monde legs delta camo", "Monde Legs Delta Camo"),
-                product("monde arms hemlock camo", "Monde Arms Hemlock Camo"),
-                product("r97 shotgun", "R97 Shotgun"),
-                product("strata arms levski edition", "Strata Arms Levski Edition"),
-                product("strata helmet levski edition", "Strata Helmet Levski Edition"),
-                product("pitman mining laser", "Pitman Mining Laser"),
-                product(
-                    "cf-337 panther \"hazard-zone\" repeater",
-                    "CF-337 Panther \"Hazard-Zone\" Repeater"),
-                product("cq7 rifle", "CQ7 Rifle"),
-                product("lynx arms (core)", "Lynx Arms (Core)"),
-                product("oracle helmet", "Oracle Helmet"),
-                product("bul-h4 helmet", "BUL-H4 Helmet"),
-                product("bul-h4 armor", "BUL-H4 Armor")));
+            byName(
+                List.of(
+                    product("monde legs delta camo", "Monde Legs Delta Camo"),
+                    product("monde arms hemlock camo", "Monde Arms Hemlock Camo"),
+                    product("r97 shotgun", "R97 Shotgun"),
+                    product("strata arms levski edition", "Strata Arms Levski Edition"),
+                    product("strata helmet levski edition", "Strata Helmet Levski Edition"),
+                    product("pitman mining laser", "Pitman Mining Laser"),
+                    product(
+                        "cf-337 panther \"hazard-zone\" repeater",
+                        "CF-337 Panther \"Hazard-Zone\" Repeater"),
+                    product("cq7 rifle", "CQ7 Rifle"),
+                    product("lynx arms (core)", "Lynx Arms (Core)"),
+                    product("oracle helmet", "Oracle Helmet"),
+                    product("bul-h4 helmet", "BUL-H4 Helmet"),
+                    product("bul-h4 armor", "BUL-H4 Armor"))));
     BlueprintExternalAlias lynx = new BlueprintExternalAlias();
     lynx.setSourceSystem(BlueprintExternalAliasSource.SCMDB);
     lynx.setExternalName("Lynx Arms");
@@ -122,7 +127,7 @@ class ExchangeResolveCorpusTest {
         new BlueprintImportService(
             mapper,
             blueprintProductService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintAliasRepository,
             personalBlueprintRepository,
@@ -132,7 +137,7 @@ class ExchangeResolveCorpusTest {
         new ExchangeResolveService(
             blueprintProductService,
             importService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintRepository,
             gameItemRepository,
@@ -149,7 +154,8 @@ class ExchangeResolveCorpusTest {
                 ExchangeCatalogKind.BLUEPRINT,
                 entries.stream()
                     .map(e ->
-                        new ExchangeItemRef(null, null, null, null, null, e.externalName(), null))
+                        new ExchangeItemRef(
+                            null, null, null, null, null, null, e.externalName(), null))
                     .toList()));
 
     assertThat(entries).hasSize(31);
@@ -187,6 +193,23 @@ class ExchangeResolveCorpusTest {
                   .toList());
       case UNMATCHED -> new Result(index, Status.UNMATCHED, null, null);
     };
+  }
+
+  /**
+   * Indexes products by their normalised name.
+   *
+   * @param products the products
+   * @return the index
+   */
+  private static Map<String, List<ResolvedProduct>> byName(List<ResolvedProduct> products) {
+    Map<String, List<ResolvedProduct>> index = new LinkedHashMap<>();
+    for (ResolvedProduct p : products) {
+      index
+          .computeIfAbsent(
+              new BlueprintNameNormalizer().normalize(p.productName()), _ -> new ArrayList<>())
+          .add(p);
+    }
+    return index;
   }
 
   /**

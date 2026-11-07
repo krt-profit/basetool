@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent})}">
 <head>
-    <title th:text="${material != null ? material.name : 'Material'} + ' - ' + ${appTitle}">Material Detail - Profit Basetool</title>
+    <title th:text="${material != null ? material.displayName(#locale) : 'Material'} + ' - ' + ${appTitle}">Material Detail - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/pages/catalogue/material-detail.css}">
     </th:block>
@@ -16,7 +16,7 @@
               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
               ><span th:text="#{nav.materials.list}">Material-Übersicht</span></a>
             <div class="page-title">
-                <h1 th:text="${material != null ? material.name : #messages.msg('materials.detail.notFound')}">Material</h1>
+                <h1 th:text="${material != null ? material.displayName(#locale) : #messages.msg('materials.detail.notFound')}">Material</h1>
                 <th:block th:if="${material != null}">
                     <span th:if="${material.category != null and material.category.name != null}" class="chip"
                           data-testid="material-category" th:text="${material.category.name}">Mineral</span>

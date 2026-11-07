@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Poi;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.PoiService;
@@ -41,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PoiServiceTest {
 
   @Mock private PoiRepository poiRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private PoiService service;
 

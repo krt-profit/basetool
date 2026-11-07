@@ -170,7 +170,13 @@ class GdprParticipantCoverageTest {
           "p4k_import_job.created_by",
           "The id of the admin who enqueued a P4K import, a pseudonymous operational record;"
               + " P4kImportJobService.pruneOldJobs drops jobs older than seven days after every"
-              + " run.");
+              + " run.",
+          "p4k_import_run.created_by",
+          "The id of the admin who applied a P4K catalogue, a pseudonymous operational record"
+              + " of a never-pruned import run (REQ-P4K-005).",
+          "p4k_review_case.resolved_by",
+          "The id of the admin who resolved a P4K review case, a pseudonymous record of an act"
+              + " on the organisation's catalogue that is never pruned (REQ-P4K-016).");
 
   /** Member references no export section selects, each with the reason. */
   static final Map<String, String> NOT_EXPORTED =
@@ -249,14 +255,26 @@ class GdprParticipantCoverageTest {
               "The concurrency companion of mission.owner_id, which missionsOwned exports."),
           Map.entry(
               "p4k_import_job.created_by",
-              "The admin who enqueued a catalogue import; operational, pruned after seven days."));
+              "The admin who enqueued a catalogue import; operational, pruned after seven days."),
+          Map.entry(
+              "p4k_import_run.created_by",
+              "The admin who applied a catalogue import; an act on the organisation's catalogue."),
+          Map.entry(
+              "p4k_review_case.resolved_by",
+              "The admin who resolved a review case; an act on the organisation's catalogue."));
 
   /** Member references the account merge does not classify, each with the reason. */
   static final Map<String, String> NOT_MERGED =
       Map.of(
           "p4k_import_job.created_by",
           "The admin who enqueued a catalogue import; operational, pruned after seven days, and"
-              + " never the subject of a merge.");
+              + " never the subject of a merge.",
+          "p4k_import_run.created_by",
+          "The admin who applied a catalogue import; it stays with the act and is never the"
+              + " subject of a merge.",
+          "p4k_review_case.resolved_by",
+          "The admin who resolved a review case; it stays with the act and is never the subject"
+              + " of a merge.");
 
   @MockitoBean private RoleRepository roleRepository;
 

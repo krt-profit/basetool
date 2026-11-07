@@ -43,6 +43,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
@@ -80,10 +81,12 @@ public class BlueprintRequirementGroup extends AbstractEntity<UUID> {
 
   /** Wiki internal key of the slot, e.g. {@code "EMITTER"}. */
   @Column(name = "group_key")
+  @Nullable
   private String groupKey;
 
   /** Display name of the slot, e.g. {@code "Emitter"}. */
   @Column(name = "name")
+  @Nullable
   private String name;
 
   /** Wiki node kind; always {@code "group"} for a requirement group. */
@@ -92,7 +95,12 @@ public class BlueprintRequirementGroup extends AbstractEntity<UUID> {
 
   /** Number of children that must be fulfilled within the group. */
   @Column(name = "required_count")
+  @Nullable
   private Integer requiredCount;
+
+  /** Whether the group is an optional cost of the P4K, which a craft may leave out. */
+  @Column(name = "is_optional", nullable = false)
+  private boolean optional;
 
   /** Ordered stat-modifier lines (the stats this slot contributes). Owned with cascade + orphan. */
   @Getter(AccessLevel.NONE)

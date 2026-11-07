@@ -104,8 +104,27 @@ function compute(slider) {
         qOut.textContent = String(Math.round(q));
     }
     if (vOut) {
-        vOut.textContent = `×${value === null ? '?' : formatNumber(value, 2, document.documentElement.lang)}`;
+        vOut.textContent = modifierText(value, slider.getAttribute('data-vkind') === 'ADDITIVE');
     }
+}
+
+/**
+ * Renders a modifier value: a factor as „×1.05", a summand of an additive modifier as „+1" or
+ * „-0.5".
+ *
+ * @param {number | null} value the modifier value, null when unknown
+ * @param {boolean} additive whether the value is a summand
+ * @returns {string} the text
+ */
+function modifierText(value, additive) {
+    if (value === null) {
+        return additive ? '?' : '×?';
+    }
+    const text = formatNumber(value, 2, document.documentElement.lang);
+    if (!additive) {
+        return `×${text}`;
+    }
+    return value > 0 ? `+${text}` : text;
 }
 
 const RESULTS_ID = 'admin-bp-results';

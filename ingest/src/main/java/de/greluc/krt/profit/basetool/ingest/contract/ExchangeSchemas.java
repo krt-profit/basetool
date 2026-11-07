@@ -27,6 +27,7 @@ import com.networknt.schema.path.NodePath;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,8 +41,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Checks exchange documents against the committed v1 JSON Schemas (REQ-XCH-011, REQ-XCH-026):
- * whether a body is valid, and which of its fields no schema declares — those are ignored and
- * reported as {@code UNKNOWN_FIELD} warnings, since the schemas stay open.
+ * whether a body is valid, and which of its fields no schema declares. In a client's request those
+ * fields are ignored and reported as {@code UNKNOWN_FIELD} warnings, since the schemas stay open;
+ * in a backend answer they break the contract, which fails closed (REQ-XCH-050).
  */
 @Component
 public class ExchangeSchemas {
@@ -126,6 +128,25 @@ public class ExchangeSchemas {
     List<String> unknown = new ArrayList<>();
     walk(List.of(root), instance, "", unknown, 0);
     return List.copyOf(unknown);
+  }
+
+  /**
+   * Lists where an answer breaks its contract: every value that violates the schema and every
+   * property the schema does not declare (REQ-XCH-050). The content of a declared free-form map,
+   * such as {@code extensions}, is not inspected.
+   *
+   * @param schemaName the schema's file name, optionally with a fragment
+   * @param answer the answer
+   * @return JSON Pointers to the breaches, at most {@value #MAX_REPORTED}; empty when the answer
+   *     holds its contract
+   * @throws IllegalArgumentException if no committed schema has that name
+   */
+  public @NotNull @Unmodifiable List<String> answerBreaches(
+      @NotNull String schemaName, @NotNull JsonNode answer) {
+    Set<String> breaches = new LinkedHashSet<>();
+    validate(schemaName, answer).forEach(violation -> breaches.add(violation.pointer()));
+    breaches.addAll(unknownFields(schemaName, answer));
+    return breaches.stream().limit(MAX_REPORTED).toList();
   }
 
   /**

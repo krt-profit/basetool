@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
@@ -62,6 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
 class StockRowViewCharacterisationTest {
 
   @Autowired private StockCommands stockCommands;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private StockReads stockReads;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -92,7 +96,7 @@ class StockRowViewCharacterisationTest {
     materialRepository.saveAndFlush(material);
     location = new Location();
     location.setName("row-view-" + UUID.randomUUID());
-    locationRepository.saveAndFlush(location);
+    locationRepository.saveAndFlush(TestPlaces.onOwnCity(location, cityRepository));
     JobOrder order = new JobOrder();
     order.setResponsibleOrgUnit(unit);
     order.setRequestingOrgUnit(unit);

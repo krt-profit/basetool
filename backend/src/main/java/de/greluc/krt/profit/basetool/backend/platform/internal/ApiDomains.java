@@ -49,6 +49,9 @@ public final class ApiDomains {
           Map.entry("AdminExchangeBulkUndoController", "exchange"),
           Map.entry("AdminExchangeRegistryController", "exchange"),
           Map.entry("AdminP4kImportController", "catalogue"),
+          Map.entry("AdminP4kImportReportController", "catalogue"),
+          Map.entry("AdminStarmapController", "catalogue"),
+          Map.entry("AdminShopController", "catalogue"),
           Map.entry("AdminPersonSearchController", "identity"),
           Map.entry("AdminPersonalBlueprintController", "blueprint"),
           Map.entry("AdminPersonalInventoryController", "personalinventory"),
@@ -167,7 +170,6 @@ public final class ApiDomains {
           Map.entry("TerminalController", "catalogue"),
           Map.entry("TermsController", "identity"),
           Map.entry("TermsDocumentController", "identity"),
-          Map.entry("UexLocationController", "catalogue"),
           Map.entry("UserController", "identity"),
           Map.entry("UserProfileController", "identity"));
 

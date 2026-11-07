@@ -76,7 +76,7 @@ public class DefaultBlueprintService {
    * resolved against the active blueprint catalog; the canonical name and output item are stamped
    * onto the new row.
    *
-   * @param productKey normalized product key of the product to mark as default
+   * @param productKey product key of the product to mark as default
    * @param createdBy the adding admin's {@code app_user.id} rendered as text, or {@code "system"}
    *     for a seeded row (provenance, not a foreign key)
    * @return the persisted DTO

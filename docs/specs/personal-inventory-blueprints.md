@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
-> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md); planned: [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md), [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md)
+> **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md), [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md); planned: [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
 
@@ -129,7 +129,7 @@ existing and future users:
   (`in_keycloak = true`) so a re-run never duplicates;
 - adding a new default grants it to all existing users at once (REQ-INV-017).
 
-Granting MUST use the same normalized `product_key` the rest of the blueprint feature uses, so a
+Granting MUST use the same `product_key` (REQ-INV-070) the rest of the blueprint feature uses, so a
 granted default lines up with the catalog, the product search "owned" flag, the availability
 overview (REQ-INV-012/013) and the job-order coverage view — i.e. a default counts as genuinely
 owned everywhere, for every user.
@@ -315,7 +315,16 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
   uncraftable.
 - **Craftable count.** Per material the recipe's RESOURCE lines are aggregated into one required
   amount per craft; `N = floor( min over materials of ( qualifying available / required ) )`. The
-  binding ("limiting") material is named.
+  binding ("limiting") material is named. A recipe whose groups are a choose-n selection
+  (`required_group_count`, REQ-P4K-027) counts only the `n` option groups the caller's inventory
+  covers best — most crafts from that group alone first, then the smallest shortfall for one craft,
+  then recipe order — so it is craftable when `n` options are covered, and the material breakdown
+  and shortfall list only those groups' materials. An optional group (`is_optional`) never counts.
+  The inventory-only and the refinery-inclusive figures each select their `n` groups against their
+  own stock; the breakdown lists the materials either selection counts, and each row's `counted` /
+  `countedWithRefinery` flag says which figures it belongs to, so the page shows and limits by only
+  the rows of the current refinery setting. The selection is `catalogue.api.RecipeGroupSelection`,
+  which the item-order derivation shares (REQ-ORDERS-025).
 - **Quantity unit (SCU vs Stück).** A RESOURCE ingredient may resolve to a material whose
   `QuantityType` is `PIECE` rather than `SCU`, and a bridged ITEM ingredient is always a PIECE
   material counted in whole units. The computation is done in the material's **own unit**
@@ -706,15 +715,15 @@ names of all its rows in one registry query, and none when no row came from a cl
 ### REQ-INV-069 — The stat contribution shows the crafted item's values, not only the factor
 
 The recipe's stat chips (REQ-INV-009) show, for every stat whose crafted-item base value is stored
-(REQ-DATA-027), the base value and the value the slider's quality yields — „Integrity 550 → 605"
+(REQ-P4K-030), the base value and the value the slider's quality yields — „Integrity 550 → 605"
 with the factor's change „+10 %" beside it in grey. A stat without a stored base value shows that
 change alone.
 
 - **The data.** The recipe endpoint (`GET /api/v1/personal-blueprints/{id}/recipe`) carries
   `baseStats`: the representative recipe's crafted item's base values, each with its `propertyKey`,
-  `baseValue` and `unit` (`NONE`, `PERCENT`, `CELSIUS`, `METER`, `METER_PER_SECOND`,
-  `ROUNDS_PER_MINUTE`); empty when none is stored or the recipe names no crafted item. A chip finds
-  its value by the modifier's `propertyKey`.
+  `baseValue`, `unit` (`NONE`, `PERCENT`, `CELSIUS`, `METER`, `METER_PER_SECOND`,
+  `ROUNDS_PER_MINUTE`) and `source` (`P4K`, `SCWIKI`; REQ-P4K-030); empty when none is stored or
+  the recipe names no crafted item. A chip finds its value by the modifier's `propertyKey`.
 - **The value.** The value at a quality is the base value times the factor
   `computeModifierValue` yields (REQ-INV-009, unchanged), for every unit alike: a negative base —
   the lowest tolerated temperature — moves away from zero as the factor grows, which is the
@@ -723,35 +732,38 @@ change alone.
 - **The text.** The unit stands once, after the value („-61 → -67,1 °C", „30 → 36 %",
   „650 → 683 Schuss/min"); a percentage is a fraction scaled to 0–100. A number is whole from 100,
   has one decimal from 10, two from 1 and three significant digits below. The chip's tooltip adds
-  „Grundwert → Wert bei der gewählten Qualität" to the better-direction hint. Unit labels and the
-  tooltip come from the DE/EN bundles.
+  „Grundwert → Wert bei der gewählten Qualität" and the value's source, „Quelle: P4K" or „Quelle:
+  SC Wiki", to the better-direction hint; no build stamp stands beside the values. Unit labels and
+  the tooltip come from the DE/EN bundles.
 - **The factor.** Every factor in the recipe — beside a value, alone on a chip, and in the hint
   „(1000 → +5 %)" — reads as the signed change it makes: `1.1` is „+10 %", `0.95` „-5 %", `1`
   „±0 %", with at most one decimal.
+- **The summand.** A P4K modifier whose `valueKind` is `ADDITIVE` (REQ-P4K-027) carries summands,
+  not factors: its value is the base value plus the summand („3 → 4"), its change the signed summand
+  in the stat's unit when the base value names one („+1", „-0,5", „+2 °C"; a percentage scaled to
+  0–100), never a percentage factor; the admin blueprint page shows it as „+1" instead of „×1.00".
+  The contract gives a summand no unit of its own. A Wiki modifier (`valueKind` `null`) and a
+  `MULTIPLIER` one carry factors.
 
-> [!note] Planned amendment — the tooltip names the value's source (#2927;
-> [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md))
-> A base value comes from the P4K catalogue, or from the SC Wiki where the catalogue has none. The
-> chip shows every value as above; its tooltip also names the source, „P4K" or „SC Wiki". No build
-> stamp stands beside the values.
+*Amended (#2927, #3040;
+[ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)):*
+a base value comes from the P4K catalogue, or from the SC Wiki where the catalogue has none
+(REQ-P4K-030), and the tooltip names that source.
 
 **Acceptance**
 
-- [x] The recipe response carries the crafted item's base values sorted by property key, and none
-  without a crafted item. *`BlueprintProductServiceTest`.*
+- [x] The recipe response carries the crafted item's base values with their source, sorted by
+  property key, and none without a crafted item. *`BlueprintProductServiceTest`.*
 - [x] The value is base times factor; the text is unit-aware and scales a percentage; a missing
-  factor shows „?"; a factor reads as a signed percentage. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
+  factor shows „?"; a factor reads as a signed percentage, a summand as a signed value in the
+  stat's unit. *`blueprint-stats.test.mjs` (`:frontend:testBlueprintStatsJs`).*
 - [x] The frontend mirror follows the contract. *`FrontendDtoContractTest`.*
 
 **Code:** `BlueprintStatBaseDto`, `BlueprintProductService#resolveRecipe`,
 `personal-inventory-blueprint-stats.js`, `personal-inventory-blueprints-recipe.js`
-`renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309
+`renderQualityBlock` / `showChipValue` · **Decision:** ADR-0309, ADR-0342
 
 ### REQ-INV-070 — A personal blueprint is keyed by its produced item's GUID
-
-> [!note] Planned — implementation pending (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
-> Today a personal blueprint is keyed by the normalised product key (`product_key`).
 
 A member owns a **product** — what a blueprint produces — not a single recipe record. Its key is
 the DataForge GUID of the produced item, which the P4K import stores as `producedItemGuid` on the
@@ -777,11 +789,26 @@ counts, never a Wiki UUID. A name is used only to resolve to that key.
 
 **Acceptance**
 
-- [ ] A name that resolves to one GUID is stored under that GUID; one that resolves to several is
+- [x] A name that resolves to one GUID is stored under that GUID; one that resolves to several is
   `SUGGESTED` with the candidates, and the pick is learned as an alias.
-- [ ] The backfill keys every resolvable row by GUID and keeps the name key, with a review case, for
+- [x] The backfill keys every resolvable row by GUID and keeps the name key, with a review case, for
   the others; a later run that resolves such a row upgrades it.
-- [ ] A fallback row and a GUID row of the same product merge into one GUID row with the earliest
+- [x] A fallback row and a GUID row of the same product merge into one GUID row with the earliest
   date and the note, and the merge writes one audit event.
 
-**Enforced by:** — (planned) · **Issues:** #2893
+`product_key` holds the GUID's lower-case text for a GUID-keyed product and the normalised name
+for a fallback row (`ProductKeys`). The backfill runs inside every P4K APPLY, after the
+reconcilers and the sweep (`PersonalBlueprintKeyUpgrade`, behind the catalogue's
+`ProducedItemGuidFollower`): a name key held by a member, the default set, an alias, a
+Materialbörse offer or request, or the exchange feed and journal moves when exactly one active
+product carries that name and a GUID. The merge keeps the GUID row's note, or the fallback row's
+when the GUID row has none. "The audit details move" means every event from the move on carries the
+GUID key; the audit history is append-only, so events written before a move keep the key they
+recorded, and the
+move itself is audited (`BLUEPRINT_PRODUCT_KEYS_UPGRADED` per run, `BLUEPRINT_PRODUCT_MERGED` per
+merge). The key is the produced item's GUID, not a `game_item` id, so a Wiki/UEX item merge and
+its `game_item_redirect` leave it untouched.
+
+**Enforced by:** `PersonalBlueprintKeyBackfillTest`, `BlueprintImportServiceTest`,
+`ProductKeysTest` · **Code:** `ProductKeys`, `PersonalBlueprintKeyUpgrade`,
+`BlueprintProductService#productsByNameKey` · **Issues:** #2893

@@ -26,7 +26,7 @@ import java.util.UUID;
  * One of the caller's owned blueprints; the owner id is never exposed.
  *
  * @param id entry primary key
- * @param productKey normalized product identity
+ * @param productKey product identity, a produced-item GUID or a fallback name key
  * @param productName display name of the owned product
  * @param outputItemId resolved output {@code game_item} id, or {@code null}
  * @param acquiredAt optional in-game acquisition time

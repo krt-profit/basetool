@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemClassResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
@@ -118,12 +119,11 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            gameItemStatRepository,
-            new GameItemStatWriter(gameItemStatRepository),
+            new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
                 scWikiClient, properties, gameItemStatRepository, syncReportService),
             itemReconciliationService,
-            new ScWikiItemFieldWriter(meterRegistry),
+            new ScWikiItemFieldWriter(new ItemClassResolver(meterRegistry), syncReportService),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);

@@ -69,17 +69,21 @@ public class BlueprintModifierSegment extends AbstractEntity<UUID> {
 
   /** Lowest ingredient-quality value of this segment. */
   @Column(name = "quality_min")
+  @Nullable
   private Double qualityMin;
 
   /** Highest ingredient-quality value of this segment. */
   @Column(name = "quality_max")
+  @Nullable
   private Double qualityMax;
 
   /** Stat multiplier applied at {@link #qualityMin}. */
   @Column(name = "modifier_at_start")
+  @Nullable
   private Double modifierAtStart;
 
   /** Stat multiplier applied at {@link #qualityMax}. */
   @Column(name = "modifier_at_end")
+  @Nullable
   private Double modifierAtEnd;
 }

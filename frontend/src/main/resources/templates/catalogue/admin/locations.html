@@ -18,6 +18,11 @@
         <div th:replace="~{kernel/fragments/components :: alert('warning', 'admin.catalog.truncated', null)}"></div>
     </th:block>
 
+    <p class="alert alert-info" data-testid="locations-create-hint">
+        <span th:text="#{admin.locations.createHint}">Neue Lagerorte legst du auf der Sternenkarte an, direkt auf einem sichtbaren Objekt.</span>
+        <a th:href="@{/admin/starmap}" data-testid="locations-starmap-link" th:text="#{admin.locations.createHint.link}">Zur Sternenkarte</a>
+    </p>
+
     <section class="list-panel">
     <form id="locations-filter" class="no-track" role="search" method="get" th:action="@{/admin/locations}">
         <div class="toolbar">
@@ -42,7 +47,8 @@
                 </thead>
                 <tbody>
                     <tr th:each="loc : ${locations}" data-testid="location-row">
-                        <td><span class="cell-title" th:text="${loc.name}">Name</span></td>
+                        <td><span class="cell-title" th:text="${loc.name}">Name</span><span th:if="${loc.p4kDisplayName(#locale) != null}" class="cell-sub" data-testid="location-p4k-name"
+                                th:title="#{admin.location.p4kName}" th:text="${loc.p4kDisplayName(#locale)}">Lorville</span></td>
                         <td th:text="${loc.description}">Desc</td>
                         <td class="cell-actions">
                             <div class="cluster gap-2">

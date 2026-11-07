@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
@@ -158,7 +159,7 @@ class UexUniverseSyncServiceTest {
     service.syncCities();
 
     verify(cityRepository, atLeastOnce()).save(any(City.class));
-    verifyNoInteractions(locationRepository);
+    verify(locationRepository, never()).save(any());
   }
 
   @Test
@@ -462,7 +463,98 @@ class UexUniverseSyncServiceTest {
     service.syncSpaceStations();
 
     verify(spaceStationRepository, atLeastOnce()).save(any());
-    verifyNoInteractions(locationRepository);
+    verify(locationRepository, never()).save(any());
+  }
+
+  @Test
+  void syncCities_clearsTheReferenceOnlyMarker_whenTheCityBecomesLive() {
+    City city = savedCity(3, "Rising City");
+    Location marked = referenceOnly(city, "Rising City");
+    when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(3, "Rising City", 1))));
+    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
+    when(locationRepository.findByName("Rising City")).thenReturn(Optional.of(marked));
+
+    service.syncCities();
+
+    assertFalse(marked.getReferenceOnly());
+    assertEquals("Rising City", marked.getName());
+    verify(locationRepository).save(marked);
+  }
+
+  @Test
+  void syncCities_keepsAReferenceOnlyLocationOfAnOfflineCityNamedAfterIt() {
+    City city = savedCity(4, "Renamed City");
+    Location marked = referenceOnly(city, "Old Name");
+    when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(4, "Renamed City", 0))));
+    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
+    when(locationRepository.findByName("Renamed City")).thenReturn(Optional.empty());
+
+    service.syncCities();
+
+    assertTrue(marked.getReferenceOnly());
+    assertEquals("Renamed City", marked.getName());
+    verify(locationRepository).save(marked);
+  }
+
+  @Test
+  void syncCities_keepsTheNameOfAReferenceOnlyLocation_whenAnotherLocationHoldsIt() {
+    City city = savedCity(5, "Shared Name");
+    Location marked = referenceOnly(city, "Shared Name (UEX city 5)");
+    Location other = new Location();
+    other.setId(UUID.randomUUID());
+    other.setName("Shared Name");
+    when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(5, "Shared Name", 1))));
+    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
+    when(locationRepository.findByName("Shared Name")).thenReturn(Optional.of(other));
+
+    service.syncCities();
+
+    assertFalse(marked.getReferenceOnly());
+    assertEquals("Shared Name (UEX city 5)", marked.getName());
+  }
+
+  @Test
+  void syncSpaceStations_leavesALocationThatIsNotReferenceOnly_whenNotAvailableLive() {
+    SpaceStation station = new SpaceStation();
+    station.setId(UUID.randomUUID());
+    station.setIdSpaceStation(72);
+    station.setName("Quiet Station");
+    Location storage = new Location();
+    storage.setName("Curated Name");
+    UexSpaceStationDto dto =
+        UexSpaceStationDto.builder().id(72).name("Quiet Station").isAvailableLive(0).build();
+    when(uexClient.getSpaceStations()).thenReturn(fetched(List.of(dto)));
+    when(spaceStationRepository.findByIdSpaceStation(72)).thenReturn(Optional.of(station));
+    when(spaceStationRepository.save(any(SpaceStation.class))).thenAnswer(i -> i.getArgument(0));
+    when(locationRepository.findBySpaceStationId(station.getId())).thenReturn(Optional.of(storage));
+
+    service.syncSpaceStations();
+
+    assertEquals("Curated Name", storage.getName());
+    verify(locationRepository, never()).save(any());
+  }
+
+  private static UexCityDto cityDto(int uexId, String name, int live) {
+    return UexCityDto.builder().id(uexId).name(name).isAvailableLive(live).build();
+  }
+
+  private City savedCity(int uexId, String name) {
+    City city = new City();
+    city.setId(UUID.randomUUID());
+    city.setIdCity(uexId);
+    city.setName(name);
+    when(cityRepository.findByIdCity(uexId)).thenReturn(Optional.of(city));
+    when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
+    return city;
+  }
+
+  private static Location referenceOnly(City city, String name) {
+    Location location = new Location();
+    location.setId(UUID.randomUUID());
+    location.setName(name);
+    location.setCity(city);
+    location.setReferenceOnly(true);
+    return location;
   }
 
   @Test

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One ranked material candidate for a raw screen name the refinery screenshot import could not
@@ -28,5 +29,18 @@ import java.util.UUID;
  * @param id id of the candidate {@code Material}
  * @param name display name of the candidate
  * @param score similarity in {@code [0.0, 1.0]}
+ * @param nameDe the candidate's German name, or {@code null} (REQ-P4K-023)
  */
-public record ImportSuggestionDto(UUID id, String name, double score) {}
+public record ImportSuggestionDto(UUID id, String name, double score, @Nullable String nameDe) {
+
+  /**
+   * Creates a candidate without a German name.
+   *
+   * @param id id of the candidate {@code Material}
+   * @param name display name of the candidate
+   * @param score similarity in {@code [0.0, 1.0]}
+   */
+  public ImportSuggestionDto(UUID id, String name, double score) {
+    this(id, name, score, null);
+  }
+}

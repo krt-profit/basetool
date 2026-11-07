@@ -80,6 +80,15 @@ public interface GameItemRepository
   Optional<GameItem> findByExternalUuid(UUID externalUuid);
 
   /**
+   * Finds the GameItem row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<GameItem> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a game item by UEX's integer item id, the match key for UEX rows without a UUID.
    *
    * @param uexItemId UEX's integer item id
@@ -291,6 +300,16 @@ public interface GameItemRepository
       @Param("uexIds") Collection<Integer> uexIds,
       @Param("names") Collection<String> names,
       @Param("nameKeys") Collection<String> nameKeys);
+
+  /**
+   * Lists the distinct game versions the UEX item sync stamped on the items, for the "P4K import
+   * due" signal (REQ-OBS-022).
+   *
+   * @return the distinct non-null {@code uex_game_version_seen} values, in no particular order
+   */
+  @Query(
+      "SELECT DISTINCT g.uexGameVersionSeen FROM GameItem g WHERE g.uexGameVersionSeen IS NOT NULL")
+  List<String> findDistinctUexGameVersions();
 
   /**
    * The identifiers of one game item, for resolving an item reference (REQ-XCH-012).

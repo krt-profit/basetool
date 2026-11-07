@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.mockito.Mockito.mock;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeParityCallers;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,6 +52,9 @@ import org.springframework.transaction.annotation.Transactional;
 class RefineryScopeParityTest {
 
   @Autowired private RefineryOrderRepository refineryOrderRepository;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
@@ -110,6 +115,6 @@ class RefineryScopeParityTest {
   private Location location() {
     Location location = new Location();
     location.setName("Parity-L-" + UUID.randomUUID());
-    return locationRepository.save(location);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 }

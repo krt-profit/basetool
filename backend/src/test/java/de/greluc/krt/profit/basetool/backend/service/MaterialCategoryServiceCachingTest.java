@@ -19,15 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,10 +42,11 @@ import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Spring-Boot integration tests for the {@code @Cacheable} / {@code @CacheEvict} annotations on
- * {@link MaterialCategoryService}. The {@code findAll()} method is no-arg and therefore keyed by
- * {@link SimpleKey#EMPTY}, which is verified explicitly so a refactor adding parameters to {@code
- * findAll} cannot silently shift the cache key without breaking the test.
+ * Spring-Boot integration tests for the {@code @Cacheable} annotations on {@link
+ * MaterialCategoryService} and their eviction after a P4K apply. The {@code findAll()} method is
+ * no-arg and therefore keyed by {@link SimpleKey#EMPTY}, which is verified explicitly so a refactor
+ * adding parameters to {@code findAll} cannot silently shift the cache key without breaking the
+ * test.
  */
 @SpringBootTest
 @Transactional
@@ -50,6 +55,7 @@ class MaterialCategoryServiceCachingTest {
   @Autowired private MaterialCategoryService materialCategoryService;
   @Autowired private MaterialCategoryRepository materialCategoryRepository;
   @Autowired private CacheManager cacheManager;
+  @Autowired private MasterDataCacheEvictionService cacheEvictionService;
 
   private MaterialCategory ore;
   private MaterialCategory good;
@@ -109,49 +115,22 @@ class MaterialCategoryServiceCachingTest {
   }
 
   @Test
-  void create_evictsAllEntries() {
+  void aP4kApplyEvictsAllEntries() {
     primeCacheWithEverything();
 
-    MaterialCategory consumable = new MaterialCategory();
-    consumable.setName("Consumable");
-    materialCategoryService.create(consumable);
+    cacheEvictionService.evictP4kSyncedMasterData();
 
-    assertCacheIsEmpty("create must evict every entry");
+    assertCacheIsEmpty("a P4K apply must evict every entry");
   }
 
   @Test
-  void update_evictsAllEntries() {
-    primeCacheWithEverything();
+  void findAll_leavesOutAGroupTheP4kStamped() {
+    good.setP4kDeletedAt(Instant.now());
+    materialCategoryRepository.flush();
 
-    MaterialCategory rename = new MaterialCategory();
-    rename.setName("Refinable Ore (renamed)");
-    materialCategoryService.update(ore.getId(), rename);
-
-    assertCacheIsEmpty("update must evict every entry");
-  }
-
-  @Test
-  void delete_evictsAllEntries() {
-    primeCacheWithEverything();
-
-    materialCategoryService.delete(good.getId());
-
-    assertCacheIsEmpty("delete must evict every entry");
-  }
-
-  @Test
-  void cacheRepopulatesAfterMutation() {
-    materialCategoryService.findById(ore.getId());
-    MaterialCategory rename = new MaterialCategory();
-    rename.setName("Refinable Ore (rename-2)");
-    materialCategoryService.update(ore.getId(), rename);
-    assertNull(cache().get(ore.getId()));
-
-    materialCategoryService.findById(ore.getId());
-
-    assertNotNull(
-        cache().get(ore.getId()),
-        "cache must repopulate on the next read so the next mutator exercises eviction again");
+    assertEquals(
+        List.of("Refinable Ore"),
+        materialCategoryService.findAll().stream().map(MaterialCategoryDto::name).toList());
   }
 
   private void primeCacheWithEverything() {

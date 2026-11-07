@@ -135,7 +135,16 @@ class AdminPersonalInventoryPageControllerMvcTest {
     String userSub = UUID.randomUUID().toString();
     PersonalInventoryItemDto item =
         new PersonalInventoryItemDto(
-            UUID.randomUUID(), "Kiste", "n", 7, null, "Lorville", 3, 0L, null, null);
+            UUID.randomUUID(),
+            "Kiste",
+            "n",
+            UUID.randomUUID(),
+            null,
+            "Lorville",
+            3,
+            0L,
+            null,
+            null);
     when(backendApiClient.get(
             contains("/api/v1/personal-inventory/admin/"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(item), 0, 50, 51L, 2, List.of()));
@@ -296,8 +305,7 @@ class AdminPersonalInventoryPageControllerMvcTest {
                 .with(csrf())
                 .param("name", "Kiste")
                 .param("quantity", "2")
-                .param("locationUexId", "7")
-                .param("locationType", "CITY")
+                .param("locationId", "0c000001-0000-4000-8000-000000000001")
                 .param("version", "3"))
         .andExpect(status().is3xxRedirection());
 

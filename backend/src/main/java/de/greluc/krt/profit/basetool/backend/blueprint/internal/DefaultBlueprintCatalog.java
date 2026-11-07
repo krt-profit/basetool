@@ -31,7 +31,7 @@ public final class DefaultBlueprintCatalog {
 
   /**
    * Display names of the default starter blueprints (scmbd.net spelling). Insertion order is
-   * irrelevant — identity is the normalized product key.
+   * irrelevant — identity is the product key.
    */
   public static final List<String> STARTER_PRODUCT_NAMES =
       List.of(

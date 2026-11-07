@@ -20,57 +20,45 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One item record from the P4K catalog, matched to {@code game_item} by {@link #guid} ({@code
- * external_uuid}) first, then a unique case-insensitive {@link #className}, then a unique
- * case-insensitive {@link #name}.
+ * One entry of {@code items} in catalogue version 2, bound to the fields the import writes or
+ * decides on; every other field is skipped.
  *
- * <p>Any field may be {@code null} when the source did not resolve it.
- *
- * @param guid DataForge {@code __ref} GUID (string form of {@code game_item.external_uuid})
- * @param className RSI engine class name; matches {@code game_item.class_name}
- * @param path source DCB record path (forensic; not persisted)
- * @param type item type token (forensic; not persisted)
- * @param subType item sub-type token (forensic; not persisted)
- * @param size component size tier (forensic; not persisted)
- * @param grade item grade marker (forensic; not persisted)
- * @param mass mass in kg, filled into {@code game_item.mass} when null
- * @param manufacturerGuid manufacturer GUID, filled into {@code game_item.manufacturer} when null
- * @param tags raw item tag tokens (forensic; not persisted)
- * @param name English display name; matches {@code game_item.name}
- * @param nameDe German display name, or {@code null}
- * @param desc English description, filled into {@code game_item.description_en} when null
- * @param descDe German description, filled into {@code game_item.description_de} when null
- * @param nameKey raw {@code @LOC} name localization key, stored as {@code name_key} without the
- *     {@code @}
- * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)
- * @param displayType {@code SCItemPurchasableParams.displayType} (forensic; not persisted)
+ * @param guid the Record GUID
+ * @param className the Record name
+ * @param recordPath the record path without {@code .xml}
+ * @param name the localised name
+ * @param description the localised description, a game text
+ * @param type the {@code AttachDef.Type}, e.g. {@code PowerPlant}, or {@code null}
+ * @param subType the {@code AttachDef.SubType}, or {@code null}
+ * @param size the {@code AttachDef.Size}, or {@code null}
+ * @param grade the raw {@code AttachDef.Grade} integer, or {@code null}
+ * @param itemClass {@code Civilian}, {@code Competition}, {@code Industrial}, {@code Military},
+ *     {@code Stealth}, another value or {@code null}; its null share per run is a monitoring gauge
+ *     (REQ-OBS-022)
+ * @param mass the mass in kilograms, or {@code null}
+ * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
+ * @param playability {@code player}, {@code mission}, {@code special}, another value or {@code
+ *     null}; read through {@link P4kClosedSet#parse} as a {@link P4kItemPlayability}
+ * @param stats the stat blocks the blueprint stat base values come from (REQ-P4K-030), or {@code
+ *     null} for an item without one
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kItemDto(
-    String guid,
-    String className,
-    String path,
-    String type,
-    String subType,
-    Integer size,
-    String grade,
-    Double mass,
-    String manufacturerGuid,
-    List<String> tags,
-    String name,
-    String nameDe,
-    String desc,
-    String descDe,
-    String nameKey,
-    String descKey,
-    String displayType) {
-
-  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
-  public P4kItemDto {
-    desc = P4kText.decodeLineBreaks(desc);
-    descDe = P4kText.decodeLineBreaks(descDe);
-  }
-}
+    @Nullable String guid,
+    @Nullable String className,
+    @Nullable String recordPath,
+    @Nullable P4kLocalisedText name,
+    @Nullable P4kLocalisedText description,
+    @Nullable String type,
+    @Nullable String subType,
+    @Nullable Integer size,
+    @Nullable Integer grade,
+    @Nullable String itemClass,
+    @Nullable Double mass,
+    @Nullable String manufacturerGuid,
+    @Nullable String playability,
+    @Nullable P4kItemStats stats)
+    implements P4kRecord {}

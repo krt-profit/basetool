@@ -58,7 +58,8 @@ public class BlueprintService {
     Page<Blueprint> page =
         search != null && !search.isBlank()
             ? blueprintRepository.searchActive(LikePatterns.escapeNullable(search.trim()), pageable)
-            : blueprintRepository.findByScwikiDeletedAtIsNull(pageable);
+            : blueprintRepository
+                .findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(pageable);
     return page.map(blueprintMapper::toDto);
   }
 }

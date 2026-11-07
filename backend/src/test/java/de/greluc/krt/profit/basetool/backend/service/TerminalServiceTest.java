@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalService;
@@ -44,6 +45,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TerminalServiceTest {
 
   @Mock private TerminalRepository terminalRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private TerminalService service;
 

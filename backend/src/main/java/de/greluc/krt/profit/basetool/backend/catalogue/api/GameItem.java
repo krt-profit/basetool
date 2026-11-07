@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -47,16 +48,18 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>The UEX sync writes the UEX-side columns, the Wiki sync joins the same row and fills the
  * Wiki-sourced ones, updating {@link #sourceSystems}. {@link #kind} follows the more-specific-wins
- * rule; {@link #manufacturer} keeps the UEX value when the sources disagree.
+ * rule. The P4K leads name, manufacturer, type, sub-type, size, grade, class and mass: where its
+ * {@code p4k_*} value is non-null the displayed column holds it and the other sources leave it
+ * alone (REQ-P4K-017).
  */
 @Entity
 @Table(name = "game_item")
 @Getter
 @Setter
-@ToString(exclude = {"manufacturer", "uexCategory", "linkedShipType"})
+@ToString(exclude = {"manufacturer", "uexCategory", "linkedShipType", "p4kManufacturer"})
 @NoArgsConstructor
 @AllArgsConstructor
-public class GameItem extends AbstractEntity<UUID> {
+public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -71,11 +74,19 @@ public class GameItem extends AbstractEntity<UUID> {
   private UUID externalUuid;
 
   /**
-   * Canonical display name: the P4K name on a row the import knows, else the Wiki name, else the
-   * UEX name (REQ-P4K-017).
+   * Canonical display name: {@link #p4kName} when set, else the live Wiki name, else the UEX name
+   * (REQ-P4K-017).
    */
   @Column(nullable = false)
   private String name;
+
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
 
   /** Joint manufacturer link. Sticky on UEX in case of a UEX/Wiki disagreement. */
   @ManyToOne(fetch = FetchType.LAZY)
@@ -181,11 +192,13 @@ public class GameItem extends AbstractEntity<UUID> {
   /** English description from Wiki. R4. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionEn;
 
   /** German description from Wiki. R4. */
   @Column(name = "description_de", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionDe;
 
   /** Wiki flag indicating this is the base variant of a family. R4. */
@@ -304,10 +317,11 @@ public class GameItem extends AbstractEntity<UUID> {
   private String uexGameVersionSeen;
 
   /**
-   * DataForge asset GUID observed by the P4K Reader import, recorded alongside {@link
-   * #externalUuid} so a disagreement stays auditable. Not unique.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code external_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
+  @Nullable
   private UUID p4kUuid;
 
   /**
@@ -320,9 +334,93 @@ public class GameItem extends AbstractEntity<UUID> {
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")
+  @Nullable
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
+
+  /**
+   * The P4K's English name (REQ-P4K-017), or {@code null}; while non-null it is {@link #name} and
+   * UEX does not write the name.
+   */
+  @Column(name = "p4k_name")
+  @Nullable
+  private String p4kName;
+
+  /**
+   * The manufacturer the P4K's {@code manufacturerGuid} resolves to (REQ-P4K-017), or {@code null};
+   * while non-null it is {@link #manufacturer} and UEX does not write the manufacturer.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "p4k_manufacturer_id")
+  @Nullable
+  private Manufacturer p4kManufacturer;
+
+  /**
+   * The P4K's item {@code type} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #wikiType} and the SC Wiki does not write the type.
+   */
+  @Column(name = "p4k_type")
+  @Nullable
+  private String p4kType;
+
+  /**
+   * The P4K's item {@code subType} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #wikiSubType} and the SC Wiki does not write the sub-type.
+   */
+  @Column(name = "p4k_sub_type")
+  @Nullable
+  private String p4kSubType;
+
+  /**
+   * The P4K's item {@code size} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #sizeClass} and the SC Wiki does not write the size.
+   */
+  @Column(name = "p4k_size")
+  @Nullable
+  private Integer p4kSize;
+
+  /**
+   * The raw DataForge {@code grade} of the matched item, whatever its type (REQ-P4K-018), or {@code
+   * null}; with {@link #p4kType} it gives the P4K's grade letter.
+   */
+  @Column(name = "p4k_grade_raw")
+  @Nullable
+  private Integer p4kGradeRaw;
+
+  /**
+   * The P4K's component class (REQ-P4K-019), or {@code null} when the catalogue has none or an
+   * unknown one; while non-null it is {@link #itemClass} and the SC Wiki does not write the class.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "p4k_item_class", length = 16)
+  @Nullable
+  private ShipComponentClass p4kItemClass;
+
+  /**
+   * The P4K's mass in kg (REQ-P4K-017), or {@code null}; while non-null it is {@link #mass} and the
+   * SC Wiki does not write the mass.
+   */
+  @Column(name = "p4k_mass")
+  @Nullable
+  private Double p4kMass;
 }

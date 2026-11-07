@@ -71,7 +71,7 @@ codes, whichever side refuses it.
 | Reason | Meaning | Client action |
 | --- | --- | --- |
 | `UNMATCHED` | The reference resolves to nothing. | Show it; offer `catalog/resolve`. |
-| `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `bt`. |
+| `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `guid` for a blueprint, else `bt`. |
 | `DEFAULT_NOT_REMOVABLE` | A default-granted blueprint cannot be removed. | Keep it. |
 | `STOCK_EARMARKED` | The lot's stock, the stock a `share` or `unshare` would move, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |

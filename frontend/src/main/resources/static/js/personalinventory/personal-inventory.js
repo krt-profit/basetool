@@ -8,6 +8,12 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 
 const SEARCH_LIMIT = 2000;
 
+/** The picker marker of each location kind; a location linked to neither has none. */
+const MARKER_CLASS = /** @type {Record<string, string>} */ ({
+    CITY: 'krt-pi-loc-city',
+    SPACE_STATION: 'krt-pi-loc-station',
+});
+
 /** @type {HTMLElement | null} */
 let modal = null;
 /** @type {HTMLElement | null} */
@@ -23,9 +29,7 @@ let searchInput = null;
 /** @type {HTMLElement | null} */
 let resultsEl = null;
 /** @type {HTMLInputElement | null} */
-let hiddenUexId = null;
-/** @type {HTMLInputElement | null} */
-let hiddenLocationType = null;
+let hiddenLocationId = null;
 /** @type {number | null} */
 let debounceTimer = null;
 
@@ -47,8 +51,7 @@ function init() {
     titleEl = $('krt-pi-modal-title');
     searchInput = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-search'));
     resultsEl = $('krt-pi-location-results');
-    hiddenUexId = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-uex-id'));
-    hiddenLocationType = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-type'));
+    hiddenLocationId = /** @type {HTMLInputElement | null} */ ($('krt-pi-location-id'));
 
     if (searchInput) {
         searchInput.addEventListener('input', onSearchInput);
@@ -141,8 +144,8 @@ function submitItemForm() {
     const i18n = window.krtPersonalInventoryI18n || {};
     const action = form.getAttribute('action') || form.action;
     const isUpdate = /\/update$/.test(action);
-    const uexId = hiddenUexId ? hiddenUexId.value : '';
-    if (!uexId) {
+    const locationId = hiddenLocationId ? hiddenLocationId.value : '';
+    if (!locationId && !isUpdate) {
         showFrontendErrorToast(
             krtI18nText(
                 i18n.locationRequired || i18n.errorCreate,
@@ -156,8 +159,7 @@ function submitItemForm() {
         name: fieldValue('name'),
         note: fieldValue('note'),
         quantity: toIntOrNull(fieldValue('quantity')),
-        locationUexId: toIntOrNull(uexId),
-        locationType: hiddenLocationType ? hiddenLocationType.value : null,
+        locationId: locationId || null,
     };
     if (isUpdate) {
         payload.version = toIntOrNull(fieldValue('version'));
@@ -321,8 +323,7 @@ function openEdit(btn) {
     setField('name', btn.getAttribute('data-name'));
     setField('note', btn.getAttribute('data-note'));
     setField('quantity', btn.getAttribute('data-quantity'));
-    if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-location-uex-id') || '';
-    if (hiddenLocationType) hiddenLocationType.value = btn.getAttribute('data-location-type') || '';
+    if (hiddenLocationId) hiddenLocationId.value = btn.getAttribute('data-location-id') || '';
     if (searchInput) searchInput.value = btn.getAttribute('data-location-name') || '';
     krtModal.open(modal);
 }
@@ -376,8 +377,7 @@ function clearForm() {
     ['id', 'version', 'name', 'note', 'quantity'].forEach((n) => {
         setField(n, '');
     });
-    if (hiddenUexId) hiddenUexId.value = '';
-    if (hiddenLocationType) hiddenLocationType.value = '';
+    if (hiddenLocationId) hiddenLocationId.value = '';
     if (searchInput) searchInput.value = '';
 }
 
@@ -391,7 +391,7 @@ function runSearch() {
     const q = searchInput.value || '';
     const endpoints = window.krtPersonalInventoryEndpoints || {};
     const url = `${
-        endpoints.uexSearch || '/personal-inventory/uex-search'
+        endpoints.locationSearch || '/personal-inventory/location-search'
     }?q=${encodeURIComponent(q)}&limit=${SEARCH_LIMIT}`;
     resultsEl.hidden = false;
     krtHtml.set(
@@ -412,7 +412,7 @@ function runSearch() {
 /**
  * Renders the location type-ahead results.
  *
- * @param {ApiDto<'UexLocationDto'>[] | null} items the matching locations
+ * @param {ApiDto<'PersonalInventoryLocationOption'>[] | null} items the matching locations
  */
 function renderResults(items) {
     if (!resultsEl) return;
@@ -427,13 +427,13 @@ function renderResults(items) {
         return;
     }
     const html = items.map((it) => {
-        const typeClass = it.type === 'CITY' ? 'krt-pi-loc-city' : 'krt-pi-loc-station';
+        const typeClass = (it.type && MARKER_CLASS[it.type]) || '';
         const meta = it.starSystemName
             ? `${it.parentName || ''} / ${it.starSystemName}`
             : it.parentName || '';
-        return krtHtml`<button type="button" class="krt-pi-typeahead-item" data-uex-id="${
-            it.uexId
-        }" data-type="${it.type}" data-name="${
+        return krtHtml`<button type="button" class="krt-pi-typeahead-item" data-location-id="${
+            it.id
+        }" data-name="${
             it.name
         }"><span class="krt-pi-location-marker ${typeClass}"></span><span class="krt-pi-typeahead-name">${
             it.name || ''
@@ -450,8 +450,8 @@ function renderResults(items) {
     krtHtml.set(resultsEl, html);
     resultsEl.querySelectorAll('.krt-pi-typeahead-item').forEach((btn) => {
         btn.addEventListener('click', () => {
-            if (hiddenUexId) hiddenUexId.value = btn.getAttribute('data-uex-id') || '';
-            if (hiddenLocationType) hiddenLocationType.value = btn.getAttribute('data-type') || '';
+            if (hiddenLocationId)
+                hiddenLocationId.value = btn.getAttribute('data-location-id') || '';
             if (searchInput) searchInput.value = btn.getAttribute('data-name') || '';
             if (resultsEl) resultsEl.hidden = true;
         });

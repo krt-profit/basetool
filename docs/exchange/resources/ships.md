@@ -13,7 +13,7 @@ The ships the member owns in the Hangar. Reading needs `exchange.hangar.read`, c
 | `shipType` | `{bt, name}`; `bt` is the ship type's Basetool id. |
 | `name` | The member's name for the ship; absent when it has none. Up to 255 characters. |
 | `insurance` | `{kind: LTI}` or `{kind: MONTHS, months}` with 0 to 120 months. |
-| `location` | `{name, uex?}` of the warehouse location, when the ship has one. |
+| `location` | `{name, uex?, guid?}` of the warehouse location, when the ship has one. |
 | `fitted` | Whether the ship is fitted. |
 | `orgUnit` | `{id, name, shorthand, kind}` of the [org unit](org-units.md) the ship belongs to; absent when it belongs to none. |
 | `orgUnitVersion` | The counter of the ship's org unit. It moves only when the unit changes, and `version` does not move with it. |

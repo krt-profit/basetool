@@ -19,26 +19,35 @@
 
 package de.greluc.krt.profit.basetool.backend.repository;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Pins the curated home-location query backing the hangar bulk "set home location" picker: only
  * rows flagged {@code is_home_location} and not {@code hidden}, ordered by name descending
- * (Z-&gt;A).
+ * (Z-&gt;A); and that no list, picker or exchange read offers a reference-only row (REQ-P4K-039).
  */
 @SpringBootTest
 @Transactional
 class LocationRepositoryTest {
 
+  private static final PageRequest PAGE = PageRequest.of(0, 500);
+
   @Autowired private LocationRepository repository;
+  @Autowired private CityRepository cityRepository;
 
   @Test
   void findHomeLocations_returnsOnlyCuratedVisible_orderedByNameDescending() {
@@ -49,7 +58,9 @@ class LocationRepositoryTest {
     repository.save(loc("HL-Test-HiddenHome", true, true));
 
     List<String> mine =
-        repository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc().stream()
+        repository
+            .findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc()
+            .stream()
             .map(Location::getName)
             .filter(name -> name.startsWith("HL-Test-"))
             .toList();
@@ -57,8 +68,58 @@ class LocationRepositoryTest {
     assertEquals(List.of("HL-Test-Charlie", "HL-Test-Bravo", "HL-Test-Alpha"), mine);
   }
 
-  private static Location loc(String name, boolean homeLocation, boolean hidden) {
-    Location location = new Location();
+  @Test
+  void aReferenceOnlyRowIsInNoListPickerOrExchangeRead() {
+    City city = new City();
+    city.setIdCity(990_339);
+    city.setName("RO-Test City");
+    city.setHasRefineryTerminal(true);
+    city = cityRepository.save(city);
+    Location offered = loc("RO-Test Offered", true, false);
+    Location marked = loc("RO-Test City", true, false);
+    marked.setCity(city);
+    marked.setReferenceOnly(true);
+    repository.save(offered);
+    repository.save(marked);
+
+    assertThat(repository.findAllReference())
+        .extracting(LocationReferenceDto::name)
+        .contains("RO-Test Offered")
+        .doesNotContain("RO-Test City");
+    assertThat(repository.searchReference("RO-Test", PAGE).map(LocationReferenceDto::name))
+        .containsExactly("RO-Test Offered");
+    assertThat(repository.findByReferenceOnlyFalse(PAGE).map(Location::getName))
+        .doesNotContain("RO-Test City");
+    assertThat(repository.findByHiddenFalseAndReferenceOnlyFalse(PAGE).map(Location::getName))
+        .doesNotContain("RO-Test City");
+    assertThat(
+            repository
+                .findByReferenceOnlyFalseAndNameContainingIgnoreCase("RO-Test", PAGE)
+                .map(Location::getName))
+        .containsExactly("RO-Test Offered");
+    assertThat(
+            repository
+                .findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase("RO-Test", PAGE)
+                .map(Location::getName))
+        .containsExactly("RO-Test Offered");
+    assertThat(
+            repository.findByHomeLocationTrueAndHiddenFalseAndReferenceOnlyFalseOrderByNameDesc())
+        .extracting(Location::getName)
+        .doesNotContain("RO-Test City");
+    assertThat(repository.findLocationsWithRefinery()).doesNotContain(marked);
+    assertThat(repository.findExchangeLocations())
+        .extracting(LocationRepository.ExchangeLocationRow::getName)
+        .doesNotContain("RO-Test City");
+    assertThat(repository.findExchangeByCity(990_339)).isEmpty();
+    assertThat(
+            repository.findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(
+                "RO-Test City"))
+        .isEmpty();
+    assertThat(repository.findByCityId(city.getId())).contains(marked);
+  }
+
+  private Location loc(String name, boolean homeLocation, boolean hidden) {
+    Location location = TestPlaces.onOwnCity(new Location(), cityRepository);
     location.setName(name);
     location.setHomeLocation(homeLocation);
     location.setHidden(hidden);

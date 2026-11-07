@@ -75,6 +75,7 @@ class GeneratedDtoAgreementTest {
           "NotificationViewDto",
           "NotificationPageSliceDto",
           "StagedHandoff",
+          "StarmapStoragePlaceRequest",
           "PageResponse",
           "BereichCreateRequest",
           "MaterialUpdateAjaxRequest",
@@ -150,7 +151,7 @@ class GeneratedDtoAgreementTest {
         .as(
             "frontend-only types. A genuine new view model raises this AND gets a reason beside its"
                 + " name; a backend type that stopped existing does NOT belong here")
-        .hasSize(12);
+        .hasSize(13);
     assertThat(ALIASES)
         .as(
             "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"

@@ -100,7 +100,10 @@ class DtoMirrorConsistencyTest {
           entry(
               "OrganisationsleitungCreateRequest",
               "write subset of OrganisationsleitungDto; the backend assigns the rest"),
-          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"));
+          entry("StagedHandoff", "mirror of the ingest gateway's Redis value, not of the backend"),
+          entry(
+              "StarmapStoragePlaceRequest",
+              "browser body turned into a LocationDto on the chosen starmap object"));
 
   /**
    * Per-DTO whitelist of backend-only record components the frontend deliberately does not mirror.

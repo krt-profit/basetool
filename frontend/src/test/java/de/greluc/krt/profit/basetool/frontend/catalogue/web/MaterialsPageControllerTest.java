@@ -286,11 +286,11 @@ class MaterialsPageControllerTest {
 
     assertEquals("catalogue/materials-overview", viewName);
     Collection<String> systems = (Collection<String>) model.getAttribute("starSystems");
-    Collection<String> materials = (Collection<String>) model.getAttribute("materialNames");
+    Map<String, String> materials = (Map<String, String>) model.getAttribute("materialLabels");
     assertNotNull(systems);
     assertTrue(systems.contains("Stanton"));
     assertNotNull(materials);
-    assertTrue(materials.contains("Aluminum"));
+    assertTrue(materials.containsKey("Aluminum"));
   }
 
   @Test

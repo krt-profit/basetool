@@ -22,14 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -216,12 +212,11 @@ class AdminMaterialsPageControllerMvcTest {
         .contains("class=\"text-danger admin-material-flag\"")
         .contains(">Rohmaterial<")
         .contains("data-list-total=\"1\"")
-        .contains("data-category-row")
-        .containsPattern("data-category-empty hidden=\"hidden\"")
-        .doesNotContain("data-testid=\"empty-state\" data-category-empty>");
+        .doesNotContain("data-category-row")
+        .doesNotContain("/admin/materials/categories");
   }
 
-  /** Neither materials nor categories: both lists show their empty state. */
+  /** No materials: the list shows its empty state, and no category editor exists (REQ-P4K-025). */
   @Test
   @WithMockUser(roles = "ADMIN")
   void listMaterials_rendersTheEmptyStates() throws Exception {
@@ -230,9 +225,8 @@ class AdminMaterialsPageControllerMvcTest {
     String main = html.substring(html.indexOf("<main"), html.indexOf("</main>"));
     assertThat(main)
         .containsPattern("data-materials-table[^>]*hidden=\"hidden\"")
-        .containsPattern("data-category-table hidden=\"hidden\"")
-        .contains("data-category-empty>");
-    assertThat(main.split("data-testid=\"empty-state\"", -1)).hasSize(3);
+        .doesNotContain("data-category-table");
+    assertThat(main.split("data-testid=\"empty-state\"", -1)).hasSize(2);
   }
 
   /**
@@ -327,63 +321,5 @@ class AdminMaterialsPageControllerMvcTest {
             PageStylesheets.content(
                 containsString(
                     ".form-group input:where(:not([type='checkbox'], [type='radio']))")));
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createCategoryAjax_withHeader_returns200WithCategory() throws Exception {
-    when(backendApiClient.post(
-            contains("/material-categories"), any(), eq(MaterialCategoryDto.class)))
-        .thenReturn(new MaterialCategoryDto(UUID.randomUUID(), "X", 0L));
-
-    mockMvc
-        .perform(
-            post("/admin/materials/categories")
-                .header("X-Requested-With", "XMLHttpRequest")
-                .with(csrf())
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"X\"}"))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("X")));
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createCategoryAjax_withHeaderBlankName_returns400() throws Exception {
-    mockMvc
-        .perform(
-            post("/admin/materials/categories")
-                .header("X-Requested-With", "XMLHttpRequest")
-                .with(csrf())
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"  \"}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void deleteCategoryAjax_withHeader_returns200() throws Exception {
-    UUID id = UUID.randomUUID();
-    when(backendApiClient.delete(eq("/api/v1/material-categories/{id}"), eq(Void.class), eq(id)))
-        .thenReturn(null);
-
-    mockMvc
-        .perform(
-            post("/admin/materials/categories/" + id + "/delete")
-                .header("X-Requested-With", "XMLHttpRequest")
-                .with(csrf()))
-        .andExpect(status().isOk());
-  }
-
-  @Test
-  @WithMockUser(roles = "ADMIN")
-  void createCategory_withoutHeader_redirects() throws Exception {
-    when(backendApiClient.post(
-            contains("/material-categories"), any(), eq(MaterialCategoryDto.class)))
-        .thenReturn(new MaterialCategoryDto(UUID.randomUUID(), "X", 0L));
-
-    mockMvc
-        .perform(post("/admin/materials/categories").with(csrf()).param("name", "X"))
-        .andExpect(status().is3xxRedirection());
   }
 }

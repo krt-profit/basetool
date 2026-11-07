@@ -21,8 +21,14 @@ package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +38,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -42,7 +49,12 @@ class PersonalInventoryItemRepositoryTest {
   private static final UUID OWNER_B = UUID.fromString("bbbbbbbb-0000-0000-0000-00000000000b");
 
   @Autowired private PersonalInventoryItemRepository repository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private LocationRepository locationRepository;
+  @Autowired private EntityManager entityManager;
+  @Autowired private JdbcTemplate jdbc;
 
   @BeforeEach
   void clean() {
@@ -124,13 +136,64 @@ class PersonalInventoryItemRepositoryTest {
         "JPA must increment @Version on each update – this is the basis for the 409 contract.");
   }
 
+  @Test
+  void aLocationIsSelectableWhenOfferedOrAlreadyUsedByTheOwner() {
+    Location offered = location("PI-Sel Offered", false, false);
+    Location hidden = location("PI-Sel Hidden", true, false);
+    Location usedByA = location("PI-Sel Used By A", false, true);
+    Location usedByB = location("PI-Sel Used By B", false, true);
+    PersonalInventoryItem onA = item(OWNER_A, "On A");
+    onA.setLocation(usedByA);
+    repository.save(onA);
+    PersonalInventoryItem onB = item(OWNER_B, "On B");
+    onB.setLocation(usedByB);
+    repository.save(onB);
+
+    assertTrue(repository.findSelectableLocation(OWNER_A, offered.getId()).isPresent());
+    assertTrue(repository.findSelectableLocation(OWNER_A, usedByA.getId()).isPresent());
+    assertTrue(repository.findSelectableLocation(OWNER_A, hidden.getId()).isEmpty());
+    assertTrue(repository.findSelectableLocation(OWNER_A, usedByB.getId()).isEmpty());
+    List<String> names =
+        repository.findSelectableLocations(OWNER_A, "pi-sel", PageRequest.of(0, 50)).stream()
+            .map(Location::getName)
+            .toList();
+    assertEquals(List.of("PI-Sel Offered", "PI-Sel Used By A"), names);
+    assertEquals(
+        List.of("PI-Sel Offered"),
+        repository.findSelectableLocations(OWNER_A, "pi-sel", PageRequest.of(0, 1)).stream()
+            .map(Location::getName)
+            .toList());
+  }
+
+  @Test
+  void deletingALocationClearsTheKeyAndKeepsTheSnapshot() {
+    Location doomed = location("PI-Del Doomed", false, false);
+    PersonalInventoryItem item = item(OWNER_A, "Survivor");
+    item.setLocation(doomed);
+    item.setLocationNameSnapshot("PI-Del Doomed");
+    PersonalInventoryItem saved = repository.saveAndFlush(item);
+
+    entityManager.clear();
+    jdbc.update("DELETE FROM location WHERE id = ?", doomed.getId());
+
+    PersonalInventoryItem reloaded = repository.findById(saved.getId()).orElseThrow();
+    assertNull(reloaded.getLocation());
+    assertEquals("PI-Del Doomed", reloaded.getLocationNameSnapshot());
+  }
+
+  private Location location(String name, boolean hidden, boolean referenceOnly) {
+    Location location = new Location();
+    location.setName(name);
+    location.setHidden(hidden);
+    location.setReferenceOnly(referenceOnly);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
+  }
+
   private static PersonalInventoryItem item(UUID ownerUserId, String name) {
     return PersonalInventoryItem.builder()
         .ownerUserId(ownerUserId)
         .name(name)
         .note(null)
-        .locationUexId(1)
-        .locationType(PersonalInventoryLocationType.CITY)
         .locationNameSnapshot("Lorville")
         .quantity(1)
         .build();

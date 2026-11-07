@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationOption;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -97,6 +99,28 @@ public class PersonalInventoryController {
   }
 
   /**
+   * Searches the locations the caller may pick for an item (REQ-P4K-039): every offered storage
+   * place plus every location one of the caller's items references.
+   *
+   * @param q optional case-insensitive name fragment
+   * @param limit optional result cap, clamped to {@code [1, 2000]}, default 25
+   * @param ownerUserId the caller, from the JWT
+   * @return the matching locations, by name
+   */
+  @GetMapping("/locations")
+  @Operation(summary = "Search the locations the caller may pick for a personal inventory entry.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Up to 2000 matches, sorted by name."),
+    @ApiResponse(responseCode = "401", description = "Authentication required.")
+  })
+  public List<PersonalInventoryLocationOption> searchSelectableLocations(
+      @RequestParam(required = false) String q,
+      @RequestParam(required = false) Integer limit,
+      @CurrentUserId UUID ownerUserId) {
+    return service.searchLocations(ownerUserId, q, limit);
+  }
+
+  /**
    * Fetches one of the caller's own items. 404 for unknown id OR cross-owner attempt (the two cases
    * are intentionally indistinguishable on the wire).
    *
@@ -125,7 +149,7 @@ public class PersonalInventoryController {
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Item created."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
-    @ApiResponse(responseCode = "404", description = "Referenced UEX location does not exist.")
+    @ApiResponse(responseCode = "404", description = "Location unknown or not selectable.")
   })
   public PersonalInventoryItemResponse create(
       @Valid @RequestBody PersonalInventoryItemCreateRequest request,

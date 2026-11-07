@@ -83,7 +83,15 @@ not want booked out of stock). The service:
 - **Rejects `amount > (amount − manufacturedAmount)`** — producing more than the line still needs —
   with `ProductionAllocationException` → HTTP **422** (code `PRODUCTION_ALLOCATION`).
 - Computes the **required per-material demand** for `amount` units from the line's **snapshotted
-  recipe** (`JobOrderItemMaterial`, the same snapshot that feeds the aggregated-materials view):
+  recipe** (`JobOrderItemMaterial`, the same snapshot that feeds the aggregated-materials view). The
+  snapshot (`JobOrderItemService.applyItemLine`, and the create preview `deriveForPreview`) holds
+  the lines one craft consumes as `catalogue.api.RecipeGroupSelection` picks them, the selection
+  the craftability uses (REQ-INV-048): no optional cost (`is_optional`), and of a choose-n recipe
+  (`required_group_count`, REQ-P4K-027) exactly `n` option groups. An order can link only the
+  materials it snapshots, so the selection is measured against no stock: the `n` groups with the
+  smallest demand for one craft, equal ones in recipe order — the LIVE choose-2-of-3
+  `BP_CRAFT_thp_light_legs_01_01_01` (0.03 / 0.02 / 0.03 SCU) requires 0.05 SCU per unit, not
+  0.08. `skippedMaterialIds` stays the explicit override:
   `demand = roundForQuantityType(requiredQuantity × amount / lineAmount)` per material, summed per
   material id. A material listed in **`skippedMaterialIds`** ("nicht ausbuchen") is **excluded from
   the demand map**, so it is neither required to be covered nor may be named by a `consumption`
@@ -211,7 +219,8 @@ registry), and the receiver's apply map.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
-`JobOrderItemServiceTest` (aggregate reduced by manufactured units, 0 for a fully manufactured line),
+`JobOrderItemServiceTest` (aggregate reduced by manufactured units, 0 for a fully manufactured line,
+a choose-2-of-3 recipe snapshots two options and no optional cost),
 `JobOrderControllerTest` (`bookProduction` auth +
 mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but-undelivered),
 `V219MigrationTest` (backfill + CHECK constraints) · **Code:**

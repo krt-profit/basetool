@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -48,6 +51,7 @@ public class CityService {
 
   private final CityRepository cityRepository;
   private final CityMapper cityMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the paged city catalogue. The page is cached per {@link Pageable} (default key
@@ -97,6 +101,12 @@ public class CityService {
     City city = requireCity(id);
     city.setHasLoadingDock(value);
     city.setHasLoadingDockOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN,
+        city.getId(),
+        city.getName(),
+        null,
+        AuditDetails.of("hasLoadingDock", value));
     return cityRepository.save(city);
   }
 
@@ -112,6 +122,12 @@ public class CityService {
   public City clearLoadingDockOverride(UUID id) {
     City city = requireCity(id);
     city.setHasLoadingDockOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED,
+        city.getId(),
+        city.getName(),
+        null,
+        null);
     return cityRepository.save(city);
   }
 }

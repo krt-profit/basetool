@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -46,7 +47,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>The UEX vehicle sync fills the capability flags, dimensions, fuel, URLs and the cross-source
  * keys {@link #externalUuid} / {@link #uexVehicleId}; descriptions ({@link #descriptionEn}, {@link
  * #descriptionDe}) come only from the SC Wiki sync and the P4K import. Wiki-side columns are
- * nullable.
+ * nullable. On a row with a P4K GUID the P4K import leads the class name, manufacturer, name, crew
+ * size, role, career, mass, hull health, size, vehicle kind, insurance facts and, when every cargo
+ * grid was read, the cargo (REQ-P4K-031).
  */
 @Entity
 @Getter
@@ -54,7 +57,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString(exclude = "manufacturer")
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShipType extends AbstractEntity<UUID> {
+public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -63,6 +66,14 @@ public class ShipType extends AbstractEntity<UUID> {
 
   @Column(nullable = false, unique = true)
   private String name;
+
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "manufacturer_id")
@@ -175,6 +186,52 @@ public class ShipType extends AbstractEntity<UUID> {
   /** Shield health points. */
   @Column(name = "shield_hp")
   private Double shieldHp;
+
+  /** English role label from the P4K catalogue, e.g. {@code Light Freight} (REQ-P4K-031). */
+  @Column(name = "role")
+  @Nullable
+  private String role;
+
+  /** English career label from the P4K catalogue, e.g. {@code Transporter} (REQ-P4K-031). */
+  @Column(name = "career")
+  @Nullable
+  private String career;
+
+  /** The item size of the ship's attach definition from the P4K catalogue (REQ-P4K-031). */
+  @Column(name = "size_class")
+  @Nullable
+  private Integer sizeClass;
+
+  /** Spaceship or ground vehicle, from the P4K catalogue (REQ-P4K-031). */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "vehicle_kind", length = 16)
+  @Nullable
+  private ShipVehicleKind vehicleKind;
+
+  /** Whether an insurance claim restores the ship with its loadout, from the P4K catalogue. */
+  @Column(name = "insurance_restore_on_claim")
+  @Nullable
+  private Boolean insuranceRestoreOnClaim;
+
+  /** The entity class name the insurance parameters name, from the P4K catalogue. */
+  @Column(name = "insurance_ship_class_name")
+  @Nullable
+  private String insuranceShipClassName;
+
+  /** The insurance claim time in minutes, from the P4K catalogue. */
+  @Column(name = "insurance_claim_minutes")
+  @Nullable
+  private Double insuranceClaimMinutes;
+
+  /** The shortest insurance claim time in minutes, from the P4K catalogue. */
+  @Column(name = "insurance_mandatory_claim_minutes")
+  @Nullable
+  private Double insuranceMandatoryClaimMinutes;
+
+  /** The insurance expedite fee in aUEC, from the P4K catalogue. */
+  @Column(name = "insurance_expedite_fee")
+  @Nullable
+  private Long insuranceExpediteFee;
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")
@@ -383,11 +440,13 @@ public class ShipType extends AbstractEntity<UUID> {
   /** English description, filled by the SC Wiki vehicle sync and the P4K import, never by UEX. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionEn;
 
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */
   @Column(name = "description_de", columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String descriptionDe;
 
   /** Last successful UEX sync touch. */
@@ -414,12 +473,10 @@ public class ShipType extends AbstractEntity<UUID> {
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
 
   /**
-   * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this ship. Kept
-   * alongside (not in place of) {@link #externalUuid}: the importer backfills {@code external_uuid}
-   * only when it is null and unclaimed, but always records the P4K-observed GUID here so a UUID
-   * disagreement stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code external_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /**
@@ -434,7 +491,24 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "p4k_synced_at")
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

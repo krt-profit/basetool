@@ -18,7 +18,7 @@
     <div class="toolbar drill-toolbar">
         <label for="materialSelect" class="form-label-xs" th:text="#{inventory.material.switch}">Anderes Material</label>
         <select id="materialSelect" class="material-select" data-trigger="navigate-select" data-url-template="/inventory/material/{value}" data-krt-combobox="remote-materials">
-            <option th:each="mat : ${materials}" th:if="${mat.id == selectedMaterialId}" th:value="${mat.id}" th:text="${mat.name}" th:selected="${mat.id == selectedMaterialId}"></option>
+            <option th:each="mat : ${materials}" th:if="${mat.id == selectedMaterialId}" th:value="${mat.id}" th:text="${mat.displayName(#locale)}" th:selected="${mat.id == selectedMaterialId}"></option>
         </select>
     </div>
 

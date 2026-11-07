@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
@@ -62,6 +64,9 @@ class LikeEscapeCatalogRepositoriesDataTest {
   private static final String TAG = "Lk" + UUID.randomUUID().toString().substring(0, 8);
 
   @Autowired private LocationRepository locationRepository;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private MaterialRepository materialRepository;
   @Autowired private TerminalRepository terminalRepository;
   @Autowired private MaterialPriceRepository materialPriceRepository;
@@ -107,7 +112,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
     Location hidden = new Location();
     hidden.setName(TAG + " Dock_B");
     hidden.setHidden(true);
-    locationRepository.save(hidden);
+    locationRepository.save(TestPlaces.onOwnCity(hidden, cityRepository));
     Material visible = saveMaterial(TAG + " Gem%A");
     saveMaterial(TAG + " GemXA");
     Material invisible = saveMaterial(TAG + " Gem_B");
@@ -117,16 +122,18 @@ class LikeEscapeCatalogRepositoriesDataTest {
     PageRequest page = PageRequest.of(0, 50);
     assertThat(
             locationRepository
-                .findByNameContainingIgnoreCase((TAG + " dock%a").toUpperCase(), page)
+                .findByReferenceOnlyFalseAndNameContainingIgnoreCase(
+                    (TAG + " dock%a").toUpperCase(), page)
                 .map(Location::getName))
         .containsExactly(TAG + " Dock%A");
     assertThat(
             locationRepository
-                .findByNameContainingIgnoreCase(TAG + " Dock_B", page)
+                .findByReferenceOnlyFalseAndNameContainingIgnoreCase(TAG + " Dock_B", page)
                 .map(Location::getName))
         .containsExactly(TAG + " Dock_B");
     assertThat(
-            locationRepository.findByHiddenFalseAndNameContainingIgnoreCase(TAG + " Dock_B", page))
+            locationRepository.findByHiddenFalseAndReferenceOnlyFalseAndNameContainingIgnoreCase(
+                TAG + " Dock_B", page))
         .isEmpty();
     assertThat(
             materialRepository
@@ -134,9 +141,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
                 .map(Material::getName))
         .containsExactly(visible.getName());
     assertThat(materialRepository.findByNameContainingIgnoreCase(TAG + " Gem_B", page)).hasSize(1);
-    assertThat(
-            materialRepository.findByIsVisibleTrueAndNameContainingIgnoreCase(TAG + " Gem_B", page))
-        .isEmpty();
+    assertThat(materialRepository.searchPickableByName(TAG + " Gem_B", page)).isEmpty();
   }
 
   @Test
@@ -242,7 +247,7 @@ class LikeEscapeCatalogRepositoriesDataTest {
   private void saveLocation(String name) {
     Location location = new Location();
     location.setName(name);
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private Material saveMaterial(String name) {

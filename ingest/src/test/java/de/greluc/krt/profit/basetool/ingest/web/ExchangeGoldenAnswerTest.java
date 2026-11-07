@@ -33,6 +33,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import com.nimbusds.jose.jwk.ECKey;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.handoff.HandoffStagingService;
+import de.greluc.krt.profit.basetool.ingest.observability.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRegistryReader;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeRevocationReader;
 import de.greluc.krt.profit.basetool.ingest.relay.ServiceAccountTokenProvider;
@@ -41,6 +42,8 @@ import de.greluc.krt.profit.basetool.ingest.store.ExchangeIdempotency;
 import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.Filter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -151,6 +154,7 @@ class ExchangeGoldenAnswerTest {
   private static final Set<String> RELAYED_OPERATIONS = new TreeSet<>();
 
   @Autowired private WebApplicationContext context;
+  @Autowired private MeterRegistry meterRegistry;
 
   @MockitoBean private JwtDecoder jwtDecoder;
   @MockitoBean private HandoffStagingService stagingService;
@@ -279,6 +283,7 @@ class ExchangeGoldenAnswerTest {
 
   @Test
   void aRelayedRefusalAndARelayFailureAnswerAsRecorded() throws Exception {
+    double brokenBefore = relayOutcomes("answer_contract_broken");
     List<String> mismatched = new ArrayList<>();
     OVERRIDES.put(
         "POST /api/v1/exchange/me/stock/changes", json(409, "{\"code\":\"OPTIMISTIC_LOCK\"}"));
@@ -302,6 +307,42 @@ class ExchangeGoldenAnswerTest {
       }
     }
     assertThat(mismatched).as("goldens that differ; see " + OBSERVED).isEmpty();
+    assertThat(relayOutcomes("answer_contract_broken"))
+        .as("the locations answer that breaks its schema")
+        .isEqualTo(brokenBefore + 1);
+  }
+
+  @Test
+  void anAnswerWithAnUndeclaredPropertyFailsClosedAndIsCountedAsABrokenContract() throws Exception {
+    double before = relayOutcomes("answer_contract_broken");
+    double passedBefore = relayOutcomes("ok");
+    OVERRIDES.put(
+        "GET /api/v1/exchange/me/ships",
+        json(200, SHIP_PAGE.replace("\"fitted\":false", "\"fitted\":false,\"description\":\"x\"")));
+
+    assertThat(matches("failed-ships-answer-carries-undeclared-property", record(get("/me/ships"))))
+        .as("golden differs; see " + OBSERVED)
+        .isTrue();
+    assertThat(relayOutcomes("answer_contract_broken")).isEqualTo(before + 1);
+    assertThat(relayOutcomes("ok")).isEqualTo(passedBefore);
+  }
+
+  @Test
+  void aDeclaredFreeFormMapPassesVerbatim() throws Exception {
+    double passedBefore = relayOutcomes("ok");
+    OVERRIDES.put(
+        "GET /api/v1/exchange/me/ships",
+        json(
+            200,
+            SHIP_PAGE.replace(
+                "\"fitted\":false",
+                "\"fitted\":false,\"extensions\":{\"org.example.fleet\":{\"colour\":\"red\","
+                    + "\"slots\":[1,2]}}")));
+
+    assertThat(matches("route-get-ships-with-extensions", record(get("/me/ships"))))
+        .as("golden differs; see " + OBSERVED)
+        .isTrue();
+    assertThat(relayOutcomes("ok")).isEqualTo(passedBefore + 1);
   }
 
   @Test
@@ -599,6 +640,22 @@ class ExchangeGoldenAnswerTest {
     return Files.exists(golden)
         ? Files.readString(golden, StandardCharsets.UTF_8).replace("\r\n", "\n")
         : null;
+  }
+
+  /**
+   * Reads the relay outcome counter of the test client.
+   *
+   * @param outcome the outcome
+   * @return the count, {@code 0} before the first one
+   */
+  private double relayOutcomes(@NotNull String outcome) {
+    Counter counter =
+        meterRegistry
+            .find(MetricNames.EXCHANGE_RELAY)
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .tag(MetricNames.TAG_CLIENT_ID, ExchangeTestSupport.CLIENT)
+            .counter();
+    return counter == null ? 0 : counter.count();
   }
 
   /**

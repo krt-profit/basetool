@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditChangedFields;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
@@ -48,6 +52,7 @@ public class FrequencyTypeService {
 
   private final FrequencyTypeRepository frequencyTypeRepository;
   private final FrequencyTypeMapper frequencyTypeMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns paged frequency type list.
@@ -94,7 +99,14 @@ public class FrequencyTypeService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public FrequencyType createFrequencyType(@NotNull FrequencyType frequencyType) {
-    return frequencyTypeRepository.save(frequencyType);
+    FrequencyType saved = frequencyTypeRepository.save(frequencyType);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_FREQUENCY_TYPE_CREATED,
+        saved.getId(),
+        saved.getName(),
+        null,
+        null);
+    return saved;
   }
 
   /**
@@ -110,6 +122,19 @@ public class FrequencyTypeService {
   @CacheEvict(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE, allEntries = true)
   public FrequencyType updateFrequencyType(@NotNull UUID id, @NotNull FrequencyType frequencyType) {
     FrequencyType existing = requireFrequencyType(id);
+    AuditChangedFields changed =
+        AuditChangedFields.create()
+            .compare("name", existing.getName(), frequencyType.getName())
+            .compare("description", existing.getDescription(), frequencyType.getDescription())
+            .compare("active", existing.isActive(), frequencyType.isActive());
+    if (!changed.isEmpty()) {
+      auditRecorder.record(
+          AuditEventType.CATALOGUE_FREQUENCY_TYPE_UPDATED,
+          id,
+          frequencyType.getName(),
+          null,
+          changed.toDetails());
+    }
     existing.setName(frequencyType.getName());
     existing.setDescription(frequencyType.getDescription());
     existing.setActive(frequencyType.isActive());
@@ -130,6 +155,8 @@ public class FrequencyTypeService {
     }
     FrequencyType existing = requireFrequencyType(id);
     existing.setActive(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_FREQUENCY_TYPE_DEACTIVATED, id, existing.getName(), null, null);
     frequencyTypeRepository.save(existing);
   }
 
@@ -144,6 +171,8 @@ public class FrequencyTypeService {
   public void activateFrequencyType(@NotNull UUID id) {
     FrequencyType existing = requireFrequencyType(id);
     existing.setActive(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_FREQUENCY_TYPE_ACTIVATED, id, existing.getName(), null, null);
     frequencyTypeRepository.save(existing);
   }
 
@@ -166,5 +195,11 @@ public class FrequencyTypeService {
             frequencyTypeRepository.save(freq);
           });
     }
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_FREQUENCY_TYPES_REORDERED,
+        null,
+        null,
+        null,
+        AuditDetails.of("count", ids.size()));
   }
 }

@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -37,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodReposit
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -62,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -86,6 +88,10 @@ class DualUseRequestBodyProofTest {
 
   @Autowired private WebApplicationContext context;
 
+  @Autowired private CityRepository cityRepository;
+
+  @Autowired private JdbcTemplate jdbc;
+
   @Autowired private UserRepository userRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -99,8 +105,6 @@ class DualUseRequestBodyProofTest {
   @Autowired private JobTypeRepository jobTypeRepository;
 
   @Autowired private LocationRepository locationRepository;
-
-  @Autowired private MaterialCategoryRepository materialCategoryRepository;
 
   @Autowired private MaterialRepository materialRepository;
 
@@ -224,7 +228,15 @@ class DualUseRequestBodyProofTest {
         id(
             adminPost(
                 "/api/v1/locations",
-                body("name", "Victim Loc", "hidden", false, "homeLocation", false)));
+                body(
+                    "name",
+                    "Victim Loc",
+                    "hidden",
+                    false,
+                    "homeLocation",
+                    false,
+                    "starmapObjectId",
+                    TestPlaces.visibleNode(jdbc))));
 
     JsonNode created =
         adminPost(
@@ -239,7 +251,9 @@ class DualUseRequestBodyProofTest {
                 "homeLocation",
                 false,
                 "version",
-                7));
+                7,
+                "starmapObjectId",
+                TestPlaces.visibleNode(jdbc)));
     UUID createdId = id(created);
     assertThat(createdId).isNotEqualTo(victimId);
 
@@ -261,27 +275,6 @@ class DualUseRequestBodyProofTest {
         .isEqualTo("Victim Loc");
     assertThat(locationRepository.findById(createdId).orElseThrow().getName())
         .isEqualTo("Renamed Loc");
-  }
-
-  @Test
-  void materialCategoryDtoForgedIdNeitherOverwritesNorRetargetsAnotherRow() throws Exception {
-    UUID victimId = id(adminPost("/api/v1/material-categories", body("name", "Victim Cat")));
-
-    JsonNode created =
-        adminPost(
-            "/api/v1/material-categories",
-            body("id", victimId, "name", "Forged Cat", "version", 7));
-    UUID createdId = id(created);
-    assertThat(createdId).isNotEqualTo(victimId);
-
-    adminPut(
-        "/api/v1/material-categories/" + createdId,
-        body("id", victimId, "name", "Renamed Cat", "version", created.get("version").asLong()));
-
-    assertThat(materialCategoryRepository.findById(victimId).orElseThrow().getName())
-        .isEqualTo("Victim Cat");
-    assertThat(materialCategoryRepository.findById(createdId).orElseThrow().getName())
-        .isEqualTo("Renamed Cat");
   }
 
   @Test
@@ -654,7 +647,7 @@ class DualUseRequestBodyProofTest {
     Location location = new Location();
     location.setName("Dual-Use Refinery");
     location.setSpaceStation(spaceStation);
-    return locationRepository.save(location);
+    return locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private List<Map<String, Object>> goods() {

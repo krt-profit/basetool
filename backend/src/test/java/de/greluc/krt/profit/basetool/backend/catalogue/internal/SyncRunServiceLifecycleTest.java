@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -62,6 +63,7 @@ class SyncRunServiceLifecycleTest {
   @Mock private ExternalSyncRunRepository repository;
   @Mock private AdminDashboardLiveSync dashboard;
   @Mock private LiveSyncPublisher catalogue;
+  @Mock private AuditRecorder auditRecorder;
   private final SyncRunProgress progress = new SyncRunProgress();
   private final SimpleMeterRegistry metrics = new SimpleMeterRegistry();
   private final RecordingTransactionManager transactions = new RecordingTransactionManager();
@@ -71,7 +73,9 @@ class SyncRunServiceLifecycleTest {
 
   @BeforeEach
   void setUp() {
-    service = new SyncRunService(repository, progress, metrics, dashboard, catalogue, transactions);
+    service =
+        new SyncRunService(
+            repository, progress, metrics, dashboard, catalogue, auditRecorder, transactions);
     context = new AnnotationConfigApplicationContext();
     context.registerBean(SyncRunService.class, () -> service);
     context.refresh();

@@ -49,6 +49,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Optional<Blueprint> findByScwikiUuid(UUID scwikiUuid);
 
   /**
+   * Finds the Blueprint row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<Blueprint> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a blueprint by its {@code BP_CRAFT_*} key, the P4K import's fallback upsert key.
    *
    * <p>The key is not unique; the lowest {@code scwiki_uuid} wins deterministically.
@@ -57,6 +66,15 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return the lowest-{@code scwiki_uuid} blueprint with that key if any exists
    */
   Optional<Blueprint> findFirstByScwikiKeyOrderByScwikiUuidAsc(String scwikiKey);
+
+  /**
+   * Finds a blueprint the P4K seeded that the SC Wiki has not listed yet, by its key: the SC Wiki
+   * blueprint sync's fallback upsert key (REQ-P4K-027).
+   *
+   * @param scwikiKey the blueprint key
+   * @return the P4K-known blueprint of that key without a SC Wiki UUID, if any
+   */
+  Optional<Blueprint> findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(String scwikiKey);
 
   /**
    * Returns the distinct Wiki item UUIDs referenced by blueprint ingredient lines, so the item sync
@@ -88,7 +106,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Pages active blueprints without a search term.
+   * Pages active blueprints without a search term; a blueprint the P4K retired is not active
+   * (REQ-P4K-013).
    *
    * <p>Separate from {@link #searchActive(String, Pageable)} so no {@code null} is bound into
    * {@code LOWER(CONCAT(...))}, which PostgreSQL rejects as {@code bytea}.
@@ -96,7 +115,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @param pageable page request (whitelisted sort)
    * @return a page of active blueprints
    */
-  Page<Blueprint> findByScwikiDeletedAtIsNull(Pageable pageable);
+  Page<Blueprint> findByScwikiDeletedAtIsNullAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+      Pageable pageable);
 
   /**
    * Pages active blueprints whose output-item name or Wiki key contains {@code q}, ignoring case.
@@ -107,7 +127,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   @Query(
       """
-      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL
+      SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
       AND (LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
       OR LOWER(b.scwikiKey) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\')
       """)
@@ -121,7 +141,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @return active blueprints whose {@code outputItem} is that game item
    */
   @Query(
-      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND (b.outputItem.id = :gameItemId"
+      "SELECT b FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL"
+          + " AND b.p4kHiddenAt IS NULL AND (b.outputItem.id = :gameItemId"
           + " OR b.outputItem.id = (SELECT r.canonicalItem.id FROM GameItemRedirect r"
           + " WHERE r.id = :gameItemId))")
   List<Blueprint> findByOutputItemId(@Param("gameItemId") UUID gameItemId);
@@ -143,7 +164,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Pages the distinct game items orderable as item-order lines: outputs of an active blueprint
-   * with at least one resolved RESOURCE ingredient.
+   * with at least one resolved RESOURCE ingredient, the items and blueprints the P4K retired left
+   * out (REQ-P4K-013).
    *
    * @param q case-insensitive item-name substring, or {@code null} for no filter
    * @param pageable page request (whitelisted sort)
@@ -154,23 +176,26 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           """
           SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
           (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi AND
-          b.scwikiDeletedAt IS NULL AND i.kind =
+          b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
           SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
           EXISTS (SELECT 1 FROM Blueprint b JOIN b.ingredients i WHERE b.outputItem = gi
-          AND b.scwikiDeletedAt IS NULL AND i.kind =
+          AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL AND i.kind =
           de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE
-          AND i.material IS NOT NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          AND i.material IS NOT NULL) AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
+          AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
 
   /**
    * Pages the distinct game items bookable as Lager item stock: outputs of at least one active
-   * blueprint (REQ-INV-029); a superset of {@link #findOrderableItems(String, Pageable)}.
+   * blueprint (REQ-INV-029), the items and blueprints the P4K retired left out (REQ-P4K-013); a
+   * superset of {@link #findOrderableItems(String, Pageable)}.
    *
    * @param q case-insensitive item-name substring; must be non-null ({@code ""} = no filter)
    * @param pageable page request (whitelisted {@code name} / {@code id} sort)
@@ -181,27 +206,30 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           """
           SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi
           LEFT JOIN FETCH gi.manufacturer WHERE EXISTS
-          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL)
+          (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
+          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL
           AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
           SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi WHERE
-          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS
-          NULL) AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+          EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL)
+          AND gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
           """)
   Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
-   * Projects active blueprint recipes to output name, Wiki key, manufacturer name and output-item
-   * id for the product search; the latter two are {@code null} when unresolved.
+   * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
+   * produced-item GUID and German manufacturer name; every column after the Wiki key is {@code
+   * null} when unresolved. A recipe the P4K sweep stamped or an admin hid is included, so existing
+   * references keep resolving; a new reference reads {@link #findOfferableProductRows(String)}.
    *
    * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
    * @return projection rows for every matching active recipe
    */
   @Query(
       """
-      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id)
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
       FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
       WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
       AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
@@ -209,38 +237,59 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 
   /**
-   * Projects every active blueprint recipe to {@code (id, outputName)} for resolving a product key
-   * to a representative recipe.
+   * Projects the recipes a new reference may name as {@link #findActiveProductRows(String)} does,
+   * without a recipe the P4K sweep stamped or an admin hid (REQ-P4K-013).
    *
-   * @return id + output name for every active recipe with a non-null output name, ordered by name
-   *     then Wiki key then id
+   * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
+   * @return projection rows for every matching offerable recipe
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
+      FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
+      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
+      AND b.outputName IS NOT NULL
+      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+      """)
+  List<BlueprintProductRow> findOfferableProductRows(@Param("q") String q);
+
+  /**
+   * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid)} for
+   * resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped or an
+   * admin hid is included, since only existing references read it (REQ-P4K-013).
+   *
+   * @return id, output name and produced-item GUID for every active recipe with a non-null output
+   *     name, ordered by name then Wiki key then id
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow(b.id,
-      b.outputName) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
+      b.outputName, b.producedItemGuid) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
       NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC
       """)
   List<BlueprintIdNameRow> findActiveIdNameRows();
 
   /**
-   * Projects the active blueprints whose own UUIDs or whose output item's UUIDs, UEX id or name key
-   * match, for the exchange's catalogue resolution (REQ-XCH-012).
+   * Projects the offerable blueprints whose own UUIDs or whose output item's UUIDs, UEX id or name
+   * key match, for the exchange's catalogue resolution of a write (REQ-XCH-012); a recipe the P4K
+   * sweep stamped or an admin hid is not offered (REQ-P4K-013).
    *
    * @param guids the game GUIDs to match; must not be empty
    * @param uexIds the UEX item ids to match; must not be empty
    * @param nameKeys the lower-cased name keys to match; must not be empty
-   * @return one row per matching active blueprint
+   * @return one row per matching offerable blueprint
    */
   @Query(
       """
       SELECT new
       de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository$ExchangeBlueprintKeyRow(
-      b.outputName, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid, oi.uexItemId,
-      oi.nameKey)
+      b.outputName, b.producedItemGuid, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid,
+      oi.uexItemId, oi.nameKey)
       FROM Blueprint b LEFT JOIN b.outputItem oi
-      WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
-      AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR oi.externalUuid IN :guids
+      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
+      AND b.outputName IS NOT NULL
+      AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR b.producedItemGuid IN :guids
+      OR oi.externalUuid IN :guids
       OR oi.p4kUuid IN :guids OR oi.uexItemId IN :uexIds OR LOWER(oi.nameKey) IN :nameKeys)
       """)
   List<ExchangeBlueprintKeyRow> findExchangeKeyRows(
@@ -252,7 +301,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * The game identifiers of one active blueprint and its output item, for resolving a blueprint by
    * GUID, UEX id or name key (REQ-XCH-012).
    *
-   * @param outputName the blueprint's output name, from which its product key is derived
+   * @param outputName the blueprint's output name, from which a name key is derived
+   * @param producedItemGuid the produced item's GUID, the product key when present, or {@code null}
    * @param blueprintScwikiUuid the blueprint's Wiki UUID, or {@code null}
    * @param blueprintP4kUuid the blueprint's game-file UUID, or {@code null}
    * @param itemExternalUuid the output item's Wiki UUID, or {@code null}
@@ -262,6 +312,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    */
   record ExchangeBlueprintKeyRow(
       String outputName,
+      UUID producedItemGuid,
       UUID blueprintScwikiUuid,
       UUID blueprintP4kUuid,
       UUID itemExternalUuid,

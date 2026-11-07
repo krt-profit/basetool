@@ -1,0 +1,2760 @@
+{
+ "schemaVersion": 2,
+ "source": {
+  "channel": "LIVE",
+  "build": {
+   "branch": "sc-alpha-4.10.2",
+   "version": "4.10.197.2878",
+   "changeNumber": "12913470",
+   "buildId": "2cae0dfc-a941-4dcc-b82a-543b08b52d97",
+   "publicPatch": null
+  },
+  "archiveSize": 161991049216,
+  "archiveModified": "2026-10-15T18:32:56Z",
+  "toolVersion": "0.4.2",
+  "exportedAt": "2026-11-05T07:53:34Z"
+ },
+ "completeness": {
+  "manufacturers": {
+   "status": "complete"
+  },
+  "items": {
+   "status": "complete"
+  },
+  "ships": {
+   "status": "complete"
+  },
+  "commodities": {
+   "status": "complete"
+  },
+  "blueprints": {
+   "status": "complete"
+  },
+  "resourceGroups": {
+   "status": "complete"
+  },
+  "blueprintCategories": {
+   "status": "complete"
+  },
+  "gameplayProperties": {
+   "status": "complete"
+  },
+  "qualityDistributions": {
+   "status": "complete"
+  },
+  "qualityQuantizations": {
+   "status": "complete"
+  },
+  "blueprintPools": {
+   "status": "complete"
+  },
+  "dismantleProcesses": {
+   "status": "complete"
+  },
+  "paints": {
+   "status": "complete"
+  },
+  "loadouts": {
+   "status": "complete"
+  },
+  "starmapObjects": {
+   "status": "complete"
+  },
+  "contracts": {
+   "status": "complete"
+  },
+  "mineableElements": {
+   "status": "complete"
+  },
+  "refiningProcesses": {
+   "status": "complete"
+  },
+  "mineableCompositions": {
+   "status": "complete"
+  },
+  "miningGlobalParams": {
+   "status": "complete"
+  },
+  "harvestableProviderPresets": {
+   "status": "complete"
+  },
+  "subHarvestableMultiConfigs": {
+   "status": "complete"
+  },
+  "harvestableLocations": {
+   "status": "complete"
+  },
+  "lootContainers": {
+   "status": "complete"
+  },
+  "shops": {
+   "status": "complete"
+  },
+  "factionReputations": {
+   "status": "complete"
+  },
+  "reputationScopes": {
+   "status": "complete"
+  },
+  "reputationStandings": {
+   "status": "complete"
+  },
+  "reputationContexts": {
+   "status": "complete"
+  },
+  "missionTypes": {
+   "status": "complete"
+  },
+  "missionLocalities": {
+   "status": "complete"
+  },
+  "contractScenarios": {
+   "status": "complete"
+  },
+  "lootTables": {
+   "status": "complete"
+  },
+  "lootArchetypes": {
+   "status": "complete"
+  },
+  "lootPoolFilters": {
+   "status": "complete"
+  },
+  "legacyLootTables": {
+   "status": "complete"
+  },
+  "legacyLootArchetypes": {
+   "status": "complete"
+  },
+  "mineableEntities": {
+   "status": "complete"
+  },
+  "crafters": {
+   "status": "complete"
+  },
+  "cargoManifests": {
+   "status": "complete"
+  },
+  "missionLocationTemplates": {
+   "status": "complete"
+  },
+  "contractShipSpawns": {
+   "status": "complete"
+  },
+  "contractLocationQueries": {
+   "status": "complete"
+  },
+  "contractTemplates": {
+   "status": "complete"
+  },
+  "missionBrokerEntries": {
+   "status": "complete"
+  },
+  "contractNpcSpawns": {
+   "status": "complete"
+  },
+  "contractEntitySpawns": {
+   "status": "complete"
+  },
+  "shipStoreSlugs": {
+   "status": "complete"
+  }
+ },
+ "manufacturers": [
+  {
+   "guid": "0e6d8f1b-ebb8-4773-8ca4-f25d737c8709",
+   "className": "VGL",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.vgl",
+   "code": "VGL",
+   "name": {
+    "key": "@manufacturer_NameVGL",
+    "en": "Virgil",
+    "de": "Virgil"
+   },
+   "description": {
+    "key": "@manufacturer_DescVGL",
+    "en": "High-end Commercial and Personal armor manufacturer. Aside f",
+    "de": "Hersteller von hochwertiger Ausrüstung für den kommerziellen"
+   }
+  },
+  {
+   "guid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "className": "ORIG",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.orig",
+   "code": "ORIG",
+   "name": {
+    "key": "@manufacturer_NameOrigin",
+    "en": "Origin Jumpworks",
+    "de": "Origin Jumpworks"
+   },
+   "description": {
+    "key": "@manufacturer_DescOrigin",
+    "en": "Known primarily for high-end ship manufacturing, but also pr",
+    "de": "In erster Linie für die Herstellung hochwertiger Schiffe bek"
+   }
+  },
+  {
+   "guid": "57bfcf3d-13f6-4c2c-b7c7-6bf8eacb8a24",
+   "className": "GODI",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.godi",
+   "code": "GODI",
+   "name": {
+    "key": "@manufacturer_NameGODI",
+    "en": "Gorgon Defender Industries",
+    "de": "Gorgon Defender Industries"
+   },
+   "description": {
+    "key": "@manufacturer_DescGODI",
+    "en": "When Humanity started being attacked by Vanduul, it was ofte",
+    "de": "Als die Angriffe der Vanduul gegen die Menschheit anfingen,"
+   }
+  },
+  {
+   "guid": "709e8255-a0b1-4c5e-8b0e-28781be25984",
+   "className": "KSAR",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.ksar",
+   "code": "KSAR",
+   "name": {
+    "key": "@manufacturer_NameKSAR",
+    "en": "Kastak Arms",
+    "de": "Kastak Arms"
+   },
+   "description": {
+    "key": "@manufacturer_DescKSAR",
+    "en": "Kastak Arms makes inexpensive energy weapons with intimidati",
+    "de": "Kastak Arms stellt preiswerte Energiewaffen wie den furchtei"
+   }
+  },
+  {
+   "guid": "8a7bd715-5b97-404f-b02e-0d0cc593f608",
+   "className": "CDS",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/armor/scitemmanufacturer.cds",
+   "code": "CDS",
+   "name": {
+    "key": "@manufacturer_NameCDS",
+    "en": "Clark Defense Systems",
+    "de": "Clark Defense Systems"
+   },
+   "description": {
+    "key": "@manufacturer_DescCDS",
+    "en": "Ground-combat defensive systems, covers a lot of commercial",
+    "de": "CDS deckt einen großen kommerziellen Bereich ab, von Körperp"
+   }
+  },
+  {
+   "guid": "b922abdb-0634-4358-9eee-60118f3cf3a7",
+   "className": "ANVL",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.anvl",
+   "code": "ANVL",
+   "name": {
+    "key": "@manufacturer_NameANVL",
+    "en": "Anvil Aerospace",
+    "de": "Anvil Aerospace"
+   },
+   "description": {
+    "key": "@manufacturer_DescANVL",
+    "en": "For civilians, Anvil Aerospace produces small fighting craft",
+    "de": "Für die Zivilbevölkerung stellt Anvil Aerospace kleine Kampf"
+   }
+  },
+  {
+   "guid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "className": "AEGS",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.aegs",
+   "code": "AEG",
+   "name": {
+    "key": "@manufacturer_NameAEGS",
+    "en": "Aegis Dynamics",
+    "de": "Aegis Dynamics"
+   },
+   "description": {
+    "key": "@manufacturer_DescAEGS",
+    "en": "Aegis grew to prominence as a manufacturer of military space",
+    "de": "Während des Ersten Tevarin-Krieges erlangte Aegis als Herste"
+   }
+  },
+  {
+   "guid": "d7cc897f-b760-4a73-93c0-27e23c52db0a",
+   "className": "JUST",
+   "recordPath": "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.just",
+   "code": "JUST",
+   "name": {
+    "key": "@manufacturer_NameJUST",
+    "en": "Juno Starwerk",
+    "de": "Juno Starwerk"
+   },
+   "description": {
+    "key": "@manufacturer_DescJUST",
+    "en": "Second only to RSI in terms of longevity in the space indust",
+    "de": "An zweiter Stelle nach RSI, was seine Langlebigkeit in der I"
+   }
+  }
+ ],
+ "items": [
+  {
+   "guid": "00003571-11df-4b9d-a30d-1392d2a4bde7",
+   "className": "MISC_Fury_Thruster_Main",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/thrusters/misc_fury_thruster_main",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "MainThruster",
+   "subType": "JointThruster",
+   "size": 1,
+   "grade": 1,
+   "mass": 350.0,
+   "manufacturerGuid": null,
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": "special",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "000ec670-7acc-4771-b567-7c939d2a80c0",
+   "className": "ORIG_600i_Pilot_SeatAccess",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/seataccess/orig_600i_pilot_seataccess",
+   "name": {
+    "key": "@item_Name_SeatAccess_GenericSeat",
+    "en": "Seat",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Nam"
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "SeatAccess",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 1,
+   "mass": 4.0,
+   "manufacturerGuid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": null,
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "00335844-8889-4c40-b4c5-e4d8496838cf",
+   "className": "ksar_smg_energy_01_contestedzonereward",
+   "recordPath": "libs/foundry/records/entities/scitem/weapons/fps_weapons/ksar_smg_energy_01_contestedzonereward",
+   "name": {
+    "key": "@item_Nameksar_smg_energy_01",
+    "en": "Custodian SMG",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Nam"
+   },
+   "description": {
+    "key": "@item_Descksar_smg_energy_01",
+    "en": "Manufacturer: Kastak Arms",
+    "de": "! GERMAN_(GERMANY) TRANSLATION NOT FOUND FOR LOCID: item_Des"
+   },
+   "type": "WeaponPersonal",
+   "subType": "Medium",
+   "size": 2,
+   "grade": 1,
+   "mass": 3.35,
+   "manufacturerGuid": "709e8255-a0b1-4c5e-8b0e-28781be25984",
+   "tags": [
+    "stocked",
+    "smg",
+    "ksar_smg_energy_01"
+   ],
+   "displayType": {
+    "key": "@item_displayType_SMG",
+    "en": "SMG",
+    "de": "MP"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": {
+     "fireActions": [
+      {
+       "kind": "SWeaponActionFireRapidParams",
+       "name": "Rapid",
+       "fireRate": 800.0,
+       "pellets": 1,
+       "ammoCost": 1,
+       "heatPerShot": 4.0,
+       "chargeTime": null,
+       "overchargeTime": null,
+       "cooldownTime": null,
+       "hitType": null,
+       "fullDamageRange": null,
+       "zeroDamageRange": null,
+       "damagePerSecond": null,
+       "spread": {
+        "min": 0.5,
+        "max": 2.0,
+        "firstAttack": 0.4,
+        "attack": 0.8,
+        "decay": 4.5
+       }
+      },
+      {
+       "kind": "SWeaponActionFireChargedParams",
+       "name": "Charge",
+       "fireRate": 900.0,
+       "pellets": 1,
+       "ammoCost": 1,
+       "heatPerShot": 4.5,
+       "chargeTime": 3.0,
+       "overchargeTime": 4.0,
+       "cooldownTime": 0.8,
+       "hitType": null,
+       "fullDamageRange": null,
+       "zeroDamageRange": null,
+       "damagePerSecond": null,
+       "spread": {
+        "min": 0.5,
+        "max": 2.0,
+        "firstAttack": 0.08,
+        "attack": 0.08,
+        "decay": 8.0
+       }
+      }
+     ],
+     "ammoCapacity": 60,
+     "ammo": {
+      "speed": 600.0,
+      "lifetime": 2.0,
+      "damage": {
+       "physical": 0.0,
+       "energy": 13.0,
+       "distortion": 0.0,
+       "thermal": 0.0,
+       "biochemical": 0.0,
+       "stun": 0.0
+      },
+      "detonationDamage": null,
+      "detonationMinRadius": null,
+      "detonationMaxRadius": null
+     }
+    },
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
+  },
+  {
+   "guid": "0306b7df-6adf-4da5-9ca8-839a5d41c1cc",
+   "className": "SoftLock_Terminal_Standard_LowTech_CommodityKiosk_console_storage_1_a",
+   "recordPath": "libs/foundry/records/entities/scitem/mission_entities/softlock_terminal/softlock_terminal_standard_lowtech_commoditykiosk_console_storage_1_a",
+   "name": {
+    "key": "@item_displayType_kioskScreen_generic",
+    "en": "Screen",
+    "de": null
+   },
+   "description": {
+    "key": "@LOC_EMPTY",
+    "en": null,
+    "de": null
+   },
+   "type": "UNDEFINED",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 1,
+   "mass": 0.0,
+   "manufacturerGuid": null,
+   "tags": [],
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "itemClass": null,
+   "playability": "mission",
+   "variantOf": null,
+   "stats": null
+  },
+  {
+   "guid": "04285ce3-561f-4377-b0db-c641e3fad1de",
+   "className": "COOL_JUST_S02_Snowpack_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/cooler/cool_just_s02_snowpack_scitem",
+   "name": {
+    "key": "@item_NameCOOL_JUST_S02_Snowpack_SCItem",
+    "en": "Snowpack",
+    "de": "Snowpack"
+   },
+   "description": {
+    "key": "@item_DescCOOL_JUST_S02_Snowpack_SCItem",
+    "en": "Item Type: Cooler",
+    "de": "Hersteller: Juno Starwerk"
+   },
+   "type": "Cooler",
+   "subType": "UNDEFINED",
+   "size": 2,
+   "grade": 1,
+   "mass": 710.0,
+   "manufacturerGuid": "d7cc897f-b760-4a73-93c0-27e23c52db0a",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_Cooler",
+    "en": "Cooler",
+    "de": "Kühler"
+   },
+   "itemClass": "Industrial",
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": {
+     "coolingRate": 46.0,
+     "unit": "SStandardResourceUnit"
+    },
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 550.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1980.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 9500.0,
+       "decayRate": 0.5
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Coolant",
+        "amount": 46.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 4.0,
+        "unit": "SPowerSegmentResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "guid": "339bd641-8dfb-4bc1-b273-5ffc5f702fbb",
+   "className": "SHLD_GODI_S01_AllStop_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/shieldgenerator/shld_godi_s01_allstop_scitem",
+   "name": {
+    "key": "@item_NameSHLD_GODI_S01_AllStop",
+    "en": "AllStop",
+    "de": "AllStop"
+   },
+   "description": {
+    "key": "@item_DescSHLD_GODI_S01_AllStop",
+    "en": "Item Type: Shield Generator",
+    "de": "Hersteller: Gorgon Defender Industries"
+   },
+   "type": "Shield",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 3,
+   "mass": 120.0,
+   "manufacturerGuid": "57bfcf3d-13f6-4c2c-b7c7-6bf8eacb8a24",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_ShieldGenerator",
+    "en": "Shield Generator",
+    "de": "Schildgenerator"
+   },
+   "itemClass": "Military",
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": null,
+    "shield": {
+     "maxHealth": 3168.0,
+     "maxRegen": 602.0,
+     "decayRatio": 0.25,
+     "downedRegenDelay": 11.5,
+     "damagedRegenDelay": 5.75
+    },
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 210.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1240.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 0.0,
+       "decayRate": 0.15
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Shield",
+        "amount": 602.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 3.0,
+        "unit": "SPowerSegmentResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConsumption",
+        "direction": "consumption",
+        "resource": "Coolant",
+        "amount": 0.0,
+        "unit": "SStandardResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "guid": "4ec3037b-4b6f-4837-b00d-cd9b4836a82a",
+   "className": "COOL_AEGS_S01_Bracer_SCItem",
+   "recordPath": "libs/foundry/records/entities/scitem/ships/cooler/cool_aegs_s01_bracer_scitem",
+   "name": {
+    "key": "@item_NameCOOL_AEGS_S01_Bracer",
+    "en": "Bracer",
+    "de": "Bracer"
+   },
+   "description": {
+    "key": "@item_DescCOOL_AEGS_S01_Bracer",
+    "en": "Item Type: Cooler\nManufacturer: Aegis Dynamics \nSize: 1\nGrade: C\nClass: Military\n\nFor those looking for a solid, dependable mid-line cooler, you can’t do much better than Aegis’ Bracer. This small-frame cooler system offers solid performance and durability to keep your ship firing on all cylinders.",
+    "de": "Hersteller: Aegis Dynamics\nGegenstand: Kühler\nGröße: 1\nStufe: C\nKlasse: militärisch\n\nWer nach einem soliden und zuverlässigen Kühler der Mittelklasse sucht, kommt nicht um den Bracer von Aegis herum. Dieses kompakte Kühlersystem bietet solide Leistung und Haltbarkeit, die dein Schiff weiterhin auf Hochtouren laufen lassen."
+   },
+   "type": "Cooler",
+   "subType": "UNDEFINED",
+   "size": 1,
+   "grade": 3,
+   "mass": 210.0,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "tags": [],
+   "displayType": {
+    "key": "@item_displayType_Cooler",
+    "en": "Cooler",
+    "de": "Kühler"
+   },
+   "itemClass": "Military",
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": {
+     "coolingRate": 34.0,
+     "unit": "SStandardResourceUnit"
+    },
+    "missile": null,
+    "armor": null,
+    "clothing": null,
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": 180.0,
+    "resourceStates": [
+     {
+      "name": "Online",
+      "emSignature": {
+       "nominal": 1490.0,
+       "decayRate": 0.15
+      },
+      "irSignature": {
+       "nominal": 7260.0,
+       "decayRate": 0.5
+      },
+      "flows": [
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "generation",
+        "resource": "Coolant",
+        "amount": 34.0,
+        "unit": "SStandardResourceUnit"
+       },
+       {
+        "kind": "ItemResourceDeltaConversion",
+        "direction": "consumption",
+        "resource": "Power",
+        "amount": 3.0,
+        "unit": "SPowerSegmentResourceUnit"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "guid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
+   "className": "cds_armor_heavy_arms_01_01_01",
+   "recordPath": "libs/foundry/records/entities/scitem/characters/human/armor/pu_armor/heavy/arms/cds_armor_heavy_arms_01_01_01",
+   "name": {
+    "key": "@item_Name_cds_heavy_armor_01_arms",
+    "en": "ADP-mk4 Arms Woodland",
+    "de": "ADP-MK-IV-Arme (Waldland)"
+   },
+   "description": {
+    "key": "@item_Desc_cds_heavy_armor_01_Shared",
+    "en": "Item Type: Heavy Armor",
+    "de": null
+   },
+   "type": "Char_Armor_Arms",
+   "subType": "Heavy",
+   "size": 1,
+   "grade": 1,
+   "mass": 6.0,
+   "manufacturerGuid": "8a7bd715-5b97-404f-b02e-0d0cc593f608",
+   "tags": [
+    "Marine_Heavy",
+    "Set_01",
+    "Color_01",
+    "SM_Marine"
+   ],
+   "displayType": {
+    "key": "@item_displayType_ArmorArms",
+    "en": "Armor: Arms",
+    "de": "Armpanzerung"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": null,
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": {
+     "integrityMilestoneToBreak": 0.1,
+     "damageResistance": {
+      "ignoreMeleeDamage": false,
+      "physical": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "energy": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "distortion": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "thermal": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "biochemical": {
+       "multiplier": 0.6,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "stun": {
+       "multiplier": 0.4,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      }
+     }
+    },
+    "clothing": {
+     "temperatureResistanceMin": -70.0,
+     "temperatureResistanceMax": 100.0,
+     "radiationCapacity": 26800.0,
+     "radiationDissipationRate": 145.8,
+     "gForceResistance": -0.125
+    },
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
+  },
+  {
+   "guid": "de20695c-eb2f-4b68-be6f-9806cbd205a7",
+   "className": "vgl_armor_light_arms_01_01_20",
+   "recordPath": "libs/foundry/records/entities/scitem/characters/human/armor/pu_armor/light/arms/vgl_armor_light_arms_01_01_20",
+   "name": {
+    "key": "@item_Name_vgl_armor_light_arms_01_01_20",
+    "en": "TrueDef-Pro Arms Silver/Gold/Grey",
+    "de": "TrueDef-Pro-Arme (Silber/Gold/Grau)"
+   },
+   "description": {
+    "key": "@item_Desc_vgl_advocacy_lightarmor_Shared",
+    "en": "Item Type: Light Armor",
+    "de": null
+   },
+   "type": "Char_Armor_Arms",
+   "subType": "Light",
+   "size": 1,
+   "grade": 1,
+   "mass": 2.0,
+   "manufacturerGuid": "0e6d8f1b-ebb8-4773-8ca4-f25d737c8709",
+   "tags": [
+    "Virgil",
+    "Set_01",
+    "Color_20",
+    "SM_RestrictedArm"
+   ],
+   "displayType": {
+    "key": "@item_displayType_ArmorArms",
+    "en": "Armor: Arms",
+    "de": "Armpanzerung"
+   },
+   "itemClass": null,
+   "playability": "player",
+   "variantOf": "1036805c-1d16-43db-ae15-7f04f7c38a66",
+   "stats": {
+    "weapon": null,
+    "shield": null,
+    "quantumDrive": null,
+    "powerPlant": null,
+    "cooler": null,
+    "missile": null,
+    "armor": {
+     "integrityMilestoneToBreak": 0.1,
+     "damageResistance": {
+      "ignoreMeleeDamage": false,
+      "physical": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "energy": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "distortion": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "thermal": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "biochemical": {
+       "multiplier": 0.8,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      },
+      "stun": {
+       "multiplier": 0.7,
+       "threshold": 0.0,
+       "damageCap": 0.0,
+       "damageCapLimit": 0.0
+      }
+     }
+    },
+    "clothing": {
+     "temperatureResistanceMin": -38.0,
+     "temperatureResistanceMax": 68.0,
+     "radiationCapacity": 26000.0,
+     "radiationDissipationRate": 145.8,
+     "gForceResistance": -0.03125
+    },
+    "radar": null,
+    "tractorBeam": null,
+    "weaponModifier": null,
+    "miningLaser": null,
+    "miningModifier": null,
+    "health": null,
+    "resourceStates": []
+   }
+  }
+ ],
+ "ships": [
+  {
+   "guid": "0045b223-9bea-4ef5-a873-d1316830fe43",
+   "className": "ANVL_Hornet_F7C_Mk2_AI_Super",
+   "recordPath": "libs/foundry/records/entities/spaceships/anvl_hornet_f7c_mk2_ai_super",
+   "name": {
+    "key": "@vehicle_NameANVL_Hornet_F7C_Mk2",
+    "en": "Anvil F7C Hornet Mk II",
+    "de": null
+   },
+   "description": {
+    "key": "@vehicle_DescANVL_Hornet_F7C_Mk2",
+    "en": "Manufacturer: Anvil Aerospace",
+    "de": null
+   },
+   "role": {
+    "key": "@vehicle_class_mediumfighter",
+    "en": "Medium Fighter",
+    "de": "Mittlerer Jäger"
+   },
+   "career": {
+    "key": "@vehicle_focus_combat",
+    "en": "Combat",
+    "de": "Kampf"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "b922abdb-0634-4358-9eee-60118f3cf3a7",
+   "vehicleDefinition": "Scripts/Entities/Vehicles/Implementations/Xml/ANVL_Hornet_F7A.xml",
+   "vehicleKind": "spaceship",
+   "size": 2,
+   "mass": 62117.0,
+   "massBasis": "parts",
+   "hullHealth": 13153.0,
+   "cargoScu": 2.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "ai",
+   "variantOf": "fb231ba1-dba1-4c9f-823a-746c772ae92f",
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "ANVL_Hornet_F7C_Mk2",
+    "baseWaitTimeMinutes": 11.34,
+    "mandatoryWaitTimeMinutes": 3.56,
+    "expediteFee": 5104
+   }
+  },
+  {
+   "guid": "0079c5d5-1678-4f8c-85ba-18ca8f642af6",
+   "className": "AEGS_Avenger_Titan",
+   "recordPath": "libs/foundry/records/entities/spaceships/aegs_avenger_titan",
+   "name": {
+    "key": "@vehicle_NameAEGS_Avenger_Titan",
+    "en": "Aegis Avenger Titan",
+    "de": "Aegis Avenger Titan"
+   },
+   "description": {
+    "key": "@vehicle_DescAEGS_Avenger_Titan",
+    "en": "Manufacturer: Aegis Dynamics",
+    "de": "Hersteller: Aegis Dynamics"
+   },
+   "role": {
+    "key": "@vehicle_class_lightfreight",
+    "en": "Light Freight",
+    "de": "Leichter Frachter"
+   },
+   "career": {
+    "key": "@vehicle_focus_transporter",
+    "en": "Transporter",
+    "de": "Transport"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/aegs_avenger.xml",
+   "vehicleKind": "spaceship",
+   "size": 2,
+   "mass": 48986.68,
+   "massBasis": "parts",
+   "hullHealth": 11900.0,
+   "cargoScu": 8.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "player",
+   "variantOf": null,
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "AEGS_Avenger_Titan",
+    "baseWaitTimeMinutes": 4.05,
+    "mandatoryWaitTimeMinutes": 1.35,
+    "expediteFee": 2343
+   }
+  },
+  {
+   "guid": "05189197-09f7-4869-8db2-5fe21886cda3",
+   "className": "ORIG_890Jump_Unmanned",
+   "recordPath": "libs/foundry/records/entities/spaceships/orig_890jump_unmanned",
+   "name": {
+    "key": "@vehicle_NameORIG_890Jump",
+    "en": "Origin 890 Jump",
+    "de": "Origin 890 Jump"
+   },
+   "description": {
+    "key": "@vehicle_DescORIG_890Jump",
+    "en": "Manufacturer: Origin Jumpworks",
+    "de": "Hersteller: Origin Jumpworks"
+   },
+   "role": {
+    "key": "@item_ShipFocus_LuxuryTouring",
+    "en": "Luxury Touring",
+    "de": "Luxusreisen"
+   },
+   "career": {
+    "key": "@vehicle_focus_exploration",
+    "en": "Exploration",
+    "de": "Erkundung"
+   },
+   "crewSize": 8,
+   "manufacturerGuid": "1e47a9ec-a3f0-431d-be0e-377712e1ed84",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/orig_890jump.xml",
+   "vehicleKind": "spaceship",
+   "size": 6,
+   "mass": 43896159.0,
+   "massBasis": "parts",
+   "hullHealth": 153200.0,
+   "cargoScu": 388.0,
+   "cargoGridsWithIssue": 0,
+   "playability": "mission",
+   "variantOf": "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "ORIG_890Jump",
+    "baseWaitTimeMinutes": 67.5,
+    "mandatoryWaitTimeMinutes": 22.5,
+    "expediteFee": 33750
+   }
+  },
+  {
+   "guid": "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+   "className": "AEGS_Javelin",
+   "recordPath": "libs/foundry/records/entities/spaceships/aegs_javelin",
+   "name": {
+    "key": "@vehicle_NameAEGS_Javelin",
+    "en": "Aegis Javelin",
+    "de": "Aegis-Javelin"
+   },
+   "description": {
+    "key": "@vehicle_DescAEGS_Javelin",
+    "en": "Manufacturer: Aegis Dynamics",
+    "de": "Hersteller: Aegis Dynamics"
+   },
+   "role": {
+    "key": "@vehicle_class_destroyer",
+    "en": "Destroyer",
+    "de": "Zerstörer"
+   },
+   "career": {
+    "key": "@vehicle_class_destroyer",
+    "en": "Destroyer",
+    "de": "Zerstörer"
+   },
+   "crewSize": 1,
+   "manufacturerGuid": "cf4a74bf-eb2c-462a-9b78-f7f2724c31d2",
+   "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/aegs_javelin.xml",
+   "vehicleKind": "spaceship",
+   "size": 6,
+   "mass": 111080494.0,
+   "massBasis": "parts",
+   "hullHealth": 7852400.0,
+   "cargoScu": null,
+   "cargoGridsWithIssue": 17,
+   "playability": "special",
+   "variantOf": null,
+   "insurance": {
+    "restoreOnClaim": true,
+    "shipEntityClassName": "AEGS_Javelin",
+    "baseWaitTimeMinutes": 168.75,
+    "mandatoryWaitTimeMinutes": 56.25,
+    "expediteFee": 84375
+   }
+  }
+ ],
+ "commodities": [
+  {
+   "guid": "001c7bc6-2bb6-4f66-a8ef-a1c63e80ffc5",
+   "className": "borase",
+   "recordPath": "libs/foundry/records/entities/commodities/metals/borase",
+   "name": {
+    "key": "@items_commodities_borase",
+    "en": "Borase",
+    "de": "Borase"
+   },
+   "description": {
+    "key": "@items_commodities_borase_desc",
+    "en": "This highly thermally conductive material is often formed fr",
+    "de": "Dieses höchst wärmeleitfähige Material wird durch die Spalla"
+   },
+   "typeGuid": "9b28b2e4-7df3-43f3-a69a-d82b119e25bf",
+   "subtypeGuid": "33bff393-42f1-4f70-85a1-71e695ed2a5a",
+   "displayType": {
+    "key": "@items_commodities_type_metal",
+    "en": "Metal",
+    "de": "Metall"
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  },
+  {
+   "guid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "className": "Ouratite",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@items_commodities_ouratite",
+    "en": "Ouratite",
+    "de": null
+   },
+   "description": {
+    "key": "@items_commodities_ouratite_desc",
+    "en": "Notable for its ability to withstand kinetic impacts, ourati",
+    "de": null
+   },
+   "typeGuid": "4d3f31f7-feab-488c-8f36-ac7c8c4012b8",
+   "subtypeGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  },
+  {
+   "guid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+   "className": "Aslarite",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@items_commodities_aslarite",
+    "en": "Aslarite",
+    "de": null
+   },
+   "description": {
+    "key": "@items_commodities_aslarite_desc",
+    "en": "Aslarite is a naturally-occurring mineral that is most commo",
+    "de": null
+   },
+   "typeGuid": "8e17c99b-1bf6-49cb-838e-e7eb72a9088f",
+   "subtypeGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+   "displayType": {
+    "key": null,
+    "en": null,
+    "de": null
+   },
+   "densityGramsPerCubicCentimetre": 1.0,
+   "refinedSubtypeGuid": null
+  }
+ ],
+ "blueprints": [
+  {
+   "guid": "0037f308-adfc-4c4e-994f-cd477e895aab",
+   "className": "BP_CRAFT_vgl_armor_light_arms_01_01_20",
+   "recordPath": "libs/foundry/records/crafting/blueprints/crafting/fpsgear/armour/engineer/light/bp_craft_vgl_armor_light_arms_01_01_20",
+   "key": "BP_CRAFT_vgl_armor_light_arms_01_01_20",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "categoryGuid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "producedItemGuid": "de20695c-eb2f-4b68-be6f-9806cbd205a7",
+   "craftTimeSeconds": 120,
+   "ingredients": [
+    {
+     "resourceGuid": "7f4599b0-a2b2-4178-8c7e-13292054ab20",
+     "itemGuid": null,
+     "quantityScu": 0.03,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "CASING",
+     "slotKey": "@crafting_ui_slotname_casing"
+    },
+    {
+     "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+     "itemGuid": null,
+     "quantityScu": 0.02,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "INSULATIVE LINER",
+     "slotKey": "@crafting_ui_slotname_insulativeliner"
+    }
+   ],
+   "tiers": [
+    {
+     "craftTimeSeconds": 120,
+     "mandatory": {
+      "kind": "select",
+      "count": 2,
+      "slot": "ASPECTS",
+      "slotKey": null,
+      "options": [
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "CASING",
+        "slotKey": "@crafting_ui_slotname_casing",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "7f4599b0-a2b2-4178-8c7e-13292054ab20",
+          "itemGuid": null,
+          "quantityScu": 0.03,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.85,
+            "atEnd": 1.15
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "INSULATIVE LINER",
+        "slotKey": "@crafting_ui_slotname_insulativeliner",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+          "itemGuid": null,
+          "quantityScu": 0.02,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         },
+         {
+          "propertyGuid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": "Include",
+      "modifiers": []
+     },
+     "optional": []
+    }
+   ],
+   "defaultAvailable": false,
+   "dismantle": {
+    "processGuid": "f4e2e342-a389-47c9-82be-f35824c570de",
+    "tierIndex": 0
+   }
+  },
+  {
+   "guid": "005d95db-96ca-45b7-9647-7e7537b8fac8",
+   "className": "BP_CRAFT_cds_armor_heavy_arms_01_01_01",
+   "recordPath": "libs/foundry/records/crafting/blueprints/crafting/fpsgear/armour/combat/heavy/bp_craft_cds_armor_heavy_arms_01_01_01",
+   "key": "BP_CRAFT_cds_armor_heavy_arms_01_01_01",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "categoryGuid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "producedItemGuid": "bef9cd69-24f0-434a-ba7a-2bf751228093",
+   "craftTimeSeconds": 240,
+   "ingredients": [
+    {
+     "resourceGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+     "itemGuid": null,
+     "quantityScu": 0.06,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "ARMOURED CARAPACE",
+     "slotKey": "@crafting_ui_slotname_armouredcarapace"
+    },
+    {
+     "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+     "itemGuid": null,
+     "quantityScu": 0.02,
+     "quantityUnits": null,
+     "minQuality": 0,
+     "slot": "INSULATIVE LINER",
+     "slotKey": "@crafting_ui_slotname_insulativeliner"
+    }
+   ],
+   "tiers": [
+    {
+     "craftTimeSeconds": 240,
+     "mandatory": {
+      "kind": "select",
+      "count": 2,
+      "slot": "ASPECTS",
+      "slotKey": null,
+      "options": [
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "ARMOURED CARAPACE",
+        "slotKey": "@crafting_ui_slotname_armouredcarapace",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+          "itemGuid": null,
+          "quantityScu": 0.06,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.85,
+            "atEnd": 1.15
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "kind": "select",
+        "count": 1,
+        "slot": "INSULATIVE LINER",
+        "slotKey": "@crafting_ui_slotname_insulativeliner",
+        "options": [
+         {
+          "kind": "resource",
+          "count": null,
+          "slot": null,
+          "slotKey": null,
+          "options": [],
+          "resourceGuid": "fde0cd65-8827-4b23-804d-cc8845dfa7ac",
+          "itemGuid": null,
+          "quantityScu": 0.02,
+          "quantityUnits": null,
+          "minQuality": 0,
+          "quantityMultiplier": null,
+          "compositionInclusion": null,
+          "modifiers": []
+         }
+        ],
+        "resourceGuid": null,
+        "itemGuid": null,
+        "quantityScu": null,
+        "quantityUnits": null,
+        "minQuality": null,
+        "quantityMultiplier": null,
+        "compositionInclusion": null,
+        "modifiers": [
+         {
+          "propertyGuid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         },
+         {
+          "propertyGuid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+          "ranges": [
+           {
+            "kind": "multiplier",
+            "startQuality": 0,
+            "endQuality": 1000,
+            "atStart": 0.8,
+            "atEnd": 1.2
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "resourceGuid": null,
+      "itemGuid": null,
+      "quantityScu": null,
+      "quantityUnits": null,
+      "minQuality": null,
+      "quantityMultiplier": null,
+      "compositionInclusion": "Include",
+      "modifiers": []
+     },
+     "optional": []
+    }
+   ],
+   "defaultAvailable": false,
+   "dismantle": {
+    "processGuid": "f4e2e342-a389-47c9-82be-f35824c570de",
+    "tierIndex": 0
+   }
+  }
+ ],
+ "resourceGroups": [
+  {
+   "guid": "1676f718-39c2-45d7-be78-4023db6452ff",
+   "className": "HeatPlaceholder",
+   "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
+   "name": {
+    "key": "@LOC_PLACEHOLDER",
+    "en": null,
+    "de": null
+   },
+   "parentGuid": null
+  }
+ ],
+ "blueprintCategories": [
+  {
+   "guid": "0c11afd4-2287-43fb-8da9-1b6673ac8e1b",
+   "className": "VehicleComponentS4",
+   "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
+   "name": {
+    "key": null,
+    "en": null,
+    "de": null
+   }
+  },
+  {
+   "guid": "35b0267e-cce0-46cc-a3ec-250271fe2ef3",
+   "className": "FPSArmours",
+   "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
+   "name": {
+    "key": null,
+    "en": null,
+    "de": null
+   }
+  }
+ ],
+ "gameplayProperties": [
+  {
+   "guid": "69143912-ee80-43e9-8862-e1745f0f0b9f",
+   "className": "GPP_Armor_TemperatureMin",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_temperaturemin",
+   "name": {
+    "key": "@StatName_GPP_Armor_TemperatureMin",
+    "en": "Min Temp",
+    "de": null
+   }
+  },
+  {
+   "guid": "6c186289-6db8-4820-a367-5292f4ea1c61",
+   "className": "GPP_Armor_TemperatureMax",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_temperaturemax",
+   "name": {
+    "key": "@StatName_GPP_Armor_TemperatureMax",
+    "en": "Max Temp",
+    "de": null
+   }
+  },
+  {
+   "guid": "804e9acc-c3a5-4787-b2b1-c898e5198f92",
+   "className": "GPP_Armor_DamageMitigation",
+   "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_damagemitigation",
+   "name": {
+    "key": "@StatName_GPP_Armor_DamageMitigation",
+    "en": "Damage Mitigation",
+    "de": null
+   }
+  }
+ ],
+ "qualityDistributions": [],
+ "qualityQuantizations": [],
+ "blueprintPools": [],
+ "dismantleProcesses": [
+  {
+   "guid": "f4e2e342-a389-47c9-82be-f35824c570de",
+   "className": "GlobalGenericDismantle",
+   "recordPath": "libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle",
+   "efficiency": 0.5,
+   "timeSeconds": 15
+  }
+ ],
+ "craftingGlobal": {
+  "dismantleExcludedResourceGuids": [
+   "392b4dca-449a-4d4d-8fef-beab024d9ee7",
+   "4a47cad8-0271-4048-b19b-d9b52521fc20",
+   "86d00bd8-08f7-4231-b375-a609803fc46d",
+   "8cd317a3-df9b-4315-8ac3-0f1fca42dfd4",
+   "989f9b73-f636-4f35-a81d-579dcbe3f0ab",
+   "bde5a2c8-2ef4-46ac-9403-2fcb79e4016c"
+  ],
+  "dismantleExcludedItemGuids": [
+   "e954d75e-fb1e-487e-90a8-170f0284b502",
+   "ee704f52-8794-434d-bcd7-47fec365ffbd"
+  ]
+ },
+ "paints": [
+  {
+   "itemGuid": "05694347-4761-446b-8305-78e8af4b911a",
+   "shipGuids": [
+    "0079c5d5-1678-4f8c-85ba-18ca8f642af6"
+   ]
+  }
+ ],
+ "loadouts": [
+  {
+   "entityGuid": "0005b63c-e673-4165-964b-0ec197192477",
+   "entityKind": "item",
+   "issues": [],
+   "ports": [
+    {
+     "name": "slot_1",
+     "source": "unset",
+     "minSize": 1,
+     "maxSize": 6,
+     "types": [
+      {
+       "type": "NOITEM_Vehicle",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "tableDisplay"
+     ],
+     "portTags": [],
+     "requiredTags": [
+      "DRAK_Caterpillar",
+      "ShipShowdown"
+     ],
+     "displayNameKey": null,
+     "visibility": "unspecified",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    }
+   ]
+  },
+  {
+   "entityGuid": "0079c5d5-1678-4f8c-85ba-18ca8f642af6",
+   "entityKind": "ship",
+   "issues": [],
+   "ports": [
+    {
+     "name": "hardpoint_paint",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Paints",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "editable"
+     ],
+     "portTags": [
+      "Paint_Avenger"
+     ],
+     "requiredTags": [
+      "Paint_Avenger"
+     ],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    },
+    {
+     "name": "hardpoint_cooler_left",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Cooler",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "left",
+      "invisible",
+      "editable"
+     ],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "invisible",
+     "itemGuid": "4ec3037b-4b6f-4837-b00d-cd9b4836a82a",
+     "itemClassName": "COOL_AEGS_S01_Bracer_SCItem",
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    },
+    {
+     "name": "hardpoint_weapon_class2_nose",
+     "source": "loadout",
+     "minSize": 4,
+     "maxSize": 4,
+     "types": [
+      {
+       "type": "Turret",
+       "subTypes": []
+      },
+      {
+       "type": "WeaponGun",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "editable"
+     ],
+     "portTags": [
+      "$AEGS_Avenger_Base"
+     ],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": "ea49d194-0c0b-43e1-82fb-d72f35c1af05",
+     "itemClassName": "Mount_Gimbal_S4",
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": [
+      {
+       "name": "hardpoint_class_2",
+       "source": "override",
+       "minSize": 4,
+       "maxSize": 4,
+       "types": [
+        {
+         "type": "WeaponGun",
+         "subTypes": [
+          "Gun"
+         ]
+        }
+       ],
+       "flags": [
+        "editable"
+       ],
+       "portTags": [],
+       "requiredTags": [],
+       "displayNameKey": "@itemport_slot",
+       "visibility": "unspecified",
+       "itemGuid": "df89e9ca-8a11-477c-8abd-f4837a277dbe",
+       "itemClassName": "APAR_BallisticGatling_S4",
+       "dockedVehicle": false,
+       "unresolved": null,
+       "ports": [
+        {
+         "name": "BAR1",
+         "source": "unset",
+         "minSize": 1,
+         "maxSize": 1,
+         "types": [
+          {
+           "type": "WeaponAttachment",
+           "subTypes": [
+            "Barrel"
+           ]
+          }
+         ],
+         "flags": [
+          "uneditable"
+         ],
+         "portTags": [],
+         "requiredTags": [],
+         "displayNameKey": null,
+         "visibility": "unspecified",
+         "itemGuid": null,
+         "itemClassName": null,
+         "dockedVehicle": false,
+         "unresolved": null,
+         "ports": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "hardpoint_scanner",
+     "source": "vehicle",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Scanner",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "invisible",
+      "uneditable"
+     ],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "invisible",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    }
+   ]
+  },
+  {
+   "entityGuid": "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+   "entityKind": "ship",
+   "issues": [
+    "unknown_class"
+   ],
+   "ports": [
+    {
+     "name": "hardpoint_seataccess_copilot",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 4,
+     "types": [
+      {
+       "type": "SeatAccess",
+       "subTypes": []
+      }
+     ],
+     "flags": [],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": null,
+     "itemClassName": "AEGS_Javelin_SeatAccess_CoPilot",
+     "dockedVehicle": false,
+     "unresolved": "unknown_class",
+     "ports": []
+    }
+   ]
+  }
+ ],
+ "starmapObjects": [
+  {
+   "guid": "0007b9e3-a737-4bf5-b937-9cd3c6263fbe",
+   "className": "AsteroidCluster_Pyro",
+   "recordPath": "libs/foundry/records/starmap/pu/asteroidcluster_pyro",
+   "name": {
+    "key": "@generic_locations_blank",
+    "en": null,
+    "de": null
+   },
+   "type": "Asteroid_ValidQT",
+   "typeGuid": "f6461834-fa63-468f-a3c4-d1ed6ef8c20d",
+   "parentGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "hideInStarmap": false,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "02a373c1-566a-475f-9534-113d3d742d6a",
+   "className": "IasiPlatformStanton1b_2",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton4/events/iasiplatformstanton1b_2",
+   "name": {
+    "key": "@Iasi_Location_Name",
+    "en": "RSI Event Platform",
+    "de": null
+   },
+   "type": "PointOfInterest",
+   "typeGuid": "4969b9e4-4b1e-45b4-b335-506bbf7af476",
+   "parentGuid": "f8f07f5b-1c0e-47c9-aa50-46963065bf18",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "IasiPlatform_1b_002",
+   "placedUnderGuid": "f8f07f5b-1c0e-47c9-aa50-46963065bf18",
+   "position": [
+    12905712296.826,
+    41180565.304,
+    150568.633
+   ]
+  },
+  {
+   "guid": "1aacc387-4c9a-41d4-bba3-8a728eae07c6",
+   "className": "JumpPoint_Stanton_Magnus",
+   "recordPath": "libs/foundry/records/starmap/pu/jumppoint_stanton_magnus",
+   "name": {
+    "key": "@Stanton_JumpPoint_Magnus",
+    "en": "Stanton - Magnus Jump Point",
+    "de": "Stanton-Magnus-Sprungpunkt"
+   },
+   "type": "JumpPoint",
+   "typeGuid": "65b8ee34-7fbc-432a-afca-834b16fa22f5",
+   "parentGuid": "e1501a68-09e5-472e-93a4-01efcde8c8f8",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "OOC_JumpPoint_stanton_magnus",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    -62284282868.185,
+    23467602586.872,
+    20198396608.0
+   ]
+  },
+  {
+   "guid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "className": "StantonStar",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stantonstar/starmapobject.stantonstar",
+   "name": {
+    "key": "@StantonStar",
+    "en": "Stanton",
+    "de": "Stanton"
+   },
+   "type": "Star",
+   "typeGuid": "80846bb9-e389-411f-b50f-f65f3b639b1d",
+   "parentGuid": null,
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton",
+   "placedUnderGuid": null,
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "guid": "468d4102-a210-47b5-8bc3-084f791a173c",
+   "className": "Nyx_Levski",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/delamar/landingzone/nyx_levski",
+   "name": {
+    "key": "@ui_pregame_port_Levski_name",
+    "en": "Levski",
+    "de": "Levski"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": "nyx",
+   "entityName": "levski_all-001",
+   "placedUnderGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "position": [
+    -9641672902.905,
+    -11490734473.54,
+    -93642.551
+   ]
+  },
+  {
+   "guid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "className": "Stanton1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/starmapobject.stanton1",
+   "name": {
+    "key": "@Stanton1",
+    "en": "Hurston",
+    "de": "Hurston"
+   },
+   "type": "Planet",
+   "typeGuid": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton_1_Hurston",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    12850457093.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "guid": "59485d8c-7947-4e00-871c-d35f6451aab8",
+   "className": "RR_ARC_L1",
+   "recordPath": "libs/foundry/records/starmap/pu/station/reststop/rr_arc_l1",
+   "name": {
+    "key": "@RR_ARC_L1",
+    "en": "ARC-L1 Wide Forest Station",
+    "de": "ARC-L1-Wide-Forest-Station"
+   },
+   "type": "Manmade_VisibleOnInteraction",
+   "typeGuid": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "LOC_RR_S3_L1",
+   "placedUnderGuid": "0b8b226a-076f-44fb-a522-dee6b0c4be4c",
+   "position": [
+    16729220034.958,
+    -19942048185.735,
+    2239765.215
+   ]
+  },
+  {
+   "guid": "5de4be76-7d6c-47e3-ab7b-9d344d27f506",
+   "className": "JumpPoint_Pyro_Stanton",
+   "recordPath": "libs/foundry/records/starmap/pu/system/pyro/jumppoint_pyro_stanton",
+   "name": {
+    "key": "@Pyro_JumpPoint_Stanton",
+    "en": "Pyro-Stanton Jump Point",
+    "de": "Pyro-Stanton-Sprungpunkt"
+   },
+   "type": "Anomaly",
+   "typeGuid": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "parentGuid": "a1b8a311-6465-45dc-873d-e8d06d4372df",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "jumppoint_pyro_stanton",
+   "placedUnderGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "position": [
+    34178643295.763,
+    40591998290.601,
+    0.0
+   ]
+  },
+  {
+   "guid": "ab29f65e-c792-4b1f-b23d-5810cb0ef416",
+   "className": "RR_HUR_LEO",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/orbiting/rr_hur_leo",
+   "name": {
+    "key": "@Stanton1_Transfer",
+    "en": "Everus Harbor",
+    "de": "Everus-Hafen"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ObjectContainer_RestStop",
+   "placedUnderGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "position": [
+    12849949350.688,
+    -903464.438,
+    496489.063
+   ]
+  },
+  {
+   "guid": "c9c137cf-c520-47ee-9e6d-5d653dfbe201",
+   "className": "StantonSolarSystem",
+   "recordPath": "libs/foundry/records/starmap/pu/stantonsolarsystem",
+   "name": {
+    "key": "@StantonSystem",
+    "en": "Stanton System",
+    "de": null
+   },
+   "type": "SolarSystem",
+   "typeGuid": "32ed44de-920b-43ce-b55d-82cc4ef9fa59",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "dc34b5af-e417-48d2-b47b-98b56eedf0a7",
+   "className": "Stanton2b_ShubinMining_SCD1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton2b/outpost/stanton2b_shubinmining_scd1",
+   "name": {
+    "key": "@Stanton2b_Shubin_001",
+    "en": "Shubin Mining Facility SCD-1",
+    "de": "Shubin-Bergbauanlage SCD-1"
+   },
+   "type": "Outpost",
+   "typeGuid": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "parentGuid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "shubin_cluster_001_sand_{B8AA34E0-BBDC-4000-A3AE-3705210EE06E}.socpak",
+   "placedUnderGuid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "position": [
+    -18930413514.363,
+    -2610308346.968,
+    221253.344
+   ]
+  },
+  {
+   "guid": "e658b2b1-fae7-4945-89b8-b332f235d59b",
+   "className": "Stanton2b",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton2b/starmapobject.stanton2b",
+   "name": {
+    "key": "@Stanton2b",
+    "en": "Daymar",
+    "de": "Daymar"
+   },
+   "type": "Moon",
+   "typeGuid": "4af1132e-d980-482d-823f-f713a196b9aa",
+   "parentGuid": "c15033ab-2eb3-4d6d-b882-0cb336e67ed8",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "OOC_Stanton_2b_Daymar",
+   "placedUnderGuid": "c15033ab-2eb3-4d6d-b882-0cb336e67ed8",
+   "position": [
+    -18930539539.535,
+    -2610158765.499,
+    0.0
+   ]
+  },
+  {
+   "guid": "f1759f46-e3c0-4dc1-94bc-c94488b58913",
+   "className": "Stanton1_Lorville",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1/landingzone/stanton1_lorville",
+   "name": {
+    "key": "@ui_pregame_port_Lorville_name",
+    "en": "Lorville",
+    "de": "Lorville"
+   },
+   "type": "LandingZone",
+   "typeGuid": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "parentGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ObjectContainer_Lorville_City",
+   "placedUnderGuid": "551af60b-7727-4936-acc7-763d25d7a1de",
+   "position": [
+    12850128103.835,
+    -752434.616,
+    572120.274
+   ]
+  },
+  {
+   "guid": "f1d0e8d9-1e3a-47a2-98e7-02a220ba8f14",
+   "className": "Race_TimeTrial_Stanton4c_Icebreaker",
+   "recordPath": "libs/foundry/records/starmap/pu/race_timetrial_stanton4c_icebreaker",
+   "name": {
+    "key": "@Stanton4c_Racetrack_Icebreaker",
+    "en": "The Icebreaker",
+    "de": null
+   },
+   "type": "NavPoint",
+   "typeGuid": "c7f1393f-8cb3-4ac8-9dc7-75671c1b07fe",
+   "parentGuid": "732dedf3-9530-4972-98ab-2fcae64669db",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "racing_static_st4c_icebreaker",
+   "placedUnderGuid": "732dedf3-9530-4972-98ab-2fcae64669db",
+   "position": [
+    22488067631.75,
+    37081321702.622,
+    66610.567
+   ]
+  },
+  {
+   "guid": "f5c47a9e-0b4c-49ee-adf4-a5f65f3c3929",
+   "className": "Pyro1_ASD_RF_LazarusComplex_Tithonus_2A",
+   "recordPath": "libs/foundry/records/starmap/pu/pyro1_asd_rf_lazaruscomplex_tithonus_2a",
+   "name": {
+    "key": "@Pyro1_ASD_Research_Facility_2A",
+    "en": "Lazarus Complex Tithonus-I",
+    "de": null
+   },
+   "type": "Outpost_InvalidQT",
+   "typeGuid": "7949a092-c8c3-447e-b417-156403cf27f0",
+   "parentGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "STMGN_ResearchLab_04_RastarLE",
+   "placedUnderGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "position": [
+    -7921241397.301,
+    -2387126929.586,
+    -211553.669
+   ]
+  },
+  {
+   "guid": "00506b11-4482-4d8a-9363-8d767875aed8",
+   "className": "PrivateMiningPoint_Stanton4_L4_002",
+   "recordPath": "libs/foundry/records/starmap/pu/privateminingpoint_stanton4_l4_002",
+   "name": {
+    "key": "@MiningClaim_S4L4_002",
+    "en": "Mining Claim #LX4-224",
+    "de": "Bergbau-Claim #LX4-224"
+   },
+   "type": "Asteroid",
+   "typeGuid": "e60452a5-b85c-4ab1-97e7-9cefb466f87b",
+   "parentGuid": "5e71e60c-52cc-42b9-806a-d8d2a236df28",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "PrivateMiningAsteroid_S4_L4-002",
+   "placedUnderGuid": "604eea8b-24e4-4425-806d-922a277ff308",
+   "position": [
+    -20968722133.82,
+    38056068134.811,
+    -11846444.619
+   ]
+  },
+  {
+   "guid": "00e7f077-e8c8-4775-afeb-e4921c4da7c0",
+   "className": "Stanton3b_ASD_Delve_Facility_006",
+   "recordPath": "libs/foundry/records/starmap/pu/stanton3b_asd_delve_facility_006",
+   "name": {
+    "key": "@Stanton3b_ASD_Delving_Facility_006",
+    "en": "Onyx Facility S3B6",
+    "de": null
+   },
+   "type": "Outpost",
+   "typeGuid": "e207a1ec-1395-4c1c-8e51-b38c4420784c",
+   "parentGuid": "d6f1ccd9-fbfb-4086-9608-8466ef2c1c93",
+   "hideInStarmap": true,
+   "system": "stanton",
+   "entityName": "s3b_asd_facility_006",
+   "placedUnderGuid": "d6f1ccd9-fbfb-4086-9608-8466ef2c1c93",
+   "position": [
+    18379568197.306,
+    -22000201126.959,
+    55102.039
+   ]
+  },
+  {
+   "guid": "02069d4a-e37a-474c-9229-691ce013bdc1",
+   "className": "TheCollectorAsteroid_Stanton1",
+   "recordPath": "libs/foundry/records/starmap/pu/thecollectorasteroid_stanton1",
+   "name": {
+    "key": "@Collector_Station_01_Name",
+    "en": "Wikelo Emporium Dasi Station",
+    "de": null
+   },
+   "type": "Manmade_VisibleOnInteraction",
+   "typeGuid": "4895b5bb-94ac-470a-bf6f-084a54a09be5",
+   "parentGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "ab_collector_gas_Stanton1",
+   "placedUnderGuid": "34ff378f-faee-47bb-b5fe-f505e665c5ca",
+   "position": [
+    14333387186.509,
+    2001161588.504,
+    0.0
+   ]
+  },
+  {
+   "guid": "02a62832-2087-45cf-8861-cbf0bd310be7",
+   "className": "PARTY_MEMBER_QT_Beacon",
+   "recordPath": "libs/foundry/records/starmap/pu/player_related/party_member_qt_beacon",
+   "name": {
+    "key": "@starmap_partymember",
+    "en": "Party Member",
+    "de": "Party-Mitglied"
+   },
+   "type": "Manmade",
+   "typeGuid": "3819ac97-18f1-499e-9729-b889172da3f8",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "0c39de63-bb45-496e-8029-0ed91580c84a",
+   "className": "Delamar",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/delamar/starmapobject.delamar",
+   "name": {
+    "key": "@Delamar",
+    "en": "Delamar",
+    "de": "Delamar"
+   },
+   "type": "Moon",
+   "typeGuid": "4af1132e-d980-482d-823f-f713a196b9aa",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "122e8057-831d-4517-a23b-0eb8382b90a2",
+   "className": "Stanton4_NewBabbage",
+   "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton4/landingzone/stanton4_newbabbage",
+   "name": {
+    "key": "@ui_pregame_port_NewBabbage_name",
+    "en": "New Babbage",
+    "de": "New Babbage"
+   },
+   "type": "LandingZone",
+   "typeGuid": "d68b137c-28c4-4c14-8a29-19e83a586b6d",
+   "parentGuid": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "NewBabbage_LOC",
+   "placedUnderGuid": "5a529db7-1a4e-45b0-bdcb-a5a0c7a7fc57",
+   "position": [
+    22461564529.493,
+    37185325600.517,
+    743654.685
+   ]
+  },
+  {
+   "guid": "15c0678a-5240-4866-9e67-52c8e2baa74c",
+   "className": "JumpPoint_Pyro_Cano",
+   "recordPath": "libs/foundry/records/starmap/pu/system/pyro/jumppoint_pyro_cano",
+   "name": {
+    "key": "@Pyro_JumpPoint_Cano",
+    "en": "Pyro - Cano Jump Point",
+    "de": "Pyro-Cano-Sprungpunkt"
+   },
+   "type": "Anomaly",
+   "typeGuid": "24975610-8f9b-442c-8f90-4e58f660e8f7",
+   "parentGuid": "a14bec87-5801-4440-8ca8-35597487ac9a",
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "17092f34-d9c8-4d50-89f6-a92940b9cd52",
+   "className": "NyxSolarSystem",
+   "recordPath": "libs/foundry/records/starmap/pu/nyxsolarsystem",
+   "name": {
+    "key": "@NyxSystem",
+    "en": "Nyx System",
+    "de": null
+   },
+   "type": "SolarSystem",
+   "typeGuid": "32ed44de-920b-43ce-b55d-82cc4ef9fa59",
+   "parentGuid": null,
+   "hideInStarmap": true,
+   "system": null,
+   "entityName": null,
+   "placedUnderGuid": null,
+   "position": null
+  },
+  {
+   "guid": "26afa18b-af55-44a5-8a19-ceb06c3f69ba",
+   "className": "Pyro1_ASD_RF_LazarusComplex_Tithonus_2B",
+   "recordPath": "libs/foundry/records/starmap/pu/pyro1_asd_rf_lazaruscomplex_tithonus_2b",
+   "name": {
+    "key": "@Pyro1_ASD_Research_Facility_2B",
+    "en": "Lazarus Complex Tithonus-II",
+    "de": null
+   },
+   "type": "Outpost_InvalidQT",
+   "typeGuid": "7949a092-c8c3-447e-b417-156403cf27f0",
+   "parentGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "hideInStarmap": true,
+   "system": "pyro",
+   "entityName": "STMGN_ResearchLab_05_RastarLE",
+   "placedUnderGuid": "bd473b11-e20d-415f-bac3-e9e8099582b2",
+   "position": [
+    -7921185041.995,
+    -2387210335.247,
+    -212216.799
+   ]
+  },
+  {
+   "guid": "2a8a3554-b2f2-489d-a50c-5adff46cbf1b",
+   "className": "Nyx1",
+   "recordPath": "libs/foundry/records/starmap/pu/system/nyx/nyx1/nyx1",
+   "name": {
+    "key": "@Nyx1",
+    "en": "Nyx I",
+    "de": "Nyx I"
+   },
+   "type": "Planet",
+   "typeGuid": "73efbf7b-a595-49df-b99f-f3fe75558d8a",
+   "parentGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "hideInStarmap": false,
+   "system": "nyx",
+   "entityName": "Nyx1",
+   "placedUnderGuid": "77ed5653-bd14-4952-b904-afd79faeef60",
+   "position": [
+    6495194198.506,
+    -3749995462.199,
+    0.0
+   ]
+  },
+  {
+   "guid": "d08d892a-6e6f-4b14-9f1f-f05c76551ea7",
+   "className": "Race_TimeTrial_Stanton3_XGRClubTrack",
+   "recordPath": "libs/foundry/records/starmap/pu/race_timetrial_stanton3_xgrclubtrack",
+   "name": {
+    "key": "@Stanton3_Racetrack_SkyScraper",
+    "en": "The Sky Scraper",
+    "de": null
+   },
+   "type": "NavPoint",
+   "typeGuid": "c7f1393f-8cb3-4ac8-9dc7-75671c1b07fe",
+   "parentGuid": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+   "hideInStarmap": false,
+   "system": "stanton",
+   "entityName": "racing_static_st3_xgrclubtrack",
+   "placedUnderGuid": "35a9f8f5-8f80-4796-83db-7d7362baeb9a",
+   "position": [
+    18586918467.856,
+    -22152072356.313,
+    -245264.0
+   ]
+  }
+ ],
+ "contracts": [],
+ "mineableElements": [],
+ "refiningProcesses": [],
+ "mineableCompositions": [],
+ "miningGlobalParams": [],
+ "harvestableProviderPresets": [],
+ "subHarvestableMultiConfigs": [],
+ "harvestableLocations": [],
+ "lootContainers": [],
+ "shops": [
+  {
+   "key": "40fa0e04-ca49-593b-ffb0-20907233c091,4013956c-77bf-e743-db3a-7802f8e7469d,446c6ac8-876c-6579-6bc0-3b54c1c32995,40c7378f-9531-bf6e-cc93-44d1a189fe86,40ea61ed-9418-98d8-db00-742707529fb5,4f70bc03-b2f5-6cea-768c-ffedb033d2a2",
+   "entityGuid": "4f70bc03-b2f5-6cea-768c-ffedb033d2a2",
+   "system": "pyro",
+   "entityName": "SCShop_RestStop_Bar_Rund",
+   "registryName": "RestStop_Bars",
+   "defaultValue": "1141645a-167b-406c-882d-e0b4a238f868",
+   "containers": [
+    "pyrostar",
+    "RegionBD_3base_ab_pyro_final_set_encounter-001",
+    "ab_pyro_asmbl_01_enctr_001b",
+    "LocationHarvestableObjectContainer_ab_pyro_int_enctr_001b",
+    "rstop_bar_001_rund_003"
+   ],
+   "body": "RegionBD_3base_ab_pyro_final_set_encounter-001",
+   "location": "ab_pyro_asmbl_01_enctr_001b",
+   "starmapObjectGuid": null,
+   "kind": "shopfood",
+   "brand": null,
+   "commodityExchange": false,
+   "inventory": null,
+   "itemGuids": null
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4cccecbb-9ecd-4b4b-915a-7c58ae41b6b0,4c152f4a-716b-6eb6-289f-27f285fdb3ac,473217ea-be6b-758c-7fe7-5bb08ae418a0,41355073-47cf-08c6-675c-8c5fd44153a0,44a49502-7647-4998-be47-fa240d553fb6",
+   "entityGuid": "44a49502-7647-4998-be47-fa240d553fb6",
+   "system": "stanton",
+   "entityName": "CubbyBlast_Area18",
+   "registryName": "CubbyBlast_Area18",
+   "defaultValue": "b35f316b-236b-45c0-be9a-f9ea7b749daa",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_3_ArcCorp",
+    "Area18_City_objectContainer",
+    "Area18_central-001",
+    "cubby_int"
+   ],
+   "body": "OOC_Stanton_3_ArcCorp",
+   "location": "Area18_City_objectContainer",
+   "starmapObjectGuid": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+   "kind": "personalweapon",
+   "brand": "cubbyblast",
+   "commodityExchange": false,
+   "inventory": "inv_cubbyblast_a18",
+   "itemGuids": [
+    "bef9cd69-24f0-434a-ba7a-2bf751228093",
+    "de20695c-eb2f-4b68-be6f-9806cbd205a7"
+   ]
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4cccecbb-9ecd-4b4b-915a-7c58ae41b6b0,4c152f4a-716b-6eb6-289f-27f285fdb3ac,473217ea-be6b-758c-7fe7-5bb08ae418a0,468bfd40-102c-8168-8783-bba414ded3b4,42ab0900-69e4-3fd3-98e4-76a4c3402ea8",
+   "entityGuid": "42ab0900-69e4-3fd3-98e4-76a4c3402ea8",
+   "system": "stanton",
+   "entityName": "Dumpers_Depot_Area18",
+   "registryName": "DumpersDepot_Area18",
+   "defaultValue": "23545b90-86fc-4c64-88a9-a48ff43337c4",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_3_ArcCorp",
+    "Area18_City_objectContainer",
+    "Area18_central-001",
+    "OC_Dumpers_Int"
+   ],
+   "body": "OOC_Stanton_3_ArcCorp",
+   "location": "Area18_City_objectContainer",
+   "starmapObjectGuid": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+   "kind": "shippart",
+   "brand": "dumpersdepot",
+   "commodityExchange": false,
+   "inventory": "inv_dumpersdepot_area18",
+   "itemGuids": [
+    "339bd641-8dfb-4bc1-b273-5ffc5f702fbb"
+   ]
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4ce1f681-b479-5269-0536-3d7f02fdccaf,41d770bd-ec63-eb6a-7aca-93a2e263f7a8,4338223d-c6f3-5823-7605-ee2e313b6ab5,431d701e-0e1e-6faf-753a-e5ce3f2202ac,431d701e-0e1e-6faf-753a-e5ce3f2202ac,46e97556-1daa-e671-c95b-8d40905b2db9,42eef9e5-ecd4-6e5b-6254-e332a5dd44b9",
+   "entityGuid": "42eef9e5-ecd4-6e5b-6254-e332a5dd44b9",
+   "system": "stanton",
+   "entityName": "SCShop_CommEx_TDD_NewBabbage",
+   "registryName": "L_TDD_NewBabbage",
+   "defaultValue": "8daeeb75-087d-45ba-935a-d46e2b0d5708",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_4_Microtech",
+    "NewBabbage_LOC",
+    "ObjectContainer-123",
+    "ObjectContainer-Newbab_Domes_Int_001",
+    "ObjectContainer-Commons_Plaza_Interior",
+    "ObjectContainer-002"
+   ],
+   "body": "OOC_Stanton_4_Microtech",
+   "location": "NewBabbage_LOC",
+   "starmapObjectGuid": "122e8057-831d-4517-a23b-0eb8382b90a2",
+   "kind": "commex",
+   "brand": "tdd",
+   "commodityExchange": true,
+   "inventory": null,
+   "itemGuids": null
+  }
+ ],
+ "factionReputations": [],
+ "reputationScopes": [],
+ "reputationStandings": [],
+ "reputationContexts": [],
+ "missionTypes": [],
+ "missionLocalities": [],
+ "contractScenarios": [],
+ "lootTables": [],
+ "lootArchetypes": [],
+ "lootPoolFilters": [],
+ "legacyLootTables": [],
+ "legacyLootArchetypes": [],
+ "mineableEntities": [],
+ "crafters": [],
+ "cargoManifests": [],
+ "missionLocationTemplates": [],
+ "contractShipSpawns": [],
+ "contractLocationQueries": [],
+ "contractTemplates": [],
+ "missionBrokerEntries": [],
+ "contractNpcSpawns": [],
+ "contractEntitySpawns": [],
+ "shipStoreSlugs": [],
+ "itemRecovery": {
+  "guid": "c4ac0f5a-c072-4666-b3a0-5aef0cf3ff65",
+  "className": "GlobalItemRecovery",
+  "recordPath": "libs/foundry/records/entitlementpolicies/globalitemrecovery",
+  "globalBrickTimer": 10.0,
+  "baseReclaimTime": 0.0,
+  "baseDeliveryTime": 0.0,
+  "scalingPriceFloor": 0.0,
+  "aUECperSecond": 1e-06,
+  "defaultLoadoutCooldownMultiplier": 200.0,
+  "defaultLoadoutDeliveryTimeMultiplier": 200.0,
+  "claimCostMultiplier": 0.003,
+  "vehicleChassisRepairCostMultiplier": 1.0,
+  "vehicleComponentRepairCostMultiplier": 1.0,
+  "vehicleRepairMissingItemCostMultiplier": 1.0,
+  "deliverySecondsPerAUEC": 1e-06,
+  "expeditedDeliverySecondsPerAUEC": 5e-07,
+  "defaultLoadoutExpeditedDeliveryTimeMultiplier": 100.0,
+  "flatMinimumDeliveryTimerSeconds": 10.0,
+  "maxExpeditedClaimCostMultiplier": 0.0003,
+  "escalatingClaimsParams": {
+   "escalatingClaimChainLimit": 1,
+   "escalationTimerMultiplier": 1.0,
+   "escalatingClaimCostMultiplier": 1.0,
+   "escalatingDeliveryTimerMultiplier": 1.0
+  },
+  "overrides": [
+   {
+    "classGuids": [
+     "20d5f617-147a-4530-a753-a7afd1875fd1",
+     "a852bb00-e395-468f-9adc-78b3df9c82f6",
+     "973bc147-4422-48a6-99c8-6ff0ead25bdf",
+     "f8c8fe5c-1aa3-41d7-86b0-6bb54b249541",
+     "968249b2-ca7c-4b41-8f58-730673fefc8c",
+     "1164be4d-623e-4ef7-bc3d-4cdb45c22ec5",
+     "ec956be2-8e3a-460d-b3a8-97df4cb12b78",
+     "3ea9bcd8-1ddd-4714-a537-7b2675e8c2d2",
+     "93b13680-9aa6-4c21-b998-e4f8880f7c12",
+     "887cd720-7337-44ae-9708-828ccf808649",
+     "b616b3ad-123c-40f2-80bd-b8f4109633aa",
+     "ea2c22bc-c2f0-42dc-967d-3300f9232f91",
+     "83318d44-b6c1-42d8-bcd1-284318718b42",
+     "16aa514f-12ac-43a4-b51d-44447252186e",
+     "1bed9058-e284-4c0f-b561-6ba57ab4f99d",
+     "6135a874-4cb1-4f49-9f29-5781e5991f2b",
+     "e7eeba8d-b108-48a1-a332-d9edbab2b9c1",
+     "2f231daa-95e5-4cb2-a32e-4db8f29a30d6",
+     "3c9af040-d919-4afc-b768-45821a5b913c",
+     "c6cfa4d9-e794-4bb6-8da9-54cb779ea109",
+     "e32d125f-a3f8-4bc7-b0e6-cb7edf22b7ac",
+     "c2956880-b82a-42d0-962b-eb736dac1536",
+     "b58f7735-9454-4a0a-b724-2bc8d61961d7",
+     "11ebc47d-4763-4faa-9020-171cf6c2651f",
+     "eaeb562d-d4ac-43bd-a843-e8a6d69fad82",
+     "34506e83-b7b8-4804-a7bb-f31f11bb9214",
+     "6c44bcd6-d4c4-41c7-8939-a576e3aa9482"
+    ],
+    "claimCooldownMultiplier": 1.0,
+    "claimCostMultiplier": 1.0,
+    "deliveryTimeMultiplier": 1.0,
+    "maxExpediteCostMultiplier": 1.0,
+    "expeditedDeliveryTimeMultiplier": 1.0,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f6d606c9-b324-4efa-814f-15a59047a6a5",
+     "f1b224dd-273e-488f-9dee-fbf73f44f462",
+     "f0caa993-4c6b-4402-8ef1-d91879060f3b",
+     "4b0585b0-b60b-4c52-a744-d812e5e9ad58",
+     "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+     "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+     "a5a5b055-c5d7-4384-9951-f15d47b88789"
+    ],
+    "claimCooldownMultiplier": 1.0,
+    "claimCostMultiplier": 1.0,
+    "deliveryTimeMultiplier": 1.0,
+    "maxExpediteCostMultiplier": 1.0,
+    "expeditedDeliveryTimeMultiplier": 1.0,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "e379e38c-459a-4705-be7d-49a5f5d7a928",
+     "0d4c5000-ffdb-41f5-9de1-d64252dfef21",
+     "5d2bf0b6-d9be-4738-8717-0f455c461d8a",
+     "28f22bb8-9f1c-4a46-9a39-20bcb1e5000e",
+     "f7b8addd-9253-495c-a278-bdaa236e6cbc",
+     "081236f5-9549-4a60-9123-6ae21f0cd261",
+     "11ebc47d-4763-4faa-9020-171cf6c2651f",
+     "9634b4d6-9f5a-4ad2-8574-431c15e3bc5d",
+     "8c2730d4-52c1-43fb-9972-d9956fb7ea1f"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "831fdcfc-337a-4350-967d-e693d19efeee",
+     "e19fc6c3-f5fa-4623-9a17-b00a29b71500",
+     "674e0a52-4469-4b55-ba0d-6aecc44d1728",
+     "e17ccf62-f2d2-4c4e-a132-a3000d40fbde",
+     "1810d1a7-61e3-4d95-bafb-0f11758c7683",
+     "c03e7aef-6411-4e85-9c10-e89862884433",
+     "6ec72f64-2002-481c-b7c9-b132476ba6aa",
+     "0d690d1a-9f57-4976-bff1-ec46bf039e75",
+     "c4ceff45-d851-44b1-921b-bfef93a6cd6a",
+     "ecdfd0df-6c5f-4183-a24b-9e1546e00a4e",
+     "aaa12a00-a1e7-4dfc-8626-3bebb005209f",
+     "cf9aa91e-15bf-435c-a22d-f2cadc4485ce",
+     "34077e67-5e2c-4903-a17c-2d0e163751c7",
+     "f68ee841-88d1-46f3-a1e2-5dc71d9d5d97",
+     "e4770804-b43a-4c2d-a4e4-fedd410e50fb",
+     "02fe3279-3598-4ce6-96dc-0bc5cb90dfdc",
+     "3d371fd4-50e2-4b5e-859f-1086e905c946",
+     "4559fbe2-55ab-a5a8-4e77-75106cb96ab7",
+     "478bfc10-9577-ac19-262a-d40a93c3fcb2",
+     "4ed10b1c-df4f-4ab0-430e-b5b9f33b0f94",
+     "dc39ca6b-1d76-4db5-9346-356f49954978",
+     "565d8121-50a9-4920-af50-f176caef0431",
+     "13a02a6d-7d67-4d22-8530-d4d2c8443f66",
+     "c989caf2-84a5-4c01-b99e-5fc9f8d0ce8e",
+     "14b8caeb-d5e1-4816-9537-86ef19afada8",
+     "ff873dda-2b79-4fa3-b3ce-535b8adff5e2",
+     "34821163-e32e-42bf-99df-8f42ba66ef34",
+     "6c6e9731-3d70-4f1b-84c2-9dbf3c1f97c7",
+     "ca888820-a627-4f5e-927b-426f654e9968"
+    ],
+    "claimCooldownMultiplier": 0.8,
+    "claimCostMultiplier": 0.8,
+    "deliveryTimeMultiplier": 0.8,
+    "maxExpediteCostMultiplier": 0.8,
+    "expeditedDeliveryTimeMultiplier": 0.8,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f8ac4c26-8f4d-4cb3-9be2-7d867a95a877",
+     "11b660a2-c77c-490b-9e85-ee70400c5cf8",
+     "38ae749f-d4fc-4dfd-907b-ed8db61f3d88",
+     "50ddaf5e-a8e3-42fe-a1d3-7267f39b39b0",
+     "ecadf2b2-a404-4776-9289-04af91538d76",
+     "daf936a1-689f-4edb-980a-96947e2727c4",
+     "316c6601-b405-4a3a-abac-394c655718f8"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "f80d39f3-50fc-4fca-ada1-76de4c237e3f",
+     "881e3879-a186-44da-8b47-1d8f0a846438",
+     "8ffde65b-ee9b-4a50-b386-3111175736b2",
+     "0920e187-515d-466a-9c6a-a7dde9d2b1bc",
+     "35f6ad71-01c6-4762-a18b-99c7fdde9760",
+     "384d7e27-daec-4554-a8e9-6920a10a86c1",
+     "087b2253-2fc7-4fae-9f9d-97f64b7c43db",
+     "528fdddc-c97f-4ae8-a00e-11a59fc3662d",
+     "6f0e14a9-cb6c-4b71-ae92-376867bb1be8",
+     "4e62ae95-d173-4b94-8b91-9d85bc963ba1"
+    ],
+    "claimCooldownMultiplier": 0.7,
+    "claimCostMultiplier": 0.7,
+    "deliveryTimeMultiplier": 0.7,
+    "maxExpediteCostMultiplier": 0.7,
+    "expeditedDeliveryTimeMultiplier": 0.7,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   },
+   {
+    "classGuids": [
+     "d46f4de1-8dc1-473b-9739-88c9ba7e75a6",
+     "0b17b11f-4ac4-4e04-b973-beb6f299b99b",
+     "5cf39b3b-41d8-45c1-8ef2-d4678c7a7b85",
+     "7533ff77-836c-4bd2-9171-487d9c63863c",
+     "40a1f83b-3623-49e6-8168-ab8223998aa2",
+     "f6d606c9-b324-4efa-814f-15a59047a6a5",
+     "f1b224dd-273e-488f-9dee-fbf73f44f462",
+     "f05b74b2-06cf-44d0-8607-c09487359384",
+     "94d31d2e-5fa8-460c-9fa4-2942b6f0ce33",
+     "58544d8c-f000-47a4-9ec6-ad663dbd8ff0"
+    ],
+    "claimCooldownMultiplier": 0.6,
+    "claimCostMultiplier": 0.6,
+    "deliveryTimeMultiplier": 0.6,
+    "maxExpediteCostMultiplier": 0.6,
+    "expeditedDeliveryTimeMultiplier": 0.6,
+    "flatMinimumDeliveryTimerSecondsMultiplier": 1.0,
+    "escalationTimerMultiplier": 1.0,
+    "escalatingClaimCostMultiplier": 1.0,
+    "escalatingDeliveryTimerMultiplier": 1.0
+   }
+  ]
+ }
+}

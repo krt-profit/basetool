@@ -979,6 +979,10 @@ interface Window {
     krtMemberEditI18n?: KrtI18nDict;
     krtDeletionRequestsI18n?: KrtI18nDict;
     krtP4kImportI18n?: KrtI18nDict;
+    /** Labels of the admin starmap page, from `starmap.html`. */
+    krtStarmapI18n?: KrtI18nDict;
+    /** Labels of the admin shops page, from `shops.html`. */
+    krtShopsI18n?: KrtI18nDict;
     krtBlueprintsImportI18n?: KrtI18nDict;
     krtBlueprintsRecipeI18n?: KrtI18nDict;
 

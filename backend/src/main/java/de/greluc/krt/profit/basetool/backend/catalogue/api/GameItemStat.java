@@ -39,7 +39,8 @@ import lombok.ToString;
 
 /**
  * The base value of one blueprint stat on a crafted game item, before any ingredient quality
- * applies (REQ-DATA-027). Written by the SC Wiki item sync for craftable items only.
+ * applies (REQ-P4K-030). Written by the P4K import for every catalogue item with stats and by the
+ * SC Wiki item sync for craftable items where no P4K value exists.
  */
 @Entity
 @Table(name = "game_item_stat")
@@ -67,4 +68,9 @@ public class GameItemStat extends AbstractEntity<UUID> {
   /** The base value in the property's {@link BlueprintStatProperty#getUnit() unit}. */
   @Column(name = "base_value", nullable = false)
   private Double baseValue;
+
+  /** Where the base value comes from; a P4K value is never replaced by an SC Wiki one. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "source", nullable = false, length = 16)
+  private GameItemStatSource source;
 }

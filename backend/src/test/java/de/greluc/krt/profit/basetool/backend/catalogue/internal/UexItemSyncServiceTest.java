@@ -173,6 +173,36 @@ class UexItemSyncServiceTest {
   }
 
   @Test
+  void syncItems_keepsTheNameAndManufacturerTheP4kLeads_andRecordsTheUexName() {
+    UUID externalUuid = UUID.randomUUID();
+    Manufacturer p4kMaker = new Manufacturer();
+    p4kMaker.setId(UUID.randomUUID());
+    p4kMaker.setName("Gorgon Defender Industries");
+    GameItem matched = storedItem(7, externalUuid);
+    matched.setName("AllStop");
+    matched.setP4kName("AllStop");
+    matched.setManufacturer(p4kMaker);
+    matched.setP4kManufacturer(p4kMaker);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(
+            fetched(helmetDto(7, "AllStop Shield", externalUuid.toString(), helmetsCategory)));
+    when(gameItemRepository.findByUexItemId(7)).thenReturn(Optional.of(matched));
+    lenient()
+        .when(manufacturerAliasRepository.findCompanyRefs())
+        .thenReturn(List.of(ref(1, rsi.getId())));
+    lenient().when(manufacturerRepository.getReferenceById(rsi.getId())).thenReturn(rsi);
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    assertEquals("AllStop", matched.getName());
+    assertEquals("AllStop Shield", matched.getUexName());
+    assertSame(p4kMaker, matched.getManufacturer());
+  }
+
+  @Test
   void syncItems_handlesEmptyUuidByLeavingExternalUuidNull() {
     UexItemDto avionics = helmetDto(99, "Random Flight Blade", "", helmetsCategory);
     helmetsCategory.setSection("Avionics");

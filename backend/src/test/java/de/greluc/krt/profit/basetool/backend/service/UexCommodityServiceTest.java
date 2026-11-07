@@ -34,7 +34,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexCommodityOccurrenceSync;
@@ -68,6 +70,8 @@ class UexCommodityServiceTest {
   @Mock private TerminalRepository terminalRepository;
 
   @Mock private UexCommodityOccurrenceSync occurrenceSync;
+
+  @Mock private SyncReportService syncReportService;
 
   /** A real chunk writer, so the rows are actually written through its callbacks (BE-PERF-09). */
   @Spy
@@ -199,6 +203,30 @@ class UexCommodityServiceTest {
     assertEquals(existingId, cap.getValue().getId());
     assertEquals(7L, cap.getValue().getVersion());
     verify(materialRepository, never()).findByName(any());
+  }
+
+  @Test
+  void commoditySync_keepsTheP4kName_andReportsTheDifferentUexName() {
+    UUID runId = UUID.randomUUID();
+    UUID p4kGuid = UUID.randomUUID();
+    Material p4kKnown = new Material();
+    p4kKnown.setIdCommodity(5);
+    p4kKnown.setName("Borase");
+    p4kKnown.setP4kUuid(p4kGuid);
+    p4kKnown.setDensityGramPerCc(1.0);
+    when(syncReportService.beginRun()).thenReturn(runId);
+    when(uexClient.getCommodities())
+        .thenReturn(fetched(List.of(commodity(5, "Borase (Ore)", 0, 1))));
+    when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
+    when(materialRepository.findByIdCommodity(5)).thenReturn(Optional.of(p4kKnown));
+
+    uexCommodityService.fetchAndProcessCommoditiesPrices();
+
+    assertEquals("Borase", p4kKnown.getName());
+    assertEquals(1.0, p4kKnown.getDensityGramPerCc());
+    verify(syncReportService)
+        .logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "commodity", p4kGuid, "name", "Borase", "Borase (Ore)");
   }
 
   @Test

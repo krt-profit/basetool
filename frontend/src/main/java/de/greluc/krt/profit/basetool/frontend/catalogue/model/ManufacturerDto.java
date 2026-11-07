@@ -20,9 +20,24 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Manufacturer payload. */
+/**
+ * Data transfer record carrying Manufacturer payload.
+ *
+ * @param id the manufacturer's id
+ * @param name its name
+ * @param abbreviation its short display code
+ * @param nickname its UEX nickname
+ * @param wiki its UEX wiki link
+ * @param description its description
+ * @param hidden whether an admin hid it from the pickers
+ * @param nameDe its German name, or {@code null} (REQ-P4K-023)
+ * @param p4kUuid its P4K GUID, the key of its Fan Kit logo (REQ-P4K-022), or {@code null}
+ */
 @DtoMirror
 public record ManufacturerDto(
     UUID id,
@@ -31,4 +46,39 @@ public record ManufacturerDto(
     String nickname,
     String wiki,
     String description,
-    boolean hidden) {}
+    boolean hidden,
+    @Nullable String nameDe,
+    @Nullable UUID p4kUuid) {
+
+  /**
+   * Creates a manufacturer without a German name and a P4K GUID.
+   *
+   * @param id the manufacturer's id
+   * @param name its name
+   * @param abbreviation its short display code
+   * @param nickname its UEX nickname
+   * @param wiki its UEX wiki link
+   * @param description its description
+   * @param hidden whether an admin hid it from the pickers
+   */
+  public ManufacturerDto(
+      UUID id,
+      String name,
+      String abbreviation,
+      String nickname,
+      String wiki,
+      String description,
+      boolean hidden) {
+    this(id, name, abbreviation, nickname, wiki, description, hidden, null, null);
+  }
+
+  /**
+   * Returns the name the page shows.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
+  }
+}

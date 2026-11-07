@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -56,9 +59,13 @@ public class SyncReportService {
   /** §8.8 retention: keep the last 30 runs per source. */
   public static final int RUNS_TO_KEEP = 30;
 
+  /** The aggregate of a P4K run's summary event. */
+  private static final String P4K_RUN_AGGREGATE = "catalog";
+
   private final ExternalSyncReportRepository repository;
   private final MeterRegistry meterRegistry;
   private final AdminDashboardLiveSync adminDashboardLiveSync;
+  private final AuditRecorder auditRecorder;
 
   private final ExternalSyncRunRepository runRepository;
   private final SyncRunProgress progress;
@@ -235,6 +242,59 @@ public class SyncReportService {
   }
 
   /**
+   * Records a UEX or SC Wiki value that differs from the value the P4K leads on a P4K-known row,
+   * which keeps its value (REQ-P4K-020); an absent source value, or one equal to the P4K value
+   * ignoring case, is no finding.
+   *
+   * @param source the source serving the value, {@code UEX} or {@code SCWIKI}
+   * @param runId the current run's id (from {@link #beginRun()})
+   * @param aggregate the aggregate the event concerns
+   * @param p4kUuid the row's P4K GUID
+   * @param column the column the values belong to
+   * @param p4kValue the value the row keeps
+   * @param sourceValue the value the source serves
+   * @return whether an event was recorded
+   */
+  public boolean logP4kDisagreement(
+      @NotNull SyncSourceSystem source,
+      @NotNull UUID runId,
+      @NotNull String aggregate,
+      @NotNull UUID p4kUuid,
+      @NotNull String column,
+      @Nullable String p4kValue,
+      @Nullable String sourceValue) {
+    if (sourceValue == null
+        || sourceValue.isBlank()
+        || sourceValue.strip().equalsIgnoreCase(p4kValue)) {
+      return false;
+    }
+    repository.save(
+        ExternalSyncReport.builder()
+            .runId(runId)
+            .ranAt(Instant.now())
+            .sourceSystem(source)
+            .eventType(SyncEventType.P4K_DISAGREEMENT)
+            .aggregate(aggregate)
+            .externalUuid(p4kUuid)
+            .externalName(p4kValue)
+            .detail(P4kFields.disagreement(column, p4kValue, sourceValue.strip()))
+            .build());
+    countSyncEvent(source, SyncEventType.P4K_DISAGREEMENT);
+    return true;
+  }
+
+  /**
+   * Records the summary of one P4K APPLY: its counts per kind, as the run's {@code
+   * SYNC_RUN_SUMMARY} event of the {@code catalog} aggregate.
+   *
+   * @param runId the run
+   * @param summary the one-line counts per kind
+   */
+  public void logP4kRunSummary(@NotNull UUID runId, @NotNull String summary) {
+    logP4kEvent(runId, SyncEventType.SYNC_RUN_SUMMARY, P4K_RUN_AGGREGATE, null, null, summary);
+  }
+
+  /**
    * Records one P4K catalog-import finding for the given aggregate, stamping {@code source = P4K}
    * and {@code ran_at = now}.
    *
@@ -316,6 +376,14 @@ public class SyncReportService {
           days,
           source == null ? "ALL" : source);
     }
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SYNC_REPORTS_DELETED,
+        null,
+        null,
+        null,
+        AuditDetails.of("source", source == null ? "ALL" : source.name())
+            .with("olderThanDays", days)
+            .with("deleted", deleted));
     return deleted;
   }
 

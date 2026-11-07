@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.model;
 
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code GameItemReferenceDto}: a slim reference to an orderable
@@ -33,6 +35,9 @@ import java.util.UUID;
  * @param grade the component grade, or {@code null} when unknown or no component
  * @param itemClass the {@code ShipComponentClass} name, or {@code null} when unknown or no
  *     component
+ * @param noLongerInGame whether the P4K retired the item; the reference then shows the "no longer
+ *     in the game" notice (REQ-P4K-013)
+ * @param nameDe the item's German name, or {@code null} (REQ-P4K-023)
  */
 @DtoMirror
 public record GameItemReferenceDto(
@@ -42,8 +47,34 @@ public record GameItemReferenceDto(
     String componentType,
     Integer size,
     String grade,
-    String itemClass)
+    String itemClass,
+    boolean noLongerInGame,
+    @Nullable String nameDe)
     implements ComponentItemReference {
+
+  /**
+   * Builds a reference without a German name.
+   *
+   * @param id the game item's id
+   * @param name the item's display name
+   * @param kind the item kind name
+   * @param componentType the component type, or {@code null}
+   * @param size the component size, or {@code null}
+   * @param grade the component grade, or {@code null}
+   * @param itemClass the component class, or {@code null}
+   * @param noLongerInGame whether the P4K retired the item
+   */
+  public GameItemReferenceDto(
+      UUID id,
+      String name,
+      String kind,
+      String componentType,
+      Integer size,
+      String grade,
+      String itemClass,
+      boolean noLongerInGame) {
+    this(id, name, kind, componentType, size, grade, itemClass, noLongerInGame, null);
+  }
 
   /**
    * Builds a reference without component data, for items that are no ship component.
@@ -54,5 +85,37 @@ public record GameItemReferenceDto(
    */
   public GameItemReferenceDto(UUID id, String name, String kind) {
     this(id, name, kind, null, null, null, null);
+  }
+
+  /**
+   * Builds a reference to an item still in the game.
+   *
+   * @param id the game item's id
+   * @param name the item's display name
+   * @param kind the item kind name
+   * @param componentType the component type, or {@code null}
+   * @param size the component size, or {@code null}
+   * @param grade the component grade, or {@code null}
+   * @param itemClass the component class, or {@code null}
+   */
+  public GameItemReferenceDto(
+      UUID id,
+      String name,
+      String kind,
+      String componentType,
+      Integer size,
+      String grade,
+      String itemClass) {
+    this(id, name, kind, componentType, size, grade, itemClass, false);
+  }
+
+  /**
+   * Returns the name the page shows.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
   }
 }

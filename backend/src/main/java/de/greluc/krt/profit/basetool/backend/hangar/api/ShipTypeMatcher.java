@@ -26,18 +26,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Tolerant, in-memory {@code ShipType} resolver for the hangar import.
+ * In-memory {@code ShipType} resolver shared by the hangar import and the exchange's {@code
+ * SHIP_TYPE} references (REQ-P4K-032, ADR-0341).
  *
- * <p>Resolves in five stages: exact case-insensitive name, normalised name, upload tokens ⊆ ship
- * tokens, ship tokens ⊆ upload tokens, then slug against {@code uexSlug} and {@code scwikiSlug}.
- * The token-subset stages require a unique candidate. Stateless and static-only.
+ * <p>The key steps come first: the P4K GUID or Wiki UUID, the class name (else the {@code
+ * variantOf} group base), then the UEX vehicle id (else the curated alias of ADR-0307). The name is
+ * the last step, in four stages: exact case-insensitive name, normalised name, upload tokens ⊆ ship
+ * tokens, ship tokens ⊆ upload tokens. A step that finds several ship types is ambiguous and never
+ * resolves to the first. Stateless and static-only.
  */
 public final class ShipTypeMatcher {
 
@@ -50,24 +55,40 @@ public final class ShipTypeMatcher {
   private ShipTypeMatcher() {}
 
   /**
-   * Builds the multi-key lookup index (exact, normalised, token-set and slug keys) from the given
-   * ship types; on a key collision the first ship type wins.
+   * Builds the lookup index without key links, as the hangar import uses it.
    *
-   * @param shipTypes a snapshot of the {@code ship_type} table (typically {@code
-   *     shipTypeRepository.findAll()})
+   * @param shipTypes a snapshot of the {@code ship_type} table
    * @return the populated lookup index
    */
   public static @NotNull ShipTypeIndex buildIndex(@NotNull List<ShipType> shipTypes) {
+    return buildIndex(shipTypes, ShipTypeLinks.NONE);
+  }
+
+  /**
+   * Builds the lookup index: GUIDs, class names, UEX ids, names, tokens and slugs, every key
+   * keeping all the ship types that share it.
+   *
+   * @param shipTypes a snapshot of the {@code ship_type} table
+   * @param links the variant groups and the UEX alias
+   * @return the populated lookup index
+   */
+  public static @NotNull ShipTypeIndex buildIndex(
+      @NotNull List<ShipType> shipTypes, @NotNull ShipTypeLinks links) {
     ShipTypeIndex idx = new ShipTypeIndex();
     for (ShipType st : shipTypes) {
+      idx.byId.put(st.getId(), st);
+      add(idx.byGuid, st.getP4kUuid(), st);
+      add(idx.byGuid, st.getExternalUuid(), st);
+      add(idx.byClassName, lower(st.getClassName()), st);
+      add(idx.byUexId, st.getUexVehicleId(), st);
       String name = st.getName();
       if (name == null || name.isBlank()) {
         continue;
       }
-      idx.byExactLower.putIfAbsent(name.trim().toLowerCase(Locale.ROOT), st);
+      add(idx.byExactLower, name.trim().toLowerCase(Locale.ROOT), st);
       String normalized = normalizeForMatching(name);
       if (!normalized.isEmpty()) {
-        idx.byNormalized.putIfAbsent(normalized, st);
+        add(idx.byNormalized, normalized, st);
       }
       Set<String> tokens = tokenize(name);
       if (!tokens.isEmpty()) {
@@ -75,161 +96,145 @@ public final class ShipTypeMatcher {
       }
       String uexSlug = normalizeForMatching(st.getUexSlug());
       if (!uexSlug.isEmpty()) {
-        idx.byUexSlug.putIfAbsent(uexSlug, st);
+        add(idx.byUexSlug, uexSlug, st);
       }
       String scwikiSlug = normalizeForMatching(st.getScwikiSlug());
       if (!scwikiSlug.isEmpty()) {
-        idx.byScwikiSlug.putIfAbsent(scwikiSlug, st);
+        add(idx.byScwikiSlug, scwikiSlug, st);
       }
     }
+    links
+        .variantBaseByClassName()
+        .forEach((className, id) -> {
+          ShipType base = idx.byId.get(id);
+          if (base != null) {
+            idx.variantBase.put(className, base);
+          }
+        });
+    links
+        .aliasByUexId()
+        .forEach((uexId, ids) ->
+            idx.byAlias.put(
+                uexId, ids.stream().map(idx.byId::get).filter(Objects::nonNull).toList()));
     return idx;
   }
 
   /**
-   * Resolves an upload entry against the pre-built index: first by name through the four tolerant
-   * name stages, then — only if those all miss or stay ambiguous — by the optional slug fallback.
-   * The slug is supplied for StarJump FleetViewer and Fleetyards entries and {@code null} for the
-   * Fleetview / HangarXPLOR formats, for which this behaves exactly like the name-only resolution.
+   * Resolves a hangar-import entry: the name, then, when the name finds none or several, the
+   * optional slug. The slug is supplied for StarJump FleetViewer and Fleetyards entries and {@code
+   * null} for the Fleetview / HangarXPLOR formats.
    *
    * @param index lookup index produced by {@link #buildIndex(List)}
    * @param rawName trimmed entry name from the upload
    * @param slug source-provided ship slug for the fallback stage, or {@code null}
-   * @return the matching {@code ShipType} or {@code null} if neither name nor slug produces a hit
+   * @return the one matching {@code ShipType}, or {@code null} when neither resolves to exactly one
    */
   public static @Nullable ShipType resolve(
       @NotNull ShipTypeIndex index, @NotNull String rawName, @Nullable String slug) {
-    ShipType byName = resolveByName(index, rawName);
+    ShipType byName = resolveName(index, rawName).single();
     if (byName != null) {
       return byName;
     }
-    return resolveBySlug(index, slug);
+    return resolveBySlug(index, slug).single();
   }
 
   /**
-   * Resolves a normalised source slug by exact match against {@code ShipType.uexSlug}, then {@code
-   * ShipType.scwikiSlug}. A {@code null}, blank or empty-after-normalisation slug yields {@code
-   * null}.
+   * Resolves a P4K GUID or SC Wiki UUID.
    *
-   * @param index lookup index produced by {@link #buildIndex(List)}
-   * @param slug source-provided ship slug, or {@code null}
-   * @return the matching {@code ShipType} or {@code null} if no slug index entry matches
+   * @param index lookup index
+   * @param guid the GUID
+   * @return the ship types holding it
    */
-  private static @Nullable ShipType resolveBySlug(
+  public static @NotNull ShipTypeMatch resolveGuid(
+      @NotNull ShipTypeIndex index, @NotNull UUID guid) {
+    return ShipTypeMatch.of(index.byGuid.get(guid));
+  }
+
+  /**
+   * Resolves a class name: the ship types carrying exactly it, else the ship type of its variant
+   * group's base.
+   *
+   * @param index lookup index
+   * @param className the class name, compared ignoring case
+   * @return the ship types found
+   */
+  public static @NotNull ShipTypeMatch resolveClassName(
+      @NotNull ShipTypeIndex index, @NotNull String className) {
+    String key = className.toLowerCase(Locale.ROOT);
+    List<ShipType> own = index.byClassName.get(key);
+    if (own != null) {
+      return ShipTypeMatch.of(own);
+    }
+    ShipType base = index.variantBase.get(key);
+    return base == null ? ShipTypeMatch.NONE : ShipTypeMatch.of(List.of(base));
+  }
+
+  /**
+   * Resolves a UEX vehicle id: the ship types holding it, else those carrying the class name the
+   * curated alias ties it to.
+   *
+   * @param index lookup index
+   * @param uexId the UEX vehicle id
+   * @return the ship types found
+   */
+  public static @NotNull ShipTypeMatch resolveUexId(
+      @NotNull ShipTypeIndex index, @NotNull Integer uexId) {
+    List<ShipType> direct = index.byUexId.get(uexId);
+    return ShipTypeMatch.of(direct != null ? direct : index.byAlias.get(uexId));
+  }
+
+  /**
+   * Resolves a name through the four name stages; the first stage that finds a ship type answers.
+   *
+   * @param index lookup index
+   * @param rawName the name
+   * @return the ship types the answering stage found, several when the name is ambiguous
+   */
+  public static @NotNull ShipTypeMatch resolveName(
+      @NotNull ShipTypeIndex index, @NotNull String rawName) {
+    List<ShipType> exact = index.byExactLower.get(rawName.trim().toLowerCase(Locale.ROOT));
+    if (exact != null) {
+      return ShipTypeMatch.of(exact);
+    }
+    String normalized = normalizeForMatching(rawName);
+    if (!normalized.isEmpty()) {
+      List<ShipType> byNormalized = index.byNormalized.get(normalized);
+      if (byNormalized != null) {
+        return ShipTypeMatch.of(byNormalized);
+      }
+    }
+    Set<String> fvTokens = tokenize(rawName);
+    if (fvTokens.isEmpty()) {
+      return ShipTypeMatch.NONE;
+    }
+    List<ShipType> wider = new ArrayList<>();
+    List<ShipType> narrower = new ArrayList<>();
+    for (TokenView tv : index.tokenized) {
+      if (tv.tokens().containsAll(fvTokens)) {
+        wider.add(tv.shipType());
+      } else if (fvTokens.containsAll(tv.tokens())) {
+        narrower.add(tv.shipType());
+      }
+    }
+    return ShipTypeMatch.of(wider.isEmpty() ? narrower : wider);
+  }
+
+  /**
+   * Resolves a normalised source slug against {@code ShipType.uexSlug}, then {@code
+   * ShipType.scwikiSlug}. A {@code null}, blank or empty-after-normalisation slug finds nothing.
+   *
+   * @param index lookup index
+   * @param slug source-provided ship slug, or {@code null}
+   * @return the ship types found
+   */
+  private static @NotNull ShipTypeMatch resolveBySlug(
       @NotNull ShipTypeIndex index, @Nullable String slug) {
     String normSlug = normalizeForMatching(slug);
     if (normSlug.isEmpty()) {
-      return null;
+      return ShipTypeMatch.NONE;
     }
-    ShipType match = index.byUexSlug.get(normSlug);
-    if (match != null) {
-      return match;
-    }
-    return index.byScwikiSlug.get(normSlug);
-  }
-
-  /**
-   * Four-stage name resolution against the pre-built index. The earlier stages are deterministic
-   * one-shot map lookups; the later (token-subset) stages scan the tokenised view and require the
-   * candidate to be unique so an ambiguous abbreviation cannot silently map to the wrong variant.
-   *
-   * @param index lookup index produced by {@link #buildIndex(List)}
-   * @param rawName trimmed entry name from the upload
-   * @return the matching {@code ShipType} or {@code null} if no stage produces a unique hit
-   */
-  private static @Nullable ShipType resolveByName(
-      @NotNull ShipTypeIndex index, @NotNull String rawName) {
-    ShipType match = index.byExactLower.get(rawName.toLowerCase(Locale.ROOT));
-    if (match != null) {
-      return match;
-    }
-
-    String normalized = normalizeForMatching(rawName);
-    if (!normalized.isEmpty()) {
-      match = index.byNormalized.get(normalized);
-      if (match != null) {
-        return match;
-      }
-    }
-
-    Set<String> fvTokens = tokenize(rawName);
-    if (fvTokens.isEmpty()) {
-      return null;
-    }
-
-    ShipType uniqueSubset = findUniqueWhereFvSubsetOfUex(index.tokenized, fvTokens);
-    if (uniqueSubset != null) {
-      return uniqueSubset;
-    }
-    if (anyFvSubsetOfUex(index.tokenized, fvTokens)) {
-      return null;
-    }
-
-    return findUniqueWhereUexSubsetOfFv(index.tokenized, fvTokens);
-  }
-
-  /**
-   * Returns the single {@code ShipType} whose token set contains the entire {@code fvTokens} set,
-   * or {@code null} if zero or more than one candidate satisfies the predicate.
-   *
-   * @param tokenized tokenised view of every ship type
-   * @param fvTokens token set parsed from the upload entry name
-   * @return the unique {@code ShipType} or {@code null} (no match or ambiguous)
-   */
-  private static @Nullable ShipType findUniqueWhereFvSubsetOfUex(
-      @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
-    ShipType found = null;
-    for (TokenView tv : tokenized) {
-      if (tv.tokens().containsAll(fvTokens)) {
-        if (found != null) {
-          return null;
-        }
-        found = tv.shipType();
-      }
-    }
-    return found;
-  }
-
-  /**
-   * Cheap pre-check used to short-circuit Stage 4 when Stage 3 already saw multiple candidates.
-   * Returns {@code true} as soon as any ship-type token set contains the fv token set — i.e. the
-   * upload entry is a strict abbreviation of at least one canonical name.
-   *
-   * @param tokenized tokenised view of every ship type
-   * @param fvTokens token set parsed from the upload entry name
-   * @return {@code true} iff at least one candidate satisfies fv ⊆ uex
-   */
-  private static boolean anyFvSubsetOfUex(
-      @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
-    for (TokenView tv : tokenized) {
-      if (tv.tokens().containsAll(fvTokens)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Returns the single {@code ShipType} whose token set is contained in {@code fvTokens}, or {@code
-   * null} if zero or more than one candidate satisfies the predicate. Reverse-direction counterpart
-   * of {@link #findUniqueWhereFvSubsetOfUex(List, Set)} — handles upload names that are
-   * <em>longer</em> than UEX's canonical short form (e.g. {@code "Ursa Rover"} → {@code "Ursa"}).
-   *
-   * @param tokenized tokenised view of every ship type
-   * @param fvTokens token set parsed from the upload entry name
-   * @return the unique {@code ShipType} or {@code null} (no match or ambiguous)
-   */
-  private static @Nullable ShipType findUniqueWhereUexSubsetOfFv(
-      @NotNull List<TokenView> tokenized, @NotNull Set<String> fvTokens) {
-    ShipType found = null;
-    for (TokenView tv : tokenized) {
-      if (!tv.tokens().isEmpty() && fvTokens.containsAll(tv.tokens())) {
-        if (found != null) {
-          return null;
-        }
-        found = tv.shipType();
-      }
-    }
-    return found;
+    List<ShipType> match = index.byUexSlug.get(normSlug);
+    return ShipTypeMatch.of(match != null ? match : index.byScwikiSlug.get(normSlug));
   }
 
   /**
@@ -247,8 +252,8 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Splits a ship name into an alphanumeric token set. Used by the token-subset match stages. Empty
-   * tokens (from leading/trailing/multiple separators) are dropped.
+   * Splits a ship name into an alphanumeric token set. Empty tokens (from leading, trailing or
+   * multiple separators) are dropped.
    *
    * @param name raw name (nullable)
    * @return the token set (never null; empty set for null/empty input)
@@ -264,20 +269,52 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Pre-computed multi-key view over the {@code ship_type} table. Built once per import via {@link
-   * #buildIndex(List)} so per-entry resolution touches only in-memory structures.
+   * Lower-cases a key.
+   *
+   * @param value the key, or {@code null}
+   * @return the lower-cased key, or {@code null}
    */
-  public static final class ShipTypeIndex {
-    private final Map<String, ShipType> byExactLower = new HashMap<>();
-    private final Map<String, ShipType> byNormalized = new HashMap<>();
-    private final List<TokenView> tokenized = new ArrayList<>();
-    private final Map<String, ShipType> byUexSlug = new HashMap<>();
-    private final Map<String, ShipType> byScwikiSlug = new HashMap<>();
+  private static @Nullable String lower(@Nullable String value) {
+    return value == null || value.isBlank() ? null : value.toLowerCase(Locale.ROOT);
   }
 
   /**
-   * Pairing of a {@code ShipType} with its tokenised alphanumeric form, for the Stage 3 / 4
-   * token-subset comparisons.
+   * Adds a ship type under a key, skipping a {@code null} key.
+   *
+   * @param index the index
+   * @param key the key, or {@code null}
+   * @param shipType the ship type
+   * @param <K> the key type
+   */
+  private static <K> void add(
+      @NotNull Map<K, List<ShipType>> index, @Nullable K key, @NotNull ShipType shipType) {
+    if (key != null) {
+      index.computeIfAbsent(key, _ -> new ArrayList<>()).add(shipType);
+    }
+  }
+
+  /**
+   * Pre-computed multi-key view over the {@code ship_type} table. Built once per import or request
+   * via {@link #buildIndex(List, ShipTypeLinks)} so per-entry resolution touches only in-memory
+   * structures.
+   */
+  public static final class ShipTypeIndex {
+    private final Map<UUID, ShipType> byId = new HashMap<>();
+    private final Map<UUID, List<ShipType>> byGuid = new HashMap<>();
+    private final Map<String, List<ShipType>> byClassName = new HashMap<>();
+    private final Map<String, ShipType> variantBase = new HashMap<>();
+    private final Map<Integer, List<ShipType>> byUexId = new HashMap<>();
+    private final Map<Integer, List<ShipType>> byAlias = new HashMap<>();
+    private final Map<String, List<ShipType>> byExactLower = new HashMap<>();
+    private final Map<String, List<ShipType>> byNormalized = new HashMap<>();
+    private final List<TokenView> tokenized = new ArrayList<>();
+    private final Map<String, List<ShipType>> byUexSlug = new HashMap<>();
+    private final Map<String, List<ShipType>> byScwikiSlug = new HashMap<>();
+  }
+
+  /**
+   * Pairing of a {@code ShipType} with its tokenised alphanumeric form, for the token-subset
+   * stages.
    *
    * @param shipType the ship type
    * @param tokens its alphanumeric tokens

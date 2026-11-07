@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class DefaultBlueprintBootstrapTest {
   @Mock private DefaultBlueprintRepository defaultBlueprintRepository;
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private GameItemRepository gameItemRepository;
-  @Mock private BlueprintNameNormalizer normalizer;
+  @Mock private ProductKeys productKeys;
   @Mock private DefaultBlueprintProvisioningService provisioningService;
   @Mock private DefaultBlueprintKeyService keyService;
 
@@ -66,7 +66,7 @@ class DefaultBlueprintBootstrapTest {
   void anAbsentFlagSeedsAndThenSetsTheFlag() {
     when(systemSettings.getSettingValue(DefaultBlueprintBootstrap.SEEDED_FLAG_KEY))
         .thenReturn(Optional.empty());
-    when(normalizer.normalize(anyString())).thenReturn("key");
+    when(productKeys.nameKey(anyString())).thenReturn("key");
     when(defaultBlueprintRepository.existsByProductKey("key")).thenReturn(true);
 
     bootstrap.run();
@@ -78,7 +78,7 @@ class DefaultBlueprintBootstrapTest {
   void aFlagOtherThanTrueSeedsAgainAndOverwritesTheFlag() {
     when(systemSettings.getSettingValue(DefaultBlueprintBootstrap.SEEDED_FLAG_KEY))
         .thenReturn(Optional.of("false"));
-    when(normalizer.normalize(anyString())).thenReturn("");
+    when(productKeys.nameKey(anyString())).thenReturn("");
 
     bootstrap.run();
 

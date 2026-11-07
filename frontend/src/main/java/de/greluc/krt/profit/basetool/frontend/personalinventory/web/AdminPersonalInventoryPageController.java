@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalIn
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.model.PersonalInventoryItemUpdateRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -134,7 +136,9 @@ public class AdminPersonalInventoryPageController {
   @PostMapping("/{userSub}/add")
   public String add(
       @PathVariable @NotNull UUID userSub,
-      @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
+      @Validated({Default.class, PersonalInventoryForm.Create.class})
+          @ModelAttribute("personalInventoryForm")
+          PersonalInventoryForm form,
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
@@ -145,11 +149,7 @@ public class AdminPersonalInventoryPageController {
     try {
       PersonalInventoryItemCreateRequest request =
           new PersonalInventoryItemCreateRequest(
-              form.getName(),
-              form.getNote(),
-              form.getLocationUexId(),
-              form.getLocationType(),
-              form.getQuantity());
+              form.getName(), form.getNote(), form.getLocationId(), form.getQuantity());
       personalInventoryClient.createForMember(userSub, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
@@ -192,8 +192,7 @@ public class AdminPersonalInventoryPageController {
           new PersonalInventoryItemUpdateRequest(
               form.getName(),
               form.getNote(),
-              form.getLocationUexId(),
-              form.getLocationType(),
+              form.getLocationId(),
               form.getQuantity(),
               form.getVersion());
       personalInventoryClient.updateForMember(id, request);

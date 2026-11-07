@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
@@ -57,6 +58,8 @@ class SyncReportServiceTest {
   @Spy private SyncRunProgress progress = new SyncRunProgress();
 
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private SyncReportService service;
 
@@ -118,6 +121,31 @@ class SyncReportServiceTest {
     assertNull(row.getExternalName());
     assertEquals("categories=1, upserted=1", row.getDetail());
     assertNotNull(row.getRanAt());
+  }
+
+  @Test
+  void logP4kDisagreement_recordsADifferingValue_andIgnoresAnEqualOrAbsentOne() {
+    UUID runId = UUID.randomUUID();
+    UUID guid = UUID.randomUUID();
+
+    boolean differing =
+        service.logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "manufacturer", guid, "name", "Aegis", "Aegis UEX ");
+    boolean equalIgnoringCase =
+        service.logP4kDisagreement(
+            SyncSourceSystem.UEX, runId, "manufacturer", guid, "name", "Aegis", "aegis");
+    boolean absent =
+        service.logP4kDisagreement(
+            SyncSourceSystem.SCWIKI, runId, "manufacturer", guid, "name", "Aegis", " ");
+
+    assertEquals(List.of(true, false, false), List.of(differing, equalIgnoringCase, absent));
+    ArgumentCaptor<ExternalSyncReport> saved = ArgumentCaptor.forClass(ExternalSyncReport.class);
+    verify(repository).save(saved.capture());
+    ExternalSyncReport row = saved.getValue();
+    assertEquals(SyncSourceSystem.UEX, row.getSourceSystem());
+    assertEquals(SyncEventType.P4K_DISAGREEMENT, row.getEventType());
+    assertEquals(guid, row.getExternalUuid());
+    assertEquals("column=name;stored=Aegis;source=Aegis UEX", row.getDetail());
   }
 
   @Test

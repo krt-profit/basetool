@@ -30,4 +30,4 @@ x-content-type-options: nosniff
 x-correlation-id: <correlation-id>
 x-frame-options: DENY
 x-xss-protection: 0
-{"results":[{"index":0,"status":"resolved","ref":{"bt":"bp-cf-337-panther-repeater","name":"CF-337 Panther Repeater"}},{"index":1,"status":"ambiguous","candidates":[{"bt":"a","name":"A"},{"bt":"b","name":"B"}]},{"index":2,"status":"unmatched"}],"warnings":[{"pointer":"/hint","code":"UNKNOWN_FIELD"},{"pointer":"/refs/0/colour","code":"UNKNOWN_FIELD"}]}
+{"results":[{"index":0,"status":"resolved","ref":{"guid":"de20695c-eb2f-4b68-be6f-9806cbd205a7","bt":"de20695c-eb2f-4b68-be6f-9806cbd205a7","name":"CF-337 Panther Repeater"}},{"index":1,"status":"ambiguous","candidates":[{"bt":"a","name":"A"},{"bt":"b","name":"B"}]},{"index":2,"status":"unmatched"}],"warnings":[{"pointer":"/hint","code":"UNKNOWN_FIELD"},{"pointer":"/refs/0/colour","code":"UNKNOWN_FIELD"}]}

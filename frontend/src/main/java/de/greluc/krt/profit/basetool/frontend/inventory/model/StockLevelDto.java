@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.inventory.model;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
+import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -73,6 +75,18 @@ public record StockLevelDto(
    */
   public String entryName() {
     return material != null ? material.name() : gameItem.name();
+  }
+
+  /**
+   * The name the page shows for the watched material or game item (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the catalogue entry's German name on a German page when it has one, else its name
+   */
+  public String entryDisplayName(@Nullable Locale locale) {
+    String nameDe =
+        material != null ? material.nameDe() : gameItem != null ? gameItem.nameDe() : null;
+    return LocalisedNames.display(entryName(), nameDe, locale);
   }
 
   /**

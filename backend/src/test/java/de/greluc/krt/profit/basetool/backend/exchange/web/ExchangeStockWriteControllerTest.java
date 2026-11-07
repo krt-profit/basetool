@@ -1021,13 +1021,10 @@ class ExchangeStockWriteControllerTest {
    * @return its id
    */
   private @NotNull UUID location(@Nullable Integer uexCity) {
-    UUID city = null;
-    if (uexCity != null) {
-      city = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO city (id, id_city, name) VALUES (?, ?, ?)", city, uexCity, "City " + city);
-      cities.add(city);
-    }
+    UUID city = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO city (id, id_city, name) VALUES (?, ?, ?)", city, uexCity, "City " + city);
+    cities.add(city);
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO location (id, name, hidden, city_id) VALUES (?, ?, false, ?)",

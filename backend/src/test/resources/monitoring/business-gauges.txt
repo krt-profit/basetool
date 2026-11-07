@@ -1,5 +1,7 @@
 GAUGE|basetool.bank.booking.request.pending.count|{}|null
 GAUGE|basetool.bank.booking.request.pending.oldest.age|{}|seconds
+GAUGE|basetool.catalogue.items.with.stats|{source=P4K}|null
+GAUGE|basetool.catalogue.items.with.stats|{source=SCWIKI}|null
 GAUGE|basetool.deletion.request.pending.count|{}|null
 GAUGE|basetool.deletion.request.pending.oldest.age|{}|seconds
 GAUGE|basetool.job.order.open.count|{status=IN_PROGRESS}|null
@@ -10,9 +12,87 @@ GAUGE|basetool.material.request.open.count|{status=ACTIVE}|null
 GAUGE|basetool.operation.open.count|{status=ACTIVE}|null
 GAUGE|basetool.operation.open.count|{status=PLANNED}|null
 GAUGE|basetool.operation.open.oldest.age|{}|seconds
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=BLUEPRINT_CATEGORY}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=BLUEPRINT}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=COMMODITY}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=ITEM}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=MANUFACTURER}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=RESOURCE_GROUP}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=SHIP}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=SHOP}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=STARMAP_OBJECT}|null
+GAUGE|basetool.p4k.import.due|{}|null
 GAUGE|basetool.p4k.import.job.pending.count|{status=PENDING}|null
 GAUGE|basetool.p4k.import.job.pending.count|{status=RUNNING}|null
 GAUGE|basetool.p4k.import.job.pending.oldest.age|{}|seconds
+GAUGE|basetool.p4k.import.last.run.item.class.null.ratio.change|{}|null
+GAUGE|basetool.p4k.import.last.run.item.class.null.ratio|{}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=BLUEPRINT_CATEGORY, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=COMMODITY, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=ITEM, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=MANUFACTURER, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=RESOURCE_GROUP, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=SHOP, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.unknown.classes|{}|null
+GAUGE|basetool.p4k.import.last.run.unknown.grades|{}|null
+GAUGE|basetool.p4k.review.case.open.oldest.age|{}|seconds
+GAUGE|basetool.p4k.review.cases.open|{kind=BLUEPRINT_CATEGORY}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=BLUEPRINT}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=COMMODITY}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=ITEM}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=MANUFACTURER}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=RESOURCE_GROUP}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=SHIP}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=SHOP}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=STARMAP_OBJECT}|null
 GAUGE|basetool.refinery.order.open.count|{status=IN_PROGRESS}|null
 GAUGE|basetool.refinery.order.open.count|{status=OPEN}|null
 GAUGE|basetool.refinery.order.open.oldest.age|{}|seconds

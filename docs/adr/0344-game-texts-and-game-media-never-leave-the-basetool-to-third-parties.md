@@ -1,6 +1,6 @@
 # ADR-0344 — Game texts and game media never leave the Basetool to third parties
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-033, REQ-XCH-050) · the exchange spec (REQ-XCH-036) · the observability spec ·
@@ -55,8 +55,6 @@ unchanged.
 - The exchange spec gains a requirement and a threat-model row; the P4K catalogue spec gains the
   classification requirement; the observability spec and the monitoring rules gain the outcome and
   its alert.
-- Pending: the two annotations, the ArchUnit rule, the ratchet, the gateway check and the metric
-  outcome.
 
 ## Alternatives considered
 

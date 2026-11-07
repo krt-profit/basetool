@@ -19,11 +19,37 @@
 
 package de.greluc.krt.profit.basetool.backend.personalinventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
+
 /**
- * Discriminator for the UEX location referenced by a {@link PersonalInventoryItem}. The numeric UEX
- * id alone is not unique across location categories, so the type is persisted alongside it.
+ * The kind of place a personal-inventory location is, derived from what the {@code location} row is
+ * linked to; display only, never stored.
  */
 public enum PersonalInventoryLocationType {
+  /** A location linked to a UEX city. */
   CITY,
-  SPACE_STATION
+  /** A location linked to a UEX space station. */
+  SPACE_STATION,
+  /** A location linked to neither, such as an admin-created storage place. */
+  OTHER;
+
+  /**
+   * Derives the kind of a location from its city or space-station link; reads only whether the link
+   * is set, so a lazy link stays unloaded.
+   *
+   * @param location the location, or {@code null} when the item's place no longer resolves
+   * @return the kind, or {@code null} for a {@code null} location
+   */
+  @Contract("null -> null; !null -> !null")
+  public static @Nullable PersonalInventoryLocationType of(@Nullable Location location) {
+    if (location == null) {
+      return null;
+    }
+    if (location.getCity() != null) {
+      return CITY;
+    }
+    return location.getSpaceStation() != null ? SPACE_STATION : OTHER;
+  }
 }

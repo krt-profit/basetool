@@ -46,7 +46,7 @@ import org.jetbrains.annotations.Nullable;
  * A crafting blueprint one user ({@link #ownerUserId}) has unlocked in-game; part of the Personal
  * Inventory area alongside {@code PersonalInventoryItem}.
  *
- * <p>Ownership is per product, not per recipe: identity is the normalized {@link #productKey},
+ * <p>Ownership is per product, not per recipe: identity is the {@link #productKey} (REQ-INV-070),
  * unique per owner; {@link #productName} keeps the display spelling and {@link #outputItem}
  * optionally links the resolved {@link GameItem}.
  */
@@ -78,8 +78,9 @@ public class PersonalBlueprint extends AbstractEntity<UUID> {
   private UUID ownerUserId;
 
   /**
-   * Normalized product identity (lowercased, collapsed whitespace, normalized punctuation of the SC
-   * Wiki output name). Unique per owner; the import and search both match on this key.
+   * Product identity: the produced item's DataForge GUID as lower-case text, or the normalised
+   * output name while the P4K import has given the product no GUID ({@code ProductKeys},
+   * REQ-INV-070). Unique per owner.
    */
   @Column(name = "product_key", nullable = false, length = 255)
   private String productKey;

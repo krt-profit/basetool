@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,7 +49,7 @@ import org.jetbrains.annotations.Nullable;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class Material extends AbstractEntity<UUID> {
+public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -62,6 +63,14 @@ public class Material extends AbstractEntity<UUID> {
   @Column(nullable = false, unique = true)
   private String name;
 
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private MaterialType type;
@@ -72,6 +81,7 @@ public class Material extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String description;
 
   @Column(name = "code")
@@ -229,12 +239,10 @@ public class Material extends AbstractEntity<UUID> {
   private MaterialCategory category;
 
   /**
-   * DataForge {@code __ref} commodity GUID observed by the KRT P4K Reader import. Kept alongside
-   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
-   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
-   * stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code scwiki_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /**
@@ -244,6 +252,14 @@ public class Material extends AbstractEntity<UUID> {
   @Column(name = "name_key", length = 200)
   @Nullable
   private String nameKey;
+
+  /**
+   * The P4K {@code subtypeGuid}: the commodity's {@code ResourceType}, an n:1 join for blueprint
+   * ingredients and refined-from links and never a key (REQ-P4K-024).
+   */
+  @Column(name = "p4k_subtype_uuid")
+  @Nullable
+  private UUID p4kSubtypeUuid;
 
   /** Wiki-owned mining and cargo enrichment, independent of UEX market data. */
   @JdbcTypeCode(SqlTypes.JSON)
@@ -255,7 +271,24 @@ public class Material extends AbstractEntity<UUID> {
   @Column(name = "p4k_synced_at")
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

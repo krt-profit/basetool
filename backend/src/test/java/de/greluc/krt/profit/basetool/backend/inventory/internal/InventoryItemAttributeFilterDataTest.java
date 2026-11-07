@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
@@ -52,6 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 class InventoryItemAttributeFilterDataTest {
 
   @Autowired private InventoryItemRepository inventoryItemRepository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private InventoryItemViewRepository inventoryItemViewRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private GameItemRepository gameItemRepository;
@@ -76,7 +80,7 @@ class InventoryItemAttributeFilterDataTest {
 
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     quantumDriveS2A = gameItem(GameItemKind.VEHICLE_ITEM, "QuantumDrive", 2, "A");
     quantumDriveS1C = gameItem(GameItemKind.VEHICLE_ITEM, "QuantumDrive", 1, " C ");
