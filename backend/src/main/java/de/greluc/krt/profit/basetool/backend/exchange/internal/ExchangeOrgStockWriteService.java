@@ -401,7 +401,7 @@ public class ExchangeOrgStockWriteService
    * Resolves the material or item of every book-in in one pass.
    *
    * @param ops the ops
-   * @return the catalogue entry of each book-in, by op index
+   * @return the catalogue entry of each book-in, by op index; a retired item ends its op
    */
   private @NotNull Map<Integer, ExchangeLotCatalogue.Entry> resolveBookIns(
       @NotNull List<ExchangeOrgStockChangeSet.Op> ops) {
@@ -418,7 +418,7 @@ public class ExchangeOrgStockWriteService
     }
     Map<Integer, ExchangeLotCatalogue.Entry> byRef = lotCatalogue.resolve(refs);
     Map<Integer, ExchangeLotCatalogue.Entry> byOp = new HashMap<>();
-    byRef.forEach((index, entry) -> byOp.put(indexes.get(index), entry));
+    byRef.forEach((index, entry) -> byOp.put(indexes.get(index), entry.forBookIn()));
     return byOp;
   }
 

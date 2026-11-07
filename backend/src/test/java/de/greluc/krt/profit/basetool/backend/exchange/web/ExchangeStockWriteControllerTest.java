@@ -618,17 +618,7 @@ class ExchangeStockWriteControllerTest {
   void aPieceBookInJoinsTheExistingRow() throws Exception {
     UUID helmet = item();
     UUID orison = location(null);
-    UUID existing = UUID.randomUUID();
-    jdbc.update(
-        """
-        INSERT INTO inventory_item (id, user_id, game_item_id, location_id, amount, personal,
-                                    stolen, created_at, version)
-        VALUES (?, ?, ?, ?, 3, true, false, now(), 0)
-        """,
-        existing,
-        member,
-        helmet,
-        orison);
+    itemRow(helmet, orison, 3);
 
     change(
             """
@@ -646,6 +636,76 @@ class ExchangeStockWriteControllerTest {
                 member,
                 helmet))
         .containsExactly(5.0);
+  }
+
+  @Test
+  void aRiseOfARetiredItemIsRefusedWhileAFallStillApplies() throws Exception {
+    UUID helmet = retired(item());
+    UUID orison = location(null);
+    String place = locationName(orison);
+    itemRow(helmet, orison, 3);
+
+    set(helmet, place, 0, "5", "3", "PIECE")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("ITEM_RETIRED"));
+    assertThat(itemTotal(helmet)).isEqualTo(3.0);
+
+    change("{\"ops\":[" + op(helmet, locationName(location(null)), 0, "2", "0", "PIECE") + "]}")
+        .andExpect(jsonPath("$.results[0].reason").value("ITEM_RETIRED"));
+    assertThat(itemTotal(helmet)).isEqualTo(3.0);
+
+    set(helmet, place, 0, "1", "3", "PIECE").andExpect(jsonPath("$.applied").value(1));
+    assertThat(itemTotal(helmet)).isEqualTo(1.0);
+  }
+
+  @Test
+  void aMoveOfARetiredItemAppliesWhicheverOpComesFirstButNotBeyondItsFall() throws Exception {
+    UUID helmet = retired(item());
+    UUID orison = location(null);
+    UUID area18 = location(null);
+    itemRow(helmet, orison, 3);
+
+    change(
+            "{\"ops\":["
+                + op(helmet, locationName(area18), 0, "2", "0", "PIECE")
+                + ","
+                + op(helmet, locationName(orison), 0, "1", "3", "PIECE")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+    assertThat(itemTotal(helmet)).isEqualTo(3.0);
+
+    change(
+            "{\"ops\":["
+                + op(helmet, locationName(orison), 0, "0", "1", "PIECE")
+                + ","
+                + op(helmet, locationName(area18), 0, "4", "2", "PIECE")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].index").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("ITEM_RETIRED"));
+    assertThat(itemTotal(helmet)).isEqualTo(2.0);
+  }
+
+  @Test
+  void aRefusedFallOfARetiredItemCoversNoLaterRise() throws Exception {
+    UUID helmet = retired(item());
+    UUID orison = location(null);
+    UUID area18 = location(null);
+    itemRow(helmet, orison, 3);
+
+    change(
+            "{\"ops\":["
+                + op(helmet, locationName(orison), 0, "0", "5", "PIECE")
+                + ","
+                + op(helmet, locationName(area18), 0, "3", "0", "PIECE")
+                + "]}")
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[1].reason").value("ITEM_RETIRED"));
+    assertThat(itemTotal(helmet)).isEqualTo(3.0);
   }
 
   @Test
@@ -1012,6 +1072,55 @@ class ExchangeStockWriteControllerTest {
         className);
     items.add(id);
     return id;
+  }
+
+  /**
+   * Stamps a game item as swept by the P4K.
+   *
+   * @param item the item
+   * @return {@code item}
+   */
+  private @NotNull UUID retired(@NotNull UUID item) {
+    jdbc.update("UPDATE game_item SET p4k_deleted_at = now() WHERE id = ?", item);
+    return item;
+  }
+
+  /**
+   * Seeds a personal Lager row of a game item.
+   *
+   * @param item the item
+   * @param location the location
+   * @param amount the pieces
+   */
+  private void itemRow(@NotNull UUID item, @NotNull UUID location, double amount) {
+    jdbc.update(
+        """
+        INSERT INTO inventory_item (id, user_id, game_item_id, location_id, amount, personal,
+                                    stolen, created_at, version)
+        VALUES (?, ?, ?, ?, ?, true, false, now(), 0)
+        """,
+        UUID.randomUUID(),
+        member,
+        item,
+        location,
+        amount);
+  }
+
+  /**
+   * Sums the member's pieces of a game item over every place.
+   *
+   * @param item the item
+   * @return the pieces
+   */
+  private double itemTotal(@NotNull UUID item) {
+    Double sum =
+        jdbc.queryForObject(
+            "SELECT COALESCE(SUM(amount), 0) FROM inventory_item WHERE user_id = ?"
+                + " AND game_item_id = ?",
+            Double.class,
+            member,
+            item);
+    return sum == null ? 0 : sum;
   }
 
   /**

@@ -380,6 +380,23 @@ class ExchangeGoldenAnswerTest {
   }
 
   @Test
+  void aBookInOfARetiredItemIsRelayedAsRecorded() throws Exception {
+    OVERRIDES.put(
+        "POST /api/v1/exchange/org-stock/changes",
+        json(200, fixture("change-result/valid/item-retired.json")));
+
+    assertThat(
+            matches(
+                "refused-org-stock-changes-item-retired",
+                record(
+                    post(
+                        "/org-stock/changes",
+                        fixture("change-set--orgStockChangeSet/valid/book-in.json")))))
+        .as("golden differs; see " + OBSERVED)
+        .isTrue();
+  }
+
+  @Test
   void aHeldBackMassChangeIsStagedWithTheSeamsMembersAndAnswersAsRecorded() throws Exception {
     OVERRIDES.put(
         "POST /api/v1/exchange/me/stock/changes",

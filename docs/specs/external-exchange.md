@@ -988,6 +988,15 @@ suggestion never hides an exact item, whichever key the op sends beside `name`. 
 `share`, `unshare` and the org-stock `book-in` (REQ-XCH-045) share this order; the generic
 `catalog/resolve` answers stay as they are.
 
+A lot of an item the P4K retired (swept or hidden, REQ-P4K-013) takes no new stock: a
+`set-quantity` that raises it is `rejected` `ITEM_RETIRED`, after the version and `unchanged`
+checks, unless the batch's falls of the same item cover the rise — a move between places or a
+stolen marking, which the web allows on a held entry too. Every fall of the batch counts from the
+start, whichever comes first; a fall the plan refuses gives its amount back, an applied rise uses
+its amount up (`ExchangeRetiredItemCover`). Falls, shares and unshares of a retired item stay
+open, and so does an undo, which restores what the member held. The reason is additive in v1: the
+`change-result` schema has always allowed any reason of its pattern.
+
 A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
 member holds shared rows of the lot, ordered by unit id — only the member's own rows, and a pool of
@@ -1117,6 +1126,9 @@ production had landed at quality 0 (203 journal entries, 36 lots).
   *`ExchangeUndoControllerTest`.*
 - [x] Moving stock to the lot's stolen twin marks the rows — a part split off, a whole lot flipped —
   and a piece book-in joins the existing row. *`ExchangeStockWriteControllerTest`.*
+- [x] A rise of a retired item's lot is `ITEM_RETIRED` and books nothing, a fall of it applies, a
+  move of it applies whichever op comes first but not beyond its fall, and a refused fall covers no
+  later rise. *`ExchangeStockWriteControllerTest`.*
 
 The feed's lot key is the one the change log records, `m:<material>|l:<location>|q:<quality>|s:<0|1>`
 or `i:<item>|…`; a snapshot pages lots by their lowest row id. The material reference carries the
@@ -2847,7 +2859,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   a partial `stolen` or `move-pool` would leave less than the entry's earmarks; a whole `move-pool`
   of a pledged entry), `STOCK_OFFERED` (a partial `stolen` or `move-pool` would leave less than the
   entry offers on the Materialbörse), `OVER_ALLOCATION`,
-  `EARMARK_TARGET_INVALID`, and those of
+  `EARMARK_TARGET_INVALID`, `ITEM_RETIRED` (a `book-in` whose `material` resolves to an item the
+  P4K retired, REQ-P4K-013; the ops on an existing entry of such an item stay open), and those of
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
@@ -2880,6 +2893,9 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
 - [x] A `book-in` naming a member who withholds their name, or who is not a member of the unit, is
   refused `HOLDER_UNKNOWN`, and so is a `move-holder` to such a member; a `move-holder` into a unit
   the writer is not a Logistician of is `NOT_PERMITTED`. *`ExchangeOrgStockWriteControllerTest`.*
+- [x] A `book-in` of an item the P4K retired is refused `ITEM_RETIRED` and books nothing, and the
+  gateway relays the refusal as the backend answers it. *`ExchangeOrgStockWriteControllerTest`,
+  `ExchangeGoldenAnswerTest` (ingest).*
 - [x] A stale version is `VERSION_CONFLICT`, earmarked stock is protected unless the book-out names
   the earmark, and a replayed idempotency key returns the first result (the gateway's filter, as for
   every write). *`ExchangeOrgStockWriteControllerTest`, `ExchangeIdempotencyFilterTest`.*

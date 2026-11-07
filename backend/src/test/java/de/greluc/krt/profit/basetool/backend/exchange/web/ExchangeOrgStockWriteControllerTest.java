@@ -251,6 +251,33 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   @Test
+  void aBookInOfARetiredItemIsRefusedAndBooksNothing() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    UUID helmet = item("Helmet " + UUID.randomUUID());
+    jdbc.update("UPDATE game_item SET p4k_hidden_at = now() WHERE id = ?", helmet);
+    UUID area18 = location();
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookIn(staffel, ref(staffel, holder), helmet, area18, "2", "PIECE"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("ITEM_RETIRED"));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_item WHERE game_item_id = ?",
+                Integer.class,
+                helmet))
+        .isZero();
+  }
+
+  @Test
   void aLogisticianBooksOutAnotherMembersEntryAndTheHolderIsTold() throws Exception {
     UUID staffel = orgUnit();
     joins(member, staffel, true);

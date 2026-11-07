@@ -361,7 +361,7 @@ public class InventoryItemService {
   /**
    * Creates an entry for {@code dto.userId()} with a note, exactly as {@link #createInventoryItem}
    * does but without its book-in check and its retired-item refusal, for a pool write whose caller
-   * decided who may book and which lot it names (REQ-XCH-045).
+   * decided who may book and refused a retired item per op (REQ-XCH-045, REQ-P4K-013).
    *
    * @param dto the entry, naming its holder
    * @param note the note, or {@code null} for none
