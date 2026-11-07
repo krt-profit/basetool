@@ -727,6 +727,27 @@ class UexItemSyncServiceTest {
   }
 
   @Test
+  void aUexNameNeverReplacesTheWikiNameOfARowBoundToTheUexId() {
+    UUID uuid = UUID.fromString("6c46b8e3-81c8-4018-bce2-740b81174a00");
+    GameItem bound = storedItem(5277, uuid);
+    bound.setName("AD6B Ballistic Gatling");
+    bound.setScwikiName("AD6B Ballistic Gatling");
+    bound.setSourceSystems(GameItemSourceSystem.BOTH);
+    List<GameItem> rows = new ArrayList<>(List.of(bound));
+    stubMutableRepository(rows);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(
+            fetched(helmetDto(5277, "Breakneck S4 Gatling", uuid.toString(), helmetsCategory)));
+
+    service.syncItems();
+
+    assertEquals("AD6B Ballistic Gatling", bound.getName());
+    assertEquals("Breakneck S4 Gatling", bound.getUexName());
+  }
+
+  @Test
   void aUuidlessUexItemNeverChoosesBetweenTwoWikiVariantsWithTheSameSourceName() {
     GameItem first = storedItem(90, UUID.randomUUID());
     GameItem second = storedItem(91, UUID.randomUUID());

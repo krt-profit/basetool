@@ -36,7 +36,10 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-/** Applies Wiki item metadata without changing canonical identity or UEX-owned attributes. */
+/**
+ * Applies Wiki item metadata without changing canonical identity or UEX-owned attributes; the
+ * canonical name follows {@link GameItemNamePrecedence}.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -47,8 +50,8 @@ public class ScWikiItemFieldWriter {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Writes the Wiki-owned attributes and source presence; omitted size, grade and class stay
-   * intact.
+   * Writes the Wiki-owned attributes, source presence and, on a row the P4K import does not know,
+   * the canonical name; omitted size, grade and class stay intact.
    *
    * @param item managed catalogue item
    * @param dto identity-verified source payload
@@ -56,6 +59,7 @@ public class ScWikiItemFieldWriter {
    */
   public void apply(@NotNull GameItem item, @NotNull ScWikiItemDto dto, @NotNull Instant now) {
     item.setScwikiName(dto.name());
+    GameItemNamePrecedence.applyWikiName(item, dto.name());
     item.setWikiMetadata(dto.metadata());
     item.setScwikiSlug(dto.slug());
     item.setClassName(dto.className());
@@ -123,12 +127,7 @@ public class ScWikiItemFieldWriter {
    * @return whether this payload may not seed a new catalogue row
    */
   static boolean shouldSkipNewItem(ScWikiItemDto dto) {
-    if (!StringUtils.hasText(dto.name())) {
-      return true;
-    }
-    String name = dto.name().trim();
-    return name.contains("<")
-        || name.contains(">")
+    return !GameItemNamePrecedence.isUsableWikiName(dto.name())
         || "NOITEM_Vehicle".equalsIgnoreCase(dto.type());
   }
 }

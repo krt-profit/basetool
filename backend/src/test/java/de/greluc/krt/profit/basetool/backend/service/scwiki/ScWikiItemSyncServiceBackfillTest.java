@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiIte
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -291,7 +292,7 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
-  void backfill_flipsUexOnlyToBoth_andFillsWikiColumns_withoutOverwritingCanonicalFields() {
+  void backfill_flipsUexOnlyToBoth_fillsWikiColumns_andTakesTheWikiNameButKeepsTheManufacturer() {
     UUID uuid = UUID.randomUUID();
     Manufacturer uexMfr = manufacturer("UEX Aegis");
     GameItem existing = new GameItem();
@@ -309,9 +310,29 @@ class ScWikiItemSyncServiceBackfillTest {
     GameItem result = captureSaves().get(uuid);
     assertEquals(GameItemSourceSystem.BOTH, result.getSourceSystems());
     assertEquals(GameItemKind.VEHICLE_ITEM, result.getKind());
-    assertEquals("UEX Canonical Name", result.getName());
+    assertEquals("Wiki Display Name", result.getName());
     assertSame(uexMfr, result.getManufacturer());
     assertEquals("classif", result.getClassification());
+  }
+
+  @Test
+  void backfill_neverRenamesARowTheP4kKnows() {
+    UUID uuid = UUID.randomUUID();
+    GameItem existing = new GameItem();
+    existing.setExternalUuid(uuid);
+    existing.setName("P4K Archive Name");
+    existing.setKind(GameItemKind.GENERIC);
+    existing.setSourceSystems(GameItemSourceSystem.BOTH);
+    existing.setP4kSyncedAt(Instant.now());
+
+    stubPass(VEHICLE_ITEMS, itemDto(uuid, "Wiki Display Name"));
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
+
+    service.syncItems();
+
+    GameItem result = captureSaves().get(uuid);
+    assertEquals("P4K Archive Name", result.getName());
+    assertEquals("Wiki Display Name", result.getScwikiName());
   }
 
   @Test

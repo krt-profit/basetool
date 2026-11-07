@@ -75,7 +75,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthP4kImportService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="1527"/>
+    <property name="max" value="1506"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>

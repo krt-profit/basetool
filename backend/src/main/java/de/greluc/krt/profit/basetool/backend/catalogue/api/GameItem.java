@@ -70,7 +70,10 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
 
-  /** Canonical display name. UEX writes it; the Wiki sync may overwrite per §6.3.3. */
+  /**
+   * Canonical display name: the P4K name on a row the import knows, else the Wiki name, else the
+   * UEX name (REQ-P4K-017).
+   */
   @Column(nullable = false)
   private String name;
 
