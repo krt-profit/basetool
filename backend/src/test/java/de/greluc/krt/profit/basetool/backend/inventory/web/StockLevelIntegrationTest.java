@@ -414,6 +414,21 @@ class StockLevelIntegrationTest {
   }
 
   @Test
+  void levelsOfACatalogueEntryTheP4kRetiredAreHiddenWhileUexStillListsIt() throws Exception {
+    createdId(null, 2.0, null);
+    createItemLevel(1.0, null).andExpect(status().isCreated());
+
+    jdbc.update("UPDATE material SET p4k_hidden_at = now() WHERE id = ?", material);
+    jdbc.update(
+        "UPDATE game_item SET uex_item_id = 987653, p4k_deleted_at = now() WHERE id = ?", item);
+    assertThat(listed()).isZero();
+
+    jdbc.update("UPDATE material SET p4k_hidden_at = NULL WHERE id = ?", material);
+    jdbc.update("UPDATE game_item SET p4k_deleted_at = NULL WHERE id = ?", item);
+    assertThat(listed()).isEqualTo(2);
+  }
+
+  @Test
   void aGameItemStillLiveAtOneSourceIsNotHidden() throws Exception {
     createItemLevel(1.0, null).andExpect(status().isCreated());
 

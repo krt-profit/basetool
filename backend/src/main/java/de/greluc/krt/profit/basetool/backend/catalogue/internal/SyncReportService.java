@@ -243,8 +243,8 @@ public class SyncReportService {
 
   /**
    * Records a UEX or SC Wiki value that differs from the value the P4K leads on a P4K-known row,
-   * which keeps its value (REQ-P4K-020); an absent source value, or one equal to the P4K value
-   * ignoring case, is no finding.
+   * which keeps its value (REQ-P4K-020); a value that {@link P4kFields#agrees} with the P4K value
+   * is no finding.
    *
    * @param source the source serving the value, {@code UEX} or {@code SCWIKI}
    * @param runId the current run's id (from {@link #beginRun()})
@@ -263,9 +263,7 @@ public class SyncReportService {
       @NotNull String column,
       @Nullable String p4kValue,
       @Nullable String sourceValue) {
-    if (sourceValue == null
-        || sourceValue.isBlank()
-        || sourceValue.strip().equalsIgnoreCase(p4kValue)) {
+    if (sourceValue == null || P4kFields.agrees(p4kValue, sourceValue)) {
       return false;
     }
     repository.save(

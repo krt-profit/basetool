@@ -121,6 +121,7 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(gameItemRepository.findBySourceUuid(any())).thenCallRealMethod();
     config.putAll(Map.of("item-sync-enabled", true, "sync-all-items", true));
     rebuild();
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
@@ -249,6 +250,30 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(dto.name(), existing.getScwikiName());
     verify(gameItemRepository, times(2)).save(existing);
     verify(scWikiClient, times(2)).fetchAllPagesResult(eq(ITEMS), any(), any(), any(), any());
+  }
+
+  @Test
+  void backfill_adoptsTheRowTheP4kSeededUnderTheSameGuid_insteadOfCreatingASecondRow() {
+    UUID guid = UUID.randomUUID();
+    GameItem seeded = new GameItem();
+    seeded.setId(UUID.randomUUID());
+    seeded.setP4kUuid(guid);
+    seeded.setName("P4K Seeded Item");
+    seeded.setKind(GameItemKind.GENERIC);
+    seeded.setSourceSystems(GameItemSourceSystem.P4K);
+    stubPass(ITEMS, itemDto(guid, "P4K Seeded Item"));
+    when(gameItemRepository.findByP4kUuidAndExternalUuidIsNull(guid))
+        .thenReturn(Optional.of(seeded));
+
+    service.syncItems();
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    assertSame(seeded, saved.getValue());
+    assertEquals(guid, seeded.getExternalUuid());
+    assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.CREATED_WIKI_ONLY), any(), any(), any(), any());
   }
 
   @Test

@@ -86,6 +86,7 @@ class UexItemSyncServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(gameItemRepository.findBySourceUuid(any())).thenCallRealMethod();
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(scWikiProperties.reconcileUuidlessByName()).thenReturn(true);
 
@@ -298,6 +299,36 @@ class UexItemSyncServiceTest {
             isNull(),
             isNull(),
             contains("sharedUuidDeclined=1"));
+  }
+
+  @Test
+  void syncItems_adoptsTheRowTheP4kSeededUnderTheSameGuid_insteadOfCreatingASecondRow() {
+    UUID guid = UUID.randomUUID();
+    GameItem seeded = new GameItem();
+    seeded.setId(UUID.randomUUID());
+    seeded.setP4kUuid(guid);
+    seeded.setName("Seeded Helmet");
+    seeded.setP4kName("Seeded Helmet");
+    seeded.setKind(GameItemKind.GENERIC);
+    seeded.setSourceSystems(GameItemSourceSystem.P4K);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(fetched(helmetDto(8, "UEX Helmet Name", guid.toString(), helmetsCategory)));
+    when(gameItemRepository.findByUexItemId(8)).thenReturn(Optional.empty());
+    when(gameItemRepository.findByP4kUuidAndExternalUuidIsNull(guid))
+        .thenReturn(Optional.of(seeded));
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    assertSame(seeded, saved.getValue());
+    assertEquals(guid, seeded.getExternalUuid());
+    assertEquals(8, seeded.getUexItemId());
+    assertEquals("Seeded Helmet", seeded.getName());
+    assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
   }
 
   @Test

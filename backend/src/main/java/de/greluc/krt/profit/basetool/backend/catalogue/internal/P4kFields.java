@@ -56,10 +56,7 @@ final class P4kFields {
   @Contract("_, null, _, _ -> false")
   static <V> boolean fillIfNull(
       @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
-    if (current != null || incoming == null) {
-      return false;
-    }
-    if (incoming instanceof String s && s.isBlank()) {
+    if (!isAbsent(current) || isAbsent(incoming)) {
       return false;
     }
     if (apply) {
@@ -100,9 +97,18 @@ final class P4kFields {
    */
   @Contract("_, null -> false")
   static boolean leads(@Nullable Object current, @Nullable Object incoming) {
-    return incoming != null
-        && !(incoming instanceof String s && s.isBlank())
-        && !sameValue(current, incoming);
+    return !isAbsent(incoming) && !sameValue(current, incoming);
+  }
+
+  /**
+   * Whether a field value counts as no value: {@code null} or a blank string.
+   *
+   * @param value the value
+   * @return {@code true} when the value is absent
+   */
+  @Contract("null -> true")
+  static boolean isAbsent(@Nullable Object value) {
+    return value == null || (value instanceof String s && s.isBlank());
   }
 
   /**
@@ -160,6 +166,26 @@ final class P4kFields {
       return x.compareTo(y) == 0;
     }
     return Objects.equals(a, b);
+  }
+
+  /**
+   * Whether another source's value agrees with the value the P4K leads, so that it is no {@code
+   * P4K_DISAGREEMENT}: an absent or blank source value agrees, strings compare stripped and
+   * ignoring case, decimals by value (REQ-P4K-017, REQ-P4K-020).
+   *
+   * @param kept the value the row keeps
+   * @param source the other source's value
+   * @return {@code true} when the source value is no disagreement
+   */
+  @Contract("_, null -> true")
+  static boolean agrees(@Nullable Object kept, @Nullable Object source) {
+    if (isAbsent(source)) {
+      return true;
+    }
+    if (kept instanceof String k && source instanceof String s) {
+      return k.strip().equalsIgnoreCase(s.strip());
+    }
+    return sameValue(kept, source);
   }
 
   /**

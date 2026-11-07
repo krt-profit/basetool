@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -350,7 +351,11 @@ public class UexItemSyncService {
     if (item.getExternalUuid() == null
         && externalUuid != null
         && (lookups == null || lookups.census().uniqueUuid(externalUuid))) {
-      Optional<GameItem> uuidOwner = gameItemRepository.findByExternalUuid(externalUuid);
+      final UUID writtenId = item.getId();
+      Optional<GameItem> uuidOwner =
+          gameItemRepository
+              .findBySourceUuid(externalUuid)
+              .filter(owner -> !Objects.equals(owner.getId(), writtenId));
       if (uuidOwner.isPresent()) {
         GameItem owner = uuidOwner.orElseThrow();
         log.debug(
@@ -461,7 +466,7 @@ public class UexItemSyncService {
     }
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
     if (externalUuid != null && (lookups == null || lookups.census().uniqueUuid(externalUuid))) {
-      Optional<GameItem> byUuid = gameItemRepository.findByExternalUuid(externalUuid);
+      Optional<GameItem> byUuid = gameItemRepository.findBySourceUuid(externalUuid);
       if (byUuid.isPresent()) {
         GameItem candidate = byUuid.orElseThrow();
         if (candidate.getUexItemId() == null || candidate.getUexItemId().equals(dto.id())) {
