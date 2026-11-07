@@ -154,6 +154,7 @@ steps; the first that fails ends it:
 | `stolen: true` needs the Basetool's stolen marking, which may be switched off | `rejected` `STOLEN_MARKING_DISABLED` |
 | The lot's stock is locked; its quantity must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
 | A lot already at `quantity` | `unchanged` |
+| A rise of an item no longer in the game, beyond what the batch's falls of that item still cover | `rejected` `ITEM_RETIRED` |
 | An empty lot whose last change came from the web, the app, the system, another client or another installation | `rejected` `REMOVED_ELSEWHERE` |
 | A fall larger than the lot's stock not reserved for a job order or mission | `rejected` `STOCK_EARMARKED` |
 
@@ -286,6 +287,12 @@ out and in.
 fall counts as a move, not as a removal for the mass-change guard, when the batch's rises of the same
 material or item cover all of it, falls taken in the batch's order. Sent in two batches, the fall
 counts as a removal.
+
+**Items no longer in the game.** An item the game no longer has, or one the Basetool hid, cannot be
+booked in: a rise of its lot is refused `ITEM_RETIRED`. A fall still applies, and so does a rise
+the same batch's falls of that item cover, so the member can still move or mark stock they hold:
+every fall of the batch counts, whether it comes before or after the rise, and a fall the server
+refuses covers no rise after it. Shares and unshares are not affected.
 
 ## The stock result
 

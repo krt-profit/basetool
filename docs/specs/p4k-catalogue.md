@@ -407,6 +407,8 @@ prices and terminals.
   still work.
 - [x] A write that sets a retired blueprint on an item-order line by its id, or keeps one on a line
   it edits, is refused with `400` and code `CATALOGUE_BLUEPRINT_RETIRED`.
+- [x] An exchange write that would book a retired game item in is refused per op as `rejected`
+  `ITEM_RETIRED`; a fall, and a move the batch's falls cover, still apply.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager and item-order item pickers
@@ -432,8 +434,14 @@ lists, deletes, withdrawals and the state changes of an existing entry (pause, r
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
 `catalogue.api`; the JPQL queries that keep only listed items and recipes concatenate
 `P4kRetirementJpql`, the query form of `P4kKeyedRow.isP4kRetired()`. The frontend shows
-`error.catalogue.itemRetired` for the code (`krtFetch.catalogueRetiredMessage`). An exchange pool
-book-in (REQ-XCH-045) keeps the item its lot resolved.
+`error.catalogue.itemRetired` for the code (`krtFetch.catalogueRetiredMessage`).
+
+The exchange refuses the same per op, with the change-result reason `ITEM_RETIRED` instead of a
+`400`: an org-stock `book-in` of a retired item (REQ-XCH-045), and a stock `set-quantity` that
+raises a retired item's lot beyond what the batch's falls of that item cover (REQ-XCH-016), so a
+move or stolen marking of held stock still applies. Falls, shares, unshares and the ops on an
+existing org-stock entry stay open. Both resolve the lot through `ExchangeLotCatalogue`, whose entry
+reports the retirement.
 
 **The backend refuses a retired blueprint the same way.** The one write that names a blueprint by
 its id, an item-order line added or edited (REQ-ORDERS-032), resolves it through
@@ -447,7 +455,9 @@ are all retired answers as unknown there.
 **Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
 `SelectableGameItemsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
 `SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
-`PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`
+`PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`,
+`ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
+`ExchangeGoldenAnswerTest` (ingest)
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
 ### REQ-P4K-014 — every run keeps a change report, and the report is never pruned

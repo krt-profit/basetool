@@ -5,6 +5,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-07
 
+- **New: per-op reason `ITEM_RETIRED`.** An item the game no longer has, or one the Basetool hid,
+  cannot be booked in: an org-stock `book-in` of it, and a stock rise of it that the batch's falls
+  of the same item do not cover, are `rejected` with this reason. Falls, moves, stolen markings,
+  shares and every org-stock op on an existing entry still apply
+  ([stock](resources/stock.md#what-a-change-books), [errors](errors.md)). No schema changes: a
+  reason has always been any code of the v1 pattern, so a tolerant client already handles it.
 - **New: warehouse locations carry `guid`.** A location linked to a starmap object, itself or
   through its city or space station, carries the object's DataForge GUID as `guid` in
   `catalog/locations` and in the `location` of the stock, org-stock and ship feeds. A `location` in

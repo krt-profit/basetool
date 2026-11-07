@@ -88,6 +88,7 @@ codes, whichever side refuses it.
 | `QUANTITY_ABOVE_EXPECTED` | A stock `share` or `unshare` moves more than its `expectedQuantity`. | Move at most the amount the client last saw at the source. |
 | `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount, or an earmark op would earmark more of one kind than the entry holds. | Lower the earmarks. |
 | `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, one the entry is not earmarked to, or, for `allocation-add`, one it already is. | Read the [targets](resources/org-stock.md#the-targets) and the entry again. |
+| `ITEM_RETIRED` | The item is no longer in the game, or the Basetool hid it: an org-stock `book-in` of it, or a stock rise of it that the batch's falls of the same item do not cover. | Do not retry; tell the member the item can no longer be booked in. Lowering or moving the stock they hold still works. |
 
 ## Warnings
 
