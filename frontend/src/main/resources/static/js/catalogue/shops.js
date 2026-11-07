@@ -18,19 +18,24 @@
  */
 
 import { krtHtml } from '/js/kernel/krt-html.js';
-import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
-import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
 import {
-    bindCandidateClick,
+    bindPager,
+    pagerLabels,
+    reloadedBeyondEnd,
+    renderPager,
+} from '/js/catalogue/catalogue-pager.js';
+import {
+    bindLinkRowActions,
     bindTypedFilter,
     byId as $,
     changeLink as sendLinkChange,
+    createLinkPicker,
     dictionaryLabels,
     filterValue,
     forgetRead,
     idOf,
-    readJson as readJsonOr,
+    jsonReader,
     showCandidates,
     swapRow,
 } from '/js/catalogue/catalogue-link-admin.js';
@@ -50,11 +55,23 @@ const shownShops = new Map();
 
 let shopsPage = 0;
 
-/** @type {Shop | null} */
-let linkTarget = null;
-
 /** Reads one label of the page's dictionary. */
 const t = dictionaryLabels(() => window.krtShopsI18n, 'krtShopsI18n');
+
+/** Reads a JSON answer for one render target, or null after the load-error toast or a newer read. */
+const readJson = jsonReader(() => t('loadError'));
+
+/** The terminal picker of a shop. */
+const picker = createLinkPicker({
+    modalId: 'shops-link-modal',
+    subjectId: 'shops-link-shop',
+    searchId: 'shops-link-search',
+    candidatesId: 'shops-link-candidates',
+    subject: (/** @type {Shop} */ s) => shopName(s),
+    search: (/** @type {Shop} */ s) => s.placeName || '',
+    loadCandidates,
+    link: (/** @type {Shop} */ s, terminalId, btn) => changeLink(s, 'SET', terminalId, btn),
+});
 
 /**
  * The page's section seam: writes go through it, and a peer admin's change or an APPLY, announced in
@@ -71,18 +88,6 @@ const sections = krtPageSections.create({
         },
     },
 });
-
-/**
- * Reads a JSON answer for one render target, or null after the page's load-error toast or when a
- * later read of the target superseded it.
- *
- * @param {string} url the proxy URL
- * @param {string} target the render target
- * @returns {Promise<any>} the parsed body, or null
- */
-function readJson(url, target) {
-    return readJsonOr(url, t('loadError'), target);
-}
 
 /**
  * The name the list shows for a shop: its registry name, else its entity name.
@@ -151,6 +156,7 @@ function loadShops(page) {
     readJson(`${PAGE_URL}/entries?${params}`, 'shops-entries').then(
         (/** @type {ApiPage<'ShopAdminDto'> | null} */ result) => {
             if (!result) return;
+            if (reloadedBeyondEnd(page, result, loadShops)) return;
             shopsPage = page;
             const rows = result.content || [];
             shownShops.clear();
@@ -159,17 +165,14 @@ function loadShops(page) {
             const empty = $('shops-empty');
             if (empty) empty.hidden = rows.length > 0;
             if (body) krtHtml.set(body, rows.map(shopRow));
-            renderPager($('shops-pager'), result, {
-                previous: t('pagePrevious'),
-                next: t('pageNext'),
-            });
+            renderPager($('shops-pager'), result, pagerLabels(t));
         },
     );
 }
 
 /**
  * Sends a link change as a compare-and-set on the link the row shows and swaps the row in place; a
- * link that changed meanwhile reloads the list.
+ * link that changed meanwhile closes the picker and reloads the list.
  *
  * @param {Shop} s the shop as shown
  * @param {LinkAction} action the change
@@ -190,48 +193,16 @@ function changeLink(s, action, terminalId, submitter) {
         action,
         submitter,
         t,
-        reload: () => loadShops(shopsPage),
+        reload() {
+            picker.dismiss();
+            loadShops(shopsPage);
+        },
         show(/** @type {Shop} */ updated) {
             shownShops.set(idOf(updated), updated);
             const row = document.querySelector(`tr[data-shop-id="${CSS.escape(idOf(updated))}"]`);
             if (row) swapRow(row, shopRow(updated));
         },
     });
-}
-
-/**
- * Handles the list's clicks: the picker opener and the clear and release actions.
- *
- * @param {MouseEvent} e the click
- */
-function onShopsClick(e) {
-    const target = e.target instanceof Element ? e.target : null;
-    const btn = target ? target.closest('button[data-link-open], button[data-link-action]') : null;
-    const row = btn ? btn.closest('tr[data-shop-id]') : null;
-    if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
-    const s = shownShops.get(row.dataset.shopId || '');
-    if (!s) return;
-    if (btn.dataset.linkOpen !== undefined) {
-        openLinkDialog(s);
-        return;
-    }
-    const action = btn.dataset.linkAction;
-    if (action === 'CLEAR' || action === 'RELEASE') changeLink(s, action, null, btn);
-}
-
-/**
- * Opens the terminal picker for a shop, searching by the shop's place.
- *
- * @param {Shop} s the shop
- */
-function openLinkDialog(s) {
-    linkTarget = s;
-    const label = $('shops-link-shop');
-    if (label) label.textContent = shopName(s);
-    const search = $('shops-link-search');
-    if (search instanceof HTMLInputElement) search.value = s.placeName || '';
-    krtModal.open('shops-link-modal', { focus: search });
-    loadCandidates();
 }
 
 /** Loads the terminals matching the picker's search as link candidates. */
@@ -262,34 +233,21 @@ function loadCandidates() {
     );
 }
 
-/**
- * Links the picker's shop to the picked terminal.
- *
- * @param {string | null} terminalId the terminal
- * @param {HTMLButtonElement} btn the pick button
- */
-function pickCandidate(terminalId, btn) {
-    const s = linkTarget;
-    if (!s) return;
-    changeLink(s, 'SET', terminalId, btn).then((saved) => {
-        if (!saved) return;
-        linkTarget = null;
-        krtModal.close('shops-link-modal');
-    });
-}
-
 /** Wires the filters, the pager, the row actions and the picker, then loads the list. */
 function initShops() {
     const form = $('shops-filter');
     if (form) form.addEventListener('submit', (e) => e.preventDefault());
     ['shops-query', 'shops-system'].forEach((id) => bindTypedFilter(id, () => loadShops(0)));
-    bindTypedFilter('shops-link-search', loadCandidates);
     const unlinked = $('shops-unlinked');
     if (unlinked) unlinked.addEventListener('change', () => loadShops(0));
     bindPager($('shops-pager'), loadShops);
-    const rows = $('shops-rows');
-    if (rows) rows.addEventListener('click', onShopsClick);
-    bindCandidateClick('shops-link-candidates', pickCandidate);
+    bindLinkRowActions({
+        rowsId: 'shops-rows',
+        rowSelector: 'tr[data-shop-id]',
+        find: (row) => shownShops.get(row.dataset.shopId || ''),
+        open: picker.open,
+        change: (s, action, btn) => changeLink(s, action, null, btn),
+    });
     loadShops(0);
 }
 

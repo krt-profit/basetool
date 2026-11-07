@@ -22,16 +22,22 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
-import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
 import {
-    bindCandidateClick,
+    bindPager,
+    pagerLabels,
+    reloadedBeyondEnd,
+    renderPager,
+} from '/js/catalogue/catalogue-pager.js';
+import {
+    bindLinkRowActions,
     bindTypedFilter,
     byId as $,
     changeLink as sendLinkChange,
+    createLinkPicker,
     dictionaryLabels,
     filterValue,
     idOf,
-    readJson as readJsonOr,
+    jsonReader,
     showCandidates,
     swapRow,
 } from '/js/catalogue/catalogue-link-admin.js';
@@ -63,9 +69,6 @@ let placesPage = 0;
 /** @type {StarmapObject | null} */
 let storageTarget = null;
 
-/** @type {StarmapPlace | null} */
-let linkTarget = null;
-
 /**
  * The page's section seam: writes go through it, and a peer admin's change or an APPLY, announced in
  * the admin room's `starmap` section, reloads both lists on their current pages.
@@ -86,22 +89,21 @@ const sections = krtPageSections.create({
 /** Reads one label of the page's dictionary. */
 const t = dictionaryLabels(() => window.krtStarmapI18n, 'krtStarmapI18n');
 
-/** @returns {{ previous: string, next: string }} the pager button names */
-function pagerLabels() {
-    return { previous: t('pagePrevious'), next: t('pageNext') };
-}
+/** Reads a JSON answer for one render target, or null after the load-error toast or a newer read. */
+const readJson = jsonReader(() => t('loadError'));
 
-/**
- * Reads a JSON answer for one render target, or null after the page's load-error toast or when a
- * later read of the target superseded it.
- *
- * @param {string} url the proxy URL
- * @param {string} target the render target
- * @returns {Promise<any>} the parsed body, or null
- */
-function readJson(url, target) {
-    return readJsonOr(url, t('loadError'), target);
-}
+/** The object picker of a link row. */
+const picker = createLinkPicker({
+    modalId: 'starmap-link-modal',
+    subjectId: 'starmap-link-row',
+    searchId: 'starmap-link-search',
+    candidatesId: 'starmap-link-candidates',
+    subject: (/** @type {StarmapPlace} */ p) => p.name || '',
+    search: (/** @type {StarmapPlace} */ p) => p.name || '',
+    loadCandidates,
+    link: (/** @type {StarmapPlace} */ p, objectId, btn) => changeLink(p, 'SET', objectId, btn),
+});
+
 /**
  * The name a list shows for an object: its P4K name in the page language, else its class name.
  *
@@ -189,6 +191,7 @@ function loadObjects(page) {
     readJson(`${PAGE_URL}/objects?${params}`, 'starmap-objects').then(
         (/** @type {ApiPage<'StarmapObjectAdminDto'> | null} */ result) => {
             if (!result) return;
+            if (reloadedBeyondEnd(page, result, loadObjects)) return;
             objectsPage = page;
             const rows = result.content || [];
             shownObjects.clear();
@@ -200,7 +203,7 @@ function loadObjects(page) {
                 krtHtml.set(body, rows.map(objectRow));
                 selectCurrentOverrides(body);
             }
-            renderPager($('starmap-objects-pager'), result, pagerLabels());
+            renderPager($('starmap-objects-pager'), result, pagerLabels(t));
         },
     );
 }
@@ -380,6 +383,7 @@ function loadPlaces(page) {
         'starmap-places',
     ).then((/** @type {ApiPage<'StarmapPlaceLinkDto'> | null} */ result) => {
         if (!result) return;
+        if (reloadedBeyondEnd(page, result, loadPlaces)) return;
         placesPage = page;
         const rows = result.content || [];
         shownPlaces.clear();
@@ -388,13 +392,13 @@ function loadPlaces(page) {
         const empty = $('starmap-links-empty');
         if (empty) empty.hidden = rows.length > 0;
         if (body) krtHtml.set(body, rows.map(placeRow));
-        renderPager($('starmap-links-pager'), result, pagerLabels());
+        renderPager($('starmap-links-pager'), result, pagerLabels(t));
     });
 }
 
 /**
  * Sends a link change as a compare-and-set on the link the row shows and swaps the row in place;
- * a link that changed meanwhile reloads the list.
+ * a link that changed meanwhile closes the picker and reloads the list.
  *
  * @param {StarmapPlace} p the row as shown
  * @param {LinkAction} action the change
@@ -415,47 +419,16 @@ function changeLink(p, action, objectId, submitter) {
         action,
         submitter,
         t,
-        reload: () => loadPlaces(placesPage),
+        reload() {
+            picker.dismiss();
+            loadPlaces(placesPage);
+        },
         show(/** @type {StarmapPlace} */ updated) {
             shownPlaces.set(idOf(updated), updated);
             const row = document.querySelector(`tr[data-place-id="${CSS.escape(idOf(updated))}"]`);
             if (row) swapRow(row, placeRow(updated));
         },
     });
-}
-/**
- * Handles the link list's clicks: the picker opener and the clear and release actions.
- *
- * @param {MouseEvent} e the click
- */
-function onPlacesClick(e) {
-    const target = e.target instanceof Element ? e.target : null;
-    const btn = target ? target.closest('button[data-link-open], button[data-link-action]') : null;
-    const row = btn ? btn.closest('tr[data-place-id]') : null;
-    if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
-    const p = shownPlaces.get(row.dataset.placeId || '');
-    if (!p) return;
-    if (btn.dataset.linkOpen !== undefined) {
-        openLinkDialog(p);
-        return;
-    }
-    const action = btn.dataset.linkAction;
-    if (action === 'CLEAR' || action === 'RELEASE') changeLink(p, action, null, btn);
-}
-
-/**
- * Opens the link picker for a row, searching the objects by the row's UEX name.
- *
- * @param {StarmapPlace} p the row
- */
-function openLinkDialog(p) {
-    linkTarget = p;
-    const rowLabel = $('starmap-link-row');
-    if (rowLabel) rowLabel.textContent = p.name || '';
-    const search = $('starmap-link-search');
-    if (search instanceof HTMLInputElement) search.value = p.name || '';
-    krtModal.open('starmap-link-modal', { focus: search });
-    loadCandidates();
 }
 
 /** Loads the first page of the objects matching the picker's search as link candidates. */
@@ -485,21 +458,6 @@ function loadCandidates() {
 }
 
 /**
- * Links the picker's row to the picked object.
- *
- * @param {string | null} objectId the object
- * @param {HTMLButtonElement} btn the pick button
- */
-function pickCandidate(objectId, btn) {
-    const p = linkTarget;
-    if (!p) return;
-    changeLink(p, 'SET', objectId, btn).then((saved) => {
-        if (!saved) return;
-        linkTarget = null;
-        krtModal.close('starmap-link-modal');
-    });
-}
-/**
  * Keeps a filter form from submitting; its fields reload the list in place.
  *
  * @param {string} id the form id
@@ -517,7 +475,6 @@ function initStarmap() {
         bindTypedFilter(id, () => loadObjects(0)),
     );
     bindTypedFilter('starmap-links-query', () => loadPlaces(0));
-    bindTypedFilter('starmap-link-search', loadCandidates);
     const kind = $('starmap-links-kind');
     if (kind) kind.addEventListener('change', () => loadPlaces(0));
     const unlinked = $('starmap-links-unlinked');
@@ -537,9 +494,13 @@ function initStarmap() {
             }
         });
     }
-    const places = $('starmap-links');
-    if (places) places.addEventListener('click', onPlacesClick);
-    bindCandidateClick('starmap-link-candidates', pickCandidate);
+    bindLinkRowActions({
+        rowsId: 'starmap-links',
+        rowSelector: 'tr[data-place-id]',
+        find: (row) => shownPlaces.get(row.dataset.placeId || ''),
+        open: picker.open,
+        change: (p, action, btn) => changeLink(p, action, null, btn),
+    });
     const storageForm = $('starmap-storage-form');
     if (storageForm) storageForm.addEventListener('submit', onStorageSubmit);
 

@@ -43,6 +43,7 @@
       "catalogue/catalogue-link-admin.js",
       "catalogue/catalogue-list.js",
       "catalogue/catalogue-pager.js",
+      "catalogue/catalogue-time.js",
       "catalogue/locations.js",
       "catalogue/material-detail.js",
       "catalogue/materials-matrix.js",
