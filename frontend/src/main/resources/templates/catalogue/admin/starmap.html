@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{admin.starmap.title} + ' - ' + ${appTitle}">Sternenkarte - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/catalogue/admin-starmap.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.starmap', eyebrowKey='nav.admin.group.masterdata', titleText=#{admin.starmap.title},
+        count=null, actions=null)}"></th:block>
+
+    <p class="form-hint" th:text="#{admin.starmap.intro}">Die Objekte der Sternenkarte stammen aus dem P4K-Import.</p>
+
+    <section class="starmap-section" aria-labelledby="starmap-objects-title" data-testid="starmap-objects">
+        <h2 id="starmap-objects-title" class="starmap-section-title" th:text="#{admin.starmap.objects.title}">Objekte</h2>
+        <form id="starmap-objects-filter" class="no-track" role="search">
+            <div class="toolbar">
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-objects-query', 'query', null, 'admin.starmap.filter.search')}"></th:block>
+                <div class="starmap-filter">
+                    <label for="starmap-objects-system" class="visually-hidden" th:text="#{admin.starmap.filter.system}">Sternensystem</label>
+                    <input type="text" id="starmap-objects-system" name="starSystem" autocomplete="off" data-filter-chip-ignore
+                           th:attr="placeholder=#{admin.starmap.filter.system}">
+                </div>
+                <div class="starmap-filter">
+                    <label for="starmap-objects-type" class="visually-hidden" th:text="#{admin.starmap.filter.type}">Typ</label>
+                    <input type="text" id="starmap-objects-type" name="type" autocomplete="off" data-filter-chip-ignore
+                           th:attr="placeholder=#{admin.starmap.filter.type}">
+                </div>
+            </div>
+        </form>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.starmap.col.name}">Name</th>
+                        <th th:text="#{admin.starmap.col.type}">Typ</th>
+                        <th th:text="#{admin.starmap.col.system}">System</th>
+                        <th th:text="#{admin.starmap.col.position}">Position</th>
+                        <th th:text="#{admin.starmap.col.hideInStarmap}">P4K: ausgeblendet</th>
+                        <th class="cell-status" th:text="#{admin.starmap.col.visibility}">Sichtbarkeit</th>
+                        <th th:text="#{admin.starmap.col.override}">Einstellung</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody id="starmap-objects">
+                    </tbody>
+                </table>
+            </div>
+            <div id="starmap-objects-empty" class="empty-state" data-testid="empty-state" hidden>
+                <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.objects.empty.title', 'admin.starmap.objects.empty', null)}"></th:block>
+            </div>
+            <nav id="starmap-objects-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
+    </section>
+
+    <section class="starmap-section" aria-labelledby="starmap-links-title" data-testid="starmap-links">
+        <h2 id="starmap-links-title" class="starmap-section-title" th:text="#{admin.starmap.links.title}">UEX-Verknüpfungen</h2>
+        <p class="form-hint" th:text="#{admin.starmap.links.hint}">Eine von Hand gesetzte Verknüpfung behält der Import bei.</p>
+        <form id="starmap-links-filter" class="no-track" role="search">
+            <div class="toolbar">
+                <div class="starmap-filter">
+                    <label for="starmap-links-kind" class="visually-hidden" th:text="#{admin.starmap.filter.kind}">UEX-Tabelle</label>
+                    <select id="starmap-links-kind" name="kind" data-testid="starmap-links-kind" data-filter-chip-ignore>
+                        <option th:each="k : ${placeKinds}" th:value="${k}" th:selected="${k == 'CITY'}"
+                                th:text="#{${'admin.starmap.kind.' + k}}">Stadt</option>
+                    </select>
+                </div>
+                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-links-query', 'query', null, 'admin.starmap.filter.placeSearch')}"></th:block>
+                <label class="krt-switch" for="starmap-links-unlinked">
+                    <input type="checkbox" role="switch" id="starmap-links-unlinked" name="unlinkedOnly" data-testid="starmap-links-unlinked" data-filter-chip-ignore>
+                    <span th:text="#{admin.starmap.filter.unlinkedOnly}">Nur unverknüpfte</span>
+                </label>
+            </div>
+        </form>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.starmap.col.uexName}">UEX-Name</th>
+                        <th th:text="#{admin.starmap.col.system}">System</th>
+                        <th th:text="#{admin.starmap.col.linkedObject}">Verknüpftes Objekt</th>
+                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
+                    </tr>
+                    </thead>
+                    <tbody id="starmap-links">
+                    </tbody>
+                </table>
+            </div>
+            <div id="starmap-links-empty" class="empty-state" data-testid="empty-state" hidden>
+                <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.links.empty.title', 'admin.starmap.links.empty', null)}"></th:block>
+            </div>
+            <nav id="starmap-links-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
+    </section>
+</main>
+
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='starmap-storage-modal', titleKey='admin.starmap.dialog.storage.title', body=~{::starmap-storage-modal-body})}">
+    <th:block th:ref="starmap-storage-modal-body">
+        <form id="starmap-storage-form" class="starmap-form">
+            <div class="krt-modal-body">
+                <p class="m-0">
+                    <span class="text-muted" th:text="#{admin.starmap.dialog.storage.object}">Objekt</span>:
+                    <span id="starmap-storage-object" class="data-value"></span>
+                </p>
+                <div class="form-group">
+                    <label for="starmap-storage-name" class="form-label" th:text="#{admin.starmap.dialog.storage.name}">Name</label>
+                    <input type="text" id="starmap-storage-name" name="name" required maxlength="255" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="starmap-storage-description" class="form-label" th:text="#{admin.starmap.dialog.storage.description}">Beschreibung</label>
+                    <textarea id="starmap-storage-description" name="description" rows="3" maxlength="1000"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="starmap-storage-hidden" name="hidden">
+                        <span th:text="#{admin.starmap.dialog.storage.hidden}">In Auswahllisten ausblenden</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="starmap-storage-home" name="homeLocation">
+                        <span th:text="#{admin.starmap.dialog.storage.home}">Als Home-Location anbieten</span>
+                    </label>
+                </div>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                        data-modal-id="starmap-storage-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="submit" id="starmap-storage-submit" class="btn btn--cta" th:text="#{admin.starmap.dialog.storage.save}">Lagerort anlegen</button>
+            </div>
+        </form>
+    </th:block>
+</th:block>
+
+<th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='starmap-link-modal', titleKey='admin.starmap.dialog.link.title', variant='krt-modal--wide', body=~{::starmap-link-modal-body})}">
+    <th:block th:ref="starmap-link-modal-body">
+        <div class="krt-modal-body">
+            <p class="m-0">
+                <span class="text-muted" th:text="#{admin.starmap.dialog.link.row}">UEX-Zeile</span>:
+                <span id="starmap-link-row" class="data-value"></span>
+            </p>
+            <div class="form-group">
+                <label for="starmap-link-search" class="form-label" th:text="#{admin.starmap.dialog.link.search}">Objekt suchen</label>
+                <input type="search" id="starmap-link-search" autocomplete="off">
+            </div>
+            <ul id="starmap-link-candidates" class="starmap-candidates" data-testid="starmap-link-candidates"></ul>
+            <p id="starmap-link-empty" class="text-muted" hidden th:text="#{admin.starmap.dialog.link.empty}">Kein Objekt gefunden.</p>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                    data-modal-id="starmap-link-modal" th:text="#{general.cancel}">Abbrechen</button>
+        </div>
+    </th:block>
+</th:block>
+</th:block>
+<th:block th:fragment="pageTail">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    window.krtStarmapI18n = {
+        'yes': /*[[#{admin.starmap.yes}]]*/ 'yes',
+        'no': /*[[#{admin.starmap.no}]]*/ 'no',
+        'unknown': /*[[#{admin.starmap.unknown}]]*/ 'unknown',
+        'visible': /*[[#{admin.starmap.visible}]]*/ 'visible',
+        'hidden': /*[[#{admin.starmap.hidden}]]*/ 'hidden',
+        'retired': /*[[#{admin.starmap.retired}]]*/ 'no longer in game',
+        'override.rule': /*[[#{admin.starmap.override.rule}]]*/ 'Rule',
+        'override.VISIBLE': /*[[#{admin.starmap.override.VISIBLE}]]*/ 'Visible',
+        'override.HIDDEN': /*[[#{admin.starmap.override.HIDDEN}]]*/ 'Hidden',
+        'overrideLabel': /*[[#{admin.starmap.col.override}]]*/ 'Setting',
+        'storageCreate': /*[[#{admin.starmap.storage.create}]]*/ 'Create storage place',
+        'storageExists': /*[[#{admin.starmap.storage.exists}]]*/ 'Has storage place',
+        'unlinked': /*[[#{admin.starmap.unlinked}]]*/ 'not linked',
+        'manual': /*[[#{admin.starmap.manual}]]*/ 'manual',
+        'actionLink': /*[[#{admin.starmap.action.link}]]*/ 'Link',
+        'actionClear': /*[[#{admin.starmap.action.clear}]]*/ 'Unlink',
+        'actionRelease': /*[[#{admin.starmap.action.release}]]*/ 'Hand back to import',
+        'pick': /*[[#{admin.starmap.dialog.link.pick}]]*/ 'Select',
+        'toastVisibility': /*[[#{admin.starmap.toast.visibility}]]*/ 'Visibility saved.',
+        'toastStorage': /*[[#{admin.starmap.toast.storage}]]*/ 'Storage place created.',
+        'toastLinked': /*[[#{admin.starmap.toast.linked}]]*/ 'Link set.',
+        'toastCleared': /*[[#{admin.starmap.toast.cleared}]]*/ 'Link removed.',
+        'toastReleased': /*[[#{admin.starmap.toast.released}]]*/ 'Link handed back to the import.',
+        'conflict': /*[[#{admin.starmap.toast.conflict}]]*/ 'The entry changed meanwhile.',
+        'storageRefused': /*[[#{admin.starmap.toast.storageRefused}]]*/ 'No storage place can be created on this object.',
+        'error': /*[[#{admin.starmap.toast.error}]]*/ 'Saving failed.',
+        'loadError': /*[[#{admin.starmap.toast.loadError}]]*/ 'The list could not be loaded.',
+        'pagePrevious': /*[[#{general.pagination.previous}]]*/ 'Previous',
+        'pageNext': /*[[#{general.pagination.next}]]*/ 'Next'
+    };
+</script>
+<script type="module" th:src="@{/js/catalogue/starmap.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

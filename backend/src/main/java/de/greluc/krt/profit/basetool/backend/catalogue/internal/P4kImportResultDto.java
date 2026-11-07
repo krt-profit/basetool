@@ -36,6 +36,9 @@ import org.jetbrains.annotations.Nullable;
  * @param ships the ship counts
  * @param commodities the commodity counts
  * @param blueprints the blueprint counts
+ * @param starmapObjects the starmap object counts; {@code unmatched} and {@code review} count the
+ *     UEX location rows left unlinked (REQ-P4K-035); {@code null} in a result stored before the
+ *     starmap was imported
  * @param ingredientsResolved blueprint ingredient lines whose material or item the run resolved
  * @param runId the {@code p4k_import_run} of an APPLY, {@code null} for a preview
  * @param sweeps the sweep result per kind (REQ-P4K-011, REQ-P4K-012), in the order of the kinds;
@@ -50,6 +53,7 @@ public record P4kImportResultDto(
     Counts ships,
     Counts commodities,
     Counts blueprints,
+    @Nullable Counts starmapObjects,
     int ingredientsResolved,
     @Nullable UUID runId,
     @Nullable List<Sweep> sweeps) {

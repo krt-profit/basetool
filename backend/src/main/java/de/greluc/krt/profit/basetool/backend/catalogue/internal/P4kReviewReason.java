@@ -55,5 +55,17 @@ public enum P4kReviewReason {
    * A personal-blueprint name key that resolves to several produced-item GUIDs (REQ-P4K-029); the
    * case's GUID is a name-based UUID of the key.
    */
-  PRODUCT_KEY_AMBIGUOUS
+  PRODUCT_KEY_AMBIGUOUS,
+
+  /**
+   * A UEX location row whose normalised name, type and linked parent match several starmap objects
+   * (REQ-P4K-035); the case's GUID is a name-based UUID of the row.
+   */
+  STARMAP_LINK_AMBIGUOUS,
+
+  /**
+   * A UEX location row whose normalised name, type and linked parent match no starmap object
+   * (REQ-P4K-035); the case's GUID is a name-based UUID of the row.
+   */
+  STARMAP_LINK_NOT_FOUND
 }

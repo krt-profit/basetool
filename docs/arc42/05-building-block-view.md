@@ -221,7 +221,9 @@ orchestrator (`P4kImportService`) over one reconciler per catalogue kind and the
 loadout trees, which point at the rows the base kinds matched (the loadouts streamed in a second
 pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportReportService` and `P4kReviewService` serve the run list, the change
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
-(REQ-P4K-001…016). The kernel types
+(REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
+`P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
+`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The kernel types
 `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
 enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
 publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in

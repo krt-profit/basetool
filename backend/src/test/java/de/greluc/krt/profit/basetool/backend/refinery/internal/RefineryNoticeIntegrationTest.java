@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -71,6 +73,8 @@ class RefineryNoticeIntegrationTest {
   private static final ActorRef ACTING = new ActorRef(ACTOR, "Ada");
 
   @Autowired private RefineryReadyNoticeProducer producer;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private NotificationCreationService creationService;
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
@@ -90,7 +94,7 @@ class RefineryNoticeIntegrationTest {
     user(ACTOR, "refinery-actor");
     location = new Location();
     location.setName("Refinery-Hub-" + UUID.randomUUID());
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     material = new Material();
     material.setName("Refinery-Ore-" + UUID.randomUUID());
     material.setType(MaterialType.RAW);

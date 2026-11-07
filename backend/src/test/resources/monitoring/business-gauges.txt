@@ -15,6 +15,7 @@ GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=COMMODITY}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=ITEM}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=MANUFACTURER}|null
 GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=SHIP}|null
+GAUGE|basetool.p4k.catalogue.stamped.rows|{kind=STARMAP_OBJECT}|null
 GAUGE|basetool.p4k.import.due|{}|null
 GAUGE|basetool.p4k.import.job.pending.count|{status=PENDING}|null
 GAUGE|basetool.p4k.import.job.pending.count|{status=RUNNING}|null
@@ -51,6 +52,12 @@ GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=matched}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=reappeared}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=unmatched}|null
 GAUGE|basetool.p4k.import.last.run.rows|{kind=SHIP, outcome=vanished}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=added}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=changed}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=matched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=reappeared}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=unmatched}|null
+GAUGE|basetool.p4k.import.last.run.rows|{kind=STARMAP_OBJECT, outcome=vanished}|null
 GAUGE|basetool.p4k.import.last.run.unknown.classes|{}|null
 GAUGE|basetool.p4k.import.last.run.unknown.grades|{}|null
 GAUGE|basetool.p4k.review.case.open.oldest.age|{}|seconds
@@ -59,6 +66,7 @@ GAUGE|basetool.p4k.review.cases.open|{kind=COMMODITY}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=ITEM}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=MANUFACTURER}|null
 GAUGE|basetool.p4k.review.cases.open|{kind=SHIP}|null
+GAUGE|basetool.p4k.review.cases.open|{kind=STARMAP_OBJECT}|null
 GAUGE|basetool.refinery.order.open.count|{status=IN_PROGRESS}|null
 GAUGE|basetool.refinery.order.open.count|{status=OPEN}|null
 GAUGE|basetool.refinery.order.open.oldest.age|{}|seconds

@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -67,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -94,6 +96,8 @@ import org.springframework.transaction.annotation.Transactional;
 class UserDeletionEndStateTest {
 
   @Autowired private UserDeletionService userDeletionService;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private MissionService missionService;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -329,7 +333,7 @@ class UserDeletionEndStateTest {
     squadron = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     location = new Location();
     location.setName("End Hub " + tag);
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     material = new Material();
     material.setName("End Ore " + tag);
     material.setType(MaterialType.RAW);

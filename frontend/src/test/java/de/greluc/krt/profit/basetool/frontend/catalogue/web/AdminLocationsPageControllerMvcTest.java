@@ -195,6 +195,28 @@ class AdminLocationsPageControllerMvcTest {
         .doesNotContain("btn-secondary");
   }
 
+  /**
+   * The page offers no free create form: a new storage place is created on a starmap object, and
+   * the page points there (REQ-P4K-036); the toggles of the listed places stay.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listData_pointsToTheStarmapForANewPlace_andOffersNoCreateForm() throws Exception {
+    String html =
+        renderList(
+            List.of(new LocationDto(UUID.randomUUID(), "ARC-L1", "Arc-Corp L1", false, true, 0L)));
+
+    assertThat(html)
+        .contains("data-testid=\"locations-create-hint\"")
+        .contains("Neue Lagerorte legst du auf der Sternenkarte an")
+        .containsPattern("href=\"/admin/starmap\"[^>]*>Zur Sternenkarte<")
+        .doesNotContainPattern("<form[^>]*action=\"/admin/locations\"[^>]*method=\"post\"")
+        .doesNotContainPattern("<form[^>]*method=\"post\"[^>]*action=\"/admin/locations\"")
+        .doesNotContain("name=\"starmapObjectId\"")
+        .contains("data-location-toggle=\"visibility\"")
+        .contains("data-location-toggle=\"home\"");
+  }
+
   /** A second page of a searched list counts every match and links back to the first page. */
   @Test
   @WithMockUser(roles = "ADMIN")

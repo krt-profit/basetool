@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,6 +76,9 @@ class InventoryEarmarkReadNoNPlusOneTest {
   private static final int STATEMENT_BOUND = 15;
 
   @Autowired private InventoryItemService inventoryItemService;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -230,7 +235,7 @@ class InventoryEarmarkReadNoNPlusOneTest {
     created.add(material);
     Location location = new Location();
     location.setName("Earmark Depot " + tag);
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     created.add(location);
     Mission shared = mission("Shared " + tag);
     for (int i = 0; i < rows; i++) {

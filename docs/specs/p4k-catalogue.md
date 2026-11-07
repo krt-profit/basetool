@@ -22,18 +22,20 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 #2927, #3027–#3029).
 
 > [!note] Partly implemented
-> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
-> and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
+> REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category and shop
+> tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
 > REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
 > REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
-> implemented (#3043), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-047 is implemented (#3034); every other
+> implemented (#3043), REQ-P4K-034…038 are implemented (#3044), REQ-P4K-040 and REQ-P4K-041 are
+> implemented (#3045), REQ-P4K-047 is implemented (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kCommodityReconciler`, `P4kBlueprintReconciler`)
 > sharing `P4kRowMatcher`, then `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the
-> rows the base kinds matched; the wire format is `catalogue.internal.p4k`.
+> rows the base kinds matched, and the starmap tree and its UEX links (`P4kStarmapReconciler`,
+> `P4kStarmapLinker`); the wire format is `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -177,8 +179,8 @@ when that elapses the job fails with a message and writes nothing. A PREVIEW tak
 - [x] Pruning the job leaves the run with a `null` job reference.
 
 The run is `p4k_import_run` (V342) with one `p4k_import_run_kind` row per kind (completeness, its
-Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds, the category, starmap
-and shop tables add it with their areas.
+Filter and the six counts); `p4k_seen_run_id` exists on the five base kinds and `starmap_object`;
+the category and shop tables add it with their areas.
 
 **Enforced by:** `P4kImportRunTest` · **ADR:**
 [ADR-0335](../adr/0335-the-p4k-import-reads-catalogue-version-2-behind-a-synchronous-live-only-gate-and-records-every-run.md) · **Issues:** #2885
@@ -323,10 +325,12 @@ move. Each kind's outcome is `p4k_import_run_kind.sweep` (`SWEPT`, `SKIPPED_PART
 `SKIPPED_EMPTY`, `SKIPPED_DUPLICATE_GUID`, `SKIPPED_MASS_GUARD`) and, when skipped, a
 `SWEEP_SKIPPED` report row with the kind's P4K-known rows and the rows it would have stamped.
 
-> [!note] Planned — the category, starmap and shop tables
-> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027), the starmap objects and
-> the shops do not exist yet; each joins the sweep as one `P4kSweepTarget` when its area adds the
-> table with `p4k_uuid`, `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
+The starmap objects are the target `STARMAP_OBJECT`; their name is a game text, so a report row
+names them by class name, and no other source lists them.
+
+> [!note] Planned — the category and shop tables
+> The commodity and blueprint category tables (REQ-P4K-025, REQ-P4K-027) and the shops do not exist
+> yet; each joins the sweep as one `P4kSweepTarget` when its area adds the table with `p4k_uuid`, `p4k_seen_run_id`, `p4k_deleted_at` and `p4k_hidden_at`.
 
 **Enforced by:** `P4kImportServiceSweepTest` · **Code:** `P4kSweeper`, `P4kSweepTarget`,
 `P4kSweepOutcome` · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
@@ -962,10 +966,19 @@ object follows the sweep (REQ-P4K-011); a UEX row linked to it stays usable.
 
 **Acceptance**
 
-- [ ] An object whose parent is imported in the same run gets its parent link, whatever the order.
-- [ ] A jump point without a UEX counterpart is imported and is no trade place.
+- [x] An object whose parent is imported in the same run gets its parent link, whatever the order.
+- [x] A jump point without a UEX counterpart is imported and is no trade place.
 
-**Enforced by (planned):** `P4kStarmapImportTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+Every record with a GUID is matched by that GUID or added (`ADDED`); the P4K writes every column
+but the admin's visibility override, a `null` included, and a changed column is a `CHANGED` report
+row. The parent is set once the whole kind is read; a `parentGuid` the catalogue does not list
+leaves the parent `null`. A GUID the catalogue repeats is read once. `name` and `name_de` are game
+texts (`@GameText`): a report row names the object by its class name only. A catalogue without
+starmap objects leaves the tree and the links as they are. The result's `starmapObjects` counts the
+objects (`matched`, `enriched`, `created`) and the UEX rows left unlinked (`unmatched`, `review`).
+
+**Enforced by:** `P4kStarmapImportTest`, `GameTextClassificationTest` · **Code:**
+`P4kStarmapReconciler`, `StarmapObject` (V352) · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-035 — the UEX locations link to the starmap tree; ambiguity goes to review, manual links win
 
@@ -979,11 +992,38 @@ event (REQ-P4K-046).
 
 **Acceptance**
 
-- [ ] A city whose name, type and linked planet match one object is linked.
-- [ ] Two candidates open one review case and link nothing.
-- [ ] A manual link survives an APPLY that would link elsewhere.
+- [x] A city whose name, type and linked planet match one object is linked.
+- [x] Two candidates open one review case and link nothing.
+- [x] A manual link survives an APPLY that would link elsewhere.
 
-**Enforced by (planned):** `P4kStarmapLinkTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+The tables are linked parents first, in the order above. A name is normalised to lower case without
+accents, every other run of characters one space, and compared with the object's English name. The
+type is compared as a family, the type's lower-case name up to its first `_` (`Outpost_InvalidQT` is
+`outpost`), taken from the types of the LIVE catalogue: `star_system` takes `star` (the star
+carries the system's name, `Stanton`) and `solarsystem`; `orbit` `planet`, `jumppoint` and
+`anomaly` (the jump points of Pyro and Nyx); `planet` `planet`; `moon` `moon`; `city`
+`landingzone` and `manmade` (Levski); `space_station` `manmade` (Everus Harbor) and
+`manmade_visibleoninteraction`'s family `manmade` (the Lagrange stations), and `landingzone`;
+`outpost` `outpost`, `manmade`; `poi` `pointofinterest`, `outpost`, `manmade`, `asteroid`,
+`navpoint`, `anomaly`; `terminal` `manmade`, `pointofinterest`, `outpost`, `landingzone`. The parent is the nearest parent the row names
+(UEX's `*_name` columns: city, space station, outpost, moon, planet, orbit, then the star system)
+that is linked; a candidate must lie below it at any depth, and with no linked parent every object of
+the name and type is a candidate. A stamped or hidden object links nothing new. A row left unlinked
+is one `UNMATCHED` row and one case `STARMAP_LINK_AMBIGUOUS` or `STARMAP_LINK_NOT_FOUND` of kind
+`STARMAP_OBJECT`, whose GUID is a name-based UUID of the table and the row; the report names the row
+by its table and its UEX name, and a run that links the row closes the case as `RESOLVED`. A link
+the run changes is a `CHANGED` row (`<table>.starmap_object_id`, old and new GUID).
+
+The link columns are not mapped on the UEX entities, so a UEX sync never writes them. An admin sets
+(`SET`), clears (`CLEAR`) or hands back to the import (`RELEASE`) a link at
+`PUT /api/v1/catalog/admin/starmap/places/{kind}/{id}/link`; the request echoes the link and the
+manual flag the admin saw and is a `409` when either changed meanwhile, so it never collides with an
+edit of the row's UEX data. `SET` and `CLEAR` mark the link manual (`starmap_link_manual`), which
+every APPLY leaves alone.
+
+**Enforced by:** `P4kStarmapLinkTest`, `StarmapPlaceKindTest` · **Code:** `P4kStarmapLinker`,
+`StarmapPlaceKind`,
+`StarmapPlaceRows`, `StarmapAdminService`, `P4kRunResolvedCases` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-036 — a storage place can sit on any visible starmap node an admin picks
 
@@ -995,11 +1035,18 @@ exchange `uex` reference keep running through city and station.
 
 **Acceptance**
 
-- [ ] A `location` with none of the three references is refused by the database.
-- [ ] An admin creates a storage place on a visible outpost; a hidden object is refused.
-- [ ] An APPLY creates no `location` row.
+- [x] A `location` with none of the three references is refused by the database.
+- [x] An admin creates a storage place on a visible outpost; a hidden object is refused.
+- [x] An APPLY creates no `location` row.
 
-**Enforced by (planned):** `LocationStarmapNodeTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+`POST /api/v1/locations` creates a storage place only on a starmap object (`starmapObjectId`, `400`
+without one or on an object that is not visible) that carries none yet and that no city or space
+station links to (`409`), audited `CATALOGUE_STORAGE_PLACE_CREATED`; one node carries at most one
+place (`uq_location_starmap_object`). The node is set on create only. The database refuses a row
+with none of the three (`ck_location_place`, V352).
+
+**Enforced by:** `LocationStarmapNodeTest`, `LocationServiceTest`, `P4kStarmapImportTest` · **Code:**
+`LocationService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-037 — a linked place shows its P4K name, and only the curated name reaches the exchange
 
@@ -1012,11 +1059,16 @@ write resolver tries `guid`, then `uex`, then the exact name (specified in
 
 **Acceptance**
 
-- [ ] A German page shows the German P4K name of a linked city; the exchange serves its
+- [x] A German page shows the German P4K name of a linked city; the exchange serves its
   `location.name`.
 
-**Enforced by (planned):** `LocationNameDisplayTest`, `ExchangeResolveServiceTest` · **ADR:**
-[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896
+A place is linked through its own node, else through its city's, else its space station's object.
+`LocationDto` carries the object's `p4kName` and `p4kNameDe` (read-only); the admin locations page
+shows the one of the page language under the curated name.
+
+**Enforced by:** `LocationNameDisplayTest`, `LocationStarmapNodeTest`,
+`ExchangeLocationGuidIntegrationTest`, `ExchangeCatalogControllerTest` · **ADR:**
+[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2896, #3044
 
 ### REQ-P4K-038 — a starmap object is visible only inside a linked live star system
 
@@ -1028,11 +1080,20 @@ rule, survives re-imports and is an audit event (REQ-P4K-046).
 
 **Acceptance**
 
-- [ ] An object in a linked live system with a position and `hideInStarmap` `false` is visible; the
+- [x] An object in a linked live system with a position and `hideInStarmap` `false` is visible; the
   same object with `hideInStarmap` `null` or `true`, or without a position, is hidden.
-- [ ] An admin override to visible survives the next APPLY.
+- [x] An admin override to visible survives the next APPLY.
 
-**Enforced by (planned):** `StarmapVisibilityTest` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902
+The object's `system` is the folder of its star system (`stanton`); it is linked to the UEX star
+system whose normalised name equals it. An object the sweep stamped or an admin hid through a review
+case is never visible. The override is `starmap_object.visibility_override` (`VISIBLE`, `HIDDEN`, or
+`null` for the rule), set at `PUT /api/v1/catalog/admin/starmap/objects/{id}/visibility` with the
+object's version and audited `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` (`visibility=VISIBLE|HIDDEN|RULE`).
+The admin page `/admin/starmap` lists the objects with their visibility and the UEX rows with their
+links.
+
+**Enforced by:** `StarmapVisibilityTest`, `AdminStarmapControllerMvcTest` · **Code:**
+`StarmapVisibility`, `StarmapAdminService` · **ADR:** [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) · **Issues:** #2902, #3044
 
 ### REQ-P4K-039 — no feature references a location by an external id
 
@@ -1204,7 +1265,13 @@ the never-pruned detail record; the audit event carries no free text.
   override and storage place writes exactly one `CATALOGUE` event with the row UUID as subject;
   the event types of the override and the review resolution exist.
 
-**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest` ·
+The starmap's events are recorded: `CATALOGUE_STARMAP_LINK_SET`, `…_LINK_CLEARED` and
+`…_LINK_RELEASED` (subject the UEX row, details `kind`, `starmapObjectId`,
+`previousStarmapObjectId`), `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` and
+`CATALOGUE_STORAGE_PLACE_CREATED`; the shop link's event follows with REQ-P4K-043.
+
+**Enforced by:** `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
+`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest` ·
 **Enforced by (planned):** further cases in `CatalogueAuditTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901
 
 ### REQ-P4K-047 — the import is monitored and says when it is due

@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -916,7 +917,7 @@ class ExchangeUndoControllerTest {
 
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Place " + id);
+    TestPlaces.insertLocation(jdbc, id, "Place " + id);
     locations.add(id);
     return id;
   }

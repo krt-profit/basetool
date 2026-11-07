@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -78,6 +80,8 @@ class InventoryModuleContractTest {
   private static final String LOGISTICIAN = "ROLE_LOGISTICIAN";
 
   @Autowired private WebApplicationContext context;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -113,7 +117,7 @@ class InventoryModuleContractTest {
     ore = materialRepository.save(ore);
     hangar = new Location();
     hangar.setName("Inv Hangar " + tag);
-    hangar = locationRepository.save(hangar);
+    hangar = locationRepository.save(TestPlaces.onOwnCity(hangar, cityRepository));
   }
 
   @Test

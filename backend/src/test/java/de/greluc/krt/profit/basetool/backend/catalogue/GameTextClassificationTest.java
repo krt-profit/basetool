@@ -82,7 +82,9 @@ class GameTextClassificationTest {
           "/$defs/Ship/properties/description",
           List.of("ShipType.descriptionEn", "ShipType.descriptionDe"),
           "/$defs/Commodity/properties/description",
-          List.of("Material.description"));
+          List.of("Material.description"),
+          "/$defs/StarmapObject/properties/name",
+          List.of("StarmapObject.name", "StarmapObject.nameDe"));
 
   /** The schema properties marked {@code "x-gameText": true} that the Basetool does not store. */
   private static final Set<String> NOT_IMPORTED =
@@ -120,7 +122,6 @@ class GameTextClassificationTest {
           "/$defs/RefiningProcess/properties/processName",
           "/$defs/ReputationScope/properties/displayName",
           "/$defs/ReputationStanding/properties/displayName",
-          "/$defs/StarmapObject/properties/name",
           "/$defs/StringOption/properties/displayName");
 
   @Test

@@ -657,6 +657,16 @@ public enum AuditEventType {
   CATALOGUE_P4K_REVIEW_KEPT(AuditDomain.CATALOGUE),
   /** An admin resolved a P4K review case by hiding the row (REQ-P4K-016). */
   CATALOGUE_P4K_REVIEW_HIDDEN(AuditDomain.CATALOGUE),
+  /** An admin linked a UEX location to a starmap object by hand (REQ-P4K-035). */
+  CATALOGUE_STARMAP_LINK_SET(AuditDomain.CATALOGUE),
+  /** An admin unlinked a UEX location from the starmap by hand (REQ-P4K-035). */
+  CATALOGUE_STARMAP_LINK_CLEARED(AuditDomain.CATALOGUE),
+  /** An admin handed a UEX location's starmap link back to the P4K import (REQ-P4K-035). */
+  CATALOGUE_STARMAP_LINK_RELEASED(AuditDomain.CATALOGUE),
+  /** An admin set a starmap object visible or hidden, or back to the rule (REQ-P4K-038). */
+  CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN(AuditDomain.CATALOGUE),
+  /** An admin created a storage place on a starmap object (REQ-P4K-036). */
+  CATALOGUE_STORAGE_PLACE_CREATED(AuditDomain.CATALOGUE),
   /** An admin deleted sync-report rows older than a chosen age. */
   CATALOGUE_SYNC_REPORTS_DELETED(AuditDomain.CATALOGUE),
   /** A UEX or SC Wiki sync run finished, with its outcome and committed counts. */

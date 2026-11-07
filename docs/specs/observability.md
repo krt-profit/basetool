@@ -4101,8 +4101,9 @@ alerts never carry `source="P4K"`.
     later run matched again.
   - `basetool_p4k_review_cases_open{kind}` and `basetool_p4k_review_case_open_oldest_age_seconds`.
 
-  The starmap kind joins these gauges with its rows, its unmatched UEX rows and its open link
-  reviews when it is imported
+  The starmap kind is `kind="STARMAP_OBJECT"` in these gauges: its `matched`, `added` and
+  `changed` rows count the starmap objects, its `unmatched` rows the UEX location rows the run left
+  unlinked, and `basetool_p4k_review_cases_open` its open link reviews
   ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
   change report records a skipped sweep.

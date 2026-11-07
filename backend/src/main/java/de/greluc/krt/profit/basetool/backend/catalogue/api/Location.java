@@ -86,4 +86,12 @@ public class Location extends AbstractEntity<UUID> {
    */
   @Column(name = "reference_only", nullable = false)
   private Boolean referenceOnly = false;
+
+  /**
+   * The starmap object an admin made this storage place on (REQ-P4K-036), or {@code null} for a
+   * place that hangs on a city or space station; set on create only.
+   */
+  @Column(name = "starmap_object_id", updatable = false)
+  @Nullable
+  private UUID starmapObjectId;
 }

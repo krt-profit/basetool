@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -75,6 +77,9 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
   private static final int STATEMENT_BOUND = 15;
 
   @Autowired private JobOrderStockReadService stockReadService;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private JobOrderQueryService queryService;
   @Autowired private JobOrderStockProjectionService projectionService;
   @Autowired private InventoryItemRepository inventoryItemRepository;
@@ -224,7 +229,7 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
     created.add(gameItem);
     Location location = new Location();
     location.setName("Linked Depot " + tag);
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     created.add(location);
     JobOrder order =
         jobOrderRepository.save(

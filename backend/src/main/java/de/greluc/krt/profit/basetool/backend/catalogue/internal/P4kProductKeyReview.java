@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ProducedItemGuidFollo
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -53,7 +52,7 @@ public class P4kProductKeyReview {
   private static final String CASE_GUID_PREFIX = "personal-blueprint-product-key:";
 
   private final List<ProducedItemGuidFollower> followers;
-  private final P4kReviewCaseRepository caseRepository;
+  private final P4kRunResolvedCases runResolvedCases;
 
   /**
    * Lets every follower move its rows and records the name keys left over; an APPLY also reopens
@@ -64,7 +63,7 @@ public class P4kProductKeyReview {
    */
   public void follow(@NotNull P4kImportContext context, @NotNull Instant now) {
     boolean apply = context.isApply();
-    Set<CaseKey> found = new HashSet<>();
+    Set<P4kRunResolvedCases.Found> found = new HashSet<>();
     for (ProducedItemGuidFollower follower : followers) {
       for (UnresolvedProductKey key : follower.followProducedItemGuids(apply)) {
         UUID guid = caseGuid(key.nameKey());
@@ -72,41 +71,17 @@ public class P4kProductKeyReview {
             key.ambiguous()
                 ? P4kReviewReason.PRODUCT_KEY_AMBIGUOUS
                 : P4kReviewReason.PRODUCT_KEY_UNRESOLVED;
-        found.add(new CaseKey(guid, reason));
+        P4kRunResolvedCases.Found finding = new P4kRunResolvedCases.Found(guid, reason);
+        found.add(finding);
         context.getReport().review(P4kKind.BLUEPRINT, new NameKeyRecord(key), guid, reason, null);
-        if (!apply) {
-          continue;
+        if (apply) {
+          runResolvedCases.reopenIfRunResolved(P4kKind.BLUEPRINT, finding);
         }
-        caseRepository
-            .findByKindAndGuidAndReason(P4kKind.BLUEPRINT, guid, reason)
-            .filter(c -> c.getResolution() == P4kReviewResolution.RESOLVED)
-            .ifPresent(P4kProductKeyReview::reopen);
       }
     }
-    if (!apply) {
-      return;
+    if (apply) {
+      runResolvedCases.closeUnfound(P4kKind.BLUEPRINT, REASONS, found, now);
     }
-    for (P4kReviewCase open :
-        caseRepository.findByStatusAndKindAndReasonIn(
-            P4kReviewStatus.OPEN, P4kKind.BLUEPRINT, REASONS)) {
-      if (!found.contains(new CaseKey(open.getGuid(), open.getReason()))) {
-        open.setStatus(P4kReviewStatus.REVIEWED);
-        open.setResolution(P4kReviewResolution.RESOLVED);
-        open.setResolvedAt(now);
-      }
-    }
-  }
-
-  /**
-   * Opens a case a run closed again, because a later run found its name key unresolved once more;
-   * an admin's decision is never reopened.
-   *
-   * @param reviewCase the case closed as {@code RESOLVED}
-   */
-  private static void reopen(@NotNull P4kReviewCase reviewCase) {
-    reviewCase.setStatus(P4kReviewStatus.OPEN);
-    reviewCase.setResolution(null);
-    reviewCase.setResolvedAt(null);
   }
 
   /**
@@ -117,16 +92,8 @@ public class P4kProductKeyReview {
    */
   @NotNull
   static UUID caseGuid(@NotNull String nameKey) {
-    return UUID.nameUUIDFromBytes((CASE_GUID_PREFIX + nameKey).getBytes(StandardCharsets.UTF_8));
+    return P4kRunResolvedCases.caseGuid(CASE_GUID_PREFIX + nameKey);
   }
-
-  /**
-   * The identity of a review case of this review.
-   *
-   * @param guid the case GUID
-   * @param reason the reason
-   */
-  private record CaseKey(@NotNull UUID guid, @NotNull P4kReviewReason reason) {}
 
   /**
    * A name key as the report row names it: its name key as class name, its product name as English

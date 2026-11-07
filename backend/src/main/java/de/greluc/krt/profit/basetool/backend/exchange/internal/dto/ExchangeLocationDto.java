@@ -20,17 +20,20 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * A non-hidden Lager location for external clients, in the shape of the published {@code
  * location.schema.json} (REQ-XCH-018).
  *
- * @param name the location name
+ * @param name the location's curated name, never a starmap game text
  * @param uex the UEX place the location stands for, or {@code null} when it has none
+ * @param guid the GUID of the P4K starmap object the location stands for, or {@code null} when it
+ *     links none (REQ-P4K-037)
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record ExchangeLocationDto(String name, @Nullable UexRef uex) {
+public record ExchangeLocationDto(String name, @Nullable UexRef uex, @Nullable UUID guid) {
 
   /**
    * A UEX place.

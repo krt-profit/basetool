@@ -5,6 +5,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-07
 
+- **New: warehouse locations carry `guid`.** A location linked to a starmap object, itself or
+  through its city or space station, carries the object's DataForge GUID as `guid` in
+  `catalog/locations` and in the `location` of the stock, org-stock and ship feeds. A `location` in
+  a change set accepts `guid`, tried before `uex` and `name`; an unknown GUID falls back to them
+  ([formats](formats.md#place--location-ref)). `uex` stays and is not deprecated; `name` stays the
+  warehouse's own name. `location.schema.json` and `location-ref.schema.json` gain the optional
+  `guid`.
 - **Changed: a `SHIP_TYPE` name several ship types share is `ambiguous`.** It resolved to one of
   them before; it now answers `ambiguous` with at most ten candidates, so let the member pick one or
   send a key field. No schema changes: `ambiguous` with its candidates has always been a possible

@@ -167,9 +167,11 @@ item-ref.schema.json#/properties/nameLocale IDENTIFIER
 item-ref.schema.json#/properties/scGuid IDENTIFIER
 item-ref.schema.json#/properties/scRecord IDENTIFIER
 item-ref.schema.json#/properties/uexId IDENTIFIER
+location-ref.schema.json#/properties/guid IDENTIFIER
 location-ref.schema.json#/properties/name SHORT_NAME
 location-ref.schema.json#/properties/uex/properties/id IDENTIFIER
 location-ref.schema.json#/properties/uex/properties/kind FACT_VALUE
+location.schema.json#/properties/guid IDENTIFIER
 location.schema.json#/properties/name SHORT_NAME
 location.schema.json#/properties/uex/properties/id IDENTIFIER
 location.schema.json#/properties/uex/properties/kind FACT_VALUE

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -35,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
@@ -60,6 +62,8 @@ class LocationDeleteInUseIntegrationTest {
       "Cannot delete location: It is currently used by one or more refinery orders.";
 
   @Autowired private LocationService locationService;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private ShipRepository shipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
@@ -92,7 +96,7 @@ class LocationDeleteInUseIntegrationTest {
   private Location location() {
     Location location = new Location();
     location.setName("Loc Hub " + UUID.randomUUID());
-    return locationRepository.saveAndFlush(location);
+    return locationRepository.saveAndFlush(TestPlaces.onOwnCity(location, cityRepository));
   }
 
   private void ship(Location location) {

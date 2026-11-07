@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
@@ -762,7 +763,7 @@ class ExchangeStockUnshareControllerTest {
 
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Place " + id);
+    TestPlaces.insertLocation(jdbc, id, "Place " + id);
     locations.add(id);
     return id;
   }

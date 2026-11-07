@@ -75,7 +75,14 @@ enum P4kSweepTarget {
       "Blueprint",
       "e.scwikiKey",
       "e.outputName",
-      "e.scwikiSyncedAt IS NOT NULL AND e.scwikiDeletedAt IS NULL");
+      "e.scwikiSyncedAt IS NOT NULL AND e.scwikiDeletedAt IS NULL"),
+
+  /**
+   * {@code starmap_object}; its name is a game text, so the report names it by its class name, and
+   * no other source lists it.
+   */
+  STARMAP_OBJECT(
+      P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL");
 
   /** The kind. */
   @NotNull private final P4kKind kind;
@@ -106,6 +113,7 @@ enum P4kSweepTarget {
       case MANUFACTURER -> MANUFACTURER;
       case COMMODITY -> COMMODITY;
       case BLUEPRINT -> BLUEPRINT;
+      case STARMAP_OBJECT -> STARMAP_OBJECT;
     };
   }
 

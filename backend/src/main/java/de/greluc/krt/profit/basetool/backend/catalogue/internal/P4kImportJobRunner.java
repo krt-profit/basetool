@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
@@ -186,11 +187,12 @@ public class P4kImportJobRunner {
         || hasChanges(result.items())
         || hasChanges(result.ships())
         || hasChanges(result.commodities())
-        || hasChanges(result.blueprints());
+        || hasChanges(result.blueprints())
+        || hasChanges(result.starmapObjects());
   }
 
-  private static boolean hasChanges(P4kImportResultDto.Counts counts) {
-    return counts.created() > 0 || counts.enriched() > 0;
+  private static boolean hasChanges(P4kImportResultDto.@Nullable Counts counts) {
+    return counts != null && (counts.created() > 0 || counts.enriched() > 0);
   }
 
   /**
