@@ -514,6 +514,40 @@ class UexUniverseSyncServiceTest {
   }
 
   @Test
+  void syncCities_givesALiveCityItsOwnLocation_whenAStarmapNodePlaceHoldsItsName() {
+    City city = savedCity(6, "Krt Node Name");
+    Location nodePlace = new Location();
+    nodePlace.setId(UUID.randomUUID());
+    nodePlace.setName("Krt Node Name");
+    nodePlace.setStarmapObjectId(UUID.randomUUID());
+    when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(6, "Krt Node Name", 1))));
+    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.empty());
+    when(locationRepository.findByName("Krt Node Name")).thenReturn(Optional.of(nodePlace));
+    when(locationRepository.findByName("Krt Node Name (UEX city 6)")).thenReturn(Optional.empty());
+
+    service.syncCities();
+
+    ArgumentCaptor<Location> cap = ArgumentCaptor.forClass(Location.class);
+    verify(locationRepository).save(cap.capture());
+    assertNotSame(nodePlace, cap.getValue());
+    assertEquals("Krt Node Name (UEX city 6)", cap.getValue().getName());
+    assertSame(city, cap.getValue().getCity());
+    assertNull(nodePlace.getCity());
+  }
+
+  @Test
+  void syncCities_createsNoLocation_whenBothNamesAreHeld() {
+    City city = savedCity(8, "Krt Taken");
+    when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(8, "Krt Taken", 1))));
+    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.empty());
+    when(locationRepository.findByName(any())).thenReturn(Optional.of(new Location()));
+
+    service.syncCities();
+
+    verify(locationRepository, never()).save(any());
+  }
+
+  @Test
   void syncSpaceStations_leavesALocationThatIsNotReferenceOnly_whenNotAvailableLive() {
     SpaceStation station = new SpaceStation();
     station.setId(UUID.randomUUID());

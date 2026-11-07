@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -73,19 +72,17 @@ public class P4kStarmapLinker {
     tree.all().stream()
         .filter(o -> o.getId() != null)
         .forEach(o -> guidById.put(o.getId(), o.getP4kUuid()));
-    Map<StarmapPlaceKind, Map<String, UUID>> linked = new EnumMap<>(StarmapPlaceKind.class);
+    StarmapParentLinks<UUID> linked = new StarmapParentLinks<>();
     Set<P4kRunResolvedCases.Found> found = new HashSet<>();
     for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
-      Map<String, UUID> linkedOfKind = new HashMap<>();
-      linked.put(kind, linkedOfKind);
       Map<UUID, UUID> writes = new LinkedHashMap<>();
       for (StarmapPlaceRow row : placeRows.rows(kind)) {
         UUID link =
             row.manual()
                 ? guidById.get(row.starmapObjectId())
-                : linkRow(row, tree, byName, linked, guidById, found, writes, context);
-        if (link != null && row.name() != null) {
-          linkedOfKind.put(StarmapNames.key(row.starSystem(), row.name()), link);
+                : linkRow(row, tree, byName, linked.byKind(), guidById, found, writes, context);
+        if (link != null) {
+          linked.put(row, link);
         }
       }
       if (context.isApply()) {

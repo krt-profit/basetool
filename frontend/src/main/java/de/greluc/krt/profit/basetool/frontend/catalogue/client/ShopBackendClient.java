@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShopTerminalLinkRe
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShopTerminalOptionDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -70,18 +69,14 @@ public class ShopBackendClient {
       boolean unlinkedOnly,
       int page,
       int size) {
-    StringBuilder uri =
-        new StringBuilder(BASE).append("?page={page}&size={size}&unlinkedOnly={unlinkedOnly}");
-    List<Object> variables = new ArrayList<>(List.of(page, size, unlinkedOnly));
-    if (starSystem != null) {
-      uri.append("&starSystem={starSystem}");
-      variables.add(starSystem);
-    }
-    if (query != null) {
-      uri.append("&query={query}");
-      variables.add(query);
-    }
-    return backendApiClient.get(uri.toString(), SHOP_PAGE, variables.toArray());
+    QueryTemplate uri =
+        new QueryTemplate(BASE)
+            .param("page", page)
+            .param("size", size)
+            .param("unlinkedOnly", unlinkedOnly)
+            .param("starSystem", starSystem)
+            .param("query", query);
+    return backendApiClient.get(uri.template(), SHOP_PAGE, uri.variables());
   }
 
   /**

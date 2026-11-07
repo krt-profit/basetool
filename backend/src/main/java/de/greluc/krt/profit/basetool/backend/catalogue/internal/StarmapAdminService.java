@@ -158,7 +158,10 @@ public class StarmapAdminService {
     List<StarmapPlaceRow> slice = rows.subList(from, to);
     Map<UUID, StarmapObject> objects = linkedObjects(slice);
     return new PageImpl<>(
-        slice.stream().map(r -> toDto(r, objects.get(r.starmapObjectId()))).toList(),
+        slice.stream()
+            .map(r ->
+                toDto(r, r.starmapObjectId() == null ? null : objects.get(r.starmapObjectId())))
+            .toList(),
         pageable,
         rows.size());
   }

@@ -772,7 +772,7 @@ Each writer therefore evicts the caches it can make stale **on completion**, thr
   data. (The UEX set covers the universe catalogues it rewrites — cities, star systems, locations,
   terminals, POIs, outposts — alongside the commodity / manufacturer / ship-type / refining-method
   caches; the P4K set covers the material / manufacturer / ship-type / blueprint-family caches its
-  apply reconciles.)
+  apply reconciles, and the locations, which carry their starmap objects' P4K names.)
 - This is also the sole scheduler evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write
   hook of its own (CACHE-DIST-03); it is rebuilt by the SC Wiki blueprint sync and the P4K blueprint
   apply, so evicting it on their completion is both necessary and sufficient.

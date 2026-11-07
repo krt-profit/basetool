@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStock
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -113,6 +114,21 @@ class ExchangeLocationGuidIntegrationTest {
     jdbc.update("UPDATE city SET starmap_object_id = ? WHERE id_city = ?", nodeObject, OTHER_CITY);
 
     assertThat(resolver.resolve(new ExchangeLocationRef(null, null, NODE_GUID))).contains(onNode);
+  }
+
+  @Test
+  void aSweptOrHiddenStarmapObjectGivesThePlaceNoGuid() {
+    jdbc.update("UPDATE starmap_object SET p4k_deleted_at = now() WHERE p4k_uuid = ?", CITY_GUID);
+
+    assertThat(resolver.resolve(new ExchangeLocationRef(null, null, CITY_GUID))).isEmpty();
+    assertThat(locationRepository.findExchangeGuids(List.of(onLinkedCity.getId()))).isEmpty();
+
+    jdbc.update(
+        "UPDATE starmap_object SET p4k_deleted_at = NULL, p4k_hidden_at = now() WHERE p4k_uuid = ?",
+        CITY_GUID);
+
+    assertThat(resolver.resolve(new ExchangeLocationRef(null, null, CITY_GUID))).isEmpty();
+    assertThat(locationRepository.findExchangeGuids(List.of(onLinkedCity.getId()))).isEmpty();
   }
 
   @Test
