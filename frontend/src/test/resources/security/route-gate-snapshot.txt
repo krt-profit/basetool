@@ -103,6 +103,7 @@
 /admin/org-structure/squadrons/{id}/update POST -> AdminSquadronsPageController#updateSquadron gate=class:hasRole('ADMIN') layout=yes
 /admin/org-structure/squadrons/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#updateSquadronAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import GET -> AdminP4kImportPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/due GET -> AdminP4kReportController#due gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/jobs GET -> AdminP4kImportPageController#listJobs gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs POST consumes=[multipart/form-data] -> AdminP4kImportPageController#enqueuePreview gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
