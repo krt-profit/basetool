@@ -146,7 +146,7 @@ steps; the first that fails ends it:
 
 | Step | Refused as |
 | --- | --- |
-| `material` resolves as a material, else as an item | `unmatched` `UNMATCHED`, `ambiguous` `AMBIGUOUS` |
+| `material` resolves [as a material, else as an item](#how-material-resolves) | `unmatched` `UNMATCHED`, `ambiguous` `AMBIGUOUS` |
 | `location` resolves to a warehouse location, never created | `rejected` `LOCATION_UNKNOWN` |
 | `quantity` and `expectedQuantity` are in the material's unit — `PIECE` for an item | `rejected` `UNIT_MISMATCH` |
 | `stolen: true` needs the Basetool's stolen marking, which may be switched off | `rejected` `STOLEN_MARKING_DISABLED` |
@@ -161,6 +161,21 @@ it sends. `REMOVED_ELSEWHERE` guards against refilling what the member emptied
 elsewhere; ask the member, then resend with `override: true`. On `STOCK_EARMARKED`, ask the member
 to release the reservation in the web. On `VERSION_CONFLICT`, pull the feed, merge, and send the op
 again under a new `Idempotency-Key`.
+
+### How `material` resolves
+
+The server resolves an op's `material` reference in this order, the first that holds deciding:
+
+1. It matches exactly one material, by any key or by its exact, canonical or alias name: that
+   material.
+2. It matches exactly one item, by `bt`, `scRecord`, `scGuid`, `uexId`, `locKey` or exact `name`:
+   that item.
+3. Either catalogue matched several entries, or the material names only came close (fuzzy
+   suggestions): `ambiguous` `AMBIGUOUS`.
+4. Otherwise: `unmatched` `UNMATCHED`.
+
+A material whose name merely resembles an item's never hides that item. The same order applies to
+`share`, `unshare` and the [org-stock](org-stock.md) `book-in`.
 
 ### Sharing into a unit's pool
 

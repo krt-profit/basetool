@@ -985,6 +985,14 @@ quality 0. `materialKind` classifies a material for the client's own lists — `
 decides the quality. An item lot of a ship component carries `component` (REQ-XCH-049). Writes are
 audited in the Lager domain with the external client.
 
+A lot's `material` reference resolves in a fixed order (`ExchangeLotCatalogue`): an exact material
+match (any key, exact, canonical or alias name) wins; else an exact item match (any key or exact
+name); else `ambiguous` `AMBIGUOUS` when either catalogue matched several entries or the material
+names only came close (fuzzy suggestions); else `unmatched` `UNMATCHED`. A fuzzy material
+suggestion never hides an exact item, whichever key the op sends beside `name`. `set-quantity`,
+`share`, `unshare` and the org-stock `book-in` (REQ-XCH-045) share this order; the generic
+`catalog/resolve` answers stay as they are.
+
 A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
 member holds shared rows of the lot, ordered by unit id — only the member's own rows, and a pool of
