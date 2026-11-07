@@ -52,14 +52,20 @@ import org.springframework.stereotype.Component;
  * link, fills the empty description and refreshes the name key. A commodity is created only when a
  * record of the run references its {@code ResourceType} and that reference joins it alone; such a
  * row is visible at once. On a row UEX does not know, a commodity with a {@code refinedSubtypeGuid}
- * becomes RAW and its resolved target REFINED.
+ * becomes RAW and its resolved target REFINED. A group or refined-from link an admin overrides
+ * ({@link MaterialP4kOverride}) is kept, and a differing P4K value is reported as {@code
+ * P4K_DISAGREEMENT}.
  */
 @Component
 @RequiredArgsConstructor
 public class P4kCommodityReconciler {
 
+  /** The {@code external_sync_report} aggregate of a commodity disagreement. */
+  private static final String REPORT_AGGREGATE = "commodity";
+
   private final MaterialRepository materialRepository;
   private final P4kReviewCaseRepository reviewCaseRepository;
+  private final SyncReportService syncReportService;
 
   /**
    * Reconciles every commodity; the resource groups must be reconciled first.
@@ -120,7 +126,7 @@ public class P4kCommodityReconciler {
       P4kCommodityDto targetRecord = join.single(commodity.refinedSubtypeGuid());
       Reconciled target = targetRecord == null ? null : rows.get(targetRecord);
       if (target != null) {
-        linkRefined(source, target, context);
+        linkRefined(source, commodity, target, context);
       } else if (targetRecord == null) {
         linkAssigned(source, commodity, assignments, context);
       }
@@ -137,7 +143,7 @@ public class P4kCommodityReconciler {
         if (reconciled.writer() == null) {
           createdWithoutGroup.add(row);
         }
-      } else if (row.getId() != null) {
+      } else if (row.getId() != null && !row.isResourceGroupManual()) {
         grouped.add(row.getId());
       }
     });
@@ -147,7 +153,8 @@ public class P4kCommodityReconciler {
   /**
    * What the commodities of a run leave for the group review (REQ-P4K-025).
    *
-   * @param grouped the saved materials the run gives a resource group from their record
+   * @param grouped the saved materials the run gives a resource group from their record; a material
+   *     whose group an admin overrides is left out, its stored group decides
    * @param createdWithoutGroup the materials the run creates whose record names no group, unsaved
    *     in a preview
    */
@@ -180,12 +187,22 @@ public class P4kCommodityReconciler {
         writer.lead("name", row.getName(), name, row::setName, Function.identity());
       }
     }
-    writer.lead(
-        "category_id",
+    MaterialCategory group = context.resourceGroup(commodity.typeGuid());
+    if (!overridden(
+        MaterialP4kOverride.RESOURCE_GROUP,
+        row,
+        commodity,
         row.getCategory(),
-        context.resourceGroup(commodity.typeGuid()),
-        row::setCategory,
-        MaterialCategory::getName);
+        group,
+        MaterialCategory::getName,
+        context)) {
+      writer.lead(
+          MaterialP4kOverride.RESOURCE_GROUP.getColumn(),
+          row.getCategory(),
+          group,
+          row::setCategory,
+          MaterialCategory::getName);
+    }
     writer.lead(
         "density_g_per_cc",
         row.getDensityGramPerCc(),
@@ -271,24 +288,16 @@ public class P4kCommodityReconciler {
    * @param assignments the admins' resource assignments
    * @param context the run
    */
-  private static void linkAssigned(
+  private void linkAssigned(
       @NotNull Reconciled source,
       @NotNull P4kCommodityDto commodity,
       @NotNull P4kResourceAssignments assignments,
       @NotNull P4kImportContext context) {
     UUID refinedSubtype = P4kGuids.parse(commodity.refinedSubtypeGuid());
     Material assigned = refinedSubtype == null ? null : assignments.material(refinedSubtype);
-    if (assigned == null) {
-      return;
+    if (assigned != null) {
+      linkRefinedMaterial(source, commodity, assigned, context);
     }
-    Material row = source.row();
-    source.write(
-        "refined_material_id",
-        row.getRefinedMaterial(),
-        assigned,
-        row::setRefinedMaterial,
-        Material::getName,
-        context);
   }
 
   /**
@@ -296,19 +305,16 @@ public class P4kCommodityReconciler {
    * marks the target REFINED.
    *
    * @param source the refining material
+   * @param commodity the source's record
    * @param target the material its {@code refinedSubtypeGuid} joins
    * @param context the run
    */
-  private static void linkRefined(
-      @NotNull Reconciled source, @NotNull Reconciled target, @NotNull P4kImportContext context) {
-    Material row = source.row();
-    source.write(
-        "refined_material_id",
-        row.getRefinedMaterial(),
-        target.row(),
-        row::setRefinedMaterial,
-        Material::getName,
-        context);
+  private void linkRefined(
+      @NotNull Reconciled source,
+      @NotNull P4kCommodityDto commodity,
+      @NotNull Reconciled target,
+      @NotNull P4kImportContext context) {
+    linkRefinedMaterial(source, commodity, target.row(), context);
     Material refined = target.row();
     if (refined.getIdCommodity() == null) {
       target.write(
@@ -319,6 +325,82 @@ public class P4kCommodityReconciler {
           MaterialType::name,
           context);
     }
+  }
+
+  /**
+   * Writes the material a source refines into, unless an admin overrides the link.
+   *
+   * @param source the refining material
+   * @param commodity the source's record
+   * @param refined the material the P4K names
+   * @param context the run
+   */
+  private void linkRefinedMaterial(
+      @NotNull Reconciled source,
+      @NotNull P4kCommodityDto commodity,
+      @NotNull Material refined,
+      @NotNull P4kImportContext context) {
+    Material row = source.row();
+    if (!overridden(
+        MaterialP4kOverride.REFINED_MATERIAL,
+        row,
+        commodity,
+        row.getRefinedMaterial(),
+        refined,
+        Material::getName,
+        context)) {
+      source.write(
+          MaterialP4kOverride.REFINED_MATERIAL.getColumn(),
+          row.getRefinedMaterial(),
+          refined,
+          row::setRefinedMaterial,
+          Material::getName,
+          context);
+    }
+  }
+
+  /**
+   * Whether an admin overrides a led field of a material; an APPLY then reports a P4K value that
+   * would replace the stored one as {@code P4K_DISAGREEMENT} and writes nothing.
+   *
+   * @param field the field
+   * @param row the material
+   * @param commodity the record
+   * @param current the material's value
+   * @param incoming the catalogue's value
+   * @param label renders a value for the report
+   * @param context the run
+   * @param <V> the value type
+   * @return {@code true} when the caller must not write the field
+   */
+  private <V> boolean overridden(
+      @NotNull MaterialP4kOverride field,
+      @NotNull Material row,
+      @NotNull P4kCommodityDto commodity,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Function<V, String> label,
+      @NotNull P4kImportContext context) {
+    if (!field.isSet(row)) {
+      return false;
+    }
+    UUID runId = context.getRunId();
+    if (incoming != null
+        && P4kFields.leads(current, incoming)
+        && context.isApply()
+        && runId != null) {
+      syncReportService.logP4kEvent(
+          runId,
+          SyncEventType.P4K_DISAGREEMENT,
+          REPORT_AGGREGATE,
+          commodity.parsedGuid(),
+          row.getName(),
+          P4kFields.disagreement(
+              field.getColumn(),
+              current == null ? null : label.apply(current),
+              label.apply(incoming)));
+    }
+    return true;
   }
 
   /**

@@ -239,6 +239,20 @@ public class Material extends AbstractEntity<UUID> implements P4kKeyedRow {
   private MaterialCategory category;
 
   /**
+   * Whether {@link #category} is an admin's override that no P4K APPLY writes over (REQ-P4K-025);
+   * the APPLY reports a differing P4K group instead.
+   */
+  @Column(name = "resource_group_manual", nullable = false)
+  private boolean resourceGroupManual;
+
+  /**
+   * Whether {@link #refinedMaterial} is an admin's override that no P4K APPLY writes over
+   * (REQ-P4K-024); the APPLY reports a differing P4K link instead.
+   */
+  @Column(name = "refined_material_manual", nullable = false)
+  private boolean refinedMaterialManual;
+
+  /**
    * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
    * Wiki UUID stays in {@code scwiki_uuid}.
    */

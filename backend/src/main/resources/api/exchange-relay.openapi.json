@@ -4049,6 +4049,14 @@
           "refinedMaterial" : {
             "$ref" : "#/components/schemas/MaterialDto"
           },
+          "refinedMaterialManual" : {
+            "type" : "boolean",
+            "readOnly" : true
+          },
+          "resourceGroupManual" : {
+            "type" : "boolean",
+            "readOnly" : true
+          },
           "type" : {
             "type" : "string"
           },

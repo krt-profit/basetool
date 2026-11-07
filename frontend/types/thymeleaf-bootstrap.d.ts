@@ -40,6 +40,8 @@ declare const CAT_MSG: KrtI18nDict;
 /** Injected by the page bootstrap (declared in materials.html). */
 declare const MSG_CREATE_ERROR: string;
 /** Injected by the page bootstrap (declared in materials.html). */
+declare const MSG_OVERRIDE_RELEASED: string;
+/** Injected by the page bootstrap (declared in materials.html). */
 declare const MSG_CREATE_SUCCESS: string;
 
 /** Injected by the page bootstrap (declared in materials.html). */

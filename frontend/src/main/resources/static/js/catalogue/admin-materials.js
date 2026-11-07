@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR */
+/* global CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR, MSG_OVERRIDE_RELEASED */
 
 import { krtAutocomplete } from '/js/kernel/autocomplete.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
@@ -109,6 +109,9 @@ function updateMaterial(selectElement) {
             successMessage: MSG_UPDATE_SUCCESS,
             errorMessage: MSG_UPDATE_ERROR,
             conflict: CAT_CONFLICT,
+            onSuccess(/** @type {ApiDto<'MaterialDto'> | null} */ material) {
+                showOverrides(tr, material);
+            },
         })
         .finally(() => {
             selectElement.disabled = false;
@@ -117,6 +120,61 @@ function updateMaterial(selectElement) {
 
 krtEvents.on('change', 'admin-materials-update', (el) => {
     updateMaterial(/** @type {HTMLInputElement | HTMLSelectElement} */ (el));
+});
+
+/**
+ * Shows each override marker of a material row exactly when the saved material holds that override.
+ *
+ * @param {HTMLTableRowElement} tr the material row
+ * @param {ApiDto<'MaterialDto'> | null} material the material as saved
+ */
+function showOverrides(tr, material) {
+    if (!material) {
+        return;
+    }
+    /** @type {Record<string, boolean>} */
+    const overrides = {
+        RESOURCE_GROUP: material.resourceGroupManual === true,
+        REFINED_MATERIAL: material.refinedMaterialManual === true,
+    };
+    tr.querySelectorAll('[data-p4k-override]').forEach((marker) => {
+        const field = marker.getAttribute('data-p4k-override') || '';
+        /** @type {HTMLElement} */ (marker).hidden = !overrides[field];
+    });
+}
+
+/**
+ * Hands an overridden field of a material back to the P4K import.
+ *
+ * @param {HTMLElement} button the marker's release button
+ */
+function releaseOverride(button) {
+    const tr = button.closest('tr');
+    if (!tr) {
+        return;
+    }
+    const matId = /** @type {string} */ (tr.getAttribute('data-mat-id'));
+    const field = /** @type {string} */ (button.getAttribute('data-p4k-field'));
+    const version = /** @type {string} */ (tr.getAttribute('data-version'));
+    krtFetch.write({
+        method: 'DELETE',
+        url:
+            `/admin/materials/${encodeURIComponent(matId)}/p4k-overrides/` +
+            `${encodeURIComponent(field)}/ajax?version=${encodeURIComponent(version)}`,
+        serialize: `admin-material:${matId}`,
+        submitter: button,
+        containerSelector: tr,
+        successMessage: MSG_OVERRIDE_RELEASED,
+        errorMessage: MSG_UPDATE_ERROR,
+        conflict: CAT_CONFLICT,
+        onSuccess(/** @type {ApiDto<'MaterialDto'> | null} */ material) {
+            showOverrides(tr, material);
+        },
+    });
+}
+
+krtEvents.on('click', 'admin-materials-release-override', (button) => {
+    releaseOverride(/** @type {HTMLElement} */ (button));
 });
 
 /**

@@ -802,6 +802,8 @@ name, and the file exports (the handover report PDF, the purchasing CSV), show `
   different name.
 - [x] A material UEX does not know becomes RAW when it has `refinedSubtypeGuid` and its target
   REFINED; a material UEX knows keeps the UEX type.
+- [x] An APPLY keeps a refined material an admin overrides and reports the P4K link it does not
+  write; once the admin hands the field back, the next APPLY writes the P4K link again.
 
 `P4kCommodityReconciler` writes the led values through `P4kRowWriter.lead` (a `CHANGED` row each);
 `subtypeGuid` is `material.p4k_subtype_uuid`, and the join is `P4kCommodityJoin`. The two review
@@ -818,8 +820,24 @@ it keeps its value, and a created row starts as `NO_REFINE`. A UEX name or SC Wi
 differs on a row with a `p4k_uuid` is reported as `P4K_DISAGREEMENT`. The P4K also leads
 `material.name_de` (REQ-P4K-023).
 
-**Enforced by:** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest` · **Code:**
-`P4kCommodityReconciler`, `P4kCommodityJoin` · **ADR:**
+**Admin override.** An admin who changes the refined material of a material with a `p4k_uuid` on
+`/admin/materials` (`MaterialService.updateMaterial`) sets `material.refined_material_manual` (V357,
+`MaterialP4kOverride.REFINED_MATERIAL`, audited `CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field`
+and `valueId`); the resource group of REQ-P4K-025 sets `resource_group_manual` the same way. A
+material without a `p4k_uuid` gets no override from an edit. While a field is overridden, an APPLY
+writes neither the refined-from link nor the material an admin assigned to its resource
+(`P4kResourceAssignments`) onto it, and records a P4K value that differs from the stored one in
+`external_sync_report` as `P4K_DISAGREEMENT` (aggregate `commodity`,
+`column=refined_material_id|category_id;stored=…;source=…`); a preview writes and records nothing.
+The page shows each overridden field with a "von Hand" chip and a button "An den Import
+zurückgeben", which calls `DELETE /api/v1/materials/{id}/p4k-overrides/{field}?version=`
+(`CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED`) through `krtFetch` and hides the chip in place. The
+release only clears the flag and keeps the stored value: the Basetool keeps no P4K value per row,
+so the next APPLY writes it. Both writes check the material's `@Version`.
+
+**Enforced by:** `P4kCommodityPrecedenceTest`, `UexCommodityServiceTest`,
+`P4kMaterialOverrideTest`, `MaterialP4kOverrideServiceTest`, `AdminMaterialsPageControllerMvcTest`
+· **Code:** `P4kCommodityReconciler`, `P4kCommodityJoin`, `MaterialP4kOverride` · **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891
 
 ### REQ-P4K-025 — the resource groups are the commodity categories
@@ -828,7 +846,8 @@ The `resourceGroups` kind becomes the commodity categories: P4K GUID as identity
 `name_de` from the P4K (the `className` when the name is a placeholder and `en` is `null`),
 `parentGuid` as the parent with a cycle guard (a group never becomes its own ancestor). The
 admin-maintained categories are not mapped onto groups: each P4K-matched material takes its group
-from its catalogue record on APPLY (`typeGuid`, REQ-P4K-024). A material that has no group after an
+from its catalogue record on APPLY (`typeGuid`, REQ-P4K-024), unless an admin overrides it (the
+admin override of REQ-P4K-024). A material that has no group after an
 APPLY (the P4K matched no record, or its record names no group) opens a review case "no resource
 group", which an admin resolves by assigning an existing group; admins never create or rename a
 group or a category. An admin category is retired once no material references it; until then it
@@ -846,6 +865,9 @@ category-to-group mapping holds.)
 - [x] A material without a group after an APPLY opens one case, the admin's assignment of an
   existing group resolves it with an audit event, and an admin category or a keep is refused.
 - [x] No admin endpoint creates or renames a category.
+- [x] An APPLY keeps a group an admin overrides, reports the P4K group, and opens no "no resource
+  group" case while the overriding group is a resource group; the case's `ASSIGN` sets the same
+  override.
 
 The groups are the rows of `material_category` (V348: `p4k_uuid`, `class_name`, `name_de`,
 `parent_id` and the P4K stamps; the name is no longer unique, as two groups are "Man-made"). They
@@ -861,13 +883,15 @@ category editor.
 The case is `NO_RESOURCE_GROUP` (kind `COMMODITY`, one per live material, its GUID a name-based
 UUID of the material's name); a later run closes it as `RESOLVED` once the material has a group.
 It is resolved only as `ASSIGN` with a live resource group from
-`GET /api/v1/catalog/admin/import/p4k/resource-groups` (`CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED`); keep
-and hide do not apply. An admin category is a `material_category` row without `p4k_uuid`; the
+`GET /api/v1/catalog/admin/import/p4k/resource-groups` (`CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED`),
+which sets `resource_group_manual`, so a later record naming a group does not replace the admin's;
+keep and hide do not apply. An overridden material is left out of the run's grouped set, so its
+stored group decides whether it opens a case. An admin category is a `material_category` row without `p4k_uuid`; the
 APPLY deletes the unreferenced ones (it is no P4K row, so REQ-P4K-013's stamp does not apply) and
 records the number as `adminCategoriesRetired` on `CATALOGUE_P4K_APPLIED`.
 
 **Enforced by:** `P4kResourceGroupImportTest`, `P4kMaterialGroupReviewTest`,
-`MaterialCategoryControllerTest` · **Code:** `P4kResourceGroupReconciler`, `P4kMaterialGroupReview`
+`MaterialCategoryControllerTest`, `P4kMaterialOverrideTest` · **Code:** `P4kResourceGroupReconciler`, `P4kMaterialGroupReview`
 · **ADR:**
 [ADR-0339](../adr/0339-the-p4k-catalogue-leads-commodities-and-its-resource-groups-become-the-commodity-categories.md) · **Issues:** #2891, #2825
 

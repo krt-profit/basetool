@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -320,7 +321,8 @@ public class MaterialService {
 
   /**
    * Updates the admin-maintained fields of a material; UEX-imported fields are not changed. Unknown
-   * refined-material or category ids resolve to {@code null}.
+   * refined-material or category ids resolve to {@code null}. A changed resource group or refined
+   * material of a P4K-known material becomes an admin override ({@link MaterialP4kOverride}).
    *
    * @param id material primary key
    * @param materialDetails the new values, including the expected version
@@ -355,6 +357,7 @@ public class MaterialService {
       material.setIsVisible(materialDetails.getIsVisible());
     }
 
+    UUID refinedBefore = idOf(material.getRefinedMaterial());
     if (materialDetails.getRefinedMaterial() != null
         && materialDetails.getRefinedMaterial().getId() != null) {
       Material refined =
@@ -364,6 +367,7 @@ public class MaterialService {
       material.setRefinedMaterial(null);
     }
 
+    UUID categoryBefore = idOf(material.getCategory());
     if (materialDetails.getCategory() != null && materialDetails.getCategory().getId() != null) {
       MaterialCategory category =
           materialCategoryRepository.findById(materialDetails.getCategory().getId()).orElse(null);
@@ -372,7 +376,72 @@ public class MaterialService {
       material.setCategory(null);
     }
 
+    overrideIfChanged(
+        material,
+        MaterialP4kOverride.REFINED_MATERIAL,
+        refinedBefore,
+        material.getRefinedMaterial());
+    overrideIfChanged(
+        material, MaterialP4kOverride.RESOURCE_GROUP, categoryBefore, material.getCategory());
     return materialRepository.save(material);
+  }
+
+  /**
+   * Marks a field the P4K leads as an admin override when an edit changes it on a P4K-known
+   * material, and audits the override once it is set (REQ-P4K-024, REQ-P4K-025).
+   *
+   * @param material the edited material
+   * @param field the field
+   * @param before the id the field held before the edit
+   * @param after the related row the field holds now
+   */
+  private void overrideIfChanged(
+      @NotNull Material material,
+      @NotNull MaterialP4kOverride field,
+      @Nullable UUID before,
+      @Nullable AbstractEntity<UUID> after) {
+    UUID afterId = idOf(after);
+    if (material.getP4kUuid() == null || Objects.equals(before, afterId) || field.isSet(material)) {
+      return;
+    }
+    field.set(material, true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_P4K_OVERRIDE_SET,
+        material.getId(),
+        material.getName(),
+        null,
+        AuditDetails.of("field", field.name()).with("valueId", afterId));
+  }
+
+  /**
+   * Hands an overridden field of a material back to the P4K import: the next APPLY writes the P4K
+   * value again (REQ-P4K-024, REQ-P4K-025). A field without an override stays as it is.
+   *
+   * @param id material primary key
+   * @param field the field to release
+   * @param version the material version the admin saw
+   * @return the material
+   * @throws NotFoundException when no material has the id
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
+   */
+  @Transactional
+  @EvictAllMaterialCaches
+  public Material releaseP4kOverride(
+      @NotNull UUID id, @NotNull MaterialP4kOverride field, long version) {
+    Material material = requireMaterial(id);
+    OptimisticLock.checkRequired(material.getVersion(), version, Material.class, id);
+    if (!field.isSet(material)) {
+      return material;
+    }
+    field.set(material, false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED,
+        id,
+        material.getName(),
+        null,
+        AuditDetails.of("field", field.name()));
+    return materialRepository.saveAndFlush(material);
   }
 
   /**

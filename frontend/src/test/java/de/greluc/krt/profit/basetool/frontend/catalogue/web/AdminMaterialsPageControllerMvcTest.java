@@ -24,15 +24,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import java.util.Collections;
@@ -299,6 +303,106 @@ class AdminMaterialsPageControllerMvcTest {
         .doesNotContain("<html")
         .doesNotContain("id=\"materials-results\"")
         .doesNotContain("data-testid=\"page-head\"");
+  }
+
+  /**
+   * Builds a raw material with the given override flags (REQ-P4K-024, REQ-P4K-025).
+   *
+   * @param id the material id
+   * @param groupManual whether the resource group is an admin override
+   * @param refinedManual whether the refined material is an admin override
+   * @return the material
+   */
+  private static @NotNull MaterialDto overridden(
+      @NotNull UUID id, boolean groupManual, boolean refinedManual) {
+    return new MaterialDto(
+        id,
+        "Borase",
+        "RAW",
+        "SCU",
+        null,
+        null,
+        null,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        3L,
+        null,
+        null,
+        groupManual,
+        refinedManual);
+  }
+
+  /**
+   * Each override marker shows only for a field the material overrides, with its release button.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void listMaterials_showsTheOverrideMarkerOfAnOverriddenFieldOnly() throws Exception {
+    String html = renderList(List.of(overridden(UUID.randomUUID(), true, false)), List.of());
+
+    assertThat(html)
+        .containsPattern(
+            "data-p4k-override=\"RESOURCE_GROUP\""
+                + " data-testid=\"material-override-RESOURCE_GROUP\">")
+        .containsPattern(
+            "data-p4k-override=\"REFINED_MATERIAL\""
+                + " data-testid=\"material-override-REFINED_MATERIAL\" hidden=\"hidden\">")
+        .contains(
+            "data-trigger=\"admin-materials-release-override\" data-p4k-field=\"RESOURCE_GROUP\"")
+        .contains(">An den Import zurückgeben<")
+        .contains(">von Hand<");
+  }
+
+  /** Releasing an override forwards the field and version and answers with the saved material. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void releaseP4kOverrideAjax_forwardsTheFieldAndVersion_andAnswersWithTheMaterial()
+      throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.delete(
+            eq("/api/v1/materials/{id}/p4k-overrides/{field}?version={version}"),
+            eq(MaterialDto.class),
+            eq(id),
+            eq("RESOURCE_GROUP"),
+            eq(3L)))
+        .thenReturn(overridden(id, false, false));
+
+    mockMvc
+        .perform(
+            delete("/admin/materials/{id}/p4k-overrides/RESOURCE_GROUP/ajax", id)
+                .param("version", "3")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resourceGroupManual").value(false))
+        .andExpect(jsonPath("$.version").value(3));
+  }
+
+  /** A stale version reaches the page as the backend's 409, which opens the conflict dialog. */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void releaseP4kOverrideAjax_passesTheBackendConflictThrough() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(backendApiClient.delete(
+            eq("/api/v1/materials/{id}/p4k-overrides/{field}?version={version}"),
+            eq(MaterialDto.class),
+            eq(id),
+            eq("REFINED_MATERIAL"),
+            eq(2L)))
+        .thenThrow(new BackendServiceException("stale", null, 409));
+
+    mockMvc
+        .perform(
+            delete("/admin/materials/{id}/p4k-overrides/REFINED_MATERIAL/ajax", id)
+                .param("version", "2")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isConflict());
   }
 
   @Test

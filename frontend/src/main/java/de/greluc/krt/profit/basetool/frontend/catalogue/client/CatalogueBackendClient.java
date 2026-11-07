@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItemDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialP4kOverride;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialSellingTerminalDto;
@@ -377,6 +378,25 @@ public class CatalogueBackendClient {
    */
   public void updateMaterial(@NotNull UUID id, @NotNull MaterialDto body) {
     backendApiClient.put("/api/v1/materials/{id}", body, Void.class, id);
+  }
+
+  /**
+   * Hands an overridden field of a material back to the P4K import.
+   *
+   * @param id the material
+   * @param field the overridden field
+   * @param version the material version the admin saw
+   * @return the material, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MaterialDto releaseMaterialP4kOverride(
+      @NotNull UUID id, @NotNull MaterialP4kOverride field, long version) {
+    return backendApiClient.delete(
+        "/api/v1/materials/{id}/p4k-overrides/{field}?version={version}",
+        MaterialDto.class,
+        id,
+        field.name(),
+        version);
   }
 
   /**
