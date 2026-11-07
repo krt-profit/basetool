@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for {@link GameItemStat}, the stored blueprint stat base values. */
@@ -50,10 +51,11 @@ public interface GameItemStatRepository extends JpaRepository<GameItemStat, UUID
   List<UUID> findBlueprintOutputUuidsWithoutStats();
 
   /**
-   * Counts the game items that carry at least one stored base value.
+   * Counts the game items that carry at least one stored base value of a source.
    *
-   * @return the number of distinct items with a {@code game_item_stat} row
+   * @param source the source of the values
+   * @return the number of distinct items with a {@code game_item_stat} row of that source
    */
-  @Query("SELECT COUNT(DISTINCT s.gameItem) FROM GameItemStat s")
-  long countItemsWithStats();
+  @Query("SELECT COUNT(DISTINCT s.gameItem) FROM GameItemStat s WHERE s.source = :source")
+  long countItemsWithStatsBySource(@Param("source") GameItemStatSource source);
 }

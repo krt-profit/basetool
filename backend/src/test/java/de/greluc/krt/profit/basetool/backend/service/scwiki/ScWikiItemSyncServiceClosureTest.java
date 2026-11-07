@@ -119,8 +119,7 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            gameItemStatRepository,
-            new GameItemStatWriter(gameItemStatRepository),
+            new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
                 scWikiClient, properties, gameItemStatRepository, syncReportService),
             itemReconciliationService,

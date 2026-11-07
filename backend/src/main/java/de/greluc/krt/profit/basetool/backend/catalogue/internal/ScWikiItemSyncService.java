@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses.KindPass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses.KindPassResult;
@@ -48,7 +47,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +90,6 @@ public class ScWikiItemSyncService {
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SyncReportService syncReportService;
-  private final GameItemStatRepository gameItemStatRepository;
   private final GameItemStatWriter gameItemStatWriter;
   private final ScWikiItemStatFollowUp statFollowUp;
   private final ItemReconciliationService itemReconciliationService;
@@ -100,9 +97,6 @@ public class ScWikiItemSyncService {
 
   /** Registry the orphan-sweep stand-down counter binds to. */
   private final MeterRegistry meterRegistry;
-
-  /** Items with a stored blueprint stat base value, read by the gauge after each run. */
-  private final AtomicLong itemsWithStats = new AtomicLong();
 
   /**
    * Lazily resolved self-proxy, so the per-item {@code REQUIRES_NEW} writes each open their own
@@ -126,12 +120,10 @@ public class ScWikiItemSyncService {
               + " skipping.");
       return 0;
     }
-    meterRegistry.gauge(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS, itemsWithStats);
     try (var _ = scWikiClient.openSyncRun()) {
-      int written =
-          Boolean.TRUE.equals(properties.syncAllItems()) ? syncItemsBackfill() : syncItemsClosure();
-      itemsWithStats.set(gameItemStatRepository.countItemsWithStats());
-      return written;
+      return Boolean.TRUE.equals(properties.syncAllItems())
+          ? syncItemsBackfill()
+          : syncItemsClosure();
     }
   }
 
@@ -254,7 +246,7 @@ public class ScWikiItemSyncService {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }
     gameItemRepository.save(item);
-    gameItemStatWriter.write(item, dto);
+    gameItemStatWriter.write(item, dto, runId);
     return isNew ? ClosureOutcome.CREATED : ClosureOutcome.FILLED;
   }
 
@@ -714,7 +706,7 @@ public class ScWikiItemSyncService {
       item.setManufacturer(resolvedManufacturer);
       fieldWriter.apply(item, dto, runId, now);
       gameItemRepository.save(item);
-      gameItemStatWriter.write(item, dto);
+      gameItemStatWriter.write(item, dto, runId);
       syncReportService.logScwikiEvent(
           runId,
           SyncEventType.CREATED_WIKI_ONLY,
@@ -747,7 +739,7 @@ public class ScWikiItemSyncService {
       outcome = BackfillOutcome.LINKED;
     }
     gameItemRepository.save(item);
-    gameItemStatWriter.write(item, dto);
+    gameItemStatWriter.write(item, dto, runId);
     return outcome;
   }
 
@@ -785,7 +777,7 @@ public class ScWikiItemSyncService {
     fieldWriter.apply(uexRow, dto, runId, now);
     uexRow.setSourceSystems(GameItemSourceSystem.BOTH);
     gameItemRepository.save(uexRow);
-    gameItemStatWriter.write(uexRow, dto);
+    gameItemStatWriter.write(uexRow, dto, runId);
     syncReportService.logScwikiEvent(
         runId,
         SyncEventType.LINKED_VIA_NAME,

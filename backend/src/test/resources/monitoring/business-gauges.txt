@@ -1,5 +1,7 @@
 GAUGE|basetool.bank.booking.request.pending.count|{}|null
 GAUGE|basetool.bank.booking.request.pending.oldest.age|{}|seconds
+GAUGE|basetool.catalogue.items.with.stats|{source=P4K}|null
+GAUGE|basetool.catalogue.items.with.stats|{source=SCWIKI}|null
 GAUGE|basetool.deletion.request.pending.count|{}|null
 GAUGE|basetool.deletion.request.pending.oldest.age|{}|seconds
 GAUGE|basetool.job.order.open.count|{status=IN_PROGRESS}|null

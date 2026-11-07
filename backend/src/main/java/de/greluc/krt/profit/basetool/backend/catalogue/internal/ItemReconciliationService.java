@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatSource;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import java.time.Instant;
 import java.util.Comparator;
@@ -310,7 +311,14 @@ public class ItemReconciliationService {
         stats.findByGameItemId(to.getId()).stream()
             .collect(Collectors.toMap(GameItemStat::getProperty, Function.identity()));
     for (GameItemStat source : stats.findByGameItemId(from.getId())) {
-      if (targetStats.containsKey(source.getProperty())) {
+      GameItemStat target = targetStats.get(source.getProperty());
+      if (target != null) {
+        if (source.getSource() == GameItemStatSource.P4K
+            && target.getSource() != GameItemStatSource.P4K) {
+          target.setBaseValue(source.getBaseValue());
+          target.setSource(GameItemStatSource.P4K);
+          stats.save(target);
+        }
         stats.delete(source);
       } else {
         source.setGameItem(to);

@@ -1,6 +1,6 @@
 # ADR-0342 — Blueprint stat base values come from the P4K catalogue and the SC Wiki fills gaps
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-030, REQ-OBS-023) · REQ-INV-069 · supersedes the source decision of
@@ -56,6 +56,5 @@ The catalogue of p4kx v0.4.2 (`schemaVersion` 2) closes both gaps:
   requirement, which ADR-0309 backed.
 - The observability spec and the monitoring rules change for the `source` label and the narrowed
   alert.
-- Pending: the `source` column, the P4K writer in the import, the `className` mapping in
-  `BlueprintStatProperty`, the 1 % disagreement report, the tooltip, and the metric and alert
-  change.
+- A duplicate merge keeps a P4K value over the survivor's Wiki value of the same stat, which
+  amends ADR-0349's stat-collision rule for P4K-sourced values.

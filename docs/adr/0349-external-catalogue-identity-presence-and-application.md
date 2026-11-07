@@ -45,6 +45,9 @@ different P4K GUIDs; both stay untouched and go to the P4K review list as `GUID_
 (REQ-P4K-007). A GUID only the retired row holds moves onto the survivor, and a P4K-matched
 survivor keeps its name and manufacturer.
 
+**Amendment (stat source, ADR-0342):** a duplicate stat property keeps the survivor's value unless
+only the retired row's value has `game_item_stat.source = P4K`; then that P4K value wins.
+
 ## Consequences
 
 A source error or local failure cannot masquerade as upstream removal. Source order and variant

@@ -81,6 +81,7 @@ public class P4kImportService {
   private final P4kImportProperties properties;
   private final P4kManufacturerReconciler manufacturerReconciler;
   private final P4kItemReconciler itemReconciler;
+  private final P4kItemStatReconciler itemStatReconciler;
   private final P4kShipReconciler shipReconciler;
   private final P4kResourceGroupReconciler resourceGroupReconciler;
   private final P4kCommodityReconciler commodityReconciler;
@@ -232,6 +233,7 @@ public class P4kImportService {
       @NotNull P4kImportContext context) {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
+    itemStatReconciler.reconcile(catalogue, context);
     shipReconciler.reconcile(catalogue, context);
     manufacturerReconciler.finish(context);
     resourceGroupReconciler.reconcile(catalogue, context);

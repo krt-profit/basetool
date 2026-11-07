@@ -1400,7 +1400,7 @@ request and no sync writes it.
 > [REQ-P4K-030](p4k-catalogue.md#req-p4k-030--a-crafted-items-blueprint-stat-base-values-come-from-the-p4k-and-the-sc-wiki-fills-gaps)
 > / [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)
 > — kept for the reasoning. The P4K catalogue leads the stat base values and the SC Wiki fills
-> gaps; the rule below holds until REQ-P4K-030 is implemented.
+> gaps (REQ-P4K-030, implemented in #3040); every stored value names its `source`.
 
 A blueprint modifier names the stat it changes by its SC Wiki `property_key` (`health_maxhealth`,
 `weapon_damage`, `armor_temperaturemin`, …) and gives only the factor a quality applies. The value

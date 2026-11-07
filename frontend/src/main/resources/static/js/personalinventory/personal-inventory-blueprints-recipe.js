@@ -532,6 +532,14 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
             titleParts.push(
                 krtI18nText(i18n().statValueTitle, 'krtBlueprintsRecipeI18n.statValueTitle'),
             );
+            if (base.source) {
+                titleParts.push(
+                    krtI18nText(
+                        i18n()[`statSource${base.source}`],
+                        `krtBlueprintsRecipeI18n.statSource${base.source}`,
+                    ),
+                );
+            }
         }
         const bw = betterWhenText(m.betterWhen);
         if (bw) {
