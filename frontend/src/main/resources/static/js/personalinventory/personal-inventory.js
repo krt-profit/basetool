@@ -402,9 +402,10 @@ function runSearch() {
         )}</div>`,
     );
     krtFetch
-        .getJson(url)
+        .getJson(url, { key: 'personal-inventory-location-search' })
         .then(renderResults)
-        .catch(() => {
+        .catch((/** @type {unknown} */ error) => {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             renderResults([]);
         });
 }
