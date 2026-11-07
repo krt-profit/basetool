@@ -200,7 +200,17 @@ public class ScWikiVehicleSyncService {
       ship.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
     }
     ship.setExternalUuid(dto.uuid());
-    applyWikiFields(ship, dto, now);
+    P4kLedColumns led = new P4kLedColumns(ship);
+    applyWikiFields(ship, dto, now, led);
+    if (!led.disagreements().isEmpty()) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.P4K_DISAGREEMENT,
+          "ship_type",
+          dto.uuid(),
+          dto.name(),
+          String.join(" | ", led.disagreements()));
+    }
     if (ship.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       ship.setSourceSystems(GameItemSourceSystem.BOTH);
     }
@@ -208,12 +218,24 @@ public class ScWikiVehicleSyncService {
     return saved.getExternalUuid();
   }
 
-  private void applyWikiFields(ShipType ship, ScWikiVehicleDto dto, Instant now) {
+  /**
+   * Writes the Wiki's vehicle facts; the class name is written only while empty, and on a P4K-known
+   * row a differing class name or hull health is reported instead (REQ-P4K-031).
+   *
+   * @param ship the row written
+   * @param dto the Wiki vehicle
+   * @param now the sync time
+   * @param led the row's P4K-led column writes
+   */
+  private void applyWikiFields(
+      ShipType ship, ScWikiVehicleDto dto, Instant now, P4kLedColumns led) {
     ship.setScwikiSlug(dto.slug());
     ship.setGameName(dto.gameName());
     ship.setScwikiGameVersionSeen(dto.version());
     if (!StringUtils.hasText(ship.getClassName())) {
       ship.setClassName(dto.className());
+    } else if (ship.getP4kUuid() != null && StringUtils.hasText(dto.className())) {
+      led.write("class_name", ship.getClassName(), dto.className(), ship::setClassName);
     }
     if (dto.vehicleInventory() != null) {
       ship.setVehicleInventoryScu(nonNegative(dto.vehicleInventory()) / MICRO_SCU_PER_SCU);
@@ -222,7 +244,7 @@ public class ScWikiVehicleSyncService {
       ship.setOreCapacity(nonNegative(dto.oreCapacity()));
     }
     if (dto.health() != null) {
-      ship.setHealth(nonNegative(dto.health()));
+      led.write("health", ship.getHealth(), nonNegative(dto.health()), ship::setHealth);
     }
     if (dto.shieldHp() != null) {
       ship.setShieldHp(nonNegative(dto.shieldHp()));

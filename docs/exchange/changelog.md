@@ -3,6 +3,16 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-07
+
+- **Changed: a `SHIP_TYPE` name several ship types share is `ambiguous`.** It resolved to one of
+  them before; it now answers `ambiguous` with at most ten candidates, so let the member pick one or
+  send a key field. No schema changes: `ambiguous` with its candidates has always been a possible
+  answer in `v1`, so a tolerant client already handles it ([catalogue](resources/catalog.md)).
+- **New: more `SHIP_TYPE` keys resolve.** `scGuid` also matches the game-file GUID, the `scRecord`
+  of a variant without a ship type of its own resolves to its group's base, and `uexId` falls back
+  to the curated class-name alias ([catalogue](resources/catalog.md)).
+
 ## 2026-11-05
 
 - **New: `Date` is readable cross-origin.** The gateway exposes `Date` to approved extensions on

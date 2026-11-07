@@ -125,4 +125,40 @@ final class P4kRowWriter {
           .changed(kind, record, "name_key", current, P4kFields.storedNameKey(incoming));
     }
   }
+
+  /**
+   * Writes a value the catalogue leads: a non-null catalogue value replaces a different stored one,
+   * and a {@code null} or blank one keeps the stored value.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param label renders a value for the report
+   * @param <V> the value type
+   */
+  <V> void lead(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter,
+      @NotNull Function<V, String> label) {
+    if (incoming == null
+        || (incoming instanceof String s && s.isBlank())
+        || P4kFields.sameValue(current, incoming)) {
+      return;
+    }
+    changed = true;
+    if (context.isApply()) {
+      setter.accept(incoming);
+    }
+    context
+        .getReport()
+        .changed(
+            kind,
+            record,
+            column,
+            current == null ? null : label.apply(current),
+            label.apply(incoming));
+  }
 }

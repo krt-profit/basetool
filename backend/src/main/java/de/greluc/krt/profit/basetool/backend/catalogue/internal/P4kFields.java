@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
@@ -83,6 +85,21 @@ final class P4kFields {
       setter.accept(stored);
     }
     return true;
+  }
+
+  /**
+   * Whether two values are the same fact; decimals compare by value, so {@code 8.0} equals {@code
+   * 8.000}.
+   *
+   * @param a one value
+   * @param b the other value
+   * @return {@code true} when both are {@code null} or equal
+   */
+  static boolean sameValue(@Nullable Object a, @Nullable Object b) {
+    if (a instanceof BigDecimal x && b instanceof BigDecimal y) {
+      return x.compareTo(y) == 0;
+    }
+    return Objects.equals(a, b);
   }
 
   /**

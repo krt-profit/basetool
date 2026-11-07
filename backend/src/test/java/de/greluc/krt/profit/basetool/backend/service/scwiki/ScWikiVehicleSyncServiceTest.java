@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiVehicleDto;
@@ -496,6 +497,69 @@ class ScWikiVehicleSyncServiceTest {
 
     verify(scope).close();
     verifyNoInteractions(shipTypeRepository);
+  }
+
+  @Test
+  void aP4kKnownShipKeepsItsHullHealthAndClassName_andTheDisagreementIsReported() {
+    UUID uuid = UUID.randomUUID();
+    ShipType p4kKnown = new ShipType();
+    p4kKnown.setId(UUID.randomUUID());
+    p4kKnown.setName("Aegis Avenger Titan");
+    p4kKnown.setExternalUuid(uuid);
+    p4kKnown.setP4kUuid(UUID.randomUUID());
+    p4kKnown.setClassName("AEGS_Avenger_Titan");
+    p4kKnown.setHealth(11_900.0);
+    ScWikiVehicleDto dto =
+        ScWikiVehicleDto.builder()
+            .uuid(uuid)
+            .name("Avenger Titan")
+            .className("AEGS_Avenger_Titan_Wiki")
+            .health(12_500.5)
+            .shieldHp(3_000.0)
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(p4kKnown));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    assertEquals(11_900.0, p4kKnown.getHealth());
+    assertEquals("AEGS_Avenger_Titan", p4kKnown.getClassName());
+    assertEquals(3_000.0, p4kKnown.getShieldHp());
+    ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.P4K_DISAGREEMENT),
+            eq("ship_type"),
+            eq(uuid),
+            eq("Avenger Titan"),
+            detail.capture());
+    assertTrue(detail.getValue().contains("column=health;stored=11900.0;source=12500.5"));
+    assertTrue(detail.getValue().contains("column=class_name;stored=AEGS_Avenger_Titan;"));
+  }
+
+  @Test
+  void aP4kKnownShipWithoutHullHealthTakesTheWikiValue() {
+    UUID uuid = UUID.randomUUID();
+    ShipType p4kKnown = new ShipType();
+    p4kKnown.setId(UUID.randomUUID());
+    p4kKnown.setName("Aegis Javelin");
+    p4kKnown.setExternalUuid(uuid);
+    p4kKnown.setP4kUuid(UUID.randomUUID());
+    ScWikiVehicleDto dto =
+        ScWikiVehicleDto.builder().uuid(uuid).name("Javelin").health(7_852_400.0).build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto)));
+    when(shipTypeRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(p4kKnown));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    assertEquals(7_852_400.0, p4kKnown.getHealth());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.P4K_DISAGREEMENT), any(), any(), any(), any());
   }
 
   /** Supplies one relevant vehicle row that can be written without any prior local match. */
