@@ -685,6 +685,13 @@ public enum AuditEventType {
   CATALOGUE_MATERIAL_CREATED(AuditDomain.CATALOGUE),
   /** An admin edited a material. */
   CATALOGUE_MATERIAL_UPDATED(AuditDomain.CATALOGUE),
+  /**
+   * An admin's edit made a material's resource group or refined material an override no P4K APPLY
+   * writes over (REQ-P4K-024, REQ-P4K-025).
+   */
+  CATALOGUE_MATERIAL_P4K_OVERRIDE_SET(AuditDomain.CATALOGUE),
+  /** An admin handed a material's overridden field back to the P4K import (REQ-P4K-024/025). */
+  CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED(AuditDomain.CATALOGUE),
   /** An admin deleted a material. */
   CATALOGUE_MATERIAL_DELETED(AuditDomain.CATALOGUE),
   /** An admin created a material category. */

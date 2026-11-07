@@ -73,6 +73,16 @@
     .admin-materials-table select {
         min-width: 8.5rem;
     }
+    .admin-material-override {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1);
+        margin-top: var(--space-1);
+    }
+    .admin-material-override[hidden] {
+        display: none;
+    }
     @media (width <= 768px) {
         .admin-materials-table td:not(:first-child) {
             flex: 1 1 100%;

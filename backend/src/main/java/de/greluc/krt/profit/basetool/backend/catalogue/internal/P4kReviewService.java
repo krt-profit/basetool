@@ -109,9 +109,10 @@ public class P4kReviewService {
 
   /**
    * Resolves an open case as keep or hide, a {@code NO_RESOURCE_GROUP} case by assigning a resource
-   * group to its material, or a {@code RESOURCE_JOIN_NONE} / {@code RESOURCE_JOIN_SEVERAL} case by
-   * assigning the material its {@code ResourceType} stands for; every later APPLY links that
-   * resource's recipe lines to the assigned material (REQ-P4K-024).
+   * group to its material as an admin override no APPLY writes over ({@link
+   * MaterialP4kOverride#RESOURCE_GROUP}), or a {@code RESOURCE_JOIN_NONE} / {@code
+   * RESOURCE_JOIN_SEVERAL} case by assigning the material its {@code ResourceType} stands for;
+   * every later APPLY links that resource's recipe lines to the assigned material (REQ-P4K-024).
    *
    * @param caseId the case
    * @param resolution keep, hide or assign
@@ -215,6 +216,7 @@ public class P4kReviewService {
     }
     if (ungrouped != null) {
       ungrouped.setCategory(group);
+      MaterialP4kOverride.RESOURCE_GROUP.set(ungrouped, true);
     }
     if (material != null) {
       reviewCase.setRowId(material.getId());

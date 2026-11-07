@@ -26,7 +26,10 @@ import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Material payload. */
+/**
+ * Data transfer record carrying Material payload; {@code resourceGroupManual} and {@code
+ * refinedMaterialManual} tell whether a P4K APPLY keeps the admin's group and refined material.
+ */
 @DtoMirror
 public record MaterialDto(
     UUID id,
@@ -45,9 +48,11 @@ public record MaterialDto(
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
     CommodityMiningData miningData,
-    @Nullable String nameDe) {
+    @Nullable String nameDe,
+    @Nullable Boolean resourceGroupManual,
+    @Nullable Boolean refinedMaterialManual) {
 
-  /** Creates a material without a German name. */
+  /** Creates a material without a German name or override flags. */
   public MaterialDto(
       UUID id,
       String name,
@@ -82,6 +87,8 @@ public record MaterialDto(
         isVisible,
         version,
         miningData,
+        null,
+        null,
         null);
   }
 

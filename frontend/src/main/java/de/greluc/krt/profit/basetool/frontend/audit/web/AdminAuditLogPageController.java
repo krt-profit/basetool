@@ -445,6 +445,8 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_SYNC_RUN_FINISHED",
                   "CATALOGUE_MATERIAL_CREATED",
                   "CATALOGUE_MATERIAL_UPDATED",
+                  "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET",
+                  "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED",
                   "CATALOGUE_MATERIAL_DELETED",
                   "CATALOGUE_MATERIAL_CATEGORY_CREATED",
                   "CATALOGUE_MATERIAL_CATEGORY_UPDATED",

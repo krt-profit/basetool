@@ -151,6 +151,7 @@ class P4kMaterialGroupReviewTest {
 
     assertThat(resolved.status()).isEqualTo(P4kReviewStatus.REVIEWED);
     assertThat(unknown.getCategory()).isEqualTo(mineral);
+    assertThat(unknown.isResourceGroupManual()).isTrue();
     assertThat(groupCase(unknown).getResolution()).isEqualTo(P4kReviewResolution.ASSIGN);
   }
 

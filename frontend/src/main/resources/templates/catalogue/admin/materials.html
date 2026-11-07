@@ -92,6 +92,10 @@
                                     <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
                                     <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
                                 </select>
+                                <div class="admin-material-override" data-p4k-override="RESOURCE_GROUP" data-testid="material-override-RESOURCE_GROUP" th:hidden="${mat.resourceGroupManual != true}">
+                                    <span class="chip chip--warning" th:title="#{admin.material.p4kOverride.manual.tooltip}" th:text="#{admin.material.p4kOverride.manual}">von Hand</span>
+                                    <button type="button" class="btn btn-ghost btn-xs" data-trigger="admin-materials-release-override" data-p4k-field="RESOURCE_GROUP" th:text="#{admin.material.p4kOverride.release}">An den Import zurückgeben</button>
+                                </div>
                             </td>
                             <td th:attr="data-label=#{admin.material.refined}">
                                 <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
@@ -101,6 +105,10 @@
                                         <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                     </select>
                                     <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
+                                    <div class="admin-material-override" data-p4k-override="REFINED_MATERIAL" data-testid="material-override-REFINED_MATERIAL" th:hidden="${mat.refinedMaterialManual != true}">
+                                        <span class="chip chip--warning" th:title="#{admin.material.p4kOverride.manual.tooltip}" th:text="#{admin.material.p4kOverride.manual}">von Hand</span>
+                                        <button type="button" class="btn btn-ghost btn-xs" data-trigger="admin-materials-release-override" data-p4k-field="REFINED_MATERIAL" th:text="#{admin.material.p4kOverride.release}">An den Import zurückgeben</button>
+                                    </div>
                                 </th:block>
                                 <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
                                     <span>-</span>
@@ -204,6 +212,7 @@
     const MSG_UPDATE_ERROR = /*[[#{notification.error.save}]]*/ 'Fehler beim Speichern.';
     const MSG_CREATE_SUCCESS = /*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.';
     const MSG_CREATE_ERROR = /*[[#{admin.materials.create.error}]]*/ 'Material konnte nicht angelegt werden.';
+    const MSG_OVERRIDE_RELEASED = /*[[#{admin.material.p4kOverride.released}]]*/ 'An den Import zurückgegeben.';
 </script>
 <script type="module" th:src="@{/js/catalogue/admin-materials.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>

@@ -496,7 +496,10 @@ The coverage list holds the **Katalog** area
     (`CATALOGUE_MATERIAL_*`, `CATALOGUE_MATERIAL_ALIAS_*`: created, updated, deleted; the material
     categories are the P4K resource groups, written only by the P4K APPLY of
     `CATALOGUE_P4K_APPLIED`, REQ-P4K-025, and `CATALOGUE_MATERIAL_CATEGORY_*` labels only earlier
-    entries of the retired admin editor); manufacturer, ship-type and terminal visibility
+    entries of the retired admin editor); the P4K overrides of a material's resource group and
+    refined material (`CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field` and `valueId` when an
+    edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
+    back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,

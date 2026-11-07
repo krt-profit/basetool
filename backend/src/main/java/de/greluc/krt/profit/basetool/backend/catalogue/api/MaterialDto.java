@@ -23,7 +23,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Material payload. */
+/**
+ * Data transfer record carrying Material payload; {@code resourceGroupManual} and {@code
+ * refinedMaterialManual} tell whether a P4K APPLY keeps the admin's group and refined material
+ * (REQ-P4K-024, REQ-P4K-025).
+ */
 public record MaterialDto(
     UUID id,
     String name,
@@ -41,9 +45,14 @@ public record MaterialDto(
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
     @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable CommodityMiningData miningData,
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable String nameDe) {
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable String nameDe,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable Boolean resourceGroupManual,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable Boolean refinedMaterialManual) {
 
-  /** Creates a material without a German name; {@code nameDe} is written by the P4K only. */
+  /**
+   * Creates a material without a German name or override flags, which the P4K and the admin
+   * overrides write only.
+   */
   public MaterialDto(
       UUID id,
       String name,
@@ -78,6 +87,8 @@ public record MaterialDto(
         isVisible,
         version,
         miningData,
+        null,
+        null,
         null);
   }
 
