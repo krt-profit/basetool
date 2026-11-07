@@ -121,7 +121,7 @@ class ScWikiClientRunHistoryTest {
             new GameItemStatWriter(stats),
             new ScWikiItemStatFollowUp(client, properties, stats, report),
             reconciliation,
-            new ScWikiItemFieldWriter(metrics),
+            new ScWikiItemFieldWriter(new ItemClassResolver(metrics), report),
             metrics,
             self);
     history =

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.Getter;
@@ -124,5 +125,94 @@ final class P4kRowWriter {
           .getReport()
           .changed(kind, record, "name_key", current, P4kFields.storedNameKey(incoming));
     }
+  }
+
+  /**
+   * Writes a value the P4K leads over the row's value; a {@code null} catalogue value keeps it.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param <V> the value type
+   */
+  <V> void lead(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter) {
+    lead(column, current, incoming, setter, String::valueOf);
+  }
+
+  /**
+   * Writes a reference the P4K leads over the row's value, logging it by a short label; a {@code
+   * null} catalogue value keeps it.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param label renders a value as an identifier or short name
+   * @param <V> the value type
+   */
+  <V> void lead(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter,
+      @NotNull Function<V, String> label) {
+    if (incoming == null || Objects.equals(current, incoming)) {
+      return;
+    }
+    write(column, current, incoming, setter, label);
+  }
+
+  /**
+   * Mirrors the catalogue's value into a column of the P4K's own, a {@code null} included.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param <V> the value type
+   */
+  <V> void mirror(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter) {
+    if (!Objects.equals(current, incoming)) {
+      write(column, current, incoming, setter, String::valueOf);
+    }
+  }
+
+  /**
+   * Writes a changed value and logs it as a {@code CHANGED} row.
+   *
+   * @param column the column written
+   * @param current the row's value
+   * @param incoming the catalogue's value
+   * @param setter writes the value
+   * @param label renders a value as an identifier or short name
+   * @param <V> the value type
+   */
+  private <V> void write(
+      @NotNull String column,
+      @Nullable V current,
+      @Nullable V incoming,
+      @NotNull Consumer<V> setter,
+      @NotNull Function<V, String> label) {
+    if (context.isApply()) {
+      setter.accept(incoming);
+    }
+    changed = true;
+    context
+        .getReport()
+        .changed(
+            kind,
+            record,
+            column,
+            current == null ? null : label.apply(current),
+            incoming == null ? null : label.apply(incoming));
   }
 }

@@ -512,8 +512,8 @@ class ItemReconciliationIntegrationTest {
   void aP4kLedCanonicalIdentityKeepsItsNameAndAttributes() {
     Pair pair = pair();
     jdbc.update(
-        "UPDATE game_item SET name = 'P4K Name', source_systems = 'P4K', p4k_synced_at = now(),"
-            + " mass = 100 WHERE id = ?",
+        "UPDATE game_item SET name = 'P4K Name', p4k_name = 'P4K Name', source_systems = 'P4K',"
+            + " p4k_synced_at = now(), mass = 100 WHERE id = ?",
         pair.canonical());
     GameItem canonical = items.findById(pair.canonical()).orElseThrow();
 

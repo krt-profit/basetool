@@ -31,6 +31,12 @@ import org.jetbrains.annotations.Nullable;
  * @param recordPath the record path without {@code .xml}
  * @param name the localised name
  * @param description the localised description, a game text
+ * @param type the {@code AttachDef.Type}, e.g. {@code PowerPlant}, or {@code null}
+ * @param subType the {@code AttachDef.SubType}, or {@code null}
+ * @param size the {@code AttachDef.Size}, or {@code null}
+ * @param grade the raw {@code AttachDef.Grade} integer, or {@code null}
+ * @param itemClass {@code Civilian}, {@code Competition}, {@code Industrial}, {@code Military},
+ *     {@code Stealth}, another value or {@code null}
  * @param mass the mass in kilograms, or {@code null}
  * @param manufacturerGuid the GUID of the manufacturer, or {@code null}
  * @param playability {@code player}, {@code mission}, {@code special}, another value or {@code
@@ -43,6 +49,11 @@ public record P4kItemDto(
     @Nullable String recordPath,
     @Nullable P4kLocalisedText name,
     @Nullable P4kLocalisedText description,
+    @Nullable String type,
+    @Nullable String subType,
+    @Nullable Integer size,
+    @Nullable Integer grade,
+    @Nullable String itemClass,
     @Nullable Double mass,
     @Nullable String manufacturerGuid,
     @Nullable String playability)

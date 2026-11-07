@@ -48,13 +48,15 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>The UEX sync writes the UEX-side columns, the Wiki sync joins the same row and fills the
  * Wiki-sourced ones, updating {@link #sourceSystems}. {@link #kind} follows the more-specific-wins
- * rule; {@link #manufacturer} keeps the UEX value when the sources disagree.
+ * rule. The P4K leads name, manufacturer, type, sub-type, size, grade, class and mass: where its
+ * {@code p4k_*} value is non-null the displayed column holds it and the other sources leave it
+ * alone (REQ-P4K-017).
  */
 @Entity
 @Table(name = "game_item")
 @Getter
 @Setter
-@ToString(exclude = {"manufacturer", "uexCategory", "linkedShipType"})
+@ToString(exclude = {"manufacturer", "uexCategory", "linkedShipType", "p4kManufacturer"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
@@ -71,7 +73,7 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
 
-  /** Canonical display name. UEX writes it; the Wiki sync may overwrite per §6.3.3. */
+  /** Canonical display name: {@link #p4kName} when set, else the UEX or SC Wiki name. */
   @Column(nullable = false)
   private String name;
 
@@ -344,4 +346,70 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "p4k_seen_run_id")
   @Nullable
   private UUID p4kSeenRunId;
+
+  /**
+   * The P4K's English name (REQ-P4K-017), or {@code null}; while non-null it is {@link #name} and
+   * UEX does not write the name.
+   */
+  @Column(name = "p4k_name")
+  @Nullable
+  private String p4kName;
+
+  /**
+   * The manufacturer the P4K's {@code manufacturerGuid} resolves to (REQ-P4K-017), or {@code null};
+   * while non-null it is {@link #manufacturer} and UEX does not write the manufacturer.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "p4k_manufacturer_id")
+  @Nullable
+  private Manufacturer p4kManufacturer;
+
+  /**
+   * The P4K's item {@code type} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #wikiType} and the SC Wiki does not write the type.
+   */
+  @Column(name = "p4k_type")
+  @Nullable
+  private String p4kType;
+
+  /**
+   * The P4K's item {@code subType} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #wikiSubType} and the SC Wiki does not write the sub-type.
+   */
+  @Column(name = "p4k_sub_type")
+  @Nullable
+  private String p4kSubType;
+
+  /**
+   * The P4K's item {@code size} (REQ-P4K-017), or {@code null}; while non-null it is {@link
+   * #sizeClass} and the SC Wiki does not write the size.
+   */
+  @Column(name = "p4k_size")
+  @Nullable
+  private Integer p4kSize;
+
+  /**
+   * The raw DataForge {@code grade} of the matched item, whatever its type (REQ-P4K-018), or {@code
+   * null}; with {@link #p4kType} it gives the P4K's grade letter.
+   */
+  @Column(name = "p4k_grade_raw")
+  @Nullable
+  private Integer p4kGradeRaw;
+
+  /**
+   * The P4K's component class (REQ-P4K-019), or {@code null} when the catalogue has none or an
+   * unknown one; while non-null it is {@link #itemClass} and the SC Wiki does not write the class.
+   */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "p4k_item_class", length = 16)
+  @Nullable
+  private ShipComponentClass p4kItemClass;
+
+  /**
+   * The P4K's mass in kg (REQ-P4K-017), or {@code null}; while non-null it is {@link #mass} and the
+   * SC Wiki does not write the mass.
+   */
+  @Column(name = "p4k_mass")
+  @Nullable
+  private Double p4kMass;
 }
