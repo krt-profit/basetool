@@ -192,11 +192,12 @@ class P4kUploadGateTest {
   void kindsTheImportSkips_doNotCountAgainstTheHeldLimit() {
     byte[] fixture = P4kTestCatalogues.fixtureBytes();
     ObjectNode root = P4kTestCatalogues.tree();
-    root.put("unreadTail", "L".repeat(fixture.length * 4));
+    int tailLength = Math.multiplyExact(fixture.length, 4);
+    root.put("unreadTail", "L".repeat(tailLength));
 
     P4kAcceptedUpload accepted =
         gate(1_000_000_000L, fixture.length).check(P4kTestCatalogues.bytes(root));
 
-    assertThat(accepted.uploadedBytes()).isGreaterThan(fixture.length * 4);
+    assertThat(accepted.uploadedBytes()).isGreaterThan(tailLength);
   }
 }
