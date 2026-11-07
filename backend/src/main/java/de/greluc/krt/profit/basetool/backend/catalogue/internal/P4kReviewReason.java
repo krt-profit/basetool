@@ -67,5 +67,17 @@ public enum P4kReviewReason {
    * A UEX location row whose normalised name, type and linked parent match no starmap object
    * (REQ-P4K-035); the case's GUID is a name-based UUID of the row.
    */
-  STARMAP_LINK_NOT_FOUND
+  STARMAP_LINK_NOT_FOUND,
+
+  /**
+   * A shop whose place holds several UEX terminals of the matching name (REQ-P4K-043); the case's
+   * GUID is the shop's.
+   */
+  SHOP_LINK_AMBIGUOUS,
+
+  /**
+   * A shop whose place is unknown or holds no UEX terminal of the matching name (REQ-P4K-043); the
+   * case's GUID is the shop's.
+   */
+  SHOP_LINK_NOT_FOUND
 }

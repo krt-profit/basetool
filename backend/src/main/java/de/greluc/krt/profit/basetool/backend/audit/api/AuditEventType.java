@@ -665,6 +665,12 @@ public enum AuditEventType {
   CATALOGUE_STARMAP_LINK_RELEASED(AuditDomain.CATALOGUE),
   /** An admin set a starmap object visible or hidden, or back to the rule (REQ-P4K-038). */
   CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN(AuditDomain.CATALOGUE),
+  /** An admin linked a P4K shop to a UEX terminal by hand (REQ-P4K-043). */
+  CATALOGUE_SHOP_LINK_SET(AuditDomain.CATALOGUE),
+  /** An admin unlinked a P4K shop from its UEX terminal by hand (REQ-P4K-043). */
+  CATALOGUE_SHOP_LINK_CLEARED(AuditDomain.CATALOGUE),
+  /** An admin handed a P4K shop's terminal link back to the P4K import (REQ-P4K-043). */
+  CATALOGUE_SHOP_LINK_RELEASED(AuditDomain.CATALOGUE),
   /** An admin created a storage place on a starmap object (REQ-P4K-036). */
   CATALOGUE_STORAGE_PLACE_CREATED(AuditDomain.CATALOGUE),
   /** An admin deleted sync-report rows older than a chosen age. */

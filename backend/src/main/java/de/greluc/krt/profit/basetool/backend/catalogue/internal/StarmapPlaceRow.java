@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -69,6 +70,39 @@ public record StarmapPlaceRow(
       case SPACE_STATION -> spaceStation;
       case OUTPOST -> outpost;
     };
+  }
+
+  /**
+   * Returns the link of the row's nearest linked parent: the parents the row names, nearest first,
+   * then its star system.
+   *
+   * @param linked the links of the rows of each kind, keyed by star system and name
+   * @param <V> the link value, a starmap object's GUID or id
+   * @return the parent's link, or {@code null} when no named parent is linked or the row is a star
+   *     system
+   */
+  @Nullable
+  public <V> V nearestLinkedParent(@NotNull Map<StarmapPlaceKind, Map<String, V>> linked) {
+    if (kind == StarmapPlaceKind.STAR_SYSTEM) {
+      return null;
+    }
+    for (StarmapPlaceKind.Parent parent : kind.getParents()) {
+      String parentName = parentName(parent);
+      if (parentName != null) {
+        V link =
+            linked
+                .getOrDefault(parent.kind(), Map.of())
+                .get(StarmapNames.key(starSystem, parentName));
+        if (link != null) {
+          return link;
+        }
+      }
+    }
+    return starSystem == null
+        ? null
+        : linked
+            .getOrDefault(StarmapPlaceKind.STAR_SYSTEM, Map.of())
+            .get(StarmapNames.key(starSystem, starSystem));
   }
 
   /**

@@ -4104,7 +4104,11 @@ alerts never carry `source="P4K"`.
   The starmap kind is `kind="STARMAP_OBJECT"` in these gauges: its `matched`, `added` and
   `changed` rows count the starmap objects, its `unmatched` rows the UEX location rows the run left
   unlinked, and `basetool_p4k_review_cases_open` its open link reviews
-  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). Labels are
+  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). The shop
+  kind is `kind="SHOP"`: its `matched`, `added` and `changed` rows count the shops, its `unmatched`
+  rows the shops the run left without a UEX terminal, and `basetool_p4k_review_cases_open` their
+  open link reviews
+  ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md)). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
   change report records a skipped sweep.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the

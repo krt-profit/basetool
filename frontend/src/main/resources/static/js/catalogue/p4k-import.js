@@ -412,6 +412,7 @@ function createdTotal(result) {
         result.commodities,
         result.blueprints,
         result.starmapObjects,
+        result.shops,
     ];
     let sum = 0;
     blocks.forEach((c) => {
@@ -600,6 +601,7 @@ function renderResult(result) {
             krtI18nText(i18n().rowStarmapObjects, 'krtP4kImportI18n.rowStarmapObjects'),
             result.starmapObjects || undefined,
         ],
+        [krtI18nText(i18n().rowShops, 'krtP4kImportI18n.rowShops'), result.shops || undefined],
     ];
     const body = $('krt-p4k-rows');
     const html = rows.map((pair) => {

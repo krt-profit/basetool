@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-/** What an admin does with a UEX location's starmap link (REQ-P4K-035). */
+/**
+ * What an admin does with a link the P4K import keeps: a UEX location's starmap link (REQ-P4K-035)
+ * or a shop's UEX terminal link (REQ-P4K-043).
+ */
 public enum StarmapLinkAction {
 
-  /** Links the row to a chosen object; no APPLY changes it. */
+  /** Links the row to a chosen target; no APPLY changes it. */
   SET,
 
   /** Unlinks the row; no APPLY links it again. */

@@ -82,8 +82,8 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds, the starmap objects, the ship store slugs and the paints,
-   * skipping everything else, the loadouts included.
+   * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs and
+   * the paints, skipping everything else, the loadouts included.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -121,6 +121,7 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.COMMODITY, P4kCommodityDto.class),
           listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class),
           listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
+          listOf(kinds, P4kKind.SHOP, P4kShopDto.class),
           storeSlugs,
           paints);
     } catch (JacksonException e) {
@@ -265,6 +266,7 @@ public class P4kCatalogueReader {
       case COMMODITY -> P4kCommodityDto.class;
       case BLUEPRINT -> P4kBlueprintDto.class;
       case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
+      case SHOP -> P4kShopDto.class;
     };
   }
 

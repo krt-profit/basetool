@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueDetailsDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemCatalogueMetadata;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemShopAvailabilityDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
@@ -132,7 +133,12 @@ class InventoryPageControllerMvcTest {
             eq(gameItemId)))
         .thenReturn(
             new ItemCatalogueDetailsDto(
-                gameItemId, "Catalogue-only Rifle", UUID.randomUUID(), "Rifle_Class", metadata));
+                gameItemId,
+                "Catalogue-only Rifle",
+                UUID.randomUUID(),
+                "Rifle_Class",
+                metadata,
+                List.of()));
 
     String html =
         mockMvc
@@ -157,6 +163,69 @@ class InventoryPageControllerMvcTest {
             "not an independent price confirmation",
             "&lt;unsafe-tag&gt;")
         .doesNotContain("<unsafe-tag>");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemCatalogueDetails_listTheShopsAnItemIsAvailableAt_andAnEmptyListAsUnknown()
+      throws Exception {
+    UUID listed = UUID.randomUUID();
+    UUID unlisted = UUID.randomUUID();
+    when(backendApiClient.get(
+            eq("/api/v1/game-items/{id}/catalogue"), eq(ItemCatalogueDetailsDto.class), eq(listed)))
+        .thenReturn(
+            new ItemCatalogueDetailsDto(
+                listed,
+                "Krt Shield",
+                null,
+                null,
+                null,
+                List.of(
+                    new ItemShopAvailabilityDto(
+                        UUID.randomUUID(),
+                        "Dumper's Depot - Area 18",
+                        "DumpersDepot_Area18",
+                        "Dumpers_Depot_Area18",
+                        "stanton",
+                        "Area18",
+                        "Area18 DE"),
+                    new ItemShopAvailabilityDto(
+                        UUID.randomUUID(),
+                        null,
+                        "CubbyBlast_Area18",
+                        "CubbyBlast_Area18",
+                        "stanton",
+                        null,
+                        null))));
+    when(backendApiClient.get(
+            eq("/api/v1/game-items/{id}/catalogue"),
+            eq(ItemCatalogueDetailsDto.class),
+            eq(unlisted)))
+        .thenReturn(
+            new ItemCatalogueDetailsDto(unlisted, "Krt Rifle", null, null, null, List.of()));
+
+    String listedHtml =
+        mockMvc
+            .perform(get("/inventory/game-item/" + listed).param("lang", "de"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String unlistedHtml =
+        mockMvc
+            .perform(get("/inventory/game-item/" + unlisted).param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(listedHtml)
+        .contains(
+            "item-available-at", "Dumper&#39;s Depot - Area 18", "Area18 DE", "CubbyBlast_Area18")
+        .doesNotContain("item-available-at-unknown");
+    assertThat(unlistedHtml)
+        .contains("item-available-at-unknown", "Unknown")
+        .doesNotContain("item-available-at-shop", "Not available");
   }
 
   /**

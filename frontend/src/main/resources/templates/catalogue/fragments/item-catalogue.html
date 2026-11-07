@@ -9,6 +9,18 @@
         <th:block th:if="${details.gameUuid != null}"><dt th:text="#{catalogue.item.uuid}">Game asset identity</dt><dd th:text="${details.gameUuid}"></dd></th:block>
         <th:block th:if="${details.className != null}"><dt th:text="#{catalogue.item.className}">Engine class</dt><dd th:text="${details.className}"></dd></th:block>
     </dl>
+    <section data-testid="item-available-at">
+        <h3 class="section-title" th:text="#{catalogue.item.availableAt}">Available at</h3>
+        <p th:if="${#lists.isEmpty(details.availableAt)}" class="cell-sub" data-testid="item-available-at-unknown"
+           th:text="#{catalogue.item.availableAt.unknown}">Unknown: no shop list of the game names this item.</p>
+        <ul th:unless="${#lists.isEmpty(details.availableAt)}">
+            <li th:each="shop : ${details.availableAt}" data-testid="item-available-at-shop">
+                <span class="cell-title" th:text="${shop.shopName()}"></span>
+                <span class="cell-sub" th:text="${shop.placeName(#locale) ?: shop.starSystem}"></span>
+            </li>
+        </ul>
+        <p class="cell-sub" th:text="#{catalogue.item.availableAt.help}">From the game files; prices and stock come from UEX.</p>
+    </section>
     <p th:if="${details.wikiMetadata == null}" class="cell-sub" th:text="#{catalogue.item.unavailable}">Source details have not been loaded.</p>
     <th:block th:if="${details.wikiMetadata != null}" th:with="wiki=${details.wikiMetadata}">
         <p th:if="${wiki.gameVersion != null}" class="cell-sub" th:text="#{catalogue.source.version(${wiki.gameVersion})}">Source version</p>

@@ -15,7 +15,7 @@ import {
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
 /** The kinds a report filters by, in display order. */
-const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT'];
+const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT', 'SHOP'];
 
 /** The change types a report filters by, in display order. */
 const TYPES = [

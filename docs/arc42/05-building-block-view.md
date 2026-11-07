@@ -223,7 +223,11 @@ pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportRe
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
 (REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
 `P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
-`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The kernel types
+`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The shops
+(`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
+terminal of its place by name (`ShopTerminalNames`), and `ShopAdminService` serves the admin's
+manual links; `ItemCatalogueDetailsService` shows an item's shops as "available at"
+(REQ-P4K-042…044). The kernel types
 `AbstractEntity` and `PageResponse` lie in `kernel` since 2026-10-12, and the catalogue's entities,
 enums, DTOs, repositories and validation types followed (P4-5 part 2): 69 in `catalogue.api`, which
 publishes the entities as the foundation modules do (§5.2 of the plan), and 32 in

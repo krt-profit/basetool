@@ -88,6 +88,8 @@ public class P4kImportService {
   private final P4kLoadoutReconciler loadoutReconciler;
   private final P4kStarmapReconciler starmapReconciler;
   private final P4kStarmapLinker starmapLinker;
+  private final P4kShopReconciler shopReconciler;
+  private final P4kShopLinker shopLinker;
   private final P4kSweeper sweeper;
   private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
@@ -212,7 +214,8 @@ public class P4kImportService {
    * Reconciles the five kinds in dependency order, then links the paints and stores the ship
    * loadouts, which refer to the items and ships (REQ-P4K-040, REQ-P4K-041), and imports the
    * starmap tree and links the UEX locations to it when the catalogue lists starmap objects
-   * (REQ-P4K-034, REQ-P4K-035).
+   * (REQ-P4K-034, REQ-P4K-035), and the shops with their item lists and terminal links when it
+   * lists shops (REQ-P4K-042…044).
    *
    * @param payload the stored upload, streamed again for the loadouts
    * @param catalogue the catalogue
@@ -243,6 +246,9 @@ public class P4kImportService {
         context);
     if (!catalogue.starmapObjects().isEmpty()) {
       starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
+    }
+    if (!catalogue.shops().isEmpty()) {
+      shopLinker.link(shopReconciler.reconcile(catalogue.shops(), context), context);
     }
     return ingredientsResolved;
   }
@@ -424,6 +430,7 @@ public class P4kImportService {
         report.counts(P4kKind.COMMODITY, completeness(head, P4kKind.COMMODITY)),
         report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
         report.counts(P4kKind.STARMAP_OBJECT, completeness(head, P4kKind.STARMAP_OBJECT)),
+        report.counts(P4kKind.SHOP, completeness(head, P4kKind.SHOP)),
         ingredientsResolved,
         context.getRunId(),
         Arrays.stream(P4kKind.values()).map(report::sweepResult).toList());
@@ -476,7 +483,8 @@ public class P4kImportService {
                 "ships" + counts(result.ships()),
                 "commodities" + counts(result.commodities()),
                 "blueprints" + counts(result.blueprints()),
-                "starmapObjects" + counts(Objects.requireNonNull(result.starmapObjects())))
+                "starmapObjects" + counts(Objects.requireNonNull(result.starmapObjects())),
+                "shops" + counts(Objects.requireNonNull(result.shops())))
             .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
@@ -509,6 +517,7 @@ public class P4kImportService {
         .with("commodities", counts(result.commodities()))
         .with("blueprints", counts(result.blueprints()))
         .with("starmapObjects", counts(Objects.requireNonNull(result.starmapObjects())))
+        .with("shops", counts(Objects.requireNonNull(result.shops())))
         .with("ingredientsResolved", result.ingredientsResolved());
   }
 

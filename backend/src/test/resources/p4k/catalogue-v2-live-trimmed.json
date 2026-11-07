@@ -2001,6 +2001,82 @@
    "commodityExchange": false,
    "inventory": null,
    "itemGuids": null
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4cccecbb-9ecd-4b4b-915a-7c58ae41b6b0,4c152f4a-716b-6eb6-289f-27f285fdb3ac,473217ea-be6b-758c-7fe7-5bb08ae418a0,41355073-47cf-08c6-675c-8c5fd44153a0,44a49502-7647-4998-be47-fa240d553fb6",
+   "entityGuid": "44a49502-7647-4998-be47-fa240d553fb6",
+   "system": "stanton",
+   "entityName": "CubbyBlast_Area18",
+   "registryName": "CubbyBlast_Area18",
+   "defaultValue": "b35f316b-236b-45c0-be9a-f9ea7b749daa",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_3_ArcCorp",
+    "Area18_City_objectContainer",
+    "Area18_central-001",
+    "cubby_int"
+   ],
+   "body": "OOC_Stanton_3_ArcCorp",
+   "location": "Area18_City_objectContainer",
+   "starmapObjectGuid": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+   "kind": "personalweapon",
+   "brand": "cubbyblast",
+   "commodityExchange": false,
+   "inventory": "inv_cubbyblast_a18",
+   "itemGuids": [
+    "bef9cd69-24f0-434a-ba7a-2bf751228093",
+    "de20695c-eb2f-4b68-be6f-9806cbd205a7"
+   ]
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4cccecbb-9ecd-4b4b-915a-7c58ae41b6b0,4c152f4a-716b-6eb6-289f-27f285fdb3ac,473217ea-be6b-758c-7fe7-5bb08ae418a0,468bfd40-102c-8168-8783-bba414ded3b4,42ab0900-69e4-3fd3-98e4-76a4c3402ea8",
+   "entityGuid": "42ab0900-69e4-3fd3-98e4-76a4c3402ea8",
+   "system": "stanton",
+   "entityName": "Dumpers_Depot_Area18",
+   "registryName": "DumpersDepot_Area18",
+   "defaultValue": "23545b90-86fc-4c64-88a9-a48ff43337c4",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_3_ArcCorp",
+    "Area18_City_objectContainer",
+    "Area18_central-001",
+    "OC_Dumpers_Int"
+   ],
+   "body": "OOC_Stanton_3_ArcCorp",
+   "location": "Area18_City_objectContainer",
+   "starmapObjectGuid": "c6535844-c615-494e-9dc1-c2d0c6e7190a",
+   "kind": "shippart",
+   "brand": "dumpersdepot",
+   "commodityExchange": false,
+   "inventory": "inv_dumpersdepot_area18",
+   "itemGuids": [
+    "339bd641-8dfb-4bc1-b273-5ffc5f702fbb"
+   ]
+  },
+  {
+   "key": "4a269932-183e-362d-aacc-188e7debbea9,4ce1f681-b479-5269-0536-3d7f02fdccaf,41d770bd-ec63-eb6a-7aca-93a2e263f7a8,4338223d-c6f3-5823-7605-ee2e313b6ab5,431d701e-0e1e-6faf-753a-e5ce3f2202ac,431d701e-0e1e-6faf-753a-e5ce3f2202ac,46e97556-1daa-e671-c95b-8d40905b2db9,42eef9e5-ecd4-6e5b-6254-e332a5dd44b9",
+   "entityGuid": "42eef9e5-ecd4-6e5b-6254-e332a5dd44b9",
+   "system": "stanton",
+   "entityName": "SCShop_CommEx_TDD_NewBabbage",
+   "registryName": "L_TDD_NewBabbage",
+   "defaultValue": "8daeeb75-087d-45ba-935a-d46e2b0d5708",
+   "containers": [
+    "OOC_Stanton",
+    "OOC_Stanton_4_Microtech",
+    "NewBabbage_LOC",
+    "ObjectContainer-123",
+    "ObjectContainer-Newbab_Domes_Int_001",
+    "ObjectContainer-Commons_Plaza_Interior",
+    "ObjectContainer-002"
+   ],
+   "body": "OOC_Stanton_4_Microtech",
+   "location": "NewBabbage_LOC",
+   "starmapObjectGuid": "122e8057-831d-4517-a23b-0eb8382b90a2",
+   "kind": "commex",
+   "brand": "tdd",
+   "commodityExchange": true,
+   "inventory": null,
+   "itemGuids": null
   }
  ],
  "factionReputations": [],
