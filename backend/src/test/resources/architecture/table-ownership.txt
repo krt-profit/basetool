@@ -139,6 +139,7 @@ ship_type_p4k_variant catalogue
 ship_type_uex_alias catalogue
 space_station catalogue
 star_system catalogue
+starmap_object catalogue
 supply_donation supply
 supply_need supply
 supply_unit_setting supply

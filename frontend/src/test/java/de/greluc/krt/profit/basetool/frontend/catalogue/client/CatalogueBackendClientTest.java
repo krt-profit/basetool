@@ -229,7 +229,8 @@ class CatalogueBackendClientTest {
         "{\"id\":\""
             + ID
             + "\",\"name\":\"Area18\",\"description\":\"ArcCorp city\",\"hidden\":true,"
-            + "\"homeLocation\":false,\"version\":3}");
+            + "\"homeLocation\":false,\"version\":3,\"starmapObjectId\":null,\"p4kName\":null,"
+            + "\"p4kNameDe\":null}");
   }
 
   @Test

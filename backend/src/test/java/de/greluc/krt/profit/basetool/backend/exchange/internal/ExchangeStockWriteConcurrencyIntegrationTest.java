@@ -333,7 +333,7 @@ class ExchangeStockWriteConcurrencyIntegrationTest {
         "q" + quality,
         "set-quantity",
         new ExchangeItemRef(null, material.toString(), null, null, null, null, null, null),
-        new ExchangeLocationRef(locationName, null),
+        new ExchangeLocationRef(locationName, null, null),
         quality,
         false,
         new ExchangeStockChangeSet.Quantity(new BigDecimal(target), "SCU"),

@@ -67,19 +67,26 @@ material matches, as an `ITEM`.
 ## Warehouse locations — `GET /exchange/v1/catalog/locations`
 
 No parameters. The answer is a [`location-list`](../schemas/): the warehouse's non-hidden locations,
-ordered by name, each with its UEX city or space station when it is linked to one (a city link wins).
+ordered by name, each with its UEX city or space station when it is linked to one (a city link wins)
+and with `guid`, the DataForge GUID of its starmap object, when it is linked to one: its own, else
+its city's, else its space station's. `name` is the warehouse's own name for the place.
 
 ```json
 {
   "items": [
-    {"name": "Area18", "uex": {"kind": "CITY", "id": 4}},
+    {
+      "name": "Area18",
+      "uex": {"kind": "CITY", "id": 4},
+      "guid": "5b0a2c7e-1f3d-4e8a-9c6b-2d4f8a1e7c30"
+    },
     {"name": "Seraphim Station"}
   ]
 }
 ```
 
 These are the only places a stock lot or a ship can be at. A `location` in a change set resolves by
-its `uex` link first, then by the exact `name` of a non-hidden location; a place with neither is
+its `guid` first, then by its `uex` link, then by the exact `name` of a non-hidden location; a
+value that matches nothing falls through to the next, and a place none of them matches is
 refused per op as `LOCATION_UNKNOWN` and is never created. Offer the member a place from this list
 instead. The list changes rarely; reading it once per session is enough.
 

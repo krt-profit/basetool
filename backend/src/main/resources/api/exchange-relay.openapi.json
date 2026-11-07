@@ -2975,6 +2975,10 @@
       "ExchangeLocationDto" : {
         "type" : "object",
         "properties" : {
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string"
           },
@@ -2997,6 +3001,10 @@
       "ExchangeLocationRef" : {
         "type" : "object",
         "properties" : {
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "name" : {
             "type" : "string",
             "maxLength" : 200,
@@ -3957,6 +3965,16 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "p4kName" : {
+            "type" : "string"
+          },
+          "p4kNameDe" : {
+            "type" : "string"
+          },
+          "starmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
           },
           "version" : {
             "type" : "integer",

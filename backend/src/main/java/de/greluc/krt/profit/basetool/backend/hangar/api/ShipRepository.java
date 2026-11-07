@@ -50,8 +50,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       """
       SELECT new
       de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository$ExchangeShipRow(
-      s.id, s.version, s.name, t.id, t.name, s.insurance, l.name, c.idCity, st.idSpaceStation,
-      s.fitted, o, s.owningOrgUnitVersion) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
+      s.id, s.version, s.name, t.id, t.name, s.insurance, l.id, l.name, c.idCity,
+      st.idSpaceStation, s.fitted, o, s.owningOrgUnitVersion) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
       LEFT JOIN l.city c LEFT JOIN l.spaceStation st LEFT JOIN s.owningOrgUnit o
       WHERE s.owner.id = :member
       """;
@@ -481,6 +481,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param shipTypeId the ship type's id
    * @param shipTypeName the ship type's name
    * @param insurance {@code LTI} or the insurance months as digits, or {@code null}
+   * @param locationId the location's id, or {@code null} when the ship has none
    * @param locationName the location's name, or {@code null} when the ship has none
    * @param uexCityId the UEX id of the location's city, or {@code null}
    * @param uexSpaceStationId the UEX id of the location's space station, or {@code null}
@@ -495,6 +496,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       UUID shipTypeId,
       String shipTypeName,
       String insurance,
+      @Nullable UUID locationId,
       String locationName,
       Integer uexCityId,
       Integer uexSpaceStationId,

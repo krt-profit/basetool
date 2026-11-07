@@ -43,7 +43,7 @@ public class ExchangeCatalogService {
   private final LocationRepository locationRepository;
 
   /**
-   * Lists the Lager's non-hidden locations with their UEX place, in one query.
+   * Lists the Lager's non-hidden locations with their UEX place and starmap GUID, in one query.
    *
    * @return the locations, ordered by name
    */
@@ -57,29 +57,31 @@ public class ExchangeCatalogService {
   }
 
   /**
-   * Maps one row; a city link wins over a space-station link.
+   * Maps one row.
    *
    * @param row the row
    * @return the DTO
    */
   @NotNull
   private static ExchangeLocationDto toDto(@NotNull ExchangeLocationRow row) {
-    return new ExchangeLocationDto(row.name(), uex(row));
+    return new ExchangeLocationDto(
+        row.getName(), uex(row.getUexCityId(), row.getUexSpaceStationId()), row.getGuid());
   }
 
   /**
-   * Returns the UEX place of a row.
+   * Returns the UEX place of a location; a city link wins over a space-station link.
    *
-   * @param row the row
+   * @param uexCityId the UEX id of the location's city, or {@code null}
+   * @param uexSpaceStationId the UEX id of the location's space station, or {@code null}
    * @return the place, or {@code null} when the location links none
    */
-  @Nullable
-  private static ExchangeLocationDto.UexRef uex(@NotNull ExchangeLocationRow row) {
-    if (row.uexCityId() != null && row.uexCityId() > 0) {
-      return new ExchangeLocationDto.UexRef(KIND_CITY, row.uexCityId());
+  static @Nullable ExchangeLocationDto.UexRef uex(
+      @Nullable Integer uexCityId, @Nullable Integer uexSpaceStationId) {
+    if (uexCityId != null && uexCityId > 0) {
+      return new ExchangeLocationDto.UexRef(KIND_CITY, uexCityId);
     }
-    if (row.uexSpaceStationId() != null && row.uexSpaceStationId() > 0) {
-      return new ExchangeLocationDto.UexRef(KIND_SPACE_STATION, row.uexSpaceStationId());
+    if (uexSpaceStationId != null && uexSpaceStationId > 0) {
+      return new ExchangeLocationDto.UexRef(KIND_SPACE_STATION, uexSpaceStationId);
     }
     return null;
   }

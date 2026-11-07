@@ -188,7 +188,7 @@ class ExchangeStockWritePathCharacterisationTest {
         "op-" + stolen,
         "set-quantity",
         new ExchangeItemRef(null, material.toString(), null, null, null, null, null, null),
-        new ExchangeLocationRef(locationName, null),
+        new ExchangeLocationRef(locationName, null, null),
         QUALITY,
         stolen,
         new ExchangeStockChangeSet.Quantity(new BigDecimal(target), "SCU"),

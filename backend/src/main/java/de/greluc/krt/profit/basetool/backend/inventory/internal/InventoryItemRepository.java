@@ -64,7 +64,8 @@ public interface InventoryItemRepository
         g.name AS gameItemName, g.wiki_type AS gameItemWikiType, g.size_class AS gameItemSize,
         g.grade AS gameItemGrade, g.item_class AS gameItemClass, l.name AS locationName,
         c.id_city AS uexCityId, s.id_space_station AS uexSpaceStationId,
-        lots.quality AS quality, lots.stolen AS stolen, lots.amount AS amount
+        COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid) AS locationGuid, lots.quality AS quality,
+        lots.stolen AS stolen, lots.amount AS amount
       FROM (SELECT CAST(MIN(CAST(i.id AS text)) AS uuid) AS anchor,
                    exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
                                           i.quality, i.stolen) AS lot_key,
@@ -78,6 +79,9 @@ public interface InventoryItemRepository
       JOIN location l ON l.id = lots.location_id
       LEFT JOIN city c ON c.id = l.city_id
       LEFT JOIN space_station s ON s.id = l.space_station_id
+      LEFT JOIN starmap_object lso ON lso.id = l.starmap_object_id
+      LEFT JOIN starmap_object cso ON cso.id = c.starmap_object_id
+      LEFT JOIN starmap_object sso ON sso.id = s.starmap_object_id
       """;
 
   /**
@@ -106,7 +110,8 @@ public interface InventoryItemRepository
         g.wiki_type AS gameItemWikiType, g.size_class AS gameItemSize, l.name AS locationName,
         g.item_class AS gameItemClass, c.id_city AS uexCityId, lots.quality AS quality,
         s.id_space_station AS uexSpaceStationId, lots.stolen AS stolen, lots.amount AS amount,
-        lots.job_order_earmarked AS jobOrderEarmarked, lots.mission_earmarked AS missionEarmarked
+        lots.job_order_earmarked AS jobOrderEarmarked, lots.mission_earmarked AS missionEarmarked,
+        COALESCE(lso.p4k_uuid, cso.p4k_uuid, sso.p4k_uuid) AS locationGuid
       FROM (SELECT CAST(MIN(CAST(i.id AS text)) AS uuid) AS anchor,
                    'u:' || i.owning_org_unit_id || '|'
                        || exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
@@ -131,6 +136,9 @@ public interface InventoryItemRepository
       JOIN location l ON l.id = lots.location_id
       LEFT JOIN city c ON c.id = l.city_id
       LEFT JOIN space_station s ON s.id = l.space_station_id
+      LEFT JOIN starmap_object lso ON lso.id = l.starmap_object_id
+      LEFT JOIN starmap_object cso ON cso.id = c.starmap_object_id
+      LEFT JOIN starmap_object sso ON sso.id = s.starmap_object_id
       """;
 
   /**

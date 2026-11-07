@@ -562,7 +562,15 @@ class CatalogueCachedReadsTest {
                 locationController.updateLocation(
                     locationId,
                     new LocationDto(
-                        locationId, "Cat Location Renamed " + tag, "changed", false, false, 0L)),
+                        locationId,
+                        "Cat Location Renamed " + tag,
+                        "changed",
+                        false,
+                        false,
+                        0L,
+                        null,
+                        null,
+                        null)),
             node ->
                 pinFields(
                     node,

@@ -296,5 +296,6 @@ exempt-table|ship_type_p4k_variant
 exempt-table|ship_type_uex_alias
 exempt-table|space_station
 exempt-table|star_system
+exempt-table|starmap_object
 exempt-table|terminal
 exempt-table|uex_category

@@ -338,7 +338,7 @@ public final class P4kImportReport {
     change.setChangeType(type);
     change.setGuid(record.parsedGuid());
     change.setClassName(shorten(record.className()));
-    change.setNameEn(shorten(record.nameEn()));
+    change.setNameEn(shorten(record.reportName()));
     change.setRecordPath(record.recordPath());
     return change;
   }

@@ -24,8 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The parts of a version-2 catalogue the import reads: the head, the five base kinds and the
- * curated ship store slugs. Every other kind of the file is skipped while reading.
+ * The parts of a version-2 catalogue the import reads: the head, the five base kinds, the starmap
+ * objects and the curated ship store slugs. Every other kind of the file is skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param ships the ships, empty when the file has none
  * @param commodities the commodities, empty when the file has none
  * @param blueprints the blueprints, empty when the file has none
+ * @param starmapObjects the starmap objects, empty when the file has none
  * @param shipStoreSlugs the curated ship store slugs, empty when the file has none
  */
 public record P4kCatalogue(
@@ -42,6 +43,7 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kShipDto> ships,
     @NotNull @Unmodifiable List<P4kCommodityDto> commodities,
     @NotNull @Unmodifiable List<P4kBlueprintDto> blueprints,
+    @NotNull @Unmodifiable List<P4kStarmapObjectDto> starmapObjects,
     @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs) {
 
   /**
@@ -53,6 +55,7 @@ public record P4kCatalogue(
    * @param ships the ships
    * @param commodities the commodities
    * @param blueprints the blueprints
+   * @param starmapObjects the starmap objects
    * @param shipStoreSlugs the ship store slugs
    */
   public P4kCatalogue {
@@ -61,6 +64,7 @@ public record P4kCatalogue(
     ships = List.copyOf(ships);
     commodities = List.copyOf(commodities);
     blueprints = List.copyOf(blueprints);
+    starmapObjects = List.copyOf(starmapObjects);
     shipStoreSlugs = List.copyOf(shipStoreSlugs);
   }
 
@@ -79,6 +83,7 @@ public record P4kCatalogue(
       case SHIP -> ships;
       case COMMODITY -> commodities;
       case BLUEPRINT -> blueprints;
+      case STARMAP_OBJECT -> starmapObjects;
     };
   }
 }

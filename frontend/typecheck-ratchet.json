@@ -41,6 +41,7 @@
       "catalogue/admin-quality-tiers.js",
       "catalogue/admin-squadrons.js",
       "catalogue/catalogue-list.js",
+      "catalogue/catalogue-pager.js",
       "catalogue/locations.js",
       "catalogue/material-detail.js",
       "catalogue/materials-matrix.js",
@@ -51,6 +52,7 @@
       "catalogue/p4k-import.js",
       "catalogue/p4k-report.js",
       "catalogue/ship-data.js",
+      "catalogue/starmap.js",
       "catalogue/sync-reports.js",
       "catalogue/uex.js"
     ],

@@ -40,7 +40,10 @@ public enum P4kKind {
   COMMODITY("commodities"),
 
   /** {@code blueprints}, matched against {@code blueprint}. */
-  BLUEPRINT("blueprints");
+  BLUEPRINT("blueprints"),
+
+  /** {@code starmapObjects}, imported into {@code starmap_object} (REQ-P4K-034). */
+  STARMAP_OBJECT("starmapObjects");
 
   /** The top-level field of the catalogue that holds this kind, also its completeness key. */
   @Getter @NotNull private final String catalogueField;

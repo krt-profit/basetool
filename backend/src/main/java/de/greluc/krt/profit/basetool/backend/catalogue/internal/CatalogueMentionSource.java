@@ -125,6 +125,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "ship_type_uex_alias",
         "space_station",
         "star_system",
+        "starmap_object",
         "terminal",
         "uex_category");
   }

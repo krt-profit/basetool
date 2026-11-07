@@ -10,8 +10,8 @@
 > [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md),
 > [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
 > [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md);
-> planned: [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
+> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
+> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
 
 # External client exchange
 
@@ -1118,9 +1118,10 @@ refused `400` (`ExchangeStockChangeSetValidationTest`, `ExchangeStockWriteContro
 
 The backend applies a change set at `POST /api/v1/exchange/me/stock/changes`
 (`exchange.stock.write`) in one transaction. Each op resolves its material — a material first, an
-item otherwise — and its place, the UEX link first, then the exact name of a non-hidden location
-(`LOCATION_UNKNOWN`), checks both units against the material's (`UNIT_MISMATCH`); then every lot
-the batch names is locked before any op compares `expectedQuantity` (`VERSION_CONFLICT`): first a
+item otherwise — and its place, its starmap `guid` first, then the UEX link, then the exact name of
+a non-hidden location, a value that matches nothing falling through to the next
+(`LOCATION_UNKNOWN`; REQ-XCH-018), checks both units against the material's (`UNIT_MISMATCH`);
+then every lot the batch names is locked before any op compares `expectedQuantity` (`VERSION_CONFLICT`): first a
 transaction-scoped advisory lock per member and lot key, all of them in ascending order of the
 lock key, then the lots' rows in the order of the lots' keys, each lot's rows in id order
 (ADR-0229). So two sets of one member over the same lots never deadlock whatever order their ops
@@ -1233,18 +1234,24 @@ quantity per `minQuality`, `source: material-order|item-order`) and `items[]` (i
 per-order breakdown and no low-count suppression; a client may cache it for up to 7 days. A client
 approved for `exchange.demand.details` adds a per-order breakdown for the member's Logistician
 units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described here.
-`GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link.
+`GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link and
+their starmap `guid`.
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
 scope), one query, a city link winning over a space-station link.
 
-> [!note] Planned amendment — a linked place carries its starmap `guid` (#2896;
-> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md))
-> `uex: {kind, id}` stays and is not deprecated. A place linked to a P4K starmap object additionally
-> carries that object's `guid`, additive in the v1 schemas (`location`, `location-ref`;
-> REQ-XCH-026). The write resolver of REQ-XCH-016 tries `guid`, then `uex`, then the exact name.
-> The name a place carries is `location.name`, the curated name, never the P4K name of the starmap
-> object.
+**A place linked to a P4K starmap object carries that object's `guid`** (REQ-P4K-037,
+[ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md) decision 7):
+the `p4k_uuid` of the location's own starmap object, else of its city's linked object, else of its
+space station's, in lower-case canonical form; a place linked to none carries no `guid`. It is
+additive in the v1 schemas `location` and `location-ref` (REQ-XCH-026) and appears wherever a
+place does: the location list and the `location` of the stock, org-stock and ship feeds. `uex:
+{kind, id}` stays and is not deprecated. The name a place carries is `location.name`, the curated
+name, never the P4K name of the starmap object, which is a game text (ADR-0344). The write resolver
+(`ExchangeLocationResolver`, REQ-XCH-016, REQ-XCH-017, REQ-XCH-042) tries `guid`, then `uex`, then
+the exact name, always among the non-hidden, non-reference-only places; a value that matches
+nothing falls through to the next, and among several places with one `guid` a place linked to the
+object itself wins, then the name decides.
 
 The backend serves the demand as `GET /api/v1/exchange/me/org-demand` (`exchange.demand.read`): the
 open and in-progress orders a unit of the member's memberships is responsible for. A material line
@@ -1289,6 +1296,12 @@ demand.*
 - [x] The response schema admits no name or free-text field outside the detailed orders of
   REQ-XCH-047. *`ExchangeOrgDemandRouteTest` pins the schema's field sets and the `reason` enum;
   outside `orders` the only names are catalogue names.*
+- [x] A place linked to a starmap object, directly or through its city, carries the object's `guid`
+  and its curated name in the location list and the feeds; an unlinked place carries no `guid`; a
+  write's `guid` wins over `uex`, and an unknown `guid` falls back to `uex` and the name.
+  *`ExchangeCatalogControllerTest.aLinkedPlaceCarriesItsStarmapGuidAndCuratedName`,
+  `ExchangeLocationGuidIntegrationTest`; the schemas' fixtures
+  `location-ref/valid/by-guid.json` and `location-ref/invalid/guid-upper-case.json`.*
 
 **Status:** the backend location list is built — WP 3.1 (#2083); the backend's demand and the
 gateway's demand route (`GET /exchange/v1/me/org-demand`) are built — WP 4.3 (#2095); the

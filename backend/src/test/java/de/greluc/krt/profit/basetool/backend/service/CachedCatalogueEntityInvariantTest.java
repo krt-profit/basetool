@@ -513,7 +513,10 @@ class CachedCatalogueEntityInvariantTest {
                           "changed",
                           true,
                           true,
-                          locationService.getLocation(id).version())));
+                          locationService.getLocation(id).version(),
+                          null,
+                          null,
+                          null)));
         });
     cases.put(
         "LocationService#deleteLocation",

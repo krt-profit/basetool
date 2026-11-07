@@ -81,7 +81,8 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds and the ship store slugs, skipping everything else.
+   * Reads the head, the five base kinds, the starmap objects and the ship store slugs, skipping
+   * everything else.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -115,6 +116,7 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.SHIP, P4kShipDto.class),
           listOf(kinds, P4kKind.COMMODITY, P4kCommodityDto.class),
           listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class),
+          listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
           storeSlugs);
     } catch (JacksonException e) {
       throw new P4kCatalogueFormatException("The upload is not catalogue JSON.", e);
@@ -227,6 +229,7 @@ public class P4kCatalogueReader {
       case SHIP -> P4kShipDto.class;
       case COMMODITY -> P4kCommodityDto.class;
       case BLUEPRINT -> P4kBlueprintDto.class;
+      case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
     };
   }
 

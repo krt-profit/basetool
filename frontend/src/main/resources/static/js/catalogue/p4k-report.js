@@ -3,6 +3,10 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
+import {
+    bindPager as bindListPager,
+    renderPager as renderListPager,
+} from '/js/catalogue/catalogue-pager.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
@@ -11,7 +15,7 @@ import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
 /** The kinds a report filters by, in display order. */
-const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT'];
+const KINDS = ['MANUFACTURER', 'ITEM', 'SHIP', 'COMMODITY', 'BLUEPRINT', 'STARMAP_OBJECT'];
 
 /** The change types a report filters by, in display order. */
 const TYPES = [
@@ -96,27 +100,7 @@ function readJson(url) {
  * @param {{ page?: number, totalPages?: number } | null} page the page the list shows
  */
 function renderPager(nav, page) {
-    if (!nav) return;
-    const total = page && page.totalPages ? page.totalPages : 0;
-    const current = page && page.page ? page.page : 0;
-    nav.hidden = total <= 1;
-    krtHtml.set(
-        nav,
-        krtHtml`<button type="button" class="page-btn" data-page="${current - 1}" aria-label="${t(
-            'pagePrevious',
-        )}">‹</button><span class="page-status"><b>${current + 1}</b> / ${Math.max(
-            total,
-            1,
-        )}</span><button type="button" class="page-btn" data-page="${current + 1}" aria-label="${t(
-            'pageNext',
-        )}">›</button>`,
-    );
-    nav.querySelectorAll('button[data-page]').forEach((btn) => {
-        if (btn instanceof HTMLButtonElement) {
-            const target = Number(btn.dataset.page);
-            btn.disabled = target < 0 || target >= total;
-        }
-    });
+    renderListPager(nav, page, { previous: t('pagePrevious'), next: t('pageNext') });
 }
 
 /**
@@ -126,25 +110,7 @@ function renderPager(nav, page) {
  * @param {(page: number) => void} load loads a page of its list
  */
 function bindPager(id, load) {
-    const nav = $(id);
-    if (!nav) return;
-    nav.addEventListener('click', (e) => {
-        const page = pagerTarget(e);
-        if (page != null) load(page);
-    });
-}
-
-/**
- * Reads the page a pager button asks for.
- *
- * @param {Event} e the click
- * @returns {number | null} the page, or null when the click hit no enabled button
- */
-function pagerTarget(e) {
-    const target = /** @type {Element | null} */ (e.target);
-    const btn = target && target.closest ? target.closest('button[data-page]') : null;
-    if (!(btn instanceof HTMLButtonElement) || btn.disabled) return null;
-    return Number(btn.dataset.page);
+    bindListPager($(id), load);
 }
 
 /**

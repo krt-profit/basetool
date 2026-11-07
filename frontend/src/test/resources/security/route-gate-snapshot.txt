@@ -148,6 +148,12 @@
 /admin/special-commands/{id}/members/{userId}/lead POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#toggleMemberLeadAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST -> AdminSpecialCommandsPageController#updateSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#updateSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/starmap GET -> AdminStarmapPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/starmap/objects GET -> AdminStarmapController#objects gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/objects/{id}/storage-place POST -> AdminStarmapController#createStoragePlace gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/objects/{id}/visibility POST -> AdminStarmapController#overrideVisibility gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/places/{kind} GET -> AdminStarmapController#places gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/places/{kind}/{id}/link POST -> AdminStarmapController#changeLink gate=class:hasRole('ADMIN') layout=no
 /admin/supply GET -> SupplyPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
 /admin/sync-reports GET -> AdminSyncReportsPageController#combined gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST -> AdminSyncReportsPageController#deleteOld gate=class:hasRole('ADMIN') layout=yes

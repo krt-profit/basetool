@@ -181,6 +181,8 @@ public abstract class InventoryItemMapper {
   }
 
   /** Nested mapping for the item's {@link Location} (used as {@code uses} target). */
+  @Mapping(target = "p4kName", ignore = true)
+  @Mapping(target = "p4kNameDe", ignore = true)
   public abstract LocationDto locationToDto(Location location);
 
   /**

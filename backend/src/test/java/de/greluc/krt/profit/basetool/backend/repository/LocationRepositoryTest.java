@@ -107,7 +107,7 @@ class LocationRepositoryTest {
         .doesNotContain("RO-Test City");
     assertThat(repository.findLocationsWithRefinery()).doesNotContain(marked);
     assertThat(repository.findExchangeLocations())
-        .extracting(LocationRepository.ExchangeLocationRow::name)
+        .extracting(LocationRepository.ExchangeLocationRow::getName)
         .doesNotContain("RO-Test City");
     assertThat(repository.findExchangeByCity(990_339)).isEmpty();
     assertThat(
