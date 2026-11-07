@@ -85,7 +85,7 @@ public class PersonalBlueprintKeyUpgrade implements ProducedItemGuidFollower {
     heldKeys.addAll(nameKeys(aliasRepository.findAllDistinctProductKeys()));
     participants.forEach(p -> heldKeys.addAll(nameKeys(p.referencedProductKeys())));
 
-    Map<String, List<ResolvedProduct>> byName = productService.productsByNameKey();
+    Map<String, List<ResolvedProduct>> byName = productService.knownProductsByNameKey();
     Tally tally = new Tally();
     List<UnresolvedProductKey> unresolved = new ArrayList<>();
     for (String nameKey : heldKeys) {

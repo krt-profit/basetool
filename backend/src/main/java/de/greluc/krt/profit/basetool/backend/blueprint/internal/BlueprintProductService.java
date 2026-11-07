@@ -93,7 +93,7 @@ public class BlueprintProductService implements BlueprintProducts {
     int cap = Math.clamp(limit, 1, MAX_LIMIT);
     String q = query == null ? "" : query.trim();
 
-    List<ProductAccumulator> products = new ArrayList<>(buildProductMap(q).values());
+    List<ProductAccumulator> products = new ArrayList<>(offerableProducts(q).values());
     products.sort(
         Comparator.comparing(
             p -> p.displayName, Comparator.nullsLast(String::compareToIgnoreCase)));
@@ -119,7 +119,8 @@ public class BlueprintProductService implements BlueprintProducts {
    * Resolves a product key to its canonical product (display name and optional output-item id).
    *
    * @param productKey product key
-   * @return the resolved product, or empty for a blank key or one no active blueprint produces
+   * @return the resolved product, or empty for a blank key or one no offerable blueprint produces
+   *     (REQ-P4K-013)
    */
   @Override
   @NotNull
@@ -127,7 +128,7 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKey == null || productKey.isBlank()) {
       return Optional.empty();
     }
-    ProductAccumulator p = buildProductMap("").get(productKey);
+    ProductAccumulator p = offerableProducts("").get(productKey);
     return p == null
         ? Optional.empty()
         : Optional.of(new ResolvedProduct(p.productKey, p.displayName, p.outputItemId));
@@ -162,7 +163,8 @@ public class BlueprintProductService implements BlueprintProducts {
 
   /**
    * Resolves product keys to the game item each product produces, in one scan of the active
-   * recipes; an empty input issues no query.
+   * recipes; an empty input issues no query. The keys name existing references, so a recipe the
+   * P4K stamped or an admin hid still resolves (REQ-P4K-013).
    *
    * @param productKeys the product keys
    * @return product key to output-item id; keys without an active product or output item are absent
@@ -173,7 +175,8 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKeys.isEmpty()) {
       return Map.of();
     }
-    Map<String, ProductAccumulator> products = buildProductMap("");
+    Map<String, ProductAccumulator> products =
+        buildProductMap(blueprintRepository.findActiveProductRows(""));
     Map<String, UUID> ids = new HashMap<>();
     for (String key : productKeys) {
       ProductAccumulator product = key == null ? null : products.get(key);
@@ -295,32 +298,56 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Returns every active product as a {@link ResolvedProduct} (product key + display name +
-   * optional resolved output-item id), de-duplicated by product key. Backs the Phase 4 import
+   * Returns every product a new reference may name as a {@link ResolvedProduct} (product key +
+   * display name + optional resolved output-item id), de-duplicated by product key. Backs the Phase 4 import
    * matching engine, which needs the full candidate set in memory to score fuzzy suggestions.
    *
-   * @return all active products, de-duplicated by product key, in master-scan order
+   * @return all offerable products, de-duplicated by product key, in master-scan order
    */
   @Override
   @NotNull
   public List<ResolvedProduct> allProducts() {
-    return buildProductMap("").values().stream()
+    return offerableProducts("").values().stream()
         .map(p -> new ResolvedProduct(p.productKey, p.displayName, p.outputItemId))
         .toList();
   }
 
   /**
-   * Indexes every active product by the name keys of its recipes' output names, so a name resolves
-   * to every product it names: one for a unique name, several when recipes of that name produce
-   * items with different GUIDs (REQ-INV-070).
+   * Indexes every product a new reference may name (REQ-P4K-013) by the name keys of its recipes'
+   * output names, so a name resolves to every product it names: one for a unique name, several when
+   * recipes of that name produce items with different GUIDs (REQ-INV-070).
    *
    * @return name key to the products it names, in master-scan order; never {@code null}
    */
   @Override
   @NotNull
   public Map<String, List<ResolvedProduct>> productsByNameKey() {
+    return nameIndex(offerableProducts(""));
+  }
+
+  /**
+   * Indexes every product an existing reference may still name by its recipes' name keys, as
+   * {@link #productsByNameKey()} does but with the recipes the P4K stamped or an admin hid, for
+   * moving references that already exist (REQ-P4K-013).
+   *
+   * @return name key to the products it names, in master-scan order; never {@code null}
+   */
+  @NotNull
+  Map<String, List<ResolvedProduct>> knownProductsByNameKey() {
+    return nameIndex(buildProductMap(blueprintRepository.findActiveProductRows("")));
+  }
+
+  /**
+   * Indexes products by the name keys of their recipes' output names.
+   *
+   * @param products the products by product key
+   * @return name key to the products it names, in the products' order
+   */
+  @NotNull
+  private static Map<String, List<ResolvedProduct>> nameIndex(
+      @NotNull Map<String, ProductAccumulator> products) {
     Map<String, List<ResolvedProduct>> index = new LinkedHashMap<>();
-    for (ProductAccumulator p : buildProductMap("").values()) {
+    for (ProductAccumulator p : products.values()) {
       ResolvedProduct product = new ResolvedProduct(p.productKey, p.displayName, p.outputItemId);
       for (String nameKey : p.nameKeys) {
         index.computeIfAbsent(nameKey, _ -> new ArrayList<>()).add(product);
@@ -364,8 +391,9 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Builds the index from lower-cased {@code scwiki_key} to every {@code product_key} an active
-   * recipe with that key produces, keeping keys that name several products (REQ-XCH-012).
+   * Builds the index from lower-cased {@code scwiki_key} to every {@code product_key} an offerable
+   * recipe with that key produces (REQ-P4K-013), keeping keys that name several products
+   * (REQ-XCH-012).
    *
    * @return lower-cased {@code scwiki_key} to its product keys in first-seen order; never {@code
    *     null}
@@ -374,7 +402,7 @@ public class BlueprintProductService implements BlueprintProducts {
   @NotNull
   public Map<String, Set<String>> scwikiKeyToProductKeys() {
     Map<String, Set<String>> index = new LinkedHashMap<>();
-    for (BlueprintProductRow row : blueprintRepository.findActiveProductRows("")) {
+    for (BlueprintProductRow row : blueprintRepository.findOfferableProductRows("")) {
       if (row.scwikiKey() == null || row.outputName() == null) {
         continue;
       }
@@ -392,17 +420,26 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Loads the active blueprint rows matching {@code q} and groups them by product key in first-seen
-   * order.
+   * Loads the products a new reference may name (REQ-P4K-013) whose recipes match {@code q}.
    *
    * @param q case-insensitive output-name substring ({@code ""} = no filter)
    * @return product accumulators keyed by product key
    */
   @NotNull
-  private Map<String, ProductAccumulator> buildProductMap(String q) {
+  private Map<String, ProductAccumulator> offerableProducts(@NotNull String q) {
+    return buildProductMap(blueprintRepository.findOfferableProductRows(LikePatterns.escape(q)));
+  }
+
+  /**
+   * Groups blueprint rows by product key in first-seen order.
+   *
+   * @param rows the rows
+   * @return product accumulators keyed by product key
+   */
+  @NotNull
+  private Map<String, ProductAccumulator> buildProductMap(@NotNull List<BlueprintProductRow> rows) {
     Map<String, ProductAccumulator> map = new LinkedHashMap<>();
-    for (BlueprintProductRow row :
-        blueprintRepository.findActiveProductRows(LikePatterns.escape(q))) {
+    for (BlueprintProductRow row : rows) {
       if (row.outputName() == null) {
         continue;
       }

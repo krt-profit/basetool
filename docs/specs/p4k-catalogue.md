@@ -382,7 +382,12 @@ prices and terminals.
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager and item-order item pickers
 (`BlueprintRepository.findItemsWithActiveBlueprint`, `findOrderableItems`), the blueprint pickers,
-the ship-type, manufacturer and material pickers and searches. The notice is `noLongerInGame` on
+the ship-type, manufacturer and material pickers and searches. A blueprint recipe leaves the product
+search, the product-key resolution of a new personal blueprint, default blueprint, Materialbörse
+offer or request, the name and Wiki-key matches of the imports and the exchange's catalogue
+resolution (`BlueprintRepository.findOfferableProductRows`, `findExchangeKeyRows`); an owned
+product's recipe, its craftability, a product-key upgrade and the output item of an existing
+exchange item still read it (`findActiveProductRows`, `findActiveIdNameRows`). The notice is `noLongerInGame` on
 `InventoryGameItemReferenceDto`, `GameItemReferenceDto` and `ShipTypeDto`, shown in the Lager, the
 hangar, the job-order items, handovers and item collection, and the mission units.
 

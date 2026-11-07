@@ -220,8 +220,9 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
-   * produced-item GUID and German manufacturer name for the product search; every column after the
-   * Wiki key is {@code null} when unresolved.
+   * produced-item GUID and German manufacturer name; every column after the Wiki key is {@code
+   * null} when unresolved. A recipe the P4K sweep stamped or an admin hid is included, so existing
+   * references keep resolving; a new reference reads {@link #findOfferableProductRows(String)}.
    *
    * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
    * @return projection rows for every matching active recipe
@@ -236,8 +237,26 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintProductRow> findActiveProductRows(@Param("q") String q);
 
   /**
+   * Projects the recipes a new reference may name as {@link #findActiveProductRows(String)} does,
+   * without a recipe the P4K sweep stamped or an admin hid (REQ-P4K-013).
+   *
+   * @param q case-insensitive output-name substring; must be non-null ({@code ""} = no filter)
+   * @return projection rows for every matching offerable recipe
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow(b.outputName, b.scwikiKey, m.name, oi.id, b.producedItemGuid, m.nameDe)
+      FROM Blueprint b LEFT JOIN b.outputItem oi LEFT JOIN oi.manufacturer m
+      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
+      AND b.outputName IS NOT NULL
+      AND LOWER(b.outputName) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'
+      """)
+  List<BlueprintProductRow> findOfferableProductRows(@Param("q") String q);
+
+  /**
    * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid)} for
-   * resolving a product key to a representative recipe.
+   * resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped or
+   * an admin hid is included, since only existing references read it (REQ-P4K-013).
    *
    * @return id, output name and produced-item GUID for every active recipe with a non-null output
    *     name, ordered by name then Wiki key then id
@@ -251,13 +270,14 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintIdNameRow> findActiveIdNameRows();
 
   /**
-   * Projects the active blueprints whose own UUIDs or whose output item's UUIDs, UEX id or name key
-   * match, for the exchange's catalogue resolution (REQ-XCH-012).
+   * Projects the offerable blueprints whose own UUIDs or whose output item's UUIDs, UEX id or name
+   * key match, for the exchange's catalogue resolution of a write (REQ-XCH-012); a recipe the P4K
+   * sweep stamped or an admin hid is not offered (REQ-P4K-013).
    *
    * @param guids the game GUIDs to match; must not be empty
    * @param uexIds the UEX item ids to match; must not be empty
    * @param nameKeys the lower-cased name keys to match; must not be empty
-   * @return one row per matching active blueprint
+   * @return one row per matching offerable blueprint
    */
   @Query(
       """
@@ -266,7 +286,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       b.outputName, b.producedItemGuid, b.scwikiUuid, b.p4kUuid, oi.externalUuid, oi.p4kUuid,
       oi.uexItemId, oi.nameKey)
       FROM Blueprint b LEFT JOIN b.outputItem oi
-      WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
+      WHERE b.scwikiDeletedAt IS NULL AND b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL
+      AND b.outputName IS NOT NULL
       AND (b.scwikiUuid IN :guids OR b.p4kUuid IN :guids OR b.producedItemGuid IN :guids
       OR oi.externalUuid IN :guids
       OR oi.p4kUuid IN :guids OR oi.uexItemId IN :uexIds OR LOWER(oi.nameKey) IN :nameKeys)

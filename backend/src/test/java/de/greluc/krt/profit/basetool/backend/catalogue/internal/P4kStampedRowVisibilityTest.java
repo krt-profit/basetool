@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductDto;
+import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -36,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +67,7 @@ class P4kStampedRowVisibilityTest {
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private InventoryItemMapper inventoryItemMapper;
   @Autowired private ShipTypeMapper shipTypeMapper;
+  @Autowired private BlueprintProductService productService;
 
   private GameItem craftable(String name) {
     GameItem item = new GameItem();
@@ -130,6 +134,52 @@ class P4kStampedRowVisibilityTest {
           assertThat(c.getGuid()).isEqualTo(gone.getP4kUuid());
           assertThat(c.isStillLiveElsewhere()).isTrue();
         });
+  }
+
+  @Test
+  void aStampedOrHiddenRecipe_offersNoNewReference_butItsOwnerStillReadsIt() {
+    Blueprint live = recipe("Visibility live helmet");
+    Blueprint vanished = recipe("Visibility vanished helmet");
+    vanished.setP4kDeletedAt(STAMPED);
+    Blueprint hidden = recipe("Visibility hidden helmet");
+    hidden.setP4kHiddenAt(STAMPED);
+    blueprintRepository.flush();
+    String vanishedKey = vanished.getProducedItemGuid().toString();
+    String hiddenKey = hidden.getProducedItemGuid().toString();
+
+    assertThat(productService.searchProducts("visibility", 50, UUID.randomUUID()))
+        .extracting(BlueprintProductDto::productKey)
+        .contains(live.getProducedItemGuid().toString())
+        .doesNotContain(vanishedKey, hiddenKey);
+    assertThat(productService.resolveByProductKey(vanishedKey)).isEmpty();
+    assertThat(productService.resolveByProductKey(hiddenKey)).isEmpty();
+    assertThat(
+            blueprintRepository.findExchangeKeyRows(
+                List.of(
+                    live.getProducedItemGuid(),
+                    vanished.getProducedItemGuid(),
+                    hidden.getProducedItemGuid()),
+                List.of(-1),
+                List.of("-")))
+        .extracting(BlueprintRepository.ExchangeBlueprintKeyRow::producedItemGuid)
+        .containsExactly(live.getProducedItemGuid());
+    assertThat(productService.resolveRecipe(hiddenKey)).isPresent();
+    assertThat(productService.resolveRepresentativeBlueprints(Set.of(vanishedKey)))
+        .containsKey(vanishedKey);
+  }
+
+  /**
+   * Saves a recipe keyed by a produced-item GUID of its own.
+   *
+   * @param name the output name
+   * @return the recipe
+   */
+  private Blueprint recipe(String name) {
+    Blueprint blueprint = new Blueprint();
+    blueprint.setScwikiUuid(UUID.randomUUID());
+    blueprint.setProducedItemGuid(UUID.randomUUID());
+    blueprint.setOutputName(name);
+    return blueprintRepository.save(blueprint);
   }
 
   @Test

@@ -103,7 +103,7 @@ class BlueprintProductServiceTest {
   @Test
   void searchProducts_dedupesMultiVariantNamesAndCountsThem() {
     UUID itemId = UUID.randomUUID();
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_A", "Behring", itemId),
@@ -124,25 +124,25 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_passesTrimmedQueryToRepository() {
-    when(blueprintRepository.findActiveProductRows("pistol")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("pistol")).thenReturn(List.of());
 
     service.searchProducts("  pistol  ", 25, SUB);
 
-    verify(blueprintRepository).findActiveProductRows("pistol");
+    verify(blueprintRepository).findOfferableProductRows("pistol");
   }
 
   @Test
   void searchProducts_escapesLikeMetacharactersInTheQuery() {
-    when(blueprintRepository.findActiveProductRows("100\\%\\_a\\\\b")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("100\\%\\_a\\\\b")).thenReturn(List.of());
 
     service.searchProducts("100%_a\\b", 25, SUB);
 
-    verify(blueprintRepository).findActiveProductRows("100\\%\\_a\\\\b");
+    verify(blueprintRepository).findOfferableProductRows("100\\%\\_a\\\\b");
   }
 
   @Test
   void searchProducts_sortsAlphabeticallyAndCapsToLimit() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Bravo", "B", null, null),
@@ -159,7 +159,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_clampsNonPositiveLimitToOne() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
     noneOwned();
 
@@ -170,7 +170,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_marksProductsOwnedByCaller() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
     when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
@@ -189,7 +189,7 @@ class BlueprintProductServiceTest {
   @Test
   void resolveByProductKey_returnsCanonicalProductWithOutputItemId() {
     UUID itemId = UUID.randomUUID();
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Arclight Pistol", "BP_A", "Behring", itemId)));
 
     Optional<ResolvedProduct> resolved = service.resolveByProductKey("arclight pistol");
@@ -203,12 +203,12 @@ class BlueprintProductServiceTest {
   @Test
   void resolveByProductKey_returnsEmptyForBlankKey() {
     assertTrue(service.resolveByProductKey("  ").isEmpty());
-    verify(blueprintRepository, org.mockito.Mockito.never()).findActiveProductRows(anyString());
+    verify(blueprintRepository, org.mockito.Mockito.never()).findOfferableProductRows(anyString());
   }
 
   @Test
   void resolveByProductKey_returnsEmptyForUnknownKey() {
-    when(blueprintRepository.findActiveProductRows("")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("")).thenReturn(List.of());
 
     assertTrue(service.resolveByProductKey("does-not-exist").isEmpty());
   }
@@ -225,7 +225,7 @@ class BlueprintProductServiceTest {
     UUID outputItemId = UUID.randomUUID();
     when(blueprintRepository.findByOutputItemId(gameItemId))
         .thenReturn(List.of(blueprint("Arclight Pistol")));
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Arclight Pistol", "BP_A", "Behring", outputItemId)));
 
     Optional<ResolvedProduct> resolved = service.resolveByGameItem(gameItemId);
@@ -244,7 +244,7 @@ class BlueprintProductServiceTest {
         .thenReturn(List.of(blueprint("Zeta Widget"), blueprint("Alpha Widget")));
     when(blueprintRepository.findByOutputItemId(itemReverseOrder))
         .thenReturn(List.of(blueprint("Alpha Widget"), blueprint("Zeta Widget")));
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Alpha Widget", "BP_ALPHA", null, null),
@@ -272,7 +272,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_mapsLowercasedKeyToProductKey() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_CRAFT_AMRS_LaserCannon_S1", null, null),
@@ -287,7 +287,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_excludesAmbiguousKeys() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_DUP", null, null),
