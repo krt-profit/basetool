@@ -138,6 +138,8 @@ public class ItemReconciliationService {
     }
     recipes.blueprints(uexItemId, target.getId());
     recipes.ingredients(uexItemId, target.getId());
+    recipes.loadoutPorts(uexItemId, target.getId());
+    recipes.paints(uexItemId, target.getId());
     movePrices(source, target);
     moveStats(source, target);
     redirects.repoint(uexItemId, target.getId());

@@ -1174,7 +1174,14 @@
    "ee704f52-8794-434d-bcd7-47fec365ffbd"
   ]
  },
- "paints": [],
+ "paints": [
+  {
+   "itemGuid": "05694347-4761-446b-8305-78e8af4b911a",
+   "shipGuids": [
+    "0079c5d5-1678-4f8c-85ba-18ca8f642af6"
+   ]
+  }
+ ],
  "loadouts": [
   {
    "entityGuid": "0005b63c-e673-4165-964b-0ec197192477",
@@ -1206,6 +1213,207 @@
      "itemClassName": null,
      "dockedVehicle": false,
      "unresolved": null,
+     "ports": []
+    }
+   ]
+  },
+  {
+   "entityGuid": "0079c5d5-1678-4f8c-85ba-18ca8f642af6",
+   "entityKind": "ship",
+   "issues": [],
+   "ports": [
+    {
+     "name": "hardpoint_paint",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Paints",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "editable"
+     ],
+     "portTags": [
+      "Paint_Avenger"
+     ],
+     "requiredTags": [
+      "Paint_Avenger"
+     ],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    },
+    {
+     "name": "hardpoint_cooler_left",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Cooler",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "left",
+      "invisible",
+      "editable"
+     ],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "invisible",
+     "itemGuid": "4ec3037b-4b6f-4837-b00d-cd9b4836a82a",
+     "itemClassName": "COOL_AEGS_S01_Bracer_SCItem",
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    },
+    {
+     "name": "hardpoint_weapon_class2_nose",
+     "source": "loadout",
+     "minSize": 4,
+     "maxSize": 4,
+     "types": [
+      {
+       "type": "Turret",
+       "subTypes": []
+      },
+      {
+       "type": "WeaponGun",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "editable"
+     ],
+     "portTags": [
+      "$AEGS_Avenger_Base"
+     ],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": "ea49d194-0c0b-43e1-82fb-d72f35c1af05",
+     "itemClassName": "Mount_Gimbal_S4",
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": [
+      {
+       "name": "hardpoint_class_2",
+       "source": "override",
+       "minSize": 4,
+       "maxSize": 4,
+       "types": [
+        {
+         "type": "WeaponGun",
+         "subTypes": [
+          "Gun"
+         ]
+        }
+       ],
+       "flags": [
+        "editable"
+       ],
+       "portTags": [],
+       "requiredTags": [],
+       "displayNameKey": "@itemport_slot",
+       "visibility": "unspecified",
+       "itemGuid": "df89e9ca-8a11-477c-8abd-f4837a277dbe",
+       "itemClassName": "APAR_BallisticGatling_S4",
+       "dockedVehicle": false,
+       "unresolved": null,
+       "ports": [
+        {
+         "name": "BAR1",
+         "source": "unset",
+         "minSize": 1,
+         "maxSize": 1,
+         "types": [
+          {
+           "type": "WeaponAttachment",
+           "subTypes": [
+            "Barrel"
+           ]
+          }
+         ],
+         "flags": [
+          "uneditable"
+         ],
+         "portTags": [],
+         "requiredTags": [],
+         "displayNameKey": null,
+         "visibility": "unspecified",
+         "itemGuid": null,
+         "itemClassName": null,
+         "dockedVehicle": false,
+         "unresolved": null,
+         "ports": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "hardpoint_scanner",
+     "source": "vehicle",
+     "minSize": 1,
+     "maxSize": 1,
+     "types": [
+      {
+       "type": "Scanner",
+       "subTypes": []
+      }
+     ],
+     "flags": [
+      "invisible",
+      "uneditable"
+     ],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "invisible",
+     "itemGuid": null,
+     "itemClassName": null,
+     "dockedVehicle": false,
+     "unresolved": null,
+     "ports": []
+    }
+   ]
+  },
+  {
+   "entityGuid": "05a4f566-36a4-495c-99a4-dbedc5105cb6",
+   "entityKind": "ship",
+   "issues": [
+    "unknown_class"
+   ],
+   "ports": [
+    {
+     "name": "hardpoint_seataccess_copilot",
+     "source": "loadout",
+     "minSize": 1,
+     "maxSize": 4,
+     "types": [
+      {
+       "type": "SeatAccess",
+       "subTypes": []
+      }
+     ],
+     "flags": [],
+     "portTags": [],
+     "requiredTags": [],
+     "displayNameKey": null,
+     "visibility": "visible",
+     "itemGuid": null,
+     "itemClassName": "AEGS_Javelin_SeatAccess_CoPilot",
+     "dockedVehicle": false,
+     "unresolved": "unknown_class",
      "ports": []
     }
    ]

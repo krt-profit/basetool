@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -80,6 +81,8 @@ public class P4kImportService {
   private final P4kShipReconciler shipReconciler;
   private final P4kCommodityReconciler commodityReconciler;
   private final P4kBlueprintReconciler blueprintReconciler;
+  private final P4kPaintReconciler paintReconciler;
+  private final P4kLoadoutReconciler loadoutReconciler;
   private final P4kSweeper sweeper;
   private final P4kProductKeyReview productKeyReview;
   private final P4kImportRunRepository runRepository;
@@ -125,7 +128,7 @@ public class P4kImportService {
     P4kCatalogue catalogue = read(payload);
     P4kBuild build = requireBuild(catalogue.head());
     P4kImportContext context = new P4kImportContext(catalogue, false, Instant.now(), null, true);
-    int ingredientsResolved = reconcile(catalogue, context);
+    int ingredientsResolved = reconcile(payload, catalogue, context);
     sweepAndFollow(catalogue, context, false);
     return new P4kPreview(
         result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
@@ -156,14 +159,19 @@ public class P4kImportService {
     run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
     P4kImportContext context =
         new P4kImportContext(catalogue, true, now, run.getId(), request.createItemsAndShips());
-    int ingredientsResolved = reconcile(catalogue, context);
+    int ingredientsResolved = reconcile(payload, catalogue, context);
     List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
     P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
     overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
     syncReportService.logP4kEvent(
-        run.getId(), SyncEventType.SYNC_RUN_SUMMARY, "catalog", null, null, summary(result));
+        run.getId(),
+        SyncEventType.SYNC_RUN_SUMMARY,
+        "catalog",
+        null,
+        null,
+        summary(result, context.getReport()));
     auditRecorder.record(
         AuditEventType.CATALOGUE_P4K_APPLIED,
         run.getId(),
@@ -171,7 +179,7 @@ public class P4kImportService {
         null,
         auditDetails(run, result));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
-    log.info("P4K import applied (run {}): {}", run.getId(), summary(result));
+    log.info("P4K import applied (run {}): {}", run.getId(), summary(result, context.getReport()));
     return result;
   }
 
@@ -195,19 +203,37 @@ public class P4kImportService {
   }
 
   /**
-   * Reconciles the five kinds in dependency order.
+   * Reconciles the five kinds in dependency order, then links the paints and stores the ship
+   * loadouts, which refer to the items and ships (REQ-P4K-040, REQ-P4K-041).
    *
+   * @param payload the stored upload, streamed again for the loadouts
    * @param catalogue the catalogue
    * @param context the run
    * @return the ingredient lines the blueprints resolved
    */
-  private int reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
+  private int reconcile(
+      byte @NotNull [] payload,
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context) {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
     shipReconciler.reconcile(catalogue, context);
     manufacturerReconciler.finish(context);
     commodityReconciler.reconcile(catalogue.commodities(), context);
-    return blueprintReconciler.reconcile(catalogue.blueprints(), context);
+    int ingredientsResolved = blueprintReconciler.reconcile(catalogue.blueprints(), context);
+    paintReconciler.reconcile(
+        catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
+    loadoutReconciler.reconcile(
+        action ->
+            read(
+                payload,
+                in -> {
+                  reader.readLoadouts(in, action);
+                  return null;
+                }),
+        catalogue,
+        context);
+    return ingredientsResolved;
   }
 
   /**
@@ -219,9 +245,23 @@ public class P4kImportService {
    */
   @NotNull
   private P4kCatalogue read(byte @NotNull [] payload) {
+    return Objects.requireNonNull(read(payload, reader::read));
+  }
+
+  /**
+   * Hands the decompressed content of a stored upload to a reading step.
+   *
+   * @param payload the stored upload, compressed
+   * @param step reads the decompressed content
+   * @param <T> what the step returns
+   * @return the step's result
+   * @throws BadRequestException when it cannot be read or passes the decompressed limit
+   */
+  @Nullable
+  private <T> T read(byte @NotNull [] payload, @NotNull Function<InputStream, T> step) {
     try (InputStream in =
         P4kCompression.openDecompressed(payload, properties.decompressedLimitBytes())) {
-      return reader.read(in);
+      return step.apply(in);
     } catch (P4kCatalogueFormatException e) {
       throw new BadRequestException("The stored catalogue is not readable catalogue JSON.", e);
     } catch (P4kContentTooLargeException e) {
@@ -412,10 +452,12 @@ public class P4kImportService {
    * Renders the run summary for {@code external_sync_report}.
    *
    * @param result the result
+   * @param report the run's report, for the loadout and paint counts
    * @return one line with the counts per kind
    */
   @NotNull
-  private static String summary(@NotNull P4kImportResultDto result) {
+  private static String summary(
+      @NotNull P4kImportResultDto result, @NotNull P4kImportReport report) {
     return Stream.of(
                 "manufacturers" + counts(result.manufacturers()),
                 "items" + counts(result.items()),
@@ -425,6 +467,12 @@ public class P4kImportService {
             .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
+        + "; loadoutShips="
+        + report.loadoutShips()
+        + "; loadoutPorts="
+        + report.loadoutPorts()
+        + "; paintLinks="
+        + report.paintLinks()
         + "; createItemsAndShips="
         + result.createItemsAndShips();
   }

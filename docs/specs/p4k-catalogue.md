@@ -26,13 +26,14 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035),
 > REQ-P4K-020…023 are implemented (#3036), REQ-P4K-029 is implemented (#3039), REQ-P4K-031 and
 > REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is implemented (#3041), REQ-P4K-039 is
-> implemented (#3043), REQ-P4K-047 is implemented (#3034); every other
+> implemented (#3043), REQ-P4K-040 and REQ-P4K-041 are implemented (#3045), REQ-P4K-047 is implemented (#3034); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
 > UUID clean-up first (REQ-P4K-001…007), then the sweep and the change report, then the areas one
 > by one. The import is `P4kImportService` with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kCommodityReconciler`, `P4kBlueprintReconciler`)
-> sharing `P4kRowMatcher`; the wire format is `catalogue.internal.p4k`.
+> sharing `P4kRowMatcher`, then `P4kPaintReconciler` and `P4kLoadoutReconciler`, which link to the
+> rows the base kinds matched; the wire format is `catalogue.internal.p4k`.
 
 Related requirements in other specs: the monitoring of the import (REQ-OBS-022 and REQ-OBS-023 in [`observability.md`](observability.md)), the catalogue audit domain (REQ-AUDIT-001 in
 [`audit.md`](audit.md)), the exchange guard for game texts and media (REQ-XCH-050 in
@@ -1088,12 +1089,21 @@ longer lists. Ports with `issues` and
 describes the type's default, not a member's ship. Ports, sizes, flags and the default item are fact
 values; no exchange route serves them yet (#2821 decides).
 
+The tree is `ship_type_loadout_port` (`V353`): one row per port with its ship type, its parent, its
+place among its siblings, `types` as `Type` or `Type.SubType` per entry, `item_guid` (the
+catalogue's GUID, kept for an entity without a row, a docked vehicle included) and `game_item_id`.
+An unknown `source` reads as `null` and counts as an `UNKNOWN_VALUE` (REQ-P4K-003). A ship loadout
+with `issues` or unresolved ports is one `LOADOUT_ISSUES` report row (`old_value` the issue codes,
+`new_value` the unresolved ports). A complete but empty kind removes nothing, as the sweep skips an
+empty kind. The import streams the kind in a second pass over the upload, one loadout at a time,
+because it is most of the file. An item merge moves the default item of a port onto the survivor.
+
 **Acceptance**
 
-- [ ] A ship's tree is stored with nested ports and default items; a second APPLY replaces it.
-- [ ] An `itemGuid` without a `game_item` row stores the port with a `null` item reference.
+- [x] A ship's tree is stored with nested ports and default items; a second APPLY replaces it.
+- [x] An `itemGuid` without a `game_item` row stores the port with a `null` item reference.
 
-**Enforced by (planned):** `P4kLoadoutImportTest` · **Issues:** #3027
+**Enforced by:** `P4kLoadoutImportTest` · **Issues:** #3027, #3045
 
 ### REQ-P4K-041 — a paint is an item, and its ships are a link table
 
@@ -1102,11 +1112,15 @@ table `ship_type_paint` holds the `shipGuids` assignment. APPLY replaces the lin
 the `paints` kind lists; a `partial` kind leaves unlisted paints as they are, a `complete` kind also
 removes the links of paints it no longer lists.
 
+A link needs both rows: a paint whose item or a ship whose ship type the Basetool lacks links
+nothing. A complete but empty kind removes nothing, and an item merge moves the paint's links onto
+the survivor.
+
 **Acceptance**
 
-- [ ] A paint fitting three ship types yields three link rows; one fitting none yields none.
+- [x] A paint fitting three ship types yields three link rows; one fitting none yields none.
 
-**Enforced by (planned):** `P4kPaintImportTest` · **Issues:** #3027
+**Enforced by:** `P4kPaintImportTest` · **Issues:** #3027, #3045
 
 ## Shops
 

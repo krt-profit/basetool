@@ -11478,7 +11478,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED" ]
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
           }
         }, {
           "in" : "query",
@@ -12024,7 +12024,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED" ]
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
           }
         }, {
           "in" : "query",
@@ -88138,7 +88138,7 @@
         "properties" : {
           "changeType" : {
             "type" : "string",
-            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED" ]
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
           },
           "className" : {
             "type" : "string"
