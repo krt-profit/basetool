@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,8 +49,9 @@ final class P4kFields {
    * @param setter writes the value
    * @param apply whether to write or only report
    * @param <V> the value type
-   * @return whether the row's value changes
+   * @return whether the row's value changes; never {@code true} for a {@code null} incoming value
    */
+  @Contract("_, null, _, _ -> false")
   static <V> boolean fillIfNull(
       @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
     if (current != null || incoming == null) {
