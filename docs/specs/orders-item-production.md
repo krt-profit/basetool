@@ -334,6 +334,13 @@ remainder is **not** dropped from the contract: `openAmount` still travels in th
 the write server-side (no overclaim), and is still surfaced to the user as the claim modal's
 `Maximal verfügbar:` hint, fed by the `data-open` attribute on the *Eintragen* / edit controls.
 
+**Material tables on a phone.** Below 768px the *Bedarf* table of a material order and the
+aggregated *Materialien* table of an item order (`.od-lines-table`) stack each row as a card: the
+material name as its heading, then one line per value with the column name on the left and the value
+on the right, separated by hairlines — the quality tier, the amounts, the claims (one per line) with
+the *Eintragen* action, and the status chip. Every value cell therefore carries a `data-label`. The
+desktop table is unchanged.
+
 *Amended 2026-10-03 (website overhaul phase 3): page head with kind and status badges and the
 overflow menu; the KPI band became a `.kpi-grid` led by the „Geliefert / benötigt" progress tile (the
 „Items geliefert" tile folded into it), requester-redacted views drop the fulfilment and handover
@@ -378,6 +385,8 @@ on the *Items* tab.*
 - [ ] The aggregated *Materialien* pane shows a *Vorhanden* column (linked stock,
   `AggregatedMaterialDto.currentStock`) between *Gesamtmenge* and the claim columns, for both
   strict-staffel and SK-public item orders.
+- [ ] Below 768px both material tables show each row as a card with one labelled line per value
+  (label left, value right); every value cell of a row carries its column name as `data-label`.
 - [ ] The item order's *Übergaben* tab shows the "record production first" hint while the order is
   not fully delivered and nothing is manufactured-but-undelivered, and the "all delivered" note only
   once every ordered unit is delivered (`isFullyDelivered`).
