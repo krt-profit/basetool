@@ -1,6 +1,6 @@
 # ADR-0337 — The P4K catalogue leads a game item's attributes and the SC Wiki fills gaps
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-017…019, REQ-OBS-023), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -18,7 +18,7 @@ archive: `type`, `subType`, `size`, `grade`, `itemClass`, `mass`, `manufacturerG
 - `grade` is the raw DataForge integer; the catalogue carries no letter. For ship components the
   letter is in the `Grade:` line of the description, a game text. Of the items with such a line,
   the integer maps 1 to 4 onto A to D for the component types; 19 items, all with grade 1, do not
-  match and are listed in the contract. Elsewhere grade 1 carries no letter evidence, and
+  match and the contract names them by type only. Elsewhere grade 1 carries no letter evidence, and
   `WeaponAttachment` runs from 3 to 7 with the size of the part.
 - `itemClass` is one of `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or
   `null`; p4kx parses it from the English description's `Class:` line, and it is `null` for FPS
@@ -35,8 +35,9 @@ archive: `type`, `subType`, `size`, `grade`, `itemClass`, `mass`, `manufacturerG
 2. **Columns the catalogue does not carry keep their source.** Dimensions stay with the Wiki; the
    UEX category and every price or terminal field stay with UEX.
 3. **Grade letter.** The import maps 1 → A, 2 → B, 3 → C, 4 → D only for the types `Cooler`,
-   `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`, and treats the 19 mismatching grade-1 items
-   of the contract as no grade. Everywhere else the P4K grade counts as `null` for the letter
+   `PowerPlant`, `QuantumDrive`, `Radar` and `Shield`. The contract names the 19 mismatching
+   grade-1 items by type only, not by GUID, so those of a mapped type map like their type and a
+   differing Wiki letter is reported; the others get no letter from their type. Everywhere else the P4K grade counts as `null` for the letter
    column, so the Wiki fills it. The import never reads the `Grade:` description line.
 4. **Raw grade.** A new nullable column `p4k_grade_raw` stores the integer for every matched item,
    whatever its type. It is a fact value, may reach the exchange, and has no UI.
@@ -56,7 +57,9 @@ archive: `type`, `subType`, `size`, `grade`, `itemClass`, `mass`, `manufacturerG
   overwritten each cycle.
 - The share of `null` `itemClass` per run is monitored as a gauge.
 - REQ-DATA-024 is superseded in the P4K catalogue spec, `docs/specs/p4k-catalogue.md`, which
-  carries these rules. Implementation is pending.
+  carries these rules.
+- The P4K's own value of each attribute is kept in a `p4k_*` column beside the displayed one, so
+  the Wiki and UEX can tell a P4K value from their own.
 
 ## Alternatives considered
 

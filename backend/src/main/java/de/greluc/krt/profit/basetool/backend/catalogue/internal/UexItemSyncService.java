@@ -374,15 +374,12 @@ public class UexItemSyncService {
     }
 
     item.setUexName(dto.name());
-    if (item.getSourceSystems() != GameItemSourceSystem.P4K
-        || !StringUtils.hasText(item.getName())) {
+    if (item.getP4kName() == null || !StringUtils.hasText(item.getName())) {
       item.setName(dto.name());
     }
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
     Manufacturer manufacturer = resolveManufacturer(dto, lookups);
-    if (manufacturer != null
-        && (item.getSourceSystems() != GameItemSourceSystem.P4K
-            || item.getManufacturer() == null)) {
+    if (manufacturer != null && item.getP4kManufacturer() == null) {
       item.setManufacturer(manufacturer);
     }
     item.setUexItemId(dto.id());
