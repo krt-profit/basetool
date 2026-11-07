@@ -68,15 +68,6 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   Optional<Blueprint> findFirstByScwikiKeyOrderByScwikiUuidAsc(String scwikiKey);
 
   /**
-   * Finds a blueprint the P4K seeded that the SC Wiki has not listed yet, by its key: the SC Wiki
-   * blueprint sync's fallback upsert key (REQ-P4K-027).
-   *
-   * @param scwikiKey the blueprint key
-   * @return the P4K-known blueprint of that key without a SC Wiki UUID, if any
-   */
-  Optional<Blueprint> findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(String scwikiKey);
-
-  /**
    * Returns the distinct Wiki item UUIDs referenced by blueprint ingredient lines, so the item sync
    * can also fetch items not yet in {@code game_item}.
    *
@@ -87,8 +78,26 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<UUID> findReferencedItemUuids();
 
   /**
+   * Finds the blueprints the P4K seeded that the SC Wiki has not listed yet, by their key: the SC
+   * Wiki blueprint sync's fallback upsert key (REQ-P4K-027).
+   *
+   * @param scwikiKey the blueprint key
+   * @return the P4K-known blueprints of that key without a SC Wiki UUID, the ones the P4K still
+   *     lists first, then by P4K GUID
+   */
+  @Query(
+      """
+      SELECT b FROM Blueprint b
+      WHERE b.scwikiKey = :scwikiKey AND b.scwikiUuid IS NULL AND b.p4kUuid IS NOT NULL
+      ORDER BY CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN 0 ELSE 1 END,
+      b.p4kUuid ASC
+      """)
+  List<Blueprint> findP4kSeededByScwikiKey(@Param("scwikiKey") String scwikiKey);
+
+  /**
    * Soft-deletes every unmarked blueprint whose {@code scwiki_uuid} is not in {@code
-   * seenScwikiUuids}. Callers must pass a non-empty seen set.
+   * seenScwikiUuids}, except one the P4K still lists ({@code p4k_uuid} set, {@code p4k_deleted_at}
+   * unset), which the leading P4K keeps live (REQ-P4K-027). Callers must pass a non-empty seen set.
    *
    * @param seenScwikiUuids the blueprint UUIDs successfully processed in the current run
    * @param now timestamp to stamp on the soft-deleted rows
@@ -101,6 +110,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       WHERE b.scwikiUuid IS NOT NULL
       AND b.scwikiUuid NOT IN :seenScwikiUuids
       AND b.scwikiDeletedAt IS NULL
+      AND (b.p4kUuid IS NULL OR b.p4kDeletedAt IS NOT NULL)
       """)
   int markScwikiDeleted(
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
@@ -254,18 +264,22 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<BlueprintProductRow> findOfferableProductRows(@Param("q") String q);
 
   /**
-   * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid)} for
-   * resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped or an
-   * admin hid is included, since only existing references read it (REQ-P4K-013).
+   * Projects every active blueprint recipe to {@code (id, outputName, producedItemGuid, retired)}
+   * for resolving an owned product key to a representative recipe; a recipe the P4K sweep stamped
+   * or an admin hid is included, since only existing references read it, and sorts after every live
+   * one (REQ-P4K-013).
    *
-   * @return id, output name and produced-item GUID for every active recipe with a non-null output
-   *     name, ordered by name then Wiki key then id
+   * @return the rows of every active recipe with a non-null output name, the live ones first, each
+   *     part ordered by name then Wiki key then id
    */
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow(b.id,
-      b.outputName, b.producedItemGuid) FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS
-      NOT NULL ORDER BY b.outputName ASC, b.scwikiKey ASC, b.id ASC
+      b.outputName, b.producedItemGuid,
+      CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN false ELSE true END)
+      FROM Blueprint b WHERE b.scwikiDeletedAt IS NULL AND b.outputName IS NOT NULL
+      ORDER BY CASE WHEN b.p4kDeletedAt IS NULL AND b.p4kHiddenAt IS NULL THEN 0 ELSE 1 END,
+      b.outputName ASC, b.scwikiKey ASC, b.id ASC
       """)
   List<BlueprintIdNameRow> findActiveIdNameRows();
 

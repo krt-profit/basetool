@@ -103,12 +103,11 @@ public class BlueprintCraftabilityService {
     Map<String, Blueprint> recipes =
         blueprintProductService.resolveRepresentativeBlueprints(productKeys);
 
-    Map<UUID, List<CraftabilitySlice>> inventory =
-        slicesPerMaterial(craftableStockSource.ownedStockSlices(userId));
+    List<CraftabilitySlice> ownedSlices = craftableStockSource.ownedStockSlices(userId);
+    Map<UUID, List<CraftabilitySlice>> inventory = slicesPerMaterial(ownedSlices);
     Map<UUID, List<CraftabilitySlice>> withRefinery = inventory;
     if (includeRefinery) {
-      List<CraftabilitySlice> merged =
-          new ArrayList<>(craftableStockSource.ownedStockSlices(userId));
+      List<CraftabilitySlice> merged = new ArrayList<>(ownedSlices);
       merged.addAll(craftabilityYieldSource.pendingYieldSlices(userId));
       withRefinery = slicesPerMaterial(merged);
     }
@@ -337,7 +336,7 @@ public class BlueprintCraftabilityService {
 
   /**
    * Evaluates the pooled requirements of each side against its stock map; the breakdown lists the
-   * materials either side counts.
+   * materials either side counts, and each side's columns use that side's own requirement.
    *
    * @param blueprintId the owned blueprint id
    * @param recipe the representative recipe
@@ -369,8 +368,10 @@ public class BlueprintCraftabilityService {
     for (MaterialRequirement req : shown.values()) {
       boolean inInventoryCraft = counted.containsKey(req.materialId);
       boolean inRefineryCraft = countedWithRefinery.containsKey(req.materialId);
+      MaterialRequirement refReq = countedWithRefinery.getOrDefault(req.materialId, req);
       Availability inv = availability(inventory.get(req.materialId), req.floor, req.required);
-      Availability ref = availability(withRefinery.get(req.materialId), req.floor, req.required);
+      Availability ref =
+          availability(withRefinery.get(req.materialId), refReq.floor, refReq.required);
       results.put(req.materialId, new MaterialResult(req, inv, ref));
       materials.add(
           new CraftabilityMaterialDto(
@@ -385,7 +386,7 @@ public class BlueprintCraftabilityService {
               inInventoryCraft ? round(inv.missing) : 0.0d,
               inRefineryCraft ? round(ref.missing) : 0.0d,
               (int) Math.floor(inv.available / req.required),
-              (int) Math.floor(ref.available / req.required),
+              (int) Math.floor(ref.available / refReq.required),
               req.quantityType,
               req.materialNameDe,
               inInventoryCraft,

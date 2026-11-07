@@ -272,7 +272,7 @@ public class P4kBlueprintReconciler {
       return false;
     }
     P4kBlueprintRecipe stored = P4kBlueprintRecipe.stored(row);
-    if (recipe.equals(stored)) {
+    if (recipe.matches(stored)) {
       return false;
     }
     context

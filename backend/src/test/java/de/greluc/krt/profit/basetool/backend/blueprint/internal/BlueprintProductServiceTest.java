@@ -308,8 +308,8 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveIdNameRows())
         .thenReturn(
             List.of(
-                new BlueprintIdNameRow(id1, "Arclight Pistol", null),
-                new BlueprintIdNameRow(id2, "Arclight Pistol", null)));
+                new BlueprintIdNameRow(id1, "Arclight Pistol", null, false),
+                new BlueprintIdNameRow(id2, "Arclight Pistol", null, false)));
     Blueprint recipe = new Blueprint();
     var metadata =
         new BlueprintCatalogueMetadata(
@@ -343,11 +343,26 @@ class BlueprintProductServiceTest {
   }
 
   @Test
+  void resolveRecipe_countsOnlyTheLiveVariantsBesideALiveRepresentative() {
+    UUID live = UUID.randomUUID();
+    when(blueprintRepository.findActiveIdNameRows())
+        .thenReturn(
+            List.of(
+                new BlueprintIdNameRow(live, "Arclight Pistol", null, false),
+                new BlueprintIdNameRow(UUID.randomUUID(), "Arclight Pistol", null, true)));
+    when(blueprintRepository.findById(live)).thenReturn(Optional.of(new Blueprint()));
+
+    PersonalBlueprintRecipeResponse result = service.resolveRecipe("arclight pistol").orElseThrow();
+
+    assertEquals(1, result.variantCount());
+  }
+
+  @Test
   void resolveRecipe_carriesTheOutputItemsStatBaseValuesWithTheirUnits() {
     UUID id = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon", null)));
+        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon", null, false)));
     GameItem item = new GameItem();
     item.setId(itemId);
     Blueprint recipe = new Blueprint();
@@ -389,7 +404,7 @@ class BlueprintProductServiceTest {
   @Test
   void resolveRecipe_returnsEmptyForUnknownKey() {
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item", null)));
+        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item", null, false)));
 
     assertTrue(service.resolveRecipe("ghost").isEmpty());
   }

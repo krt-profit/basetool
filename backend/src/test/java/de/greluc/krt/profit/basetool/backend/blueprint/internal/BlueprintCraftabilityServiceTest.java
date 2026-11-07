@@ -200,6 +200,46 @@ class BlueprintCraftabilityServiceTest {
   }
 
   @Test
+  void aChooseTwoOfThreeRecipe_measuresTheRefineryColumnsAgainstTheRefinerySelection() {
+    Blueprint bp = new Blueprint();
+    bp.setRequiredGroupCount(2);
+    Material iron = material(MAT_A, "Iron");
+    BlueprintRequirementGroup frame = slot(bp, 0, "FRAME");
+    bp.addIngredient(resource(0, iron, 2.0, null, frame));
+    BlueprintRequirementGroup liner = slot(bp, 1, "LINER");
+    bp.addIngredient(resource(1, material(MAT_B, "Tungsten"), 1.0, null, liner));
+    BlueprintRequirementGroup plating = slot(bp, 2, "PLATING");
+    bp.addIngredient(resource(2, iron, 3.0, null, plating));
+    bp.addIngredient(resource(3, material(MAT_C, "Copper"), 1.0, null, plating));
+    stubOwned(owned("armor", "Armor"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("armor", bp));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 500, 20.0), new CraftabilitySlice(MAT_B, 500, 4.0)));
+    when(refineryOrderService.pendingYieldSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_C, 500, 100.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
+
+    assertEquals(4, dto.craftable());
+    assertEquals(4, dto.craftableWithRefinery());
+    CraftabilityMaterialDto ironRow = material(dto, MAT_A);
+    assertEquals(10, ironRow.craftable());
+    assertEquals(4, ironRow.craftableWithRefinery());
+  }
+
+  private static BlueprintRequirementGroup slot(Blueprint bp, int order, String key) {
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(order);
+    slot.setGroupKey(key);
+    slot.setRequiredCount(1);
+    bp.addRequirementGroup(slot);
+    return slot;
+  }
+
+  @Test
   void computeForOwner_belowFloorStockMakesTheBlueprintNotCraftable() {
     stubOwned(owned("widget", "Widget"));
     when(blueprintProductService.resolveRepresentativeBlueprints(any()))

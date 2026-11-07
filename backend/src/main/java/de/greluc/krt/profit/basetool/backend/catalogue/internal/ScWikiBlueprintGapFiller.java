@@ -263,7 +263,9 @@ public class ScWikiBlueprintGapFiller {
   }
 
   /**
-   * Writes the Wiki's value where the P4K holds none, else reports a Wiki value that differs.
+   * Writes the Wiki's value where the P4K holds none, else reports a Wiki value that differs. On a
+   * P4K-known blueprint a missing Wiki value keeps the stored one, so a list row that stands in for
+   * a missed detail does not clear an earlier fill.
    *
    * @param blueprint the blueprint
    * @param runId the Wiki run
@@ -281,7 +283,9 @@ public class ScWikiBlueprintGapFiller {
       @Nullable V wikiValue,
       @NotNull Consumer<V> setter) {
     if (p4kValue == null) {
-      setter.accept(wikiValue);
+      if (wikiValue != null || blueprint.getP4kUuid() == null) {
+        setter.accept(wikiValue);
+      }
       return;
     }
     report(blueprint, runId, column, p4kValue, wikiValue);

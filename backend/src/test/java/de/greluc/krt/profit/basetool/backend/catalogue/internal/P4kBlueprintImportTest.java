@@ -184,6 +184,45 @@ class P4kBlueprintImportTest {
   }
 
   @Test
+  void aWikiFillOfALineTheP4kLeftUnlinked_isNeitherReportedNorRewrittenByTheNextApply() {
+    Blueprint blueprint = wikiBlueprint();
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    BlueprintIngredient casing = line(blueprint, CASING_RESOURCE);
+    assertThat(casing.getMaterial()).isNull();
+    Material wikiFill = material("Wiki casing");
+    casing.setMaterial(wikiFill);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(line(blueprint, CASING_RESOURCE)).isSameAs(casing);
+    assertThat(casing.getMaterial()).isEqualTo(wikiFill);
+  }
+
+  @Test
+  void theFirstApplyOverAWikiRecipe_keepsTheWikisSlotNameAndStatDirection() {
+    Blueprint blueprint = wikiBlueprint();
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(0);
+    slot.setGroupKey("casing");
+    slot.setName("Casing");
+    slot.setKind("group");
+    BlueprintRequirementModifier modifier = new BlueprintRequirementModifier();
+    modifier.setOrderIndex(0);
+    modifier.setPropertyKey("armor_damagemitigation");
+    modifier.setBetterWhen("higher");
+    slot.addModifier(modifier);
+    blueprint.addRequirementGroup(slot);
+    blueprintRepository.save(blueprint);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    BlueprintRequirementGroup written = blueprint.getRequirementGroups().getFirst();
+    assertThat(written.getGroupKey()).isEqualTo("CASING");
+    assertThat(written.getName()).isEqualTo("Casing");
+    assertThat(written.getModifiers().getFirst().getBetterWhen()).isEqualTo("higher");
+  }
+
+  @Test
   void twoWikiRecipesSharingTheKey_holdTheRecordForAGuidConflictAndNeitherIsRewritten() {
     Blueprint first = wikiBlueprint();
     Blueprint second = wikiBlueprint();

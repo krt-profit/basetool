@@ -101,7 +101,7 @@ public class PersonalBlueprintKeyUpgrade implements ProducedItemGuidFollower {
       }
     }
     if (tally.keys > 0) {
-      defaultKeyService.refresh();
+      defaultKeyService.refreshAfterCommit();
       auditRecorder.record(
           AuditEventType.BLUEPRINT_PRODUCT_KEYS_UPGRADED,
           null,

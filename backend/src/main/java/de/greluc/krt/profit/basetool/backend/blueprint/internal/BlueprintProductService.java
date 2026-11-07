@@ -191,8 +191,9 @@ public class BlueprintProductService implements BlueprintProducts {
    * Resolves a product key to the recipe graph of its representative recipe: build slots with
    * ingredients and per-quality stat modifiers, plus the variant count.
    *
-   * <p>The representative is the first recipe of the group in {@code findActiveIdNameRows} order.
-   * Must run inside this service's read transaction.
+   * <p>The representative is the first recipe of the group in {@code findActiveIdNameRows} order, a
+   * live one whenever the group has one, and the variant count counts the recipes of its liveness
+   * (REQ-P4K-013). Must run inside this service's read transaction.
    *
    * @param productKey product key (see {@link ProductKeys})
    * @return the recipe view, or empty if the key is blank or unknown
@@ -202,30 +203,30 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKey == null || productKey.isBlank()) {
       return Optional.empty();
     }
-    UUID representativeId = null;
-    String displayName = null;
+    BlueprintIdNameRow representative = null;
     int variantCount = 0;
     for (BlueprintIdNameRow row : blueprintRepository.findActiveIdNameRows()) {
       if (row.outputName() == null
           || !productKeys.of(row.producedItemGuid(), row.outputName()).equals(productKey)) {
         continue;
       }
-      if (representativeId == null) {
-        representativeId = row.id();
-        displayName = row.outputName();
+      if (representative == null) {
+        representative = row;
       }
-      variantCount++;
+      if (row.retired() == representative.retired()) {
+        variantCount++;
+      }
     }
-    if (representativeId == null) {
+    if (representative == null) {
       return Optional.empty();
     }
-    Blueprint recipe = blueprintRepository.findById(representativeId).orElse(null);
+    Blueprint recipe = blueprintRepository.findById(representative.id()).orElse(null);
     if (recipe == null) {
       return Optional.empty();
     }
     return Optional.of(
         new PersonalBlueprintRecipeResponse(
-            Objects.requireNonNull(displayName),
+            Objects.requireNonNull(representative.outputName()),
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
             blueprintMapper.toIngredientDtos(recipe.getIngredients()),

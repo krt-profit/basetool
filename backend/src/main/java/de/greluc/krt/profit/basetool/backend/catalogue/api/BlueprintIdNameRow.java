@@ -31,5 +31,7 @@ import java.util.UUID;
  * @param outputName the SC Wiki output-item name (normalized, then grouped into a product)
  * @param producedItemGuid the produced item's DataForge GUID, the product key when present, or
  *     {@code null}
+ * @param retired whether the P4K sweep stamped the recipe or an admin hid it (REQ-P4K-013)
  */
-public record BlueprintIdNameRow(UUID id, String outputName, UUID producedItemGuid) {}
+public record BlueprintIdNameRow(
+    UUID id, String outputName, UUID producedItemGuid, boolean retired) {}
