@@ -28,7 +28,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -95,6 +98,72 @@ class E2eAudienceEnforcementParityTest {
     assertThat(mapper.path("config").path("id.token.claim").asString())
         .as("id.token.claim must stay false — the prod realm's mapper stamps the access token only")
         .isNotEqualTo("true");
+  }
+
+  /**
+   * Keeps the backend's Admin API scope and audience present in both generated test realms.
+   *
+   * @param realmPath module-relative synthetic realm path
+   * @throws IOException if a committed realm cannot be read
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {REALM_EXPORT, "../docker/sandbox/keycloak/realm-basetool.json"})
+  void onlyTheBackendReceivesTheAdminApiScope(String realmPath) throws IOException {
+    JsonNode realm =
+        JsonMapper.builder()
+            .build()
+            .readTree(Files.readString(resolve(realmPath), StandardCharsets.UTF_8));
+    JsonNode scope = named(realm.path("clientScopes"), "name", "kc-admin-api");
+    assertThat(scope.path("attributes").path("include.in.token.scope").asString())
+        .isEqualTo("true");
+    JsonNode mapper =
+        named(scope.path("protocolMappers"), "protocolMapper", "oidc-admin-api-audience-mapper");
+    assertThat(mapper.path("config").path("access.token.claim").asString()).isEqualTo("true");
+    assertThat(mapper.path("config").path("id.token.claim").asString()).isNotEqualTo("true");
+    JsonNode backend = named(realm.path("clients"), "clientId", "backend-service");
+    assertThat(hasScope(backend.path("defaultClientScopes"), "kc-admin-api")).isTrue();
+    for (JsonNode client : realm.path("clients")) {
+      boolean backendIdentity = "backend-service".equals(client.path("clientId").asString());
+      assertThat(hasScope(client.path("defaultClientScopes"), "kc-admin-api"))
+          .as("default Admin API scope for %s in %s", client.path("clientId"), realmPath)
+          .isEqualTo(backendIdentity);
+      assertThat(hasScope(client.path("optionalClientScopes"), "kc-admin-api")).isFalse();
+    }
+    assertThat(hasScope(realm.path("defaultDefaultClientScopes"), "kc-admin-api")).isFalse();
+    assertThat(hasScope(realm.path("defaultOptionalClientScopes"), "kc-admin-api")).isFalse();
+  }
+
+  /**
+   * Finds a required object by its identifying field.
+   *
+   * @param objects source objects
+   * @param field identifying field
+   * @param value required identifier
+   * @return the matching object
+   */
+  private static JsonNode named(@NotNull JsonNode objects, String field, @NotNull String value) {
+    for (JsonNode object : objects) {
+      if (value.equals(object.path(field).asString())) {
+        return object;
+      }
+    }
+    return fail("Missing %s=%s", field, value);
+  }
+
+  /**
+   * Checks one configured scope list without accepting partial name matches.
+   *
+   * @param scopes configured scope names
+   * @param expected exact scope name
+   * @return whether the scope is assigned
+   */
+  private static boolean hasScope(@NotNull JsonNode scopes, @NotNull String expected) {
+    for (JsonNode scope : scopes) {
+      if (expected.equals(scope.asString())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
