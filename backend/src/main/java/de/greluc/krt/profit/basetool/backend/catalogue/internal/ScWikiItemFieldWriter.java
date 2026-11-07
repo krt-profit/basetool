@@ -35,7 +35,8 @@ import org.springframework.util.StringUtils;
 /**
  * Applies Wiki item metadata without changing canonical identity or UEX-owned attributes; the
  * attributes the P4K leads are written only where the P4K value is {@code null}, and a differing
- * Wiki value is reported (REQ-P4K-017…019).
+ * Wiki value is reported (REQ-P4K-017…019); the canonical name follows {@link
+ * GameItemNamePrecedence}.
  */
 @Slf4j
 @Component
@@ -52,8 +53,9 @@ public class ScWikiItemFieldWriter {
   private final SyncReportService syncReportService;
 
   /**
-   * Writes the Wiki-owned attributes and source presence; omitted size, grade and class stay
-   * intact, and an attribute the P4K holds a value for keeps it.
+   * Writes the Wiki-owned attributes, source presence and, on a row without a P4K name, the
+   * canonical name; omitted size, grade and class stay intact, and an attribute the P4K holds a
+   * value for keeps it.
    *
    * @param item managed catalogue item
    * @param dto identity-verified source payload
@@ -66,6 +68,7 @@ public class ScWikiItemFieldWriter {
       @NotNull UUID runId,
       @NotNull Instant now) {
     item.setScwikiName(dto.name());
+    GameItemNamePrecedence.applyWikiName(item, dto.name());
     item.setWikiMetadata(dto.metadata());
     item.setScwikiSlug(dto.slug());
     item.setClassName(dto.className());
@@ -169,12 +172,7 @@ public class ScWikiItemFieldWriter {
    * @return whether this payload may not seed a new catalogue row
    */
   static boolean shouldSkipNewItem(ScWikiItemDto dto) {
-    if (!StringUtils.hasText(dto.name())) {
-      return true;
-    }
-    String name = dto.name().trim();
-    return name.contains("<")
-        || name.contains(">")
+    return !GameItemNamePrecedence.isUsableWikiName(dto.name())
         || "NOITEM_Vehicle".equalsIgnoreCase(dto.type());
   }
 }

@@ -311,7 +311,7 @@ The single table every other statement about retention must agree with.
 | Exchange: connected installation, ship links | While connected; a ship link until its ship is deleted, at the latest with the account | Disconnection, then the sweep above; `ON DELETE CASCADE` (REQ-DATA-008) | — |
 | Exchange change sequence, write journal, bulk-undo runs | **90 days** | `ExchangeChangeRetentionTask` (REQ-XCH-013/-022/-034) | `app.exchange.change-retention.max-age` |
 | Exchange revocation and deny-list mirror (Redis) | **90 days** after the revocation | Redis key expiry (REQ-XCH-008) | `ExchangeRevocationMirror.RETENTION` |
-| Exchange idempotency results (Redis) | **24 hours** | Redis key expiry (REQ-XCH-020) | `app.exchange.store.idempotency-ttl` (ingest) |
+| Exchange idempotency results (Redis) | **1 hour** | Redis key expiry (REQ-XCH-020) | `app.exchange.store.idempotency-ttl` (ingest) |
 | Exchange staged mass change | **30 minutes** | Expiry of the staged change (REQ-XCH-021) | `ExchangeMassChangeService.STAGING_REACH` |
 | Exchange client session, online and offline (Keycloak) | **30 days** idle, **90 days** at most | Keycloak client attributes (REQ-XCH-005) | `EXCHANGE_OFFLINE_SESSION_*` and `EXCHANGE_SESSION_*` in `scripts/provision-keycloak-realm.py` |
 | Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `BASETOOL_KEEP_DAILY` / `_WEEKLY` / `_MONTHLY` in `scripts/backup.sh` |

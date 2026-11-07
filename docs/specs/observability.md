@@ -1880,7 +1880,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_ingest_exchange_client_budget_used_ratio{client_id}` is one client's use of its own
   budget at its last write, labelled with the admitted request's registry client id, so the
   registry bounds it; `ExchangeClientBudgetHigh` (warning, 10 m) fires above 0.8 of it, which the
-  total's alert cannot while one client's 16 MiB are a quarter of the 64 MiB
+  total's alert cannot while one client's 64 MiB are half of the 128 MiB
   (`exchange_client_budget_alert_test.yml`; panel beside the total's on the Exchange dashboard).
   The normal DPoP nonce challenge (`use_dpop_nonce`) is not counted as a refusal: it is the
   protocol's first round trip and stays counted on the auth-failure counter; a reason of its own
@@ -4104,8 +4104,12 @@ alerts never carry `source="P4K"`.
   The starmap kind is `kind="STARMAP_OBJECT"` in these gauges: its `matched`, `added` and
   `changed` rows count the starmap objects, its `unmatched` rows the UEX location rows the run left
   unlinked, and `basetool_p4k_review_cases_open` its open link reviews
-  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). The
-  blueprint categories are `kind="BLUEPRINT_CATEGORY"` (REQ-P4K-027). Labels are
+  ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)). The shop
+  kind is `kind="SHOP"`: its `matched`, `added` and `changed` rows count the shops, its `unmatched`
+  rows the shops the run left without a UEX terminal, and `basetool_p4k_review_cases_open` their
+  open link reviews
+  ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md)). The blueprint categories
+  are `kind="BLUEPRINT_CATEGORY"` (REQ-P4K-027). Labels are
   the bounded enums `kind` and `outcome` only (REQ-OBS-006). The mass guard has no metric; the
   change report records a skipped sweep.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the

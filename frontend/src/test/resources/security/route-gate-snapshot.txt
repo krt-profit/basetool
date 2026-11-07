@@ -105,6 +105,7 @@
 /admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/apply POST -> AdminP4kImportPageController#applyJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/changes GET -> AdminP4kReportController#previewChanges gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/materials GET -> AdminP4kReportController#materials gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/resource-groups GET -> AdminP4kReportController#resourceGroups gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases GET -> AdminP4kReportController#openReviewCases gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases/{id}/resolve POST -> AdminP4kReportController#resolve gate=class:hasRole('ADMIN') layout=no
@@ -133,6 +134,10 @@
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
+/admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
+/admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no
+/admin/shops/{id}/terminal-link POST -> AdminShopsController#changeLink gate=class:hasRole('ADMIN') layout=no
 /admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes

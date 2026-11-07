@@ -25,10 +25,10 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The parts of a version-2 catalogue the import holds in memory: the head, the five base kinds, the
- * starmap objects, the curated ship store slugs, the paints, the resource groups, the blueprint
- * categories and the crafting records the blueprints refer to. The loadouts
- * are streamed in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every other kind
- * of the file is skipped while reading.
+ * starmap objects, the shops, the curated ship store slugs, the paints, the resource groups, the
+ * blueprint categories and the crafting records the blueprints refer to. The loadouts are streamed
+ * in a pass of their own ({@link P4kCatalogueReader#readLoadouts}); every other kind of the file is
+ * skipped while reading.
  *
  * @param head the head
  * @param manufacturers the manufacturers, empty when the file has none
@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param commodities the commodities, empty when the file has none
  * @param blueprints the blueprints, empty when the file has none
  * @param starmapObjects the starmap objects, empty when the file has none
+ * @param shops the shops, empty when the file has none
  * @param shipStoreSlugs the curated ship store slugs, empty when the file has none
  * @param paints the paints, empty when the file has none
  * @param resourceGroups the resource groups, empty when the file has none
@@ -51,6 +52,7 @@ public record P4kCatalogue(
     @NotNull @Unmodifiable List<P4kCommodityDto> commodities,
     @NotNull @Unmodifiable List<P4kBlueprintDto> blueprints,
     @NotNull @Unmodifiable List<P4kStarmapObjectDto> starmapObjects,
+    @NotNull @Unmodifiable List<P4kShopDto> shops,
     @NotNull @Unmodifiable List<P4kShipStoreSlug> shipStoreSlugs,
     @NotNull @Unmodifiable List<P4kPaintDto> paints,
     @NotNull @Unmodifiable List<P4kResourceGroupDto> resourceGroups,
@@ -73,6 +75,7 @@ public record P4kCatalogue(
    * @param commodities the commodities
    * @param blueprints the blueprints
    * @param starmapObjects the starmap objects
+   * @param shops the shops
    * @param shipStoreSlugs the ship store slugs
    * @param paints the paints
    * @param resourceGroups the resource groups
@@ -86,6 +89,7 @@ public record P4kCatalogue(
     commodities = List.copyOf(commodities);
     blueprints = List.copyOf(blueprints);
     starmapObjects = List.copyOf(starmapObjects);
+    shops = List.copyOf(shops);
     shipStoreSlugs = List.copyOf(shipStoreSlugs);
     paints = List.copyOf(paints);
     resourceGroups = List.copyOf(resourceGroups);
@@ -108,6 +112,7 @@ public record P4kCatalogue(
       case COMMODITY -> commodities;
       case BLUEPRINT -> blueprints;
       case STARMAP_OBJECT -> starmapObjects;
+      case SHOP -> shops;
       case RESOURCE_GROUP -> resourceGroups;
       case BLUEPRINT_CATEGORY -> blueprintCategories;
     };

@@ -157,7 +157,8 @@ public class ScWikiBlueprintGapFiller {
    * @return the group, or {@code null}
    */
   @Nullable
-  private static BlueprintRequirementGroup group(@NotNull Blueprint blueprint, @Nullable String key) {
+  private static BlueprintRequirementGroup group(
+      @NotNull Blueprint blueprint, @Nullable String key) {
     if (key == null) {
       return null;
     }

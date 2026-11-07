@@ -141,7 +141,12 @@ class P4kMaterialGroupReviewTest {
 
     P4kReviewCaseDto resolved =
         reviewService.resolve(
-            open.getId(), P4kReviewResolution.ASSIGN, mineral.getId(), null, open.getVersion(), ADMIN);
+            open.getId(),
+            P4kReviewResolution.ASSIGN,
+            mineral.getId(),
+            null,
+            open.getVersion(),
+            ADMIN);
     runs.apply(withMineral(), false);
 
     assertThat(resolved.status()).isEqualTo(P4kReviewStatus.REVIEWED);
@@ -158,7 +163,12 @@ class P4kMaterialGroupReviewTest {
 
     assertThatThrownBy(() ->
             reviewService.resolve(
-                open.getId(), P4kReviewResolution.ASSIGN, erz.getId(), null, open.getVersion(), ADMIN))
+                open.getId(),
+                P4kReviewResolution.ASSIGN,
+                erz.getId(),
+                null,
+                open.getVersion(),
+                ADMIN))
         .isInstanceOf(BadRequestException.class);
     assertThatThrownBy(() ->
             reviewService.resolve(

@@ -39,6 +39,9 @@ import java.util.List;
  * @param starmapObjects per-kind tallies for starmap objects, whose {@code unmatched} and {@code
  *     review} count the UEX location rows left unlinked, or {@code null} in a result stored before
  *     the starmap was imported
+ * @param shops per-kind tallies for shops, whose {@code unmatched} and {@code review} count the
+ *     shops left without a UEX terminal, or {@code null} in a result stored before shops were
+ *     imported
  * @param resourceGroups per-kind tallies for the commodity categories, or {@code null} in a result
  *     stored before they were imported
  * @param blueprintCategories per-kind tallies for the blueprint categories, or {@code null} in a
@@ -60,6 +63,7 @@ public record P4kImportResultDto(
     Counts commodities,
     Counts blueprints,
     Counts starmapObjects,
+    Counts shops,
     Counts resourceGroups,
     Counts blueprintCategories,
     long ingredientsResolved,

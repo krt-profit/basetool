@@ -83,6 +83,9 @@ enum P4kSweepTarget {
   STARMAP_OBJECT(
       P4kKind.STARMAP_OBJECT, "StarmapObject", "e.className", "e.className", "e.id IS NULL"),
 
+  /** {@code shop}; its entity name stands in for a class name, and no other source lists it. */
+  SHOP(P4kKind.SHOP, "Shop", "e.entityName", "e.registryName", "e.id IS NULL"),
+
   /** {@code material_category}: no other source lists a resource group. */
   RESOURCE_GROUP(P4kKind.RESOURCE_GROUP, "MaterialCategory", "e.className", "e.name", "1 = 0"),
 
@@ -120,6 +123,7 @@ enum P4kSweepTarget {
       case COMMODITY -> COMMODITY;
       case BLUEPRINT -> BLUEPRINT;
       case STARMAP_OBJECT -> STARMAP_OBJECT;
+      case SHOP -> SHOP;
       case RESOURCE_GROUP -> RESOURCE_GROUP;
       case BLUEPRINT_CATEGORY -> BLUEPRINT_CATEGORY;
     };

@@ -24,8 +24,9 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The {@code craftingGlobal} object of catalogue version 2, bound to the resources a dismantle never returns; an entity that cannot be
- * dismantled already has no {@code dismantle} on its blueprint.
+ * The {@code craftingGlobal} object of catalogue version 2, bound to the resources a dismantle
+ * never returns; an entity that cannot be dismantled already has no {@code dismantle} on its
+ * blueprint.
  *
  * @param dismantleExcludedResourceGuids the {@code ResourceType} GUIDs a dismantle never returns
  */

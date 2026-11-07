@@ -740,6 +740,7 @@ public class NavigationRegistry {
                 of("admin.p4kimport", "/admin/p4k-import", "nav.admin.p4kImport")
                     .with(PALETTE_ONLY),
                 of("admin.starmap", "/admin/starmap", "nav.admin.starmap").with(PALETTE_ONLY),
+                of("admin.shops", "/admin/shops", "nav.admin.shops").with(PALETTE_ONLY),
                 of("admin.syncreports", "/admin/sync-reports", "nav.admin.syncReports")
                     .with(PALETTE_ONLY),
                 of("admin.syncreports.uex", "/admin/sync-reports/uex", "palette.page.syncUex")

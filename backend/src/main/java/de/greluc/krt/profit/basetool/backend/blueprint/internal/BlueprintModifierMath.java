@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierValueKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierSegment;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierValueKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -31,8 +31,8 @@ import org.jetbrains.annotations.Nullable;
  * {@code computeModifierValue}.
  *
  * <p>A modifier maps an ingredient quality to a stat multiplier; below {@code 1.0} worsens a
- * higher-is-better stat, above {@code 1.0} a lower-is-better one (REQ-INV-048); for a P4K
- * {@code ADDITIVE} modifier the neutral value is {@code 0}.
+ * higher-is-better stat, above {@code 1.0} a lower-is-better one (REQ-INV-048); for a P4K {@code
+ * ADDITIVE} modifier the neutral value is {@code 0}.
  */
 final class BlueprintModifierMath {
 

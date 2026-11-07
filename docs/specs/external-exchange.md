@@ -978,6 +978,14 @@ quality 0. `materialKind` classifies a material for the client's own lists — `
 decides the quality. An item lot of a ship component carries `component` (REQ-XCH-049). Writes are
 audited in the Lager domain with the external client.
 
+A lot's `material` reference resolves in a fixed order (`ExchangeLotCatalogue`): an exact material
+match (any key, exact, canonical or alias name) wins; else an exact item match (any key or exact
+name); else `ambiguous` `AMBIGUOUS` when either catalogue matched several entries or the material
+names only came close (fuzzy suggestions); else `unmatched` `UNMATCHED`. A fuzzy material
+suggestion never hides an exact item, whichever key the op sends beside `name`. `set-quantity`,
+`share`, `unshare` and the org-stock `book-in` (REQ-XCH-045) share this order; the generic
+`catalog/resolve` answers stay as they are.
+
 A lot carries an additive `split` (`exchange.stock.read`, no new scope): `personal`, the member's
 personal rows, and `pools`, one entry `{orgUnit: {id}, quantity}` per unit in whose pool the
 member holds shared rows of the lot, ordered by unit id — only the member's own rows, and a pool of
@@ -1367,8 +1375,9 @@ revisited once the SC Extractor was to write its offline files in that format.*
 
 ### REQ-XCH-020 — Writes are idempotent per client and member
 
-Every write carries an `Idempotency-Key` (`400 IDEMPOTENCY_KEY_MISSING`), kept 24 h and keyed per
-(client, member, key). Authentication, gates and rate limits run before the lookup; only results
+Every write carries an `Idempotency-Key` (`400 IDEMPOTENCY_KEY_MISSING`), kept 1 h
+(`app.exchange.store.idempotency-ttl`, owner decision 2026-11-07, ADR-0221 amendment 3) and keyed per
+(client, member, key); a retry under the key after that runs as a new write. Authentication, gates and rate limits run before the lookup; only results
 produced after them are cached — never `401`, `403`, `429`, `503`,
 `MASS_CHANGE_CONFIRMATION_REQUIRED` or a `5xx`. A duplicate in flight gets
 `409 IDEMPOTENCY_IN_PROGRESS`; a reused key with a different request — another method, path or
@@ -1598,8 +1607,9 @@ WP 4.5 (#2087)
 ### REQ-XCH-023 — Rate limits, quotas and a hard Redis budget
 
 Per-minute buckets per (client, member) and per client run in-process; daily write quotas live in
-Redis (`ingest:xch:quota:*`). All gateway-written exchange data in Redis is bounded to 1 MiB per
-client and member, 16 MB per client and 64 MB in total, counted per stored value with a fixed
+Redis (`ingest:xch:quota:*`). All gateway-written exchange data in Redis is bounded to 4 MiB per
+client and member, 64 MiB per client and 128 MiB in total (owner decision 2026-11-07, ADR-0221
+amendment 3), counted per stored value with a fixed
 per-entry overhead (an estimate of Redis's own bookkeeping, not a measurement of its memory — see
 *The byte budget* below); above a limit the gateway
 answers `503 EXCHANGE_BUDGET_EXHAUSTED` with a `Retry-After` of when enough of the budget expires
@@ -1689,17 +1699,25 @@ and only then incremented, so no crash between two commands can leave it without
 outside the budget. `basetool_ingest_exchange_budget_used_ratio` reports the total's use and
 `ExchangeBudgetHigh` fires above 80 % of it;
 `basetool_ingest_exchange_client_budget_used_ratio{client_id}` reports each registry client's use
-of its own budget and `ExchangeClientBudgetHigh` fires above 80 % of that. The second is the one that warns with a single client: its 16 MiB are a
-quarter of the total, so the total's gauge reads 25 % at most while that client's writes are all
+of its own budget and `ExchangeClientBudgetHigh` fires above 80 % of that. The second is the one that warns with a single client: its 64 MiB are
+half of the total, so the total's gauge reads 50 % at most while that client's writes are all
 refused (load test of 2026-09-28, finding 4). Both are the value at the last write.
+
+**Why these sizes.** A client that follows the sync guide's 5-minute cadence writes a stock and a
+ships change set per cycle, 24 an hour. Under the 1-hour replay window a member therefore holds
+about 24 cached answers, at most 24 × 32.5 KiB ≈ 0.8 MiB even when every answer is the largest
+cacheable one, beside one 32.5 KiB reservation — well inside 4 MiB, which leaves room for staged
+drafts and mass changes. With the former 24 h window and 1 MiB, 576 answers a day filled the
+member's budget once an answer averaged about 1.3 KiB (#3061).
 
 **When a refused write may retry.** The sets are scored by expiry, so the refusal's
 `Retry-After` is read from them: for every scope the write's charge would overflow, a read-only
 script walks up to 1000 entries in expiry order until the bytes expiring cover the overflow, and
-the longest such wait is the answer, in whole seconds rounded up — at least 1 and at most 3600,
-the cap also when the entries read never free enough, and 60 when Redis cannot be read. A full
-budget frees only as cached answers expire, up to 24 hours; the cap makes a client ask again at
-least hourly instead of parking it for a day.
+the longest such wait is the answer, in whole seconds rounded up and at least 1. When the entries
+read never free enough, the scope's latest expiry stands in — the moment the scope is empty — so
+`Retry-After` is never shorter than the time until the write fits the budget as it stands. It
+has no upper cap: a client that honours it is not refused again for the entries held now. It is
+60 when Redis cannot be read or an overflowing scope holds no entry.
 
 What the budget counts, and what stays an estimate:
 
@@ -1723,7 +1741,7 @@ issues against the same user's key patterns and commands (REQ-SEC-068).
   working. *`ExchangeStoreRedisIntegrationTest` fills one member's and then one client's budget in a
   real Redis under the ingest ACL user; other members and clients keep fitting, and expired entries
   free their bytes. Sessions live under keys the ingest user cannot reach at all. End to end through
-  the gateway, `scripts/sandbox-load.py budget` fills the member budget at its 1 MiB default and the
+  the gateway, `scripts/sandbox-load.py budget` fills the member budget at its 4 MiB default and the
   client and total budgets lowered to 2.5 MiB, checking every admission against the live sets
   (REQ-XCH-029).*
 - [x] The exchange relay does not share the extractor relay's breaker, and more than four large

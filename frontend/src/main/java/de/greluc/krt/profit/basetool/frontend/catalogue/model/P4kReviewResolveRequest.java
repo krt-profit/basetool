@@ -28,8 +28,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * An admin's resolution of a P4K review case (REQ-P4K-016), relayed to the backend.
  *
- * @param resolution {@code KEEP}, {@code HIDE}, or {@code ASSIGN} for a missing resource group or
- *     a resource that joins no single commodity
+ * @param resolution {@code KEEP}, {@code HIDE}, or {@code ASSIGN} for a missing resource group or a
+ *     resource that joins no single commodity
  * @param categoryId the resource group an {@code ASSIGN} of a missing group gives the material,
  *     else {@code null}
  * @param materialId the material an {@code ASSIGN} of a resource gives its recipe lines, else

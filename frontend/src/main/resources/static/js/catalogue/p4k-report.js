@@ -22,6 +22,7 @@ const KINDS = [
     'COMMODITY',
     'BLUEPRINT',
     'STARMAP_OBJECT',
+    'SHOP',
     'RESOURCE_GROUP',
     'BLUEPRINT_CATEGORY',
 ];
@@ -370,7 +371,7 @@ const RESOURCE_JOIN_REASONS = ['RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'];
  * @returns {ReturnType<typeof krtHtml>} the cell content
  */
 function caseActions(c) {
-    if (RESOURCE_JOIN_REASONS.includes(c.reason)) {
+    if (RESOURCE_JOIN_REASONS.includes(c.reason || '')) {
         return krtHtml`<select class="form-input" data-material-pick aria-label="${t(
             'pickMaterial',
         )}"><option value="">${t('pickMaterial')}</option>${materials.map(

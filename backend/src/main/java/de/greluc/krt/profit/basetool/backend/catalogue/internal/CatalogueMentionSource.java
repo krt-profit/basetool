@@ -129,6 +129,8 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "ship_type_p4k_variant",
         "ship_type_paint",
         "ship_type_uex_alias",
+        "shop",
+        "shop_item",
         "space_station",
         "star_system",
         "starmap_object",

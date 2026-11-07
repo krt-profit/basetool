@@ -217,10 +217,16 @@ class AdminP4kImportPageControllerMvcTest {
   void aResolution_returnsTheCase_andAStaleOneIsAConflict() throws Exception {
     String resolve = BASE + "/review-cases/{id}/resolve";
     when(backendApiClient.post(
-            resolve, new P4kReviewResolveRequest("HIDE", null, null, 3L), P4kReviewCaseDto.class, CASE))
+            resolve,
+            new P4kReviewResolveRequest("HIDE", null, null, 3L),
+            P4kReviewCaseDto.class,
+            CASE))
         .thenReturn(hiddenCase());
     when(backendApiClient.post(
-            resolve, new P4kReviewResolveRequest("HIDE", null, null, 2L), P4kReviewCaseDto.class, CASE))
+            resolve,
+            new P4kReviewResolveRequest("HIDE", null, null, 2L),
+            P4kReviewCaseDto.class,
+            CASE))
         .thenThrow(new BackendServiceException("stale", null, 409));
 
     mockMvc

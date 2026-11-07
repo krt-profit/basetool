@@ -70,6 +70,18 @@ public enum P4kReviewReason {
   STARMAP_LINK_NOT_FOUND,
 
   /**
+   * A shop whose place holds several UEX terminals of the matching name (REQ-P4K-043); the case's
+   * GUID is the shop's.
+   */
+  SHOP_LINK_AMBIGUOUS,
+
+  /**
+   * A shop whose place is unknown or holds no UEX terminal of the matching name (REQ-P4K-043); the
+   * case's GUID is the shop's.
+   */
+  SHOP_LINK_NOT_FOUND,
+
+  /**
    * A blueprint ingredient's {@code resourceGuid} or a {@code refinedSubtypeGuid} that no commodity
    * record carries as its {@code subtypeGuid} (REQ-P4K-024); the case's GUID is that {@code
    * ResourceType}.

@@ -48,8 +48,8 @@ import org.jetbrains.annotations.Nullable;
  * contract "Tiers" and "Dismantle returns"). The first tier is the recipe. The mandatory cost's
  * root selection decides how many of its options a craft fills; each option becomes a requirement
  * group, a selection of resource and item lines a group of those lines, and the lines of nested
- * selections join the group they sit in. Every optional cost becomes an optional group.
- * Quantities carry the {@code quantityMultiplier}; minimum qualities are clamped (REQ-DATA-023).
+ * selections join the group they sit in. Every optional cost becomes an optional group. Quantities
+ * carry the {@code quantityMultiplier}; minimum qualities are clamped (REQ-DATA-023).
  */
 final class P4kBlueprintRecipeReader {
 
@@ -126,7 +126,9 @@ final class P4kBlueprintRecipeReader {
       addGroup(groups, root, false);
     }
     if (tier.optional() != null) {
-      tier.optional().stream().filter(Objects::nonNull).forEach(line -> addGroup(groups, line, true));
+      tier.optional().stream()
+          .filter(Objects::nonNull)
+          .forEach(line -> addGroup(groups, line, true));
     }
     return new P4kBlueprintRecipe(requiredGroupCount, groups);
   }
@@ -178,7 +180,8 @@ final class P4kBlueprintRecipeReader {
    */
   @Nullable
   P4kDismantleProcessDto process() {
-    UUID guid = blueprint.dismantle() == null ? null : P4kGuids.parse(blueprint.dismantle().processGuid());
+    UUID guid =
+        blueprint.dismantle() == null ? null : P4kGuids.parse(blueprint.dismantle().processGuid());
     return guid == null ? null : crafting.dismantleProcesses().get(guid);
   }
 
@@ -371,10 +374,9 @@ final class P4kBlueprintRecipeReader {
         ranges.size() < 2
             ? List.of()
             : ranges.stream()
-                .map(
-                    r ->
-                        new P4kBlueprintRecipe.Segment(
-                            quality(r.startQuality()), quality(r.endQuality()), r.atStart(), r.atEnd()))
+                .map(r ->
+                    new P4kBlueprintRecipe.Segment(
+                        quality(r.startQuality()), quality(r.endQuality()), r.atStart(), r.atEnd()))
                 .toList();
     return new P4kBlueprintRecipe.Modifier(
         propertyGuid,

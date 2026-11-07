@@ -819,7 +819,13 @@ class ScWikiBlueprintSyncServiceTest {
     assertEquals(77, bp.getCraftTimeSeconds());
     verify(syncReportService)
         .logP4kDisagreement(
-            SyncSourceSystem.SCWIKI, runId, "blueprint", p4kUuid, "craft_time_seconds", "77", "540");
+            SyncSourceSystem.SCWIKI,
+            runId,
+            "blueprint",
+            p4kUuid,
+            "craft_time_seconds",
+            "77",
+            "540");
   }
 
   @Test
@@ -895,6 +901,7 @@ class ScWikiBlueprintSyncServiceTest {
     assertEquals(detail.uuid(), seeded.getScwikiUuid());
     verify(blueprintRepository).save(seeded);
   }
+
   @Test
   void failedWritesAreNotCountedAsAppliedAndCanBeReplayed() {
     ScWikiBlueprintDto dto = blueprint(UUID.randomUUID(), List.of(), List.of());

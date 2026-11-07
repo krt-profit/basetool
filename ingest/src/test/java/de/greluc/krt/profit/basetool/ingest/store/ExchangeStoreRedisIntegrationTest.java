@@ -73,8 +73,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The byte budget and the idempotency cache against a real Redis under the ingest ACL user
  * (REQ-XCH-020, REQ-XCH-023): filling one member's budget and then one client's leaves every other
- * member and client working, parallel writes never overshoot a budget, a duplicate that raced the
- * first request replays its answer, and a lock is released only by the request holding it.
+ * member and client working, parallel writes never overshoot a budget, a day of periodic syncs fits
+ * one member's budget, a duplicate that raced the first request replays its answer, and a lock is
+ * released only by the request holding it.
  */
 @Testcontainers
 class ExchangeStoreRedisIntegrationTest {
@@ -93,14 +94,22 @@ class ExchangeStoreRedisIntegrationTest {
 
   private static final ExchangeStoreProperties DEFAULTS =
       new ExchangeStoreProperties(
-          1_048_576L,
-          16_777_216L,
+          4_194_304L,
           67_108_864L,
+          134_217_728L,
           32768,
-          Duration.ofHours(24),
+          Duration.ofHours(1),
           Duration.ofMinutes(2),
           524_288L,
           10);
+
+  /** The pause between two syncs of a client that follows the sync guide's periodic cadence. */
+  private static final Duration SYNC_INTERVAL = Duration.ofMinutes(5);
+
+  /** An answer close to the largest the idempotency cache keeps, the worst case of a sync. */
+  private static final int LARGE_ANSWER_BYTES = 30_000;
+
+  private static final byte[] SMALL_ANSWER = "{\"written\":true}".getBytes(StandardCharsets.UTF_8);
 
   private static final int THREADS = 16;
 
@@ -484,7 +493,11 @@ class ExchangeStoreRedisIntegrationTest {
     ExchangeQuotas quotas = new ExchangeQuotas(template, defaults, clock);
     String counter = quotas.countWrite("a", "m1").key();
     defaults.record(
-        "a", "m1", "ingest:xch:idem:a:m1:old", 1_048_576L - 20_000L, Duration.ofMinutes(10));
+        "a",
+        "m1",
+        "ingest:xch:idem:a:m1:old",
+        DEFAULTS.memberBytes() - 20_000L,
+        Duration.ofMinutes(10));
     AtomicInteger writes = new AtomicInteger();
 
     MockHttpServletResponse response =
@@ -519,8 +532,61 @@ class ExchangeStoreRedisIntegrationTest {
         .as("another member fits now")
         .isEqualTo(1L);
     assertThat(budget.retryAfterSeconds("a", "m1", 5000L))
-        .as("larger than the member's whole budget")
-        .isEqualTo(ExchangeBudget.MAX_RETRY_AFTER_SECONDS);
+        .as("more than the entries free: the scope's latest expiry, when it is empty")
+        .isEqualTo(1200L);
+  }
+
+  @Test
+  void theWaitIsNotCappedBelowTheLongestEntry() {
+    budget.record("a", "m1", "ingest:xch:idem:a:m1:1", 3000L, Duration.ofHours(30));
+
+    assertThat(budget.reserve("a", "m1", "ingest:xch:idem:a:m1:2", 100L, Duration.ofHours(1)))
+        .isFalse();
+    assertThat(budget.retryAfterSeconds("a", "m1", 100L))
+        .isEqualTo(Duration.ofHours(30).toSeconds());
+  }
+
+  @Test
+  void aDayOfPeriodicStockAndShipSyncsNeverExhaustsTheMembersBudget() throws Exception {
+    ExchangeIdempotencyFilter filter =
+        filter(new ExchangeIdempotency(template, JsonMapper.builder().build(), DEFAULTS));
+    ExchangeQuotas quotas =
+        new ExchangeQuotas(
+            template,
+            new ExchangeBudget(template, DEFAULTS, new SimpleMeterRegistry(), clock),
+            clock);
+    byte[] answer = largeAnswer();
+    AtomicInteger writes = new AtomicInteger();
+    long cycles = Duration.ofHours(24).dividedBy(SYNC_INTERVAL);
+
+    for (long cycle = 0; cycle < cycles; cycle++) {
+      for (String resource : List.of("stock", "ships")) {
+        String counter = quotas.countWrite("a", "m1").key();
+        MockHttpServletResponse response =
+            send(filter, resource + "-sync-" + cycle, writes, counter, answer);
+        assertThat(response.getStatus())
+            .as("the %s sync of cycle %d", resource, cycle)
+            .isEqualTo(200);
+      }
+      now.set(now.get().plus(SYNC_INTERVAL));
+    }
+
+    assertThat(writes).hasValue((int) (2 * cycles));
+    assertThat(total(ExchangeBudget.memberScope("a", "m1")))
+        .as("an hour of answers is what the member holds")
+        .isLessThan(DEFAULTS.memberBytes() / 4);
+  }
+
+  /**
+   * Builds a JSON answer of {@link #LARGE_ANSWER_BYTES} bytes, below the largest cacheable answer.
+   *
+   * @return the answer's bytes
+   */
+  private static byte @NotNull [] largeAnswer() {
+    String prefix = "{\"pad\":\"";
+    String suffix = "\"}";
+    return (prefix + "x".repeat(LARGE_ANSWER_BYTES - prefix.length() - suffix.length()) + suffix)
+        .getBytes(StandardCharsets.UTF_8);
   }
 
   @Test
@@ -598,6 +664,27 @@ class ExchangeStoreRedisIntegrationTest {
       @NotNull AtomicInteger writes,
       @Nullable String counted)
       throws Exception {
+    return send(filter, key, writes, counted, SMALL_ANSWER);
+  }
+
+  /**
+   * Sends one write through the filter, whose chain answers it with the given body.
+   *
+   * @param filter the filter
+   * @param key the idempotency key
+   * @param writes counts the writes that reached the chain
+   * @param counted the quota counter the write was counted on, or {@code null} for none
+   * @param answer the body the write answers with
+   * @return the response
+   * @throws Exception if the filter fails
+   */
+  private static @NotNull MockHttpServletResponse send(
+      @NotNull ExchangeIdempotencyFilter filter,
+      @NotNull String key,
+      @NotNull AtomicInteger writes,
+      @Nullable String counted,
+      byte @NotNull [] answer)
+      throws Exception {
     MockHttpServletRequest request =
         new MockHttpServletRequest("POST", ExchangeTestSupport.BLUEPRINT_CHANGES);
     request.setContent("{\"ops\":[]}".getBytes(StandardCharsets.UTF_8));
@@ -620,7 +707,7 @@ class ExchangeStoreRedisIntegrationTest {
         (req, res) -> {
           writes.incrementAndGet();
           res.setContentType("application/json");
-          res.getOutputStream().write("{\"written\":true}".getBytes(StandardCharsets.UTF_8));
+          res.getOutputStream().write(answer);
         };
     filter.doFilter(request, response, chain);
     return response;

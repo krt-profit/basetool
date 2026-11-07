@@ -55,10 +55,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The P4K review list (REQ-P4K-016, ADR-0336): lists the open cases and resolves one as keep or
  * hide, a material's missing resource group by assigning an existing group (REQ-P4K-025), or a
- * resource that joins no single commodity by assigning a material (REQ-P4K-024). A hide
- * stamps {@code p4k_hidden_at} on the row, which drops it out of every picker like the sweep's
- * stamp (REQ-P4K-013), and no later match lifts it. Each resolution stores the admin and the time
- * and records one {@code CATALOGUE} audit event (REQ-P4K-046).
+ * resource that joins no single commodity by assigning a material (REQ-P4K-024). A hide stamps
+ * {@code p4k_hidden_at} on the row, which drops it out of every picker like the sweep's stamp
+ * (REQ-P4K-013), and no later match lifts it. Each resolution stores the admin and the time and
+ * records one {@code CATALOGUE} audit event (REQ-P4K-046).
  */
 @Service
 @RequiredArgsConstructor

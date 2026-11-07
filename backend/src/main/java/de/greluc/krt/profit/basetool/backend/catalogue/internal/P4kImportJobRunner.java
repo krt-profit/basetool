@@ -188,7 +188,8 @@ public class P4kImportJobRunner {
         || hasChanges(result.ships())
         || hasChanges(result.commodities())
         || hasChanges(result.blueprints())
-        || hasChanges(result.starmapObjects());
+        || hasChanges(result.starmapObjects())
+        || hasChanges(result.shops());
   }
 
   private static boolean hasChanges(P4kImportResultDto.@Nullable Counts counts) {

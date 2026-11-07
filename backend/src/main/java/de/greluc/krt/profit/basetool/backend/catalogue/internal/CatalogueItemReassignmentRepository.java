@@ -27,8 +27,8 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Moves the recipe, loadout and paint references inside the catalogue module during a verified item
- * reconciliation.
+ * Moves the recipe, loadout, paint and shop references inside the catalogue module during a
+ * verified item reconciliation.
  */
 interface CatalogueItemReassignmentRepository extends Repository<GameItem, UUID> {
 
@@ -105,4 +105,24 @@ interface CatalogueItemReassignmentRepository extends Repository<GameItem, UUID>
           """,
       nativeQuery = true)
   int paints(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
+
+  /**
+   * Moves the retired item's shop rows onto the survivor (REQ-P4K-044); a shop that already lists
+   * the survivor keeps its row, and the retired item's row goes with it.
+   *
+   * @param retiredId retired catalogue item
+   * @param survivorId canonical catalogue item
+   * @return moved rows
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          UPDATE shop_item SET game_item_id = :survivorId
+          WHERE game_item_id = :retiredId
+            AND shop_id NOT IN
+              (SELECT held.shop_id FROM shop_item held WHERE held.game_item_id = :survivorId)
+          """,
+      nativeQuery = true)
+  int shopItems(@Param("retiredId") UUID retiredId, @Param("survivorId") UUID survivorId);
 }

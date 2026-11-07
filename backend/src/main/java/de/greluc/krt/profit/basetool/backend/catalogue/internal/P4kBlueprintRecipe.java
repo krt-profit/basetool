@@ -203,8 +203,7 @@ record P4kBlueprintRecipe(
    * @return the resolved lines of every group
    */
   int resolvedLines() {
-    return (int)
-        groups.stream().flatMap(g -> g.lines().stream()).filter(Line::resolved).count();
+    return (int) groups.stream().flatMap(g -> g.lines().stream()).filter(Line::resolved).count();
   }
 
   /**
@@ -214,7 +213,10 @@ record P4kBlueprintRecipe(
    */
   @NotNull
   String summary() {
-    return "groups=" + groups.size() + ";lines=" + groups.stream().mapToInt(g -> g.lines().size()).sum();
+    return "groups="
+        + groups.size()
+        + ";lines="
+        + groups.stream().mapToInt(g -> g.lines().size()).sum();
   }
 
   /**
@@ -273,13 +275,12 @@ record P4kBlueprintRecipe(
         modifier.getModifierAtMinQuality(),
         modifier.getModifierAtMaxQuality(),
         modifier.getSegments().stream()
-            .map(
-                s ->
-                    new Segment(
-                        s.getQualityMin(),
-                        s.getQualityMax(),
-                        s.getModifierAtStart(),
-                        s.getModifierAtEnd()))
+            .map(s ->
+                new Segment(
+                    s.getQualityMin(),
+                    s.getQualityMax(),
+                    s.getModifierAtStart(),
+                    s.getModifierAtEnd()))
             .toList());
   }
 
@@ -292,13 +293,12 @@ record P4kBlueprintRecipe(
   @NotNull
   static List<Return> storedReturns(@NotNull Blueprint blueprint) {
     return blueprint.getDismantleReturns().stream()
-        .map(
-            line ->
-                new Return(
-                    line.getP4kResourceGuid(),
-                    line.getMaterial(),
-                    line.getWikiNameSnapshot(),
-                    line.getQuantityScu()))
+        .map(line ->
+            new Return(
+                line.getP4kResourceGuid(),
+                line.getMaterial(),
+                line.getWikiNameSnapshot(),
+                line.getQuantityScu()))
         .toList();
   }
 
@@ -353,8 +353,7 @@ record P4kBlueprintRecipe(
    * @return the unsaved row
    */
   @NotNull
-  private static BlueprintRequirementModifier modifierRow(
-      @NotNull Modifier modifier, int order) {
+  private static BlueprintRequirementModifier modifierRow(@NotNull Modifier modifier, int order) {
     BlueprintRequirementModifier row = new BlueprintRequirementModifier();
     row.setOrderIndex(order);
     row.setPropertyGuid(modifier.propertyGuid());

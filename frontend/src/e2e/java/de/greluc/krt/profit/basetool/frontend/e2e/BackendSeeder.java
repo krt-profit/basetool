@@ -261,7 +261,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a refinery {@code Location} the create form's location dropdown can select.
+   * Creates a refinery {@code Location} the create form's location dropdown can select, as a
+   * storage place on a fresh visible starmap object seeded over JDBC (REQ-P4K-036). Local-stack
+   * only.
    *
    * @param username admin username
    * @param password admin password
@@ -269,8 +271,40 @@ public final class BackendSeeder {
    * @return the created location id
    */
   public String createLocation(String username, String password, String name) {
+    UUID starmapObjectId = seedVisibleStarmapObject(name);
     return seedEntity(
-        username, password, "/api/v1/locations", "{\"name\":\"" + name + "\",\"hidden\":false}");
+        username,
+        password,
+        "/api/v1/locations",
+        "{\"name\":\""
+            + name
+            + "\",\"hidden\":false,\"starmapObjectId\":\""
+            + starmapObjectId
+            + "\"}");
+  }
+
+  /**
+   * Seeds over JDBC a starmap object forced visible by its override, so that {@code POST
+   * /api/v1/locations} accepts a storage place on it without a P4K import or a live star system.
+   *
+   * @param name the object's English name
+   * @return the new object's id
+   */
+  private static UUID seedVisibleStarmapObject(String name) {
+    UUID id = UUID.randomUUID();
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+        PreparedStatement ps =
+            connection.prepareStatement(
+                "INSERT INTO starmap_object (id, p4k_uuid, type, name, visibility_override)"
+                    + " VALUES (?, ?, 'OUTPOST', ?, 'VISIBLE')")) {
+      ps.setObject(1, id);
+      ps.setObject(2, UUID.randomUUID());
+      ps.setString(3, name);
+      ps.executeUpdate();
+      return id;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedVisibleStarmapObject failed", e);
+    }
   }
 
   /**

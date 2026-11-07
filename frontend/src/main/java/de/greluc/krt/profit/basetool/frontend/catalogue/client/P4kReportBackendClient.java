@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.client;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewCaseDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewResolveRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
 import java.util.Objects;

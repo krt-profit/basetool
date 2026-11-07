@@ -43,12 +43,12 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Reconciles the catalogue's {@code blueprints} with {@code blueprint} (REQ-P4K-027…029,
- * ADR-0340): match by P4K GUID, SC Wiki UUID and {@code scwiki_key}; the P4K leads the produced
- * item and its GUID, the category, the craft time, {@code defaultAvailable}, the dismantle time and
- * efficiency, the recipe of the first tier and the dismantle returns. With the run's seeding box
- * ticked an unmatched blueprint is created when its produced item exists or the run creates it;
- * every other unmatched blueprint is reported {@code UNMATCHED}.
+ * Reconciles the catalogue's {@code blueprints} with {@code blueprint} (REQ-P4K-027…029, ADR-0340):
+ * match by P4K GUID, SC Wiki UUID and {@code scwiki_key}; the P4K leads the produced item and its
+ * GUID, the category, the craft time, {@code defaultAvailable}, the dismantle time and efficiency,
+ * the recipe of the first tier and the dismantle returns. With the run's seeding box ticked an
+ * unmatched blueprint is created when its produced item exists or the run creates it; every other
+ * unmatched blueprint is reported {@code UNMATCHED}.
  */
 @Component
 @RequiredArgsConstructor

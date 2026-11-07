@@ -103,3 +103,30 @@ are host services without a container limit, so the 18 units' `Memory=` lines su
 with Redis at 1024 MB (13 456 MiB before; read on production 2026-09-28). Both figures are right for
 what they count; the host's own ceiling is the unit sum, and alloy and node-exporter still use host
 memory outside it.
+
+## Amendment 3 (2026-11-07) — a one-hour replay window and a larger budget
+
+**Status:** accepted · **Approved by:** @greluc ([#3061](https://github.com/krt-profit/basetool/issues/3061)) ·
+**Spec:** `REQ-XCH-020`, `REQ-XCH-023`
+
+On production one member's change sets were refused `503 EXCHANGE_BUDGET_EXHAUSTED` 28 times in
+48 h under a client's ordinary 5-minute sync of stock and ships: 576 answers a day, each cached for
+24 h, filled the 1 MiB member budget once an answer averaged about 1.3 KiB. The refusal's
+`Retry-After` was capped at 3600 s while the entries lived a day, so a client that honoured it
+could be refused again.
+
+1. **Replay window.** An idempotency answer is kept **1 hour** instead of 24 (amends REQ-XCH-020).
+   A 5-minute sync then holds about 24 answers per member — at most ~0.8 MiB even when every answer
+   is the largest cacheable one. A retry under the same key later than an hour runs as a new write.
+2. **Sizes.** Decision 2's budgets become **4 MiB per client and member, 64 MiB per client and
+   128 MiB in total**. The room beyond the sync's need is for staged drafts and mass changes and a
+   faster cadence. The exchange's share of the 768 MB `maxmemory` rises from under a tenth to about
+   a sixth; sessions keep the rest, and Redis's own size is unchanged.
+3. **`Retry-After`.** The refusal's wait has no upper cap: it is never shorter than the time until
+   the write fits the budget as it stands, and when the entries read do not free enough, the
+   scope's latest expiry stands in.
+
+Alternatives weighed: not caching the answers of change sets that changed nothing (rejected: it
+weakens the replay guarantee for exactly the retry it exists for), a larger budget alone (rejected:
+it does not scale within the total), and a capped `Retry-After` with documented re-refusals
+(rejected: a client cannot tell a real wait from a cap).

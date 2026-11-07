@@ -24,7 +24,6 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.P4kReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportDueDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
@@ -34,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewResolveRe
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import jakarta.validation.Valid;

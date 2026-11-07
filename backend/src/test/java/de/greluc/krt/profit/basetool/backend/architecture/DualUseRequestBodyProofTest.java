@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodReposit
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -106,8 +105,6 @@ class DualUseRequestBodyProofTest {
   @Autowired private JobTypeRepository jobTypeRepository;
 
   @Autowired private LocationRepository locationRepository;
-
-  @Autowired private MaterialCategoryRepository materialCategoryRepository;
 
   @Autowired private MaterialRepository materialRepository;
 
@@ -278,27 +275,6 @@ class DualUseRequestBodyProofTest {
         .isEqualTo("Victim Loc");
     assertThat(locationRepository.findById(createdId).orElseThrow().getName())
         .isEqualTo("Renamed Loc");
-  }
-
-  @Test
-  void materialCategoryDtoForgedIdNeitherOverwritesNorRetargetsAnotherRow() throws Exception {
-    UUID victimId = id(adminPost("/api/v1/material-categories", body("name", "Victim Cat")));
-
-    JsonNode created =
-        adminPost(
-            "/api/v1/material-categories",
-            body("id", victimId, "name", "Forged Cat", "version", 7));
-    UUID createdId = id(created);
-    assertThat(createdId).isNotEqualTo(victimId);
-
-    adminPut(
-        "/api/v1/material-categories/" + createdId,
-        body("id", victimId, "name", "Renamed Cat", "version", created.get("version").asLong()));
-
-    assertThat(materialCategoryRepository.findById(victimId).orElseThrow().getName())
-        .isEqualTo("Victim Cat");
-    assertThat(materialCategoryRepository.findById(createdId).orElseThrow().getName())
-        .isEqualTo("Renamed Cat");
   }
 
   @Test

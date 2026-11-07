@@ -99,9 +99,11 @@ Every change set and draft carries an `Idempotency-Key` of 8 to 128 characters o
 
 - **One key per logical write.** Reuse a key only to retry the identical request after a timeout, a
   dropped connection, a `5xx`, a `429` or `409 IDEMPOTENCY_IN_PROGRESS`.
-- For 24 hours the server answers the same request under the same key with its first answer and
+- For 1 hour the server answers the same request under the same key with its first answer and
   `Idempotency-Replayed: true`. That includes `2xx`, `400`, `404`, `409`, `410` and `422` answers, so
-  a request you changed — after a conflict, after a merge — needs a new key.
+  a request you changed — after a conflict, after a merge — needs a new key. A retry sent later than
+  that runs as a new write: retry within the hour, or re-read the resource and send what is still
+  missing.
 - The same key with a different request — another route or another body — is
   `422 IDEMPOTENCY_KEY_REUSED`.
 - Keys are kept per client and member, not per installation: two installations of your client for
@@ -219,7 +221,8 @@ table, as the limit, and send a fresh DPoP proof with every request, retries inc
   seconds — for the quota, until the next UTC day. Wait at least that long.
 - Every `503` of the gateway carries `Retry-After` too: 30 seconds for `EXCHANGE_DISABLED` and
   `REGISTRY_UNAVAILABLE`, for `EXCHANGE_BUDGET_EXHAUSTED` the seconds until enough of the full
-  budget expires (at most an hour), 10 for `RELAY_BUSY`, and for `SERVICE_UNAVAILABLE` 60 when a
+  budget expires (never less than the real wait, so it can be hours), 10 for `RELAY_BUSY`, and for
+  `SERVICE_UNAVAILABLE` 60 when a
   store cannot be reached, 30 when the daily write quota cannot be counted, 5 when the identity
   provider cannot be reached, and the seconds until the earliest live proof no longer counts when
   all members together hold the gateway's cap of live DPoP proofs. Wait at least that long and

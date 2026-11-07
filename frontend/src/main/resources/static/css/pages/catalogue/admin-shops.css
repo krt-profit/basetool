@@ -1,0 +1,23 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .shops-section {
+        margin-top: var(--space-6);
+    }
+    .shops-filter input {
+        min-width: 10rem;
+    }
+    .shops-candidates {
+        display: grid;
+        gap: var(--space-2);
+        margin: var(--space-3) 0 0;
+        padding: 0;
+        list-style: none;
+    }
+    .shops-candidates li {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+        justify-content: space-between;
+    }
+}

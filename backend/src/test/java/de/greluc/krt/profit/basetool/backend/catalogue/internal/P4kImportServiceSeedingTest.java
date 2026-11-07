@@ -46,8 +46,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Items and ships are seeded only when playable, behind a per-run checkbox, and earlier seeded rows
  * are reviewed; a commodity is created only when a record of the run references it (REQ-P4K-003,
- * REQ-P4K-009, REQ-P4K-010, REQ-P4K-016, REQ-P4K-026); a blueprint is created when its produced item
- * exists or the run creates it (REQ-P4K-028).
+ * REQ-P4K-009, REQ-P4K-010, REQ-P4K-016, REQ-P4K-026); a blueprint is created when its produced
+ * item exists or the run creates it (REQ-P4K-028).
  */
 @SpringBootTest
 @Transactional
@@ -204,7 +204,8 @@ class P4kImportServiceSeedingTest {
   }
 
   /** The fixture's light-armour blueprint and the item it produces. */
-  private static final UUID ARMS_BLUEPRINT = UUID.fromString("0037f308-adfc-4c4e-994f-cd477e895aab");
+  private static final UUID ARMS_BLUEPRINT =
+      UUID.fromString("0037f308-adfc-4c4e-994f-cd477e895aab");
 
   private static final UUID ARMS_ITEM = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
 
@@ -254,7 +255,7 @@ class P4kImportServiceSeedingTest {
 
     assertThat(with.blueprints().created()).isEqualTo(2);
     assertThat(blueprintRepository.findByP4kUuid(ARMS_BLUEPRINT))
-        .hasValueSatisfying(blueprint ->
-            assertThat(blueprint.getOutputItem().getP4kUuid()).isEqualTo(ARMS_ITEM));
+        .hasValueSatisfying(
+            blueprint -> assertThat(blueprint.getOutputItem().getP4kUuid()).isEqualTo(ARMS_ITEM));
   }
 }

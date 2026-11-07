@@ -480,6 +480,10 @@ The coverage list holds the **Katalog** area
     (subject the starmap object, label its class name, `visibility=VISIBLE|HIDDEN|RULE`); and
     `CATALOGUE_STORAGE_PLACE_CREATED` when an admin creates a storage place on a starmap object
     (subject the location, details `starmapObjectId` and `hidden`);
+  - the shops ([ADR-0347](../adr/0347-p4k-shops-join-uex-terminals-by-place.md), REQ-P4K-043):
+    `CATALOGUE_SHOP_LINK_SET`, `CATALOGUE_SHOP_LINK_CLEARED` and `CATALOGUE_SHOP_LINK_RELEASED` when
+    an admin links, unlinks or hands back to the import the UEX terminal link of a shop (subject the
+    shop, label its entity name, details `terminalId` and `previousTerminalId`);
   - `CATALOGUE_SYNC_REPORTS_DELETED`, the manual delete of sync reports, with `source` (`UEX`,
     `SCWIKI`, `P4K` or `ALL`), `olderThanDays` and the `deleted` count (the automatic `pruneRuns`
     stays a log line);

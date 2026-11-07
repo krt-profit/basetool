@@ -91,9 +91,9 @@ public class P4kCatalogueReader {
   }
 
   /**
-   * Reads the head, the five base kinds, the starmap objects, the ship store slugs, the paints, the
-   * resource groups, the blueprint categories and the crafting records the blueprints refer to,
-   * skipping everything else, the loadouts included.
+   * Reads the head, the five base kinds, the starmap objects, the shops, the ship store slugs, the
+   * paints, the resource groups, the blueprint categories and the crafting records the blueprints
+   * refer to, skipping everything else, the loadouts included.
    *
    * @param in the decompressed catalogue
    * @return the catalogue
@@ -140,6 +140,7 @@ public class P4kCatalogueReader {
           listOf(kinds, P4kKind.COMMODITY, P4kCommodityDto.class),
           listOf(kinds, P4kKind.BLUEPRINT, P4kBlueprintDto.class),
           listOf(kinds, P4kKind.STARMAP_OBJECT, P4kStarmapObjectDto.class),
+          listOf(kinds, P4kKind.SHOP, P4kShopDto.class),
           storeSlugs,
           paints,
           listOf(kinds, P4kKind.RESOURCE_GROUP, P4kResourceGroupDto.class),
@@ -287,6 +288,7 @@ public class P4kCatalogueReader {
       case COMMODITY -> P4kCommodityDto.class;
       case BLUEPRINT -> P4kBlueprintDto.class;
       case STARMAP_OBJECT -> P4kStarmapObjectDto.class;
+      case SHOP -> P4kShopDto.class;
       case RESOURCE_GROUP -> P4kResourceGroupDto.class;
       case BLUEPRINT_CATEGORY -> P4kBlueprintCategoryDto.class;
     };

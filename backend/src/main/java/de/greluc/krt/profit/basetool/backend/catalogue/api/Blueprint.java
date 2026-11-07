@@ -148,7 +148,9 @@ public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   private Double p4kDismantleEfficiency;
 
-  /** Whether the requirement groups and ingredient lines are the P4K's; the Wiki only fills them. */
+  /**
+   * Whether the requirement groups and ingredient lines are the P4K's; the Wiki only fills them.
+   */
   @Column(name = "p4k_recipe", nullable = false)
   private boolean p4kRecipe;
 

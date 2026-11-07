@@ -412,6 +412,7 @@ function createdTotal(result) {
         result.commodities,
         result.blueprints,
         result.starmapObjects,
+        result.shops,
         result.resourceGroups,
         result.blueprintCategories,
     ];
@@ -602,6 +603,7 @@ function renderResult(result) {
             krtI18nText(i18n().rowStarmapObjects, 'krtP4kImportI18n.rowStarmapObjects'),
             result.starmapObjects || undefined,
         ],
+        [krtI18nText(i18n().rowShops, 'krtP4kImportI18n.rowShops'), result.shops || undefined],
         [
             krtI18nText(i18n().rowResourceGroups, 'krtP4kImportI18n.rowResourceGroups'),
             result.resourceGroups || undefined,

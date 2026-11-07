@@ -31,9 +31,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Imports the catalogue's {@code blueprintCategories} into {@code blueprint_category}
- * (REQ-P4K-027, ADR-0340): the P4K GUID is the identity, the P4K leads the class name and the
- * names, and every listed category is created, as no other source lists one.
+ * Imports the catalogue's {@code blueprintCategories} into {@code blueprint_category} (REQ-P4K-027,
+ * ADR-0340): the P4K GUID is the identity, the P4K leads the class name and the names, and every
+ * listed category is created, as no other source lists one.
  */
 @Component
 @RequiredArgsConstructor

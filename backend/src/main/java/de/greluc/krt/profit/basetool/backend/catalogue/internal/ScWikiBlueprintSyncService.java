@@ -305,17 +305,15 @@ public class ScWikiBlueprintSyncService {
   private Blueprint findOrCreate(@NotNull UUID scwikiUuid, @Nullable String key) {
     return blueprintRepository
         .findByScwikiUuid(scwikiUuid)
-        .or(
-            () ->
-                blueprintRepository
-                    .findByP4kUuid(scwikiUuid)
-                    .filter(row -> row.getScwikiUuid() == null))
-        .or(
-            () ->
-                StringUtils.hasText(key)
-                    ? blueprintRepository
-                        .findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(key)
-                    : Optional.empty())
+        .or(() ->
+            blueprintRepository
+                .findByP4kUuid(scwikiUuid)
+                .filter(row -> row.getScwikiUuid() == null))
+        .or(() ->
+            StringUtils.hasText(key)
+                ? blueprintRepository.findFirstByScwikiKeyAndScwikiUuidIsNullAndP4kUuidIsNotNull(
+                    key)
+                : Optional.empty())
         .orElseGet(Blueprint::new);
   }
 
@@ -331,6 +329,7 @@ public class ScWikiBlueprintSyncService {
         && bp.getProducedItemGuid() != null
         && bp.getProducedItemGuid().equals(output.getP4kUuid());
   }
+
   /**
    * Soft-deletes, in its own {@code REQUIRES_NEW} transaction, every blueprint whose {@code
    * scwiki_uuid} was not seen this run; call it via {@link #self}.

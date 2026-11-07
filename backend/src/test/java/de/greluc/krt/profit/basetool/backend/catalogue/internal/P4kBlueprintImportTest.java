@@ -193,12 +193,7 @@ class P4kBlueprintImportTest {
     assertThat(line(blueprint, CASING_RESOURCE).getMaterial()).isNull();
 
     reviewService.resolve(
-        open.getId(),
-        P4kReviewResolution.ASSIGN,
-        null,
-        assigned.getId(),
-        open.getVersion(),
-        ADMIN);
+        open.getId(), P4kReviewResolution.ASSIGN, null, assigned.getId(), open.getVersion(), ADMIN);
     runs.apply(P4kTestCatalogues.fixtureBytes(), false);
     runs.apply(P4kTestCatalogues.fixtureBytes(), false);
 
