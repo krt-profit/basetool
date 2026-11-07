@@ -1023,8 +1023,8 @@ REQ-DATA-027) · **Issues:** #2927, #3040
 - [x] A UEX sync leaves the P4K crew and role of a P4K-known ship.
 - [x] A store slug that maps to another ship than the UEX URL is reported, nothing is written.
 
-The columns: `crewSize` → `crew_max` (the game has no minimum crew, so `crew_min` stays with UEX),
-`role` and `career` → `role` and `career` (the English label), `mass` → `mass`, `hullHealth` →
+The columns: `crewSize` → `crew_max` (the game has no minimum crew, so `crew_min` stays with UEX;
+the UEX sync and an APPLY lower a `crew_min` above `crew_max` to it), `role` and `career` → `role` and `career` (the English label), `mass` → `mass`, `hullHealth` →
 `health`, `size` → `size_class`, `vehicleKind` → `vehicle_kind` (`SPACESHIP`, `GROUND_VEHICLE`;
 another value is an unknown closed-set value of REQ-P4K-003), `insurance` → `insurance_*`,
 `cargoScu` → `scu`; `name_de` comes with REQ-P4K-023. On a matched row the import writes a non-null
@@ -1043,7 +1043,9 @@ disagreement is one `P4K_DISAGREEMENT` event of the writing source's run, its `d
 The hangar import (`ShipTypeMatcher`) and the exchange's `SHIP_TYPE` reference (REQ-XCH-012) match
 in this order: P4K GUID / class name, then the UEX id and the curated alias of [ADR-0307](../adr/0307-uex-vehicles-reach-their-ship-type-through-a-curated-class-name-alias.md)
 (REQ-DATA-026), then the name as the last step. A name that matches several ship types answers
-`ambiguous` with at most ten `{bt, name}` candidates, never the first duplicate.
+`ambiguous` with at most ten `{bt, name}` candidates, never the first duplicate. Every step asks the
+live ship types first; a retired one (REQ-P4K-013) answers only when no live one does, so it never
+ties with or shadows its live successor.
 
 **Variants:** a class name resolves to the `ship_type` that carries exactly that class name; if none
 does and the record has `variantOf`, it resolves to the ship type of the group's base. Variants are
@@ -1054,9 +1056,12 @@ never merged automatically.
 - [x] Two ship types with the same normalised name answer `ambiguous` with both candidates.
 - [x] A variant's class name resolves to its own ship type when one exists, else to its base's.
 - [x] A class-name match wins over a different ship type of the same name.
+- [x] A live ship type wins over a retired one that shares its keys; a retired one still answers
+  when no live one matches.
 
 An APPLY keeps the variant groups in `ship_type_p4k_variant` (variant GUID, class name, base GUID);
-a complete ships kind deletes the variants it no longer lists. The hangar import's uploads carry
+a complete ships kind deletes the variants it no longer lists, and one that lists no variant at all
+deletes nothing. The hangar import's uploads carry
 only names and slugs, so it takes the name stages and then the slug; a name or slug that finds
 several ship types is skipped as unmatched.
 
@@ -1315,7 +1320,8 @@ values; no exchange route serves them yet (#2821 decides).
 The tree is `ship_type_loadout_port` (`V353`): one row per port with its ship type, its parent, its
 place among its siblings, `types` as `Type` or `Type.SubType` per entry, `item_guid` (the
 catalogue's GUID, kept for an entity without a row, a docked vehicle included) and `game_item_id`.
-An unknown `source` reads as `null` and counts as an `UNKNOWN_VALUE` (REQ-P4K-003). A ship loadout
+An unknown `source` reads as `null` and counts as an `UNKNOWN_VALUE` (REQ-P4K-003); a negative
+`minSize` or `maxSize`, which the contract declares unsigned, is stored as `null`. A ship loadout
 with `issues` or unresolved ports is one `LOADOUT_ISSUES` report row (`old_value` the issue codes,
 `new_value` the unresolved ports). A complete but empty kind removes nothing, as the sweep skips an
 empty kind. The import streams the kind in a second pass over the upload, one loadout at a time,

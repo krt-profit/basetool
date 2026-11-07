@@ -38,8 +38,9 @@ import org.springframework.stereotype.Component;
 /**
  * Keeps {@code ship_type_p4k_variant} in step with the catalogue's variant groups (REQ-P4K-032): an
  * APPLY writes every variant with a GUID, a class name the catalogue does not repeat and a {@code
- * variantOf}, and a complete ships kind deletes the variants it no longer lists. The stored rows
- * are read once and the rows to delete go in one statement.
+ * variantOf}, and a complete ships kind deletes the variants it no longer lists; one that lists no
+ * variant at all deletes nothing, as the sweep skips an empty kind. The stored rows are read once
+ * and the rows to delete go in one statement.
  */
 @Component
 @RequiredArgsConstructor
@@ -60,6 +61,7 @@ class P4kShipVariants {
       return;
     }
     Map<UUID, ShipTypeP4kVariant> wanted = wanted(ships, context);
+    boolean dropUnlisted = complete && !wanted.isEmpty();
     Map<String, UUID> claimedBy = new HashMap<>();
     wanted.values().forEach(v -> claimedBy.put(folded(v.getClassName()), v.getVariantUuid()));
     Map<UUID, ShipTypeP4kVariant> stored = new HashMap<>();
@@ -67,7 +69,7 @@ class P4kShipVariants {
     for (ShipTypeP4kVariant row : variantRepository.findAll()) {
       UUID claimant = claimedBy.get(folded(row.getClassName()));
       boolean nameTaken = claimant != null && !claimant.equals(row.getVariantUuid());
-      if (nameTaken || (complete && !wanted.containsKey(row.getVariantUuid()))) {
+      if (nameTaken || (dropUnlisted && !wanted.containsKey(row.getVariantUuid()))) {
         entityManager.detach(row);
         doomed.add(row.getVariantUuid());
       } else {

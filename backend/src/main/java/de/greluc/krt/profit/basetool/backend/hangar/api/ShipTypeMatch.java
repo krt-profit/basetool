@@ -76,15 +76,6 @@ public record ShipTypeMatch(@NotNull @Unmodifiable List<ShipType> candidates) {
   }
 
   /**
-   * Whether the step found several ship types.
-   *
-   * @return {@code true} with more than one candidate
-   */
-  public boolean isAmbiguous() {
-    return candidates.size() > 1;
-  }
-
-  /**
    * Returns the one ship type the step resolved to.
    *
    * @return the ship type, or {@code null} when the step found none or several

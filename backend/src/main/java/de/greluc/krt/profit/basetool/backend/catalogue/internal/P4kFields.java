@@ -204,4 +204,17 @@ final class P4kFields {
     }
     return key;
   }
+
+  /**
+   * Reads a size the catalogue declares unsigned; a negative value counts as none, so it never
+   * reaches a column that checks {@code >= 0}.
+   *
+   * @param size the catalogue's size, or {@code null}
+   * @return the size, or {@code null} when absent or negative
+   */
+  @Nullable
+  @Contract("null -> null")
+  static Integer nonNegative(@Nullable Integer size) {
+    return size == null || size < 0 ? null : size;
+  }
 }

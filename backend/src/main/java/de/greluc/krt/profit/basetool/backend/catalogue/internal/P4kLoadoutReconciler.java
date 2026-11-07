@@ -272,8 +272,8 @@ class P4kLoadoutReconciler {
         port.setParentId(parentId);
         port.setPosition(position);
         port.setName(dto.name() == null ? "" : dto.name());
-        port.setMinSize(dto.minSize());
-        port.setMaxSize(dto.maxSize());
+        port.setMinSize(P4kFields.nonNegative(dto.minSize()));
+        port.setMaxSize(P4kFields.nonNegative(dto.maxSize()));
         port.setTypes(types(listOf(dto.types())));
         port.setFlags(List.copyOf(listOf(dto.flags())));
         port.setRequiredTags(List.copyOf(listOf(dto.requiredTags())));

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,7 +32,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Ship types match by GUID and class name first, by UEX id and alias next, by name last, and a
- * duplicate name never picks one of its ship types (REQ-P4K-032, ADR-0341).
+ * duplicate name never picks one of its ship types; a retired ship type answers only where no live
+ * one does (REQ-P4K-032, REQ-P4K-013, ADR-0341).
  */
 class ShipTypeMatcherTest {
 
@@ -43,8 +45,8 @@ class ShipTypeMatcherTest {
 
     ShipTypeMatch match = ShipTypeMatcher.resolveName(index, "HORNET_F7C");
 
-    assertThat(match.isAmbiguous()).isTrue();
     assertThat(match.candidates()).containsExactlyInAnyOrder(dash, space);
+    assertThat(match.single()).isNull();
     assertThat(ShipTypeMatcher.resolve(index, "HORNET_F7C", null)).isNull();
   }
 
@@ -128,6 +130,39 @@ class ShipTypeMatcherTest {
     assertThat(ShipTypeMatcher.resolveUexId(index, 7).single()).isSameAs(direct);
     assertThat(ShipTypeMatcher.resolveUexId(index, 9).single()).isSameAs(aliased);
     assertThat(ShipTypeMatcher.resolveUexId(index, 11).isEmpty()).isTrue();
+  }
+
+  @Test
+  void aLiveShipTypeWinsOverARetiredOneWithTheSameKeys() {
+    UUID guid = UUID.randomUUID();
+    ShipType swept = ship("Avenger Titan", "AEGS_Avenger_Titan");
+    swept.setP4kUuid(guid);
+    swept.setUexVehicleId(7);
+    swept.setP4kDeletedAt(Instant.now());
+    ShipType hidden = ship("Avenger Titan (old)", null);
+    hidden.setP4kHiddenAt(Instant.now());
+    ShipType live = ship("Avenger-Titan", "aegs_avenger_titan");
+    live.setExternalUuid(guid);
+    live.setUexVehicleId(7);
+    ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(List.of(swept, hidden, live));
+
+    assertThat(ShipTypeMatcher.resolveGuid(index, guid).single()).isSameAs(live);
+    assertThat(ShipTypeMatcher.resolveClassName(index, "AEGS_Avenger_Titan").single())
+        .isSameAs(live);
+    assertThat(ShipTypeMatcher.resolveUexId(index, 7).single()).isSameAs(live);
+    assertThat(ShipTypeMatcher.resolveName(index, "Avenger Titan").single()).isSameAs(live);
+    assertThat(ShipTypeMatcher.resolve(index, "Avenger Titan", null)).isSameAs(live);
+  }
+
+  @Test
+  void aRetiredShipTypeAnswersOnlyWhenNoLiveOneMatches() {
+    ShipType swept = ship("Hull E", "RSI_Hull_E");
+    swept.setP4kDeletedAt(Instant.now());
+    ShipType live = ship("Avenger Titan", "AEGS_Avenger_Titan");
+    ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(List.of(swept, live));
+
+    assertThat(ShipTypeMatcher.resolveClassName(index, "RSI_Hull_E").single()).isSameAs(swept);
+    assertThat(ShipTypeMatcher.resolve(index, "Hull E", null)).isSameAs(swept);
   }
 
   /**

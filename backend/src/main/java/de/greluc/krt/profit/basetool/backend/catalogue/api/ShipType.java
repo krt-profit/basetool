@@ -115,7 +115,7 @@ public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   private String className;
 
-  /** Minimum crew complement. */
+  /** Minimum crew complement, from UEX; never above {@link #crewMax}. */
   @Column(name = "crew_min")
   @Nullable
   private Integer crewMin;
@@ -511,4 +511,14 @@ public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "p4k_seen_run_id")
   @Nullable
   private UUID p4kSeenRunId;
+
+  /**
+   * Lowers the minimum crew to the maximum when it lies above it, as it can where UEX supplies the
+   * minimum and the P4K leads the maximum (REQ-P4K-031).
+   */
+  public void capCrewMinAtCrewMax() {
+    if (crewMin != null && crewMax != null && crewMin > crewMax) {
+      crewMin = crewMax;
+    }
+  }
 }

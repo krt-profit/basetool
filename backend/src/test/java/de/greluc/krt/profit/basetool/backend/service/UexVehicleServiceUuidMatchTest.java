@@ -494,7 +494,32 @@ class UexVehicleServiceUuidMatchTest {
         .logUexEvent(any(), eq(SyncEventType.P4K_DISAGREEMENT), any(), any(), any(), any());
   }
 
+  @Test
+  void aUexMinimumCrewAboveTheKeptP4kMaximumIsLoweredToIt() {
+    UexVehicleDto dto = vehicleDto(5, "", "Avenger Titan", "2,4");
+    ShipType p4kKnown = new ShipType();
+    p4kKnown.setId(UUID.randomUUID());
+    p4kKnown.setName("Aegis Avenger Titan");
+    p4kKnown.setUexVehicleId(5);
+    p4kKnown.setP4kUuid(UUID.randomUUID());
+    p4kKnown.setCrewMax(1);
+    when(uexClient.getVehicles()).thenReturn(fetched(List.of(dto)));
+    when(shipTypeRepository.findByUexVehicleId(5)).thenReturn(Optional.of(p4kKnown));
+    when(manufacturerRepository.findByNameIgnoreCase("Origin Jumpworks"))
+        .thenReturn(Optional.of(origin));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncVehicles();
+
+    assertEquals(1, p4kKnown.getCrewMax());
+    assertEquals(1, p4kKnown.getCrewMin());
+  }
+
   private UexVehicleDto vehicleDto(int id, String uuid, String name) {
+    return vehicleDto(id, uuid, name, "1");
+  }
+
+  private UexVehicleDto vehicleDto(int id, String uuid, String name, String crew) {
     return new UexVehicleDto(
         id,
         uuid,
@@ -503,7 +528,7 @@ class UexVehicleServiceUuidMatchTest {
         name.toLowerCase().replace(' ', '-'),
         "Origin Jumpworks",
         new BigDecimal("50"),
-        "1",
+        crew,
         100_000.0,
         10.0,
         5.0,

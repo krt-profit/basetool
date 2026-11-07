@@ -187,6 +187,33 @@ class P4kShipPrecedenceTest {
   }
 
   @Test
+  void aCompleteKindWithoutAnyVariantKeepsTheStoredVariants() {
+    UUID stored = UUID.randomUUID();
+    variantRepository.save(new ShipTypeP4kVariant(stored, "TEST_Stored_Variant", HORNET_BASE));
+    ObjectNode root = P4kTestCatalogues.tree();
+    for (var ship : (ArrayNode) root.get("ships")) {
+      ((ObjectNode) ship).remove("variantOf");
+    }
+
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(variantRepository.findById(stored)).isPresent();
+  }
+
+  @Test
+  void aCatalogueCrewBelowTheStoredMinimumLowersTheMinimum() {
+    ShipType titan = titan();
+    titan.setCrewMin(2);
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(titan.getCrewMax()).isEqualTo(1);
+    assertThat(titan.getCrewMin()).isEqualTo(1);
+  }
+
+  @Test
   void aVariantClassNameReachesTheShipTypeOfItsGroupBase() {
     ShipType base = new ShipType();
     base.setName("Test Hornet Base");
