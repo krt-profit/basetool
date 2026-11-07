@@ -215,7 +215,7 @@ groups:
           severity: warning
         annotations:
           summary: "The exchange's Redis budget is more than 80 % used"
-          description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 64 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
+          description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
 
       - alert: ExchangeClientBudgetHigh
         expr: max by (client_id) (basetool_ingest_exchange_client_budget_used_ratio) > 0.8
@@ -224,7 +224,7 @@ groups:
           severity: warning
         annotations:
           summary: "Exchange client {{ $labels.client_id }} uses more than 80 % of its Redis budget"
-          description: "The exchange data the ingest gateway keeps in Redis for client {{ $labels.client_id }} (cached answers, quota counters, staged drafts) uses more than 80 % of the client's 16 MiB budget. When it is full every write of every member of that client is refused 503 EXCHANGE_BUDGET_EXHAUSTED, long before ExchangeBudgetHigh can fire, because one client's budget is a quarter of the total (REQ-XCH-023). The budget frees only as the cached answers expire, up to 24 hours. Check on the Exchange dashboard whether the client pushes its whole list every sync or keeps re-sending conflicting change sets, and contact its author; members of other clients are not affected."
+          description: "The exchange data the ingest gateway keeps in Redis for client {{ $labels.client_id }} (cached answers, quota counters, staged drafts) uses more than 80 % of the client's 64 MiB budget. When it is full every write of every member of that client is refused 503 EXCHANGE_BUDGET_EXHAUSTED, long before ExchangeBudgetHigh can fire, because one client's budget is half of the total (REQ-XCH-023). The budget frees as the cached answers expire, within about an hour. Check on the Exchange dashboard whether the client pushes its whole list every sync or keeps re-sending conflicting change sets, and contact its author; members of other clients are not affected."
 
       - alert: ExchangeRelayFailing
         expr: sum(increase(basetool_ingest_exchange_relay_total{outcome="failed"}[15m])) > 3

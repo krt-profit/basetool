@@ -1308,7 +1308,7 @@
         "name": "Idempotency-Key",
         "in": "header",
         "required": true,
-        "description": "A fresh key per logical write, kept 24 h per client and member. A replay returns the first result.",
+        "description": "A fresh key per logical write, kept 1 h per client and member. A replay returns the first result.",
         "schema": {
           "type": "string",
           "minLength": 8,

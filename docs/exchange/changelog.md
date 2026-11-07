@@ -28,6 +28,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   earlier, keeps resolving for 90 days from the release that adds `guid`; a later entry here
   announces its removal with the date. Switch to `guid`. `bt` of items, materials and ship
   types is unchanged.
+- **Changed: an `Idempotency-Key` is replayed for 1 hour instead of 24.** A retry under the same
+  key later than that runs as a new write; retry within the hour, or re-read and send what is still
+  missing ([sync guide](sync-guide.md#idempotency-keys)). A member's periodic sync no longer fills
+  its byte budget.
+- **Changed: `EXCHANGE_BUDGET_EXHAUSTED` waits as long as it must.** Its `Retry-After` is no longer
+  capped at 3600; it is never shorter than the time until the write fits the budget as it stands
+  ([errors](errors.md)).
 - **Fixed: an item is no longer refused `AMBIGUOUS` because a material's name resembles it.** A
   stock or org-stock op's `material` resolves as an exact material, else as an exact item, and only
   then as `AMBIGUOUS` or `UNMATCHED`, whether the item is sent by `name` alone or with `bt` or

@@ -1880,7 +1880,7 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   `basetool_ingest_exchange_client_budget_used_ratio{client_id}` is one client's use of its own
   budget at its last write, labelled with the admitted request's registry client id, so the
   registry bounds it; `ExchangeClientBudgetHigh` (warning, 10 m) fires above 0.8 of it, which the
-  total's alert cannot while one client's 16 MiB are a quarter of the 64 MiB
+  total's alert cannot while one client's 64 MiB are half of the 128 MiB
   (`exchange_client_budget_alert_test.yml`; panel beside the total's on the Exchange dashboard).
   The normal DPoP nonce challenge (`use_dpop_nonce`) is not counted as a refusal: it is the
   protocol's first round trip and stays counted on the auth-failure counter; a reason of its own

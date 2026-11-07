@@ -54,7 +54,7 @@ a supervisory authority reads first.
 > The policy names the numbers (90 and 180 days for notifications, 90 days for a refused
 > registration, 90 days for a disconnected exchange installation and a client revocation after the
 > disconnection, 90 days for the exchange journal and change sequence, 30 and 90 days for an
-> exchange offline session, 24 hours for exchange idempotency results, 30 minutes for a staged mass
+> exchange offline session, 1 hour for exchange idempotency results, 30 minutes for a staged mass
 > change, 24 months for the audit trails, 31 days for logs, 30 days for Keycloak events and for
 > a session, 14 days for traces, 180 days for metrics, about six months for backups) in sentences,
 > while the code and the platform configuration hold them. Changing a configured window without

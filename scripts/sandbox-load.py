@@ -54,8 +54,8 @@ RESOURCES = {"blueprints": "/exchange/v1/me/blueprints", "stock": "/exchange/v1/
              "ships": "/exchange/v1/me/ships"}
 DEFAULT_MIX = "feed=45,snapshot=8,small=20,large=4,conflict=2,oversize=1,blueprint=6,ships=6,resolve=8"
 MAX_OPS = 500
-BUDGET_DEFAULTS = {"memberBytes": 1048576, "clientBytes": 16777216, "totalBytes": 67108864,
-                   "maxResultBytes": 32768, "idempotencyTtl": "PT24H"}
+BUDGET_DEFAULTS = {"memberBytes": 4194304, "clientBytes": 67108864, "totalBytes": 134217728,
+                   "maxResultBytes": 32768, "idempotencyTtl": "PT1H"}
 ENTRY_OVERHEAD = 512
 CLAIM_PREFIX = "ingest:xch:idem-lock:"
 CLAIM_TOKEN = 22
