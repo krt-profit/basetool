@@ -46,8 +46,9 @@ public enum LiveSyncTopicClass {
   CATALOGUE("catalogue", false, "catalogue"),
 
   /**
-   * Global admin room of the starmap and shops admin pages: the backend pokes {@code starmap} or
-   * {@code shops} when an admin's change or an APPLY changed what the page lists.
+   * Global admin room of the starmap, shops and P4K import admin pages: the backend pokes {@code
+   * starmap}, {@code shops}, {@code runs} or {@code review} when an admin's change, a review
+   * resolution or an APPLY changed what the page lists.
    */
   CATALOGUE_ADMIN("catalogue-admin", false, "catalogue_admin"),
 
@@ -91,7 +92,8 @@ public enum LiveSyncTopicClass {
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
   private static final Set<String> BLUEPRINTS_OWN_SECTIONS = Set.of("list");
   private static final Set<String> MATERIALBOARD_SECTIONS = Set.of("board");
-  private static final Set<String> CATALOGUE_ADMIN_SECTIONS = Set.of("starmap", "shops");
+  private static final Set<String> CATALOGUE_ADMIN_SECTIONS =
+      Set.of("starmap", "shops", "runs", "review");
   private static final Set<String> ADMIN_DASHBOARD_SECTIONS =
       Set.of(
           AdminDashboardLiveSync.DELETION_REQUESTS,

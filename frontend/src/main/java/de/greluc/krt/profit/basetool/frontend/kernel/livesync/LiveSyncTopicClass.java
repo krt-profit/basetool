@@ -296,16 +296,18 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
-   * Global admin room for {@code /admin/starmap} and {@code /admin/shops} with sections {@code
-   * starmap} (the objects, their visibility and storage places, and the UEX links) and {@code
-   * shops} (the shops and their terminal links), authorized locally by {@code ROLE_ADMIN} ({@link
-   * #requiredAnyRole}). The backend publishes into it after an admin's change and an APPLY
-   * (REQ-P4K-035, REQ-P4K-038, REQ-P4K-043).
+   * Global admin room for {@code /admin/starmap}, {@code /admin/shops} and {@code
+   * /admin/p4k-import} with sections {@code starmap} (the objects, their visibility and storage
+   * places, and the UEX links), {@code shops} (the shops and their terminal links), {@code runs}
+   * (the applied runs and the import-due banner) and {@code review} (the open review cases),
+   * authorized locally by {@code ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into
+   * it after an admin's change, a review resolution and an APPLY (REQ-P4K-035, REQ-P4K-038,
+   * REQ-P4K-043, REQ-FE-015).
    */
   CATALOGUE_ADMIN(
       "catalogue-admin",
       false,
-      Set.of("starmap", "shops"),
+      Set.of("starmap", "shops", "runs", "review"),
       false,
       "catalogue_admin",
       null,

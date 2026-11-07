@@ -32,7 +32,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -67,6 +70,7 @@ class P4kReviewServiceTest {
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private AuditService auditService;
   @Autowired private CacheManager cacheManager;
+  @Autowired private MeterRegistry meterRegistry;
 
   /** The key of the entry that shows whether a cache was evicted. */
   private static final String CACHE_PROBE = "p4k-review-probe";
@@ -200,6 +204,49 @@ class P4kReviewServiceTest {
             ADMIN));
 
     assertThat(shipTypes.get(CACHE_PROBE)).isNotNull();
+  }
+
+  @Test
+  void aKeep_tellsTheOtherAdminPagesOnCommit() {
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+    P4kReviewCase reviewCase = seededCase();
+    double before = adminRoomFrames();
+
+    onEveryCommitCallback(() ->
+        reviewService.resolve(
+            reviewCase.getId(),
+            P4kReviewResolution.KEEP,
+            null,
+            null,
+            reviewCase.getVersion(),
+            ADMIN));
+
+    assertThat(adminRoomFrames()).isEqualTo(before + 1);
+  }
+
+  /**
+   * Runs a write and then every commit callback the test's transaction holds, as its commit would.
+   *
+   * @param write the write
+   */
+  private static void onEveryCommitCallback(Runnable write) {
+    write.run();
+    TransactionSynchronizationManager.getSynchronizations()
+        .forEach(TransactionSynchronization::afterCommit);
+  }
+
+  /**
+   * Counts the frames published into the admin catalogue room.
+   *
+   * @return the accepted publishes of the room so far
+   */
+  private double adminRoomFrames() {
+    return meterRegistry
+        .counter(
+            LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED,
+            LivesyncMetricNames.TAG_TOPIC_CLASS,
+            LiveSyncTopicClass.CATALOGUE_ADMIN.metricLabel())
+        .count();
   }
 
   /**

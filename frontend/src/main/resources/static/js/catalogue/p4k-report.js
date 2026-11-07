@@ -1,6 +1,7 @@
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
 import { bindPager, renderPager } from '/js/catalogue/catalogue-pager.js';
 import {
@@ -50,6 +51,27 @@ let casesPage = 0;
 
 /** Reads one label of the page's dictionary. */
 const t = dictionaryLabels(() => window.krtP4kImportI18n, 'krtP4kImportI18n');
+
+/**
+ * The page's room in the admin catalogue live sync (REQ-FE-015): a peer admin's review resolution
+ * announces `review`, which reloads the options and the cases, and an APPLY announces `runs` as
+ * well, which reloads the run history and the import-due banner.
+ */
+krtPageSections.create({
+    topicClass: 'CATALOGUE_ADMIN',
+    topic: 'catalogue-admin',
+    sections: { runs: { container: '#krt-p4k-runs' }, review: { container: '#krt-p4k-cases' } },
+    receiver: {
+        coalesceMs: 1500,
+        refresh(/** @type {string[]} */ keys) {
+            if (keys.includes('runs')) {
+                refreshDueBanner();
+                loadRuns(runsPage);
+            }
+            if (keys.includes('review')) loadCasesWithOptions(casesPage);
+        },
+    },
+});
 
 /**
  * Builds a proxy URL of the page.

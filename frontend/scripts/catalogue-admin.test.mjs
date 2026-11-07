@@ -162,7 +162,7 @@ function load(entry, elements, read = () => new Promise(() => {}), extraStubs = 
         },
     });
     vm.runInContext(flattenModule(entry, { ...STUBS, ...extraStubs }), context);
-    return { fn: (name) => vm.runInContext(name, context), ui, net };
+    return { fn: (name) => vm.runInContext(name, context), ui, net, live };
 }
 
 await test('the storage-place dialog starts with an empty name, never the game-text P4K name', async () => {
@@ -291,7 +291,7 @@ function p4kReport() {
         read.resolve(body);
         await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    return { fn: page.fn, reads, answer, ui: page.ui };
+    return { fn: page.fn, reads, answer, ui: page.ui, live: page.live };
 }
 
 await test('after an APPLY the assignment options reload before the refreshed cases render', async () => {
@@ -315,6 +315,26 @@ await test('after an APPLY the assignment options reload before the refreshed ca
         report.fn('materials').map((m) => m.id),
         ['m-new'],
     );
+});
+
+await test('a peer admin resolution or APPLY reloads the review cases and the runs in place', async () => {
+    const report = p4kReport();
+    const room = report.live.sections.find((s) => s.topicClass === 'CATALOGUE_ADMIN');
+    assert.ok(room, 'the page joins the admin catalogue room');
+    assert.equal(room.topic, 'catalogue-admin');
+    assert.deepEqual(Object.keys(room.sections).sort(), ['review', 'runs']);
+    const paths = () => report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
+
+    room.receiver.refresh(['review']);
+    assert.ok(paths().includes('/resource-groups'), 'a resolution reloads the options and cases');
+    assert.ok(!paths().some((p) => p.startsWith('/runs')), 'the runs stay');
+
+    room.receiver.refresh(['runs']);
+    assert.ok(
+        paths().some((p) => p.startsWith('/runs')),
+        'an APPLY reloads the runs',
+    );
+    assert.equal(report.ui.banners, 1, 'and the import-due banner');
 });
 
 if (failures > 0) {

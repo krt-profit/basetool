@@ -397,17 +397,17 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
-  void adminStarmapAndShopsSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
-    String starmap = readResource("/static/js/catalogue/starmap.js");
-    String shops = readResource("/static/js/catalogue/shops.js");
+  void adminCatalogueSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
     Set<String> jsKeys = new LinkedHashSet<>();
-    jsKeys.addAll(seamMapKeys("/static/js/catalogue/starmap.js", "sections"));
-    jsKeys.addAll(seamMapKeys("/static/js/catalogue/shops.js", "sections"));
+    for (String page : List.of("starmap.js", "shops.js", "p4k-report.js")) {
+      String path = "/static/js/catalogue/" + page;
+      assertThat(readResource(path))
+          .contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");
+      jsKeys.addAll(seamMapKeys(path, "sections"));
+    }
 
-    assertThat(starmap).contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");
-    assertThat(shops).contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");
     assertThat(jsKeys)
-        .as("sections keys of starmap.js and shops.js vs LiveSyncTopicClass.CATALOGUE_ADMIN")
+        .as("sections keys of the admin catalogue pages vs LiveSyncTopicClass.CATALOGUE_ADMIN")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.CATALOGUE_ADMIN.allowedSections());
   }
 

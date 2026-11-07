@@ -488,9 +488,13 @@ is one case per GUID about the row holding it, naming the row it collides with i
 A hide and an assignment evict the P4K-written caches after the commit and publish the global
 `CATALOGUE` event, as a committed APPLY does (REQ-DATA-011, `P4kCatalogueChange`).
 `/admin/p4k-import` reloads the resource groups and materials a case can assign before it renders
-the cases again, so a case an APPLY opened offers what that APPLY created.
+the cases again, so a case an APPLY opened offers what that APPLY created. A resolution announces
+the `catalogue-admin` room's `review` section and an APPLY its `runs` and `review` sections, so a
+peer admin's open import page reloads its cases, its run history and its import-due banner in place
+(`CatalogueAdminLiveSync`, REQ-FE-015).
 
-**Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `AdminP4kImportPageControllerMvcTest`,
+**Enforced by:** `P4kReviewServiceTest`, `P4kCatalogueChangeTest`, `CatalogueAdminLiveSyncTest`,
+`frontend/scripts/catalogue-admin.test.mjs`, `AdminP4kImportPageControllerMvcTest`,
 `P4kImportReportControllerMvcTest`, `P4kImportReportE2eTest` · **Code:** `P4kReviewService` · **ADR:**
 [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2886, #2888
 

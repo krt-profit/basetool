@@ -32,8 +32,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * The admin starmap and shops pages hear of a change through the admin catalogue room, in the
- * section of the page that lists it (REQ-FE-010).
+ * The admin starmap, shops and P4K import pages hear of a change through the admin catalogue room,
+ * in the section of the page that lists it (REQ-FE-010, REQ-FE-015).
  */
 class CatalogueAdminLiveSyncTest {
 
@@ -65,16 +65,28 @@ class CatalogueAdminLiveSyncTest {
   }
 
   @Test
-  void anApply_announcesBothPagesInOneFrame() {
+  void anApply_announcesEveryAdminCatalogueSectionInOneFrame() {
     liveSync.applied();
 
-    verify(publisher).publishAfterCommit(ROOM, List.of("starmap", "shops"));
+    verify(publisher).publishAfterCommit(ROOM, List.of("starmap", "shops", "runs", "review"));
+    verifyNoMoreInteractions(publisher);
+  }
+
+  @Test
+  void aReviewResolution_announcesTheReviewSectionAfterCommit() {
+    liveSync.reviewChanged();
+
+    verify(publisher).publishAfterCommit(ROOM, List.of("review"));
     verifyNoMoreInteractions(publisher);
   }
 
   @Test
   void theRoomAdmitsExactlyThePageSections() {
     assertThat(LiveSyncTopicClass.CATALOGUE_ADMIN.allowedSections())
-        .containsExactlyInAnyOrder(CatalogueAdminLiveSync.STARMAP, CatalogueAdminLiveSync.SHOPS);
+        .containsExactlyInAnyOrder(
+            CatalogueAdminLiveSync.STARMAP,
+            CatalogueAdminLiveSync.SHOPS,
+            CatalogueAdminLiveSync.RUNS,
+            CatalogueAdminLiveSync.REVIEW);
   }
 }
