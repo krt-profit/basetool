@@ -137,6 +137,84 @@ class P4kBlueprintImportTest {
         .containsExactly("CASING", "INSULATIVE LINER", "PANEL COVERING");
   }
 
+  /**
+   * Gives the root selection the casing slot's modifier as its own.
+   *
+   * @param tree the catalogue
+   * @return the root's modifier
+   */
+  private static ObjectNode withRootModifier(ObjectNode tree) {
+    ObjectNode root = root(tree);
+    ObjectNode modifier =
+        (ObjectNode) root.get("options").get(0).get("modifiers").get(0).deepCopy();
+    root.putArray("modifiers").add(modifier);
+    return modifier;
+  }
+
+  @Test
+  void aSelectRootsOwnModifiers_areStoredAsRecipeWideModifiers() {
+    ObjectNode tree = P4kTestCatalogues.tree();
+    withRootModifier(tree);
+    Blueprint blueprint = wikiBlueprint();
+
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+    blueprintRepository.flush();
+
+    assertThat(blueprint.getRecipeModifiers()).hasSize(1);
+    BlueprintRequirementModifier recipeWide = blueprint.getRecipeModifiers().getFirst();
+    assertThat(recipeWide.getBlueprint()).isSameAs(blueprint);
+    assertThat(recipeWide.getRequirementGroup()).isNull();
+    assertThat(recipeWide.getPropertyKey()).isEqualTo("armor_damagemitigation");
+    assertThat(recipeWide.getValueKind()).isEqualTo(BlueprintModifierValueKind.MULTIPLIER);
+    assertThat(recipeWide.getModifierAtMinQuality()).isEqualTo(0.85);
+    assertThat(recipeWide.getModifierAtMaxQuality()).isEqualTo(1.15);
+    assertThat(blueprint.getRequirementGroups())
+        .extracting(g -> g.getModifiers().size())
+        .containsExactly(1, 2);
+  }
+
+  @Test
+  void anUnchangedRecipeWideModifier_isNeitherReportedNorRewritten() {
+    ObjectNode tree = P4kTestCatalogues.tree();
+    withRootModifier(tree);
+    Blueprint blueprint = wikiBlueprint();
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+    BlueprintRequirementModifier first = blueprint.getRecipeModifiers().getFirst();
+    BlueprintIngredient firstLine = blueprint.getIngredients().getFirst();
+
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+
+    assertThat(blueprint.getRecipeModifiers()).containsExactly(first);
+    assertThat(blueprint.getIngredients().getFirst()).isSameAs(firstLine);
+  }
+
+  @Test
+  void aChangedRecipeWideModifier_rewritesTheRecipeAndKeepsTheFilledDirection() {
+    ObjectNode tree = P4kTestCatalogues.tree();
+    ObjectNode modifier = withRootModifier(tree);
+    Blueprint blueprint = wikiBlueprint();
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+    blueprint.getRecipeModifiers().getFirst().setBetterWhen("higher");
+
+    ((ObjectNode) modifier.get("ranges").get(0)).put("atEnd", 1.3);
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+
+    assertThat(blueprint.getRecipeModifiers())
+        .extracting(
+            BlueprintRequirementModifier::getModifierAtMaxQuality,
+            BlueprintRequirementModifier::getBetterWhen)
+        .containsExactly(org.assertj.core.groups.Tuple.tuple(1.3, "higher"));
+  }
+
+  @Test
+  void aRootWithoutModifiers_storesNoRecipeWideModifier() {
+    Blueprint blueprint = wikiBlueprint();
+
+    runs.apply(P4kTestCatalogues.fixtureBytes(), false);
+
+    assertThat(blueprint.getRecipeModifiers()).isEmpty();
+  }
+
   @Test
   void theP4kLeadsTheRecipeCategoryCraftTimeAndDismantle() {
     Material aslarite = material("Aslarite");

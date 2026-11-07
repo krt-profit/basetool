@@ -83,6 +83,7 @@ class BlueprintControllerTest {
         List.of(),
         List.of(),
         List.of(),
+        List.of(),
         0L,
         null);
   }

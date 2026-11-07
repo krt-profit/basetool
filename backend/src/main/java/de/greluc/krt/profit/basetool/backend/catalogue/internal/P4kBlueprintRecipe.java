@@ -40,26 +40,32 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The recipe of one blueprint as the P4K delivers it (REQ-P4K-027): the requirement groups with
- * their modifiers and cost lines, and how many of the mandatory groups a craft fills. The value
- * {@linkplain #matches matches} the recipe a blueprint stores when the P4K changed nothing, so an
- * unchanged recipe is neither reported nor rewritten, also after the SC Wiki filled its gaps.
+ * their modifiers and cost lines, the recipe-wide modifiers of a choose-n root selection, and how
+ * many of the mandatory groups a craft fills. The value {@linkplain #matches matches} the recipe a
+ * blueprint stores when the P4K changed nothing, so an unchanged recipe is neither reported nor
+ * rewritten, also after the SC Wiki filled its gaps.
  *
  * @param requiredGroupCount how many mandatory groups one craft fills, {@code null} for all
+ * @param recipeModifiers the modifiers of the root selection, which belong to no single group
  * @param groups the requirement groups in order, the mandatory before the optional ones
  */
 record P4kBlueprintRecipe(
-    @Nullable Integer requiredGroupCount, @NotNull @Unmodifiable List<Group> groups) {
+    @Nullable Integer requiredGroupCount,
+    @NotNull @Unmodifiable List<Modifier> recipeModifiers,
+    @NotNull @Unmodifiable List<Group> groups) {
 
   /** The node kind every requirement group carries. */
   static final String GROUP_KIND = "group";
 
   /**
-   * Copies the groups.
+   * Copies the lists.
    *
    * @param requiredGroupCount how many mandatory groups one craft fills, {@code null} for all
+   * @param recipeModifiers the recipe-wide modifiers
    * @param groups the requirement groups
    */
   P4kBlueprintRecipe {
+    recipeModifiers = List.copyOf(recipeModifiers);
     groups = List.copyOf(groups);
   }
 
@@ -260,6 +266,7 @@ record P4kBlueprintRecipe(
   boolean matches(@Nullable P4kBlueprintRecipe stored) {
     return stored != null
         && Objects.equals(requiredGroupCount, stored.requiredGroupCount)
+        && pairwise(recipeModifiers, stored.recipeModifiers, Modifier::matches)
         && pairwise(groups, stored.groups, Group::matches);
   }
 
@@ -308,14 +315,16 @@ record P4kBlueprintRecipe(
   /**
    * Summarises the recipe for a report row.
    *
-   * @return e.g. {@code groups=2;lines=3}
+   * @return e.g. {@code groups=2;lines=3;recipeModifiers=1}
    */
   @NotNull
   String summary() {
     return "groups="
         + groups.size()
         + ";lines="
-        + groups.stream().mapToInt(g -> g.lines().size()).sum();
+        + groups.stream().mapToInt(g -> g.lines().size()).sum()
+        + ";recipeModifiers="
+        + recipeModifiers.size();
   }
 
   /**
@@ -353,7 +362,10 @@ record P4kBlueprintRecipe(
           new Group(
               group.getGroupKey(), group.isOptional(), group.getRequiredCount(), modifiers, lines));
     }
-    return new P4kBlueprintRecipe(blueprint.getRequiredGroupCount(), groups);
+    return new P4kBlueprintRecipe(
+        blueprint.getRequiredGroupCount(),
+        blueprint.getRecipeModifiers().stream().map(P4kBlueprintRecipe::storedModifier).toList(),
+        groups);
   }
 
   /**
@@ -402,9 +414,10 @@ record P4kBlueprintRecipe(
   }
 
   /**
-   * Replaces a blueprint's requirement groups and ingredient lines with this recipe and marks the
-   * recipe as the P4K's; the summary properties stay, and where the P4K delivers {@code null} the
-   * new rows keep what the SC Wiki filled on the stored ones ({@link P4kRecipeWikiFills}).
+   * Replaces a blueprint's requirement groups, recipe-wide modifiers and ingredient lines with this
+   * recipe and marks the recipe as the P4K's; the summary properties stay, and where the P4K
+   * delivers {@code null} the new rows keep what the SC Wiki filled on the stored ones ({@link
+   * P4kRecipeWikiFills}).
    *
    * @param blueprint the blueprint
    */
@@ -412,8 +425,15 @@ record P4kBlueprintRecipe(
     final P4kRecipeWikiFills fills = P4kRecipeWikiFills.of(blueprint);
     blueprint.clearIngredients();
     blueprint.clearRequirementGroups();
+    blueprint.clearRecipeModifiers();
     blueprint.setRequiredGroupCount(requiredGroupCount);
     blueprint.setP4kRecipe(true);
+    int recipeModifierOrder = 0;
+    for (Modifier modifier : recipeModifiers) {
+      BlueprintRequirementModifier modifierRow = modifierRow(modifier, recipeModifierOrder++);
+      fills.fillRecipeModifier(modifierRow);
+      blueprint.addRecipeModifier(modifierRow);
+    }
     int groupOrder = 0;
     int lineOrder = 0;
     for (Group group : groups) {
@@ -454,7 +474,7 @@ record P4kBlueprintRecipe(
    * Builds the row of a modifier.
    *
    * @param modifier the modifier
-   * @param order its position in the group
+   * @param order its position in its group, or among the recipe-wide modifiers
    * @return the unsaved row
    */
   @NotNull

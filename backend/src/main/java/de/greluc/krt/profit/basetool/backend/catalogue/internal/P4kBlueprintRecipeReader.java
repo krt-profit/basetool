@@ -47,10 +47,11 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Reads the recipe and the dismantle returns of one P4K blueprint from its cost tree (REQ-P4K-027,
  * contract "Tiers" and "Dismantle returns"). The first tier is the recipe. The mandatory cost's
- * root selection decides how many of its options a craft fills; each option becomes a requirement
- * group, a selection of resource and item lines a group of those lines, and the lines of nested
- * selections join the group they sit in. Every optional cost becomes an optional group. Quantities
- * carry the {@code quantityMultiplier}; minimum qualities are clamped (REQ-DATA-023).
+ * root selection decides how many of its options a craft fills and its own modifiers are the
+ * recipe-wide modifiers; each option becomes a requirement group, a selection of resource and item
+ * lines a group of those lines, and the lines of nested selections join the group they sit in.
+ * Every optional cost becomes an optional group. Quantities carry the {@code quantityMultiplier};
+ * minimum qualities are clamped (REQ-DATA-023).
  */
 final class P4kBlueprintRecipeReader {
 
@@ -116,11 +117,15 @@ final class P4kBlueprintRecipeReader {
     }
     CostLine root = tier.mandatory();
     List<P4kBlueprintRecipe.Group> groups = new ArrayList<>();
+    List<P4kBlueprintRecipe.Modifier> recipeModifiers = List.of();
     Integer requiredGroupCount = null;
     if (SELECT.equals(root.kind())) {
       List<CostLine> options = options(root);
       if (root.count() != null && root.count() < options.size()) {
         requiredGroupCount = root.count();
+      }
+      if (root.modifiers() != null) {
+        recipeModifiers = modifiersOf(root);
       }
       options.forEach(option -> addGroup(groups, option, false));
     } else {
@@ -131,7 +136,7 @@ final class P4kBlueprintRecipeReader {
           .filter(Objects::nonNull)
           .forEach(line -> addGroup(groups, line, true));
     }
-    return new P4kBlueprintRecipe(requiredGroupCount, groups);
+    return new P4kBlueprintRecipe(requiredGroupCount, recipeModifiers, groups);
   }
 
   /**

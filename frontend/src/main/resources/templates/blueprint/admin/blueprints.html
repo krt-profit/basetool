@@ -32,10 +32,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <th:block th:each="bp : ${blueprints}">
+                    <th:block th:each="bp : ${blueprints}"
+                              th:with="recipeWide=${!#lists.isEmpty(bp.recipeModifiers())}">
                         <tr th:each="g, gStat : ${bp.requirementGroups()}">
                             <td class="bp-cell-blueprint" th:if="${gStat.first}"
-                                th:rowspan="${bp.requirementGroups().size()}">
+                                th:rowspan="${bp.requirementGroups().size() + (recipeWide ? 1 : 0)}">
                                 <span class="bp-name" th:text="${bp.outputName() != null ? bp.outputName() : bp.scwikiKey()}">Output</span>
                                 <span class="bp-key" th:if="${bp.scwikiKey() != null}" th:text="${bp.scwikiKey()}">BP_KEY</span>
                             </td>
@@ -54,37 +55,16 @@
                                 <span class="bp-empty-hint" th:if="${#lists.isEmpty(g.ingredients())}">&ndash;</span>
                             </td>
                             <td th:attr="data-label=#{admin.blueprint.col.dependency}">
-                                <span class="bp-stat" th:each="m : ${g.modifiers()}">
-                                    <span class="bp-stat-label" th:text="${m.label() != null ? m.label() : m.propertyKey()}">Stat</span>
-                                    <span class="bp-stat-bw" th:if="${m.betterWhen() == 'higher'}" th:text="'(' + #{admin.blueprint.betterWhen.higher} + ')'">(h&ouml;her ist besser)</span>
-                                    <span class="bp-stat-bw" th:if="${m.betterWhen() == 'lower'}" th:text="'(' + #{admin.blueprint.betterWhen.lower} + ')'">(niedriger ist besser)</span>
-                                    <span class="bp-stat-bw" th:if="${m.betterWhen() == 'neutral'}" th:text="'(' + #{admin.blueprint.betterWhen.neutral} + ')'">(neutral)</span>
-
-                                    <span class="bp-slider"
-                                          th:if="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}"
-                                          th:attr="data-qmin=${m.effectiveQualityMin()},data-qmax=${m.effectiveQualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()},data-vrt=${m.valueRangeType()},data-vkind=${m.valueKind()}">
-                                        <span class="bp-seg" th:each="seg : ${m.segments()}"
-                                              th:attr="data-qmin=${seg.qualityMin()},data-qmax=${seg.qualityMax()},data-vstart=${seg.modifierAtStart()},data-vend=${seg.modifierAtEnd()}"></span>
-                                        <span class="bp-slider-row">
-                                            <span class="bp-slider-end" th:text="${#numbers.formatDecimal(m.effectiveQualityMin(),1,0,'DEFAULT')}">0</span>
-                                            <input type="range" class="bp-range" step="1"
-                                                   th:attr="min=${m.effectiveQualityMin()},max=${m.effectiveQualityMax()},value=${m.effectiveQualityMax()}">
-                                            <span class="bp-slider-end bp-slider-end-max" th:text="${#numbers.formatDecimal(m.effectiveQualityMax(),1,0,'DEFAULT')}">1000</span>
-                                        </span>
-                                        <span class="bp-slider-out">
-                                            <output class="bp-q">&ndash;</output>
-                                            <span class="bp-slider-arrow">&rarr;</span>
-                                            <output class="bp-out">&times;?</output>
-                                        </span>
-                                    </span>
-                                    <span class="bp-dep"
-                                          th:unless="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}">
-                                        <span class="bp-dep-val" th:if="${m.modifierAtMaxQuality() != null}"
-                                              th:text="${(m.valueKind() == 'ADDITIVE' ? (m.modifierAtMaxQuality() >= 0 ? '+' : '') : '×') + #numbers.formatDecimal(m.modifierAtMaxQuality(),1,2,'DEFAULT')}">&times;1.05</span>
-                                        <span class="bp-empty-hint" th:unless="${m.modifierAtMaxQuality() != null}">&ndash;</span>
-                                    </span>
-                                </span>
-                                <span class="bp-empty-hint" th:if="${#lists.isEmpty(g.modifiers())}">&ndash;</span>
+                                <th:block th:replace="~{blueprint/fragments/blueprint-modifier-stats :: stats(${g.modifiers()})}"></th:block>
+                            </td>
+                        </tr>
+                        <tr th:if="${recipeWide and !#lists.isEmpty(bp.requirementGroups())}"
+                            class="bp-row-recipe-wide" data-testid="bp-recipe-wide">
+                            <td th:attr="data-label=#{admin.blueprint.col.ingredients}">
+                                <span class="bp-recipe-wide" th:text="#{admin.blueprint.recipeWide}">Gilt f&uuml;r das ganze Rezept</span>
+                            </td>
+                            <td th:attr="data-label=#{admin.blueprint.col.dependency}">
+                                <th:block th:replace="~{blueprint/fragments/blueprint-modifier-stats :: stats(${bp.recipeModifiers()})}"></th:block>
                             </td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(bp.requirementGroups())}">

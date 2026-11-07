@@ -511,7 +511,8 @@ public class BlueprintCraftabilityService {
 
   /**
    * Computes the quality floor for one ingredient line: the stricter of its {@code min_quality} and
-   * its slot's no-degradation floor.
+   * its slot's no-degradation floor. The blueprint's recipe-wide modifiers belong to no slot and
+   * set no floor (REQ-P4K-027).
    *
    * @param ingredient the RESOURCE ingredient line
    * @return the quality floor (0..1000)

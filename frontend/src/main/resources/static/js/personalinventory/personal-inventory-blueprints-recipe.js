@@ -452,6 +452,10 @@ function renderRecipe(recipe) {
     if (groups.length > 0) {
         const pane = recipeEl;
         const baseByKey = indexBaseStats(recipe.baseStats);
+        const recipeModifiers = recipe.recipeModifiers || [];
+        if (recipeModifiers.length > 0) {
+            pane.appendChild(renderRecipeWideBlock(recipeModifiers, baseByKey));
+        }
         groups.forEach((g, idx) => {
             pane.appendChild(renderQualityBlock(g, idx, baseByKey));
         });
@@ -495,7 +499,77 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         block.appendChild(el('div', 'quality-name', '–'));
     }
 
-    const mods = group.modifiers || [];
+    appendModifierAffects(
+        block,
+        group.modifiers || [],
+        slotQuality(groupIndex),
+        krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
+            (firstIngredientName ? ` ${firstIngredientName}` : ''),
+        baseByKey,
+    );
+    return block;
+}
+
+/**
+ * Renders the modifiers that apply to the whole recipe rather than one slot, with their own quality
+ * slider; no slot's craftability quality presets it.
+ *
+ * @param {BpRecipeModifier[]} modifiers the recipe-wide modifiers
+ * @param {Map<string, BpStatBase>} baseByKey the crafted item's stat base values per property key
+ * @returns {HTMLElement} the quality block
+ */
+function renderRecipeWideBlock(modifiers, baseByKey) {
+    const block = el('div', 'quality-block');
+    block.setAttribute('data-testid', 'bp-recipe-wide');
+    const label = krtI18nText(i18n().recipeWide, 'krtBlueprintsRecipeI18n.recipeWide');
+    block.appendChild(el('span', 'quality-source', label));
+    const hint = el('div', 'quality-name');
+    hint.appendChild(
+        el(
+            'small',
+            null,
+            krtI18nText(i18n().recipeWideHint, 'krtBlueprintsRecipeI18n.recipeWideHint'),
+        ),
+    );
+    block.appendChild(hint);
+    appendModifierAffects(
+        block,
+        modifiers,
+        null,
+        `${krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria')} ${label}`,
+        baseByKey,
+    );
+    return block;
+}
+
+/**
+ * The effective quality the craftability computed for one slot, under the current refinery toggle.
+ *
+ * @param {number} groupIndex the slot's position, matching the craftability groups
+ * @returns {number | null} the quality, null when the slot was not evaluated
+ */
+function slotQuality(groupIndex) {
+    const craftGroup =
+        activeCraftability && activeCraftability.groups && activeCraftability.groups[groupIndex];
+    if (!craftGroup) {
+        return null;
+    }
+    const eff = refineryOn ? craftGroup.effectiveQualityWithRefinery : craftGroup.effectiveQuality;
+    return eff ?? null;
+}
+
+/**
+ * Appends a block's stat chips and, for modifiers with a quality band, the quality slider that
+ * drives them.
+ *
+ * @param {HTMLElement} block the quality block
+ * @param {BpRecipeModifier[]} mods the modifiers
+ * @param {number | null} quality the slider's preset quality, null for the band's top
+ * @param {string} ariaLabel the slider's accessible name
+ * @param {Map<string, BpStatBase>} baseByKey the crafted item's stat base values per property key
+ * @returns {void}
+ */
+function appendModifierAffects(block, mods, quality, ariaLabel, baseByKey) {
     const banded = mods.filter((m) => {
         return (
             m.effectiveQualityMin != null &&
@@ -510,7 +584,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
     if (mods.length === 0) {
         affects.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
         block.appendChild(affects);
-        return block;
+        return;
     }
 
     /** @type {StatChip[]} */
@@ -570,19 +644,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
             ),
         );
 
-        let defaultQ = qmax;
-        const craftGroup =
-            activeCraftability &&
-            activeCraftability.groups &&
-            activeCraftability.groups[groupIndex];
-        if (craftGroup) {
-            const eff = refineryOn
-                ? craftGroup.effectiveQualityWithRefinery
-                : craftGroup.effectiveQuality;
-            if (eff != null) {
-                defaultQ = Math.max(qmin, Math.min(qmax, eff));
-            }
-        }
+        const defaultQ = quality == null ? qmax : Math.max(qmin, Math.min(qmax, quality));
 
         const qrow = el('div', 'quality-row');
         const range = document.createElement('input');
@@ -591,11 +653,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         range.min = String(qmin);
         range.max = String(qmax);
         range.value = String(defaultQ);
-        range.setAttribute(
-            'aria-label',
-            krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
-                (firstIngredientName ? ` ${firstIngredientName}` : ''),
-        );
+        range.setAttribute('aria-label', ariaLabel);
         qrow.appendChild(range);
         const qval = el('span', 'quality-value');
         const qOut = el('output', null, String(Math.round(defaultQ)));
@@ -639,7 +697,6 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
     }
 
     block.appendChild(affects);
-    return block;
 }
 
 /**
