@@ -114,11 +114,14 @@ class P4kStampedRowVisibilityTest {
 
     assertThat(
             shipTypeRepository
-                .searchPickableByName("Known ship", PageRequest.of(0, 100))
+                .searchPickableByName("Sweep ", PageRequest.of(0, 100))
                 .map(ShipType::getId)
                 .getContent())
-        .hasSize(19)
-        .doesNotContain(gone.getId());
+        .hasSize(19);
+    assertThat(shipTypeRepository.searchPickableByName("Known ship", PageRequest.of(0, 100)))
+        .extracting(ShipType::getId)
+        .doesNotContain(gone.getId())
+        .isEmpty();
     assertThat(shipTypeMapper.toDto(gone).noLongerInGame()).isTrue();
     assertThat(changeRepository.findByRunId(result.runId()))
         .filteredOn(c -> c.getChangeType() == P4kChangeType.VANISHED)

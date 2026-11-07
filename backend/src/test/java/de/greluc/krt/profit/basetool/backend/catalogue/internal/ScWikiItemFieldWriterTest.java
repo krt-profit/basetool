@@ -77,7 +77,7 @@ class ScWikiItemFieldWriterTest {
             eq("game_item"),
             eq(ITEM),
             any(),
-            eq("column=size_class;p4k=2;wiki=3"));
+            eq("column=size_class;stored=2;source=3"));
   }
 
   @Test
@@ -128,7 +128,7 @@ class ScWikiItemFieldWriterTest {
             eq("game_item"),
             eq(ITEM),
             any(),
-            eq("column=grade;p4k=C;wiki=A"));
+            eq("column=grade;stored=C;source=A"));
   }
 
   @Test

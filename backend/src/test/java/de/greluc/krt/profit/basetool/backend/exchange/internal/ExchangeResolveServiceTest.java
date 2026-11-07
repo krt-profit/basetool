@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportS
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ClassNameKeyRef;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -334,6 +335,71 @@ class ExchangeResolveServiceTest {
   }
 
   @Test
+  void aShipClassNameWinsOverADifferentShipTypeOfTheSameName() {
+    ShipType byClass = shipType("Gladius", "AEGS_Gladius");
+    ShipType byName = shipType("Aegis Gladius", "AEGS_Gladius_Valiant");
+    when(shipTypeRepository.findAll()).thenReturn(List.of(byClass, byName));
+
+    Result result =
+        only(resolve(ExchangeCatalogKind.SHIP_TYPE, ref(null, "aegs_gladius", "Aegis Gladius")));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().bt()).isEqualTo(byClass.getId().toString());
+  }
+
+  @Test
+  void twoShipTypesWithTheSameNormalisedNameAnswerAmbiguousWithBoth() {
+    ShipType dash = shipType("Hornet-F7C", null);
+    ShipType space = shipType("Hornet F7C", null);
+    when(shipTypeRepository.findAll()).thenReturn(List.of(dash, space));
+
+    Result result = only(resolve(ExchangeCatalogKind.SHIP_TYPE, ref(null, null, "HORNET_F7C")));
+
+    assertThat(result.status()).isEqualTo(Status.AMBIGUOUS);
+    assertThat(result.candidates())
+        .extracting("bt")
+        .containsExactlyInAnyOrder(dash.getId().toString(), space.getId().toString());
+  }
+
+  @Test
+  void aVariantClassNameResolvesToItsOwnShipTypeElseToItsGroupBase() {
+    ShipType base = shipType("F7C Hornet Mk II", "ANVL_Hornet_F7C_Mk2");
+    ShipType own = shipType("F7C Hornet Mk II Heartseeker", "ANVL_Hornet_F7C_Mk2_Heartseeker");
+    when(shipTypeRepository.findAll()).thenReturn(List.of(base, own));
+    when(shipTypeRepository.findVariantBaseRefs())
+        .thenReturn(
+            List.of(
+                classRef("ANVL_Hornet_F7C_Mk2_Heartseeker", base.getId()),
+                classRef("ANVL_Hornet_F7C_Mk2_AI_Super", base.getId())));
+
+    ExchangeResolveResponse response =
+        resolve(
+            ExchangeCatalogKind.SHIP_TYPE,
+            ref(null, "ANVL_Hornet_F7C_Mk2_Heartseeker", null),
+            ref(null, "ANVL_Hornet_F7C_Mk2_AI_Super", null));
+
+    assertThat(response.results().get(0).ref().bt()).isEqualTo(own.getId().toString());
+    assertThat(response.results().get(1).ref().bt()).isEqualTo(base.getId().toString());
+  }
+
+  @Test
+  void aShipP4kGuidResolvesBeforeTheName() {
+    ShipType titan = shipType("Avenger Titan", "AEGS_Avenger_Titan");
+    titan.setP4kUuid(UUID.randomUUID());
+    ShipType other = shipType("Cutlass Black", null);
+    when(shipTypeRepository.findAll()).thenReturn(List.of(titan, other));
+
+    Result result =
+        only(
+            resolve(
+                ExchangeCatalogKind.SHIP_TYPE,
+                new ExchangeItemRef(
+                    null, null, titan.getP4kUuid(), null, null, "Cutlass Black", null)));
+
+    assertThat(result.ref().bt()).isEqualTo(titan.getId().toString());
+  }
+
+  @Test
   void everyReferenceIsCountedByKindAndStatus() {
     products("arclight pistol", "Arclight Pistol");
 
@@ -411,6 +477,42 @@ class ExchangeResolveServiceTest {
     material.setType(MaterialType.RAW);
     material.setIsVisible(visible);
     return material;
+  }
+
+  /**
+   * Builds a ship type with an id.
+   *
+   * @param name the name
+   * @param className the class name, or {@code null}
+   * @return the ship type
+   */
+  private static @NotNull ShipType shipType(@NotNull String name, @Nullable String className) {
+    ShipType ship = new ShipType();
+    ship.setId(UUID.randomUUID());
+    ship.setName(name);
+    ship.setClassName(className);
+    return ship;
+  }
+
+  /**
+   * Builds a class-name projection row.
+   *
+   * @param className the class name
+   * @param id the ship type id it resolves to
+   * @return the row
+   */
+  private static @NotNull ClassNameKeyRef classRef(@NotNull String className, @NotNull UUID id) {
+    return new ClassNameKeyRef() {
+      @Override
+      public String getClassName() {
+        return className;
+      }
+
+      @Override
+      public UUID getId() {
+        return id;
+      }
+    };
   }
 
   /**

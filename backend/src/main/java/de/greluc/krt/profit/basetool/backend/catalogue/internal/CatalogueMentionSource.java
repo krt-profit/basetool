@@ -121,6 +121,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "poi",
         "refining_method",
         "ship_type",
+        "ship_type_p4k_variant",
         "ship_type_uex_alias",
         "space_station",
         "star_system",

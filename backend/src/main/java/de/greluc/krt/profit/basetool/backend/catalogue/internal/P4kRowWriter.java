@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kRecord;
-import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.Getter;
@@ -126,7 +125,8 @@ final class P4kRowWriter {
   }
 
   /**
-   * Writes a value the P4K leads over the row's value; a {@code null} catalogue value keeps it.
+   * Writes a value the catalogue leads: a non-null catalogue value replaces a different stored one,
+   * and a {@code null} or blank one keeps the stored value.
    *
    * @param column the column written
    * @param current the row's value
@@ -143,14 +143,14 @@ final class P4kRowWriter {
   }
 
   /**
-   * Writes a reference the P4K leads over the row's value, logging it by a short label; a {@code
-   * null} catalogue value keeps it.
+   * Writes a value the catalogue leads, logging it by a short label: a non-null catalogue value
+   * replaces a different stored one, and a {@code null} or blank one keeps the stored value.
    *
    * @param column the column written
    * @param current the row's value
    * @param incoming the catalogue's value
    * @param setter writes the value
-   * @param label renders a value as an identifier or short name
+   * @param label renders a value as an identifier or short name for the report
    * @param <V> the value type
    */
   <V> void lead(
@@ -159,7 +159,9 @@ final class P4kRowWriter {
       @Nullable V incoming,
       @NotNull Consumer<V> setter,
       @NotNull Function<V, String> label) {
-    if (incoming == null || Objects.equals(current, incoming)) {
+    if (incoming == null
+        || (incoming instanceof String s && s.isBlank())
+        || P4kFields.sameValue(current, incoming)) {
       return;
     }
     write(column, current, incoming, setter, label);
@@ -179,7 +181,7 @@ final class P4kRowWriter {
       @Nullable V current,
       @Nullable V incoming,
       @NotNull Consumer<V> setter) {
-    if (!Objects.equals(current, incoming)) {
+    if (!P4kFields.sameValue(current, incoming)) {
       write(column, current, incoming, setter, String::valueOf);
     }
   }

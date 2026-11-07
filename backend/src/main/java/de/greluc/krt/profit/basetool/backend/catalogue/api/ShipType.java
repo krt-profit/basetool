@@ -47,7 +47,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>The UEX vehicle sync fills the capability flags, dimensions, fuel, URLs and the cross-source
  * keys {@link #externalUuid} / {@link #uexVehicleId}; descriptions ({@link #descriptionEn}, {@link
  * #descriptionDe}) come only from the SC Wiki sync and the P4K import. Wiki-side columns are
- * nullable.
+ * nullable. On a row with a P4K GUID the P4K import leads the class name, manufacturer, name, crew
+ * size, role, career, mass, hull health, size, vehicle kind, insurance facts and, when every cargo
+ * grid was read, the cargo (REQ-P4K-031).
  */
 @Entity
 @Getter
@@ -176,6 +178,52 @@ public class ShipType extends AbstractEntity<UUID> implements P4kKeyedRow {
   /** Shield health points. */
   @Column(name = "shield_hp")
   private Double shieldHp;
+
+  /** English role label from the P4K catalogue, e.g. {@code Light Freight} (REQ-P4K-031). */
+  @Column(name = "role")
+  @Nullable
+  private String role;
+
+  /** English career label from the P4K catalogue, e.g. {@code Transporter} (REQ-P4K-031). */
+  @Column(name = "career")
+  @Nullable
+  private String career;
+
+  /** The item size of the ship's attach definition from the P4K catalogue (REQ-P4K-031). */
+  @Column(name = "size_class")
+  @Nullable
+  private Integer sizeClass;
+
+  /** Spaceship or ground vehicle, from the P4K catalogue (REQ-P4K-031). */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "vehicle_kind", length = 16)
+  @Nullable
+  private ShipVehicleKind vehicleKind;
+
+  /** Whether an insurance claim restores the ship with its loadout, from the P4K catalogue. */
+  @Column(name = "insurance_restore_on_claim")
+  @Nullable
+  private Boolean insuranceRestoreOnClaim;
+
+  /** The entity class name the insurance parameters name, from the P4K catalogue. */
+  @Column(name = "insurance_ship_class_name")
+  @Nullable
+  private String insuranceShipClassName;
+
+  /** The insurance claim time in minutes, from the P4K catalogue. */
+  @Column(name = "insurance_claim_minutes")
+  @Nullable
+  private Double insuranceClaimMinutes;
+
+  /** The shortest insurance claim time in minutes, from the P4K catalogue. */
+  @Column(name = "insurance_mandatory_claim_minutes")
+  @Nullable
+  private Double insuranceMandatoryClaimMinutes;
+
+  /** The insurance expedite fee in aUEC, from the P4K catalogue. */
+  @Column(name = "insurance_expedite_fee")
+  @Nullable
+  private Long insuranceExpediteFee;
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")

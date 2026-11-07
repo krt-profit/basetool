@@ -143,7 +143,7 @@ public class ScWikiItemFieldWriter {
         "game_item",
         item.getExternalUuid(),
         item.getName(),
-        "column=" + column + ";p4k=" + p4kValue + ";wiki=" + wikiValue);
+        P4kFields.disagreement(column, String.valueOf(p4kValue), String.valueOf(wikiValue)));
   }
 
   private static boolean same(@NotNull Object p4kValue, @NotNull Object wikiValue) {

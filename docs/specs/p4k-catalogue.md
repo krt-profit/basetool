@@ -24,7 +24,7 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > [!note] Partly implemented
 > REQ-P4K-001…016 and REQ-P4K-045 are implemented (#3031, #3033; the sweep's category, starmap
 > and shop tables join with their areas), REQ-P4K-017…019 are implemented (#3035, `name_de`
-> with REQ-P4K-023), REQ-P4K-033 is
+> with REQ-P4K-023), REQ-P4K-031 and REQ-P4K-032 are implemented (#3042), REQ-P4K-033 is
 > implemented (#3041), REQ-P4K-039 is implemented (#3043); every other
 > requirement is **planned**, its open acceptance boxes and "Enforced by (planned)" test classes
 > included. The order of delivery is the map's migration order: the gate, the run record and the
@@ -494,7 +494,7 @@ displayed value for the Wiki to refresh. "The P4K value is `null`" means the `p4
 `null`; for the grade it is the letter `p4k_type` and `p4k_grade_raw` map to. UEX writes `name` and
 the manufacturer only while `p4k_name` / `p4k_manufacturer_id` are `null`, and the Wiki/UEX
 duplicate merge carries the `p4k_*` columns with the GUID onto the survivor, where they lead. A
-disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;p4k=…;wiki=…`; strings
+disagreement is the sync-report event `P4K_DISAGREEMENT` with `column=…;stored=…;source=…`; strings
 compare ignoring case. A matched row is not rewritten when its values already agree, and a preview
 writes nothing. `name_de` comes with REQ-P4K-023.
 
@@ -817,13 +817,25 @@ REQ-DATA-027) · **Issues:** #2927
 
 **Acceptance**
 
-- [ ] A ship with `cargoGridsWithIssue` 0 takes the P4K `cargoScu`; one with 2 keeps the stored
+- [x] A ship with `cargoGridsWithIssue` 0 takes the P4K `cargoScu`; one with 2 keeps the stored
   value and reports a difference.
-- [ ] A UEX sync leaves the P4K crew and role of a P4K-known ship.
-- [ ] A store slug that maps to another ship than the UEX URL is reported, nothing is written.
+- [x] A UEX sync leaves the P4K crew and role of a P4K-known ship.
+- [x] A store slug that maps to another ship than the UEX URL is reported, nothing is written.
 
-**Enforced by (planned):** `P4kShipPrecedenceTest`, `UexVehicleServiceTest`,
-`ScWikiVehicleSyncServiceTest` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) · **Issues:** #2897
+The columns: `crewSize` → `crew_max` (the game has no minimum crew, so `crew_min` stays with UEX),
+`role` and `career` → `role` and `career` (the English label), `mass` → `mass`, `hullHealth` →
+`health`, `size` → `size_class`, `vehicleKind` → `vehicle_kind` (`SPACESHIP`, `GROUND_VEHICLE`;
+another value is an unknown closed-set value of REQ-P4K-003), `insurance` → `insurance_*`,
+`cargoScu` → `scu`; `name_de` comes with REQ-P4K-023. On a matched row the import writes a non-null
+catalogue value over a different stored one and logs it as `CHANGED`; a `null` never clears. A
+name another ship type already holds is not taken (`name` is unique) and is reported instead. The
+Wiki and UEX write a led column on a P4K-known row only while it is empty (`P4kLedColumns`); every
+disagreement is one `P4K_DISAGREEMENT` event of the writing source's run, its `detail` holding
+`column=…;stored=…;source=…` entries.
+
+**Enforced by:** `P4kShipPrecedenceTest`, `UexVehicleServiceUuidMatchTest`,
+`ScWikiVehicleSyncServiceTest` · **Code:** `P4kShipBaseData`, `P4kShipStoreSlugCheck`,
+`P4kLedColumns` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) · **Issues:** #2897
 
 ### REQ-P4K-032 — ship types match by GUID and class name first, by name last, and never pick a duplicate
 
@@ -838,11 +850,17 @@ never merged automatically.
 
 **Acceptance**
 
-- [ ] Two ship types with the same normalised name answer `ambiguous` with both candidates.
-- [ ] A variant's class name resolves to its own ship type when one exists, else to its base's.
-- [ ] A class-name match wins over a different ship type of the same name.
+- [x] Two ship types with the same normalised name answer `ambiguous` with both candidates.
+- [x] A variant's class name resolves to its own ship type when one exists, else to its base's.
+- [x] A class-name match wins over a different ship type of the same name.
 
-**Enforced by (planned):** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
+An APPLY keeps the variant groups in `ship_type_p4k_variant` (variant GUID, class name, base GUID);
+a complete ships kind deletes the variants it no longer lists. The hangar import's uploads carry
+only names and slugs, so it takes the name stages and then the slug; a name or slug that finds
+several ship types is skipped as unmatched.
+
+**Enforced by:** `ShipTypeMatcherTest`, `ExchangeResolveServiceTest`, `P4kShipPrecedenceTest` ·
+**Code:** `ShipTypeMatcher`, `P4kShipVariants` · **ADR:** [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md) ·
 **Issues:** #2897
 
 ## Game texts

@@ -8,9 +8,9 @@
 > [ADR-0220](../adr/0220-external-clients-see-only-anonymised-org-demand-and-the-location-list.md),
 > [ADR-0221](../adr/0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md),
 > [ADR-0257](../adr/0257-logisticians-read-and-write-their-units-shared-stock-through-the-exchange.md),
-> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md);
-> planned: [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
+> [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
+> [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md);
+> planned: [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
 
 # External client exchange
@@ -808,25 +808,18 @@ not resolve; a response carries at most 50 warnings. Per catalogue:
 | `BLUEPRINT` | the product key (normalized output name) | `blueprint.scwiki_key` | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's `name_key` | the web import's chain: exact, alias, pack-tag strip, fuzzy |
 | `ITEM` | the item id | `class_name` | Wiki or game-file UUID | UEX item id | `name_key` | exact, case-insensitive; duplicates `ambiguous` |
 | `MATERIAL` | the material id | `scwiki_key` | Wiki or game-file UUID | UEX commodity id | `name_key` | exact, canonical (`MaterialNameCanonicalizer`), external alias, fuzzy — visible materials only |
-| `SHIP_TYPE` | the ship type id | `class_name` | Wiki UUID | UEX vehicle id | `name_key` | the hangar import's `ShipTypeMatcher` |
+| `SHIP_TYPE` | the ship type id | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the hangar import's `ShipTypeMatcher` name stages; duplicates `ambiguous` |
 
-> [!note] Planned amendment — ship types match by GUID and class name before name (#2897;
-> [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md))
-> The hangar import's `ShipTypeMatcher` and the `SHIP_TYPE` row resolve in one order: the P4K GUID
-> (`ship_type.p4k_uuid`) and the class name first, then the UEX vehicle id and the curated class-name
-> alias of ADR-0307, then the name as the last step. A name that matches several ship types answers
-> `ambiguous` with at most ten `{bt, name}` candidates, never the first duplicate. A class name
-> resolves to the ship type that carries exactly that class name; when none does and the catalogue
-> record has `variantOf`, it resolves to the ship type of its group base. Variants are never merged.
-> The row becomes:
->
-> | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
-> | --- | --- | --- | --- | --- | --- | --- |
-> | `SHIP_TYPE` | the ship type id | `class_name`, else the `variantOf` group base | P4K GUID or Wiki UUID | UEX vehicle id, then the ADR-0307 alias | `name_key` | the normalised name; duplicates `ambiguous` |
->
-> Narrowing what `name` resolves is a behaviour change within `v1`: `docs/exchange/changelog.md`
-> records it after a check against `docs/exchange/versioning.md` (REQ-XCH-026, ADR-0219), and
-> `ExchangeResolveServiceTest` covers the precedence, duplicate names and a variant's class name.
+Ship types resolve through `ShipTypeMatcher`, which the hangar import shares (REQ-P4K-032,
+[ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md)):
+the P4K GUID (`ship_type.p4k_uuid`) or Wiki UUID and the class name first, then the UEX vehicle id
+and the curated class-name alias of ADR-0307, then the name as the last step. A step that finds
+several ship types answers `ambiguous` with at most ten `{bt, name}` candidates, never the first
+duplicate. A class name resolves to the ship type that carries exactly that class name; when none
+does and the catalogue lists the class name as a variant (`ship_type_p4k_variant`, written by the
+P4K import from `variantOf`), it resolves to the ship type of its group base. Variants are never
+merged. Narrowing what `name` resolves is a behaviour change within `v1` that changes no schema;
+`docs/exchange/changelog.md` records it (REQ-XCH-026, ADR-0219).
 
 > [!note] Planned amendment — a blueprint reference carries its produced item's GUID (#2893;
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
@@ -845,8 +838,8 @@ gateway reports unknown request fields as `UNKNOWN_FIELD` warnings (WP 3.2).
   through the exchange and through the web import (`ExchangeResolveCorpusTest`).
 
 **Enforced by:** `ExchangeResolveCorpusTest`, `ExchangeResolveServiceTest`,
-`ExchangeResolveControllerTest` · **Status:** backend built — WP 3.1 (#2083); served by the gateway
-with WP 3.2 (#2082)
+`ExchangeResolveControllerTest`, `ShipTypeMatcherTest` · **Status:** backend built — WP 3.1 (#2083);
+served by the gateway with WP 3.2 (#2082); ship-type order of ADR-0341 built (#3042)
 
 ### REQ-XCH-013 — Each resource has a snapshot and a database-sequenced change feed
 

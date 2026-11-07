@@ -26,7 +26,7 @@ What each field is matched against, per kind:
 | `BLUEPRINT` | the product key, the same value as a blueprint's feed `key` | the blueprint's Wiki key | the blueprint's Wiki or game-file UUID, or its output item's | the output item's UEX id | the output item's name key | the web import's chain: exact, alias, pack-tag strip, fuzzy |
 | `ITEM` | the item id | the class name | the Wiki or game-file UUID | the UEX item id | the name key | exact, ignoring case |
 | `MATERIAL` | the material id | the Wiki key | the Wiki or game-file UUID | the UEX commodity id | the name key | exact, canonical, alias, fuzzy |
-| `SHIP_TYPE` | the ship type id | the class name | the Wiki UUID | the UEX vehicle id | the name key | the hangar import's ship-type matching |
+| `SHIP_TYPE` | the ship type id | the class name, else the base of its variant group | the game-file GUID or the Wiki UUID | the UEX vehicle id, else its curated class-name alias | the name key | the hangar import's ship-type matching; a name several ship types share is `ambiguous` |
 
 A reference takes the first of its fields, in the order `bt`, `scRecord`, `scGuid`, `uexId`,
 `locKey`, that resolves to exactly one entry. If none does, a `name` that resolves to exactly one

@@ -107,8 +107,9 @@ public enum SyncEventType {
   SOURCE_RECORDS_RESTORED,
 
   /**
-   * Wiki item sync: the Wiki serves a value for an attribute the P4K leads that differs from the
-   * P4K's; the P4K value stays and {@code detail} names the column and both values (REQ-P4K-017).
+   * A value of a column the P4K catalogue leads disagrees with another source, or with the
+   * catalogue's own cross-check, and the stored value stays (REQ-P4K-017, REQ-P4K-031); {@code
+   * detail} holds {@code column=…;stored=…;source=…} entries.
    */
   P4K_DISAGREEMENT
 }

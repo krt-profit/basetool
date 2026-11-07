@@ -55,9 +55,11 @@ import org.springframework.util.StringUtils;
  *   <li>a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
  * </ol>
  *
- * <p>Descriptions are not written here, as UEX serves none. An empty response writes nothing;
- * orphans are marked via {@link ShipTypeRepository#markUexDeletedExcept(java.util.Collection,
- * Instant)} only for a complete pre-write source-id census with no rejected writes.
+ * <p>On a row with a P4K GUID the manufacturer, cargo, maximum crew and mass are written only while
+ * empty; a differing UEX value is reported as {@link SyncEventType#P4K_DISAGREEMENT} (REQ-P4K-031).
+ * Descriptions are not written here, as UEX serves none. An empty response writes nothing; orphans
+ * are marked via {@link ShipTypeRepository#markUexDeletedExcept(java.util.Collection, Instant)}
+ * only for a complete pre-write source-id census with no rejected writes.
  */
 @Slf4j
 @Service
@@ -221,14 +223,27 @@ public class UexVehicleService {
       shipType.setUexVehicleId(dto.id());
     }
 
+    P4kLedColumns led = new P4kLedColumns(shipType);
     Manufacturer manufacturer = resolveManufacturer(dto);
-    if (manufacturer != null
-        && (shipType.getSourceSystems() != GameItemSourceSystem.P4K
-            || shipType.getManufacturer() == null)) {
-      shipType.setManufacturer(manufacturer);
+    if (manufacturer != null) {
+      led.write(
+          "manufacturer_id",
+          shipType.getManufacturer(),
+          manufacturer,
+          shipType::setManufacturer,
+          Manufacturer::getName);
     }
 
-    applyVehicleFields(shipType, dto);
+    applyVehicleFields(shipType, dto, led);
+    if (!led.disagreements().isEmpty()) {
+      syncReportService.logUexEvent(
+          runId,
+          SyncEventType.P4K_DISAGREEMENT,
+          "ship_type",
+          shipType.getP4kUuid(),
+          dto.name(),
+          String.join(" | ", led.disagreements()));
+    }
 
     shipType.setUexSyncedAt(now);
     shipType.setUexDeletedAt(null);
@@ -249,19 +264,22 @@ public class UexVehicleService {
 
   /**
    * Copies every UEX-sourced column from the DTO onto the entity; a field missing upstream clears
-   * the local value to {@code null}.
+   * the local value to {@code null}. Cargo, maximum crew and mass go through the P4K precedence
+   * (REQ-P4K-031).
    *
    * @param shipType local row being updated
    * @param dto inbound DTO
+   * @param led the row's P4K-led column writes
    */
-  private static void applyVehicleFields(@NotNull ShipType shipType, @NotNull UexVehicleDto dto) {
+  private static void applyVehicleFields(
+      @NotNull ShipType shipType, @NotNull UexVehicleDto dto, @NotNull P4kLedColumns led) {
     shipType.setUexSlug(dto.slug());
     shipType.setNameFull(dto.nameFull());
-    shipType.setScu(dto.scu());
+    led.write("scu", shipType.getScu(), dto.scu(), shipType::setScu);
     UexValues.CrewRange crew = UexValues.parseCrew(dto.crew());
     shipType.setCrewMin(crew.min());
-    shipType.setCrewMax(crew.max());
-    shipType.setMass(dto.mass());
+    led.write("crew_max", shipType.getCrewMax(), crew.max(), shipType::setCrewMax);
+    led.write("mass", shipType.getMass(), dto.mass(), shipType::setMass);
     shipType.setWidth(dto.width());
     shipType.setHeight(dto.height());
     shipType.setLengthM(dto.length());
