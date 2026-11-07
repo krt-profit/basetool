@@ -43,11 +43,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app.exchange.store")
 public record ExchangeStoreProperties(
-    @Min(1024) @DefaultValue("1048576") long memberBytes,
-    @Min(1024) @DefaultValue("16777216") long clientBytes,
-    @Min(1024) @DefaultValue("67108864") long totalBytes,
+    @Min(1024) @DefaultValue("4194304") long memberBytes,
+    @Min(1024) @DefaultValue("67108864") long clientBytes,
+    @Min(1024) @DefaultValue("134217728") long totalBytes,
     @Min(1024) @DefaultValue("32768") int maxResultBytes,
-    @NotNull @DefaultValue("PT24H") Duration idempotencyTtl,
+    @NotNull @DefaultValue("PT1H") Duration idempotencyTtl,
     @NotNull @DefaultValue("PT2M") Duration lockTtl,
     @Min(1024) @DefaultValue("524288") long maxMassChangeBytes,
     @Min(1) @DefaultValue("10") int maxDraftsPerClientMember) {}

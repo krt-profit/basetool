@@ -162,7 +162,9 @@ public class ExchangeBudget {
   /**
    * The wait script: for every scope whose limit a charge would overflow, it walks the scope's
    * entries by expiry until enough bytes expire, and returns the longest such wait in milliseconds,
-   * {@code 0} when the charge fits, or {@code -1} when the entries it may read do not free enough.
+   * or {@code 0} when the charge fits. When the entries it may read do not free enough, the scope's
+   * latest expiry stands in, the moment the whole scope is empty; {@code -1} when an overflowing
+   * scope holds no entry.
    */
   private static final RedisScript<Long> WAIT_SCRIPT =
       new DefaultRedisScript<>(
@@ -190,7 +192,11 @@ public class ExchangeBudget {
                 end
               end
               if at == nil then
-                return -1
+                local last = redis.call('ZRANGE', KEYS[i], -1, -1, 'WITHSCORES')
+                if #last == 0 then
+                  return -1
+                end
+                at = tonumber(last[2])
               end
               if at - now > wait then
                 wait = at - now
@@ -206,12 +212,6 @@ public class ExchangeBudget {
 
   /** The shortest {@code Retry-After} of a budget refusal, in seconds. */
   static final long MIN_RETRY_AFTER_SECONDS = 1;
-
-  /**
-   * The longest {@code Retry-After} of a budget refusal, in seconds: a full budget can take a day
-   * to free, and a client asks again at least hourly.
-   */
-  static final long MAX_RETRY_AFTER_SECONDS = 3600;
 
   /** The {@code Retry-After} of a budget refusal whose wait cannot be read. */
   static final long FALLBACK_RETRY_AFTER_SECONDS = 60;
@@ -415,10 +415,10 @@ public class ExchangeBudget {
 
   /**
    * Returns how many seconds a value of the given size has to wait before it fits every budget of
-   * its client and member, from the expiries of the entries each overflowing scope holds; bounded
-   * to {@value #MIN_RETRY_AFTER_SECONDS}…{@value #MAX_RETRY_AFTER_SECONDS}, the upper bound also
-   * when the entries it reads do not free enough, and {@value #FALLBACK_RETRY_AFTER_SECONDS} when
-   * Redis cannot be read.
+   * its client and member, from the expiries of the entries each overflowing scope holds: never
+   * shorter than the time until the entries now held free enough, at least {@value
+   * #MIN_RETRY_AFTER_SECONDS}, and {@value #FALLBACK_RETRY_AFTER_SECONDS} when Redis cannot be read
+   * or an overflowing scope holds no entry.
    *
    * @param clientId the client
    * @param member the member
@@ -449,14 +449,10 @@ public class ExchangeBudget {
       log.warn("Exchange budget wait could not be read: {}", e.getClass().getSimpleName());
       return FALLBACK_RETRY_AFTER_SECONDS;
     }
-    if (waitMillis == null) {
+    if (waitMillis == null || waitMillis < 0) {
       return FALLBACK_RETRY_AFTER_SECONDS;
     }
-    if (waitMillis < 0) {
-      return MAX_RETRY_AFTER_SECONDS;
-    }
-    long seconds = (waitMillis + 999L) / 1000L;
-    return Math.clamp(seconds, MIN_RETRY_AFTER_SECONDS, MAX_RETRY_AFTER_SECONDS);
+    return Math.max(MIN_RETRY_AFTER_SECONDS, Math.ceilDiv(waitMillis, 1000L));
   }
 
   /**

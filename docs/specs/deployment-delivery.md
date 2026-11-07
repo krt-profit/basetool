@@ -1079,7 +1079,7 @@ firewall, and its kernel takes no routing advice from the network.
 
 > [!note] Planned — the production rollout (epic #2078, WP 2.1, #2092)
 > Built in the repository: both command lines below carry `--maxmemory 768mb` in a 1024M container
-> (ADR-0221), sized for the exchange's bounded 64 MB partition (REQ-XCH-023) plus headroom. Still
+> (ADR-0221), sized for the exchange's bounded 128 MiB partition (REQ-XCH-023) plus headroom. Still
 > to come: no release tag carries it yet. It reaches production **with** the release that carries the
 > exchange (1.13.0, planned 2026-09-28): its Quadlet unit restarts Redis in that release's restart
 > window, with the exchange still switched off. An application rollback to an earlier release
@@ -1315,7 +1315,7 @@ both removed 2026-09-22. CPU quotas total 17.0 vCPU on 8 physical (overcommit is
 | backend     | `cpus`                                      | 3.0                  | 2026-09-13: 19.2 s over 418 events in 13 h (46 ms stall)                                                          | burst ceiling                                                                              |
 | backend     | Hikari `maximum-pool-size` (application-prod.yml) | 100            | active peak 10, total 30, pending 0, timeouts 0, acquire max 0.444 s                                              | ~10× demand; kept for the ADR-0078 live-update burst; re-open only if pending stays 0 through one |
 | redis       | `memory`                                    | 1024M                | `rss` peak 28.5 MB (at the 512M limit then)                                                                       | above `maxmemory` for the RDB/AOF-rewrite fork's copy-on-write pages                       |
-| redis       | `maxmemory` (`noeviction`)                  | 768mb                | used peak 7.07 MB (1.8 %), 8191 keys, 0 evictions; linear projection to 5000 accounts ≈ 43 MB                      | the session projection plus the exchange's 64 MB budget, with room (ADR-0221); at the ceiling writes are refused (ADR-0079) |
+| redis       | `maxmemory` (`noeviction`)                  | 768mb                | used peak 7.07 MB (1.8 %), 8191 keys, 0 evictions; linear projection to 5000 accounts ≈ 43 MB                      | the session projection plus the exchange's 128 MiB budget, with room (ADR-0221); at the ceiling writes are refused (ADR-0079) |
 | redis       | `cpus`                                      | 1.0                  | 545 s throttled in 7 days (0.661 % average); use 0.015 cores at peak                                              | burst room for the single-threaded loop plus AOF/RDB threads                               |
 | frontend    | `memory`                                    | 1792M                | heap 529 committed (2026-07-25), 493 committed / 472 used (#937); overhead ~406–420 MB                            | at HotSpot's 1792 MB server-class line (ADR-0175); G1 is also set explicitly               |
 | frontend    | `MaxRAMPercentage` / `InitialRAMPercentage` | 50 / 35              | as above                                                                                                          | ceiling 896 MB = 1.7× committed; 896 + ~420 = 73 % of limit; initial 627 MB                |

@@ -809,7 +809,7 @@
       },
       "type": "timeseries",
       "title": "Exchange Redis byte budget in use",
-      "description": "The share of the exchange's 64 MiB Redis byte budget the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). ExchangeBudgetHigh fires above 0.8; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED.",
+      "description": "The share of the exchange's 128 MiB Redis byte budget the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). ExchangeBudgetHigh fires above 0.8; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -860,7 +860,7 @@
       },
       "type": "timeseries",
       "title": "Exchange Redis byte budget in use per client",
-      "description": "The share of each selected client's 16 MiB Redis byte budget its cached answers, quota counters and staged drafts hold (REQ-XCH-023). ExchangeClientBudgetHigh fires above 0.8; when it is full every write of that client's members is refused EXCHANGE_BUDGET_EXHAUSTED, while the total's gauge beside it can still read a quarter. Last measured on the client's latest write.",
+      "description": "The share of each selected client's 64 MiB Redis byte budget its cached answers, quota counters and staged drafts hold (REQ-XCH-023). ExchangeClientBudgetHigh fires above 0.8; when it is full every write of that client's members is refused EXCHANGE_BUDGET_EXHAUSTED, while the total's gauge beside it can still read a half. Last measured on the client's latest write.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

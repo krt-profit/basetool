@@ -69,7 +69,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "The exchange's Redis budget is more than 80 % used"
-              description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 64 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
+              description: "The exchange data the ingest gateway keeps in Redis (the idempotency cache) uses more than 80 % of its 128 MiB budget. Above 100 % every exchange write is refused with 503 EXCHANGE_BUDGET_EXHAUSTED, while sessions keep their room (REQ-XCH-023, ADR-0221). Check which client writes most (the per-client sets under ingest:xch:budget:c:*) and whether a client loops."
 
   - name: silent - a budget in normal use
     interval: 1m

@@ -3834,7 +3834,7 @@
       },
       "type": "timeseries",
       "title": "Exchange Redis byte budget in use",
-      "description": "The share of the exchange's total Redis byte budget (64 MiB) the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). Above 0.8 ExchangeBudgetHigh fires; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED before they reach the backend.",
+      "description": "The share of the exchange's total Redis byte budget (128 MiB) the gateway's cached answers, quota counters and locks hold (REQ-XCH-023). Above 0.8 ExchangeBudgetHigh fires; at 1.0 writes are refused EXCHANGE_BUDGET_EXHAUSTED before they reach the backend.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
