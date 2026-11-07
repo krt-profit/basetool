@@ -851,7 +851,9 @@ seeding created invisible turns visible when the run would create it.
   `quantityMultiplier`), minimum quality (clamped as REQ-DATA-023 says), craft time, modifiers
   (`propertyGuid`, linear `ranges`), category (`categoryGuid`), `defaultAvailable` and dismantle
   (`{processGuid, tierIndex}` with the exclusions of `craftingGlobal`).
-- **Naming:** a blueprint is named through its produced item, never through its own `name`.
+- **Naming:** a blueprint is named through its produced item, never through its own `name`: when
+  the produced item resolves, every APPLY sets `output_name` to the item's current name, also on a
+  recipe the SC Wiki named; an unresolved item leaves the stored name.
 - **Categories:** `blueprintCategories` become the blueprint categories, P4K GUID as identity; they
   do not nest. They carry the run stamp and are swept like the five kinds (REQ-P4K-011). A category
   whose `name` is `null` shows its `className`, as a resource group does (REQ-P4K-025).

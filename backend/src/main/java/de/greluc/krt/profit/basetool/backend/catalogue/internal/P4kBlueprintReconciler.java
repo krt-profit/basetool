@@ -208,7 +208,7 @@ public class P4kBlueprintReconciler {
         values.producedItem(),
         row::setOutputItem,
         GameItem::getName);
-    writer.fill(
+    writer.lead(
         "output_name",
         row.getOutputName(),
         values.producedItem() == null ? null : values.producedItem().getName(),

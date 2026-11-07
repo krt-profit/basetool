@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintModifierValu
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifier;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
@@ -64,6 +66,7 @@ class P4kBlueprintImportTest {
   @Autowired private P4kImportService service;
   @Autowired private P4kImportJobRepository jobRepository;
   @Autowired private BlueprintRepository blueprintRepository;
+  @Autowired private GameItemRepository gameItemRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private P4kReviewCaseRepository reviewCaseRepository;
   @Autowired private P4kReviewService reviewService;
@@ -195,6 +198,24 @@ class P4kBlueprintImportTest {
             reviewCaseRepository.findByKindAndGuidAndReason(
                 P4kKind.BLUEPRINT, ARMS, P4kReviewReason.GUID_CONFLICT))
         .isPresent();
+  }
+
+  @Test
+  void aMatchedRecipe_isNamedThroughItsProducedItem() {
+    ObjectNode tree = P4kTestCatalogues.tree();
+    GameItem produced = new GameItem();
+    produced.setName("Current arms name");
+    produced.setExternalUuid(
+        UUID.fromString(
+            P4kTestCatalogues.record(tree, "blueprints", ARMS).get("producedItemGuid").asString()));
+    gameItemRepository.save(produced);
+    Blueprint blueprint = wikiBlueprint();
+    blueprint.setOutputName("Stale Wiki arms name");
+
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+
+    assertThat(blueprint.getOutputItem()).isEqualTo(produced);
+    assertThat(blueprint.getOutputName()).isEqualTo(produced.getName());
   }
 
   @Test
