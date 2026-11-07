@@ -85,9 +85,7 @@ final class P4kRowWriter {
       @NotNull Function<V, String> label) {
     if (P4kFields.fillIfNull(current, incoming, setter, context.isApply())) {
       changed = true;
-      context
-          .getReport()
-          .changed(kind, record, column, null, incoming == null ? null : label.apply(incoming));
+      context.getReport().changed(kind, record, column, null, label.apply(incoming));
     }
   }
 
