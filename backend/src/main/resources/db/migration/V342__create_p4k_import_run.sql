@@ -108,6 +108,6 @@ CREATE INDEX idx_manufacturer_p4k_seen_run ON manufacturer (p4k_seen_run_id);
 CREATE INDEX idx_material_p4k_seen_run ON material (p4k_seen_run_id);
 CREATE INDEX idx_blueprint_p4k_seen_run ON blueprint (p4k_seen_run_id);
 
--- REQ-P4K-008 removes seed_new, and REQ-P4K-009 adds the per-run "create new items and ships" box.
+-- A job carries the per-run "create new items and ships" box (REQ-P4K-009) and no seeding flag.
 ALTER TABLE p4k_import_job DROP COLUMN seed_new;
 ALTER TABLE p4k_import_job ADD COLUMN create_items_and_ships BOOLEAN NOT NULL DEFAULT FALSE;

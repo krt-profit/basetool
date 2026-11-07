@@ -21,7 +21,7 @@ ALTER TABLE p4k_import_change ADD COLUMN still_live_elsewhere BOOLEAN NOT NULL D
 DROP INDEX idx_p4k_import_change_run;
 CREATE INDEX idx_p4k_import_change_run ON p4k_import_change (run_id, kind, change_type, position);
 
--- NULL on the runs recorded before the sweep existed.
+-- The sweep outcome of the kind; NULL when the run recorded none.
 ALTER TABLE p4k_import_run_kind ADD COLUMN sweep VARCHAR(24);
 ALTER TABLE p4k_import_run_kind
     ADD CONSTRAINT chk_p4k_import_run_kind_sweep

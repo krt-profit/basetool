@@ -1,5 +1,5 @@
 -- REQ-P4K-039, ADR-0345 decisions 8 and 10 (step A): the personal inventory references its place
--- through location.id instead of a UEX id plus a type discriminator.
+-- through location.id.
 
 ALTER TABLE location ADD COLUMN reference_only BOOLEAN NOT NULL DEFAULT FALSE;
 
