@@ -1003,6 +1003,22 @@ val testCatalogueAdminJs =
     outputs.upToDateWhen { false }
   }
 
+val testShipTypePickerJs =
+  tasks.register<NodeTask>("testShipTypePickerJs") {
+    group = "verification"
+    description =
+      "Regression tests for the hangar dialogs' ship-type picker: the manufacturer filter and mark."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/ship-type-picker.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/ship-type-picker.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/hangar/ship-type-picker.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testEslintBans =
   tasks.register<NodeTask>("testEslintBans") {
     group = "verification"
@@ -1137,6 +1153,7 @@ tasks.named("check").configure {
     testNotificationBellLabelJs,
     testBlueprintStatsJs,
     testCatalogueAdminJs,
+    testShipTypePickerJs,
     testEslintBans,
     testTypecheckRatchet,
     lintCss,

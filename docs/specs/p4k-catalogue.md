@@ -688,7 +688,8 @@ mapping ships empty until the Fan Kit PNGs are added, so every manufacturer show
 no logo field, which `ExchangeFieldRatchetTest` holds. The logo or badge shows on Ship-Data (the
 manufacturer list and the ship types), in the personal and squadron hangar lists, beside the
 ship-type pickers of both hangar dialogs (the mark of the chosen type's manufacturer, else of the
-chosen manufacturer), and in the inventory item views (the item list, the item groups and the item
+chosen manufacturer; opening a dialog clears its manufacturer filter, so the ship's own type is
+selected and marked), and in the inventory item views (the item list, the item groups and the item
 page), whose item references carry a `ManufacturerRefDto` with the GUID.
 
 **Enforced by:** `ManufacturerLogoMappingTest`, `ShipDataPageControllerMvcTest`,
