@@ -863,7 +863,9 @@ every option is required). Each option becomes a `blueprint_requirement_group` (
 `group_key`, its `count` the `required_count`, the modifiers of the option and of its nested
 selections the group's modifiers) with the resource and item lines under it, depth first, as its
 `blueprint_ingredient` lines; each optional cost becomes a group with `is_optional`, which the
-craftability leaves out. A line keeps its `ResourceType` or entity GUID (`p4k_resource_guid`,
+craftability leaves out. The craftability counts, of a choose-n recipe, the `n` option groups the
+member's inventory covers best (REQ-INV-048), and the recipe views show an `ADDITIVE` modifier's
+values as summands, not factors (REQ-INV-069). A line keeps its `ResourceType` or entity GUID (`p4k_resource_guid`,
 `p4k_item_guid`) and links the one commodity the join yields (REQ-P4K-024), else the material an
 admin assigned, and an item by its P4K GUID. A modifier keeps `property_guid`; its `property_key`
 is the `gameplayProperties` class name without `GPP_` in lower case (the SC Wiki's key), its label

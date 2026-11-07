@@ -8,3 +8,6 @@
 - **Prüfliste: Rohstoff zuordnen.** Eine Rezept-Ressource ohne eindeutigen Rohstoff bekommt in der
   Prüfliste einen Rohstoff zugeordnet; die Zuordnung bleibt bei jedem weiteren Import erhalten
   (REQ-P4K-024).
+- **Herstellbarkeit mit Wahlplätzen.** Muss man nur zwei von drei Plätzen füllen, zählt die
+  Herstellbarkeit die zwei Plätze, die das eigene Lager am besten abdeckt; additive Werte stehen im
+  Rezept als „+1“ statt als Prozentfaktor (REQ-INV-048, REQ-INV-069).

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Boundary DTO for one stat contribution a requirement group makes to the crafted item: the
@@ -37,6 +38,8 @@ import java.util.List;
  * @param modifierAtMinQuality stat multiplier at the minimum quality
  * @param modifierAtMaxQuality stat multiplier at the maximum quality
  * @param valueRangeType interpolation type between the endpoints (e.g. {@code "linear"})
+ * @param valueKind whether the values are factors or summands of the stat; {@code null} on a Wiki
+ *     modifier, which carries factors
  * @param segments per-segment ranges of a stepped modifier; empty for the linear form
  * @param effectiveQualityMin lowest quality the modifier covers: the smallest segment bound when
  *     stepped, else {@link #qualityMin}
@@ -52,6 +55,7 @@ public record BlueprintRequirementModifierDto(
     Double modifierAtMinQuality,
     Double modifierAtMaxQuality,
     String valueRangeType,
+    @Nullable BlueprintModifierValueKind valueKind,
     List<BlueprintRequirementModifierSegmentDto> segments,
     Double effectiveQualityMin,
     Double effectiveQualityMax) {}

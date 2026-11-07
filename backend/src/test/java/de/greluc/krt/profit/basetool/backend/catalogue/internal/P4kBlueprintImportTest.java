@@ -199,4 +199,32 @@ class P4kBlueprintImportTest {
 
     assertThat(line(blueprint, CASING_RESOURCE).getMaterial()).isEqualTo(assigned);
   }
+
+  @Test
+  void theLiveChoose2Of3Blueprint_importsAsTwoOfThreeOptionGroups() throws Exception {
+    ObjectNode tree = P4kTestCatalogues.tree();
+    try (java.io.InputStream in =
+        getClass().getResourceAsStream("/p4k/blueprint-choose-2-of-3-live.json")) {
+      ((ArrayNode) tree.get("blueprints"))
+          .add(tools.jackson.databind.json.JsonMapper.builder().build().readTree(in));
+    }
+    Blueprint legs = new Blueprint();
+    legs.setScwikiUuid(UUID.randomUUID());
+    legs.setScwikiKey("BP_CRAFT_thp_light_legs_01_01_01");
+    blueprintRepository.save(legs);
+
+    runs.apply(P4kTestCatalogues.bytes(tree), false);
+
+    assertThat(legs.getRequiredGroupCount()).isEqualTo(2);
+    assertThat(legs.getRequirementGroups())
+        .extracting(
+            BlueprintRequirementGroup::getGroupKey, BlueprintRequirementGroup::getRequiredCount)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("SEGMENT PANELING", 1),
+            org.assertj.core.groups.Tuple.tuple("INSULATIVE LINER", 1),
+            org.assertj.core.groups.Tuple.tuple("PANEL COVERING", 1));
+    assertThat(legs.getIngredients())
+        .extracting(BlueprintIngredient::getQuantityScu)
+        .containsExactly(0.03, 0.02, 0.03);
+  }
 }

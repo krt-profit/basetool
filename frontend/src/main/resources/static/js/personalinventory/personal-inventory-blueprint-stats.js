@@ -86,18 +86,67 @@ export function indexBaseStats(baseStats) {
 }
 
 /**
- * The stat value a quality factor yields: the base value times the factor, for every unit alike.
- * A negative base, such as a minimum temperature, moves away from zero when the factor grows.
+ * Whether a modifier's values are summands of the stat (a P4K `ADDITIVE` modifier) rather than
+ * factors.
+ *
+ * @param {{ valueKind?: string | null } | null | undefined} m the modifier
+ * @returns {boolean} true for an additive modifier
+ */
+export function isAdditive(m) {
+    return !!m && m.valueKind === 'ADDITIVE';
+}
+
+/**
+ * The stat value a modifier value yields: the base value times a factor, for every unit alike, or
+ * the base value plus a summand of an additive modifier. A negative base, such as a minimum
+ * temperature, moves away from zero when a factor grows.
  *
  * @param {number} base the base value
- * @param {number | null | undefined} factor the modifier factor at the chosen quality
- * @returns {number | null} the value, null when the factor is unknown
+ * @param {number | null | undefined} factor the modifier value at the chosen quality
+ * @param {boolean} [additive] whether the value is a summand
+ * @returns {number | null} the value, null when the modifier value is unknown
  */
-export function statValueAt(base, factor) {
+export function statValueAt(base, factor, additive) {
     if (factor == null || !Number.isFinite(factor)) {
         return null;
     }
-    return base * factor;
+    return additive ? base + factor : base * factor;
+}
+
+/**
+ * Formats a summand of an additive modifier as the signed change it makes: `1` is „+1", `-0.5`
+ * „-0,5" in German and `0` „±0", with the unit appended when one is given.
+ *
+ * @param {number} summand the modifier value
+ * @param {string} lang a BCP 47 language tag such as `de` or `en`
+ * @param {string} [unit] the unit label of the stat, or nothing
+ * @returns {string} the signed value
+ */
+export function formatSummand(summand, lang, unit) {
+    const sign = summand > 0 ? '+' : summand < 0 ? '-' : '±';
+    const amount = formatStatNumber(Math.abs(summand), lang);
+    return `${sign}${amount}${unit ? ` ${unit}` : ''}`;
+}
+
+/**
+ * Formats a modifier value as the change it makes: a factor as a signed percentage, a summand of an
+ * additive modifier as a signed value in the stat's unit when the base value names one (a
+ * percentage scaled to 0–100).
+ *
+ * @param {number} value the modifier value
+ * @param {boolean} additive whether the value is a summand
+ * @param {BpStatBase | null | undefined} base the stat's base value and unit, or nothing
+ * @param {string} lang a BCP 47 language tag such as `de` or `en`
+ * @param {Record<string, string>} unitLabels the unit label per unit name
+ * @returns {string} the text
+ */
+export function formatModifierChange(value, additive, base, lang, unitLabels) {
+    if (!additive) {
+        return formatFactorPercent(value, lang);
+    }
+    const scale = base && base.unit === 'PERCENT' ? 100 : 1;
+    const unit = base && base.unit && base.unit !== 'NONE' ? unitLabels[base.unit] || '' : '';
+    return formatSummand(value * scale, lang, unit);
 }
 
 /**
@@ -144,15 +193,16 @@ export function formatFactorPercent(factor, lang) {
  * the end; a percentage is shown scaled to 0–100.
  *
  * @param {BpStatBase} base the stat's base value and unit
- * @param {number | null | undefined} factor the modifier factor at the chosen quality
+ * @param {number | null | undefined} factor the modifier value at the chosen quality
  * @param {string} lang a BCP 47 language tag such as `de` or `en`
  * @param {Record<string, string>} unitLabels the unit label per unit name
- * @returns {string} the text, with „?" for the value when the factor is unknown
+ * @param {boolean} [additive] whether the modifier value is a summand
+ * @returns {string} the text, with „?" for the value when the modifier value is unknown
  */
-export function formatStatRange(base, factor, lang, unitLabels) {
+export function formatStatRange(base, factor, lang, unitLabels, additive) {
     const baseValue = base.baseValue ?? 0;
     const scale = base.unit === 'PERCENT' ? 100 : 1;
-    const at = statValueAt(baseValue, factor);
+    const at = statValueAt(baseValue, factor, additive);
     const from = formatStatNumber(baseValue * scale, lang);
     const to = at == null ? '?' : formatStatNumber(at * scale, lang);
     const unit = base.unit && base.unit !== 'NONE' ? unitLabels[base.unit] || '' : '';
