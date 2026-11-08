@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
@@ -55,6 +56,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -64,6 +68,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -1267,7 +1272,75 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     request.setRequiresOwnerApproval(true);
+    stubBookableDeposit(request, accountId, holderId, txId);
+
+    BankBookingRequestDto dto =
+        service.confirm(requestId, holderId, null, true, "Freigabe: greluc", 0L, null);
+
+    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED),
+            eq(accountId),
+            eq(txId),
+            eq(requester),
+            eq("owner approval confirmed for request " + requestId.toString().substring(0, 8)));
+  }
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = {"", "   "})
+  void confirm_attestedOverLimitWithoutApproverNote_isRefusedAndBooksNothing(String staffNote) {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId, account(accountId), BankBookingRequestType.DEPOSIT, UUID.randomUUID(), 0L);
+    request.setRequiresOwnerApproval(true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+
+    BankApproverNoteRequiredException ex =
+        assertThrows(
+            BankApproverNoteRequiredException.class,
+            () -> service.confirm(requestId, UUID.randomUUID(), null, true, staffNote, 0L, null));
+
+    assertThat(ex.code()).isEqualTo("BANK_APPROVER_NOTE_REQUIRED");
+    assertThat(ex.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+    verify(bankLedgerService, never()).bookDeposit(any());
+    assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
+  }
+
+  @Test
+  void confirm_overLimitWithRecordedApproval_booksWithoutApproverNote() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID holderId = UUID.randomUUID();
+    UUID txId = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId, account(accountId), BankBookingRequestType.DEPOSIT, UUID.randomUUID(), 0L);
+    request.setRequiresOwnerApproval(true);
+    request.setOwnerApprovalGranted(true);
+    stubBookableDeposit(request, accountId, holderId, txId);
+
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, null, 0L, null);
+
+    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
+    assertThat(dto.staffNote()).isNull();
+  }
+
+  /**
+   * Stubs every collaborator a deposit confirm reaches, so the confirm books {@code txId} onto
+   * {@code holderId}.
+   *
+   * @param request the pending request the repository returns under lock
+   * @param accountId the request's account, on which the caller may confirm
+   * @param holderId the holder the confirm records
+   * @param txId the transaction the ledger books
+   */
+  private void stubBookableDeposit(
+      BankBookingRequest request, UUID accountId, UUID holderId, UUID txId) {
+    when(requestRepository.findByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
     when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
         .thenReturn(true);
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
@@ -1280,17 +1353,6 @@ class BankBookingRequestServiceTest {
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
-
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, null, 0L, null);
-
-    assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
-    verify(bankAuditService)
-        .record(
-            eq(BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED),
-            eq(accountId),
-            eq(txId),
-            eq(requester),
-            any());
   }
 
   @Test

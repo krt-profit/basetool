@@ -21,8 +21,9 @@ import { toggleTransferOnlyControl } from '/js/bank/bank-controls.js';
 
 /**
  * Applies one request row's state to the reused bank confirmation modal on every open
- * (REQ-BANK-040, REQ-BANK-041): the owner-approval checkbox gating the submit button, the split
- * and justification notices, the transfer destination-holder row and the holder label.
+ * (REQ-BANK-040, REQ-BANK-041): the owner-approval checkbox gating the submit button, the
+ * approver note an attested confirm requires, the split and justification notices, the transfer
+ * destination-holder row and the holder label.
  *
  * @param {HTMLElement} trigger the clicked confirm button carrying the request's data-field-*
  * @param {HTMLElement} modal the confirm modal overlay
@@ -55,6 +56,7 @@ export function applyConfirmModalState(trigger, modal) {
     if (submit) {
         submit.disabled = requiresApproval && !(checkbox && checkbox.checked);
     }
+    applyApproverNoteState(form, requiresApproval && !alreadyGranted);
 
     const splitNotice = /** @type {HTMLElement | null} */ (
         form.querySelector('[data-split-confirm]')
@@ -97,6 +99,28 @@ export function applyConfirmModalState(trigger, modal) {
         if (text) {
             holderLabel.textContent = text;
         }
+    }
+}
+
+/**
+ * Makes the staff note mandatory, with its "Wer hat freigegeben?" hint shown, on an attested
+ * over-limit confirm, and optional otherwise (REQ-BANK-041, ADR-0353).
+ *
+ * @param {HTMLFormElement} form the confirm form
+ * @param {boolean} attested whether the request needs approval and none was recorded in the app
+ */
+function applyApproverNoteState(form, attested) {
+    const note = /** @type {HTMLInputElement | null} */ (
+        form.querySelector('[data-approver-note]')
+    );
+    const hint = /** @type {HTMLElement | null} */ (
+        form.querySelector('[data-approver-note-hint]')
+    );
+    if (note) {
+        note.required = attested;
+    }
+    if (hint) {
+        hint.hidden = !attested;
     }
 }
 

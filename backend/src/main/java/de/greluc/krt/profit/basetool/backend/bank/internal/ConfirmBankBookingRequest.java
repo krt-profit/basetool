@@ -31,8 +31,9 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
  * @param ownerApprovalConfirmed the attestation that the responsible holder approved; required for
  *     a request flagged {@code requiresOwnerApproval} (REQ-BANK-041), ignored otherwise
- * @param staffNote the confirming employee's optional internal note (REQ-BANK-054), copied onto the
- *     booked transaction
+ * @param staffNote the confirming employee's internal note (REQ-BANK-054), copied onto the booked
+ *     transaction; optional, except that it must name the approver when a request flagged {@code
+ *     requiresOwnerApproval} carries no in-app approval (REQ-BANK-041)
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409
  */
 public record ConfirmBankBookingRequest(
