@@ -411,6 +411,8 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
   and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-units`
   API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
   single `GET /api/v1/org-units`. Leadership seats are appointed under Organisation → Leitung (REQ-ROLE-004).
+- [x] Setting a Staffel's parent bumps its optimistic-lock version and evicts the cached squadron list,
+  so the squadron admin page never echoes a superseded version and a later edit does not 409.
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
@@ -419,7 +421,8 @@ stub so every pre-#692 scenario stays byte-identical (the degrade-to-flat proof)
 `ArchitectureTest#cascadeServiceMustNotConsultTheSecurityContext`; the admin management UI by
 `AdminOrgStructurePageControllerMvcTest` (ADMIN gate + AJAX create/set-parent relay) and the
 `org-units` listing by `OrgHierarchyControllerSecurityTest` +
-`OrgHierarchyServiceTest#listAllOrgUnits_delegatesToRepository` · **ADR:**
+`OrgHierarchyServiceTest#listAllOrgUnits_delegatesToRepository`; the squadron-cache eviction by
+`OrgHierarchySquadronCacheTest` · **ADR:**
 [ADR-0025](../adr/0025-org-hierarchy-data-model.md) · **Issues:** #692, #694.
 
 ### REQ-ORG-015 — Cascading oversight without admin rights, via one descent helper
