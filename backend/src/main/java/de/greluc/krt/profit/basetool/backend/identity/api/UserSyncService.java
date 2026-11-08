@@ -70,9 +70,8 @@ public class UserSyncService {
    */
   public int syncFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");
-    Set<String> roleNames = userReconciliationService.getMappableRoleNames();
     Set<UUID> knownDiscordLinkedIds = userReconciliationService.getKnownDiscordLinkedUserIds();
-    List<KeycloakUserDto> users = keycloakService.fetchUsers(roleNames, knownDiscordLinkedIds);
+    List<KeycloakUserDto> users = keycloakService.fetchUsers(knownDiscordLinkedIds);
     if (users.isEmpty()) {
       log.info("No users fetched from Keycloak.");
       return 0;
@@ -104,7 +103,6 @@ public class UserSyncService {
       log.info(
           "User sync flagged {} local users as no longer present in Keycloak.", flaggedMissing);
     }
-    userReconciliationService.logRoleSyncSummary();
     log.info("User sync finished. Synced {} users.", count);
 
     try {

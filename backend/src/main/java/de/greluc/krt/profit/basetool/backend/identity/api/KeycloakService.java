@@ -22,12 +22,9 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -53,9 +50,10 @@ import org.springframework.web.client.RestClientResponseException;
  * account-linking writes {@link #linkDiscordIdentity}, {@link #unlinkDiscordIdentity} and {@link
  * #deleteUser} (REQ-SEC-026), which need the {@code manage-users} role.
  *
- * <p>Authenticates with {@code client_credentials}, pages all users and resolves role membership
- * per role rather than per user; the Discord link is read only for users without a local one. On
- * failure the sync returns an empty list, which the scheduler treats as "skip this run".
+ * <p>Authenticates with {@code client_credentials} and pages all users; roles are not read, since
+ * they are held in the Basetool (REQ-SEC-088). The Discord link is read only for users without a
+ * local one. On failure the sync returns an empty list, which the scheduler treats as "skip this
+ * run".
  */
 @Service
 @Slf4j
@@ -144,20 +142,16 @@ public class KeycloakService {
   }
 
   /**
-   * Fetches all realm users with their app-relevant realm roles and, for users not yet linked
-   * locally, their Discord link.
+   * Fetches all realm users and, for users not yet linked locally, their Discord link.
    *
    * <p>Returns an empty list when sync is disabled, the admin URL is unset, or any error occurs;
    * the scheduler then skips the run instead of marking users missing.
    *
-   * @param appRoleNames the locally mapped role names, matched case-insensitively against the
-   *     realm; never {@code null}
    * @param knownDiscordLinkedIds users whose Discord link need not be re-read; never {@code null}
-   * @return the users with their role names and Discord link where read, or empty on failure
+   * @return the users with their Discord link where read, or empty on failure
    */
   @NotNull
-  public List<KeycloakUserDto> fetchUsers(
-      Collection<String> appRoleNames, Set<UUID> knownDiscordLinkedIds) {
+  public List<KeycloakUserDto> fetchUsers(@NotNull Set<UUID> knownDiscordLinkedIds) {
     if (!properties.enabled() || properties.adminUrl() == null) {
       log.debug("Keycloak sync disabled or admin URL missing");
       return Collections.emptyList();
@@ -166,18 +160,15 @@ public class KeycloakService {
     try {
       String token = getAccessToken();
       List<KeycloakUserDto> roster = fetchAllUsers(token);
-      Map<UUID, Set<String>> rolesByUser = fetchRoleMemberships(appRoleNames, token);
 
       List<KeycloakUserDto> result = new ArrayList<>(roster.size());
       for (KeycloakUserDto u : roster) {
-        Set<String> roles = rolesByUser.getOrDefault(u.id(), Collections.emptySet());
         String discordUserId =
             (u.id() != null && !knownDiscordLinkedIds.contains(u.id()))
                 ? fetchDiscordFederatedId(u.id(), token)
                 : null;
         result.add(
-            new KeycloakUserDto(
-                u.id(), u.username(), u.email(), u.enabled(), roles, discordUserId));
+            new KeycloakUserDto(u.id(), u.username(), u.email(), u.enabled(), discordUserId));
       }
       return List.copyOf(result);
 
@@ -189,9 +180,8 @@ public class KeycloakService {
   }
 
   /**
-   * Logs a swallowed {@link #fetchUsers(Collection, Set)} failure, naming the missing {@code
-   * view-realm} / {@code view-users} grant when the Admin API answered {@code 401} or {@code 403}
-   * (REQ-SEC-043).
+   * Logs a swallowed {@link #fetchUsers(Set)} failure, naming the missing {@code view-users} grant
+   * when the Admin API answered {@code 401} or {@code 403} (REQ-SEC-043).
    *
    * @param e the exception caught while fetching users; never {@code null}
    */
@@ -200,9 +190,8 @@ public class KeycloakService {
         && (rcre.getStatusCode().value() == 401 || rcre.getStatusCode().value() == 403)) {
       log.error(
           "Keycloak Admin API rejected the user sync with {}: the '{}' service account is likely "
-              + "missing the 'view-realm' realm-management role. Since the role-indexed sync lists "
-              + "realm roles and reads their members, view-realm is needed beyond view-users. "
-              + "Grant it in Keycloak; the run is skipped until then.",
+              + "missing the 'view-users' realm-management role. Grant it in Keycloak; the run is "
+              + "skipped until then.",
           rcre.getStatusCode(),
           properties.clientId(),
           e);
@@ -248,252 +237,6 @@ public class KeycloakService {
       first += pageSize;
     }
     return all;
-  }
-
-  /**
-   * Builds the {@code userId -> realm role names} index by listing the members of each app-relevant
-   * realm role once, plus the roles granted through the default-role composite via {@link
-   * #fetchDefaultRoleGrants(String, Map)} (REQ-SEC-053).
-   *
-   * <p>Local role names are matched case-insensitively against {@link #fetchRealmRoleNames(String)}
-   * and queried in Keycloak's casing; local-only roles simply find no members.
-   *
-   * @param appRoleNames the realm role names to index; never {@code null}
-   * @param token a valid admin access token
-   * @return a mutable map of user id to held role names in local casing; users with none are absent
-   * @throws IllegalStateException when the realm matches none of the app's roles, so the run is
-   *     skipped
-   */
-  @NotNull
-  private Map<UUID, Set<String>> fetchRoleMemberships(
-      Collection<String> appRoleNames, String token) {
-    Map<UUID, Set<String>> byUser = new HashMap<>();
-    Map<String, String> canonicalByLower = new HashMap<>();
-    for (String appRoleName : appRoleNames) {
-      if (appRoleName != null && !appRoleName.isBlank()) {
-        canonicalByLower.put(appRoleName.toLowerCase(Locale.ROOT), appRoleName);
-      }
-    }
-    if (canonicalByLower.isEmpty()) {
-      return byUser;
-    }
-    List<String> realmRoleNames = fetchRealmRoleNames(token);
-    int matched = 0;
-    for (String keycloakRoleName : realmRoleNames) {
-      String canonical = canonicalByLower.get(keycloakRoleName.toLowerCase(Locale.ROOT));
-      if (canonical != null) {
-        matched++;
-        accumulateRoleMembers(keycloakRoleName, canonical, token, byUser);
-      }
-    }
-
-    accumulateRoleMembers(
-        defaultRoleName(), fetchDefaultRoleGrants(token, canonicalByLower), token, byUser);
-    log.info(
-        "Keycloak role index: {} of {} mappable app roles matched a realm role ({} realm roles"
-            + " listed), {} users carry at least one.",
-        matched,
-        canonicalByLower.size(),
-        realmRoleNames.size(),
-        byUser.size());
-    if (matched == 0) {
-      throw new IllegalStateException(
-          "Keycloak role index: none of the "
-              + canonicalByLower.size()
-              + " mappable app roles matched a realm role; skipping the run rather than stripping"
-              + " every account (REQ-SEC-053).");
-    }
-    return byUser;
-  }
-
-  /**
-   * Lists all realm role names via the paged {@code GET /admin/realms/{realm}/roles} endpoint. Not
-   * best-effort: a failure propagates so the whole sync run is skipped.
-   *
-   * @param token a valid admin access token
-   * @return every realm role name; never {@code null}, possibly empty
-   */
-  @NotNull
-  private List<String> fetchRealmRoleNames(String token) {
-    int pageSize = properties.pageSize();
-    List<String> names = new ArrayList<>();
-    int first = 0;
-    while (true) {
-      final int currentFirst = first;
-      List<Map<String, Object>> page =
-          adminClient
-              .get()
-              .uri(uriBuilder ->
-                  uriBuilder
-                      .path("/admin/realms/{realm}/roles")
-                      .queryParam("first", currentFirst)
-                      .queryParam("max", pageSize)
-                      .build(properties.realm()))
-              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-              .retrieve()
-              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-
-      if (page == null || page.isEmpty()) {
-        break;
-      }
-      for (Map<String, Object> role : page) {
-        if (role.get("name") instanceof String name && !name.isBlank()) {
-          names.add(name);
-        }
-      }
-      if (page.size() < pageSize) {
-        break;
-      }
-      first += pageSize;
-    }
-    return names;
-  }
-
-  /**
-   * Returns the name of the realm's default-role composite, derived by Keycloak's {@code
-   * default-roles-<realm>} convention; a renamed default role simply contributes no members.
-   *
-   * @return the default role's name for the configured realm; never {@code null}
-   */
-  @NotNull
-  private String defaultRoleName() {
-    return "default-roles-" + properties.realm().toLowerCase(Locale.ROOT);
-  }
-
-  /**
-   * Returns which of the app's mappable roles the realm's default-role composite grants, read from
-   * {@code GET /roles/{defaultRole}/composites/realm}. A {@code 404} (no composite) yields an empty
-   * set; any other failure propagates.
-   *
-   * @param token a valid admin access token
-   * @param canonicalByLower the app's mappable role names, keyed by lower-cased form
-   * @return the granted app role names in local casing; never {@code null}
-   */
-  @NotNull
-  private Set<String> fetchDefaultRoleGrants(String token, Map<String, String> canonicalByLower) {
-    List<Map<String, Object>> composites;
-    try {
-      composites =
-          adminClient
-              .get()
-              .uri(uriBuilder ->
-                  uriBuilder
-                      .path("/admin/realms/{realm}/roles/{roleName}/composites/realm")
-                      .build(properties.realm(), defaultRoleName()))
-              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-              .retrieve()
-              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-    } catch (HttpClientErrorException.NotFound notFound) {
-      log.debug("Realm has no default-role composite '{}'; nothing to fold in.", defaultRoleName());
-      return Set.of();
-    }
-    if (composites == null || composites.isEmpty()) {
-      return Set.of();
-    }
-    Set<String> granted = new HashSet<>();
-    for (Map<String, Object> composite : composites) {
-      if (composite.get("name") instanceof String name && !name.isBlank()) {
-        String canonical = canonicalByLower.get(name.toLowerCase(Locale.ROOT));
-        if (canonical != null) {
-          granted.add(canonical);
-        }
-      }
-    }
-    if (!granted.isEmpty()) {
-      log.info(
-          "Keycloak role index: the default-role composite '{}' grants {} mappable app role(s): {}",
-          defaultRoleName(),
-          granted.size(),
-          granted);
-    }
-    return granted;
-  }
-
-  /**
-   * Pages through {@code GET /roles/{queryRoleName}/users} and records {@code storedRoleName} for
-   * every member. A {@code 404} (role vanished) contributes nothing; every other failure propagates
-   * so the run is skipped rather than persisting a degraded role set.
-   *
-   * @param queryRoleName the role name as Keycloak spells it
-   * @param storedRoleName the local canonical name to record
-   * @param token a valid admin access token
-   * @param byUser the accumulator (user id &#8594; role names)
-   */
-  private void accumulateRoleMembers(
-      String queryRoleName, String storedRoleName, String token, Map<UUID, Set<String>> byUser) {
-    accumulateRoleMembers(queryRoleName, List.of(storedRoleName), token, byUser);
-  }
-
-  /**
-   * Credits several stored role names from one walk of a role's members, used for the default-role
-   * composite whose membership is every account.
-   *
-   * @param queryRoleName the realm role to read members of, in Keycloak's own casing
-   * @param storedRoleNames the local catalogue names to credit each member with
-   * @param token a valid admin access token
-   * @param byUser the accumulator, keyed by Keycloak user id
-   */
-  private void accumulateRoleMembers(
-      String queryRoleName,
-      Collection<String> storedRoleNames,
-      String token,
-      Map<UUID, Set<String>> byUser) {
-    if (storedRoleNames.isEmpty()) {
-      return;
-    }
-    int pageSize = properties.pageSize();
-    int first = 0;
-    while (true) {
-      final int currentFirst = first;
-      List<Map<String, Object>> page;
-      try {
-        page =
-            adminClient
-                .get()
-                .uri(uriBuilder ->
-                    uriBuilder
-                        .path("/admin/realms/{realm}/roles/{roleName}/users")
-                        .queryParam("first", currentFirst)
-                        .queryParam("max", pageSize)
-                        .build(properties.realm(), queryRoleName))
-                .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
-                .retrieve()
-                .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-      } catch (HttpClientErrorException.NotFound notFound) {
-        log.debug("Realm role '{}' not found while reading members; skipping.", queryRoleName);
-        return;
-      }
-      if (page == null || page.isEmpty()) {
-        break;
-      }
-      for (Map<String, Object> member : page) {
-        if (member.get("id") instanceof String idText) {
-          UUID memberId = parseUuidOrNull(idText);
-          if (memberId != null) {
-            byUser.computeIfAbsent(memberId, _ -> new HashSet<>()).addAll(storedRoleNames);
-          }
-        }
-      }
-      if (page.size() < pageSize) {
-        break;
-      }
-      first += pageSize;
-    }
-  }
-
-  /**
-   * Parses a UUID, tolerating malformed text.
-   *
-   * @param text the candidate id
-   * @return the parsed id, or {@code null} when {@code text} is not a UUID
-   */
-  @Nullable
-  private static UUID parseUuidOrNull(@NotNull String text) {
-    try {
-      return UUID.fromString(text);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
   }
 
   /**

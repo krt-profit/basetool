@@ -260,7 +260,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /**
    * Starts the ephemeral stack once: stages realm and keystore, pulls and starts compose, registers
-   * teardown, verifies the served build, and seeds the catalog data every picker needs.
+   * teardown, verifies the served build, stores the accounts' roles and seeds the catalog data
+   * every picker needs.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -281,6 +282,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     ServedBuildCheck.assertServesThisCheckout(
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     BackendSeeder seeder = new BackendSeeder();
+    E2eUserRoles.seed(seeder);
     seeder.seedCatalog();
     seeder.seedSql("/supply-e2e-seed.sql");
     seeder.seedSql("/purchasing-e2e-seed.sql");

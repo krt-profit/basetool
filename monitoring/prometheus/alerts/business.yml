@@ -498,7 +498,7 @@ groups:
           severity: warning
         annotations:
           summary: "Several accounts hold no role ({{ $labels.application }})"
-          description: "{{ $labels.application }} refused {{ $value }} distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a realm-side role rename, a hand-edit, or tokens arriving from the wrong realm; check the Keycloak role index line in the sync summary."
+          description: "{{ $labels.application }} refused {{ $value }} distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a mass withdrawal or lost role rows; check the role audit trail and basetool_user_role_changes_total (REQ-SEC-088)."
 
       - alert: RateLimitRejectionSpike
         expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1
@@ -551,11 +551,11 @@ groups:
         annotations:
           summary: "A new account was activated as admin without an approval"
           description: >-
-            A brand-new account arrived already holding the Keycloak ADMIN realm role and was
-            activated without passing the approval queue (REQ-SEC-017 bootstrap carve-out). Expected
-            for the first admin and for a deliberate re-provisioning; otherwise confirm who was
-            granted the ADMIN realm role in Keycloak, and check Administration -> Protokoll (Rollen
-            tab) for the account's arrival.
+            A brand-new account earned Admin at its first login as a bootstrap subject of
+            APP_BOOTSTRAP_ADMIN_SUBS and was activated without passing the approval queue
+            (REQ-SEC-017, REQ-SEC-088). Expected for the first admin and for a deliberate emergency
+            access; otherwise remove the subject from APP_BOOTSTRAP_ADMIN_SUBS and check
+            Administration -> Protokoll (Rollen tab) for the bootstrap grant.
 
       - alert: AccountErasureKeycloakDeleteFailed
         expr: sum(increase(basetool_account_deletion_keycloak_failures_total[24h])) > 0

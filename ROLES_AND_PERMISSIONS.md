@@ -69,7 +69,7 @@ Everything else requires authentication **and** a method gate. Both backend read
 so a `HEAD` on either answers `401`.
 
 **And there is nothing below member.** An approved account whose assembled authority set is empty —
-no realm role the application knows and no Logistician / Mission-Manager / leadership flag on any
+no stored application role and no Logistician / Mission-Manager / leadership flag on any
 membership — is refused with `403 NO_ROLE` (REQ-SEC-053); the `GUEST` role was deleted by
 migration `V239`. A person without an account can still take part in an Einsatz — the leadership
 records them as an **external participant** — but they do not hold an account and they cannot sign
@@ -219,12 +219,10 @@ just joined.
 
 ## 2. Roles & base permissions
 
-The four application roles are the Keycloak realm roles `Admin`, `KRT Member`,
-`Bank Employee` and `Bank Management` (reference export:
-[`docs/keycloak/realm-config.reference.json`](docs/keycloak/realm-config.reference.json)). Each login
-syncs the token's realm roles by name onto the `app_user` row; the authority is the role name
-upper-cased with spaces turned into underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's
-seeded permissions from
+The four application roles are `Admin`, `KRT Member`, `Bank Employee` and `Bank Management`.
+They are held in the Basetool's `user_roles` alone; Keycloak holds none of them and no token carries
+them (REQ-SEC-088, ADR-0355). The authority is the role name upper-cased with spaces turned into
+underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's seeded permissions from
 [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/internal/DataInitializer.java).
 The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
@@ -235,8 +233,9 @@ every role on the member page (tab *Rollen*), the bank management assigns and wi
 counter (`roles_version`), separate from the user record's version. The last active admin keeps
 `Admin` (`409 LAST_ADMIN`), withdrawing `KRT Member` is a departure, and the subjects in
 `APP_BOOTSTRAP_ADMIN_SUBS` receive `Admin` at login while no active admin exists. Every change is
-audited (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`) and announced to the member. Until the
-cutover ships with it, a login still writes the token's roles.
+audited (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`) and announced to the member. Approving a
+registration grants `KRT Member`. A change applies in the backend on the member's next request and
+in the web UI within a minute; neither the login nor the roster sync writes a role.
 
 ### Role hierarchy (backend + frontend identical)
 
@@ -570,7 +569,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 
 **The `Anonymous` column is gone, not empty.** Every row of it was a `❌` except two, and those two
 — reading a non-internal mission and signing up to it — are what ADR-0159 closed. There is no
-caller below `Member` on this surface: an account whose realm roles map to nothing is refused with
+caller below `Member` on this surface: an account holding no role is refused with
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
@@ -1148,17 +1147,14 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 
 ## 5. Implementation specifics
 
-1. **Keycloak sync, no fallback:** every login runs `UserReconciliationService.syncUser(Jwt)`,
-   which maps the token's `realm_access.roles` by name onto the local role catalogue (unknown names
-   are dropped) and persists them; `CustomJwtGrantedAuthoritiesConverter.assembleFor` then builds the
-   authorities from those roles, their permissions and the membership flags/ranks, cached per token
-   for the configured TTL (REQ-SEC-056). A client configured as partial-scope — none since the
-   mobile app's client was deleted — would be authorised with the narrower role list its token
-   presents and never rewrite the stored set (REQ-SEC-036, superseded). If the
-   sync keeps failing on optimistic locking, the authentication is **denied** — there is no
-   fallback to raw token role names.
-2. **No matching role:** If the token carries no role the application knows and no membership
-   mints one, the account is refused with `403 NO_ROLE` (REQ-SEC-053). It used to be
+1. **Database roles, no fallback:** every login runs `UserReconciliationService.syncUser(Jwt)`,
+   which keeps the account's names, e-mail and Discord link and writes no role;
+   `CustomJwtGrantedAuthoritiesConverter.assembleFor` then builds the authorities from the roles in
+   `user_roles`, their permissions and the membership flags/ranks, cached per session for the
+   configured TTL (REQ-SEC-056) and evicted for a member whose roles change (REQ-SEC-088). The
+   token's `realm_access` claim is ignored. If the sync keeps failing on optimistic locking, the
+   authentication is **denied**.
+2. **No role:** If the account holds no stored role and no membership mints one, the account is refused with `403 NO_ROLE` (REQ-SEC-053). It used to be
    given the authority-less **Guest** role, which `V239` deleted.
 3. **Ranks:** An admin sets the numeric member rank (1–20) freely: any account may hold any rank,
    independent of its roles and leadership seats (REQ-ROLE-007, ADR-0348). The rank grants no

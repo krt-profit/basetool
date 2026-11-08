@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,15 +27,11 @@ import org.jetbrains.annotations.Nullable;
  * Keycloak user payload for the scheduled admin-API user sync.
  *
  * <p>{@code id}, {@code username}, {@code email} and {@code enabled} come from the Admin {@code GET
- * /users} response; {@code roles} is joined in per realm role. {@code discordUserId} is enriched
- * only for users the sync back-fills, so {@code null} means "leave the existing link alone" in
- * {@code UserReconciliationService#syncUser(KeycloakUserDto)} (REQ-DATA-006).
+ * /users} response; roles are held in the Basetool and not read (REQ-SEC-088). {@code
+ * discordUserId} is enriched only for users the sync back-fills, so {@code null} means "leave the
+ * existing link alone" in {@code UserReconciliationService#syncUser(KeycloakUserDto)}
+ * (REQ-DATA-006).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record KeycloakUserDto(
-    UUID id,
-    String username,
-    String email,
-    Boolean enabled,
-    Set<String> roles,
-    @Nullable String discordUserId) {}
+    UUID id, String username, String email, Boolean enabled, @Nullable String discordUserId) {}

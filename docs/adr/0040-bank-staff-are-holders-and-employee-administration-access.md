@@ -1,6 +1,8 @@
 # ADR-0040 — Bank staff are holders: auto-registration from bank roles + employee bank-administration access
 
-- **Status:** Accepted (epic #556 follow-up, owner-approved 2026-06-22)
+- **Status:** Accepted (epic #556 follow-up, owner-approved 2026-06-22); superseded in part by
+  [ADR-0355](0355-roles-are-held-in-the-basetool-database.md): the bank roles are assigned in the Basetool, not synced from Keycloak realm
+  roles; the holder reconcile reads `user_roles` on the sync schedule as before
 - **Date:** 2026-06-22
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec REQ-BANK-001/-002/-009/-029/-030/-031 (`docs/specs/bank.md`) ·

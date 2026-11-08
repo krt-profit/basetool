@@ -7,6 +7,8 @@
   they remain, the one exception to decision 4 (*Amendment 7*, #2674); converging the remaining
   shape is unchanged. Amended again by [ADR-0300](0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)
   (2026-10-31): the provisioner also deletes the retired `Officer` realm role (*Amendment 8*).
+  Amended by [ADR-0355](0355-roles-are-held-in-the-basetool-database.md): it deletes the four application realm roles and withholds the
+  `roles` scope from the web login (*Amendment 9*).
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (requested 2026-09-22: "the testing host must mirror production")
 - **Related:** [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) (the DPoP policy and its
@@ -289,3 +291,18 @@ constant, and every other role only the target realm has is still left alone. Re
 `REQ-SEC-004`; pinned by case 4b of `scripts/provision-keycloak-realm.test.sh`. Production gets the
 deletion with a separate owner-approved dry run and apply, after the release that carries the
 migration.
+
+## Amendment 9 — the application realm roles leave the production shape
+
+- **Deciders:** @greluc (ADR-0355, #3151)
+
+The four application roles are held in the Basetool's `user_roles` (ADR-0355), so `Admin`,
+`KRT Member`, `Bank Employee` and `Bank Management` leave the production shape. The provisioner no
+longer creates them; `plan_retired_application_roles` deletes each one wherever it remains (by id,
+`roles-by-id/<id>`), and Keycloak drops its user mappings and KRT Member's place in
+`default-roles-<realm>` with it. `basetool-frontend` withholds the `roles` client scope, so the web
+login's token carries no `realm_access` claim. Like *Amendment 8* these are named constants, not a
+permission to delete. Pinned by case 4c of `scripts/provision-keycloak-realm.test.sh`. Production
+runs it after the final roster sync (`docs/deployment.md`, *Roles in the Basetool*); the rollback
+recreates the roles with the previous release's provisioner and maps them back with
+`scripts/restore-keycloak-realm-roles.py`.

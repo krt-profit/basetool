@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.kernel;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Central constants for the bare role codes, identical to {@code Role.code} and to the Keycloak
- * realm role names without the {@code ROLE_} prefix; changing a value is a breaking change.
+ * Central constants for the bare role codes, identical to {@code Role.code} and to the Spring
+ * authority names without the {@code ROLE_} prefix; changing a value is a breaking change.
  *
  * <p>{@link #authority(String)} derives the prefixed Spring-authority form. {@code LOGISTICIAN} and
  * {@code MISSION_MANAGER} are not seeded roles but derived from user flags. Lives in the

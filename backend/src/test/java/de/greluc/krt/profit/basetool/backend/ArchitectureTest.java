@@ -207,7 +207,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.BasetoolErrorControlle
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
-import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.platform.api.RequestBodyLimitProperties;
@@ -445,7 +444,6 @@ class ArchitectureTest {
           de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock.class,
           OrgUnitContextualAuthority.class,
           OrgUnitLabels.class,
-          PartialRoleScopeProperties.class,
           Permissions.class,
           ProblemResponseFactory.class,
           Quality.class,

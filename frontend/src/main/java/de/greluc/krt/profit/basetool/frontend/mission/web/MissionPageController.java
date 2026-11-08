@@ -137,7 +137,7 @@ public class MissionPageController {
 
   /**
    * Resolves the "registered member or above" predicate against the request's token authorities,
-   * which carry the Keycloak realm roles (REQ-SEC-013).
+   * which carry the roles the backend reports (REQ-SEC-013, REQ-SEC-088).
    */
   private final FrontendAuthHelperService authHelperService;
 

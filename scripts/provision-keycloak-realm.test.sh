@@ -385,6 +385,16 @@ if verb == "delete":
             user["realm_roles"] = [rid for rid in user["realm_roles"] if rid != victim["id"]]
         save()
         sys.exit(0)
+    if parts[0] == "roles-by-id" and len(parts) == 2:
+        if not any(r["id"] == parts[1] for r in data["roles"]):
+            fail(f"stub: no realm role with id {parts[1]}")
+        data["roles"] = [r for r in data["roles"] if r["id"] != parts[1]]
+        for user in data["users"].values():
+            user["realm_roles"] = [rid for rid in user["realm_roles"] if rid != parts[1]]
+        for owner, held in data["role_composites"].items():
+            data["role_composites"][owner] = [rid for rid in held if rid != parts[1]]
+        save()
+        sys.exit(0)
     if parts[0] == "clients" and len(parts) == 2:
         if policy_freezes(parts[1]):
             fail("stub: the DPoP policy still matches this client; detach it before the delete")
@@ -507,8 +517,8 @@ assert_eq "$(query "$state" "next(s for s in d['scopes'] if s['name']=='extracto
 assert_eq "$(query "$state" "next(s for s in d['scopes'] if s['name']=='extractor-ingest')['attributes']['include.in.token.scope']")" \
   "false" "extractor-ingest does not"
 assert_eq "$(query "$state" "scope_names('default', 'basetool-frontend')")" \
-  "['email', 'extractor-ingest', 'profile', 'roles', 'web-origins']" \
-  "the frontend carries extractor-ingest and NOT extractor-ingest-only (REQ-INGEST-011)"
+  "['email', 'extractor-ingest', 'profile', 'web-origins']" \
+  "the frontend carries extractor-ingest and NOT extractor-ingest-only (REQ-INGEST-011), and no roles scope (ADR-0355)"
 assert_eq "$(query "$state" "scope_names('default', 'basetool-sc-extractor')")" \
   "['basic']" "the extractor carries only basic by default: no ingest scope, no backend audience (H1)"
 assert_eq "$(query "$state" "'kc-admin-api' in scope_names('default', 'backend-service')")" \
@@ -527,7 +537,8 @@ assert_eq "$(query "$state" "client('basetool-frontend')['attributes']['post.log
 assert_eq "$(query "$state" "client('basetool-frontend')['baseUrl']")" \
   "https://testing.example/" "the frontend's baseUrl comes from --public-origin (REQ-SEC-071)"
 assert_not_contains "$(cat "${state}/state.json")" "profit-base.online" "no production hostname is written into another realm"
-assert_eq "$(query "$state" "'Bank Management' in [r['name'] for r in d['roles']]")" "True" "a missing application role is created"
+assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['name'] in ('Admin', 'KRT Member', 'Bank Employee', 'Bank Management'))")" \
+  "[]" "no application realm role is left or created (ADR-0355)"
 assert_eq "$(query "$state" "mappers('basetool-frontend')")" \
   "['description', 'discord_guild_nickname', 'discord_user_id', 'rank', 'sub']" "the frontend's claim mappers exist"
 assert_eq "$(query "$state" "[p['name'] for p in d['policies']['policies']]")" \
@@ -654,7 +665,50 @@ output="$(run_provisioner "$state" --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
 assert_eq "$(query "$state" "'Officer' in [r['name'] for r in d['roles']]")" "False" "the Officer role is gone"
 assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['name'] in ('KRT Member', 'Admin'))")" \
-  "['Admin', 'KRT Member']" "and the application roles survive"
+  "[]" "and no application role comes back"
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second apply is empty"
+assert_eq "$(writes_in "$state")" "0" "and sends no write"
+rm -rf "$state"
+
+echo "4c. the application realm roles and the web login's role claim are retired (ADR-0355)"
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["roles"] += [{"id": "r-krt", "name": "KRT Member"}, {"id": "r-adm", "name": "Admin"},
+               {"id": "r-bem", "name": "Bank Employee"}, {"id": "r-bmg", "name": "Bank Management"}]
+d["role_composites"]["r-default"].append("r-krt")
+d["users"]["u-member"] = {"id": "u-member", "client": None, "realm_roles": ["r-krt", "r-adm"],
+                          "client_roles": {}}
+frontend = next(c["id"] for c in d["clients"] if c["clientId"] == "basetool-frontend")
+d["client_default_scopes"][frontend].append("s-roles")
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+before="$(cat "${state}/state.json")"
+output="$(run_provisioner "$state")"
+assert_eq "$(cat "${state}/rc")" "2" "a realm still holding the application roles plans a change"
+planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ' | sort)"
+expected="$(printf '%s\n' \
+  "  - default scope 'roles' withheld (the web login carries no role claim; roles are held in the Basetool's user_roles, ADR-0355)" \
+  "  - realm role 'Admin' deleted with its user mappings and its place in 'default-roles-basetool' (held in the Basetool's user_roles, ADR-0355)" \
+  "  - realm role 'Bank Employee' deleted with its user mappings and its place in 'default-roles-basetool' (held in the Basetool's user_roles, ADR-0355)" \
+  "  - realm role 'Bank Management' deleted with its user mappings and its place in 'default-roles-basetool' (held in the Basetool's user_roles, ADR-0355)" \
+  "  - realm role 'KRT Member' deleted with its user mappings and its place in 'default-roles-basetool' (held in the Basetool's user_roles, ADR-0355)" | sort)"
+assert_eq "$planned" "$expected" "the plan withholds the roles scope and deletes exactly the four roles"
+assert_eq "$(cat "${state}/state.json")" "$before" "the dry run writes nothing"
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['name'] in ('Admin', 'KRT Member', 'Bank Employee', 'Bank Management'))")" \
+  "[]" "the four roles are gone"
+assert_eq "$(query "$state" "'r-krt' in d['role_composites']['r-default']")" "False" \
+  "a new account no longer holds KRT Member through the default role"
+assert_eq "$(query "$state" "d['users']['u-member']['realm_roles']")" "[]" "and no account keeps a mapping"
+assert_eq "$(query "$state" "'roles' in scope_names('default', 'basetool-frontend')")" "False" \
+  "the web login's token carries no realm-role claim"
 output="$(run_provisioner "$state" --apply)"
 assert_contains "$output" "No changes" "a second apply is empty"
 assert_eq "$(writes_in "$state")" "0" "and sends no write"
@@ -1018,7 +1072,7 @@ output="$(run_provisioner "$state" --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
 assert_contains "$output" "Applied. A second run reports no changes." "the verify pass finds nothing left"
 assert_eq "$(query "$state" "sorted(r['name'] for r in d['roles'] if r['id'] in d['role_composites']['r-default'])")" \
-  "['KRT Member', 'offline_access', 'uma_authorization']" "the default role holds offline_access beside what it had"
+  "['offline_access', 'uma_authorization']" "the default role holds offline_access beside what it had, and no KRT Member"
 assert_eq "$(query "$state" "[r['name'] for r in d['scope_role_mappings']['s-offline_access']]")" \
   "['offline_access']" "the offline_access client scope maps the offline_access role"
 assert_contains "$(cat "${state}/bodies.log")" 'create roles/default-roles-basetool/composites [{"id": "r-offline", "name": "offline_access"}]' \

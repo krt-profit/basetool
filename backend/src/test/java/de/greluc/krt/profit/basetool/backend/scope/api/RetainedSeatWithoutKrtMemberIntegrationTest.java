@@ -189,8 +189,11 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
   }
 
   private void authenticate(User holder, boolean krtMember) {
-    Set<Role> roles = krtMember ? Set.of(namedRole("KRT Member")) : Set.of();
-    List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(holder, roles));
+    User view = new User();
+    view.setId(holder.getId());
+    view.setApprovalStatus(holder.getApprovalStatus());
+    view.setRoles(krtMember ? Set.of(namedRole("KRT Member")) : Set.of());
+    List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(view));
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(

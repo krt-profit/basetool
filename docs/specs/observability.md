@@ -1684,17 +1684,17 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
   the account id the Keycloak console needs (added 2026-09-17).
 - `basetool_admin_registration_auto_activated_total` counter (untagged,
-  `UserReconciliationService`, both creation paths) counts a brand-new row that is `ACTIVE` on
-  arrival because the subject holds the Keycloak ADMIN realm role — the REQ-SEC-017
+  `UserReconciliationService`, the login path) counts a brand-new row that is `ACTIVE` on
+  arrival because a bootstrap subject earned Admin at its first login (REQ-SEC-088) — the REQ-SEC-017
   bootstrap carve-out, which is the one way an account gains full authority with no admin
   decision behind it and which used to leave no trace. Counted on whichever path inserts the
-  row (`created` is true exactly once per account), so the interactive and scheduled paths
-  cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
+  row (`created` is true exactly once per account); the roster sync creates no admin, because it
+  writes no role. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
 - `basetool_user_role_changes_total{role,action}` counter (`RoleChangeRecorder`, `role` bounded by the
   four assignable roles, `action` `assigned` / `withdrawn`) counts every role written in the Basetool,
-  the bootstrap grant included (REQ-SEC-088); who and whom is in the ROLE audit trail. A panel on
+  the bootstrap grant and the KRT Member an approval grants included (REQ-SEC-088); who and whom is in the ROLE audit trail. A panel on
   `07-basetool-operations.json` charts it per role and action.
 - `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
   the notification types) counts the recipients the engine dropped because they muted the type

@@ -46,8 +46,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the {@code role} table: the local copy of every Keycloak realm role with its permission
- * set. Only description and permissions are editable; writes evict the {@code roles} cache.
+ * Manages the {@code role} table: the application roles held in {@code user_roles} (REQ-SEC-088)
+ * with their permission sets. Only description and permissions are editable; writes evict the
+ * {@code roles} cache.
  */
 @Service
 @RequiredArgsConstructor
