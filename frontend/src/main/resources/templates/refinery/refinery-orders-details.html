@@ -11,19 +11,16 @@
 <body>
 <th:block th:fragment="pageContent">
 <main class="refinery-order">
-    <div class="page-head" data-testid="page-head"
-         th:with="headState=${orderState != null ? orderState.name() : null},
-                  headStateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'PICKED_UP': 'refinery.status.pickedUp', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  headStateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'PICKED_UP': 'status-completed', 'CANCELED': 'status-canceled'} }">
+    <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
             <a class="page-eyebrow" th:href="@{/refinery-orders}" data-testid="page-eyebrow"
               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
               ><span th:text="#{refineryorder.index.title}">Raffinerie</span></a>
             <div class="page-title">
                 <h1 th:text="#{refineryorder.detail.heading(${#strings.substring(orderId.toString(), 32)})}">Auftrag #1042</h1>
-                <span th:if="${headState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
-                      th:classappend="${headStateClasses.get(headState)}"
-                      th:text="#{${headStateKeys.get(headState)}}">Abholbereit</span>
+                <span th:if="${orderState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
+                      th:classappend="${orderState.badgeClass}"
+                      th:text="#{${orderState.labelKey}}">Abholbereit</span>
                 <span th:if="${order != null and order.provenance != null and order.provenance.createdByClient != null}" class="chip chip--info" data-testid="refinery-client-chip"
                       th:title="#{refineryorder.client.chip(${order.provenance.createdByClient})}"
                       th:text="${order.provenance.createdByClient}">VerseKit</span>
@@ -42,12 +39,10 @@
     <th:block th:fragment="refineryOrderSection">
     <div class="rod-layout"
          th:with="stateName=${orderState != null ? orderState.name() : null},
-                  stateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'PICKED_UP': 'refinery.status.pickedUp', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  stateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'PICKED_UP': 'status-completed', 'CANCELED': 'status-canceled'} },
                   openRun=${stateName == 'RUNNING' or stateName == 'READY'},
                   sales=${refineryOrderForm.oreSales ?: 0},
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
-         th:attr="data-rod-state=${stateName},data-rod-state-class=${stateName != null ? stateClasses.get(stateName) : null},data-rod-state-label=${stateName != null ? #messages.msg(stateKeys.get(stateName)) : null}">
+         th:attr="data-rod-state=${stateName},data-rod-state-class=${orderState != null ? orderState.badgeClass : null},data-rod-state-label=${orderState != null ? #messages.msg(orderState.labelKey) : null}">
         <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
             <input type="hidden" th:field="*{gameDataVersion}" />
             <input type="hidden" th:field="*{financesVersion}" />

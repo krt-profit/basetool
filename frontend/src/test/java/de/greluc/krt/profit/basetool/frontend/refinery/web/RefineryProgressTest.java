@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
@@ -27,9 +28,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -195,6 +199,38 @@ class RefineryProgressTest {
         .isEqualTo(RefineryProgress.State.READY);
     assertThat(RefineryProgress.state("CANCELED", null, pickedUp(null), NOW))
         .isEqualTo(RefineryProgress.State.CANCELED);
+  }
+
+  /** Each state carries the badge label key and design-system class the detail's badge draws. */
+  @Test
+  void eachStateCarriesItsBadge() {
+    assertThat(RefineryProgress.State.values())
+        .extracting(RefineryProgress.State::getLabelKey, RefineryProgress.State::getBadgeClass)
+        .containsExactly(
+            tuple("refinery.status.running", "status-planned"),
+            tuple("refinery.status.ready", "status-active"),
+            tuple("refinery.status.stored", "status-completed"),
+            tuple("refinery.status.pickedUp", "status-completed"),
+            tuple("refineryorder.status.CANCELED", "status-canceled"));
+  }
+
+  /**
+   * Every state's badge label key resolves in the German and the English bundle.
+   *
+   * @throws IOException when a bundle cannot be read
+   */
+  @Test
+  void everyBadgeLabelKeyIsTranslated() throws IOException {
+    for (String bundle : List.of("/messages_de.properties", "/messages_en.properties")) {
+      Properties messages = new Properties();
+      try (InputStream in = RefineryProgressTest.class.getResourceAsStream(bundle)) {
+        assertThat(in).as(bundle).isNotNull();
+        messages.load(in);
+      }
+      for (RefineryProgress.State state : RefineryProgress.State.values()) {
+        assertThat(messages).as(bundle + " " + state).containsKey(state.getLabelKey());
+      }
+    }
   }
 
   /** A picked-up row is closed: it cannot be stored from the list and shows no meter. */

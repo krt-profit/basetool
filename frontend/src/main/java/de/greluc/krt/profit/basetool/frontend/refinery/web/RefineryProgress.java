@@ -24,6 +24,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -57,18 +59,29 @@ public final class RefineryProgress {
 
   private RefineryProgress() {}
 
-  /** The place of an order in its run: the list segments and the detail's status steps. */
+  /**
+   * The place of an order in its run: the list segments and the detail's status steps, each with
+   * the label and design-system badge class the detail's status badge draws.
+   */
+  @Getter
+  @RequiredArgsConstructor
   public enum State {
     /** Open, and its end lies in the future. */
-    RUNNING,
+    RUNNING("refinery.status.running", "status-planned"),
     /** Open, and its end has passed or is unknown: the yield can be stored. */
-    READY,
+    READY("refinery.status.ready", "status-active"),
     /** The yield was stored; the run is closed. */
-    COMPLETED,
+    COMPLETED("refinery.status.stored", "status-completed"),
     /** A client reported the pickup and nothing was stored: „Abgeholt" (REQ-REFINERY-028). */
-    PICKED_UP,
+    PICKED_UP("refinery.status.pickedUp", "status-completed"),
     /** The order was canceled. */
-    CANCELED
+    CANCELED("refineryorder.status.CANCELED", "status-canceled");
+
+    /** Message key of the state's badge label. */
+    @NotNull private final String labelKey;
+
+    /** Design-system {@code status-*} class of the state's badge. */
+    @NotNull private final String badgeClass;
   }
 
   /**
