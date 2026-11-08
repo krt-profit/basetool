@@ -31,8 +31,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
@@ -40,11 +44,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Organisationsleitung;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -57,6 +58,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -70,8 +72,9 @@ import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link OrgUnitBankAccessService} with {@link OrgUnitBankSettingsService} and
- * {@link OrgUnitBankRequestService} (REQ-BANK-021): visibility per account type, the
- * holder-redacted drill-in, the balance-target gate, view grants and booking requestService.
+ * {@link OrgUnitBankRequestService} over a real {@link BankAccessRules} (REQ-BANK-021): visibility
+ * per account type, the holder-redacted drill-in, the balance-target gate, view grants and booking
+ * requests.
  *
  * <p>Lenient strictness allows shared per-test stubs.
  */
@@ -80,7 +83,7 @@ import org.springframework.security.access.AccessDeniedException;
 class OrgUnitBankAccessServiceTest {
 
   @Mock private RequestScopeResolver requestScopeResolver;
-  @Mock private AuthHelperService authHelperService;
+  @Mock private BankCaller bankCaller;
   @Mock private BankAccountRepository bankAccountRepository;
   @Mock private BankPostingRepository bankPostingRepository;
   @Mock private BankAccountViewGrantRepository viewGrantRepository;
@@ -101,7 +104,8 @@ class OrgUnitBankAccessServiceTest {
 
   @BeforeEach
   void defaultStubs() {
-    when(authHelperService.isAdmin()).thenReturn(false);
+    actingAs(BankActor.NOBODY);
+    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
     when(viewGrantRepository.findByAccountId(any())).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
@@ -111,10 +115,17 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * Builds the seam and its settings and request services on the scenario mocks, with real
-   * visibility and approval-limit collaborators.
+   * Builds the seam and its settings and request services on the scenario mocks, with a real access
+   * policy and real visibility and approval-limit collaborators.
    */
   private void wireDelegates() {
+    BankAccessRules policy =
+        new BankAccessRules(
+            bankAccountRepository,
+            viewGrantRepository,
+            approvalLimitRepository,
+            bereichRepository,
+            orgUnitRepository);
     OrgUnitBankVisibilityService visibilityService =
         new OrgUnitBankVisibilityService(viewGrantRepository, userRepository, bankAuditService);
     OrgUnitBankApprovalLimitService approvalLimitService =
@@ -123,15 +134,12 @@ class OrgUnitBankAccessServiceTest {
     service =
         new OrgUnitBankAccessService(
             requestScopeResolver,
-            authHelperService,
+            bankCaller,
+            policy,
             bankAccountRepository,
             bankPostingRepository,
-            viewGrantRepository,
-            approvalLimitRepository,
-            bereichRepository,
             bankAccountService,
-            bankStatementReportService,
-            orgUnitRepository);
+            bankStatementReportService);
     settingsService =
         new OrgUnitBankSettingsService(
             service,
@@ -145,10 +153,37 @@ class OrgUnitBankAccessServiceTest {
     requestService =
         new OrgUnitBankRequestService(
             service,
-            authHelperService,
+            policy,
             bankAccountRepository,
             bankBookingRequestRepository,
             bankBookingRequestService);
+  }
+
+  /**
+   * Makes the actor the caller of the request.
+   *
+   * @param actor the caller's actor
+   */
+  private void actingAs(BankActor actor) {
+    when(bankCaller.actor()).thenReturn(actor);
+  }
+
+  /**
+   * Makes the builder's actor the caller of the request.
+   *
+   * @param actor the caller's actor builder
+   */
+  private void actingAs(TestBankActor actor) {
+    actingAs(actor.build());
+  }
+
+  /**
+   * Sends the org unit as the request's active-org-unit pin.
+   *
+   * @param orgUnitId the pinned org unit
+   */
+  private void pinned(UUID orgUnitId) {
+    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.of(orgUnitId));
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {
@@ -165,14 +200,6 @@ class OrgUnitBankAccessServiceTest {
     bereich.setName(name);
     bereich.setShorthand(shorthand);
     return bereich;
-  }
-
-  private static OrgUnit specialCommand(UUID id, String name, String shorthand) {
-    SpecialCommand sk = new SpecialCommand();
-    sk.setId(id);
-    sk.setName(name);
-    sk.setShorthand(shorthand);
-    return sk;
   }
 
   private static BankAccount account(UUID id, String accountNo, OrgUnit orgUnit) {
@@ -212,8 +239,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount ownAccount = account(ownAccountId, "KB-0001", ownStaffel);
     BankAccount foreignAccount =
         account(UUID.randomUUID(), "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(ownStaffelId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(ownStaffelId));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(ownAccount, foreignAccount));
     when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
@@ -231,9 +257,7 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void listOverseenOrgUnitBalances_emptyForCallerWithoutOversight() {
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(
             List.of(account(UUID.randomUUID(), "KB-0001", squadron(UUID.randomUUID(), "S", "S"))));
@@ -246,13 +270,11 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void listOverseenOrgUnitBalances_adminSeesEveryOrgUnitAccountAndZeroWhenNoPostings() {
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     UUID accountAId = UUID.randomUUID();
     UUID accountBId = UUID.randomUUID();
     BankAccount accountA = account(accountAId, "KB-0001", squadron(UUID.randomUUID(), "A", "AAA"));
     BankAccount accountB = account(accountBId, "KB-0002", squadron(UUID.randomUUID(), "B", "BBB"));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(accountA, accountB));
     when(bankPostingRepository.accountBalances(List.of(accountAId, accountBId)))
@@ -279,11 +301,9 @@ class OrgUnitBankAccessServiceTest {
     grant.setAccount(account);
     grant.setGranteeKind(BankAccountViewGranteeKind.MEMBERSHIP_ROLE);
     grant.setRoleCode(MembershipRole.ENSIGN.name());
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    // Without the KRT Member role the seat's own-unit reach confers no oversight.
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.ENSIGN));
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of(grant));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.ENSIGN))
-        .thenReturn(true);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(account));
     when(bankPostingRepository.accountBalances(List.of(accountId)))
         .thenReturn(List.of(new BankAccountBalance(accountId, new BigDecimal("7"))));
@@ -303,9 +323,7 @@ class OrgUnitBankAccessServiceTest {
     ol.setName("OL");
     ol.setShorthand("OL");
     BankAccount cartel = typedAccount(cartelId, "KB-0001", BankAccountType.CARTEL, ol);
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(cartel));
     when(bankPostingRepository.accountBalances(List.of(cartelId)))
         .thenReturn(List.of(new BankAccountBalance(cartelId, new BigDecimal("42"))));
@@ -324,12 +342,9 @@ class OrgUnitBankAccessServiceTest {
     profit.setName("Profit");
     BankAccount cartelBank =
         typedAccount(cartelBankId, "KB-0001", BankAccountType.CARTEL_BANK, null);
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(
+        TestBankActor.of(UUID.randomUUID()).seat(profitBereichId, MembershipRole.BEREICHSLEITER));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            profitBereichId, MembershipRole.BEREICHSLEITER))
-        .thenReturn(true);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(cartelBank));
     when(bankPostingRepository.accountBalances(List.of(cartelBankId)))
         .thenReturn(List.of(new BankAccountBalance(cartelBankId, new BigDecimal("9"))));
@@ -343,9 +358,8 @@ class OrgUnitBankAccessServiceTest {
   void listOverseenOrgUnitBalances_specialAccountsSeenByBereichsleiterNotByOfficer() {
     UUID specialId = UUID.randomUUID();
     BankAccount special = specialAccount(specialId, "KB-0001", BankAccountStatus.ACTIVE);
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(requestScopeResolver.currentUserIsBereichsleiter()).thenReturn(true);
+    actingAs(
+        TestBankActor.of(UUID.randomUUID()).seat(UUID.randomUUID(), MembershipRole.BEREICHSLEITER));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(special));
     when(bankPostingRepository.accountBalances(List.of(specialId)))
         .thenReturn(List.of(new BankAccountBalance(specialId, new BigDecimal("999"))));
@@ -363,10 +377,7 @@ class OrgUnitBankAccessServiceTest {
     UUID ownAccountId = UUID.randomUUID();
     BankAccount ownAccount = account(ownAccountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     BankAccount special = specialAccount(UUID.randomUUID(), "KB-0002", BankAccountStatus.ACTIVE);
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
-    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
-    when(requestScopeResolver.currentUserIsBereichsleiter()).thenReturn(false);
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(ownAccount, special));
     when(bankPostingRepository.accountBalances(List.of(ownAccountId)))
@@ -392,10 +403,7 @@ class OrgUnitBankAccessServiceTest {
         account(UUID.randomUUID(), "KB-0004", squadron(staffelId, "Own", "OWN"));
     closedOwn.setStatus(BankAccountStatus.CLOSED);
     BankAccount special = specialAccount(UUID.randomUUID(), "KB-0005", BankAccountStatus.ACTIVE);
-    ScopePredicate unpinned = new ScopePredicate(false, null, Set.of(staffelId));
-    when(requestScopeResolver.currentOversightScope()).thenReturn(unpinned);
-    when(requestScopeResolver.currentOversightScopeIgnoringPin()).thenReturn(unpinned);
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(cartel, ownAccount, foreignAccount, closedOwn, special));
     when(bankPostingRepository.accountBalances(anyCollection())).thenReturn(List.of());
@@ -416,10 +424,8 @@ class OrgUnitBankAccessServiceTest {
     UUID staffelBId = UUID.randomUUID();
     UUID accountAId = UUID.randomUUID();
     UUID accountBId = UUID.randomUUID();
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, staffelAId, Set.of()));
-    when(requestScopeResolver.currentOversightScopeIgnoringPin())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelAId, staffelBId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelAId, staffelBId));
+    pinned(staffelAId);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(
             List.of(
@@ -437,9 +443,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount cartel =
         typedAccount(
             cartelId, "KB-0001", BankAccountType.CARTEL, squadron(UUID.randomUUID(), "OL", "OL"));
-    when(requestScopeResolver.currentOversightScopeIgnoringPin())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(
             List.of(
@@ -453,22 +457,25 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void activeContextOrgUnitIds_pinned_isThePinnedUnit() {
-    UUID pinned = UUID.randomUUID();
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, pinned, Set.of()));
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds())
-        .thenReturn(Set.of(pinned, UUID.randomUUID()));
+    UUID pinnedUnit = UUID.randomUUID();
+    actingAs(
+        TestBankActor.member(UUID.randomUUID())
+            .seat(pinnedUnit, MembershipRole.MEMBER)
+            .seat(UUID.randomUUID(), MembershipRole.MEMBER));
+    pinned(pinnedUnit);
 
-    assertThat(service.activeContextOrgUnitIds()).containsExactly(pinned);
+    assertThat(service.activeContextOrgUnitIds()).containsExactly(pinnedUnit);
   }
 
   @Test
   void activeContextOrgUnitIds_unpinned_isEveryDirectMembership() {
     UUID unitA = UUID.randomUUID();
     UUID unitB = UUID.randomUUID();
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of(unitA, unitB, UUID.randomUUID())));
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of(unitA, unitB));
+    actingAs(
+        TestBankActor.member(UUID.randomUUID())
+            .seat(unitA, MembershipRole.MEMBER)
+            .seat(unitB, MembershipRole.MEMBER)
+            .reach(unitA, unitB, UUID.randomUUID()));
 
     assertThat(service.activeContextOrgUnitIds()).containsExactlyInAnyOrder(unitA, unitB);
   }
@@ -479,8 +486,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
     BankBookingDto raw =
         new BankBookingDto(
             UUID.randomUUID(),
@@ -515,8 +521,6 @@ class OrgUnitBankAccessServiceTest {
     assertThat(redacted.justification()).isEqualTo("Reparatur");
     assertThat(redacted.staffNote()).isNull();
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
-    assertThat(redacted.note()).isEqualTo("note");
-    assertThat(redacted.justification()).isEqualTo("Reparatur");
   }
 
   @Test
@@ -524,8 +528,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(
         NotFoundException.class,
@@ -539,8 +542,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
     Instant from = Instant.parse("2026-06-01T00:00:00Z");
     Instant to = Instant.parse("2026-07-01T00:00:00Z");
     BankBalanceSeriesDto expected =
@@ -556,8 +558,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(
         NotFoundException.class,
@@ -570,8 +571,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(NotFoundException.class, () -> service.getViewableAccountDetail(accountId));
     verify(bankAccountService, never()).getAccountDetail(any(), any());
@@ -585,8 +585,7 @@ class OrgUnitBankAccessServiceTest {
     Instant from = Instant.now().minusSeconds(3600);
     Instant to = Instant.now();
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
     when(bankStatementReportService.generateStatement(
             eq(accountId), eq(from), eq(to), any(), eq(true)))
         .thenReturn(new byte[] {1, 2, 3});
@@ -605,9 +604,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(3L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
     when(bankAccountRepository.saveAndFlush(account)).thenReturn(account);
 
     var settings = settingsService.setBalanceTarget(accountId, new BigDecimal("10000"), 3L);
@@ -625,11 +622,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(1L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(false);
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
 
     assertThrows(
         AccessDeniedException.class,
@@ -644,9 +637,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(5L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -659,14 +650,11 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(1L);
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankAccountRepository.saveAndFlush(account)).thenReturn(account);
     when(viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
             accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, MembershipRole.ENSIGN.name()))
-        .thenReturn(false);
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
         .thenReturn(false);
 
     settingsService.setBalanceTarget(accountId, new BigDecimal("100"), 1L);
@@ -686,9 +674,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
     when(viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
             accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, MembershipRole.ENSIGN.name()))
         .thenReturn(false);
@@ -707,12 +693,10 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        BadRequestException.class,
         () ->
             settingsService.addRoleVisibility(
                 accountId, MembershipRole.BEREICHSKOORDINATOR.name()));
@@ -724,13 +708,13 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount special = specialAccount(accountId, "KB-0007", BankAccountStatus.ACTIVE);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
 
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        BadRequestException.class,
         () -> settingsService.addRoleVisibility(accountId, "LOGISTICIAN"));
     assertThrows(
-        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
+        BadRequestException.class,
         () -> settingsService.addRoleVisibility(accountId, "MISSION_MANAGER"));
     verify(viewGrantRepository, never()).save(any());
   }
@@ -740,22 +724,20 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount special = specialAccount(accountId, "KB-0008", BankAccountStatus.ACTIVE);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
 
     assertThat(settingsService.getAccountSettings(accountId).availableRoleCodes()).isEmpty();
   }
 
   @Test
-  void canView_sonderkontoWithAllMembersGrant_admitsAMember() {
+  void accessTo_sonderkontoWithAllMembersGrant_admitsAMember() {
     BankAccount special = specialAccount(UUID.randomUUID(), "KB-0010", BankAccountStatus.ACTIVE);
     BankAccountViewGrant grant = new BankAccountViewGrant();
     grant.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     when(viewGrantRepository.findByAccountId(special.getId())).thenReturn(List.of(grant));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
-    assertThat(service.canView(special)).isTrue();
+    assertThat(service.accessTo(special).has(BankAccountRight.VIEW)).isTrue();
   }
 
   @Test
@@ -949,9 +931,7 @@ class OrgUnitBankAccessServiceTest {
             null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
 
-    assertThrows(
-        de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
-        () -> requestService.createBookingRequest(request));
+    assertThrows(BadRequestException.class, () -> requestService.createBookingRequest(request));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -963,8 +943,7 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(AccessDeniedException.class, () -> requestService.createBookingRequest(request));
     verifyNoInteractions(bankBookingRequestService);
@@ -984,10 +963,8 @@ class OrgUnitBankAccessServiceTest {
     limit.setGranteeUserId(caller);
     limit.setLimitAmount(new BigDecimal("100"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    actingAs(TestBankActor.member(caller).reach(orgUnitId));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(limit));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1032,8 +1009,7 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(orgUnitId));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of());
     when(bankBookingRequestService.create(
             eq(accountId),
@@ -1080,8 +1056,7 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.TRANSFER, destId, new BigDecimal("500"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(orgUnitId));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.TRANSFER),
@@ -1133,11 +1108,9 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("100"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(outsider));
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of(viewGrant));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(outsider));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1171,7 +1144,6 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(null));
-    verify(requestScopeResolver).currentUserIsMemberOfOrgUnit(orgUnitId);
   }
 
   @Test
@@ -1187,12 +1159,9 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("100"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    actingAs(TestBankActor.member(member).reach(orgUnitId).seat(orgUnitId, MembershipRole.MEMBER));
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(member));
-    when(requestScopeResolver.currentUserIsMemberOfOrgUnit(orgUnitId)).thenReturn(true);
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1230,7 +1199,7 @@ class OrgUnitBankAccessServiceTest {
 
   /**
    * Builds an active KRT account with both approval thresholds set and stubs the request-create
-   * preconditions.
+   * preconditions: the caller is a plain member, who views the KRT account.
    *
    * @param accountId the KRT account id
    * @param t1 the bank-employee ceiling
@@ -1244,10 +1213,8 @@ class OrgUnitBankAccessServiceTest {
     cartel.setEmployeeApprovalCeiling(new BigDecimal(t1));
     cartel.setAreaLeadApprovalCeiling(new BigDecimal(t2));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
     return cartel;
   }
 
@@ -1386,11 +1353,10 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("2000000"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            orgUnitId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(
+        TestBankActor.member(UUID.randomUUID())
+            .reach(orgUnitId)
+            .seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1436,11 +1402,10 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("2000000"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            orgUnitId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(
+        TestBankActor.member(UUID.randomUUID())
+            .reach(orgUnitId)
+            .seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.create(
             any(),
             any(),
@@ -1480,7 +1445,8 @@ class OrgUnitBankAccessServiceTest {
   void createBookingRequest_krtByOlMember_bypassesAmountLadder() {
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
-    when(requestScopeResolver.currentUserIsOlMember()).thenReturn(true);
+    actingAs(
+        TestBankActor.member(UUID.randomUUID()).seat(UUID.randomUUID(), MembershipRole.OL_MEMBER));
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
@@ -1531,6 +1497,7 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setRequiresOwnerApproval(true);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId));
     verifyNoInteractions(bankBookingRequestService);
@@ -1548,9 +1515,7 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setRequiresOwnerApproval(true);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            orgUnitId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, orgUnitId));
 
@@ -1572,7 +1537,7 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
     bookingRequest.setRequiredApprover(BankRequestApprover.BANK_MANAGEMENT);
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
@@ -1593,10 +1558,8 @@ class OrgUnitBankAccessServiceTest {
     cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
     cartel.setAreaLeadApprovalCeiling(null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    actingAs(TestBankActor.member(UUID.randomUUID()));
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
@@ -1748,13 +1711,9 @@ class OrgUnitBankAccessServiceTest {
     userLimit.setGranteeUserId(caller);
     userLimit.setLimitAmount(new BigDecimal("100"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgUnitId)));
+    actingAs(TestBankActor.member(caller).reach(orgUnitId).seat(orgUnitId, MembershipRole.ENSIGN));
     when(approvalLimitRepository.findByAccountId(accountId))
         .thenReturn(List.of(roleLimit, userLimit));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.ENSIGN))
-        .thenReturn(true);
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1809,15 +1768,12 @@ class OrgUnitBankAccessServiceTest {
     areaMembers.setGranteeKind(BankAccountViewGranteeKind.AREA_MEMBERS);
     areaMembers.setLimitAmount(new BigDecimal("1000"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(bereichId)));
+    actingAs(
+        TestBankActor.member(caller)
+            .reach(bereichId)
+            .seat(bereichId, MembershipRole.BEREICHSKOORDINATOR));
     when(approvalLimitRepository.findByAccountId(accountId))
         .thenReturn(List.of(roleLimit, areaMembers));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            bereichId, MembershipRole.BEREICHSKOORDINATOR))
-        .thenReturn(true);
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of(bereichId));
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1855,9 +1811,8 @@ class OrgUnitBankAccessServiceTest {
 
   /**
    * REQ-BANK-054: the requester's own list is the member audience, so the seam blanks the bank
-   * employee's "Notiz Bankmitarbeiter" before it can reach a template. Pinning it here rather than
-   * only in the view keeps the redaction out of the rendering layer's hands — the same DTO type
-   * carries the note unredacted for the approval tab.
+   * employee's "Notiz Bankmitarbeiter" before it can reach a template; the same DTO type carries
+   * the note unredacted for the approval tab.
    */
   @Test
   void listOwnBookingRequests_redactsTheStaffNote() {
@@ -1914,19 +1869,19 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * The approver lens is deliberately NOT redacted: a responsible holder decides on the request and
-   * the employee's note is part of that context (REQ-BANK-054). This is the negative control for
-   * {@link #listOwnBookingRequests_redactsTheStaffNote()} — without it, a blanket redaction in the
-   * shared {@code toDto} would pass that test while silently emptying the approval tab.
+   * The approver lens is not redacted: a responsible holder decides on the request and the
+   * employee's note is part of that context (REQ-BANK-054). This is the negative control for {@link
+   * #listOwnBookingRequests_redactsTheStaffNote()}: a blanket redaction in the shared {@code toDto}
+   * would pass that test while emptying the approval tab.
    */
   @Test
   void listRequestsForResponsibleAccounts_keepsTheStaffNote() {
     UUID accountId = UUID.randomUUID();
     UUID orgUnitId = UUID.randomUUID();
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(account(accountId, "KB-0001", null)));
-    when(bankBookingRequestService.listForAccounts(anyCollection()))
+    when(bankBookingRequestService.listForeign(any()))
         .thenReturn(List.of(requestDto(accountId, orgUnitId, "Bar uebergeben, Zeuge greluc")));
 
     List<BankBookingRequestDto> foreign = requestService.listRequestsForResponsibleAccounts();
@@ -1935,6 +1890,10 @@ class OrgUnitBankAccessServiceTest {
         .singleElement()
         .extracting(BankBookingRequestDto::staffNote)
         .isEqualTo("Bar uebergeben, Zeuge greluc");
+    ArgumentCaptor<BankAccessRules.ForeignRequestScope> scope =
+        ArgumentCaptor.forClass(BankAccessRules.ForeignRequestScope.class);
+    verify(bankBookingRequestService).listForeign(scope.capture());
+    assertThat(scope.getValue().candidateAccountIds()).containsExactly(accountId);
   }
 
   /**
@@ -1957,9 +1916,8 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("1000"));
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    actingAs(TestBankActor.of(requester).seat(orgUnitId, MembershipRole.MEMBER));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
-    when(requestScopeResolver.currentUserIsMemberOfOrgUnit(orgUnitId)).thenReturn(true);
 
     UpdateBankBookingRequest update =
         new UpdateBankBookingRequest(
@@ -1977,7 +1935,7 @@ class OrgUnitBankAccessServiceTest {
 
   /**
    * The mirror case: an edit that stays under the ceiling leaves the request approval-free, so a
-   * correction of a typo does not gratuitously drag a responsible holder into the loop.
+   * correction of a typo does not drag a responsible holder into the loop.
    */
   @Test
   void updateOwnBookingRequest_stayingUnderTheLimit_needsNoApproval() {
@@ -1995,9 +1953,8 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("1000"));
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    actingAs(TestBankActor.of(requester).seat(orgUnitId, MembershipRole.MEMBER));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
-    when(requestScopeResolver.currentUserIsMemberOfOrgUnit(orgUnitId)).thenReturn(true);
 
     UpdateBankBookingRequest update =
         new UpdateBankBookingRequest(new BigDecimal("900"), null, "reason", null, null, null, 0L);
@@ -2021,7 +1978,7 @@ class OrgUnitBankAccessServiceTest {
     existing.setType(BankBookingRequestType.WITHDRAWAL);
     existing.setRequestedBy(UUID.randomUUID());
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    actingAs(TestBankActor.of(UUID.randomUUID()));
 
     assertThrows(
         NotFoundException.class,
@@ -2031,6 +1988,7 @@ class OrgUnitBankAccessServiceTest {
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, "reason", null, null, null, 0L)));
     verify(bankBookingRequestService, never()).updateOwn(any(), any(), anyBoolean(), any(), any());
+    verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
   private static BankBookingRequestDto requestDto(UUID accountId, UUID orgUnitId) {
@@ -2086,8 +2044,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(staffelId)));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
 
     OrgUnitBankAccountDetailDto detail = service.getViewableAccountDetail(accountId);
 
@@ -2105,8 +2062,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account =
         account(accountId, "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     assertThrows(NotFoundException.class, () -> service.getViewableAccountDetail(accountId));
     verifyNoInteractions(bankAccountService);
@@ -2118,9 +2074,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     OrgUnitBankAccountSettingsDto settings = settingsService.getAccountSettings(accountId);
 
@@ -2134,8 +2088,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(account.getOrgUnit().getId()));
 
     assertThrows(AccessDeniedException.class, () -> settingsService.getAccountSettings(accountId));
   }
@@ -2153,8 +2106,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(
             Optional.of(
                 account(hiddenId, "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"))));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    actingAs(TestBankActor.member(UUID.randomUUID()));
 
     accountRoutes()
         .forEach((route, call) -> {
@@ -2174,15 +2126,17 @@ class OrgUnitBankAccessServiceTest {
   @Test
   void getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot() {
     UUID staffelId = UUID.randomUUID();
+    UUID otherUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
-            staffelId, MembershipRole.STAFFELLEITER))
-        .thenReturn(true);
+    actingAs(
+        TestBankActor.member(UUID.randomUUID())
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .reach(otherUnitId));
+    pinned(otherUnitId);
 
+    assertThat(service.accessTo(account).has(BankAccountRight.VIEW)).isFalse();
     assertThat(settingsService.getAccountSettings(accountId).accountId()).isEqualTo(accountId);
   }
 
@@ -2211,8 +2165,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(requestScopeResolver.currentOversightScope())
-        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(account.getOrgUnit().getId()));
 
     assertThrows(
         AccessDeniedException.class,
@@ -2227,7 +2180,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = typedAccount(accountId, "KB-0099", BankAccountType.CARTEL, null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
 
     assertThrows(
         AccessDeniedException.class,
@@ -2266,7 +2219,7 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setRequiresOwnerApproval(true);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
-    when(authHelperService.isAdmin()).thenReturn(true);
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
 
     requestService.revokeOwnerApproval(requestId);
 

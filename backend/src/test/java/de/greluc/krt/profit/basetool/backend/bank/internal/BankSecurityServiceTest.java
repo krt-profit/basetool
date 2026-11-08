@@ -19,269 +19,363 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import java.util.List;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.BiPredicate;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link BankSecurityService}: the capability matrix (REQ-BANK-009) and its
- * independence from org-unit membership (REQ-BANK-008).
+ * Unit tests for {@link BankSecurityService} over a real {@link BankAccessRules}: the capability
+ * matrix (REQ-BANK-009), its independence from org-unit membership (REQ-BANK-008), the holder rule
+ * (REQ-BANK-032) and the KRT direct-booking ceiling (REQ-BANK-047).
  */
 @ExtendWith(MockitoExtension.class)
 class BankSecurityServiceTest {
 
-  @Mock private AuthHelperService authHelperService;
-  @Mock private BankAccountGrantRepository grantRepository;
+  @Mock private BankCaller bankCaller;
+  @Mock private BankAccountRepository accountRepository;
+  @Mock private BankAccountViewGrantRepository viewGrantRepository;
+  @Mock private BankAccountApprovalLimitRepository approvalLimitRepository;
+  @Mock private BereichRepository bereichRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BankHolderRepository holderRepository;
-  @Mock private Authentication authentication;
 
-  @InjectMocks private BankSecurityService bankSecurityService;
+  private BankSecurityService bankSecurityService;
 
   private final UUID accountId = UUID.randomUUID();
   private final UUID userId = UUID.randomUUID();
 
   @BeforeEach
-  void authenticatedByDefault() {
-    lenient().when(authentication.isAuthenticated()).thenReturn(true);
+  void wireTheAdapterOverTheRealPolicy() {
+    BankAccessRules policy =
+        new BankAccessRules(
+            accountRepository,
+            viewGrantRepository,
+            approvalLimitRepository,
+            bereichRepository,
+            orgUnitRepository);
+    bankSecurityService = new BankSecurityService(bankCaller, policy, holderRepository);
   }
 
   @Test
   void canSee_deniesNonBankStaff_evenWithOrgRoles() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(false);
+    callerIs(
+        TestBankActor.member(userId)
+            .seat(UUID.randomUUID(), MembershipRole.STAFFELLEITER)
+            .grant(accountId, true, true, true)
+            .build());
 
-    assertFalse(bankSecurityService.canSee(accountId, authentication));
-    verifyNoInteractions(grantRepository);
+    assertFalse(bankSecurityService.canSee(accountId, null));
   }
 
   @Test
   void canSee_allowsManagementWithoutAnyGrantRow() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+    callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canSee(accountId, authentication));
-    verify(grantRepository, never()).findById(any(BankAccountGrantId.class));
+    assertTrue(bankSecurityService.canSee(accountId, null));
   }
 
   @Test
   void canSee_allowsEmployeeWithViewOnlyGrantRow() {
-    employeeWithGrant(false, false, false);
+    callerIs(employeeWithGrant(false, false, false));
 
-    assertTrue(bankSecurityService.canSee(accountId, authentication));
+    assertTrue(bankSecurityService.canSee(accountId, null));
   }
 
   @Test
   void canSee_deniesEmployeeWithoutGrantRow() {
-    employeeWithoutGrant();
+    callerIs(employeeWithoutGrant());
 
-    assertFalse(bankSecurityService.canSee(accountId, authentication));
+    assertFalse(bankSecurityService.canSee(accountId, null));
   }
 
   @Test
   void capabilityFlags_gateExactlyTheirBooking() {
-    employeeWithGrant(true, false, false);
+    callerIs(employeeWithGrant(true, false, false));
 
-    assertTrue(bankSecurityService.canDeposit(accountId, authentication));
-    assertFalse(bankSecurityService.canWithdraw(accountId, authentication));
-    assertFalse(bankSecurityService.canTransfer(accountId, authentication));
+    assertTrue(bankSecurityService.canDeposit(accountId, null));
+    assertFalse(bankSecurityService.canWithdraw(accountId, null));
+    assertFalse(bankSecurityService.canTransfer(accountId, null));
   }
 
   @Test
   void canWithdraw_and_canTransfer_followTheirFlags() {
-    employeeWithGrant(false, true, true);
+    callerIs(employeeWithGrant(false, true, true));
 
-    assertFalse(bankSecurityService.canDeposit(accountId, authentication));
-    assertTrue(bankSecurityService.canWithdraw(accountId, authentication));
-    assertTrue(bankSecurityService.canTransfer(accountId, authentication));
+    assertFalse(bankSecurityService.canDeposit(accountId, null));
+    assertTrue(bankSecurityService.canWithdraw(accountId, null));
+    assertTrue(bankSecurityService.canTransfer(accountId, null));
   }
 
   @Test
   void capabilities_allowManagementUnrestricted() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+    callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canDeposit(accountId, authentication));
-    assertTrue(bankSecurityService.canWithdraw(accountId, authentication));
-    assertTrue(bankSecurityService.canTransfer(accountId, authentication));
+    assertTrue(bankSecurityService.canDeposit(accountId, null));
+    assertTrue(bankSecurityService.canWithdraw(accountId, null));
+    assertTrue(bankSecurityService.canTransfer(accountId, null));
+  }
+
+  /** REQ-BANK-023: confirming a request needs the grant flag of its type. */
+  @Test
+  void staffRights_canBookNeedsTheFlagOfTheRequestType() {
+    callerIs(employeeWithGrant(false, true, false));
+
+    BankStaffRights rights = bankSecurityService.staffRights();
+
+    assertFalse(rights.canBook(BankBookingRequestType.DEPOSIT, accountId));
+    assertTrue(rights.canBook(BankBookingRequestType.WITHDRAWAL, accountId));
+    assertFalse(rights.canBook(BankBookingRequestType.TRANSFER, accountId));
   }
 
   @Test
-  void canConfirm_needsTheFlagOfTheRequestType() {
-    employeeWithGrant(false, true, false);
+  void staffRights_canBookDeniesEmployeeWithoutGrantRow() {
+    callerIs(employeeWithoutGrant());
 
     assertFalse(
-        bankSecurityService.canConfirm(BankBookingRequestType.DEPOSIT, accountId, authentication));
-    assertTrue(
-        bankSecurityService.canConfirm(
-            BankBookingRequestType.WITHDRAWAL, accountId, authentication));
-    assertFalse(
-        bankSecurityService.canConfirm(BankBookingRequestType.TRANSFER, accountId, authentication));
-  }
-
-  @Test
-  void canConfirm_deniesEmployeeWithoutGrantRow() {
-    employeeWithoutGrant();
-
-    assertFalse(
-        bankSecurityService.canConfirm(BankBookingRequestType.DEPOSIT, accountId, authentication));
+        bankSecurityService.staffRights().canBook(BankBookingRequestType.DEPOSIT, accountId));
   }
 
   /**
-   * The batch check decides as {@code canConfirm} does, per type and account, from one read of the
-   * caller's grants and no per-account lookup (REQ-BANK-023, REQ-DATA-003).
+   * The staff rights decide every type and account from the actor's grants alone, with no row read
+   * per account (REQ-BANK-023, REQ-DATA-003).
    */
   @Test
-  void confirmCheck_matchesCanConfirmWithOneGrantRead() {
+  void staffRights_decideEveryTypeAndAccountWithoutReadingRows() {
     UUID otherAccount = UUID.randomUUID();
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
-    BankAccountGrant grant = new BankAccountGrant();
-    grant.setId(new BankAccountGrantId(userId, accountId));
-    grant.setCanDeposit(true);
-    when(grantRepository.findByUserId(userId)).thenReturn(List.of(grant));
+    callerIs(employeeWithGrant(true, false, false));
 
-    BiPredicate<BankBookingRequestType, UUID> check =
-        bankSecurityService.confirmCheck(authentication);
+    BankStaffRights rights = bankSecurityService.staffRights();
 
-    assertTrue(check.test(BankBookingRequestType.DEPOSIT, accountId));
-    assertFalse(check.test(BankBookingRequestType.WITHDRAWAL, accountId));
-    assertFalse(check.test(BankBookingRequestType.TRANSFER, accountId));
-    assertFalse(check.test(BankBookingRequestType.DEPOSIT, otherAccount));
-    verify(grantRepository).findByUserId(userId);
-    verify(grantRepository, never()).findById(any(BankAccountGrantId.class));
+    assertTrue(rights.canBook(BankBookingRequestType.DEPOSIT, accountId));
+    assertFalse(rights.canBook(BankBookingRequestType.WITHDRAWAL, accountId));
+    assertFalse(rights.canBook(BankBookingRequestType.TRANSFER, accountId));
+    assertFalse(rights.canBook(BankBookingRequestType.DEPOSIT, otherAccount));
+    verifyNoInteractions(
+        accountRepository,
+        viewGrantRepository,
+        approvalLimitRepository,
+        bereichRepository,
+        orgUnitRepository,
+        holderRepository);
   }
 
   @Test
-  void confirmCheck_allowsManagementWithoutReadingGrants() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+  void staffRights_allowManagementOnEveryAccount() {
+    callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    BiPredicate<BankBookingRequestType, UUID> check =
-        bankSecurityService.confirmCheck(authentication);
-
-    assertTrue(check.test(BankBookingRequestType.TRANSFER, accountId));
-    verifyNoInteractions(grantRepository);
+    assertTrue(
+        bankSecurityService.staffRights().canBook(BankBookingRequestType.TRANSFER, accountId));
   }
 
   @Test
-  void confirmCheck_deniesUnauthenticatedCaller() {
-    when(authentication.isAuthenticated()).thenReturn(false);
+  void staffRights_denyTheUnauthenticatedCaller() {
+    callerIs(BankActor.NOBODY);
 
     assertFalse(
-        bankSecurityService
-            .confirmCheck(authentication)
-            .test(BankBookingRequestType.DEPOSIT, accountId));
-    assertFalse(
-        bankSecurityService.confirmCheck(null).test(BankBookingRequestType.DEPOSIT, accountId));
+        bankSecurityService.staffRights().canBook(BankBookingRequestType.DEPOSIT, accountId));
   }
 
   @Test
-  void canSee_deniesNullOrUnauthenticatedCallers() {
-    when(authentication.isAuthenticated()).thenReturn(false);
+  void canSee_deniesTheUnauthenticatedCaller() {
+    callerIs(BankActor.NOBODY);
 
     assertFalse(bankSecurityService.canSee(accountId, null));
-    assertFalse(bankSecurityService.canSee(accountId, authentication));
-    verifyNoInteractions(grantRepository);
   }
 
   /**
-   * Pins the independence contract structurally (REQ-BANK-008): the decision consumes only the
-   * role-hierarchy lookup and the grant row. No org-unit input exists in the signature or the
-   * collaborator set, so joining/leaving an org unit cannot change any outcome.
+   * Pins the independence contract (REQ-BANK-008): the decision consumes only the actor's roles and
+   * grant rows, so a seat on any org unit changes no outcome and no org-unit row is read.
    */
   @Test
-  void decision_consultsOnlyRolesAndGrantTable() {
-    employeeWithGrant(true, true, true);
+  void decision_consultsOnlyRolesAndGrants() {
+    BankActor withoutSeat = employeeWithGrant(true, false, true);
+    BankActor withSeat =
+        TestBankActor.of(userId)
+            .roles(Roles.BANK_EMPLOYEE, Roles.KRT_MEMBER)
+            .seat(UUID.randomUUID(), MembershipRole.STAFFELLEITER)
+            .grant(accountId, true, false, true)
+            .build();
+    when(bankCaller.actor()).thenReturn(withoutSeat, withSeat);
 
-    bankSecurityService.canDeposit(accountId, authentication);
+    BankStaffRights first = bankSecurityService.staffRights();
+    BankStaffRights second = bankSecurityService.staffRights();
 
-    verify(authHelperService).hasReachableRole("ROLE_BANK_EMPLOYEE");
-    verify(authHelperService).hasReachableRole("ROLE_BANK_MANAGEMENT");
-    verify(authHelperService).currentUserId();
-    verify(grantRepository).findById(new BankAccountGrantId(userId, accountId));
+    for (BankBookingRequestType type : BankBookingRequestType.values()) {
+      assertEquals(first.canBook(type, accountId), second.canBook(type, accountId));
+    }
+    assertEquals(first.canSee(accountId), second.canSee(accountId));
+    verifyNoInteractions(
+        accountRepository,
+        viewGrantRepository,
+        approvalLimitRepository,
+        bereichRepository,
+        orgUnitRepository);
   }
 
   @Test
   void canSeeHolder_allowsManagementForAnyHolder() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(true);
+    callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
-    verifyNoInteractions(holderRepository);
+    assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
   }
 
   @Test
   void canSeeHolder_allowsEmployeeForTheirOwnHolder() {
     UUID holderId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    callerIs(employeeWithoutGrant());
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
 
-    assertTrue(bankSecurityService.canSeeHolder(holderId, authentication));
+    assertTrue(bankSecurityService.canSeeHolder(holderId, null));
   }
 
   @Test
   void canSeeHolder_deniesEmployeeForSomeoneElsesHolder() {
     UUID holderId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    callerIs(employeeWithoutGrant());
     when(holderRepository.findById(holderId))
         .thenReturn(Optional.of(holderLinkedTo(UUID.randomUUID())));
 
-    assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
+    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
   }
 
   @Test
   void canSeeHolder_deniesEmployeeWhenHolderMissing() {
     UUID holderId = UUID.randomUUID();
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
+    callerIs(employeeWithoutGrant());
     when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
 
-    assertFalse(bankSecurityService.canSeeHolder(holderId, authentication));
+    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
   }
 
   @Test
-  void canSeeHolder_deniesNonBankStaff_withoutAnyHolderLookup() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(false);
+  void canSeeHolder_deniesNonBankStaffEvenForTheirOwnHolder() {
+    UUID holderId = UUID.randomUUID();
+    callerIs(TestBankActor.member(userId).build());
+    when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
 
-    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
-    verifyNoInteractions(holderRepository);
+    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
   }
 
   @Test
-  void canSeeHolder_deniesUnauthenticatedCaller() {
-    when(authentication.isAuthenticated()).thenReturn(false);
+  void canSeeHolder_deniesTheUnauthenticatedCaller() {
+    callerIs(BankActor.NOBODY);
 
     assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
-    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), authentication));
-    verifyNoInteractions(holderRepository);
   }
 
-  /** Builds a holder row linked to the given user id (the self-ownership input of canSeeHolder). */
+  @Test
+  void exceedsCartelDirectBookingCeiling_plainEmployeeAboveCeiling_returnsTrue() {
+    callerIs(employeeWithoutGrant());
+    when(accountRepository.findById(accountId))
+        .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
+
+    assertTrue(
+        bankSecurityService.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1500")));
+  }
+
+  @Test
+  void exceedsCartelDirectBookingCeiling_atOrBelowCeiling_returnsFalse() {
+    callerIs(employeeWithoutGrant());
+    when(accountRepository.findById(accountId))
+        .thenReturn(Optional.of(cartelAccount(accountId, new BigDecimal("1000"))));
+
+    assertFalse(
+        bankSecurityService.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1000")));
+  }
+
+  @Test
+  void exceedsCartelDirectBookingCeiling_nullCeilingTreatedAsZero_anyPositiveReturnsTrue() {
+    callerIs(employeeWithoutGrant());
+    when(accountRepository.findById(accountId))
+        .thenReturn(Optional.of(cartelAccount(accountId, null)));
+
+    assertTrue(
+        bankSecurityService.exceedsCartelDirectBookingCeiling(accountId, new BigDecimal("1")));
+  }
+
+  @Test
+  void exceedsCartelDirectBookingCeiling_management_returnsFalseEvenAboveCeiling() {
+    callerIs(TestBankActor.of(userId).bankManagement().build());
+
+    assertFalse(
+        bankSecurityService.exceedsCartelDirectBookingCeiling(
+            accountId, new BigDecimal("999999999")));
+    verify(accountRepository, never()).findById(any());
+  }
+
+  @Test
+  void exceedsCartelDirectBookingCeiling_nonCartelAccount_returnsFalse() {
+    callerIs(employeeWithoutGrant());
+    when(accountRepository.findById(accountId)).thenReturn(Optional.of(areaAccount(accountId)));
+
+    assertFalse(
+        bankSecurityService.exceedsCartelDirectBookingCeiling(
+            accountId, new BigDecimal("999999999")));
+  }
+
+  /**
+   * Makes the actor the caller of every decision in the test.
+   *
+   * @param actor the request's actor
+   */
+  private void callerIs(BankActor actor) {
+    when(bankCaller.actor()).thenReturn(actor);
+  }
+
+  /**
+   * An employee (not management) holding a grant on the test account with the given flags.
+   *
+   * @param deposit {@code can_deposit}
+   * @param withdraw {@code can_withdraw}
+   * @param transfer {@code can_transfer}
+   * @return the actor
+   */
+  private BankActor employeeWithGrant(boolean deposit, boolean withdraw, boolean transfer) {
+    return TestBankActor.of(userId)
+        .roles(Roles.BANK_EMPLOYEE)
+        .grant(accountId, deposit, withdraw, transfer)
+        .build();
+  }
+
+  /**
+   * An employee (not management) without any grant row.
+   *
+   * @return the actor
+   */
+  private BankActor employeeWithoutGrant() {
+    return TestBankActor.of(userId).roles(Roles.BANK_EMPLOYEE).build();
+  }
+
+  /**
+   * Builds a holder row linked to the given user id, the self-ownership input of {@code
+   * canSeeHolder}.
+   *
+   * @param ownerUserId the member the holder belongs to
+   * @return the holder
+   */
   private static BankHolder holderLinkedTo(UUID ownerUserId) {
     User user = new User();
     user.setId(ownerUserId);
@@ -290,25 +384,38 @@ class BankSecurityServiceTest {
     return holder;
   }
 
-  /** Stubs an authenticated employee (not management) holding a grant with the given flags. */
-  private void employeeWithGrant(boolean deposit, boolean withdraw, boolean transfer) {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
-    BankAccountGrant grant = new BankAccountGrant();
-    grant.setId(new BankAccountGrantId(userId, accountId));
-    grant.setCanDeposit(deposit);
-    grant.setCanWithdraw(withdraw);
-    grant.setCanTransfer(transfer);
-    when(grantRepository.findById(new BankAccountGrantId(userId, accountId)))
-        .thenReturn(Optional.of(grant));
+  /**
+   * Builds an active {@code CARTEL} account with the given direct-booking ceiling.
+   *
+   * @param id the account id the lookup returns it for
+   * @param ceiling the T1 employee-approval ceiling, or {@code null} for an unset ceiling
+   * @return the CARTEL account
+   */
+  private static BankAccount cartelAccount(UUID id, @Nullable BigDecimal ceiling) {
+    BankAccount account = new BankAccount();
+    account.setId(id);
+    account.setAccountNo("KB-CART");
+    account.setName("KRT");
+    account.setType(BankAccountType.CARTEL);
+    account.setStatus(BankAccountStatus.ACTIVE);
+    account.setEmployeeApprovalCeiling(ceiling);
+    return account;
   }
 
-  /** Stubs an authenticated employee (not management) without any grant row. */
-  private void employeeWithoutGrant() {
-    when(authHelperService.hasReachableRole("ROLE_BANK_EMPLOYEE")).thenReturn(true);
-    when(authHelperService.hasReachableRole("ROLE_BANK_MANAGEMENT")).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
-    when(grantRepository.findById(any(BankAccountGrantId.class))).thenReturn(Optional.empty());
+  /**
+   * Builds an active {@code AREA} account, a non-CARTEL type.
+   *
+   * @param id the account id the lookup returns it for
+   * @return the AREA account
+   */
+  private static BankAccount areaAccount(UUID id) {
+    BankAccount account = new BankAccount();
+    account.setId(id);
+    account.setAccountNo("KB-" + id.toString().substring(0, 4));
+    account.setName("Bereichskonto");
+    account.setType(BankAccountType.AREA);
+    account.setAreaName("Profit");
+    account.setStatus(BankAccountStatus.ACTIVE);
+    return account;
   }
 }

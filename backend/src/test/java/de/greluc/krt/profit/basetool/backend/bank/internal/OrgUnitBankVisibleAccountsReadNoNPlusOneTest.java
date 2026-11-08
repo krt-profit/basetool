@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -57,6 +60,7 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
   @Autowired private BankAccountRepository accountRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private EntityManagerFactory entityManagerFactory;
 
   @AfterEach
@@ -82,6 +86,8 @@ class OrgUnitBankVisibleAccountsReadNoNPlusOneTest {
     User admin = new User();
     admin.setId(UUID.randomUUID());
     admin.setUsername("visible-admin-" + tag);
+    admin.setApprovalStatus(ApprovalStatus.ACTIVE);
+    admin.getRoles().add(roleRepository.findByCode(Roles.ADMIN).orElseThrow());
     userRepository.save(admin);
     SecurityContextHolder.getContext()
         .setAuthentication(

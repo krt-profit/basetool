@@ -218,7 +218,10 @@ Declared on `main`: `admin`, `app`, `audit`, `bank`, `blueprint`, `catalogue`, `
 `mission`, `navigation`, `notification`, `operation`, `orgunit`, `personalinventory`,
 `platform`, `privacy`, `purchasing`, `refinery`, `scope`, `supply` (floor 28). `mission` publishes `mission.api.MissionCommands`, its first
 command (`detachFromOperation`, plan §5.3). `bank.api` carries `BankAmounts` and `BankBookingRequestType`, which its
-events and its conflict exception expose.
+events and its conflict exception expose, and the bank access policy (ADR-0352): `BankAccessPolicy`,
+`BankActor`, `BankActors` and the decision types `BankAccountAccess`, `BankAccountRight`,
+`BankAdmission`, `BankStaffRights` and `BankRequestApprover`; its implementation stays in
+`bank.internal`.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the

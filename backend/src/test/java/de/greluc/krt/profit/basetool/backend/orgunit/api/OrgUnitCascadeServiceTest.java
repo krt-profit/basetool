@@ -85,6 +85,20 @@ class OrgUnitCascadeServiceTest {
   }
 
   @Test
+  void officerReach_isTheOfficerSeatsOwnUnitsPlusTheCascade_notAPlainMembership() {
+    OrgUnitMembership lead = membership(STAFFEL_A1_ID, OrgUnitKind.SQUADRON);
+    lead.setRole(MembershipRole.STAFFELLEITER);
+    OrgUnitMembership plain = membership(FOREIGN_STAFFEL_ID, OrgUnitKind.SQUADRON);
+    OrgUnitMembership bereich = membership(BEREICH_B_ID, OrgUnitKind.BEREICH);
+    bereich.setRole(MembershipRole.BEREICHSLEITER);
+    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_B_ID)).thenReturn(List.of(STAFFEL_B1_ID));
+
+    Set<UUID> reach = service.officerReach(List.of(lead, plain, bereich));
+
+    assertEquals(Set.of(STAFFEL_A1_ID, BEREICH_B_ID, STAFFEL_B1_ID), reach);
+  }
+
+  @Test
   void emptyMemberships_expandToEmpty() {
     assertTrue(service.expandWithDescendants(List.of()).isEmpty());
     assertTrue(service.cascadedOfficerReach(List.of()).isEmpty());

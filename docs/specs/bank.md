@@ -958,10 +958,10 @@ dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
 > **Amended 2026-10-04 — the confirm action follows the caller's capability:** every row of
 > `GET /api/v1/bank/requests` carries **`callerMayConfirm`** (`BankBookingRequestDto`, `null` on every
 > other read of that DTO): `true` exactly when the request is `PENDING` and the caller passes the same
-> capability check the confirm endpoint enforces — `BankSecurityService#canConfirm`, i.e. management,
+> capability check the confirm endpoint enforces — `BankStaffRights#canBook`, i.e. management,
 > or a grant on the request's account with `can_deposit` / `can_withdraw` / `can_transfer` matching
-> its type. The queue evaluates it through `BankSecurityService#confirmCheck`, one read of the
-> caller's grants per page, so the read stays statement-bounded (REQ-DATA-003). The over-limit
+> its type. The queue evaluates it on the caller's `BankStaffRights`, read once with the actor,
+> not per row, so the read stays statement-bounded (REQ-DATA-003). The over-limit
 > attestation stays a confirm-time input and is not part of the flag. The page offers „Bestätigen"
 > (and the attested „Bestätigen, Freigabe liegt vor …") **only where `callerMayConfirm` is true**; a
 > ready row the caller may not confirm says **„wartet auf berechtigte Bankmitarbeiter"** and keeps
@@ -1626,7 +1626,7 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
   **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
   Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/RequestScopeResolver#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/BankAccessJudgement#canView` (ADR-0352) · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 #### The Sonderkonto role audiences are retired (ADR-0300)
 
@@ -1750,7 +1750,7 @@ at all. The bank stays org-unit-blind: eligibility is decided in the `OrgUnitBan
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate replaces own-level on create; a
 view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) ·
 **Code:** `bank/internal/OrgUnitBankRequestService#createBookingRequest` /
-`OrgUnitBankAccessService#isRequestCapable` ·
+`BankAccessJudgement#isRequestCapable` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-040 — User-initiated transfer requests
@@ -2409,7 +2409,7 @@ button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anleg
 **Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Anträge
 an unsere Konten"** („Fremde Anträge" until 2026-10-03), band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
 `ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
-`canSeeForeignRequest` short-circuit on `isAdmin()` before the band check); their in-app grant records
+`BankStaffRights#mayApprove` short-circuit for an administrator before the band check); their in-app grant records
 `owner_approval_granted`
 and reuses the existing two-step machinery (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`). A bank
 employee then confirms with the mandatory `BANK_OWNER_APPROVAL_REQUIRED` checkbox exactly as
@@ -2458,7 +2458,7 @@ membership-based notification seam; the Bankleitung instead picks the request up
 (`createBookingRequest` KRT branch, `resolveCartelApprovalRouting`, `raiseCartelDirectBookingRequest`,
 `canApprove`, `listRequestsForResponsibleAccounts`),
 `bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds` (CARTEL OL set),
-`bank/internal/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
+`bank/internal/BankAccessRules#exceedsDirectBookingCeiling`,
 `bank/web/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
 `bank/internal/BankBookingOutcomeDto`, `bank/web/BankAccountController#setCartelApprovalTiers`,
 `db/migration/V203` + `V222` (approver rename), frontend `templates/bank/bank-manage.html` +
@@ -2478,9 +2478,9 @@ Spezialkommandos — via a new **`AREA_MEMBERS`** value of the shared `BankAccou
 (so it extends **both** `bank_account_view_grant` and `bank_account_approval_limit` one-for-one, V202).
 It sits alongside the existing Bereich audiences (`BEREICHSKOORDINATOR` / `BEREICHSOPERATOR` each
 separately, all-Bereichsleitung via `ALL_MEMBERS`, individual users) and is offered **only for AREA
-accounts**. The cascade membership is resolved inside the `OrgUnitBankAccessService` seam
-(`OrgUnitBankAccessService#callerIsMemberOfAreaCascade(bereichId)`, since 2026-10-10 in the seam itself,
-built on the scope kernel's direct memberships = the caller has any membership on the
+accounts**. The cascade membership is resolved by the bank access policy
+(`BankAccessJudgement#isMemberOfAreaCascade(bereichId)`, ADR-0352,
+built on the actor's direct memberships = the actor has any membership on the
 Bereich or one of its `findChildOrgUnitIds` children — the 3-level hierarchy makes the direct children
 the whole subtree), so the bank stays org-unit-blind. Toggling the grant/limit is an idempotent
 insert/delete audited `BALANCE_VISIBILITY_GRANTED/REVOKED` / `APPROVAL_LIMIT_SET/CLEARED` (tier code
@@ -2503,9 +2503,9 @@ all-member **visibility** (every Kartellmitglied, REQ-BANK-037) is **unchanged**
 **Enforced by:** `OrgUnitBankAccessServiceTest` (AREA_MEMBERS canView + limit tier; cascade vs direct
 members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest`,
 `DatabaseIndexMigrationTest` (V202 CHECK + partial unique indexes) · **Code:**
-`bank/internal/BankAccountViewGranteeKind#AREA_MEMBERS`, `bank/internal/OrgUnitBankAccessService#callerIsMemberOfAreaCascade`,
-`bank/internal/OrgUnitBankAccessService` (`matchesOrgUnitGrant`, `resolveApplicableLimit`,
-`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `bank/internal/BankApprovalLimitService#areaMembersSupported`,
+`bank/internal/BankAccountViewGranteeKind#AREA_MEMBERS`, `bank/internal/BankAccessJudgement#isMemberOfAreaCascade`,
+`bank/internal/BankAccessJudgement` (`matchesOrgUnitGrant`, `applicableLimit`), `bank/internal/OrgUnitBankSettingsService`
+(`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `bank/internal/BankApprovalLimitService#areaMembersSupported`,
 `bank/internal/BankApprovalLimitsDto`, `bank/internal/OrgUnitBankAccountSettingsDto`,
 `bank/web/OrgUnitBankController`, `db/migration/V202`, frontend
 `templates/bank/fragments/bank-approval-limits.html` + `bank/org-unit-bank-account-detail.html` ·
@@ -3037,11 +3037,11 @@ may view on the **org-unit bank page** (`/org-unit-bank`), with what the home da
 widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal accounts
 (REQ-BANK-001).
 
-- **Who sees what.** The same rule as the org-unit bank page: `OrgUnitBankAccessService#canView`
+- **Who sees what.** The same rule as the org-unit bank page: `BankAccessJudgement#canView`
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
 - **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin (`RequestScopeResolver#currentOversightScopeIgnoringPin`; an admin sees every
+  active org-unit pin (`BankAccessPolicy#viewableAccounts` without a pin; an admin sees every
   active account); only the order below uses the active context.
 - **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
   `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
@@ -3126,7 +3126,7 @@ caller with the **same `404` and the same problem detail** as an id that does no
 ids cannot be probed by comparing the two answers.
 
 - **Read routes** — the drill-in, `/transactions`, `/balance-series`, `/statement`: hidden means
-  `OrgUnitBankAccessService#canView` is false (REQ-BANK-021, -035, -037).
+  `BankAccessJudgement#canView` is false (REQ-BANK-021, -035, -037).
 - **Settings routes** — `/settings`, `/balance-target`, `/visibility/…`, `/approval-limit/…`: hidden
   means the caller may neither view the account nor set its target, configure its visibility or
   configure its approval limits. A disclosed account whose control the caller lacks still answers
@@ -3177,6 +3177,14 @@ rule against Postgres, through the real endpoints and the real token chain, with
 - **Reuse:** the seeded world (`BankAccessSeeder`, `BankAccessWorld`) and the case list are
   independent of the web driver (`BankWebAccessDriver`), so another path runs the same rows with a
   driver of its own.
+
+### Bank access policy
+
+Every bank access rule is decided by `BankAccessPolicy` for an explicit `BankActor` read from the
+database (ADR-0352). `BankAccessRulesTest` drives its four queries for explicit actors,
+`DatabaseBankActorsTest` the actor read (the exchange actor holds no Admin), and
+`BankAccessPolicyRulesTest` keeps the security context out of the policy and every role or seat
+read out of the rest of the bank.
 
 ## Out of scope
 

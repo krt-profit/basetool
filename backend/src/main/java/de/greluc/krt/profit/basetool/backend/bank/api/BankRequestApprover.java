@@ -17,13 +17,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.bank.internal;
+package de.greluc.krt.profit.basetool.backend.bank.api;
 
 /**
- * The class of approver a flagged {@link BankBookingRequest} needs before a bank employee may
- * confirm it (REQ-BANK-046). Set only when {@link BankBookingRequest#isRequiresOwnerApproval()} is
- * true; resolving it to users happens in {@code OrgUnitBankAccessService} so the bank stays
- * org-unit-blind.
+ * The class of approver a flagged booking request needs before a bank employee may confirm it
+ * (REQ-BANK-046); set only when the request needs approval, decided by {@link BankAccessPolicy}.
  */
 public enum BankRequestApprover {
 

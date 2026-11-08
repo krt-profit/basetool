@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountApprovalLimit;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountApprovalLimitRepository;
@@ -38,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolder;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Band;

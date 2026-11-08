@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingGuards;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingOutcomeDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
@@ -66,7 +65,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class BankBookingController {
 
   private final BankLedgerService bankLedgerService;
-  private final BankBookingGuards bankBookingGuards;
   private final BankSecurityService bankSecurityService;
   private final BankTransferFeeService bankTransferFeeService;
   private final OrgUnitBankRequestService orgUnitBankRequestService;
@@ -130,7 +128,7 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookWithdrawal(
       @RequestBody @Valid BankWithdrawalRequest request) {
-    if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
+    if (bankSecurityService.exceedsCartelDirectBookingCeiling(
         request.accountId(), request.amount())) {
       BankBookingRequestDto raised =
           orgUnitBankRequestService.raiseCartelDirectBookingRequest(
@@ -172,7 +170,7 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookTransfer(
       @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
-    if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
+    if (bankSecurityService.exceedsCartelDirectBookingCeiling(
         request.sourceAccountId(), request.amount())) {
       BankBookingRequestDto raised =
           orgUnitBankRequestService.raiseCartelDirectBookingRequest(

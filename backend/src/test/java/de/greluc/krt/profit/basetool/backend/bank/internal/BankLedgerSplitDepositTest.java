@@ -94,8 +94,7 @@ class BankLedgerSplitDepositTest {
             holderPostingRepository,
             authHelperService,
             eventPublisher);
-    BankBookingGuards guards =
-        new BankBookingGuards(accountRepository, postingRepository, authHelperService);
+    BankBookingGuards guards = new BankBookingGuards(postingRepository);
     bankLedgerService =
         new BankLedgerService(
             accountRepository,

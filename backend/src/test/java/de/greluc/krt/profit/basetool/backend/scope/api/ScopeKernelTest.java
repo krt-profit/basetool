@@ -170,6 +170,10 @@ class ScopeKernelTest {
           return ids;
         });
 
+    lenient()
+        .when(orgUnitCascadeService.officerReach(org.mockito.ArgumentMatchers.anyCollection()))
+        .thenCallRealMethod();
+
     StaffelMembershipResolver realResolver =
         new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
@@ -2290,39 +2294,6 @@ class ScopeKernelTest {
 
       assertFalse(scope.adminAllScope());
       assertEquals(Set.of(bereichId, childStaffelId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void ignoringPin_pinWithinOversight_keepsWholeOversightSet() {
-      UUID skId = UUID.randomUUID();
-      OrgUnitMembership lead = skMembership(MEMBER_USER_ID, skId);
-      lead.setRole(MembershipRole.SK_LEAD);
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
-          .thenReturn(List.of(seatMembership(MEMBER_USER_ID, SQUADRON_A_ID), lead));
-      lenient()
-          .when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_A_ID.toString());
-
-      ScopePredicate scope = requestScopeResolver.currentOversightScopeIgnoringPin();
-
-      assertFalse(scope.adminAllScope());
-      assertNull(scope.activeOrgUnitId());
-      assertEquals(Set.of(SQUADRON_A_ID, skId), scope.memberOrgUnitIds());
-    }
-
-    @Test
-    void ignoringPin_adminWithPin_allScope() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      lenient()
-          .when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      ScopePredicate scope = requestScopeResolver.currentOversightScopeIgnoringPin();
-
-      assertTrue(scope.adminAllScope());
-      assertNull(scope.activeOrgUnitId());
     }
   }
 
