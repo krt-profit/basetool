@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -51,6 +52,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Formula;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Refinery Order JPA entity. */
@@ -187,4 +189,8 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @ToString.Exclude
   @Nullable
   private OrgUnit owningOrgUnit;
+
+  /** Who created the order, who changed it last and who reported its pickup (REQ-REFINERY-027). */
+  @Embedded @NotNull
+  private RefineryOrderProvenance provenance = RefineryOrderProvenance.createdInWeb(Instant.now());
 }

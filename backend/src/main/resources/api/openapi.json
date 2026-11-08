@@ -92943,6 +92943,9 @@
             "type" : "number",
             "format" : "double"
           },
+          "provenance" : {
+            "$ref" : "#/components/schemas/RefineryOrderProvenanceDto"
+          },
           "refiningMethod" : {
             "$ref" : "#/components/schemas/RefiningMethodDto"
           },
@@ -93012,6 +93015,9 @@
             "type" : "number",
             "format" : "double"
           },
+          "provenance" : {
+            "$ref" : "#/components/schemas/RefineryOrderProvenanceDto"
+          },
           "refiningMethod" : {
             "$ref" : "#/components/schemas/RefiningMethodDto"
           },
@@ -93025,6 +93031,32 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "RefineryOrderProvenanceDto" : {
+        "type" : "object",
+        "properties" : {
+          "createdByClient" : {
+            "type" : "string"
+          },
+          "lastChangedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastChangedByClient" : {
+            "type" : "string"
+          },
+          "pickedUpAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "pickedUpByClient" : {
+            "type" : "string"
+          },
+          "storedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

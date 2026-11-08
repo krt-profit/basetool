@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param canEdit whether the caller may edit, cancel or store the order: the owner, or a
  *     Logistician whose grant covers the order's unit (REQ-REFINERY-019)
+ * @param provenance the creating client, the last change and the pickup marker (REQ-REFINERY-027)
  */
 public record RefineryOrderListDto(
     UUID id,
@@ -52,7 +53,8 @@ public record RefineryOrderListDto(
     List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Boolean canEdit) {
+    Boolean canEdit,
+    @Nullable RefineryOrderProvenanceDto provenance) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */

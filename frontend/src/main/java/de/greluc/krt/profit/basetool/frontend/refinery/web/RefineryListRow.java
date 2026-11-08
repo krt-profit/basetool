@@ -89,7 +89,8 @@ public record RefineryListRow(
   public static RefineryListRow of(
       @NotNull RefineryOrderListDto order, @NotNull Instant now, @NotNull Locale locale) {
     Instant endsAt = RefineryProgress.endsAt(order.startedAt(), order.durationMinutes());
-    RefineryProgress.State state = RefineryProgress.state(order.status(), endsAt, now);
+    RefineryProgress.State state =
+        RefineryProgress.state(order.status(), endsAt, order.provenance(), now);
     String remaining =
         state == RefineryProgress.State.RUNNING && endsAt != null
             ? RefineryProgress.formatDuration(RefineryProgress.minutesUntil(endsAt, now))

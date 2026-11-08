@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
@@ -150,6 +151,25 @@ class RefineryOrderDetailPatternRenderTest {
       @Nullable Instant startedAt,
       @Nullable Long durationMinutes)
       throws Exception {
+    return render(status, startedAt, durationMinutes, null);
+  }
+
+  /**
+   * Stubs the order read with its provenance and renders the detail page in German.
+   *
+   * @param status the order status
+   * @param startedAt the start of the run, or {@code null}
+   * @param durationMinutes the duration, or {@code null}
+   * @param provenance the order's provenance, or {@code null}
+   * @return the rendered HTML
+   * @throws Exception if the request fails
+   */
+  private @NotNull String render(
+      @NotNull RefineryOrderStatus status,
+      @Nullable Instant startedAt,
+      @Nullable Long durationMinutes,
+      @Nullable RefineryOrderProvenanceDto provenance)
+      throws Exception {
     RefineryGoodDto good =
         new RefineryGoodDto(
             UUID.randomUUID(),
@@ -179,7 +199,8 @@ class RefineryOrderDetailPatternRenderTest {
             3L,
             null,
             null,
-            null);
+            null,
+            provenance);
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(ORDER_ID)))
         .thenReturn(order);
@@ -261,5 +282,54 @@ class RefineryOrderDetailPatternRenderTest {
         .containsPattern("class=\"status-badge status-completed\"[^>]*>Eingelagert<")
         .doesNotContain("data-trigger=\"rod-open-store\"")
         .doesNotContain("id=\"refineryCancelForm\"");
+  }
+
+  /**
+   * A client's pickup without store reads „Abgeholt" in the badge and the last step, names the
+   * client beside the badge and in the assigned card, and a web edit shows as the last change
+   * (REQ-REFINERY-027, REQ-REFINERY-028).
+   */
+  @Test
+  void aPickedUpClientOrderShowsTheChipAndAbgeholt() throws Exception {
+    Instant pickup = Instant.now().minus(20, ChronoUnit.MINUTES);
+    String html =
+        render(
+            RefineryOrderStatus.COMPLETED,
+            Instant.now().minus(3, ChronoUnit.HOURS),
+            60L,
+            new RefineryOrderProvenanceDto(
+                "VerseKit", null, Instant.now(), pickup, "VerseKit", null));
+    String head =
+        html.substring(
+            html.indexOf("data-testid=\"page-head\""),
+            html.indexOf("id=\"refinery-order-results\""));
+
+    assertThat(head)
+        .containsPattern("class=\"status-badge status-completed\"[^>]*>Abgeholt<")
+        .containsPattern("class=\"chip chip--info\"[^>]*>VerseKit<");
+    assertThat(html)
+        .containsPattern(
+            "data-testid=\"refinery-step-closed\"[\\s\\S]*?>Abgeholt<[\\s\\S]*?>via VerseKit<")
+        .contains("Erstellt von VerseKit")
+        .containsPattern("Zuletzt ge\u00e4ndert: Web, \\d\\d\\.\\d\\d\\. \\d\\d:\\d\\d")
+        .doesNotContain("data-trigger=\"rod-open-store\"");
+  }
+
+  /** A web order shows no chip, „Erstellt von Web", and a stored pickup stays „Eingelagert". */
+  @Test
+  void aWebOrderShowsNoChipAndAStoredPickupStaysEingelagert() throws Exception {
+    Instant at = Instant.now().minus(20, ChronoUnit.MINUTES);
+    String html =
+        render(
+            RefineryOrderStatus.COMPLETED,
+            null,
+            null,
+            new RefineryOrderProvenanceDto(null, "VerseKit", at, at, "VerseKit", at));
+
+    assertThat(html)
+        .doesNotContain("chip chip--info")
+        .containsPattern("class=\"status-badge status-completed\"[^>]*>Eingelagert<")
+        .contains("Erstellt von Web")
+        .contains("Zuletzt ge\u00e4ndert: VerseKit,");
   }
 }

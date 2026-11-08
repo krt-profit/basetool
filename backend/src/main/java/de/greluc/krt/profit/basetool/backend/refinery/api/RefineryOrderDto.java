@@ -41,7 +41,8 @@ import org.jetbrains.annotations.Nullable;
  * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
  * inadmissible pick is rejected with 400 (REQ-ORG-016). {@code gameDataVersion} and {@code
  * financesVersion} are the order's section counters (REQ-REFINERY-029), which an update echoes for
- * each section it writes; a create ignores them.
+ * each section it writes; a create ignores them. {@code provenance} is read-only: the creating
+ * client, the last change and the pickup marker (REQ-REFINERY-027).
  */
 public record RefineryOrderDto(
     @Nullable UUID id,
@@ -61,4 +62,5 @@ public record RefineryOrderDto(
     @Nullable Long version,
     @Nullable UUID owningOrgUnitId,
     @Nullable Long gameDataVersion,
-    @Nullable Long financesVersion) {}
+    @Nullable Long financesVersion,
+    @Nullable RefineryOrderProvenanceDto provenance) {}

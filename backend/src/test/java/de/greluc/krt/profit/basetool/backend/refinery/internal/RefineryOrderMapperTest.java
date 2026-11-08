@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderProvenanceDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import java.time.Instant;
 import java.util.HashMap;
@@ -62,7 +63,28 @@ class RefineryOrderMapperTest {
             Mappers.getMapper(SquadronMapper.class),
             new LocationMapperImpl(),
             new RefiningMethodMapperImpl(),
-            missions::get);
+            missions::get,
+            order -> order == null ? null : PROVENANCE);
+  }
+
+  /** The provenance the stub lookup answers for every order. */
+  private static final RefineryOrderProvenanceDto PROVENANCE =
+      new RefineryOrderProvenanceDto(
+          "VerseKit", null, Instant.parse("2026-11-01T10:00:00Z"), null, null, null);
+
+  /** The detail, the yield-enriched detail and the list row carry the order's provenance. */
+  @Test
+  void everyProjectionCarriesTheProvenance() {
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+
+    assertEquals(PROVENANCE, mapper.toDto(order).provenance());
+    assertEquals(
+        PROVENANCE,
+        mapper
+            .toDto(order, Map.of(UUID.randomUUID(), new RefineryYieldBonusDto(5, null, null)))
+            .provenance());
+    assertEquals(PROVENANCE, mapper.toListDto(order, true).provenance());
   }
 
   @Test

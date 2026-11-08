@@ -129,6 +129,7 @@ public class RefineryOrderService {
     order.setFinancesVersion(0L);
     order.setStatus(RefineryOrderStatus.OPEN);
     order.setStoredAt(null);
+    order.setProvenance(RefineryOrderProvenance.createdInWeb(Instant.now()));
 
     User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
@@ -329,6 +330,7 @@ public class RefineryOrderService {
         section.advance(order);
       }
     }
+    order.getProvenance().recordWebChange(Instant.now());
 
     RefineryOrder saved = refineryOrderRepository.save(order);
     if (runTimeChanged
@@ -503,6 +505,7 @@ public class RefineryOrderService {
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
     RefineryOrderSection.GAME_DATA.advance(order);
+    order.getProvenance().recordWebChange(Instant.now());
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceByOther(order, userId, "CANCELED");

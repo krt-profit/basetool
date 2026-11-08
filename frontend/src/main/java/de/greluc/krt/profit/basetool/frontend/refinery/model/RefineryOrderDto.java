@@ -37,7 +37,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>{@code owningOrgUnitId} is the owning-org-unit picker output sent on create; {@code null}
  * stamps the owner's home Staffel. {@code gameDataVersion} and {@code financesVersion} are the
- * order's section counters (REQ-REFINERY-029), echoed by the edit form.
+ * order's section counters (REQ-REFINERY-029), echoed by the edit form. {@code provenance} is
+ * read-only: the creating client, the last change and the pickup marker (REQ-REFINERY-027), {@code
+ * null} on a request.
  */
 @DtoMirror
 public record RefineryOrderDto(
@@ -58,7 +60,8 @@ public record RefineryOrderDto(
     Long version,
     UUID owningOrgUnitId,
     Long gameDataVersion,
-    Long financesVersion) {
+    Long financesVersion,
+    @Nullable RefineryOrderProvenanceDto provenance) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */

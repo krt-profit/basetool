@@ -879,7 +879,8 @@ public class RefineryOrderPageController {
     Instant now = Instant.now();
     Instant endsAt = order.getEndsAt();
     RefineryProgress.State state =
-        RefineryProgress.state(order.status() == null ? null : order.status().name(), endsAt, now);
+        RefineryProgress.state(
+            order.status() == null ? null : order.status().name(), endsAt, order.provenance(), now);
     model.addAttribute("orderState", state);
     model.addAttribute("orderEndsAt", endsAt);
     model.addAttribute(

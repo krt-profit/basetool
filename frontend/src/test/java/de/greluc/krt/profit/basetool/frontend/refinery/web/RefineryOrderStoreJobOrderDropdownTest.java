@@ -117,6 +117,7 @@ class RefineryOrderStoreJobOrderDropdownTest {
             1L,
             null,
             null,
+            null,
             null);
 
     JobOrderReferenceDto matching =

@@ -277,6 +277,7 @@ class MissionDetailPatternRenderTest {
                     List.of(),
                     null,
                     1L,
+                    null,
                     null)));
     String html = render("/missions/" + MISSION_ID);
 

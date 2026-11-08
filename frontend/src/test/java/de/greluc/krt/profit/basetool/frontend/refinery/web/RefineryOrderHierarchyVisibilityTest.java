@@ -85,6 +85,7 @@ class RefineryOrderHierarchyVisibilityTest {
             1L,
             null,
             null,
+            null,
             null);
 
     when(backendApiClient.get(
@@ -150,6 +151,7 @@ class RefineryOrderHierarchyVisibilityTest {
             RefineryOrderStatus.COMPLETED,
             null,
             1L,
+            null,
             null,
             null,
             null);
@@ -227,6 +229,7 @@ class RefineryOrderHierarchyVisibilityTest {
             RefineryOrderStatus.CANCELED,
             null,
             1L,
+            null,
             null,
             null,
             null);

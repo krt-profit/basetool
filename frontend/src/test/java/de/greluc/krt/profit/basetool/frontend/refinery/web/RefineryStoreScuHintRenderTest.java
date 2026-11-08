@@ -154,6 +154,7 @@ class RefineryStoreScuHintRenderTest {
             1L,
             null,
             null,
+            null,
             null);
 
     when(backendApiClient.get(

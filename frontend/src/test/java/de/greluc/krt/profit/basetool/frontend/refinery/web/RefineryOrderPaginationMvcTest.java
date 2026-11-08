@@ -111,6 +111,7 @@ class RefineryOrderPaginationMvcTest {
             List.of(),
             null,
             1L,
+            null,
             null);
     int totalPages = (int) Math.ceil((double) total / 50);
     return new PageResponse<>(List.of(order), 0, 50, total, totalPages, List.of());

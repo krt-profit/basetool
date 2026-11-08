@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -33,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialNameCanonical
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -279,14 +277,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
 
     reconcileHeaderTotals(order, sourceGoods, issues);
 
-    RefineryOrderDto draftOrder =
-        draftOrder(
-            resolveOwnerReference(callerId),
-            location.map(locationMapper::toDto).orElse(null),
-            deriveStartedAt(order.sourceImages()),
-            order,
-            method.map(refiningMethodMapper::toDto).orElse(null),
-            draftGoods);
+    RefineryOrderDto draftOrder = draftOrder(callerId, order, location, method, draftGoods);
     log.debug(
         "Built refinery import draft: {} of {} rows matched, {} skipped, {} issues",
         goodsMatched,
@@ -298,39 +289,38 @@ public class RefineryImportService implements RefineryDraftBuilder {
   }
 
   /**
-   * Builds the unsaved {@code OPEN} order of an import draft: no id, mission, money besides the
-   * expenses, owning unit, version or section counters.
+   * Builds the draft's unsaved order: {@code OPEN}, owned by the caller, with the matched location
+   * and method and the extracted timer and expenses; id, mission, owning unit, version, section
+   * counters and provenance stay unset.
    *
-   * @param owner the caller as the order's owner
-   * @param location the matched refinery location, or {@code null}
-   * @param startedAt the start derived from the screenshots, or {@code null}
+   * @param callerId the uploading member, or {@code null}
    * @param order the extracted order
-   * @param method the matched refining method, or {@code null}
-   * @param goods the draft goods
+   * @param location the matched refinery location, if any
+   * @param method the matched refining method, if any
+   * @param draftGoods the resolved goods
    * @return the draft order
    */
-  @NotNull
-  private static RefineryOrderDto draftOrder(
-      @Nullable UserReferenceDto owner,
-      @Nullable LocationDto location,
-      @Nullable Instant startedAt,
+  private @NotNull RefineryOrderDto draftOrder(
+      @Nullable UUID callerId,
       @NotNull RefineryExtractOrderDto order,
-      @Nullable RefiningMethodDto method,
-      @NotNull List<RefineryGoodDto> goods) {
+      @NotNull Optional<Location> location,
+      @NotNull Optional<RefiningMethod> method,
+      @NotNull List<RefineryGoodDto> draftGoods) {
     return new RefineryOrderDto(
         null,
-        owner,
-        location,
+        resolveOwnerReference(callerId),
+        location.map(locationMapper::toDto).orElse(null),
         null,
-        startedAt,
+        deriveStartedAt(order.sourceImages()),
         order.durationMinutes(),
         order.expenses(),
         null,
         null,
         null,
-        method,
+        method.map(refiningMethodMapper::toDto).orElse(null),
         RefineryOrderStatus.OPEN.name(),
-        goods,
+        draftGoods,
+        null,
         null,
         null,
         null,

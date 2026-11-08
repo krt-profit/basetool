@@ -58,7 +58,7 @@
                     <td>
                         <a class="row-link" data-testid="row-link" th:href="@{/refinery-orders/{id}(id=${o.id})}">
                             <span class="cell-title" th:text="${row.outputLabel()}">Quantanium 18,4 SCU</span>
-                            <span class="cell-sub"><span th:text="'#' + ${row.shortId()}">#1042</span><th:block th:if="${row.inputCount() == 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.one(${row.inputName()}, ${row.inputUnits()})} : ${row.inputName()}">Quantanium-Erz 2.300 Units</span></th:block><th:block th:if="${row.inputCount() > 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.many(${row.inputCount()}, ${row.inputUnits()})} : #{refineryorder.list.input.manyNoUnits(${row.inputCount()})}">2 Erze &middot; 1.650 Units</span></th:block></span>
+                            <span class="cell-sub"><span th:text="'#' + ${row.shortId()}">#1042</span><th:block th:if="${o.provenance != null and o.provenance.createdByClient != null}"> <span class="chip chip--info" data-testid="refinery-client-chip" th:title="#{refineryorder.client.chip(${o.provenance.createdByClient})}" th:text="${o.provenance.createdByClient}">VerseKit</span></th:block><th:block th:if="${row.inputCount() == 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.one(${row.inputName()}, ${row.inputUnits()})} : ${row.inputName()}">Quantanium-Erz 2.300 Units</span></th:block><th:block th:if="${row.inputCount() > 1}"> &middot; <span th:text="${row.inputUnits() > 0} ? #{refineryorder.list.input.many(${row.inputCount()}, ${row.inputUnits()})} : #{refineryorder.list.input.manyNoUnits(${row.inputCount()})}">2 Erze &middot; 1.650 Units</span></th:block></span>
                         </a>
                     </td>
                     <td th:attr="data-label=#{refineryorder.list.refinery}">
@@ -73,9 +73,13 @@
                                   th:text="${row.readySince() != null} ? #{refinery.readyFor(${row.readySince()})} : #{refineryorder.list.ready}">abholbereit seit 1 h</span>
                             <span th:case="'COMPLETED'" class="refinery-done__text refinery-done__text--muted"
                                   th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</span>
+                            <span th:case="'PICKED_UP'" class="refinery-done__text refinery-done__text--muted" data-testid="refinery-picked-up"
+                                  th:text="#{refinery.status.pickedUp}">Abgeholt</span>
                             <span th:case="*" class="refinery-done__text refinery-done__text--danger"
                                   th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
                         </th:block>
+                        <span th:if="${o.provenance != null and o.provenance.pickedUpByClient != null}" class="refinery-done__via" data-testid="refinery-picked-up-via"
+                              th:text="#{refineryorder.list.via(${o.provenance.pickedUpByClient})}">via VerseKit</span>
                         <span th:if="${row.state().name() == 'RUNNING' or row.ready()}" class="meter refinery-meter" aria-hidden="true"
                               ><i th:classappend="${row.ready()} ? 'meter__fill--success'" th:attr="data-krtm-width=${row.progressPercent()}"></i></span>
                     </td>

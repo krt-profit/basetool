@@ -205,9 +205,11 @@ public class RefineryOrderStoreService {
       writeBackOutputQuantity(good, itemDto.amount());
     }
 
+    Instant storedAt = Instant.now();
     order.setStatus(RefineryOrderStatus.COMPLETED);
-    order.setStoredAt(Instant.now());
+    order.setStoredAt(storedAt);
     RefineryOrderSection.GAME_DATA.advance(order);
+    order.getProvenance().recordWebChange(storedAt);
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceStored(order, userId, bookedOnto);
