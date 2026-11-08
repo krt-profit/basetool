@@ -19,9 +19,11 @@ and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 `OrgUnitBankRequestService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
 approval is granted. The default rule notifies the bank management (`ROLE` `BANK_MANAGEMENT`), the
 bank employees granted on the account (`ACCOUNT_GRANT`) and the requester (`EVENT_RECIPIENT`), names
-the request, its amount, the account and the approver, and excludes the approver. Revoking the
-approval publishes `BANK_BOOKING_REQUEST_APPROVAL_REVOKED`, which clears the notice; so do confirming,
-rejecting and cancelling the request (`DECIDED_REQUEST_NOTICES`, REQ-NOTIF-018).
+the request, its amount, the account and the approver, and excludes the approver. The approval
+also clears the approval-needed notice (REQ-NOTIF-033). Revoking the approval publishes
+`BANK_BOOKING_REQUEST_APPROVAL_REVOKED`, which clears the notice and tells the required approvers
+again that their approval is needed; confirming, rejecting and cancelling the request clear it too
+(`DECIDED_REQUEST_NOTICES`, REQ-NOTIF-018).
 
 ### REQ-BANK-058 — A change to a bank grant tells the grantee
 

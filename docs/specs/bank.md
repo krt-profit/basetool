@@ -1932,6 +1932,15 @@ approval completes the approver step, so the bank's confirmation becomes current
 derived in the frontend from the request's `requiresOwnerApproval` / `requiredApprover` /
 `ownerApprovalGranted` / `status` (`BankRequestSteps`); no new endpoint, field or audit event.
 
+**„Freigabe nötig" — the approver is told (REQ-NOTIF-033, ADR-0353).** A flagged request tells its
+required approver, and only them, that their approval is needed: the responsible holders over the
+limit, the Bankleitung on the middle KRT band, the OL above `T2` — never the requester. For them this
+notice replaces the generic „Neuer Buchungsantrag"; it clears on the approval, the rejection, the
+cancellation and the confirmation, comes back when the approval is revoked, is re-decided by a
+correction (REQ-BANK-056) and moves with a change of responsible holder (REQ-NOTIF-023). The KRT
+account's responsible holders, the OL, get no generic notice for its requests. The requests carrying
+the notice for a member are exactly those waiting for that member's approval.
+
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
 is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open

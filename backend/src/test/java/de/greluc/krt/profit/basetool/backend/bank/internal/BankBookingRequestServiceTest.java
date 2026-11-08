@@ -630,6 +630,7 @@ class BankBookingRequestServiceTest {
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
             NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
             NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
@@ -712,7 +713,8 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().resolvesNotificationTypes())
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
-            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
     assertThat(event.getValue().renderParams()).containsEntry("amount", "900");
   }
 
@@ -953,6 +955,7 @@ class BankBookingRequestServiceTest {
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
             NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
             NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
@@ -1238,6 +1241,7 @@ class BankBookingRequestServiceTest {
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
             NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
             NotificationType.BANK_BOOKING_REQUEST_APPROVED);
   }
 
@@ -1591,7 +1595,9 @@ class BankBookingRequestServiceTest {
     assertThat(notice.contextRecipientUserId()).isEqualTo(requester);
     assertThat(notice.actorSub()).isEqualTo(approver);
     assertThat(notice.resolvesNotificationTypes())
-        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVED);
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
   }
 
   @Test
@@ -1615,8 +1621,11 @@ class BankBookingRequestServiceTest {
     NoticeEvent notice = (NoticeEvent) published.getValue();
     assertThat(notice.eventType())
         .isEqualTo(NotificationEventType.BANK_BOOKING_REQUEST_APPROVAL_REVOKED);
+    assertThat(notice.contextBankRequestId()).isEqualTo(requestId);
     assertThat(notice.resolvesNotificationTypes())
-        .containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVED);
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_BOOKING_REQUEST_APPROVED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
   }
 
   @Test

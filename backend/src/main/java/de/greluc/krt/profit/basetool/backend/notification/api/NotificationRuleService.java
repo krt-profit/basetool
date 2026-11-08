@@ -199,7 +199,9 @@ public class NotificationRuleService {
           MISSION_LEADERSHIP,
           EXCHANGE_CLIENT_HOLDERS,
           EVENT_RECIPIENTS,
-          SEAT_HOLDERS -> {}
+          SEAT_HOLDERS,
+          REQUIRED_APPROVER,
+          REQUEST_RESPONSIBLE -> {}
       case null -> throw new NullPointerException("selector kind");
     }
     return null;

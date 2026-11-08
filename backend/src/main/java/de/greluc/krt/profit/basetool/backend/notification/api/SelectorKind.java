@@ -98,7 +98,24 @@ public enum SelectorKind {
    * Resolves to every member who holds a leadership seat in any org unit. Reads no selector columns
    * and nothing from the event.
    */
-  SEAT_HOLDERS;
+  SEAT_HOLDERS,
+
+  /**
+   * Resolves to the members whose approval the booking request carried by the event ({@link
+   * NotificationEvent#contextBankRequestId()}) still waits for, read from its {@code
+   * required_approver}: the account's responsible holders, the Bankleitung or the OL, never the
+   * requester; nobody once the request is approved, decided or needs no approval (REQ-NOTIF-033).
+   * Reads no selector columns.
+   */
+  REQUIRED_APPROVER,
+
+  /**
+   * Resolves to the responsible holders who are told of every request on the bank account carried
+   * by the event ({@link NotificationEvent#contextAccountId()}): those of {@link
+   * #ACCOUNT_RESPONSIBLE}, except on the KRT account, whose requests reach the OL only through
+   * {@link #REQUIRED_APPROVER} (REQ-NOTIF-033). Reads no selector columns.
+   */
+  REQUEST_RESPONSIBLE;
 
   /**
    * Whether this kind reads no selector column, so the row is stored with every column {@code
@@ -117,7 +134,9 @@ public enum SelectorKind {
           MISSION_LEADERSHIP,
           EXCHANGE_CLIENT_HOLDERS,
           EVENT_RECIPIENTS,
-          SEAT_HOLDERS ->
+          SEAT_HOLDERS,
+          REQUIRED_APPROVER,
+          REQUEST_RESPONSIBLE ->
           true;
     };
   }
