@@ -944,17 +944,10 @@ public class BankBookingRequestService {
           "This request does not require the responsible holder's approval");
     }
     UUID actor = authHelperService.currentUserId().orElse(null);
-    if (granted) {
-      request.setOwnerApprovalGranted(true);
-      request.setOwnerApprovalGrantedBy(actor);
-      request.setOwnerApprovalGrantedByHandle(resolveHandle(actor));
-      request.setOwnerApprovalGrantedAt(Instant.now());
-    } else {
-      request.setOwnerApprovalGranted(false);
-      request.setOwnerApprovalGrantedBy(null);
-      request.setOwnerApprovalGrantedByHandle(null);
-      request.setOwnerApprovalGrantedAt(null);
-    }
+    request.setOwnerApprovalGranted(granted);
+    request.setOwnerApprovalGrantedBy(granted ? actor : null);
+    request.setOwnerApprovalGrantedByHandle(granted ? resolveHandle(actor) : null);
+    request.setOwnerApprovalGrantedAt(granted ? Instant.now() : null);
     bankAuditService.record(
         granted
             ? BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_GRANTED
@@ -965,20 +958,25 @@ public class BankBookingRequestService {
         (granted ? "granted" : "revoked")
             + " owner approval for request "
             + shortId(request.getId()));
-    if (granted) {
-      eventPublisher.publishEvent(
-          BankNotices.approved(
-              request.getId(),
-              request.getAccount().getId(),
-              request.getRequestedBy(),
-              request.getType(),
-              request.getAmount(),
-              request.getAccount().getAccountNo(),
-              Objects.requireNonNull(request.getOwnerApprovalGrantedByHandle()),
-              actor));
-    } else {
-      eventPublisher.publishEvent(BankNotices.approvalRevoked(request.getId()));
-    }
+    eventPublisher.publishEvent(
+        granted
+            ? BankNotices.approved(
+                request.getId(),
+                request.getAccount().getId(),
+                request.getRequestedBy(),
+                request.getType(),
+                request.getAmount(),
+                request.getAccount().getAccountNo(),
+                Objects.requireNonNull(request.getOwnerApprovalGrantedByHandle()),
+                actor)
+            : BankNotices.approvalRevoked(
+                request.getId(),
+                request.getAccount().getId(),
+                request.getType(),
+                request.getAmount(),
+                request.getAccount().getAccountNo(),
+                request.getRequesterHandle(),
+                actor));
     return toDto(request);
   }
 

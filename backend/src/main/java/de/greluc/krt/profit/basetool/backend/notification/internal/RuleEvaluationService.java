@@ -77,7 +77,35 @@ public class RuleEvaluationService {
         byType.computeIfAbsent(rule.getNotificationType(), _ -> new HashSet<>()).addAll(recipients);
       }
     }
+    dropOutranked(byType, event.outrankedNotificationTypes());
     return byType;
+  }
+
+  /**
+   * Removes every member resolved for an outranking type from the types it outranks, and drops a
+   * type left without recipients (REQ-NOTIF-033).
+   *
+   * @param byType the resolved recipients by notification type, changed in place
+   * @param outranked the outranked types by outranking type
+   */
+  private static void dropOutranked(
+      @NotNull Map<NotificationType, Set<UUID>> byType,
+      @NotNull Map<NotificationType, Set<NotificationType>> outranked) {
+    outranked.forEach((outranking, lower) -> {
+      Set<UUID> holders = byType.get(outranking);
+      if (holders == null) {
+        return;
+      }
+      for (NotificationType type : lower) {
+        Set<UUID> recipients = byType.get(type);
+        if (recipients != null) {
+          recipients.removeAll(holders);
+          if (recipients.isEmpty()) {
+            byType.remove(type);
+          }
+        }
+      }
+    });
   }
 
   @NotNull
@@ -98,7 +126,33 @@ public class RuleEvaluationService {
       case MISSION_LEADERSHIP -> resolveMissionLeadership(event);
       case EXCHANGE_CLIENT_HOLDERS -> resolveExchangeClientHolders(event);
       case SEAT_HOLDERS -> recipientResolutionService.resolveSeatHolders();
+      case REQUIRED_APPROVER -> resolveRequiredApprover(event);
+      case REQUEST_RESPONSIBLE -> resolveRequestResponsible(event);
     };
+  }
+
+  @NotNull
+  private Set<UUID> resolveRequiredApprover(@NotNull NotificationEvent event) {
+    UUID requestId = event.contextBankRequestId();
+    if (requestId == null) {
+      log.debug(
+          "Event {} carries no booking request; REQUIRED_APPROVER selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveRequiredApprovers(requestId);
+  }
+
+  @NotNull
+  private Set<UUID> resolveRequestResponsible(@NotNull NotificationEvent event) {
+    UUID accountId = event.contextAccountId();
+    if (accountId == null) {
+      log.debug(
+          "Event {} carries no bank account; REQUEST_RESPONSIBLE selector resolves to nobody",
+          event.eventType());
+      return Set.of();
+    }
+    return recipientResolutionService.resolveRequestResponsibleHolders(accountId);
   }
 
   @NotNull
