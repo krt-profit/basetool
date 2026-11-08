@@ -36,11 +36,6 @@ public enum ScLink {
   DAS_KARTELL(
       "dasKartell", "https://das-kartell.org/", "das-kartell.png", ScLinkCategory.ORGANISATION),
   KRT_OPSEC("krtOpsec", "https://krt-opsec.de/", "krt-opsec.png", ScLinkCategory.ORGANISATION),
-  SC_EXTRACTOR(
-      "scExtractor",
-      "https://github.com/krt-profit/basetool-sc-extractor",
-      "basetool-sc-extractor.svg",
-      ScLinkCategory.ORGANISATION),
   VERSEKIT("versekit", "https://versekit.xharig.com/", "versekit.png", ScLinkCategory.ORGANISATION),
   TALLYLINE(
       "tallyline",

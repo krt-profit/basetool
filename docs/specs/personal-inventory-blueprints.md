@@ -602,28 +602,26 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 [`AdminPersonalBlueprintsPageController#deleteAllUsers`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/blueprint/web/AdminPersonalBlueprintsPageController.java),
 [`admin-personal-blueprints-purge.js`](../../frontend/src/main/resources/static/js/personalinventory/admin-personal-blueprints-purge.js).
 
-### REQ-INV-038 — SC Extractor release link beside the import
+### REQ-INV-038 — VerseKit link beside the import
 
-The JSON import (REQ-INV-049) consumes an export the member has to produce with the desktop
-**Basetool SC Extractor** first, so the page head carries the way to obtain that tool directly next
-to the import trigger it feeds — a member who has no extractor yet no longer has to leave the tool
-and search for it.
+The desktop **Basetool SC Extractor** is discontinued and its repository archived; **VerseKit**
+offers its features and syncs blueprints with the Basetool. The page head therefore carries the way
+to VerseKit directly next to the import trigger, so a member does not have to leave the tool and
+search for it.
 
-- Renders as `<a id="krt-bp-extractor-link" class="overflow-menu__item" role="menuitem">` with the
+- Renders as `<a id="krt-bp-versekit-link" class="overflow-menu__item" role="menuitem">` with the
   `#krt-icon-download` glyph and an external-link mark, as the **first item of the page head's ⋯
   menu**, directly beside the „Importieren" button and above the delete-all danger item, so import
   and "get the importer" stay one reach apart.
-- Targets GitHub's canonical latest-release redirect
-  `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, so it never has to be
-  bumped per release. The URL is hardcoded in the template, matching the existing external-link
-  pattern of [`kernel/fragments/footer.html`](../../frontend/src/main/resources/templates/kernel/fragments/footer.html)
+- Targets `https://versekit.xharig.com/`. The URL is hardcoded in the template, matching the
+  existing external-link pattern of [`kernel/fragments/footer.html`](../../frontend/src/main/resources/templates/kernel/fragments/footer.html)
   (handbook / repository links) — no configuration property, no backend round-trip.
 - Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so the collection, the
   staged selection and any open detail pane survive the click.
 - Lives in the page head **outside** the swapped `#krt-bp-list` fragment, so it is unaffected by
   every batch-add / import / remove re-render (REQ-FE-005). It carries no state and triggers no
   mutation, so there is nothing to live-update and nothing to audit.
-- Label and tooltip come from the **shared** bundle keys `scExtractor.download.button` /
+- Label and tooltip come from the **shared** bundle keys `versekit.link.button` /
   `.title` (DE + EN) rather than a page-scoped key: the refinery create page carries the same
   control next to its screenshot import (`REQ-REFINERY-021`,
   [`refinery-screenshot-import.md`](refinery-screenshot-import.md)), and the two must not
@@ -632,7 +630,7 @@ and search for it.
 **Acceptance criteria:**
 
 - [ ] The Blueprints page renders the link as the first item of the page head's ⋯ menu, pointing at
-  the extractor repository's `releases/latest` URL.
+  `https://versekit.xharig.com/`.
 - [ ] The link opens in a new tab and carries `rel="noopener noreferrer"`.
 - [ ] After an in-place list re-render the link is still present and unchanged.
 

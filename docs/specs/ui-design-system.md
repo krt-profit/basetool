@@ -1596,9 +1596,8 @@ them in one place so nobody has to collect the addresses from Discord.
   in the footer (REQ-UI-026) and from the quick access. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
   since every account is at least a member, that is „every member". Not on the public surface: an
   anonymous caller is sent to the login like on every other page.
-- **What.** Forty-two links in six sections, in this order:
-  - **Organisation** — das-kartell.org, krt-opsec.de, the Basetool SC Extractor
-    (github.com/krt-profit/basetool-sc-extractor), versekit.xharig.com, Tallyline
+- **What.** Forty-one links in six sections, in this order:
+  - **Organisation** — das-kartell.org, krt-opsec.de, versekit.xharig.com, Tallyline
     (github.com/tallyline-sc/tallyline) — the org's sites and the members' desktop tools
   - **Offizielles** / Official — robertsspaceindustries.com, its Spectrum community
     (`/spectrum/community/SC`), the roadmap, issue-council, status and public-telemetry
@@ -2092,7 +2091,7 @@ Amended 2026-10-04: the „Angemeldet" chip, left out of phase 2 for want of a r
 former Org-Einheitsübersicht, ship types as tree rows with a readiness bar); „Meine Schiffe" filters
 by „Alle · Bereit · Nicht bereit" beside the search and counts „n von m einsatzbereit", and import,
 home location and „Hangar leeren …" sit in the page head (REQ-HANGAR-001/002). Mein Inventar →
-Blueprints: „Blueprints hinzufügen" opens a dialog, the extractor link and „Alle löschen …" sit in
+Blueprints: „Blueprints hinzufügen" opens a dialog, the VerseKit link and „Alle löschen …" sit in
 the „⋯" menu, one search, the segment „Alle · Craftbar" and the refinery switch; each row shows a
 status dot and „3×", the detail a key figure and the ingredients with need, stock and quality; the
 availability overview shows the first owners as chips with „+ n weitere" (REQ-INV-008/012/013/048).
