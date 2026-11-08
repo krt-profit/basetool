@@ -1792,13 +1792,16 @@ data (`/api/v1/users/admin/**`, `/api/v1/terms/admin/**`, `/api/v1/catalog/admin
 throughout is one root of its own (`/api/v1/roles/**`). No `/api/v1/admin/**` tree exists. One URL
 rule, `/api/v1/*/admin/**` and `/api/v1/roles/**`, requires `ADMIN` ahead of every domain rule, so a
 domain's own rule (for example the hangar's or the personal inventory's) can never decide an admin
-path; every handler keeps its own `hasRole('ADMIN')`. Every admin sub-tree is `no-store`
-(REQ-SEC-031) and is web-only.
+path; every handler keeps its own `hasRole('ADMIN')`. The bank's admin tree additionally carries its
+own ADMIN rule, `/api/v1/bank/admin/**`, ordered ahead of the generic one (REQ-BANK-010), so it
+stays gated if the generic rule changes. Every admin sub-tree is `no-store` (REQ-SEC-031) and is
+web-only.
 
 **Acceptance**
 
 - [x] The authorization matrix names `/api/v1/*/admin/**` or `/api/v1/roles/**` as the matching rule
-  of every operation under those paths and no other (`AuthorizationMatrixTest`).
+  of every operation under those paths and no other, except `/api/v1/bank/admin/**`, whose
+  operations name the bank's own ADMIN rule (`AuthorizationMatrixTest`).
 - [x] No operation is documented under `/api/v1/admin/` (`ApiCutMapTest`).
 - [x] Every admin sub-tree is classified `no-store` (`NoStoreApiScopesTest`).
 

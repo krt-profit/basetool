@@ -47,6 +47,11 @@ which delegates to the MVC `handlerExceptionResolver` so `GlobalExceptionHandler
 default bare `WWW-Authenticate`-only 401 or empty-body 403 (see
 [`api-conventions.md`](api-conventions.md) REQ-API-004).
 
+The URL matrix in `SecurityConfig` is the outer gate in front of every `@PreAuthorize`. The admin
+sub-trees are decided by the generic `/api/v1/*/admin/**` ADMIN rule (REQ-API-023); the bank's
+admin tree carries its own `/api/v1/bank/admin/**` ADMIN matcher ahead of it (REQ-BANK-010), so the
+bank's admin surface stays URL-gated if the generic rule changes (`BankControllerSecurityTest`).
+
 ### REQ-SEC-002a — Central role/permission constants (backend)
 
 Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and

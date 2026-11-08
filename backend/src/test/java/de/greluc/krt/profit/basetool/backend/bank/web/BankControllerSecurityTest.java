@@ -62,6 +62,12 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class BankControllerSecurityTest {
 
+  /**
+   * A path under {@code /api/v1/bank/admin/**} that no handler maps, so no {@code @PreAuthorize}
+   * can decide it and only the URL gate answers.
+   */
+  private static final String UNMAPPED_BANK_ADMIN_PATH = "/api/v1/bank/admin/no-such-route";
+
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
 
@@ -373,6 +379,20 @@ class BankControllerSecurityTest {
             get("/api/v1/bank/admin/audit")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void adminUrlGate_rejectsManagementOnAPathWithoutHandler() throws Exception {
+    mockMvc
+        .perform(
+            get(UNMAPPED_BANK_ADMIN_PATH)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get(UNMAPPED_BANK_ADMIN_PATH)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isNotFound());
   }
 
   @Test
