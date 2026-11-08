@@ -46,7 +46,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -62,7 +61,6 @@ import org.jetbrains.annotations.Nullable;
 @Setter
 @ToString
 @NoArgsConstructor
-@AllArgsConstructor
 public class RefineryOrder extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))

@@ -346,6 +346,10 @@ VerseKit-specific: the name shown is the client's display name from the registry
   is their `updated_at`. The web's create, update, cancel and store record a web change. The read
   DTOs carry it as `provenance` with each client named by its registry display name, or by its id
   once the registry no longer holds it; a page of orders reads the names in one query.
+- **Privacy:** the member's data export lists the provenance and the pickup marker of each own
+  order in `refineryOrdersOwned` (REQ-SEC-058). The sources are codes and the clients are registry
+  client ids the server writes, so the Personensuche lists the five text columns as exempt
+  (REQ-SEC-060).
 
 **Acceptance**
 
@@ -357,7 +361,8 @@ VerseKit-specific: the name shown is the client's display name from the registry
 **Enforced by:** `RefineryOrderProvenanceStampingTest`, `RefineryOrderStoreServiceTest`
 (`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `RefineryOrderProvenanceReadTest`,
 `RefineryOrderMapperTest`, `RefineryOrdersListPatternRenderTest`,
-`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderControllerTest` (the feed's `createdBy`) ·
+`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderControllerTest` (the feed's `createdBy`),
+`DataExportEndStateTest`, `PersonSearchCoverageTest` ·
 **Code:** `RefineryOrderProvenance`,
 `RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
 `refinery-orders-details.html`, migration `V372`
