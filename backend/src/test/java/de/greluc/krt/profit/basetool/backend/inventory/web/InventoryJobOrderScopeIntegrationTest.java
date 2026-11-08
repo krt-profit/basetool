@@ -74,7 +74,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A Lager earmark names only a job order the caller sees within the tenancy scope; one of another
- * org unit is refused like an unknown id (REQ-ORDERS-018, REQ-ORG-003).
+ * org unit is refused like an unknown id (REQ-ORDERS-018, REQ-ORG-003). A member of two Staffeln
+ * earmarks the stock of one to an order of the other, which is how a cross-Staffel supply reaches
+ * an order (UC-08, UC-09).
  */
 @SpringBootTest
 @Transactional
@@ -119,11 +121,7 @@ class InventoryJobOrderScopeIntegrationTest {
     member.setId(UUID.randomUUID());
     member.setUsername("lager-scope-member");
     member = userRepository.save(member);
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(member.getId(), Squadron.IRIDIUM_ID));
-    membership.setUser(member);
-    membership.setJoinedAt(Instant.now());
-    orgUnitMembershipRepository.save(membership);
+    joinSquadron(iridium);
 
     material = new Material();
     material.setName("Lager-Scope-Ore");
@@ -179,9 +177,63 @@ class InventoryJobOrderScopeIntegrationTest {
     addAllocation(id, ownOrder.getId(), row.get("version").asLong()).andExpect(status().isOk());
   }
 
+  @Test
+  void createEarmarksStockOfTheCallersOtherSquadronToAnOrderOfASquadronTheyAlsoBelongTo()
+      throws Exception {
+    joinSquadron(foreign);
+    JobOrder iridiumOrder = openJobOrderNeeding(iridium);
+
+    JsonNode row =
+        json.readTree(
+            create(iridiumOrder.getId(), foreign.getId())
+                .andExpect(status().isOk())
+                .andExpect(
+                    jsonPath("$.jobOrderAllocations[0].jobOrderId")
+                        .value(iridiumOrder.getId().toString()))
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+
+    assertThat(
+            inventoryItemRepository
+                .findById(UUID.fromString(row.get("id").asString()))
+                .orElseThrow()
+                .getOwningOrgUnit()
+                .getId())
+        .as("the stock stays in the other Staffel's pool while it serves the order")
+        .isEqualTo(foreign.getId());
+  }
+
+  @Test
+  void addAllocationEarmarksStockOfTheCallersOtherSquadronToAnOrderOfASquadronTheyAlsoBelongTo()
+      throws Exception {
+    joinSquadron(foreign);
+    JobOrder iridiumOrder = openJobOrderNeeding(iridium);
+    JsonNode row = unearmarkedRow(foreign);
+    UUID id = UUID.fromString(row.get("id").asString());
+
+    addAllocation(id, iridiumOrder.getId(), row.get("version").asLong()).andExpect(status().isOk());
+  }
+
+  private void joinSquadron(@NotNull Squadron squadron) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(member.getId(), squadron.getId()));
+    membership.setUser(member);
+    membership.setJoinedAt(Instant.now());
+    orgUnitMembershipRepository.save(membership);
+  }
+
   private @NotNull JsonNode unearmarkedRow() throws Exception {
+    return unearmarkedRow(iridium);
+  }
+
+  private @NotNull JsonNode unearmarkedRow(@NotNull OrgUnit owner) throws Exception {
     return json.readTree(
-        create(null).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        create(null, owner.getId())
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
   }
 
   private @NotNull JobOrder openJobOrderNeeding(@NotNull OrgUnit responsible) {
@@ -202,6 +254,11 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   private @NotNull ResultActions create(@Nullable UUID jobOrderId) throws Exception {
+    return create(jobOrderId, iridium.getId());
+  }
+
+  private @NotNull ResultActions create(@Nullable UUID jobOrderId, @NotNull UUID owningOrgUnitId)
+      throws Exception {
     List<InventoryAllocationInput> allocations =
         jobOrderId == null ? null : List.of(new InventoryAllocationInput(jobOrderId, 2.0));
     InventoryItemCreateDto dto =
@@ -216,7 +273,7 @@ class InventoryJobOrderScopeIntegrationTest {
             false,
             null,
             null,
-            iridium.getId(),
+            owningOrgUnitId,
             false,
             allocations,
             null);

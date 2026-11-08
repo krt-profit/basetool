@@ -59,9 +59,10 @@ class CrossStaffelHandoverE2eTest {
   private static String bInventoryItemId;
 
   /**
-   * Seeds an Officer homed in Staffel A (IRIDIUM), a fresh Staffel B with {@code test-member} homed
-   * in it, a job order owned by A, and a B-owned inventory item linked to that order (the foreign
-   * supply to be handed over).
+   * Seeds an Officer homed in Staffel A (IRIDIUM), a fresh Staffel B with {@code test-member} a
+   * member of B and of A, a job order owned by A, and a B-owned inventory item that member links to
+   * the order (the foreign supply to be handed over). The membership in A is what lets the member
+   * see the order and earmark to it (REQ-ORDERS-018).
    */
   @BeforeAll
   static void setUp() {
@@ -77,21 +78,27 @@ class CrossStaffelHandoverE2eTest {
           IRIDIUM_ID,
           true);
       String staffelBId = seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, STAFFEL_B_NAME, "EHOB");
-      seeder.assignStaffelMembership(
+      seeder.assignTwoStaffelMemberships(
           ADMIN_USER,
           ADMIN_PASSWORD,
           seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD),
           staffelBId,
-          false,
-          false);
+          IRIDIUM_ID);
       String materialId = seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E HO X-Mat");
       String bLocationId = seeder.createLocation(ADMIN_USER, ADMIN_PASSWORD, "E2E HO X-Loc");
       jobOrderId =
           seeder.createJobOrder(
               ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E HO X-Order", materialId, 650, 80);
       bInventoryItemId =
-          seeder.createInventoryItemForJobOrder(
-              MEMBER_USER, MEMBER_PASSWORD, materialId, bLocationId, jobOrderId, 750, 60);
+          seeder.createInventoryItemForJobOrderOwnedBy(
+              MEMBER_USER,
+              MEMBER_PASSWORD,
+              materialId,
+              bLocationId,
+              jobOrderId,
+              750,
+              60,
+              staffelBId);
     }
   }
 

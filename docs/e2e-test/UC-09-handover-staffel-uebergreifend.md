@@ -13,7 +13,7 @@
 
 ## Vorbedingungen
 
-Wie [UC-08](UC-08-job-order-staffel-uebergreifend.md), nur im ephemeren Modus per REST geseedet: Staffel B „E2E HO Staffel B" mit `test-member`, ein Job Order von IRIDIUM und ein von `test-member` an ihn verknüpfter, damit B-besessener Lagereintrag.
+Wie [UC-08](UC-08-job-order-staffel-uebergreifend.md), nur im ephemeren Modus per REST geseedet: Staffel B „E2E Handover B" mit `test-member` (zugleich Mitglied von IRIDIUM), ein Job Order von IRIDIUM und ein von `test-member` an ihn verknüpfter, damit B-besessener Lagereintrag.
 
 ## Auslöser
 

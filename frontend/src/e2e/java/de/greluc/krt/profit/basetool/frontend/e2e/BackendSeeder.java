@@ -1340,6 +1340,38 @@ public final class BackendSeeder {
       String jobOrderId,
       int quality,
       double amount) {
+    return createInventoryItemForJobOrderOwnedBy(
+        username, password, materialId, locationId, jobOrderId, quality, amount, null);
+  }
+
+  /**
+   * Like {@link #createInventoryItemForJobOrder}, but stamps the item onto {@code owningOrgUnitId}
+   * through the owner picker, as a member of several org units must (REQ-ORG-004). The caller must
+   * see the job order within the tenancy scope, or the backend answers {@code 404}
+   * (REQ-ORDERS-018).
+   *
+   * @param username the Keycloak username of the test user
+   * @param password the Keycloak password of the test user
+   * @param materialId the id of the material the item holds (matching the order's material)
+   * @param locationId the id of the storage location of the item
+   * @param jobOrderId the id of the job order to link the item to
+   * @param quality the quality of the held material ({@code 0..1000})
+   * @param amount the amount held (available for handover)
+   * @param owningOrgUnitId the org unit to stamp the item onto, one of the user's memberships, or
+   *     {@code null} to auto-stamp
+   * @return the created inventory item's id
+   */
+  public String createInventoryItemForJobOrderOwnedBy(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      String jobOrderId,
+      int quality,
+      double amount,
+      String owningOrgUnitId) {
+    String ownerJson =
+        owningOrgUnitId == null ? "" : ",\"owningOrgUnitId\":\"" + owningOrgUnitId + "\"";
     String body =
         "{\"materialId\":\""
             + materialId
@@ -1351,7 +1383,9 @@ public final class BackendSeeder {
             + amount
             + ",\"jobOrderId\":\""
             + jobOrderId
-            + "\",\"personal\":false}";
+            + "\",\"personal\":false"
+            + ownerJson
+            + "}";
     return seedEntity(username, password, "/api/v1/inventory", body);
   }
 
@@ -2497,14 +2531,35 @@ public final class BackendSeeder {
       String targetUserId,
       String homeSquadronId,
       String squadronId) {
+    assignTwoStaffelMemberships(adminUser, adminPassword, targetUserId, homeSquadronId, squadronId);
+    appointStaffelleiter(adminUser, adminPassword, targetUserId, squadronId);
+  }
+
+  /**
+   * Makes {@code targetUserId} a plain member of exactly two Staffeln, without any role flag, via
+   * {@code PATCH /api/v1/org-units/members/{id}/memberships} (REQ-ORG-017). The sent set is
+   * authoritative; idempotent.
+   *
+   * @param adminUser an admin Keycloak username
+   * @param adminPassword the admin password
+   * @param targetUserId the app_user id to assign (see {@link #getUserId})
+   * @param firstSquadronId the first Staffel OrgUnit id
+   * @param secondSquadronId the second Staffel OrgUnit id
+   */
+  public void assignTwoStaffelMemberships(
+      String adminUser,
+      String adminPassword,
+      String targetUserId,
+      String firstSquadronId,
+      String secondSquadronId) {
     try {
       String token = passwordGrant(adminUser, adminPassword);
       String body =
           "{\"staffeln\":[{\"squadronId\":\""
-              + homeSquadronId
+              + firstSquadronId
               + "\",\"isLogistician\":false,\"isMissionManager\":false},"
               + "{\"squadronId\":\""
-              + squadronId
+              + secondSquadronId
               + "\",\"isLogistician\":false,\"isMissionManager\":false}]}";
       int status = patch(token, "/api/v1/org-units/members/" + targetUserId + "/memberships", body);
       if (status < 200 || status >= 300) {
@@ -2513,9 +2568,8 @@ public final class BackendSeeder {
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.assignSecondStaffelleiterSeat failed", e);
+      throw new IllegalStateException("BackendSeeder.assignTwoStaffelMemberships failed", e);
     }
-    appointStaffelleiter(adminUser, adminPassword, targetUserId, squadronId);
   }
 
   /**
