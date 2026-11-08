@@ -3072,6 +3072,38 @@ it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the bac
 `backend/bank/web/BankBookingController#getTransferFeeRate` · **Related:** REQ-BANK-033,
 REQ-BANK-022, REQ-BANK-023, REQ-UI-037
 
+### REQ-BANK-066 — A hidden org-unit bank account answers like an unknown one
+
+Every org-unit bank route that takes an account id in its path
+(`/api/v1/bank/org-units/accounts/{id}` and everything below it) answers an account hidden from the
+caller with the **same `404` and the same problem detail** as an id that does not exist, so account
+ids cannot be probed by comparing the two answers.
+
+- **Read routes** — the drill-in, `/transactions`, `/balance-series`, `/statement`: hidden means
+  `OrgUnitBankAccessService#canView` is false (REQ-BANK-021, -035, -037).
+- **Settings routes** — `/settings`, `/balance-target`, `/visibility/…`, `/approval-limit/…`: hidden
+  means the caller may neither view the account nor set its target, configure its visibility or
+  configure its approval limits. A disclosed account whose control the caller lacks still answers
+  `403` (REQ-BANK-035, -036, -041), and a responsible holder whose account the active-org-unit pin
+  hides from the view scope still reaches its settings.
+- **Not covered:** the staff side (`/api/v1/bank/accounts/{id}`) already denies both alike, and a
+  deposit request may target any active account by design (REQ-BANK-042).
+
+**Acceptance**
+
+- [x] Each listed route answers an unknown and a hidden id with a `NotFoundException` of the same
+  detail and touches no ledger, statement or audit code.
+- [x] A viewer without a settings control gets `403` on the settings routes; a holder outside the
+  view scope gets the settings.
+
+**Enforced by:** `OrgUnitBankAccessServiceTest`
+(`accountRoutes_answerHiddenAndUnknownAccountsWithTheSameNotFound`,
+`getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot`, `*_byPlainViewer_*`) ·
+**Code:** `bank/internal/OrgUnitBankAccessService#requireViewableAccount`,
+`bank/internal/OrgUnitBankAccessService#requireDisclosedAccount`,
+`bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
+REQ-BANK-038, REQ-BANK-056
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only

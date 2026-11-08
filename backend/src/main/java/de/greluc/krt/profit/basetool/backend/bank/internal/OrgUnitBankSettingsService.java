@@ -83,14 +83,14 @@ public class OrgUnitBankSettingsService {
    *
    * @param accountId the account
    * @return the settings snapshot
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may neither set the target nor configure
    *     visibility
    */
   @NotNull
   @Transactional(readOnly = true)
   public OrgUnitBankAccountSettingsDto getAccountSettings(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     if (!accessService.canSetTarget(account) && !accessService.canConfigureVisibility(account)) {
       throw new AccessDeniedException("The caller may not manage this account's settings");
     }
@@ -104,7 +104,7 @@ public class OrgUnitBankSettingsService {
    * @param target the new target, or {@code null} to clear it
    * @param version the echoed optimistic-lock version
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not set the target
    * @throws ObjectOptimisticLockingFailureException on a version mismatch
    */
@@ -112,7 +112,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setBalanceTarget(
       @NotNull UUID accountId, @Nullable BigDecimal target, long version) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanSetTarget(account);
     OptimisticLock.check(account.getVersion(), version, BankAccount.class, account.getId());
     account.setBalanceTarget(target);
@@ -136,7 +136,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param roleCode the role bucket to grant
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
@@ -144,7 +144,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto addRoleVisibility(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     requireValidRoleBucket(account, roleCode);
     orgUnitBankVisibilityService.grantRole(
@@ -158,7 +158,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param roleCode the role bucket to revoke
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
@@ -166,7 +166,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto removeRoleVisibility(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     requireValidRoleBucket(account, roleCode);
     orgUnitBankVisibilityService.revokeRole(
@@ -180,7 +180,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param enabled whether all members may view the account
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    * @throws BadRequestException when the account type has no all-members bucket
    */
@@ -188,7 +188,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
       @NotNull UUID accountId, boolean enabled) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     if (!allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members visibility bucket");
@@ -203,14 +203,15 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param userId the user to grant
    * @return the refreshed settings
-   * @throws NotFoundException when the account or the user does not exist
+   * @throws NotFoundException when the account or the user does not exist, or the account is hidden
+   *     from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto addUserVisibility(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     orgUnitBankVisibilityService.grantUser(account, userId);
     return toSettingsDto(account);
@@ -222,14 +223,14 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param userId the user to revoke
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto removeUserVisibility(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     orgUnitBankVisibilityService.revokeUser(account, userId);
     return toSettingsDto(account);
@@ -242,7 +243,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param enabled whether the whole area cascade may view the account
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure visibility
    * @throws BadRequestException when the account type has no area-members bucket
    */
@@ -250,7 +251,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
       @NotNull UUID accountId, boolean enabled) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureVisibility(account);
     if (!areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members visibility bucket");
@@ -266,7 +267,7 @@ public class OrgUnitBankSettingsService {
    * @param roleCode the role bucket, a {@code MembershipRole} name
    * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
@@ -274,7 +275,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
       @NotNull UUID accountId, @NotNull String roleCode, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
     orgUnitBankApprovalLimitService.setRole(account, roleCode, limit);
@@ -287,7 +288,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param roleCode the role bucket to clear
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    * @throws BadRequestException when the role code is not a valid bucket for this account
    */
@@ -295,7 +296,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     requireValidLimitRoleBucket(account, roleCode);
     orgUnitBankApprovalLimitService.clearRole(account, roleCode);
@@ -308,7 +309,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    * @throws BadRequestException when the account type has no all-members tier
    */
@@ -316,7 +317,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
       @NotNull UUID accountId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     if (!BankApprovalLimitService.allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members approval-limit tier");
@@ -330,13 +331,13 @@ public class OrgUnitBankSettingsService {
    *
    * @param accountId the account
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     orgUnitBankApprovalLimitService.clearAllMembers(account);
     return toSettingsDto(account);
@@ -348,7 +349,7 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    * @throws BadRequestException when the account type has no area-members tier
    */
@@ -356,7 +357,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
       @NotNull UUID accountId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     if (!BankApprovalLimitService.areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members approval-limit tier");
@@ -370,13 +371,13 @@ public class OrgUnitBankSettingsService {
    *
    * @param accountId the account
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     orgUnitBankApprovalLimitService.clearAreaMembers(account);
     return toSettingsDto(account);
@@ -390,14 +391,15 @@ public class OrgUnitBankSettingsService {
    * @param userId the user the limit addresses
    * @param limit the non-negative ceiling in whole aUEC
    * @return the refreshed settings
-   * @throws NotFoundException when the account or the user does not exist
+   * @throws NotFoundException when the account or the user does not exist, or the account is hidden
+   *     from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
       @NotNull UUID accountId, @NotNull UUID userId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     orgUnitBankApprovalLimitService.setUser(account, userId, limit);
     return toSettingsDto(account);
@@ -409,14 +411,14 @@ public class OrgUnitBankSettingsService {
    * @param accountId the account
    * @param userId the user whose limit to clear
    * @return the refreshed settings
-   * @throws NotFoundException when the account does not exist
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
    * @throws AccessDeniedException when the caller may not configure approval limits
    */
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireAccount(accountId);
+    BankAccount account = accessService.requireDisclosedAccount(accountId);
     accessService.requireCanConfigureApprovalLimits(account);
     orgUnitBankApprovalLimitService.clearUser(account, userId);
     return toSettingsDto(account);

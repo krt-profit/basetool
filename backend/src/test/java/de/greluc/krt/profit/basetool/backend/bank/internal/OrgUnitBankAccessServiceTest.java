@@ -49,9 +49,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -518,7 +520,7 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void getViewableAccountBookings_deniedWhenCallerMayNotView() {
+  void getViewableAccountBookings_notFoundWhenCallerMayNotView() {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
@@ -526,7 +528,7 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertThrows(
-        AccessDeniedException.class,
+        NotFoundException.class,
         () -> service.getViewableAccountBookings(accountId, PageRequest.of(0, 20), null, null));
     verifyNoInteractions(bankStatementReportService);
   }
@@ -550,7 +552,7 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void getViewableBalanceSeries_deniedWhenCallerMayNotView() {
+  void getViewableBalanceSeries_notFoundWhenCallerMayNotView() {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
@@ -558,20 +560,20 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     assertThrows(
-        AccessDeniedException.class,
+        NotFoundException.class,
         () -> service.getViewableBalanceSeries(accountId, Instant.now(), Instant.now()));
     verifyNoInteractions(bankStatementReportService);
   }
 
   @Test
-  void getViewableAccountDetail_deniedWhenCallerMayNotView() {
+  void getViewableAccountDetail_notFoundWhenCallerMayNotView() {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(requestScopeResolver.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
-    assertThrows(AccessDeniedException.class, () -> service.getViewableAccountDetail(accountId));
+    assertThrows(NotFoundException.class, () -> service.getViewableAccountDetail(accountId));
     verify(bankAccountService, never()).getAccountDetail(any(), any());
   }
 
@@ -623,6 +625,8 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(1L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(requestScopeResolver.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
     when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
             staffelId, MembershipRole.STAFFELLEITER))
         .thenReturn(false);
@@ -2096,7 +2100,7 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void getViewableAccountDetail_outOfScope_throwsAccessDenied() {
+  void getViewableAccountDetail_outOfScope_throwsNotFound() {
     UUID accountId = UUID.randomUUID();
     BankAccount account =
         account(accountId, "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"));
@@ -2104,7 +2108,7 @@ class OrgUnitBankAccessServiceTest {
     when(requestScopeResolver.currentOversightScope())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
 
-    assertThrows(AccessDeniedException.class, () -> service.getViewableAccountDetail(accountId));
+    assertThrows(NotFoundException.class, () -> service.getViewableAccountDetail(accountId));
     verifyNoInteractions(bankAccountService);
   }
 
@@ -2130,8 +2134,76 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(requestScopeResolver.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
 
     assertThrows(AccessDeniedException.class, () -> settingsService.getAccountSettings(accountId));
+  }
+
+  /**
+   * REQ-BANK-066: every org-unit bank route that takes an account id answers a hidden account with
+   * the same 404 and problem detail as an unknown id, and touches nothing behind the gate.
+   */
+  @Test
+  void accountRoutes_answerHiddenAndUnknownAccountsWithTheSameNotFound() {
+    UUID unknownId = UUID.randomUUID();
+    UUID hiddenId = UUID.randomUUID();
+    when(bankAccountRepository.findById(unknownId)).thenReturn(Optional.empty());
+    when(bankAccountRepository.findById(hiddenId))
+        .thenReturn(
+            Optional.of(
+                account(hiddenId, "KB-0002", squadron(UUID.randomUUID(), "Foreign", "FRG"))));
+    when(requestScopeResolver.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+
+    accountRoutes()
+        .forEach((route, call) -> {
+          NotFoundException unknown =
+              assertThrows(NotFoundException.class, () -> call.accept(unknownId), route);
+          NotFoundException hidden =
+              assertThrows(NotFoundException.class, () -> call.accept(hiddenId), route);
+          assertThat(hidden.getMessage()).as(route).isEqualTo(unknown.getMessage());
+        });
+    verifyNoInteractions(bankAccountService, bankStatementReportService, bankAuditService);
+  }
+
+  /**
+   * REQ-BANK-066: the responsible holder reaches the settings of their account even when the
+   * active-org-unit pin hides it from their view scope.
+   */
+  @Test
+  void getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot() {
+    UUID staffelId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
+    when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(requestScopeResolver.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(requestScopeResolver.currentUserHoldsRoleOnOrgUnit(
+            staffelId, MembershipRole.STAFFELLEITER))
+        .thenReturn(true);
+
+    assertThat(settingsService.getAccountSettings(accountId).accountId()).isEqualTo(accountId);
+  }
+
+  /**
+   * One call per org-unit bank route that takes an account id, keyed by its path segment.
+   *
+   * @return the route calls, each taking the account id under test
+   */
+  private Map<String, Consumer<UUID>> accountRoutes() {
+    Instant from = Instant.parse("2026-06-01T00:00:00Z");
+    Instant to = Instant.parse("2026-07-01T00:00:00Z");
+    return Map.of(
+        "accounts/{id}", service::getViewableAccountDetail,
+        "transactions",
+            id -> service.getViewableAccountBookings(id, PageRequest.of(0, 20), null, null),
+        "balance-series", id -> service.getViewableBalanceSeries(id, from, to),
+        "statement", id -> service.exportViewableStatement(id, from, to, null),
+        "settings", settingsService::getAccountSettings,
+        "balance-target", id -> settingsService.setBalanceTarget(id, BigDecimal.TEN, 0L),
+        "visibility", id -> settingsService.setAllMembersVisibility(id, true),
+        "approval-limit", id -> settingsService.setAllMembersApprovalLimit(id, BigDecimal.TEN));
   }
 
   @Test
@@ -2139,6 +2211,8 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
+    when(requestScopeResolver.currentOversightScope())
+        .thenReturn(new ScopePredicate(false, null, Set.of(account.getOrgUnit().getId())));
 
     assertThrows(
         AccessDeniedException.class,

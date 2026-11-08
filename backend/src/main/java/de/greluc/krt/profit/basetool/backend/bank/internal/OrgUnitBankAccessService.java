@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
-import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -74,6 +73,9 @@ public class OrgUnitBankAccessService {
    */
   private static final BankCapabilitiesDto READ_ONLY_CAPABILITIES =
       new BankCapabilitiesDto(false, false, false, false);
+
+  /** The problem detail of the 404 for an unknown or hidden account id (REQ-BANK-066). */
+  static final String ACCOUNT_NOT_FOUND = "Bank account not found";
 
   private final RequestScopeResolver requestScopeResolver;
   private final AuthHelperService authHelperService;
@@ -190,8 +192,7 @@ public class OrgUnitBankAccessService {
    *
    * @param accountId the account to open
    * @return the read-only detail
-   * @throws NotFoundException when the account does not exist
-   * @throws AccessDeniedException when the caller may not view the account
+   * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -223,8 +224,7 @@ public class OrgUnitBankAccessService {
    * @param from inclusive lower bound on the booking instant, or {@code null}
    * @param to inclusive upper bound on the booking instant, or {@code null}
    * @return one page of redacted booking rows
-   * @throws NotFoundException when the account does not exist
-   * @throws AccessDeniedException when the caller may not view the account
+   * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -246,8 +246,7 @@ public class OrgUnitBankAccessService {
    * @param from inclusive period start
    * @param to inclusive period end
    * @return the balance series and the account's balance target
-   * @throws NotFoundException when the account does not exist
-   * @throws AccessDeniedException when the caller may not view the account
+   * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -266,8 +265,7 @@ public class OrgUnitBankAccessService {
    * @param to inclusive period end
    * @param userZone the zone to render timestamps in, or {@code null} for UTC
    * @return the redacted PDF bytes
-   * @throws NotFoundException when the account does not exist
-   * @throws AccessDeniedException when the caller may not view the account
+   * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
   @Transactional
@@ -628,18 +626,39 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Loads an account and asserts the caller may view it.
+   * Loads an account the caller may view; a hidden account fails exactly like an unknown id
+   * (REQ-BANK-066).
    *
    * @param accountId the account id
    * @return the account entity
-   * @throws NotFoundException when the account does not exist
-   * @throws AccessDeniedException when the caller may not view it
+   * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
   private BankAccount requireViewableAccount(@NotNull UUID accountId) {
     BankAccount account = requireAccount(accountId);
     if (!canView(account)) {
-      throw new AccessDeniedException("The caller may not view this account");
+      throw accountNotFound();
+    }
+    return account;
+  }
+
+  /**
+   * Loads an account the caller may view or manage on the settings panel; an account the caller may
+   * do neither with fails exactly like an unknown id (REQ-BANK-066).
+   *
+   * <p>A disclosed account the caller may not change still answers {@link AccessDeniedException}
+   * from the matching {@code requireCan…} check.
+   *
+   * @param accountId the account id
+   * @return the account entity
+   * @throws NotFoundException when the account does not exist or is hidden from the caller
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public BankAccount requireDisclosedAccount(@NotNull UUID accountId) {
+    BankAccount account = requireAccount(accountId);
+    if (!canManageSettings(account) && !canConfigureApprovalLimits(account) && !canView(account)) {
+      throw accountNotFound();
     }
     return account;
   }
@@ -652,8 +671,21 @@ public class OrgUnitBankAccessService {
    * @throws NotFoundException when the account does not exist
    */
   @NotNull
-  public BankAccount requireAccount(@NotNull UUID accountId) {
-    return Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
+  private BankAccount requireAccount(@NotNull UUID accountId) {
+    return bankAccountRepository
+        .findById(accountId)
+        .orElseThrow(OrgUnitBankAccessService::accountNotFound);
+  }
+
+  /**
+   * The one 404 every org-unit bank endpoint answers for an unknown or hidden account id
+   * (REQ-BANK-066).
+   *
+   * @return the not-found exception carrying the shared problem detail
+   */
+  @NotNull
+  private static NotFoundException accountNotFound() {
+    return new NotFoundException(ACCOUNT_NOT_FOUND);
   }
 
   /**
