@@ -78,7 +78,8 @@ public final class EarmarkTargets {
      * Returns the materials a job order requires, for the Lager's link check (REQ-ORDERS-018).
      *
      * @param jobOrderId the job order
-     * @return the required materials, or {@code null} when the order does not exist
+     * @return the required materials, or {@code null} when the order does not exist or lies outside
+     *     the caller's tenancy scope (REQ-ORG-003)
      */
     @Nullable
     Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId);
@@ -88,7 +89,8 @@ public final class EarmarkTargets {
      * material order requests none.
      *
      * @param jobOrderId the job order
-     * @return the requested game items, or {@code null} when the order does not exist
+     * @return the requested game items, or {@code null} when the order does not exist or lies
+     *     outside the caller's tenancy scope (REQ-ORG-003)
      */
     @Nullable
     Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId);

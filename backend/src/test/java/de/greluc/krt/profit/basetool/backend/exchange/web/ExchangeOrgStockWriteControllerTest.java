@@ -1179,6 +1179,7 @@ class ExchangeOrgStockWriteControllerTest {
   void aLogisticianEarmarksAnotherMembersEntryAsTheWebDoesAndTheChangeIsAuditedJournaledAndFed()
       throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     joins(holder, staffel, false);
     UUID titanium = material("SCU");
@@ -1365,6 +1366,7 @@ class ExchangeOrgStockWriteControllerTest {
       throws Exception {
     UUID staffel = orgUnit();
     UUID plain = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     joins(member, plain, false);
     UUID titanium = material("SCU");
@@ -1433,7 +1435,7 @@ class ExchangeOrgStockWriteControllerTest {
   void theTargetsAreTheOrdersAndMissionsTheWebPickerOffersForThePoolAndMaterial() throws Exception {
     UUID staffel = orgUnit();
     UUID other = orgUnit("SQUADRON");
-    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", staffel);
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID titanium = material("SCU");
     UUID open = jobOrder(staffel, titanium, "OPEN");
@@ -1611,6 +1613,16 @@ class ExchangeOrgStockWriteControllerTest {
     Long version =
         jdbc.queryForObject("SELECT version FROM inventory_item WHERE id = ?", Long.class, entry);
     return version == null ? -1 : version;
+  }
+
+  /**
+   * Makes a unit profit-eligible, so its members reach the job-order queue and see its orders
+   * (REQ-ORG-003).
+   *
+   * @param unit the unit
+   */
+  private void reachesTheJobOrderQueue(@NotNull UUID unit) {
+    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", unit);
   }
 
   /**

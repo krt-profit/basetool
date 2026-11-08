@@ -1015,7 +1015,7 @@ public class InventoryItemService {
    *
    * @param material the inventory item's material
    * @param jobOrderId the order the item is being linked to
-   * @throws NotFoundException when the order does not exist
+   * @throws NotFoundException when the order does not exist or lies outside the caller's scope
    * @throws BadRequestException when the order does not require the material
    */
   private void assertMaterialRequiredByJobOrder(Material material, UUID jobOrderId) {
@@ -1038,7 +1038,7 @@ public class InventoryItemService {
    *
    * @param gameItem the inventory row's game item
    * @param jobOrderId the order the row is being linked to
-   * @throws NotFoundException when the order does not exist
+   * @throws NotFoundException when the order does not exist or lies outside the caller's scope
    * @throws BadRequestException when the order does not request the game item
    */
   private void assertGameItemRequiredByJobOrder(GameItem gameItem, UUID jobOrderId) {

@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -104,6 +105,7 @@ class InventoryItemServiceTest {
   @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
   @Mock private JobOrderItemService jobOrderItemService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private StockLevelService stockLevelService;
   @Mock private AuditService auditService;
@@ -115,6 +117,9 @@ class InventoryItemServiceTest {
 
   @BeforeEach
   void wireDelegates() {
+    lenient()
+        .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
+        .thenReturn(true);
     lenient()
         .when(stockLevelService.lowSubjects())
         .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
@@ -159,7 +164,8 @@ class InventoryItemServiceTest {
             inventoryAccessPolicy,
             new InventoryStockCommands(
                 null, null, null, null, null, inventoryAccessPolicy, null, null),
-            new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService),
+            new JobOrderEarmarkTargets(
+                jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,
             realAggregationService,
             realCheckoutService,
@@ -713,7 +719,8 @@ class InventoryItemServiceTest {
             inventoryAccessPolicy,
             new InventoryStockCommands(
                 null, null, null, null, null, inventoryAccessPolicy, null, null),
-            new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService),
+            new JobOrderEarmarkTargets(
+                jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,
             realAggregationService,
             realCheckoutService,

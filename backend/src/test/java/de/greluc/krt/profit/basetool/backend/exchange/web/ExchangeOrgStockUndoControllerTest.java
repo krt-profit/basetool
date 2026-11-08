@@ -166,6 +166,7 @@ class ExchangeOrgStockUndoControllerTest {
   @Test
   void anUndoRestoresTheEntriesOfEveryOpTypeAndIsAudited() throws Exception {
     UUID pool = orgUnit();
+    reachesTheJobOrderQueue(pool);
     UUID other = orgUnit();
     UUID receiver = user("undo-receiver", Roles.KRT_MEMBER);
     joins(writer, pool, true);
@@ -773,6 +774,16 @@ class ExchangeOrgStockUndoControllerTest {
         "U" + id.toString().substring(0, 8));
     orgUnits.add(id);
     return id;
+  }
+
+  /**
+   * Makes a unit profit-eligible, so its members reach the job-order queue and see its orders
+   * (REQ-ORG-003).
+   *
+   * @param unit the unit
+   */
+  private void reachesTheJobOrderQueue(@NotNull UUID unit) {
+    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", unit);
   }
 
   private void joins(@NotNull UUID user, @NotNull UUID orgUnit, boolean logistician) {
