@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -42,7 +43,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Unit tests for {@link OrgHierarchyService} (REQ-ORG-014): Bereich and OL creation, the OL
- * singleton guard, and parent-kind and optimistic-lock checks on set-parent.
+ * singleton guard, parent-kind and optimistic-lock checks on set-parent, and the audit calls.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgHierarchyServiceTest {
@@ -50,6 +51,7 @@ class OrgHierarchyServiceTest {
   @Mock private BereichRepository bereichRepository;
   @Mock private OrganisationsleitungRepository organisationsleitungRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private OrgStructureAuditor orgStructureAuditor;
 
   @InjectMocks private OrgHierarchyService service;
 
@@ -77,6 +79,7 @@ class OrgHierarchyServiceTest {
     assertEquals("Profit", result.getName());
     assertNull(result.getParent());
     assertEquals(Department.PROFIT, result.getDepartment());
+    verify(orgStructureAuditor).created(result);
   }
 
   @Test
@@ -87,6 +90,7 @@ class OrgHierarchyServiceTest {
         DuplicateEntityException.class,
         () -> service.createBereich("Profit", "PRF", null, null, null));
     verify(bereichRepository, never()).save(any());
+    verifyNoInteractions(orgStructureAuditor);
   }
 
   @Test
@@ -126,6 +130,7 @@ class OrgHierarchyServiceTest {
     Organisationsleitung result = service.createOrganisationsleitung("Leitung", "OL", null);
 
     assertEquals("Leitung", result.getName());
+    verify(orgStructureAuditor).created(result);
   }
 
   @Test
@@ -155,6 +160,7 @@ class OrgHierarchyServiceTest {
     OrgUnit result = service.setParent(squadronId, bereichId, 0L);
 
     assertSame(bereich, result.getParent());
+    verify(orgStructureAuditor).parentChanged(result, null);
   }
 
   @Test
@@ -171,6 +177,7 @@ class OrgHierarchyServiceTest {
 
     assertThrows(BadRequestException.class, () -> service.setParent(squadronId, olId, 0L));
     verify(orgUnitRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(orgStructureAuditor);
   }
 
   @Test
@@ -201,5 +208,6 @@ class OrgHierarchyServiceTest {
     OrgUnit result = service.setParent(squadronId, null, 0L);
 
     assertNull(result.getParent());
+    verify(orgStructureAuditor).parentChanged(result, oldParent);
   }
 }

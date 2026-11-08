@@ -42,7 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Squadrons are the organizational units a user can be assigned to (each user belongs to one
  * squadron at a time; mission participants may name a different squadron for that mission's roster
- * line). Same soft-delete + case-insensitive uniqueness pattern as {@link JobTypeService}.
+ * line). Same soft-delete + case-insensitive uniqueness pattern as {@link JobTypeService}. Every
+ * write is audit-logged (REQ-AUDIT-001).
  */
 @Service
 @RequiredArgsConstructor
@@ -50,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SquadronService {
 
   private final SquadronRepository squadronRepository;
+  private final OrgStructureAuditor orgStructureAuditor;
 
   /**
    * Unpaged squadron list for dropdowns.
@@ -103,7 +105,9 @@ public class SquadronService {
       throw new DuplicateEntityException(
           "A Squadron with the name '" + squadron.getName() + "' already exists.");
     }
-    return squadronRepository.save(squadron);
+    Squadron saved = squadronRepository.save(squadron);
+    orgStructureAuditor.created(saved);
+    return saved;
   }
 
   /**
@@ -126,10 +130,15 @@ public class SquadronService {
 
     OptimisticLock.check(squadron.getVersion(), squadronDto.version(), Squadron.class, id);
 
+    final List<String> changed =
+        OrgStructureAuditor.changedFields(
+            squadron, squadronDto.name(), squadronDto.shorthand(), squadronDto.description());
     squadron.setName(squadronDto.name());
     squadron.setShorthand(squadronDto.shorthand());
     squadron.setDescription(squadronDto.description());
-    return squadronRepository.save(squadron);
+    Squadron saved = squadronRepository.save(squadron);
+    orgStructureAuditor.updated(saved, changed);
+    return saved;
   }
 
   /**
@@ -144,8 +153,9 @@ public class SquadronService {
       throw new NotFoundException("Squadron not found");
     }
     Squadron squadron = getSquadronById(id);
+    boolean wasActive = squadron.isActive();
     squadron.setActive(false);
-    squadronRepository.save(squadron);
+    orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
   }
 
   /**
@@ -157,8 +167,9 @@ public class SquadronService {
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public void activateSquadron(@NotNull UUID id) {
     Squadron squadron = getSquadronById(id);
+    boolean wasActive = squadron.isActive();
     squadron.setActive(true);
-    squadronRepository.save(squadron);
+    orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
   }
 
   /**
@@ -176,7 +187,10 @@ public class SquadronService {
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public Squadron setProfitEligible(@NotNull UUID id, boolean eligible) {
     Squadron squadron = getSquadronById(id);
+    boolean wasEligible = squadron.isProfitEligible();
     squadron.setProfitEligible(eligible);
-    return squadronRepository.save(squadron);
+    Squadron saved = squadronRepository.save(squadron);
+    orgStructureAuditor.profitEligibilityChanged(saved, wasEligible);
+    return saved;
   }
 }

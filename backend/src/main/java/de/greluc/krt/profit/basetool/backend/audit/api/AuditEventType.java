@@ -374,6 +374,18 @@ public enum AuditEventType {
   KOMMANDO_GROUP_UPDATED(AuditDomain.ROLE),
   /** A Kommandogruppe was deleted (its squadron-rank member links are cleared first). */
   KOMMANDO_GROUP_DELETED(AuditDomain.ROLE),
+  /** An org unit (Staffel, SK, Bereich or Organisationsleitung) was created. */
+  ORG_UNIT_CREATED(AuditDomain.ROLE),
+  /** An org unit's name, shorthand or description changed; the details name the fields. */
+  ORG_UNIT_UPDATED(AuditDomain.ROLE),
+  /** An org unit was soft-deleted. */
+  ORG_UNIT_DEACTIVATED(AuditDomain.ROLE),
+  /** A soft-deleted org unit was reactivated. */
+  ORG_UNIT_REACTIVATED(AuditDomain.ROLE),
+  /** An org unit's Job-Order processor eligibility flag was flipped. */
+  ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED(AuditDomain.ROLE),
+  /** An org unit's parent edge in the hierarchy was set, moved or cleared. */
+  ORG_UNIT_PARENT_CHANGED(AuditDomain.ROLE),
   /**
    * An admin hard-deleted a user account (REQ-DATA-008). Marker event naming the removed account
    * and summarising what went with it, so the per-area purge events can be correlated to one
