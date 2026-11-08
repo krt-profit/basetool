@@ -41,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Bereich} and {@link Organisationsleitung} rows and sets parent edges.
  *
  * <p>Parent-kind pairing is validated for a clean 400; the Organisationsleitung is a singleton.
+ * Every write is audit-logged (REQ-AUDIT-001).
  */
 @Service
 @RequiredArgsConstructor
@@ -50,6 +51,7 @@ public class OrgHierarchyService {
   private final BereichRepository bereichRepository;
   private final OrganisationsleitungRepository organisationsleitungRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final OrgStructureAuditor orgStructureAuditor;
 
   /**
    * Lists Bereiche for the admin overview.
@@ -115,7 +117,9 @@ public class OrgHierarchyService {
     if (parentOrgUnitId != null) {
       bereich.setParent(requireKind(parentOrgUnitId, OrgUnitKind.ORGANISATIONSLEITUNG));
     }
-    return bereichRepository.save(bereich);
+    Bereich saved = bereichRepository.save(bereich);
+    orgStructureAuditor.created(saved);
+    return saved;
   }
 
   /**
@@ -138,7 +142,9 @@ public class OrgHierarchyService {
     ol.setName(name);
     ol.setShorthand(shorthand);
     ol.setDescription(description);
-    return organisationsleitungRepository.save(ol);
+    Organisationsleitung saved = organisationsleitungRepository.save(ol);
+    orgStructureAuditor.created(saved);
+    return saved;
   }
 
   /**
@@ -162,15 +168,19 @@ public class OrgHierarchyService {
       @NotNull UUID orgUnitId, @Nullable UUID parentOrgUnitId, @Nullable Long version) {
     OrgUnit child = Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
+    OrgUnit previousParent = child.getParent();
     if (parentOrgUnitId == null) {
       child.setParent(null);
-      return orgUnitRepository.saveAndFlush(child);
+    } else {
+      OrgUnit parent =
+          Entities.require(
+              orgUnitRepository.findById(parentOrgUnitId), "Parent org unit not found");
+      validateParentKind(child, parent);
+      child.setParent(parent);
     }
-    OrgUnit parent =
-        Entities.require(orgUnitRepository.findById(parentOrgUnitId), "Parent org unit not found");
-    validateParentKind(child, parent);
-    child.setParent(parent);
-    return orgUnitRepository.saveAndFlush(child);
+    OrgUnit saved = orgUnitRepository.saveAndFlush(child);
+    orgStructureAuditor.parentChanged(saved, previousParent);
+    return saved;
   }
 
   /**

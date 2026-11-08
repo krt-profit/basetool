@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +47,8 @@ class SquadronServiceTest {
   @Autowired private MissionRepository missionRepository;
 
   @Autowired private MissionParticipantRepository missionParticipantRepository;
+
+  @Autowired private AuditRecorder auditRecorder;
 
   @Test
   void createSquadron_ShouldSaveShorthand() {
@@ -129,5 +134,31 @@ class SquadronServiceTest {
 
     Squadron updatedSquadron = squadronRepository.findById(squadronId).orElseThrow();
     assertFalse(updatedSquadron.isActive());
+  }
+
+  @Test
+  void everyWrite_recordsItsOrgStructureAuditEvent() {
+    Instant before = Instant.now().minusSeconds(1);
+    Squadron s = new Squadron();
+    s.setName("Audited Squadron");
+    s.setShorthand("AUD");
+    s = squadronService.createSquadron(s);
+    UUID id = s.getId();
+
+    squadronService.updateSquadron(
+        id, new SquadronDto(id, "Audited Renamed", "AUD", null, true, false, s.getVersion()));
+    squadronService.setProfitEligible(id, true);
+    squadronService.deleteSquadron(id);
+    squadronService.activateSquadron(id);
+
+    for (AuditEventType type :
+        List.of(
+            AuditEventType.ORG_UNIT_CREATED,
+            AuditEventType.ORG_UNIT_UPDATED,
+            AuditEventType.ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED,
+            AuditEventType.ORG_UNIT_DEACTIVATED,
+            AuditEventType.ORG_UNIT_REACTIVATED)) {
+      assertTrue(auditRecorder.recordedSince(type, id, before), type + " must be recorded");
+    }
   }
 }

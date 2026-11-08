@@ -20,14 +20,18 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared renderer for the compact, non-personal audit label of an org unit, so the membership, role
- * and Kommando-group audit paths emit the same {@code subjectLabel} instead of each carrying a
- * private copy.
+ * Shared renderer for the compact, non-personal audit label and reference of an org unit, so the
+ * membership, role, Kommando-group and org-structure audit paths emit the same values instead of
+ * each carrying a private copy.
  */
 public final class OrgUnitLabels {
+
+  /** The reference rendered for an absent org unit. */
+  private static final String NO_UNIT = "none";
 
   private OrgUnitLabels() {}
 
@@ -44,5 +48,15 @@ public final class OrgUnitLabels {
     }
     String shorthand = unit.getShorthand();
     return shorthand != null && !shorthand.isBlank() ? shorthand : unit.getName();
+  }
+
+  /**
+   * Renders the non-personal audit reference of an org unit as {@code KIND:id}.
+   *
+   * @param unit the org unit, or {@code null}
+   * @return {@code KIND:id}, or {@code none} when there is no org unit
+   */
+  public static @NotNull String ref(@Nullable OrgUnit unit) {
+    return unit == null ? NO_UNIT : unit.getKind() + ":" + unit.getId();
   }
 }

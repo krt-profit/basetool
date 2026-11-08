@@ -1,6 +1,6 @@
 # Activity audit logs — the unified admin audit trail
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-08.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -157,7 +157,16 @@ web, naming its client (REQ-AUDIT-005):
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
   `from=<old|null> to=<new>`, REQ-ROLE-007); and
-  Kommandogruppe create / rename+reorder / delete. For membership/rank events the
+  Kommandogruppe create / rename+reorder / delete; and every **org-structure** write on the
+  `org_unit` rows themselves — Staffel, SK, Bereich and Organisationsleitung create
+  (`ORG_UNIT_CREATED`, details `kind`, `parent` as `kind:id` or `none`, and a Bereich's
+  `department`), name / shorthand / description edit (`ORG_UNIT_UPDATED`, details name the changed
+  fields, never their values), soft-delete and reactivation (`ORG_UNIT_DEACTIVATED` /
+  `ORG_UNIT_REACTIVATED`), the Job-Order processor flag (`ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED`,
+  `from` / `to` booleans) and the hierarchy's parent edge (`ORG_UNIT_PARENT_CHANGED`, REQ-ORG-014,
+  `from` / `to` as `kind:id` or `none`). The subject is the org unit with its shorthand-or-name
+  snapshot and there is no target user; a write that leaves the recorded state unchanged records
+  nothing. For membership/rank events the
   subject is the org unit (its shorthand/name snapshot) and the affected user is the target
   reference; for Kommandogruppe events the subject is the group (its name snapshot). For a
   permission change the subject is the **role's stable `code`** carried as the subject *label* with a

@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
@@ -50,12 +51,13 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 /**
  * Mockito unit tests for {@link SpecialCommandService}. Pins the CRUD contract that the admin SK UI
  * relies on: case-insensitive uniqueness on create/update, optimistic-lock failures, soft- delete +
- * activate semantics and NotFoundException propagation.
+ * activate semantics, NotFoundException propagation and the audit call of every write.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandServiceTest {
 
   @Mock private SpecialCommandRepository specialCommandRepository;
+  @Mock private OrgStructureAuditor orgStructureAuditor;
 
   @InjectMocks private SpecialCommandService specialCommandService;
 
@@ -148,6 +150,7 @@ class SpecialCommandServiceTest {
 
     assertSame(alpha, saved);
     verify(specialCommandRepository).save(alpha);
+    verify(orgStructureAuditor).created(alpha);
   }
 
   @Test
@@ -160,6 +163,7 @@ class SpecialCommandServiceTest {
             () -> specialCommandService.createSpecialCommand(alpha));
     assertTrue(ex.getMessage().contains("Alpha"));
     verify(specialCommandRepository, never()).save(any());
+    verifyNoInteractions(orgStructureAuditor);
   }
 
   @Test
@@ -178,6 +182,7 @@ class SpecialCommandServiceTest {
     assertEquals("ALR", updated.getShorthand());
     assertEquals("New desc", updated.getDescription());
     verify(specialCommandRepository).save(alpha);
+    verify(orgStructureAuditor).updated(alpha, List.of("name", "shorthand", "description"));
   }
 
   @Test
@@ -231,6 +236,7 @@ class SpecialCommandServiceTest {
 
     assertTrue(updated.isProfitEligible(), "Toggle must flip the flag on");
     verify(specialCommandRepository).save(alpha);
+    verify(orgStructureAuditor).profitEligibilityChanged(alpha, false);
   }
 
   @Test
@@ -252,6 +258,7 @@ class SpecialCommandServiceTest {
 
     assertFalse(alpha.isActive());
     verify(specialCommandRepository).save(alpha);
+    verify(orgStructureAuditor).activeChanged(alpha, true);
   }
 
   @Test
@@ -274,6 +281,7 @@ class SpecialCommandServiceTest {
 
     assertTrue(alpha.isActive());
     verify(specialCommandRepository).save(alpha);
+    verify(orgStructureAuditor).activeChanged(alpha, false);
   }
 
   @Test

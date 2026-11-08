@@ -39,7 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Same soft-delete, case-insensitive uniqueness and optimistic-locking semantics as {@link
  * SquadronService}. The explicit duplicate check sees only other SKs; a clash with a Squadron name
- * fails at flush on the global unique constraint and maps to 409.
+ * fails at flush on the global unique constraint and maps to 409. Every write is audit-logged
+ * (REQ-AUDIT-001).
  */
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpecialCommandService {
 
   private final SpecialCommandRepository specialCommandRepository;
+  private final OrgStructureAuditor orgStructureAuditor;
 
   /**
    * Unpaged Spezialkommando list for dropdowns and the owner picker. Soft-deleted rows are excluded
@@ -100,7 +102,9 @@ public class SpecialCommandService {
       throw new DuplicateEntityException(
           "A SpecialCommand with the name '" + specialCommand.getName() + "' already exists.");
     }
-    return specialCommandRepository.save(specialCommand);
+    SpecialCommand saved = specialCommandRepository.save(specialCommand);
+    orgStructureAuditor.created(saved);
+    return saved;
   }
 
   /**
@@ -125,10 +129,14 @@ public class SpecialCommandService {
 
     OptimisticLock.check(sc.getVersion(), dto.version(), SpecialCommand.class, id);
 
+    final List<String> changed =
+        OrgStructureAuditor.changedFields(sc, dto.name(), dto.shorthand(), dto.description());
     sc.setName(dto.name());
     sc.setShorthand(dto.shorthand());
     sc.setDescription(dto.description());
-    return specialCommandRepository.save(sc);
+    SpecialCommand saved = specialCommandRepository.save(sc);
+    orgStructureAuditor.updated(saved, changed);
+    return saved;
   }
 
   /**
@@ -143,8 +151,9 @@ public class SpecialCommandService {
   @Transactional
   public void deleteSpecialCommand(@NotNull UUID id) {
     SpecialCommand sc = getSpecialCommandById(id);
+    boolean wasActive = sc.isActive();
     sc.setActive(false);
-    specialCommandRepository.save(sc);
+    orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
   }
 
   /**
@@ -156,8 +165,9 @@ public class SpecialCommandService {
   @Transactional
   public void activateSpecialCommand(@NotNull UUID id) {
     SpecialCommand sc = getSpecialCommandById(id);
+    boolean wasActive = sc.isActive();
     sc.setActive(true);
-    specialCommandRepository.save(sc);
+    orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
   }
 
   /**
@@ -174,7 +184,10 @@ public class SpecialCommandService {
   @Transactional
   public SpecialCommand setProfitEligible(@NotNull UUID id, boolean eligible) {
     SpecialCommand sc = getSpecialCommandById(id);
+    boolean wasEligible = sc.isProfitEligible();
     sc.setProfitEligible(eligible);
-    return specialCommandRepository.save(sc);
+    SpecialCommand saved = specialCommandRepository.save(sc);
+    orgStructureAuditor.profitEligibilityChanged(saved, wasEligible);
+    return saved;
   }
 }
