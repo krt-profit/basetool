@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
@@ -107,6 +108,9 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeShipChangeSet.class, "change-set.schema.json#/$defs/shipChangeSet"),
           Map.entry(
               ExchangeOrgStockChangeSet.class, "change-set.schema.json#/$defs/orgStockChangeSet"),
+          Map.entry(
+              ExchangeRefineryOrderChangeSet.class,
+              "change-set.schema.json#/$defs/refineryOrderChangeSet"),
           Map.entry(ExchangeOrgDemandDto.class, "org-demand.schema.json"),
           Map.entry(ExchangeOrgStockMembersDto.class, "org-stock-members.schema.json"),
           Map.entry(ExchangeOrgStockTargetsDto.class, "org-stock-targets.schema.json"),
