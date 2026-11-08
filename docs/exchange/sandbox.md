@@ -384,6 +384,7 @@ exchange off. The gateway sees a change within about 5 seconds.
 
 - **Catalogue.** A manufacturer; Sandbox City (UEX city id `990001`) and Sandbox Station (UEX space
   station id `990002`) with one warehouse location each, Sandbox City Hangar and Sandbox Station
+  Storage, of which Sandbox Station hosts a refinery, so a refinery order runs at Sandbox Station
   Storage; the ship types Sandbox Hauler and Sandbox Miner; the materials Sandbox Ore (Raw) (raw,
   refines into Sandbox Metal), Sandbox Metal (refined), Sandbox Trade Goods (a commodity) and
   Sandbox Component (counted in pieces); the items Sandbox Rifle and Sandbox Helmet; blueprints
@@ -604,11 +605,13 @@ handle both answers.
 [`scripts/sandbox-smoke.py`][smoke] signs in as `sandbox-member` through the device flow with a DPoP
 key — opening the bare `verification_uri`, typing the code and checking that the code-entry and
 consent pages carry the phishing warning and the consent page the code — reads every resource,
-resolves one entry per kind, syncs one blueprint, stock lot and ship, and checks that a default
-blueprint cannot be removed. With `--conformance` it also sends every change-set fixture of the
-[conformance examples](examples/README.md): valid ones as dry runs, which must be accepted, and
-invalid ones, which must be refused. With `--proof-limit` it finally floods the gateway until
-[the proof cap](#the-members-proof-cap) answers; the member is then refused for about 30 seconds.
+resolves one entry per kind, syncs one blueprint, stock lot and ship, reads the store choices,
+creates a refinery order of Sandbox Ore (Raw) at Sandbox Station Storage and picks it up with a store
+line onto the member, and checks that a default blueprint cannot be removed. With `--conformance`
+it also sends every change-set fixture of the [conformance examples](examples/README.md): valid
+ones as dry runs, which must be accepted, and invalid ones, which must be refused. With
+`--proof-limit` it finally floods the gateway until [the proof cap](#the-members-proof-cap)
+answers; the member is then refused for about 30 seconds.
 It needs only Python 3 and runs again on the same data; `--user` and `--password` pick another
 account, and `--demand withheld` expects the withheld org demand of `sandbox-member-2`. CI runs it
 against the published images after every publish and once a week.

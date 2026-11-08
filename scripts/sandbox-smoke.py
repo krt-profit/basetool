@@ -2,8 +2,9 @@
 
 It signs in `sandbox-member` through the device grant of `sandbox-client` exactly as a member would
 in a browser, takes the DPoP-bound token, and then calls the service document, labels the
-installation, reads every resource, resolves a blueprint, a ship type and a material, and syncs one
-blueprint, one stock lot and one ship, and checks that removing a default blueprint is refused. The
+installation, reads every resource, resolves a blueprint, a ship type and a material, syncs one
+blueprint, one stock lot and one ship, reads the store choices, creates a refinery order and picks it
+up into the member's stock, and checks that removing a default blueprint is refused. The
 gateway checks every answer against its v1 schema, so a passing run also proves the answers keep the
 contract. With `--conformance` it also sends every change-set conformance fixture of
 `docs/exchange/examples/v1`: each valid one as a dry run, which must be accepted, and each invalid
@@ -18,6 +19,7 @@ import pathlib
 import sys
 import tempfile
 import time
+import urllib.parse
 import uuid
 
 from sandbox_client import DEFAULT_CA, ROOT, SandboxSession
@@ -128,16 +130,64 @@ class Smoke:
                        "shipType": refs["SHIP_TYPE"], "name": "Smoke Miner",
                        "insurance": {"kind": "LTI"}}]}),
         ]:
-            status, answer = self.call("POST", path, body, write=True)
-            taken = answer.get("applied", 0) + answer.get("unchanged", 0)
-            applied = status == 200 and taken >= 1 and answer.get("notApplied", 0) == 0
-            self.step(label, applied, f"{status} {json.dumps(answer)[:300]}")
+            self.sync(label, path, body)
+        self.refinery_order(refs["MATERIAL"])
         self.default_blueprint()
         if self.args.conformance:
             self.conformance()
         if self.args.proof_limit:
             self.proof_limit()
         print(f"all {self.count} steps passed")
+
+    def sync(self, label: str, path: str, body: dict) -> dict:
+        """Sends a change set that must take every op, applied or unchanged.
+
+        Returns:
+            the change result.
+        """
+        status, answer = self.call("POST", path, body, write=True)
+        taken = answer.get("applied", 0) + answer.get("unchanged", 0)
+        applied = status == 200 and taken >= 1 and answer.get("notApplied", 0) == 0
+        self.step(label, applied, f"{status} {json.dumps(answer)[:300]}")
+        return answer
+
+    def refinery_order(self, metal: dict) -> None:
+        """Reads the store choices, creates a refinery order and picks it up into the member's stock.
+
+        The order refines Sandbox Ore (Raw) at Sandbox Station Storage, whose station hosts a
+        refinery; the pickup's one store line books the yield onto the member in one of the member's
+        own units, which a member of several units must name.
+
+        Args:
+            metal: the resolved reference of Sandbox Metal, the ore's refined output.
+        """
+        status, answer = self.call("GET", "/exchange/v1/me/store-choices/receivers")
+        self.step("the store-choice receivers", status == 200, f"{status} {json.dumps(answer)[:300]}")
+        me = next((receiver for receiver in answer.get("items", []) if receiver["self"]), {})
+        self.step("the member is a receiver with a unit", bool(me.get("orgUnits")),
+                  json.dumps(answer)[:300])
+        unit = {"id": me["orgUnits"][0]["id"]}
+        status, answer = self.call(
+            "GET", "/exchange/v1/me/store-choices/job-orders?"
+            + urllib.parse.urlencode({"material": metal["bt"]}))
+        self.step("the store-choice job orders", status == 200,
+                  f"{status} {json.dumps(answer)[:300]}")
+        place = {"name": "Sandbox Station Storage"}
+        created = self.sync("a refinery order is created", "/exchange/v1/me/refinery-orders/changes",
+                            {"ops": [{"opId": "c1", "op": "create",
+                                      "clientKey": f"smoke-{uuid.uuid4().hex[:8]}",
+                                      "orgUnit": unit, "location": place,
+                                      "goods": [{"input": {"name": "Sandbox Ore (Raw)"},
+                                                 "inputQuantity": 1000, "outputQuantity": 800,
+                                                 "quality": 800}]}]})
+        order = created["orders"][0]
+        self.sync("a refinery order is picked up into stock",
+                  "/exchange/v1/me/refinery-orders/changes",
+                  {"ops": [{"opId": "p1", "op": "pickup", "id": order["id"],
+                            "versions": {"gameData": order["versions"]["gameData"]},
+                            "lines": [{"material": metal, "location": place, "quality": 800,
+                                       "quantity": {"amount": 8, "unit": "SCU"},
+                                       "orgUnit": unit}]}]})
 
     def default_blueprint(self, limit: float = 120.0) -> None:
         """Removes a default blueprint as a dry run, which must be refused `DEFAULT_NOT_REMOVABLE`.

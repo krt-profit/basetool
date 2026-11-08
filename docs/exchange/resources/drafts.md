@@ -35,6 +35,11 @@ refinery extract: `schemaVersion` 1 and one to five `orders`. Only the first ord
 and it must be a `SETUP` panel; further orders are reported in the review. The review is the web's
 refinery-order form, filled in.
 
+The draft stays for an order the member reviews in the browser first. To write the member's orders
+directly — create, update, pick up and store them — send a change set to
+[`POST /exchange/v1/me/refinery-orders/changes`](refinery-orders.md#changing-orders--post-exchangev1merefinery-orderschanges)
+instead.
+
 ## The draft result
 
 Both routes answer a [`draft-result`](../schemas/):

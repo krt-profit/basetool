@@ -2223,7 +2223,7 @@ After each committed exchange write the backend publishes live-sync frames on th
 sections the web pages and the app listen on (Lager, Blueprints, Hangar, and the Materialbörse when
 offers changed) — `ExchangeLiveSync`, see REQ-XCH-013.
 
-**Refinery orders** (ADR-0351, planned in epic #3163). A committed refinery-order write — every op
+**Refinery orders** (ADR-0351, epic #3163). A committed refinery-order write — every op
 of REQ-XCH-052…055, its confirmation and its undo — publishes, after the commit, into the rooms the
 frontend already has: `refinery` with the section `queue` (the list) and `refinery-order/{id}` with
 the sections `order` and `store` (the detail page), and `deleted` when a client deletes the order. A pickup with store lines also publishes the

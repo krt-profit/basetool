@@ -470,7 +470,7 @@ pinned beyond being cycle-free.
 Four modules share it (ingest, backend, frontend, keycloak-spi); the contract, the routes and
 every rule are in [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-*`), the
 decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228. The refinery-order resource
-(REQ-XCH-051…056, ADR-0351) is planned in epic #3163: it adds a feed, a write service and a journal
+(REQ-XCH-051…056, ADR-0351, epic #3163) adds a feed, a write service and a journal
 of its own to the backend rows below, writing through the refinery module's services.
 
 | Where | Building block | Responsibility |

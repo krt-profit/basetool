@@ -5,55 +5,43 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-09
 
-- **New: store lines on a refinery-order `pickup`.** A pickup may carry `lines` that book the
-  yield into stock as the web's store dialog does, all or nothing, and set `storedAt`; a change set
-  holding them needs `exchange.refinery.store` (`#/$defs/refineryStoreLine`,
-  [refinery orders](resources/refinery-orders.md#store-lines)).
-- **New: store choices.** `GET /exchange/v1/me/store-choices/receivers` and
-  `GET /exchange/v1/me/store-choices/job-orders?material=` with the scope `exchange.refinery.store`
-  list the members a store line may book onto and the job orders it may earmark to, with the new
-  schemas `store-choice-receivers.schema.json` and `store-choice-job-orders.schema.json`
-  ([store choices](resources/store-choices.md)).
-- **New: per-op reasons `MATERIAL_NOT_AN_OUTPUT`, `RECEIVER_UNKNOWN`, `ORG_UNIT_NOT_ALLOWED` and
-  `JOB_ORDER_INVALID`.** They refuse a pickup's store lines; `UNIT_MISMATCH`, `LOCATION_UNKNOWN`
-  and `ORDER_STORED` refuse them too ([errors](errors.md)).
-
-## 2026-11-08
-
-- **New: refinery-order ops `cancel` and `delete`.** `cancel` cancels an order as the web does
-  and echoes `gameData`; `delete` removes an order that is not stored, with its goods, and echoes
-  both counters. A `delete` counts as a removal for the mass-change guard; the feed carries its
-  tombstone ([refinery orders](resources/refinery-orders.md)).
-- **New: refinery-order op `pickup`.** It closes an open or running order as collected in the
-  game, also before its end: the order becomes `COMPLETED` with `pickedUpAt`, nothing is booked
-  into stock, and it echoes `gameData`. A completed order is `unchanged`; a cancelled one is
-  refused with the new per-op reason `ORDER_CANCELED`
-  ([refinery orders](resources/refinery-orders.md#fields), [errors](errors.md)).
-- **New: refinery orders.** `GET /exchange/v1/me/refinery-orders` with the scope
-  `exchange.refinery.read` serves the member's own refinery orders: a snapshot of the open and
-  running ones, and a feed of every change of every own order, completed and cancelled ones
-  included. A deleted order and one moved to another member leave a tombstone; a cancel is a status
-  change. The new schema `refinery-order.schema.json` and the page `#/$defs/refineryOrderPage`
-  describe it ([refinery orders](resources/refinery-orders.md)).
-- **New: scopes `exchange.refinery.write` and `exchange.refinery.store`.** They are registered for
-  the refinery-order writes and the store of a picked-up order, whose routes follow in a later
-  entry.
-- **New: refinery-order writes.** `POST /exchange/v1/me/refinery-orders/changes` with the scope
-  `exchange.refinery.write` applies a change set of the ops `create`, `update`, `good-add`,
-  `good-update` and `good-remove` (`#/$defs/refineryOrderChangeSet`). An op names its order by `id`
-  or by the client's own `clientKey`, echoes the counters of the sections it touches, and is
-  decided in order; the set counts once against the daily write quota
-  ([refinery orders](resources/refinery-orders.md#changing-orders--post-exchangev1merefinery-orderschanges)).
-- **New: per-op reasons `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
-  `ALREADY_EXISTS`, `PRECEDING_OP_REJECTED` and `ORDER_STORED`.** They refuse refinery-order ops;
-  `NOT_A_MEMBER`, `LOCATION_UNKNOWN` and `VERSION_CONFLICT` refuse them too ([errors](errors.md)).
-- **New: `orders` and `results[].id` in a change result.** A refinery-order change set that is not
-  a dry run answers one `orders` entry per applied op, with the order's `id`, the ids of the goods
-  rows it created and its counters after the op. A `create` refused `ALREADY_EXISTS` names the
-  existing order in its result's `id`. Both fields are optional in `change-result.schema.json`.
-- **New: `clientKey` on a refinery-order tombstone.** The tombstone of an order a client created
-  carries the order's `clientKey`, for that client only; `tombstone.schema.json` gains the optional
-  field.
+- **New: refinery orders.** A client reads and writes the member's own refinery work orders and
+  books a collected yield into stock ([refinery orders](resources/refinery-orders.md)). All of it is
+  additive within `v1`.
+  - **Scopes.** `exchange.refinery.read` to read, `exchange.refinery.write` to write, and
+    `exchange.refinery.store` for store lines and the store choices.
+  - **The feed.** `GET /exchange/v1/me/refinery-orders` serves a snapshot of the open and running
+    orders and a feed of every change of every own order, completed and cancelled ones included. A
+    deleted order and one moved to another member leave a tombstone, which carries the order's
+    `clientKey` for the client that created it; a cancel is a status change. New:
+    `refinery-order.schema.json`, `#/$defs/refineryOrderPage` and the optional `clientKey` in
+    `tombstone.schema.json`.
+  - **The change set.** `POST /exchange/v1/me/refinery-orders/changes` applies the ops `create`,
+    `update`, `good-add`, `good-update`, `good-remove`, `cancel`, `delete` and `pickup`
+    (`#/$defs/refineryOrderChangeSet`). An op names its order by `id` or by the client's own
+    `clientKey`, echoes the counters of the sections it touches, and is decided in order; the set
+    counts once against the daily write quota, and only a `delete` counts for the mass-change
+    guard. A change result gains the optional `orders` and `results[].id` in
+    `change-result.schema.json`
+    ([change set](resources/refinery-orders.md#changing-orders--post-exchangev1merefinery-orderschanges)).
+  - **Pickup and store.** A `pickup` closes an open or running order as collected in the game:
+    `COMPLETED` with `pickedUpAt`. With `lines` (`#/$defs/refineryStoreLine`) it books the yield
+    into stock as the web's store dialog does, all or nothing, and sets `storedAt`
+    ([store lines](resources/refinery-orders.md#store-lines)).
+  - **Store choices.** `GET /exchange/v1/me/store-choices/receivers` and
+    `GET /exchange/v1/me/store-choices/job-orders?material=` list the members a store line may book
+    onto and the job orders it may earmark to, with the schemas
+    `store-choice-receivers.schema.json` and `store-choice-job-orders.schema.json`
+    ([store choices](resources/store-choices.md)).
+  - **Per-op reasons.** `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
+    `ALREADY_EXISTS`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`, `ORDER_CANCELED`,
+    `MATERIAL_NOT_AN_OUTPUT`, `RECEIVER_UNKNOWN`, `ORG_UNIT_NOT_ALLOWED` and `JOB_ORDER_INVALID`;
+    `NOT_A_MEMBER`, `LOCATION_UNKNOWN`, `UNIT_MISMATCH` and `VERSION_CONFLICT` refuse refinery-order
+    ops too ([errors](errors.md)).
+- **Changed: the refinery draft points at the direct writes.** The
+  [refinery draft](resources/drafts.md#refinery-draft--post-exchangev1medraftsrefinery-orders)
+  stays for an order the member reviews in the browser; to write orders directly, send a change set
+  to `POST /exchange/v1/me/refinery-orders/changes`. The draft itself is unchanged.
 
 ## 2026-11-07
 

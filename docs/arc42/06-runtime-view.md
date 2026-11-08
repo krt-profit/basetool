@@ -159,7 +159,7 @@ The building blocks are in §5.5; every rule is in
    on — Hangar, Blueprints, Lager, and the Materialbörse when an offer changed (§6.4). A ship write
    also reaches the open unit overviews through `HangarUnitLiveSync` (ADR-0260).
 
-**A refinery order, written directly** (planned, ADR-0351, REQ-XCH-051…056). Beside the draft, a
+**A refinery order, written directly** (ADR-0351, REQ-XCH-051…056). Beside the draft, a
 client reads the member's own orders from the refinery-order feed and writes them in one change
 set: it creates an order under its own `clientKey`, follows the game's timer with updates, and
 reports the pickup — without store lines when its own stock sync books the yield, with them when the

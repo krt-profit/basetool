@@ -1,6 +1,6 @@
 # ADR-0351 — Refinery orders are an Exchange resource with direct writes
 
-- **Status:** Accepted (implementation pending, epic [#3163](https://github.com/krt-profit/basetool/issues/3163))
+- **Status:** Accepted (epic [#3163](https://github.com/krt-profit/basetool/issues/3163))
 - **Date:** 2026-11-08
 - **Deciders:** @greluc
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) (REQ-XCH-051…056,
