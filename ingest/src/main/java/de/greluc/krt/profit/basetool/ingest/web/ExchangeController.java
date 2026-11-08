@@ -130,7 +130,7 @@ public class ExchangeController {
   private static final String BACKEND = "/api/v1/exchange";
 
   /** The gateway path every route of this controller lies below. */
-  private static final String GATEWAY = "/exchange/v1";
+  static final String GATEWAY = "/exchange/v1";
 
   /** The member's blueprint feed below {@link #GATEWAY}. */
   private static final String MEMBER_BLUEPRINTS = "/me/blueprints";
@@ -349,8 +349,9 @@ public class ExchangeController {
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
     String path =
-        Objects.requireNonNull(
-                (String) request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE))
+        String.valueOf(
+                Objects.requireNonNull(
+                    request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
             .substring(GATEWAY.length());
     return page(
         path,
