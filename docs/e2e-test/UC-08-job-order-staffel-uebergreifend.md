@@ -10,16 +10,16 @@
 ## Akteure
 
 - **`test-officer`** (OFFICER, Heimat-Staffel IRIDIUM = Staffel A) — treibt die UI.
-- **`test-member`** (KRT Member, Heimat einer frisch angelegten Staffel B „E2E JobOrder B") — Besitzer des verknüpften Lagereintrags; wird nur per REST verwendet.
+- **`test-member`** (KRT Member, Mitglied einer frisch angelegten Staffel B „E2E JobOrder B" **und** von IRIDIUM) — Besitzer des verknüpften Lagereintrags; wird nur per REST verwendet.
 
 ## Vorbedingungen
 
 Nur im ephemeren Modus per REST geseedet (`STACK.managesStack()`):
 
-- Staffel B (`createSquadron`) und die Mitgliedschaften beider Nutzer (`assignStaffelMembership`).
+- Staffel B (`createSquadron`), der Staffelleiter-Sitz von `test-officer` in IRIDIUM und die Mitgliedschaften von `test-member` in B und IRIDIUM (`assignTwoStaffelMemberships`).
 - Ein Job-Order-Material und eine Location.
 - Ein Job Order mit IRIDIUM als bearbeitender und anfragender Einheit (`createJobOrder`).
-- Ein Lagereintrag, den `test-member` **mit `jobOrderId` = diesem Auftrag** anlegt (`createInventoryItemForJobOrder`) — der Resolver stempelt ihn damit auf Staffel B.
+- Ein Lagereintrag, den `test-member` **mit `jobOrderId` = diesem Auftrag** und Staffel B als besitzender Einheit anlegt (`createInventoryItemForJobOrderOwnedBy`).
 
 ## Auslöser
 
@@ -39,6 +39,7 @@ Staffel A will einen Auftrag erfüllen, zu dem Staffel B Material beigesteuert h
 ## Sonderfälle & Lehren
 
 - **Cross-Staffel-Beitrag über verknüpftes Inventar:** Staffel-übergreifend ist nicht die Auftrags-_Sichtbarkeit_ (die richtet sich nach `responsibleOrgUnit.kind`, REQ-ORG-003), sondern das **verknüpfte Inventar** im Auftrags-Kontext — `findByJobOrderIdOrdered` ist ungegated, `findGlobalByFilters` bleibt gegated. Genau dieser Split ermöglicht „A bestellt, B liefert", ohne B's Lager in A's View zu leaken.
+- **Wer verknüpfen darf:** Eine Zuordnung zu einem Auftrag nimmt nur an, wer den Auftrag im Tenancy-Scope sieht (REQ-ORDERS-018); ein reines B-Mitglied bekommt für A's Auftrag `404`. Deshalb ist `test-member` auch Mitglied von A und stempelt den Eintrag ausdrücklich auf B — so entsteht B-Bestand in A's Auftrag auf demselben Weg wie im Betrieb.
 - **Zwei OrgUnit-Referenzen:** `responsible_org_unit_id` (die **bearbeitende** Einheit — muss profit-eligible sein, steuert die Sichtbarkeit) vs. `requesting_org_unit_id` (Auftraggeber, editierbar — akzeptiert jede aktive OrgUnit). Das frühere `creating_org_unit_id` ist entfallen.
 - **Profit-Eligibility-Pflicht:** `POST /api/v1/orders` verlangt ein `responsibleOrgUnitId`, das auf eine profit-eligible Einheit auflöst (sonst 400). Der Stack-Bootstrap schaltet IRIDIUM einmalig profit-eligible — siehe UC-06/Seeder.
 - **Split-Repository** ist der Kern der Isolation: ungegated im Auftrags-Kontext, gegated in der Lager-View.

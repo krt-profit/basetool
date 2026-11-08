@@ -29,6 +29,7 @@
 /admin/exchange-clients GET -> AdminExchangeClientsPageController#page gate=class:hasRole('ADMIN') layout=yes
 /admin/exchange-clients POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#create gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/settings PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#updateSettings gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/settings/bank PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#updateBankSwitch gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/undo-runs/{runId} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoRun gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#get gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id} PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#update gate=class:hasRole('ADMIN') layout=no
