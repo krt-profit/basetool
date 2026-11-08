@@ -50,7 +50,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 19 relay operations on 18 backend paths, each with the gateway route that relays it, the
+   * The 20 relay operations on 19 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -169,6 +169,14 @@ public final class ExchangeSeam {
               null,
               "page.schema.json#/$defs/orgStockPage"),
           new RelayOperation(
+              "GET",
+              "/me/refinery-orders",
+              "/me/refinery-orders",
+              "exchange.refinery.read",
+              true,
+              null,
+              "page.schema.json#/$defs/refineryOrderPage"),
+          new RelayOperation(
               "POST",
               "/org-stock/changes",
               "/org-stock/changes",
@@ -236,7 +244,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The fifteen capability scopes. */
+  /** The eighteen capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -252,6 +260,9 @@ public final class ExchangeSeam {
           "exchange.orgstock.read",
           "exchange.orgstock.details",
           "exchange.orgstock.write",
+          "exchange.refinery.read",
+          "exchange.refinery.write",
+          "exchange.refinery.store",
           "exchange.drafts.blueprints",
           "exchange.drafts.refinery");
 
@@ -261,6 +272,13 @@ public final class ExchangeSeam {
    */
   public static final @Unmodifiable Set<String> ADDITIVE_SCOPES =
       Set.of("exchange.orgstock.details", "exchange.demand.details");
+
+  /**
+   * The capability scopes the realm and the registry already grant whose routes the gateway does
+   * not serve: the refinery-order writes and store choices (REQ-XCH-052…054).
+   */
+  public static final @Unmodifiable Set<String> ROUTELESS_SCOPES =
+      Set.of("exchange.refinery.write", "exchange.refinery.store");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).

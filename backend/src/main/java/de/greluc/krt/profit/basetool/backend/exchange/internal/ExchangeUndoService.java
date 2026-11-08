@@ -240,7 +240,8 @@ public class ExchangeUndoService {
    *
    * @param resource the resource
    * @return its restorer
-   * @throws IllegalStateException for the org stock, whose entries are restored together
+   * @throws IllegalStateException for the org stock, whose entries are restored together, and for
+   *     refinery orders, which the journal does not hold
    */
   private @NotNull ExchangeEntryRestorer restorer(@NotNull ExchangeResource resource) {
     return switch (resource) {
@@ -248,6 +249,7 @@ public class ExchangeUndoService {
       case STOCK -> stockJournal;
       case SHIP -> shipJournal;
       case ORG_STOCK -> throw new IllegalStateException("Org-stock entries are restored together");
+      case REFINERY_ORDER -> throw notJournaled();
     };
   }
 
@@ -262,8 +264,19 @@ public class ExchangeUndoService {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK, ORG_STOCK -> liveSync.stockChanged(false);
       case SHIP -> liveSync.hangarChanged(member);
+      case REFINERY_ORDER -> throw notJournaled();
       case null -> throw new NullPointerException("resource");
     }
+  }
+
+  /**
+   * Refuses a refinery-order entry, which {@code ck_exchange_journal_resource} keeps out of the
+   * journal.
+   *
+   * @return the exception to throw
+   */
+  private static @NotNull IllegalStateException notJournaled() {
+    return new IllegalStateException("Refinery-order writes are not journaled");
   }
 
   /**

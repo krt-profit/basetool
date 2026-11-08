@@ -322,6 +322,21 @@
           },
           {
             "memberToken": [
+              "exchange.refinery.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.store"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.drafts.blueprints"
             ]
           },
@@ -442,6 +457,21 @@
           {
             "memberToken": [
               "exchange.orgstock.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.store"
             ]
           },
           {
@@ -843,6 +873,70 @@
             }
           }
         }
+      }
+    },
+    "/exchange/v1/me/refinery-orders": {
+      "get": {
+        "operationId": "refinery_orders_read",
+        "summary": "The member's own refinery orders: a snapshot of the open and running ones, or every order changed since a cursor.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/refineryOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
       }
     },
     "/exchange/v1/me/org-demand": {

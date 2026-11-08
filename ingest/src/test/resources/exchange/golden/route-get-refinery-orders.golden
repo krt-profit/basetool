@@ -1,0 +1,29 @@
+=== request
+GET /exchange/v1/me/refinery-orders?limit=10
+=== relayed
+GET /api/v1/exchange/me/refinery-orders?limit=10
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.refinery.read,exchange.refinery.store,exchange.refinery.write,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+=== response
+200
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"items":[{"id":"3f1c2b4a-6d5e-4a7b-8c9d-0e1f2a3b4c5d","versions":{"gameData":4,"finances":1},"status":"IN_PROGRESS","location":{"name":"ARC-L1 Wide Forest Station","uex":{"kind":"SPACE_STATION","id":12}},"method":{"code":"DINYX","name":"Dinyx Solventation"},"startedAt":"2026-11-08T10:00:00Z","durationMinutes":90,"endsAt":"2026-11-08T11:30:00Z","expenses":1250.5,"orgUnitId":"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d","goods":[{"id":"5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d","input":{"bt":"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f","name":"Quantainium (Raw)"},"inputQuantity":1200,"output":{"bt":"8d9e0f1a-2b3c-4d4e-9f5a-6b7c8d9e0f1a","name":"Quantainium"},"outputQuantity":900,"quality":650}]}],"removed":[],"nextCursor":"f1.9.0","hasMore":false}

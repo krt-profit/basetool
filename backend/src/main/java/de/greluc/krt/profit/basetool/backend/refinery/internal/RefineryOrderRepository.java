@@ -345,4 +345,44 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       "UPDATE RefineryOrder o SET o.readyNotifiedAt = :now"
           + " WHERE o.id = :id AND o.readyNotifiedAt IS NULL")
   int markReadyNotified(@Param("id") UUID id, @Param("now") Instant now);
+
+  /**
+   * Returns the ids of one exchange snapshot page of a member's orders in the given statuses.
+   *
+   * @param owner the owning member
+   * @param statuses the statuses to include
+   * @param after the last order delivered, or the zero id for the first page
+   * @param limit the page size
+   * @return the ids after {@code after}, ascending
+   */
+  @Query(
+      "SELECT o.id FROM RefineryOrder o WHERE o.owner.id = :owner AND o.status IN :statuses"
+          + " AND o.id > :after ORDER BY o.id")
+  List<UUID> findExchangeOrderIds(
+      @Param("owner") UUID owner,
+      @Param("statuses") Collection<RefineryOrderStatus> statuses,
+      @Param("after") UUID after,
+      Limit limit);
+
+  /**
+   * Loads a member's orders with everything the exchange feed serves: the location with its city
+   * and space station, the refining method and the goods with their materials.
+   *
+   * @param owner the owning member
+   * @param ids the order ids
+   * @return the orders among {@code ids} the member owns
+   */
+  @EntityGraph(
+      attributePaths = {
+        "location",
+        "location.city",
+        "location.spaceStation",
+        "refiningMethod",
+        "goods",
+        "goods.inputMaterial",
+        "goods.outputMaterial"
+      })
+  @Query("SELECT o FROM RefineryOrder o WHERE o.owner.id = :owner AND o.id IN :ids")
+  List<RefineryOrder> findExchangeOrders(
+      @Param("owner") UUID owner, @Param("ids") Collection<UUID> ids);
 }

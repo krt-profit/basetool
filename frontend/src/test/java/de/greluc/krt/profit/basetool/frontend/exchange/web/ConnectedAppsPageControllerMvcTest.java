@@ -176,6 +176,50 @@ class ConnectedAppsPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
+  void theRefineryCapabilitiesAreNamedInGermanAndEnglish() throws Exception {
+    ConnectedAppDto app =
+        new ConnectedAppDto(
+            "versekit",
+            "VerseKit",
+            List.of(
+                "exchange.connect",
+                "exchange.refinery.read",
+                "exchange.refinery.write",
+                "exchange.refinery.store"),
+            List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
+            List.of());
+    when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
+
+    mockMvc
+        .perform(get("/connected-apps").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Deine Raffinerieaufträge lesen")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Deine Raffinerieaufträge anlegen, ändern, abholen, abbrechen und"
+                            + " löschen")))
+        .andExpect(
+            content().string(containsString("Den Ertrag abgeholter Raffinerieaufträge einlagern")))
+        .andExpect(content().string(not(containsString("??"))));
+    mockMvc
+        .perform(get("/connected-apps").param("lang", "en"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Read your refinery orders")))
+        .andExpect(
+            content()
+                .string(
+                    containsString(
+                        "Create, change, pick up, cancel and delete your refinery orders")))
+        .andExpect(
+            content()
+                .string(containsString("Book the yield of picked-up refinery orders into stock")))
+        .andExpect(content().string(not(containsString("??"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
   void theOrgStockCapabilitiesAreNamedInGermanAndEnglish() throws Exception {
     ConnectedAppDto app =
         new ConnectedAppDto(

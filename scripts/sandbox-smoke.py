@@ -85,6 +85,7 @@ class Smoke:
             ("the blueprints", "GET", "/exchange/v1/me/blueprints", None),
             ("the stock", "GET", "/exchange/v1/me/stock", None),
             ("the ships", "GET", "/exchange/v1/me/ships", None),
+            ("the refinery orders", "GET", "/exchange/v1/me/refinery-orders", None),
             ("the org demand", "GET", "/exchange/v1/me/org-demand", None),
             ("the org units", "GET", "/exchange/v1/me/org-units", None),
             ("the org stock", "GET", "/exchange/v1/org-stock", None),

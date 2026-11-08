@@ -225,7 +225,8 @@ requires it and duplicating it into further files spreads personal data for no g
   consented to, the anonymised org demand — for a Logistician or leader of a unit under
   `exchange.demand.details` also the open orders of that unit with number, units, the Auftraggeber
   and comment as their author typed them, never an assignee (REQ-XCH-047, built) —, the member's
-  direct org units and the org unit of each
+  direct org units, the member's own refinery orders with the linked mission by id only (REQ-XCH-051,
+  built), the org unit of each
   of the member's ships (name, shorthand, kind) and catalogue data — never the e-mail address
   (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
   is the shared stock of a unit (ADR-0257, REQ-XCH-042…045): a client approved for it receives the

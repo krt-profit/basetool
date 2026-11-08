@@ -59,6 +59,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/blueprints` · `POST …/changes` | `exchange.blueprints.read` / `.write` | REQ-XCH-015 |
 | `GET /exchange/v1/me/stock` · `POST …/changes` | `exchange.stock.read` / `.write` | REQ-XCH-016 |
 | `GET /exchange/v1/me/ships` · `POST …/changes` | `exchange.hangar.read` / `.write` | REQ-XCH-017 |
+| `GET /exchange/v1/me/refinery-orders` | `exchange.refinery.read` | REQ-XCH-051 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
@@ -73,10 +74,9 @@ the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the memb
 units to the org demand (REQ-XCH-047).
 
 > [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
-> The table gains four rows as they are built: `GET /exchange/v1/me/refinery-orders`
-> (`exchange.refinery.read`, REQ-XCH-051), `POST …/me/refinery-orders/changes`
-> (`exchange.refinery.write`, REQ-XCH-052…055), and `GET …/me/refinery-orders/receivers` and
-> `…/me/refinery-orders/job-orders?material=` (`exchange.refinery.store`, REQ-XCH-054).
+> The read is built (REQ-XCH-051). The table gains its further rows as they are built:
+> `POST …/me/refinery-orders/changes` (`exchange.refinery.write`, REQ-XCH-052…055) and the two
+> store-choice reads (`exchange.refinery.store`, REQ-XCH-054).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -296,17 +296,18 @@ configuration cannot stretch a suspension's delay, `ExchangeGatewayPropertiesTes
 The capabilities are `exchange.connect` (base: service document, installation label, account
 check), `exchange.blueprints.read` / `.write`, `exchange.stock.read` / `.write`,
 `exchange.hangar.read` / `.write`, `exchange.demand.read` / `.details`, `exchange.orgunits.read`,
-`exchange.orgstock.read` / `.details` / `.write`, `exchange.drafts.blueprints` and
-`exchange.drafts.refinery`. A `.details` capability only widens the answer of its `.read` route and
+`exchange.orgstock.read` / `.details` / `.write`, `exchange.refinery.read` / `.write` / `.store`,
+`exchange.drafts.blueprints` and `exchange.drafts.refinery`. A `.details` capability only widens the answer of its `.read` route and
 needs it; it opens no route of its own. A request passes only if the route's scope is in the token **and**
 granted to the client in the registry (`403 SCOPE_MISSING`); the backend's exchange layer checks
 the relayed capabilities again (`@PreAuthorize("@exchangeGate.allows(…)")`). Each scope stamps the
 `basetool-ingest` audience, and the gateway enforces that audience on exchange routes in code, not
 only by property.
 
-> [!note] Planned — three refinery capabilities (ADR-0351, epic #3163)
-> `exchange.refinery.read`, `exchange.refinery.write` and `exchange.refinery.store` join the list
-> as they are built (REQ-XCH-051…054). `.store` is no `.details` capability: it gates the two
+> [!note] Planned — the routes of two refinery capabilities (ADR-0351, epic #3163)
+> The three refinery scopes are registered, in the Keycloak realm and the registry's CHECK; only
+> `.read` opens a route so far (REQ-XCH-051), `.write` and `.store` open theirs as they are built
+> (REQ-XCH-052…054). `.store` is no `.details` capability: it gates the two
 > store-choice reads of its own and is required, beside `.write`, for every change set that holds a
 > `pickup` with store lines.
 
@@ -772,7 +773,7 @@ decision 2026-09-26), and a `$id` is never changed once published. The schemas a
 `observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`, and the optional UEX
 flags `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`), `blueprint`, `stock-lot`
 (material, location, quality, `stolen`, quantity — no org unit, no row id), `ship` (with required
-`version`), `org-demand`, `org-unit` and `org-unit-list`, `location`, `installation`, `account-check`, `change-set` (at most 500
+`version`), `refinery-order` (with the required section counters `versions`), `org-demand`, `org-unit` and `org-unit-list`, `location`, `installation`, `account-check`, `change-set` (at most 500
 ops), `change-result` (compact, at most 32 KiB; its optional `cursor` is reserved and never sent in
 v1 — a client reads the feed after a push), `page`, `service-document`, `problem` and the
 offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, `items`,
@@ -887,8 +888,9 @@ purged position as the horizon, below which a cursor has expired.
   the shared rows of a pool, keyed by unit lot), both allocation tables and `org_unit_membership`
   (the org stock of REQ-XCH-042), `app_user`, `exchange_name_withholding` and `mission` (a holder's
   name, its withholding and an earmarked mission's name in the details of REQ-XCH-043), `ship` and
-  `org_unit` (the ships and lots of a renamed unit), and `location`, `city`, `space_station` and
-  `starmap_object` (the entries at a place whose reference changed, REQ-XCH-018) — to their
+  `org_unit` (the ships and lots of a renamed unit), `refinery_order` and `refinery_good`
+  (an order and its goods, once per order and transaction, REQ-XCH-051), and `location`, `city`, `space_station` and
+  `starmap_object` (the entries at a place whose reference changed, REQ-XCH-018, refinery orders included) — to their
   triggers and runs bulk deletes,
   owner reassignment, a move to another place, a rebooking between personal and shared or between
   pools that keeps the lot's key and changes its split (`V304`), and user deletion through them.
@@ -2522,7 +2524,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 19 relay operations on 18 backend
+byte-identical (D-05 of the domain modularisation plan): the 20 relay operations on 19 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2547,7 +2549,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 19 relay
+  pull request. The test also asserts that the backend stub received exactly the 20 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2575,7 +2577,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 19 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 20 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2589,13 +2591,14 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 19 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's ten exchange controllers and their `@exchangeGate`
+- the 20 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's eleven exchange controllers and their `@exchangeGate`
   expressions, `ActingMemberFilter`'s 18 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the fifteen capability scopes (`exchange.orgstock.details` and
-  `exchange.demand.details` the two that gate no route of their own), the seven gate codes with
+- the five relay headers, the eighteen capability scopes (`exchange.orgstock.details`,
+  `exchange.demand.details`, `exchange.refinery.write` and `exchange.refinery.store` the four that
+  gate no route of their own yet), the seven gate codes with
   their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
@@ -2636,7 +2639,7 @@ G-18)
 
 ### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
 
-The backend operations the gateway relays to — the 19 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 20 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
@@ -2651,7 +2654,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  19 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  20 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2665,7 +2668,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 19 relay operations and 83 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 20 relay operations and 101 schemas; `openapi.json` holds
   none of them and the 64 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
@@ -3265,19 +3268,25 @@ is named by id only.
 
 **Acceptance**
 
-- [ ] A snapshot holds the member's open and running orders and no other member's; a feed read from
+- [x] A snapshot holds the member's open and running orders and no other member's; a feed read from
   its cursor carries a completed, a cancelled and a reopened order as changes.
+  *`ExchangeRefineryOrderControllerTest`.*
 - [ ] An order created in the web, by a draft and by another client appears with its marker; only
   the creating client sees its `clientKey`.
-- [ ] A hard delete and an owner reassignment leave a tombstone; a cancel does not; a location
-  reference change re-announces the order.
-- [ ] A goods row change announces its order once; a bulk write bypassing the services appears in
-  the feed.
-- [ ] Without the scope the gateway answers `403 SCOPE_MISSING` and the backend refuses a relayed
-  request the same way.
+- [x] A hard delete and an owner reassignment leave a tombstone; a cancel does not; a location
+  reference change re-announces the order. *`ExchangeRefineryOrderControllerTest`,
+  `ExchangeChangeFeedTriggerIntegrationTest`.*
+- [x] A goods row change announces its order once; a bulk write bypassing the services appears in
+  the feed. *`ExchangeChangeFeedTriggerIntegrationTest` (`V370`).*
+- [x] Without the scope the gateway answers `403 SCOPE_MISSING` and the backend refuses a relayed
+  request the same way. *`ExchangeRefineryOrderRouteTest`, `ExchangeRefineryOrderControllerTest`.*
 
-**Status:** planned — #3167 (scopes, triggers, read); the provenance and counters it serves come with
-#3165 and #3166
+**Enforced by:** `ExchangeRefineryOrderControllerTest`, `ExchangeChangeFeedTriggerIntegrationTest`,
+`ExchangeRefineryOrderRouteTest`, `ExchangeWireContractTest` · **Code:**
+`ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370` · **Status:** partially
+implemented — #3167 (scopes, triggers, read); both `versions` counters read the order's single
+version until #3165 splits it, and `createdBy`, `clientKey` and `pickedUpAt` are served once
+#3166 and #3168 store them
 
 ### REQ-XCH-052 — A client writes the member's refinery orders in one change set
 

@@ -156,7 +156,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> expected = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> expected.put(operation.relayed(), operation.capability()));
-    assertThat(expected).as("the seam lists 19 relay operations").hasSize(19);
+    assertThat(expected).as("the seam lists 20 relay operations").hasSize(20);
     return expected;
   }
 
@@ -199,7 +199,7 @@ class ExchangeRelaySeamParityTest {
         }
       }
     }
-    assertThat(owners).as("the exchange controllers").hasSize(10);
+    assertThat(owners).as("the exchange controllers").hasSize(11);
     assertThat(served).isEqualTo(expected);
   }
 
@@ -250,7 +250,7 @@ class ExchangeRelaySeamParityTest {
   private static void assertActingMemberPaths(@NotNull Set<String> expected) {
     List<?> patterns = (List<?>) staticField(ActingMemberFilter.class, "EXCHANGE_PATHS");
     List<String> listed = patterns.stream().map(p -> ((PathPattern) p).getPatternString()).toList();
-    assertThat(listed).as("18 exact paths").hasSize(18).doesNotHaveDuplicates();
+    assertThat(listed).as("19 exact paths").hasSize(19).doesNotHaveDuplicates();
     assertThat(listed).allSatisfy(path -> assertThat(path).doesNotContain("*", "{"));
     assertThat(new TreeSet<>(listed)).isEqualTo(new TreeSet<>(expected));
   }
@@ -281,7 +281,7 @@ class ExchangeRelaySeamParityTest {
         Arrays.stream(ExchangeCapability.values())
             .map(ExchangeCapability::getScope)
             .collect(Collectors.toCollection(TreeSet::new));
-    assertThat(scopes).hasSize(15).isEqualTo(new TreeSet<>(expected));
+    assertThat(scopes).hasSize(18).isEqualTo(new TreeSet<>(expected));
   }
 
   /**

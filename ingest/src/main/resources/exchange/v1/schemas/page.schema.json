@@ -75,6 +75,20 @@
         }
       }
     },
+    "refineryOrderPage": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "refinery-order.schema.json"
+          }
+        }
+      }
+    },
     "orgStockPage": {
       "allOf": [
         {

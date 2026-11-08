@@ -3,6 +3,18 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-08
+
+- **New: refinery orders.** `GET /exchange/v1/me/refinery-orders` with the scope
+  `exchange.refinery.read` serves the member's own refinery orders: a snapshot of the open and
+  running ones, and a feed of every change of every own order, completed and cancelled ones
+  included. A deleted order and one moved to another member leave a tombstone; a cancel is a status
+  change. The new schema `refinery-order.schema.json` and the page `#/$defs/refineryOrderPage`
+  describe it ([refinery orders](resources/refinery-orders.md)).
+- **New: scopes `exchange.refinery.write` and `exchange.refinery.store`.** They are registered for
+  the refinery-order writes and the store of a picked-up order, whose routes follow in a later
+  entry.
+
 ## 2026-11-07
 
 - **New: per-op reason `ITEM_RETIRED`.** An item the game no longer has, or one the Basetool hid,

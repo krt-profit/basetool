@@ -80,6 +80,7 @@ class ExchangeContractTest {
           "/exchange/v1/me/stock/changes",
           "/exchange/v1/me/ships",
           "/exchange/v1/me/ships/changes",
+          "/exchange/v1/me/refinery-orders",
           "/exchange/v1/me/org-demand",
           "/exchange/v1/me/org-units",
           "/exchange/v1/org-stock",
