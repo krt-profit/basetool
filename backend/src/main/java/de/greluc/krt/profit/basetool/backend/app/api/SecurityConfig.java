@@ -373,6 +373,9 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/terms/document")
                 .permitAll()
+                // REQ-BANK-010: the bank's own ADMIN gate, independent of the generic admin rule.
+                .requestMatchers("/api/v1/bank/admin/**")
+                .hasRole(Roles.ADMIN)
                 .requestMatchers(
                     "/api/v1/*/admin/**",
                     "/api/v1/announcements/current/admin",

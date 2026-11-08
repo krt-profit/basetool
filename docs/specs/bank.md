@@ -339,7 +339,10 @@ The audit log is **admin-only** — bank management does **not** see it. The ban
 public surface at all: since REQ-SEC-052 there is none to be on, and it contributed nothing to the
 one that existed (consistent with REQ-SEC-009). Bank
 endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
-`/api/v1/bank/admin/**` additionally gets a `hasRole('ADMIN')` URL gate.
+`/api/v1/bank/admin/**` additionally gets a `hasRole('ADMIN')` URL gate — its own
+`SecurityConfig` matcher `/api/v1/bank/admin/**`, ordered ahead of the generic
+`/api/v1/*/admin/**` rule (REQ-API-023), so the bank's admin gate stays in force if the generic
+rule changes.
 
 > **Amendment (REQ-BANK-034..038):** the "members see nothing" rule is further relaxed on the
 > **org-unit** surface only (never the bank-staff surface, which stays grant/role-driven and
@@ -360,8 +363,11 @@ endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
   cell of the table above, including the "nothing" row.
 - [x] The sidebar "Bank" group renders only for `BANK_EMPLOYEE`-or-above; the audit-log
   page only for admins.
+- [x] A non-admin gets `403` on a `/api/v1/bank/admin/**` path that no handler maps, so the URL
+  gate decides without any `@PreAuthorize`; the authorization matrix names
+  `/api/v1/bank/admin/**` as the rule of every bank admin operation.
 
-**Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit) · **Code:** `bank/internal/BankSecurityService`, `bank/web/BankAccountController` · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest` (member 403, employee/management/admin matrix, admin-only audit, `adminUrlGate_rejectsManagementOnAPathWithoutHandler`), `AuthorizationMatrixTest` · **Code:** `bank/internal/BankSecurityService`, `bank/web/BankAccountController`, `app/api/SecurityConfig` · **Issues:** #556, #3111
 
 ### REQ-BANK-011 — Account↔account transfer semantics
 

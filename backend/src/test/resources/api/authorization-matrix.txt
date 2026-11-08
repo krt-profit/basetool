@@ -19,11 +19,11 @@ POST /api/v1/bank/accounts/{id}/close | BankAccountController#closeAccount | pre
 POST /api/v1/bank/accounts/{id}/reopen | BankAccountController#reopenAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/statement | BankAccountController#downloadStatement | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
 GET /api/v1/bank/accounts/{id}/transactions | BankAccountController#getBookings | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
-DELETE /api/v1/bank/admin/audit | BankAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit | BankAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit/export | BankAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-GET /api/v1/bank/admin/audit/export.json | BankAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
-POST /api/v1/bank/admin/wipe-reset | BankAdminController#wipeReset | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+DELETE /api/v1/bank/admin/audit | BankAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit | BankAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit/export | BankAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/bank/admin/audit/export.json | BankAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/bank/admin/wipe-reset | BankAdminController#wipeReset | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/dashboard | BankDashboardController#getDashboard | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/deposits | BankBookingController#bookDeposit | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#request.accountId, authentication) | url=anyRequest -> authenticated
 GET /api/v1/bank/export/three-month-report | BankExportController#downloadThreeMonthReport | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
