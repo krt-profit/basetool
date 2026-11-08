@@ -498,6 +498,7 @@ function initAdminExchangeClients() {
                 reasons: {
                     CHANGED_AFTERWARDS: text(data, 'reasonChangedAfterwards'),
                     GONE: text(data, 'reasonGone'),
+                    STOCK_BOOKED: text(data, 'reasonStockBooked'),
                     FAILED: text(data, 'reasonFailed'),
                 },
                 /** @type {Record<string, string>} */

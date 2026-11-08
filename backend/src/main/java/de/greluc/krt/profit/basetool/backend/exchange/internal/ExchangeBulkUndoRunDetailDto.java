@@ -39,7 +39,7 @@ public record ExchangeBulkUndoRunDetailDto(
    * @param resource {@code BLUEPRINT}, {@code STOCK} or {@code SHIP}, or {@code null} for a failed
    *     member
    * @param label the entry's name as the member's pages show it, or {@code null} when unknown
-   * @param reason {@code CHANGED_AFTERWARDS}, {@code GONE} or {@code FAILED}
+   * @param reason {@code CHANGED_AFTERWARDS}, {@code GONE}, {@code STOCK_BOOKED} or {@code FAILED}
    */
   public record SkippedEntry(
       @Nullable String memberName,

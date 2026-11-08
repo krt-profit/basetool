@@ -67,7 +67,10 @@ public class ExchangeBulkUndoSkip {
   @Column(name = "resource", updatable = false, length = 16)
   private ExchangeResource resource;
 
-  /** {@code CHANGED_AFTERWARDS}, {@code GONE}, or {@code FAILED} for a member not processed. */
+  /**
+   * {@code CHANGED_AFTERWARDS}, {@code GONE}, {@code STOCK_BOOKED}, or {@code FAILED} for a member
+   * not processed.
+   */
   @Column(name = "reason", nullable = false, updatable = false, length = 24)
   private String reason;
 }

@@ -109,7 +109,7 @@ pages update at once, and a changed timer re-arms the ready notice as a web edit
 | `good-remove` | `id` or `clientKey`, `versions`, `goodId` | Removes one good. |
 | `cancel` | `id` or `clientKey`, `versions` with `gameData` | Cancels the order as the web does, stored or not; a cancelled order is `unchanged`. |
 | `delete` | `id` or `clientKey`, `versions` with `gameData` and `finances` | Removes an order that is not stored, with its goods; a stored one is `ORDER_STORED`. |
-| `pickup` | `id` or `clientKey`, `versions` | Reports the yield collected in the game: the order becomes `COMPLETED` with `pickedUpAt`. Nothing is booked into stock. |
+| `pickup` | `id` or `clientKey`, `versions`, optional `lines` | Reports the yield collected in the game: the order becomes `COMPLETED` with `pickedUpAt`. Without `lines` nothing is booked into stock; with them the yield is [stored](#store-lines). |
 
 Every op may carry an `opId` of your own, echoed in its result.
 
@@ -137,8 +137,7 @@ Every op may carry an `opId` of your own, echoed in its result.
   the web shows it as picked up with your client's name. Nothing is booked into stock: send it
   when your own stock sync books the goods. An order already `COMPLETED` is `unchanged`, so a
   repeated pickup is harmless; a cancelled one is `ORDER_CANCELED`. The member may still change
-  the status in the web afterwards. A pickup carries no further field; a pickup that books the
-  yield into stock is not available yet.
+  the status in the web afterwards, unless the pickup carried store lines.
 - **Timer.** `endsAt` is RFC 3339 in UTC; `durationMinutes` needs `endsAt`. With both, the server
   stores `startedAt = endsAt - durationMinutes`. Without a duration the run starts at the time of
   the write, and `durationMinutes` is the rest until `endsAt`, rounded up to whole minutes, so
@@ -154,6 +153,38 @@ Every op may carry an `opId` of your own, echoed in its result.
 Nothing is matched fuzzily, because no member reviews a direct write: a reference that matches
 nothing is `unmatched`, one that matches several `ambiguous`. Resolve doubtful names with
 [`catalog/resolve`](catalog.md) first.
+
+### Store lines
+
+A `pickup` may carry `lines`, 1 to 100, to book the yield into stock as the web's store dialog
+does. A change set holding such a pickup needs `exchange.refinery.store` beside
+`exchange.refinery.write`; without it the whole set is `403 SCOPE_MISSING` and nothing runs. The
+order is stored exactly once: `storedAt` is set, its status is locked from then on, and each line
+becomes a stock row of its receiver. **All or nothing**: when one line is refused, the whole op is
+refused with that line's reason and nothing is booked.
+
+A line is `{material, location, quality, quantity}` with optional `receiver`, `orgUnit`,
+`personal`, `jobOrder` and `note`:
+
+- **Material.** An [item reference](../formats.md#item-reference--item-ref), resolved exactly, to
+  an output material of the order's goods; another is `MATERIAL_NOT_AN_OUTPUT`.
+- **Location.** A [place](../formats.md#place--location-ref) of
+  [`GET /catalog/locations`](catalog.md); another is `LOCATION_UNKNOWN`.
+- **Quantity.** In the material's own unit, else `UNIT_MISMATCH`; an SCU amount is rounded to
+  three decimals and must not round to zero (`400 SCHEMA_INVALID`).
+- **Receiver.** A `ref` of the [receivers](store-choices.md#receivers); absent books onto the
+  member. Anyone else is `RECEIVER_UNKNOWN`.
+- **Org unit.** `{id}` of one of the receiver's `orgUnits`, or of a unit the member is a
+  Logistician of; another is `ORG_UNIT_NOT_ALLOWED`. Without it, a receiver's only unit is taken
+  and a receiver without one takes none; a receiver with several needs it named.
+- **Job order.** An `id` of the [job orders](store-choices.md#job-orders) for the line's material;
+  another, one the member cannot see, or one that does not need the material is
+  `JOB_ORDER_INVALID`. A `personal` line takes no job order; the schema refuses both together.
+- **Personal** books the stock as the receiver's private stock. **Note** is free text of at most
+  1000 characters.
+
+A stored pickup reaches the member's open Lager pages live, and booking onto another member tells
+that member, as a store in the web does.
 
 ### Counters in a change set
 
@@ -213,7 +244,12 @@ them, and write on without reading the feed first.
 | `create` with a `clientKey` the member's orders already carry; `id` names the order | `rejected` | `ALREADY_EXISTS` |
 | A stale or missing counter of a section the op touches | `rejected` | `VERSION_CONFLICT` |
 | An op on an order an earlier op of the set was refused for | `rejected` | `PRECEDING_OP_REJECTED` |
-| A status change or a `delete` of an order whose yield was booked into stock | `rejected` | `ORDER_STORED` |
+| A status change or a `delete` of an order whose yield was booked into stock, or a `pickup` with lines of one | `rejected` | `ORDER_STORED` |
+| A store line whose material is no output of the order's goods | `rejected` | `MATERIAL_NOT_AN_OUTPUT` |
+| A store line whose quantity is not in the material's unit | `rejected` | `UNIT_MISMATCH` |
+| A store line whose receiver the member may not book onto | `rejected` | `RECEIVER_UNKNOWN` |
+| A store line whose unit is not allowed, or missing for a receiver with several | `rejected` | `ORG_UNIT_NOT_ALLOWED` |
+| A store line whose job order is unknown, invisible, not active or does not need the material | `rejected` | `JOB_ORDER_INVALID` |
 | Any op after a `delete` of the same order in the set | `rejected` | `ORDER_UNKNOWN` |
 
 On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `Idempotency-Key`.
@@ -231,10 +267,12 @@ feed carries its tombstone, with the `clientKey` when your client created the or
 **Undo.** The member can undo your client's writes on *Connected applications*. Undoing a `create`
 removes the order while neither of its counters moved since; undoing an `update`, a goods op or a
 `cancel` restores the sections it touched while their counters are unchanged; undoing a `pickup`
-sets the status back and clears `pickedUpAt` under the same check. Undoing a `delete` brings the
-order back under its `id`, its goods under their ids, with its `clientKey`; the feed shows it again
-under the same key. A write changed afterwards is skipped as *changed afterwards*. An undo reaches
-your feed like a web edit ([sync guide](../sync-guide.md#undo)).
+without store lines sets the status back and clears `pickedUpAt` under the same check, and a
+`pickup` with store lines is skipped: the member takes the booked stock back in the warehouse.
+Undoing a `delete` brings the order back under its `id`, its goods under their ids, with its
+`clientKey`; the feed shows it again under the same key. A write changed afterwards is skipped as
+*changed afterwards*. An undo reaches your feed like a web edit
+([sync guide](../sync-guide.md#undo)).
 
 ## Errors
 
@@ -242,7 +280,7 @@ your feed like a web edit ([sync guide](../sync-guide.md#undo)).
 | --- | --- |
 | `400 SCHEMA_INVALID` | The change set, `limit` or a parameter breaks the contract, for example a `create` without `clientKey`, an op without `id` and `clientKey`, or `durationMinutes` without `endsAt`. |
 | `400 IDEMPOTENCY_KEY_MISSING` | A change set without a well-formed `Idempotency-Key`. |
-| `403 SCOPE_MISSING` | Reading without `exchange.refinery.read`, or writing without `exchange.refinery.write`. |
+| `403 SCOPE_MISSING` | Reading without `exchange.refinery.read`, writing without `exchange.refinery.write`, or a `pickup` with store lines without `exchange.refinery.store`. |
 | `410 CURSOR_EXPIRED` | The cursor is older than the tombstones, or not one the server issued. |
 | `413 BATCH_TOO_LARGE` | More than 500 ops. |
 

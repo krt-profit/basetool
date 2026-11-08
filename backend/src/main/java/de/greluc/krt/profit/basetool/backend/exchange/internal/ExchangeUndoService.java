@@ -68,6 +68,11 @@ public class ExchangeUndoService {
    */
   static final String GONE = "GONE";
 
+  /**
+   * The reason of a refinery pickup that booked stock, which the member takes back in the Lager.
+   */
+  static final String STOCK_BOOKED = "STOCK_BOOKED";
+
   private static final String RESTORED = "restored";
   private static final String SKIPPED = "skipped";
 
@@ -313,7 +318,7 @@ public class ExchangeUndoService {
    *
    * @param journalEntryId the entry's newest journal entry
    * @param resource the entry's resource
-   * @param reason {@code CHANGED_AFTERWARDS} or {@code GONE}
+   * @param reason {@code CHANGED_AFTERWARDS}, {@code GONE} or {@code STOCK_BOOKED}
    */
   public record Skipped(
       @NotNull UUID journalEntryId, @NotNull ExchangeResource resource, @NotNull String reason) {}

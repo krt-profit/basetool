@@ -30,16 +30,19 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRestore;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
@@ -79,6 +82,9 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
   private final MissionRepository missionRepository;
+  private final OrgUnitRepository orgUnitRepository;
+  private final JobOrderRepository jobOrderRepository;
+  private final RefineryOrderStoreBooking storeBooking;
   private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
@@ -211,12 +217,20 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
 
   @Override
   public @NotNull RefineryExchangeOrder pickUp(
-      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId) {
+      @NotNull UUID owner,
+      @NotNull String clientId,
+      @NotNull UUID orderId,
+      @NotNull List<RefineryExchangeStoreLine> lines) {
     RefineryOrder order = requireOwn(owner, orderId);
     RefineryOrderStatus previousStatus = order.getStatus();
     if (previousStatus != RefineryOrderStatus.OPEN
         && previousStatus != RefineryOrderStatus.IN_PROGRESS) {
       throw new BadRequestException("error.refinery_order.not_running");
+    }
+    if (!lines.isEmpty()) {
+      storeBooking.store(order, owner, lines.stream().map(this::storeLine).toList(), clientId);
+      refineryOrderRepository.flush();
+      return RefineryExchangeReads.toRow(order);
     }
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.getProvenance().recordPickup(clientId, Instant.now());
@@ -316,6 +330,39 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
         owner,
         AuditDetails.of("goods", saved.getGoods().size()));
     return RefineryExchangeReads.toRow(saved);
+  }
+
+  /**
+   * Loads what a client's checked store line names.
+   *
+   * @param line the line
+   * @return the line the store books
+   * @throws NotFoundException when an entry it names does not exist
+   * @throws de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException when
+   *     the location is not offered
+   */
+  private @NotNull RefineryOrderStoreBooking.Line storeLine(
+      @NotNull RefineryExchangeStoreLine line) {
+    UUID unit = line.orgUnitId();
+    UUID jobOrder = line.jobOrderId();
+    return new RefineryOrderStoreBooking.Line(
+        Entities.require(
+            materialRepository.findById(line.materialId()), "error.material.output.not_found"),
+        OfferedLocations.require(
+            locationRepository.findById(line.locationId()), "error.location.not_found"),
+        line.quality(),
+        line.amount(),
+        Entities.require(userRepository.findById(line.receiverId()), "error.user.not_found"),
+        unit == null
+            ? null
+            : Entities.require(
+                orgUnitRepository.findById(unit), () -> "OrgUnit not found: " + unit),
+        line.personal(),
+        jobOrder == null
+            ? null
+            : Entities.require(
+                jobOrderRepository.findById(jobOrder), () -> "JobOrder not found: " + jobOrder),
+        line.note());
   }
 
   /**

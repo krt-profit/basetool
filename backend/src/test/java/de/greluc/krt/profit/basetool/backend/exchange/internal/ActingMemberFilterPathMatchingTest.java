@@ -176,6 +176,8 @@ class ActingMemberFilterPathMatchingTest {
         "/api/v1/exchange/me/ships/changes",
         "/api/v1/exchange/me/stock",
         "/api/v1/exchange/me/stock/changes",
+        "/api/v1/exchange/me/store-choices/job-orders",
+        "/api/v1/exchange/me/store-choices/receivers",
         "/api/v1/exchange/org-stock",
         "/api/v1/exchange/org-stock/changes",
         "/api/v1/exchange/org-stock/members",

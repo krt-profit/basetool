@@ -3418,7 +3418,7 @@ rendered only for a logistician, and a plain member sees their own name in a dis
 field submits nothing, so the server falls back to the order's owner, which for a non-logistician is
 the caller.
 
-**The exchange form of the rule** (ADR-0351, planned in epic #3163). An exchange pickup's store lines
+**The exchange form of the rule** (ADR-0351, epic #3163). An exchange pickup's store lines
 (REQ-XCH-053) and the receivers read (REQ-XCH-054) apply the same rule, but an exchange request
 carries no stored roles and no contextual grants (REQ-XCH-009), so `BookInPolicy.mayBookInFor`
 cannot answer on one. The rule is therefore decided from the database, as ADR-0257 decides the org
@@ -3446,11 +3446,13 @@ stock's Logistician:
 - [x] A logistician may still book onto another member.
 - [x] The receiver picker is absent for a non-logistician, including on a split row and on the
   flash-attribute re-render after a validation error.
-- [ ] Over the exchange, a plain member's store line naming another member is `RECEIVER_UNKNOWN` and
+- [x] Over the exchange, a plain member's store line naming another member is `RECEIVER_UNKNOWN` and
   books nothing; a Logistician of a unit the receiver belongs to may name them; an `ADMIN` without
-  that grant may not; a member withholding their name is never accepted. *Planned — #3171.*
+  that grant may not; a member withholding their name is never accepted.
+  *`ExchangeRefineryStoreControllerTest`.*
 
-**Enforced by:** `RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderStoreService#storeRefineryOrder`,
+**Enforced by:** `RefineryOrderStoreServiceTest`, `ExchangeRefineryStoreControllerTest` · **Code:**
+`RefineryOrderStoreService#storeRefineryOrder`, `ExchangeStoreChoices`, `ExchangeRefineryStoreLines`,
 `RefineryOrderPageController#viewOrderDetail`, `refinery/refinery-orders-details.html` · **Mirrors:**
 `InventoryItemService#createInventoryItem`
 

@@ -63,8 +63,19 @@ public record ExchangeRefineryOrderChangeSet(
   /** The op that removes an order with its goods. */
   public static final String DELETE = "delete";
 
-  /** The op that closes an order as collected in the game, without booking stock. */
+  /** The op that closes an order as collected in the game, booking stock only with store lines. */
   public static final String PICKUP = "pickup";
+
+  /**
+   * Whether an op of the set books stock: a pickup with store lines, which needs {@code
+   * exchange.refinery.store} (REQ-XCH-053).
+   *
+   * @return {@code true} when a pickup carries a store line
+   */
+  public boolean storesStock() {
+    return ops.stream()
+        .anyMatch(op -> PICKUP.equals(op.op()) && op.lines() != null && !op.lines().isEmpty());
+  }
 
   /**
    * One write. Every op but {@code create} names its order by {@code id} or {@code clientKey}; a
@@ -92,6 +103,7 @@ public record ExchangeRefineryOrderChangeSet(
    * @param inputQuantity a {@code good-update}'s input amount, or {@code null} to leave it
    * @param outputQuantity a {@code good-update}'s yield, or {@code null} to leave it
    * @param quality a {@code good-update}'s quality, or {@code null} to leave it
+   * @param lines a {@code pickup}'s store lines, or {@code null} to book nothing
    */
   @Schema(name = "RefineryOrderOp")
   public record Op(
@@ -118,7 +130,33 @@ public record ExchangeRefineryOrderChangeSet(
       @Nullable @Valid ExchangeItemRef input,
       @Nullable @Min(0) Integer inputQuantity,
       @Nullable @Min(1) Integer outputQuantity,
-      @Nullable @QualityValue Integer quality) {}
+      @Nullable @QualityValue Integer quality,
+      @Nullable @Size(min = 1, max = 100) List<@NotNull @Valid StoreLine> lines) {}
+
+  /**
+   * One store line of a pickup, as the web's store dialog has it (REQ-XCH-053).
+   *
+   * @param material the output material
+   * @param location where the stock is booked
+   * @param quality the quality from 0 to 1000
+   * @param quantity the amount in the material's unit
+   * @param receiver the receiving member's ref, or {@code null} for the member
+   * @param orgUnit the owning unit of the booked stock, or {@code null} for the receiver's only one
+   * @param personal whether the stock is the receiver's private stock
+   * @param jobOrder the job order the stock is earmarked to, or {@code null}
+   * @param note the note, or {@code null}
+   */
+  @Schema(name = "RefineryStoreLine")
+  public record StoreLine(
+      @NotNull @Valid ExchangeItemRef material,
+      @NotNull @Valid ExchangeLocationRef location,
+      @NotNull @QualityValue Integer quality,
+      @NotNull @Valid ExchangeStockChangeSet.Quantity quantity,
+      @Nullable @Size(min = 1, max = 128) String receiver,
+      @Nullable @Valid UnitRef orgUnit,
+      @Nullable Boolean personal,
+      @Nullable @Size(min = 1, max = 128) String jobOrder,
+      @Nullable @Size(max = 1000) String note) {}
 
   /**
    * The section counters an op echoes.
@@ -130,7 +168,7 @@ public record ExchangeRefineryOrderChangeSet(
   public record Versions(@Nullable @Min(0) Long gameData, @Nullable @Min(0) Long finances) {}
 
   /**
-   * The owning unit of a create.
+   * The owning unit of a create or of a store line's stock.
    *
    * @param id the unit's id
    */

@@ -51,6 +51,7 @@ class ExchangeRefineryOrderJournalStateTest {
             List.of(new Good(UUID.randomUUID(), UUID.randomUUID(), 500, 400, 700)),
             3L,
             1L,
+            false,
             null);
 
     State read = State.read(mapper.readTree(mapper.writeValueAsString(state.toJournal())));
@@ -74,6 +75,7 @@ class ExchangeRefineryOrderJournalStateTest {
                 List.of(),
                 5L,
                 2L,
+                true,
                 null)
             .deleted(
                 new RefineryExchangeOrigin(

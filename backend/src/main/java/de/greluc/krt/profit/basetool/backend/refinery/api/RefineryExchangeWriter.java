@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -101,22 +102,28 @@ public interface RefineryExchangeWriter {
 
   /**
    * Closes one of the member's open or running orders as collected in the game: status {@code
-   * COMPLETED} with the client's pickup marker, the game-data counter raised by one and nothing
-   * booked (REQ-XCH-053, REQ-REFINERY-028); the caller has checked the status and the counter on
-   * the locked order.
+   * COMPLETED} with the client's pickup marker and the game-data counter raised by one
+   * (REQ-XCH-053, REQ-REFINERY-028). Without lines nothing is booked; with lines the order is
+   * stored as the web's store stores it, {@code storedAt} set and audited {@code
+   * REFINERY_ORDER_STORED} (REQ-REFINERY-022). The caller has checked the status, the counter and
+   * every line on the locked order.
    *
    * @param owner the member
    * @param clientId the client that reports the pickup
    * @param orderId the order
+   * @param lines the store lines, each of an output material of the order; empty to book nothing
    * @return the saved order
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
-   *     such order
+   *     such order or a line names an entry that does not exist
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
-   *     neither {@code OPEN} nor {@code IN_PROGRESS}
+   *     neither {@code OPEN} nor {@code IN_PROGRESS}, or a line's material is no output of it
    */
   @NotNull
   RefineryExchangeOrder pickUp(
-      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId);
+      @NotNull UUID owner,
+      @NotNull String clientId,
+      @NotNull UUID orderId,
+      @NotNull List<RefineryExchangeStoreLine> lines);
 
   /**
    * Removes a client's pickup marker from one of the member's orders, for the undo of a pickup; the

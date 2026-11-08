@@ -62,8 +62,8 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The refinery-order read and write routes through both gates, with the backend relay, the quotas,
- * the idempotency store and the budget mocked (REQ-XCH-051, REQ-XCH-052).
+ * The refinery-order read and write routes and the store-choice reads through both gates, with the
+ * backend relay, the quotas, the idempotency store and the budget mocked (REQ-XCH-051…054).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeRefineryOrderRouteTest {
@@ -106,7 +106,8 @@ class ExchangeRefineryOrderRouteTest {
         .thenReturn(new ExchangeQuotas.Counted("ingest:xch:quota:test", 1L));
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     key = ExchangeTestSupport.newKey();
-    String scopes = "exchange.connect exchange.refinery.read exchange.refinery.write";
+    String scopes =
+        "exchange.connect exchange.refinery.read exchange.refinery.write exchange.refinery.store";
     when(jwtDecoder.decode(TOKEN))
         .thenReturn(
             ExchangeTestSupport.token(
@@ -200,6 +201,59 @@ class ExchangeRefineryOrderRouteTest {
   }
 
   @Test
+  void aPickupWithStoreLinesPassesTheSchemaAndIsRelayed() throws Exception {
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any()))
+        .thenReturn(ok(RESULT));
+
+    post(example("change-set--refineryOrderChangeSet/valid/pickup-with-store-lines.json"))
+        .andExpect(status().isOk());
+
+    verify(relay).forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any());
+  }
+
+  @Test
+  void theStoreChoiceReadsAreRelayedWithTheStoreCapabilityAndPassTheContract() throws Exception {
+    String material = UUID.randomUUID().toString();
+    when(relay.forward(
+            eq(HttpMethod.GET),
+            eq("/api/v1/exchange/me/store-choices/receivers"),
+            isNull(),
+            any(),
+            any()))
+        .thenReturn(ok(example("store-choice-receivers/valid/receivers.json")));
+    when(relay.forward(
+            eq(HttpMethod.GET),
+            eq("/api/v1/exchange/me/store-choices/job-orders?material=" + material),
+            isNull(),
+            any(),
+            any()))
+        .thenReturn(ok(example("store-choice-job-orders/valid/job-orders.json")));
+
+    call("/exchange/v1/me/store-choices/receivers")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].self").value(true));
+    call("/exchange/v1/me/store-choices/job-orders?material=" + material)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].number").value(42));
+    call("/exchange/v1/me/store-choices/job-orders?material=not-an-id")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+  }
+
+  @Test
+  void withoutTheStoreCapabilityTheStoreChoiceReadsAreRefused() throws Exception {
+    grant(Set.of("exchange.connect", "exchange.refinery.read", "exchange.refinery.write"));
+
+    call("/exchange/v1/me/store-choices/receivers")
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("SCOPE_MISSING"));
+    call("/exchange/v1/me/store-choices/job-orders?material=" + UUID.randomUUID())
+        .andExpect(status().isForbidden());
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
   void aCancelAndADeleteAreRelayedWithTheWriteCapability() throws Exception {
     when(relay.forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any()))
         .thenReturn(ok(RESULT));
@@ -230,7 +284,9 @@ class ExchangeRefineryOrderRouteTest {
           "duration-without-ends-at.json",
           "unknown-op.json",
           "delete-without-finances.json",
-          "pickup-without-versions.json"
+          "pickup-without-versions.json",
+          "store-line-personal-with-job-order.json",
+          "store-line-without-quantity.json"
         }) {
       post(example("change-set--refineryOrderChangeSet/invalid/" + invalid))
           .andExpect(status().isBadRequest())

@@ -135,9 +135,10 @@ web, naming its client (REQ-AUDIT-005):
   rows; no free text), written by the client's hard delete (REQ-XCH-055) and by the undo of a
   client's create (REQ-XCH-056) beside the undo's own `EXCHANGE_CHANGES_UNDONE`. The undo's
   recreation of a deleted order is `REFINERY_ORDER_RESTORED` (order id and the number of goods rows
-  restored). Both are in the viewer's Raffinerie event-type filter with their DE/EN labels.
-  *Planned (ADR-0351, epic #3163):* a pickup with store lines records `REFINERY_ORDER_STORED` with
-  its `INVENTORY_RECEIVED_FROM_REFINERY` rows.
+  restored). Both are in the viewer's Raffinerie event-type filter with their DE/EN labels. A
+  pickup with store lines (REQ-XCH-053) records `REFINERY_ORDER_STORED` under the client with the
+  number of lines, the status change and `pickup=true`, beside one
+  `INVENTORY_RECEIVED_FROM_REFINERY` per line, as the web's store does.
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
   notifications and notification-rule selectors — as a single summary event

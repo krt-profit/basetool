@@ -480,6 +480,10 @@ class ExchangeGoldenAnswerTest {
     routes.put(
         "route-post-org-stock-changes",
         post("/org-stock/changes", fixture("change-set--orgStockChangeSet/valid/book-out.json")));
+    routes.put("route-get-store-choice-receivers", get("/me/store-choices/receivers"));
+    routes.put(
+        "route-get-store-choice-job-orders",
+        get("/me/store-choices/job-orders?material=7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f"));
     routes.put(
         "route-get-org-stock-members",
         get("/org-stock/members?unit=0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"));
@@ -529,6 +533,10 @@ class ExchangeGoldenAnswerTest {
             fixture("org-stock-members/valid/roster.json");
         case "GET /api/v1/exchange/org-stock/targets" ->
             fixture("org-stock-targets/valid/targets.json");
+        case "GET /api/v1/exchange/me/store-choices/receivers" ->
+            fixture("store-choice-receivers/valid/receivers.json");
+        case "GET /api/v1/exchange/me/store-choices/job-orders" ->
+            fixture("store-choice-job-orders/valid/job-orders.json");
         case "POST /api/v1/exchange/me/blueprints/changes",
             "POST /api/v1/exchange/me/stock/changes",
             "POST /api/v1/exchange/me/ships/changes",

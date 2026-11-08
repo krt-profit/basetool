@@ -76,7 +76,7 @@ codes, whichever side refuses it.
 | `STOCK_EARMARKED` | The lot's stock, the stock a `share` or `unshare` would move, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |
 | `REMOVED_ELSEWHERE` | The entry has a live tombstone from another channel or installation; for a ship, the named `shipId` was removed there. | Ask the member; resend with `override: true` only if they agree. |
-| `UNIT_MISMATCH` | The quantity's unit does not match the material's. | Fix the unit. |
+| `UNIT_MISMATCH` | The quantity's unit does not match the material's; also a refinery store line's. | Fix the unit. |
 | `LOCATION_UNKNOWN` | The place has no warehouse location; for a refinery order, it has no location. | Offer a place from `catalog/locations`. |
 | `LINK_TARGET_TAKEN` | The server ship is already linked to another external id of this installation. | Pull and re-link. |
 | `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked, and a refinery-order op whose counter of a section it touches is stale or missing ([counters](resources/refinery-orders.md#counters-in-a-change-set)). | Pull, merge, retry this op. |
@@ -95,8 +95,12 @@ codes, whichever side refuses it.
 | `GOOD_UNKNOWN` | A refinery-order `good-update` or `good-remove` names a `goodId` that is not a good of the order. | Pull the feed and use the good ids it shows. |
 | `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
 | `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
-| `ORDER_STORED` | A refinery-order op changes the status of, or deletes, an order whose yield was booked into stock. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
+| `ORDER_STORED` | A refinery-order op changes the status of, deletes or picks up with store lines an order whose yield was booked into stock. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
 | `ORDER_CANCELED` | A refinery-order `pickup` names an order that was cancelled. | Do not retry; pull the feed for the order's status. |
+| `MATERIAL_NOT_AN_OUTPUT` | A store line of a refinery-order `pickup` books a material that is no output of the order's goods. | Book the goods' output materials as the feed shows them. |
+| `RECEIVER_UNKNOWN` | A store line names a receiver who is not among the member's [receivers](resources/store-choices.md#receivers), or a ref that names nobody. | Read the receivers again and let the member pick. |
+| `ORG_UNIT_NOT_ALLOWED` | A store line names a unit that is neither a direct membership of its receiver nor a unit the member is a Logistician of, or names none for a receiver with several memberships. | Offer the receiver's `orgUnits` from the receivers read. |
+| `JOB_ORDER_INVALID` | A store line's job order is unknown, not open or in progress, outside the member's view, or does not need the line's material. | Read the [job orders](resources/store-choices.md#job-orders) for the material again. |
 
 ## Warnings
 

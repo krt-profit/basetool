@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeFeedReader;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderFeedService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderWriteService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
@@ -60,6 +63,9 @@ public class ExchangeRefineryOrderController {
   /** Applies the change sets. */
   private final ExchangeRefineryOrderWriteService writeService;
 
+  /** Demands {@code exchange.refinery.store} of a change set that books stock. */
+  private final ExchangeGate exchangeGate;
+
   /**
    * Returns a snapshot page of the open and running orders, or with {@code cursor} every order
    * changed since it.
@@ -88,11 +94,14 @@ public class ExchangeRefineryOrderController {
   }
 
   /**
-   * Applies a change set to the member's own refinery orders (REQ-XCH-052).
+   * Applies a change set to the member's own refinery orders (REQ-XCH-052); a set holding a pickup
+   * with store lines needs {@code exchange.refinery.store} as well (REQ-XCH-053).
    *
-   * @param changeSet the creates, updates and goods ops
+   * @param changeSet the ops
    * @param authentication the relayed acting member the gate admitted
    * @return the result, with the order every applied op wrote
+   * @throws de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException {@code 403
+   *     SCOPE_MISSING} for store lines without {@code exchange.refinery.store}, before any op runs
    */
   @NotNull
   @PostMapping("/changes")
@@ -103,9 +112,16 @@ public class ExchangeRefineryOrderController {
           "Gateway-only. Ops decided in order against the section counters the earlier ops left.")
   @ApiResponse(responseCode = "200", description = "The result")
   @ApiResponse(responseCode = "400", description = "An op lacks a field its kind requires")
+  @ApiResponse(
+      responseCode = "403",
+      description = "Store lines without exchange.refinery.store (SCOPE_MISSING)")
   public ResponseEntity<ExchangeChangeResultDto> refineryOrderChanges(
       @NotNull @Valid @RequestBody ExchangeRefineryOrderChangeSet changeSet,
       @NotNull Authentication authentication) {
+    if (changeSet.storesStock()
+        && !exchangeGate.allows(ExchangeCapability.REFINERY_STORE.getScope(), authentication)) {
+      throw ExchangeProblemException.scopeMissing();
+    }
     return ResponseEntity.ok(
         writeService.apply(ExchangeCaller.of((SubjectAuthentication) authentication), changeSet));
   }

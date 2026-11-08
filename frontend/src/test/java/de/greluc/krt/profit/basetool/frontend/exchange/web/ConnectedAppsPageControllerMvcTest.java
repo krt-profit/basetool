@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.exchange.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -216,6 +217,60 @@ class ConnectedAppsPageControllerMvcTest {
             content()
                 .string(containsString("Book the yield of picked-up refinery orders into stock")))
         .andExpect(content().string(not(containsString("??"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void everyRefineryActivityIsNamedInGermanAndEnglishInsteadOfItsCode() throws Exception {
+    List<String> actions =
+        List.of(
+            "REFINERY_CREATE",
+            "REFINERY_UPDATE",
+            "REFINERY_GOOD_ADD",
+            "REFINERY_GOOD_UPDATE",
+            "REFINERY_GOOD_REMOVE",
+            "REFINERY_CANCEL",
+            "REFINERY_DELETE",
+            "REFINERY_PICKUP");
+    ConnectedAppDto app =
+        new ConnectedAppDto(
+            "versekit",
+            "VerseKit",
+            List.of("exchange.connect", "exchange.refinery.write"),
+            List.of(new ConnectedInstallationDto(INSTALLATION, "Desktop", null, null, false)),
+            actions.stream()
+                .map(action ->
+                    new ConnectedAppActivityDto(
+                        Instant.parse("2026-11-08T10:00:00Z"),
+                        "REFINERY_ORDER",
+                        action,
+                        "ARC-L1",
+                        false))
+                .toList());
+    when(backendApiClient.get(eq("/api/v1/connected-apps"), anyTypeRef())).thenReturn(List.of(app));
+
+    String german =
+        mockMvc
+            .perform(get("/connected-apps").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("Raffinerieauftrag abgeholt")))
+            .andExpect(content().string(containsString("Raffinerieauftrag gelöscht")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String english =
+        mockMvc
+            .perform(get("/connected-apps").param("lang", "en"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("Material added to a refinery order")))
+            .andExpect(content().string(containsString("Refinery order picked up")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    actions.forEach(action -> {
+      assertThat(german).doesNotContain(">" + action + "<");
+      assertThat(english).doesNotContain(">" + action + "<");
+    });
   }
 
   @Test

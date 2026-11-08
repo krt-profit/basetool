@@ -3,6 +3,21 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-09
+
+- **New: store lines on a refinery-order `pickup`.** A pickup may carry `lines` that book the
+  yield into stock as the web's store dialog does, all or nothing, and set `storedAt`; a change set
+  holding them needs `exchange.refinery.store` (`#/$defs/refineryStoreLine`,
+  [refinery orders](resources/refinery-orders.md#store-lines)).
+- **New: store choices.** `GET /exchange/v1/me/store-choices/receivers` and
+  `GET /exchange/v1/me/store-choices/job-orders?material=` with the scope `exchange.refinery.store`
+  list the members a store line may book onto and the job orders it may earmark to, with the new
+  schemas `store-choice-receivers.schema.json` and `store-choice-job-orders.schema.json`
+  ([store choices](resources/store-choices.md)).
+- **New: per-op reasons `MATERIAL_NOT_AN_OUTPUT`, `RECEIVER_UNKNOWN`, `ORG_UNIT_NOT_ALLOWED` and
+  `JOB_ORDER_INVALID`.** They refuse a pickup's store lines; `UNIT_MISMATCH`, `LOCATION_UNKNOWN`
+  and `ORDER_STORED` refuse them too ([errors](errors.md)).
+
 ## 2026-11-08
 
 - **New: refinery-order ops `cancel` and `delete`.** `cancel` cancels an order as the web does

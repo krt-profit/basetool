@@ -54,6 +54,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefin
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceJobOrdersDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceReceiversDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -136,6 +138,9 @@ class ExchangeWireContractTest {
   /** The relay path of the earmark targets, which name their unit and material in parameters. */
   private static final String TARGETS = "/org-stock/targets";
 
+  /** The relay path of the store choices' job orders, which name their material in a parameter. */
+  private static final String STORE_JOB_ORDERS = "/me/store-choices/job-orders";
+
   /** The paged relay paths that serve a snapshot but answer their feed cursor as expired. */
   private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
 
@@ -155,7 +160,9 @@ class ExchangeWireContractTest {
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
           Map.entry("org-stock-targets", ExchangeOrgStockTargetsDto.class),
-          Map.entry("org-unit-list", ExchangeOrgUnitListDto.class));
+          Map.entry("org-unit-list", ExchangeOrgUnitListDto.class),
+          Map.entry("store-choice-receivers", ExchangeStoreChoiceReceiversDto.class),
+          Map.entry("store-choice-job-orders", ExchangeStoreChoiceJobOrdersDto.class));
 
   private final SchemaRegistry registry =
       SchemaRegistry.withDefaultDialect(
@@ -305,6 +312,7 @@ class ExchangeWireContractTest {
                       case ROSTER -> "?unit=" + orgUnits.getFirst();
                       case TARGETS ->
                           "?unit=" + orgUnits.getFirst() + "&material=" + materials.getFirst();
+                      case STORE_JOB_ORDERS -> "?material=" + materials.getFirst();
                       default -> "";
                     });
         if (operation.answerMember() != null) {

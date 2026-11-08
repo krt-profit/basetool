@@ -22,8 +22,8 @@ Approved external client software — VerseKit first, our own SC Extractor secon
 blueprints, their stock in the Lager and their ships in step between that program and the
 Basetool, and read what their own units still need. A Logistician of a unit can also read and keep
 that unit's shared stock (REQ-XCH-042…046, ADR-0257), and a client can create, change, pick up,
-cancel and delete the member's own refinery orders (REQ-XCH-051…056, ADR-0351, planned in epic
-#3163). It does so only through the **exchange API**
+cancel and delete the member's own refinery orders and book a pickup's yield into stock
+(REQ-XCH-051…056, ADR-0351, epic #3163). It does so only through the **exchange API**
 on the ingest gateway, never through the backend API. This spec states what must hold; the ADRs
 above say why. The work is tracked in epic #2078; each requirement names the work package (WP) and
 sub-issue that implements it.
@@ -59,7 +59,8 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/blueprints` · `POST …/changes` | `exchange.blueprints.read` / `.write` | REQ-XCH-015 |
 | `GET /exchange/v1/me/stock` · `POST …/changes` | `exchange.stock.read` / `.write` | REQ-XCH-016 |
 | `GET /exchange/v1/me/ships` · `POST …/changes` | `exchange.hangar.read` / `.write` | REQ-XCH-017 |
-| `GET /exchange/v1/me/refinery-orders` · `POST …/changes` | `exchange.refinery.read` / `.write` | REQ-XCH-051, REQ-XCH-052 |
+| `GET /exchange/v1/me/refinery-orders` · `POST …/changes` | `exchange.refinery.read` / `.write` (+ `exchange.refinery.store` for store lines) | REQ-XCH-051, REQ-XCH-052, REQ-XCH-053 |
+| `GET /exchange/v1/me/store-choices/receivers` · `…/job-orders?material=` | `exchange.refinery.store` | REQ-XCH-054 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
@@ -73,12 +74,9 @@ The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XC
 the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the member's Logistician
 units to the org demand (REQ-XCH-047).
 
-> [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
-> The read (REQ-XCH-051) and the change set with `create`, `update`, the goods ops (REQ-XCH-052),
-> `cancel` and `delete` (REQ-XCH-055) are built; `pickup` joins the change set with
-> REQ-XCH-053. The table gains two more rows as they are built:
-> `GET …/me/store-choices/receivers` and `…/me/store-choices/job-orders?material=`
-> (`exchange.refinery.store`, REQ-XCH-054).
+The refinery-order rows are built: the read (REQ-XCH-051), the change set with `create`,
+`update`, the goods ops (REQ-XCH-052), `pickup` with and without store lines (REQ-XCH-053),
+`cancel` and `delete` (REQ-XCH-055), and the two store-choice reads (REQ-XCH-054).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -306,12 +304,9 @@ the relayed capabilities again (`@PreAuthorize("@exchangeGate.allows(…)")`). E
 `basetool-ingest` audience, and the gateway enforces that audience on exchange routes in code, not
 only by property.
 
-> [!note] Planned — the routes of the store capability (ADR-0351, epic #3163)
-> The three refinery scopes are registered, in the Keycloak realm and the registry's CHECK;
-> `.read` and `.write` open their routes (REQ-XCH-051, REQ-XCH-052), `.store` opens its own as it
-> is built (REQ-XCH-054). `.store` is no `.details` capability: it gates the two
-> store-choice reads of its own and is required, beside `.write`, for every change set that holds a
-> `pickup` with store lines.
+`exchange.refinery.store` is no `.details` capability: it gates the two store-choice reads of its
+own (REQ-XCH-054) and is required, beside `.write`, for every change set that holds a `pickup` with
+store lines (REQ-XCH-053).
 
 **Acceptance**
 
@@ -697,11 +692,11 @@ writes them; the demand details (REQ-XCH-047) carry the orders' Auftraggeber and
 decide from the database, never from a stored role and never with the admin all-scope or pin, and
 the org stock names no member who withholds their name (REQ-XCH-044).
 
-> [!note] Planned — a third exception: the refinery store choices (ADR-0351, epic #3163)
-> A pickup's store lines (REQ-XCH-053) may book onto another member, and the receivers read
-> (REQ-XCH-054) names the members the member may book onto. Both decide from the database by the
-> rule of REQ-SEC-039 for exchange requests, never from a stored role and never with the admin
-> all-scope or pin, and name no member who withholds their name.
+A third exception are the refinery store choices (ADR-0351): a pickup's store lines (REQ-XCH-053)
+may book onto another member, and the receivers read (REQ-XCH-054) names the members the member may
+book onto. Both decide from the database by the rule of REQ-SEC-039 for exchange requests, never
+from a stored role and never with the admin all-scope or pin, and name no member who withholds
+their name.
 
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
@@ -775,7 +770,7 @@ decision 2026-09-26), and a `$id` is never changed once published. The schemas a
 `observedAt`), `material-kind` (`RAW|REFINED|NO_REFINE` plus `commodity`, and the optional UEX
 flags `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`), `blueprint`, `stock-lot`
 (material, location, quality, `stolen`, quantity — no org unit, no row id), `ship` (with required
-`version`), `refinery-order` (with the required section counters `versions`), `org-demand`, `org-unit` and `org-unit-list`, `location`, `installation`, `account-check`, `change-set` (at most 500
+`version`), `refinery-order` (with the required section counters `versions`), `org-demand`, `org-unit` and `org-unit-list`, `store-choice-receivers` and `store-choice-job-orders`, `location`, `installation`, `account-check`, `change-set` (at most 500
 ops), `change-result` (compact, at most 32 KiB; its optional `cursor` is reserved and never sent in
 v1 — a client reads the feed after a push), `page`, `service-document`, `problem` and the
 offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, `items`,
@@ -2529,7 +2524,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 21 relay operations on 20 backend
+byte-identical (D-05 of the domain modularisation plan): the 23 relay operations on 22 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2596,14 +2591,13 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 21 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's eleven exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 20 exact paths, the gateway's `ExchangeRoutes` and its relay
+- the 23 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's twelve exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 22 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the eighteen capability scopes (`exchange.orgstock.details`,
-  `exchange.demand.details`, `exchange.refinery.write` and `exchange.refinery.store` the four that
-  gate no route of their own yet), the seven gate codes with
+- the five relay headers, the eighteen capability scopes (`exchange.orgstock.details` and
+  `exchange.demand.details` the two that gate no route of their own), the seven gate codes with
   their statuses, the
   codes the gateway passes through and the four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
@@ -2659,7 +2653,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  21 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  23 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2673,8 +2667,8 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 21 relay operations and 110 schemas; `openapi.json` holds
-  none of them and the 64 schemas only they reach left it; the union of both is the generated
+- [x] The relay document holds exactly the 23 relay operations and 115 schemas; `openapi.json` holds
+  none of them and the 95 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.
@@ -3402,13 +3396,17 @@ A `pickup` op reports that the member collected an order's yield in the game. It
   nothing**: when one line is refused, the whole op is refused with that line's reason and nothing
   changes.
 - **Rules of a line.** Its material must be an output material of one of the order's goods
-  (`MATERIAL_NOT_AN_OUTPUT`); its location one the Lager offers (`LOCATION_UNKNOWN`); its receiver
-  named by a `ref` of the receivers read (REQ-XCH-054) and allowed by REQ-SEC-039's exchange rule
-  (`RECEIVER_UNKNOWN`); its org unit a direct membership of the receiver or a unit in which the
+  (`MATERIAL_NOT_AN_OUTPUT`), named by an `item-ref` that resolves exactly (`UNMATCHED`,
+  `AMBIGUOUS`); its `quantity` in the material's own unit (`UNIT_MISMATCH`; one that rounds to zero
+  is `400`); its location one the Lager offers (`LOCATION_UNKNOWN`); its receiver, absent for the
+  member, named by a `ref` of the receivers read (REQ-XCH-054) and allowed by REQ-SEC-039's
+  exchange rule (`RECEIVER_UNKNOWN`); its org unit a direct membership of the receiver or a unit in which the
   member may book for others (`ORG_UNIT_NOT_ALLOWED`); its job order active, visible to the member
   and requiring the line's material (`JOB_ORDER_INVALID`, one answer for all three, so a refusal
   reveals no foreign order). A receiver with several memberships needs the unit named: an exchange
-  request has no active-context pin.
+  request has no active-context pin. A receiver without a membership takes no unit. A line that is
+  `personal` takes no job order (the schema refuses it, REQ-INV-035). An order already stored is
+  `ORDER_STORED`.
 - **Scope.** A change set that holds a `pickup` with store lines while the client lacks
   `exchange.refinery.store` is refused as a whole with `403 SCOPE_MISSING`, before any op runs. A
   pickup without lines needs only `exchange.refinery.write`.
@@ -3422,18 +3420,25 @@ A `pickup` op reports that the member collected an order's yield in the game. It
   *`ExchangeRefineryOrderWriteControllerTest`, `RefineryProgressTest`.*
 - [x] A pickup of a completed order is `unchanged`; of a cancelled one `ORDER_CANCELED`.
   *`ExchangeRefineryOrderWriteControllerTest`.*
-- [ ] A pickup with lines stores as the web's store does and locks the order through `storedAt`; one
-  refused line refuses the op and books nothing.
-- [ ] A line whose material is no output, whose receiver or unit the rule refuses, or whose job
+- [x] A pickup with lines stores as the web's store does and locks the order through `storedAt`; one
+  refused line refuses the op and books nothing. *`ExchangeRefineryStoreControllerTest`.*
+- [x] A line whose material is no output, whose receiver or unit the rule refuses, or whose job
   order is unknown, invisible or does not need the material, is refused with its reason.
-- [ ] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing.
+  *`ExchangeRefineryStoreControllerTest`.*
+- [x] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing.
+  *`ExchangeRefineryStoreControllerTest`.*
 
-Until the store lines are built, the `pickup` op declares no line field: a pickup books nothing,
-and a field it does not declare is ignored with the `UNKNOWN_FIELD` warning of REQ-XCH-026.
+The lines book through the web's store operation (`RefineryOrderStoreBooking`, shared with
+`RefineryOrderStoreService`), so each line is audited `INVENTORY_RECEIVED_FROM_REFINERY`, the order
+`REFINERY_ORDER_STORED` under the client with `pickup=true`, and a line onto another member tells
+that member (REQ-REFINERY-024). Each stored pickup publishes, after the commit, also into the Lager
+room (section `stock`), beside the refinery rooms of REQ-XCH-052.
 
-**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest` ·
-**Code:** `ExchangeRefineryOrderWriteService.pickup`, `RefineryExchangeWrites.pickUp`, `V375` ·
-**Status:** partially implemented — #3170 (pickup without store lines); #3171 (store lines)
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`,
+`ExchangeRefineryOrderRouteTest` · **Code:** `ExchangeRefineryOrderWriteService.pickup`,
+`ExchangeRefineryStoreLines`, `ExchangeStoreChoices`, `RefineryExchangeWrites.pickUp`,
+`RefineryOrderStoreBooking`, `V375` · **Status:** implemented — #3170 (pickup without store lines),
+#3171 (store lines)
 
 ### REQ-XCH-054 — A client reads the store choices under its own scope
 
@@ -3446,10 +3451,11 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
 
 - **Receivers.** `GET /exchange/v1/me/store-choices/receivers` lists the members the member may
   book onto, decided from the database by REQ-SEC-039's exchange rule: the member themselves, and
-  for a member who may book for others, the members that rule admits. Each receiver is a
-  client-scoped `ref` (the HMAC pseudonym of REQ-XCH-043) with the name the web shows and the
-  receiver's direct memberships (`id`, `name`, `kind`). Members who withhold their name
-  (REQ-XCH-044) are left out; the member themselves is always listed.
+  for a member who may book for others, the members that rule admits: the direct members of every
+  unit the member is a Logistician of. Each receiver is a client-scoped `ref` (the HMAC pseudonym of
+  REQ-XCH-043) with the name the web shows, `self`, and the receiver's direct memberships in the
+  shape of `org-unit.schema.json` (`id`, `name`, `shorthand`, `kind`). Members who withhold their
+  name (REQ-XCH-044) are left out; the member themselves is always listed, first.
 - **Job orders.** `GET /exchange/v1/me/store-choices/job-orders?material=<bt>` lists the active
   job orders the member can see that require the material, as the web's `/orders/lookup` filters
   the store dialog's picker (the job-order gate of REQ-XCH-018 and the tenancy read scope of the
@@ -3458,15 +3464,17 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
 
 **Acceptance**
 
-- [ ] A plain member's receivers list holds only the member; a member who may book for others also
+- [x] A plain member's receivers list holds only the member; a member who may book for others also
   gets the members the rule admits, with their direct memberships, and never one who withholds their
-  name.
-- [ ] The job-order read lists the visible active orders that need the material and none of another
-  unit the member cannot see.
-- [ ] Without `exchange.refinery.store` both reads are `403 SCOPE_MISSING` at the gateway and the
-  backend.
+  name. *`ExchangeRefineryStoreControllerTest`.*
+- [x] The job-order read lists the visible active orders that need the material and none of another
+  unit the member cannot see. *`ExchangeRefineryStoreControllerTest`.*
+- [x] Without `exchange.refinery.store` both reads are `403 SCOPE_MISSING` at the gateway and the
+  backend. *`ExchangeRefineryOrderRouteTest`, `ExchangeRefineryStoreControllerTest`.*
 
-**Status:** planned — #3171
+**Enforced by:** `ExchangeRefineryStoreControllerTest`, `ExchangeRefineryOrderRouteTest`,
+`ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:** `ExchangeStoreChoiceController`,
+`ExchangeStoreChoices` · **Status:** implemented — #3171
 
 ### REQ-XCH-055 — A client cancels or hard-deletes an order; only a delete counts as a removal
 
@@ -3559,13 +3567,17 @@ gone, is skipped `GONE`.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
 - [x] An undo of a pickup without lines reopens the order and clears `pickedUpAt`.
   *`ExchangeRefineryOrderWriteControllerTest`.*
-- [ ] An undo of a pickup with lines is skipped `STOCK_BOOKED`.
+- [x] An undo of a pickup with lines is skipped `STOCK_BOOKED`. *`ExchangeRefineryStoreControllerTest`.*
 
-**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`
-· **Code:** `ExchangeRefineryOrderJournal`, `ExchangeUndoService`, `V373`, `V374`, `V375` ·
-**Status:** partially implemented — #3168 (journal, undo of create, update and goods ops), #3169
-(undo of cancel and delete), #3170 (undo of a pickup without store lines); #3171 (undo of a pickup
-with store lines)
+The journal state records whether the order is stored (`stored`), so the undo tells a pickup that
+booked stock from one that did not; `V376` admits `STOCK_BOOKED` as a skip reason of the admin's
+bulk undo.
+
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`,
+`ExchangeRefineryStoreControllerTest` · **Code:** `ExchangeRefineryOrderJournal`,
+`ExchangeUndoService`, `V373`, `V374`, `V375`, `V376` · **Status:** implemented — #3168 (journal,
+undo of create, update and goods ops), #3169 (undo of cancel and delete), #3170 (undo of a pickup
+without store lines), #3171 (undo of a pickup with store lines)
 
 ## Threat model
 

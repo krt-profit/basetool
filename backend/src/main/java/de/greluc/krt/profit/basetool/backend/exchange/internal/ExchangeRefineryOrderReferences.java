@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -51,7 +52,8 @@ import org.springframework.stereotype.Component;
 /**
  * Resolves the references of refinery-order ops exactly, never fuzzily (REQ-XCH-052): a location by
  * the stock ops' rule and only a refinery, a refining method by code, then exact name, an input
- * material that may be refined, and an owning unit among the member's direct memberships.
+ * material that may be refined, an owning unit among the member's direct memberships, and a
+ * pickup's store lines through {@link ExchangeRefineryStoreLines}.
  */
 @Component
 @RequiredArgsConstructor
@@ -80,6 +82,7 @@ public class ExchangeRefineryOrderReferences {
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
+  private final ExchangeRefineryStoreLines storeLines;
 
   /**
    * Resolves the references of every op, every input material in one resolver call.
@@ -87,6 +90,8 @@ public class ExchangeRefineryOrderReferences {
    * @param caller the caller, whose memberships a create's unit must be among
    * @param ops the ops
    * @return the references of each op, in the ops' order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when a store line's
+   *     quantity rounds to zero
    */
   public @NotNull @Unmodifiable List<Refs> resolve(
       @NotNull ExchangeCaller caller, @NotNull List<Op> ops) {
@@ -96,7 +101,17 @@ public class ExchangeRefineryOrderReferences {
         ops.stream().anyMatch(op -> ExchangeRefineryOrderChangeSet.CREATE.equals(op.op()))
             ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
             : Set.of();
-    return ops.stream().map(op -> refs(op, materials, unresolved, memberships)).toList();
+    List<ExchangeRefineryStoreLines.Lines> lines = storeLines.resolve(caller, ops);
+    List<Refs> refs = new ArrayList<>(ops.size());
+    for (int i = 0; i < ops.size(); i++) {
+      ExchangeRefineryStoreLines.Lines opLines = lines.get(i);
+      Refs opRefs = refs(ops.get(i), materials, unresolved, memberships);
+      refs.add(
+          opRefs.refusal() != null || opLines.refusal() == null
+              ? opRefs.withLines(opLines.lines())
+              : Refs.refused(Objects.requireNonNull(opLines.refusal())));
+    }
+    return List.copyOf(refs);
   }
 
   /**
@@ -149,7 +164,7 @@ public class ExchangeRefineryOrderReferences {
         return Refs.refused(Outcome.rejected(NOT_A_MEMBER));
       }
     }
-    return new Refs(null, location, offered, method, orgUnit, List.copyOf(inputs));
+    return new Refs(null, location, offered, method, orgUnit, List.copyOf(inputs), List.of());
   }
 
   /**
@@ -263,6 +278,7 @@ public class ExchangeRefineryOrderReferences {
    * @param method the refining method, or {@code null} when the op names none
    * @param orgUnit the owning unit of a create, or {@code null}
    * @param inputs the input materials in the order the op names them
+   * @param lines a pickup's store lines, resolved and decided; empty when it books nothing
    */
   record Refs(
       @Nullable Outcome refusal,
@@ -270,7 +286,19 @@ public class ExchangeRefineryOrderReferences {
       boolean locationOffered,
       @Nullable UUID method,
       @Nullable UUID orgUnit,
-      @NotNull @Unmodifiable List<UUID> inputs) {
+      @NotNull @Unmodifiable List<UUID> inputs,
+      @NotNull @Unmodifiable List<RefineryExchangeStoreLine> lines) {
+
+    /**
+     * The same references with a pickup's store lines.
+     *
+     * @param storeLines the lines
+     * @return the references
+     */
+    @NotNull
+    Refs withLines(@NotNull @Unmodifiable List<RefineryExchangeStoreLine> storeLines) {
+      return new Refs(refusal, location, locationOffered, method, orgUnit, inputs, storeLines);
+    }
 
     /**
      * The references of an op one of them refuses.
@@ -279,7 +307,7 @@ public class ExchangeRefineryOrderReferences {
      * @return the references
      */
     static @NotNull Refs refused(@NotNull Outcome refusal) {
-      return new Refs(refusal, null, false, null, null, List.of());
+      return new Refs(refusal, null, false, null, null, List.of(), List.of());
     }
   }
 

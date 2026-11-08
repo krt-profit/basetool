@@ -143,6 +143,17 @@ class RefineryOrderStoreServiceTest {
             bookInPolicy,
             null,
             null));
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        refineryOrderService,
+        "storeBooking",
+        new RefineryOrderStoreBooking(
+            refineryOrderRepository,
+            (de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands)
+                org.springframework.test.util.ReflectionTestUtils.getField(
+                    refineryOrderService, "stockCommands"),
+            auditService,
+            eventPublisher,
+            userService));
     lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);

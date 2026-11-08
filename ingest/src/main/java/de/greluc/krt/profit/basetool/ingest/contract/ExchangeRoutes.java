@@ -61,6 +61,12 @@ public final class ExchangeRoutes {
               HttpMethod.POST,
               "/exchange/v1/me/refinery-orders/changes",
               "exchange.refinery.write"),
+          route(
+              HttpMethod.GET, "/exchange/v1/me/store-choices/receivers", "exchange.refinery.store"),
+          route(
+              HttpMethod.GET,
+              "/exchange/v1/me/store-choices/job-orders",
+              "exchange.refinery.store"),
           route(HttpMethod.GET, "/exchange/v1/me/org-demand", "exchange.demand.read"),
           route(HttpMethod.GET, "/exchange/v1/me/org-units", "exchange.orgunits.read"),
           route(HttpMethod.GET, "/exchange/v1/org-stock", "exchange.orgstock.read"),

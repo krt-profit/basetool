@@ -257,16 +257,18 @@ reopen and then store it in the web.
 A client's hard delete (REQ-XCH-055) refuses an order with `storedAt` set, so the record behind
 booked stock is never deleted; the web keeps cancelling through `DELETE`.
 
-> [!note] Planned — the exchange's pickup (ADR-0351, epic #3163)
-> An exchange path joins this requirement as it is built, and leaves the web's store unchanged:
->
-> - **A pickup with store lines** (REQ-XCH-053) stores through this same store operation, so it
->   books exactly once and sets `storedAt`; a refused line refuses the whole pickup and books
->   nothing.
+A client's **pickup with store lines** (REQ-XCH-053) stores through the same store operation as
+the web (`RefineryOrderStoreBooking`, shared with `RefineryOrderStoreService`), so it books exactly
+once, writes the stored amounts back into the goods and sets `storedAt` with the client's pickup
+marker; its lines are checked before the first row is booked, and a refused line refuses the whole
+pickup and books nothing. Its receivers, units and job orders are decided by REQ-SEC-039's exchange
+rule.
 
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
-`RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`)
+`RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`),
+`ExchangeRefineryStoreControllerTest`
 · **Code:** `RefineryOrderService.updateRefineryOrder` / `RefineryOrderStoreService.storeRefineryOrder`,
+`RefineryOrderStoreBooking`, `RefineryExchangeWrites.pickUp`,
 `JobOrderVisibility`
 
 ### Write requests and settings (wave 6 of the API cut)

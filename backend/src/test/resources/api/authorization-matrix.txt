@@ -155,6 +155,8 @@ GET /api/v1/exchange/me/ships | ExchangeShipController#ships | pre=@exchangeGate
 POST /api/v1/exchange/me/ships/changes | ExchangeShipController#shipChanges | pre=@exchangeGate.allows('exchange.hangar.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/stock | ExchangeStockController#stock | pre=@exchangeGate.allows('exchange.stock.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/stock/changes | ExchangeStockController#stockChanges | pre=@exchangeGate.allows('exchange.stock.write', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/me/store-choices/job-orders | ExchangeStoreChoiceController#jobOrders | pre=@exchangeGate.allows('exchange.refinery.store', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/me/store-choices/receivers | ExchangeStoreChoiceController#receivers | pre=@exchangeGate.allows('exchange.refinery.store', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/org-stock | ExchangeOrgStockController#orgStock | pre=@exchangeGate.allows('exchange.orgstock.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/org-stock/changes | ExchangeOrgStockController#orgStockChanges | pre=@exchangeGate.allows('exchange.orgstock.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/org-stock/members | ExchangeOrgStockController#orgStockMembers | pre=@exchangeGate.allows('exchange.orgstock.write', authentication) | url=anyRequest -> authenticated

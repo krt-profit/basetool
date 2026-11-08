@@ -34,7 +34,8 @@ the registry grants it to the client.
 | `exchange.orgstock.read` | the shared warehouse stock of those units, one pool per unit |
 | `exchange.orgstock.details` | with `.read`, the single named entries in the pools of units where the member is a Logistician |
 | `exchange.orgstock.write` | booking stock into and out of the pools of units where the member is a Logistician, and those units' rosters |
-| `exchange.refinery.read` / `.write` | reading the member's own refinery orders, and creating and updating them and their goods |
+| `exchange.refinery.read` / `.write` | reading the member's own refinery orders, and creating, updating, picking up, cancelling and deleting them and their goods |
+| `exchange.refinery.store` | booking a picked-up refinery order's yield into stock, and reading the store choices |
 | `exchange.drafts.blueprints` / `.refinery` | staging blueprints or refinery orders for review in the browser |
 
 `catalog/resolve` and `catalog/locations` are open to any exchange scope.
@@ -71,7 +72,9 @@ the registry grants it to the client.
 - [Org stock](resources/org-stock.md) — the shared warehouse stock of the member's units, and
   booking it in and out as a Logistician.
 - [Refinery orders](resources/refinery-orders.md) — the feed of the member's own refinery orders,
-  creating and updating them.
+  creating, updating, picking up and storing them.
+- [Store choices](resources/store-choices.md) — the receivers and job orders a pickup's store
+  lines name.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
 
 ## Support

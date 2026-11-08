@@ -367,6 +367,13 @@ class MassAssignmentGuardTest {
                   "OPEN or IN_PROGRESS as the web's form sets it; a stored order refuses a change"
                       + " with ORDER_STORED, ExchangeRefineryOrderWriteService (REQ-XCH-052)")),
           Map.entry(
+              ExchangeRefineryOrderChangeSet.StoreLine.class,
+              Map.of(
+                  "orgUnit",
+                  "the owning unit of a store line's stock, which ExchangeRefineryStoreLines"
+                      + " requires to be a direct membership of the receiver or a unit the member"
+                      + " is a Logistician of (REQ-XCH-053, REQ-SEC-039)")),
+          Map.entry(
               ExchangeOrgUnitChoice.class,
               Map.of(
                   "orgUnitId",

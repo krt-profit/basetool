@@ -52,7 +52,8 @@ import tools.jackson.databind.ObjectMapper;
  * Owns the journal state of a refinery order and sets the order back on an undo (REQ-XCH-056,
  * ADR-0285): a create is removed, an update, goods op, cancel or pickup restores the sections it
  * touched, each only while that section's counter shows no write but the client's since, a pickup's
- * marker is cleared with its status, and a delete recreates the order under its former ids.
+ * marker is cleared with its status, a pickup that booked stock is left to the member, and a delete
+ * recreates the order under its former ids.
  */
 @Component
 @RequiredArgsConstructor
@@ -76,9 +77,10 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    *
    * @param scope the member and the client
    * @param group the client's writes to the order, newest first
-   * @return {@code null} when restored, {@code CHANGED_AFTERWARDS} when another write moved a
-   *     touched section's counter, {@code GONE} when the member no longer owns the order or its
-   *     earlier state names a location, method or material that is no longer there
+   * @return {@code null} when restored, {@code STOCK_BOOKED} when a pickup of the group booked the
+   *     yield into stock, {@code CHANGED_AFTERWARDS} when another write moved a touched section's
+   *     counter, {@code GONE} when the member no longer owns the order or its earlier state names a
+   *     location, method or material that is no longer there
    */
   @Override
   public @Nullable String restore(
@@ -89,6 +91,9 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
     List<Step> steps = steps(deleted ? group.subList(1, group.size()) : group);
     if (orderId == null || steps == null) {
       return ExchangeUndoService.GONE;
+    }
+    if (steps.stream().anyMatch(Step::booksStock)) {
+      return ExchangeUndoService.STOCK_BOOKED;
     }
     boolean pickedUp =
         group.stream()
@@ -315,7 +320,17 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    * @param before the order before it, or {@code null} for its create
    * @param after the order after it
    */
-  private record Step(@Nullable State before, @NotNull State after) {}
+  private record Step(@Nullable State before, @NotNull State after) {
+
+    /**
+     * Whether the write booked the order's yield into stock, as a pickup with store lines does.
+     *
+     * @return {@code true} when the order is stored after it and was not before
+     */
+    boolean booksStock() {
+      return after.stored() && (before == null || !before.stored());
+    }
+  }
 
   /**
    * The counters the client's last writes left on the sections they touched.
@@ -341,6 +356,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    * @param goods the goods with their row ids
    * @param gameData the game-data counter
    * @param finances the finances counter
+   * @param stored whether the order's yield is booked into stock
    * @param origin what a deleted order held beyond the fields a client writes, for its recreation;
    *     {@code null} on every write but a delete
    */
@@ -357,6 +373,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       @NotNull @Unmodifiable List<Good> goods,
       long gameData,
       long finances,
+      boolean stored,
       @Nullable RefineryExchangeOrigin origin) {
 
     /**
@@ -379,6 +396,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           order.goods().stream().map(Good::of).toList(),
           order.gameDataVersion(),
           order.financesVersion(),
+          order.storedAt() != null,
           null);
     }
 
@@ -403,6 +421,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           goods,
           gameData,
           finances,
+          stored,
           removed);
     }
 
@@ -426,6 +445,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       state.put("goods", goods.stream().map(Good::toJournal).toList());
       state.put("gameData", gameData);
       state.put("finances", finances);
+      state.put("stored", stored);
       if (origin != null) {
         state.put("origin", originToJournal(origin));
       }
@@ -443,6 +463,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       String status = ExchangeJournalJson.text(node, "status");
       JsonNode gameData = node.get("gameData");
       JsonNode finances = node.get("finances");
+      JsonNode stored = node.get("stored");
       if (location == null
           || status == null
           || gameData == null
@@ -474,6 +495,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           List.copyOf(goods),
           gameData.longValue(),
           finances.longValue(),
+          stored != null && stored.asBoolean(),
           originOf(node.get("origin")));
     }
   }

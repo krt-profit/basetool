@@ -169,6 +169,12 @@ change-set.schema.json#/$defs/refineryOrderOp/oneOf/7/properties/op IDENTIFIER
 change-set.schema.json#/$defs/refineryOrderOp/oneOf/7/properties/opId IDENTIFIER
 change-set.schema.json#/$defs/refineryOrderVersions/properties/finances IDENTIFIER
 change-set.schema.json#/$defs/refineryOrderVersions/properties/gameData IDENTIFIER
+change-set.schema.json#/$defs/refineryStoreLine/properties/jobOrder IDENTIFIER
+change-set.schema.json#/$defs/refineryStoreLine/properties/note MEMBER_FREE_TEXT
+change-set.schema.json#/$defs/refineryStoreLine/properties/orgUnit/properties/id IDENTIFIER
+change-set.schema.json#/$defs/refineryStoreLine/properties/personal FACT_VALUE
+change-set.schema.json#/$defs/refineryStoreLine/properties/quality FACT_VALUE
+change-set.schema.json#/$defs/refineryStoreLine/properties/receiver IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/0/properties/externalId IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/0/properties/op IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/0/properties/opId IDENTIFIER
@@ -396,6 +402,14 @@ stock-lot.schema.json#/properties/key IDENTIFIER
 stock-lot.schema.json#/properties/quality FACT_VALUE
 stock-lot.schema.json#/properties/split/properties/pools/items/properties/orgUnit/properties/id IDENTIFIER
 stock-lot.schema.json#/properties/stolen FACT_VALUE
+store-choice-job-orders.schema.json#/properties/extensions CLIENT_DATA
+store-choice-job-orders.schema.json#/properties/items/items/properties/id IDENTIFIER
+store-choice-job-orders.schema.json#/properties/items/items/properties/number IDENTIFIER
+store-choice-job-orders.schema.json#/properties/items/items/properties/status FACT_VALUE
+store-choice-receivers.schema.json#/properties/extensions CLIENT_DATA
+store-choice-receivers.schema.json#/properties/items/items/properties/name SHORT_NAME
+store-choice-receivers.schema.json#/properties/items/items/properties/ref IDENTIFIER
+store-choice-receivers.schema.json#/properties/items/items/properties/self FACT_VALUE
 tombstone.schema.json#/properties/clientKey IDENTIFIER
 tombstone.schema.json#/properties/key IDENTIFIER
 tombstone.schema.json#/properties/removedAt FACT_VALUE

@@ -231,7 +231,11 @@ requires it and duplicating it into further files spreads personal data for no g
   (REQ-XCH-009, REQ-XCH-017, REQ-XCH-018, REQ-XCH-048). The one exception for other members' data
   is the shared stock of a unit (ADR-0257, REQ-XCH-042…045): a client approved for it receives the
   shared stock of each unit the member directly belongs to, summed per lot over every holder and
-  naming none (REQ-XCH-042, built); a client approved for its details (`exchange.orgstock.details`,
+  naming none (REQ-XCH-042, built); a client approved for the refinery store
+  (`exchange.refinery.store`, REQ-XCH-054, built) receives the members the member may book a
+  refinery yield onto — the member, and for a Logistician the direct members of their Logistician
+  units — with name, per-client pseudonym and direct org units, and the numbers of the job orders
+  the member sees; a member who withholds their name is left out; a client approved for its details (`exchange.orgstock.details`,
   REQ-XCH-043, built) shows a Logistician or leader of that unit the name as the web shows it, a
   per-client pseudonym and the note of each member's shared entries in that unit, and the unit's
   member roster (REQ-XCH-045, built). A member who withholds their name is left out of both; their

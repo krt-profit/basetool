@@ -91,6 +91,7 @@ public final class ApiDomains {
           Map.entry("ExchangeRefineryOrderController", "exchange"),
           Map.entry("ExchangeShipController", "exchange"),
           Map.entry("ExchangeStockController", "exchange"),
+          Map.entry("ExchangeStoreChoiceController", "exchange"),
           Map.entry("FrequencyTypeController", "catalogue"),
           Map.entry("GameItemController", "joborder"),
           Map.entry("HangarController", "hangar"),

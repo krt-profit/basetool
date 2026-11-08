@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
 import java.time.Duration;
 import java.time.Instant;
@@ -50,9 +51,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-053,
  * REQ-XCH-055, REQ-XCH-056, ADR-0351): creates under the client's key, partial updates, goods ops,
- * cancels, deletes and pickups without store lines, each through the refinery module's own writer,
- * decided in order against the section counters the earlier ops left, and journaled for the undo.
- * The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285); a delete counts for the
+ * cancels, deletes and pickups with or without store lines, each through the refinery module's own
+ * writer, decided in order against the section counters the earlier ops left, and journaled for the
+ * undo. The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285); a delete counts for the
  * mass-change guard.
  *
  * <p>References resolve exactly in the plan; everything that depends on the order — its address, an
@@ -215,8 +216,8 @@ public class ExchangeRefineryOrderWriteService
   }
 
   /**
-   * Refuses an op that lacks a field its kind needs; the gateway's schema keeps such an op from
-   * arriving.
+   * Refuses an op that lacks a field its kind needs, or a store line that earmarks personal stock;
+   * the gateway's schema keeps such an op from arriving.
    *
    * @param op the op
    * @throws BadRequestException when a field is missing
@@ -241,7 +242,11 @@ public class ExchangeRefineryOrderWriteService
           case ExchangeRefineryOrderChangeSet.PICKUP -> addressed && gameDataEcho;
           default -> false;
         };
-    if (!complete || (op.durationMinutes() != null && op.endsAt() == null)) {
+    boolean personalEarmark =
+        op.lines() != null
+            && op.lines().stream()
+                .anyMatch(line -> Boolean.TRUE.equals(line.personal()) && line.jobOrder() != null);
+    if (!complete || personalEarmark || (op.durationMinutes() != null && op.endsAt() == null)) {
       throw new BadRequestException("A refinery-order op lacks a field its kind needs");
     }
   }
@@ -310,6 +315,9 @@ public class ExchangeRefineryOrderWriteService
     /** The orders the set deleted. */
     private final Set<UUID> deleted = new LinkedHashSet<>();
 
+    /** Whether a pickup of the set booked stock. */
+    private boolean stockBooked;
+
     /**
      * Starts a run.
      *
@@ -346,7 +354,7 @@ public class ExchangeRefineryOrderWriteService
               case ExchangeRefineryOrderChangeSet.GOOD_REMOVE -> goodRemove(slot, op);
               case ExchangeRefineryOrderChangeSet.CANCEL -> cancel(slot, op);
               case ExchangeRefineryOrderChangeSet.DELETE -> delete(slot, op);
-              case ExchangeRefineryOrderChangeSet.PICKUP -> pickup(slot, op);
+              case ExchangeRefineryOrderChangeSet.PICKUP -> pickup(slot, change);
               default -> throw new BadRequestException("Unknown refinery-order op");
             };
       }
@@ -365,6 +373,9 @@ public class ExchangeRefineryOrderWriteService
     @Override
     public void announce() {
       liveSync.refineryOrdersChanged(written, deleted);
+      if (stockBooked) {
+        liveSync.stockChanged(false);
+      }
     }
 
     /**
@@ -628,14 +639,17 @@ public class ExchangeRefineryOrderWriteService
     }
 
     /**
-     * Decides and writes a pickup without store lines (REQ-XCH-053): an open or running order is
-     * closed whatever its end, a completed one is left, a cancelled one is refused.
+     * Decides and writes a pickup (REQ-XCH-053): an open or running order is closed whatever its
+     * end, a completed one is left, a cancelled one is refused; store lines book the yield, all or
+     * nothing, and each must name an output material of the order's goods. An order a dry run would
+     * create has no goods to check them against yet.
      *
      * @param slot the order
-     * @param op the pickup
+     * @param change the planned pickup with its resolved store lines
      * @return the outcome
      */
-    private @NotNull Outcome pickup(@NotNull Slot slot, @NotNull Op op) {
+    private @NotNull Outcome pickup(@NotNull Slot slot, @NotNull Change change) {
+      Op op = change.op();
       RefineryExchangeOrder current = slot.current;
       String status = current == null ? null : current.status();
       if (COMPLETED.equals(status)) {
@@ -647,14 +661,22 @@ public class ExchangeRefineryOrderWriteService
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
         return Outcome.rejected(VERSION_CONFLICT);
       }
+      List<RefineryExchangeStoreLine> lines = change.refs().lines();
+      Outcome refusal =
+          current == null ? null : ExchangeRefineryStoreLines.refusalFor(current, lines);
+      if (refusal != null) {
+        return refusal;
+      }
       if (dryRun || slot.id == null || current == null) {
         slot.advance(true, false);
         return Outcome.APPLIED;
       }
-      RefineryExchangeOrder after = writer.pickUp(caller.member(), caller.clientId(), slot.id);
+      RefineryExchangeOrder after =
+          writer.pickUp(caller.member(), caller.clientId(), slot.id, lines);
       journal(slot.id, ExchangeJournalAction.REFINERY_PICKUP, current, after);
       slot.current = after;
       written.add(slot.id);
+      stockBooked |= !lines.isEmpty();
       return applied(after, List.of());
     }
 

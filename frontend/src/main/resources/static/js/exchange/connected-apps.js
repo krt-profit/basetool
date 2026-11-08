@@ -81,6 +81,7 @@ function initConnectedApps() {
             reasons: {
                 CHANGED_AFTERWARDS: text('reasonChangedAfterwards'),
                 GONE: text('reasonGone'),
+                STOCK_BOOKED: text('reasonStockBooked'),
             },
             resources: {
                 BLUEPRINT: text('resourceBlueprint'),
