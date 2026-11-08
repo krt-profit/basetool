@@ -544,6 +544,8 @@ public enum AuditEventType {
   EXCHANGE_CLIENT_ACTIVATED(AuditDomain.CONNECTED_APPS),
   /** The global exchange switch was turned on or off. */
   EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
+  /** The bank switch of the exchange was turned on or off; the details carry the new state. */
+  BANK_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected a whole exchange client from their account (REQ-XCH-008). */
   EXCHANGE_CLIENT_DISCONNECTED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected one installation of an exchange client (REQ-XCH-008). */

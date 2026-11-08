@@ -45,6 +45,9 @@ public final class ExchangeProblemException extends DomainProblem {
   /** The global exchange switch is off. */
   public static final String EXCHANGE_DISABLED = "EXCHANGE_DISABLED";
 
+  /** The bank switch is off while the global switch is on (REQ-BXCH-006). */
+  public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
+
   /** The relayed client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -106,6 +109,18 @@ public final class ExchangeProblemException extends DomainProblem {
   public static @NotNull ExchangeProblemException exchangeDisabled() {
     return new ExchangeProblemException(
         HttpStatus.SERVICE_UNAVAILABLE, EXCHANGE_DISABLED, "The exchange is switched off.");
+  }
+
+  /**
+   * The refusal of a bank route while the bank switch is off.
+   *
+   * @return the {@code 503 BANK_EXCHANGE_DISABLED} refusal
+   */
+  public static @NotNull ExchangeProblemException bankExchangeDisabled() {
+    return new ExchangeProblemException(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        BANK_EXCHANGE_DISABLED,
+        "The bank is switched off on the exchange.");
   }
 
   /**

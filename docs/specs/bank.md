@@ -9,6 +9,8 @@
 > [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
 > tests; subsequent behaviour changes keep this spec in sync in the same PR.
+> **On the exchange:** the bank's route family for connected applications, its switch, limits and
+> refusal codes live in [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, ADR-0354).
 
 # Kartell bank — accounts, ledger, grants, audit, exports
 

@@ -4192,3 +4192,51 @@ These meters show where that precedence meets values it cannot place:
 **Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` (unknown class and grade);
 `CatalogueStatBusinessGaugesTest`, `BusinessMetricsCollectorTest`,
 `monitoring/prometheus/tests/scwiki_item_stats_missing_test.yml` (stat sources) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927, #3040
+
+### REQ-OBS-024 — The bank on the exchange is measured and alerted
+
+> [!note] Implemented (#3156; ADR-0354). The route slices wire the read and write counters.
+
+The bank route family of the exchange ([`bank-exchange.md`](bank-exchange.md), REQ-BXCH-006) carries
+its own meters. Every label is a registry `client_id` or a fixed enumeration, never an id, a path or
+an amount (REQ-OBS-011).
+
+- **Reads.** `basetool_exchange_bank_reads_total{client_id, route}` counts the bank reads served, with
+  `route` one of `accounts`, `bookings`, `balance_series`, `requests`, `queue`.
+- **Writes.** The existing `basetool_exchange_writes_total{client_id, resource="bank_request",
+  outcome}` counts the request writes.
+- **Refusals.** `basetool_exchange_bank_refused_total{reason}` counts what the backend refused, with
+  `reason` one of `not_found`, `not_bank_staff`, `open_request_cap`, `switched_off`, every reason
+  registered at zero. The gateway's own bank switch refusals count as
+  `basetool_ingest_exchange_refused_total{reason="bank_exchange_disabled"}`.
+- **Switch changes.** `basetool_exchange_registry_changes_total{action}` counts `bank_switch_on` and
+  `bank_switch_off` once per committed change.
+
+Alerts, each with a promtool rule test that fires and stays silent:
+
+- **`BankExchangeNotFoundSpike`**: more than 50 `not_found` refusals in an hour, a client or member
+  probing account ids.
+- **`BankExchangeOpenRequestCapHit`**: more than 10 open-request cap refusals in an hour, sustained
+  for 30 minutes.
+- **`BankExchangeSwitchChanged`**: any bank switch change in ten minutes, informational like
+  `ExchangeRegistryChanged`, which no longer fires for the bank actions.
+- **`BankBookingApprovalOverdue`** (the oldest pending booking request older than 48 hours) gains its
+  missing rule test.
+
+The „Bank" row of the exchange dashboard (`15-exchange.json`) shows the reads by route, the
+refusals by reason, the request writes, the gateway's switch refusals and the switch changes.
+
+**Acceptance**
+
+- [x] The refusal counter exists for every reason at zero, and the backend gate counts
+  `switched_off` (`ExchangeGateTest`).
+- [x] Every alert above has a promtool rule test that fires and stays silent, and
+  `ExchangeRegistryChanged` stays silent on the bank actions.
+- [ ] The read and request-write counters are incremented by the bank routes (REQ-BXCH-002…005).
+
+**Enforced by:** `ExchangeBankMetrics`, `BankExchangeRefusal`, `BankExchangeReadRoute`,
+`ExchangeMetricNames`, `ExchangeRegistryAction` · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/bank_exchange_alerts_test.yml`,
+`monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
+`monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
+REQ-BXCH-006 · **Issues:** #3121, #3156

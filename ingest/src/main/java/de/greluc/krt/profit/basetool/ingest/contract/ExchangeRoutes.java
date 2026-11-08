@@ -42,6 +42,12 @@ public final class ExchangeRoutes {
   /** Stands for "any granted exchange capability". */
   public static final String ANY = "*";
 
+  /**
+   * The root of the bank route family, which the bank switch gates (REQ-BXCH-006): every path at or
+   * below it, whether a route serves it or not.
+   */
+  public static final String BANK_PATH = "/exchange/v1/bank";
+
   /** Every authenticated exchange route. */
   public static final @Unmodifiable List<Route> ROUTES =
       List.of(
@@ -83,6 +89,16 @@ public final class ExchangeRoutes {
     return ROUTES.stream()
         .filter(route -> route.method().matches(method) && route.pattern().matches(container))
         .findFirst();
+  }
+
+  /**
+   * Tells whether a request path belongs to the bank route family.
+   *
+   * @param path the request path
+   * @return {@code true} for {@link #BANK_PATH} and every path below it
+   */
+  public static boolean isBank(@NotNull String path) {
+    return path.equals(BANK_PATH) || path.startsWith(BANK_PATH + "/");
   }
 
   /**

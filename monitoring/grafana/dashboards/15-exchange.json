@@ -1189,6 +1189,274 @@
           }
         }
       ]
+    },
+    {
+      "id": 29,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "type": "row",
+      "title": "Bank",
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 30,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 100
+      },
+      "type": "timeseries",
+      "title": "Bank reads/hour per client and route",
+      "description": "Bank exchange reads of the selected clients per hour, by route: accounts, bookings, balance series, requests and the approval queue of bank staff (REQ-BXCH-006).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, route) (increase(basetool_exchange_bank_reads_total{client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{route}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 100
+      },
+      "type": "timeseries",
+      "title": "Bank refusals/hour by reason",
+      "description": "Bank exchange requests the backend refused per hour: not_found answers 404 for an account not found for the member (BankExchangeNotFoundSpike), not_bank_staff refuses the approval queue to a member without a bank role, open_request_cap answers 409 BANK_OPEN_REQUEST_CAP at 20 pending requests (BankExchangeOpenRequestCapHit), switched_off refuses while the bank switch is off (REQ-OBS-024).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (increase(basetool_exchange_bank_refused_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 108
+      },
+      "type": "timeseries",
+      "title": "Bank request writes/day per client and outcome",
+      "description": "Bank requests the selected clients filed for their members per day, by outcome (REQ-BXCH-006).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id, outcome) (increase(basetool_exchange_writes_total{resource=\"bank_request\", client_id=~\"$client_id\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}} {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 108
+      },
+      "type": "timeseries",
+      "title": "Gateway refusals/hour while the bank switch is off",
+      "description": "Bank exchange requests of the selected clients the ingest gateway refused per hour because the bank switch is off (reason bank_exchange_disabled); the rest of the exchange keeps working (REQ-OBS-024).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (client_id) (increase(basetool_ingest_exchange_refused_total{reason=\"bank_exchange_disabled\", client_id=~\"$client_id\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{client_id}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 116
+      },
+      "type": "timeseries",
+      "title": "Bank switch changes/day",
+      "description": "Committed changes of the bank switch per day, by direction; each one fires BankExchangeSwitchChanged and is logged as BANK_EXCHANGE_SWITCH_CHANGED in the Verbundene Anwendungen audit log (REQ-OBS-024).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (action) (increase(basetool_exchange_registry_changes_total{action=~\"bank_switch_.*\"}[1d]))",
+          "refId": "A",
+          "legendFormat": "{{action}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ]
 }

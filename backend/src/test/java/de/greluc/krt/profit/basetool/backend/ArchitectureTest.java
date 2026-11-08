@@ -1911,8 +1911,10 @@ class ArchitectureTest {
   }
 
   /**
-   * Every production class named after the bank is classified: a bank class, the org-unit side, or
-   * in the bank module package, so a new bank class cannot slip past the bank rules.
+   * Every production class named after the bank is classified: a bank class, the org-unit side, the
+   * exchange side (the bank route family of the exchange module, which reaches the bank through its
+   * {@code api} only, REQ-BXCH-006), or in the bank module package, so a new bank class cannot slip
+   * past the bank rules.
    */
   @Test
   void everyBankNamedClassIsClassified() {
@@ -1929,10 +1931,12 @@ class ArchitectureTest {
         .that(selection)
         .should(
             new ArchCondition<JavaClass>(
-                "be a registered bank class, on the org-unit side, or in the bank module") {
+                "be a registered bank class, on the org-unit side, on the exchange side, or in the"
+                    + " bank module") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 if (BANK_DOMAIN.test(javaClass)
+                    || EXCHANGE_DOMAIN.test(javaClass)
                     || ORG_UNIT_BANK_SIDE.stream().anyMatch(javaClass::isEquivalentTo)) {
                   return;
                 }
@@ -1940,9 +1944,10 @@ class ArchitectureTest {
                     SimpleConditionEvent.violated(
                         javaClass,
                         javaClass.getName()
-                            + " is named after the bank but is neither in BANK_CLASSES nor in"
-                            + " ORG_UNIT_BANK_SIDE; add it to the list it belongs to so the bank"
-                            + " rules see it (REQ-BANK-008, REQ-BANK-019)."));
+                            + " is named after the bank but is neither in BANK_CLASSES, in"
+                            + " ORG_UNIT_BANK_SIDE nor in the exchange module; add it to the list"
+                            + " it belongs to so the bank rules see it (REQ-BANK-008,"
+                            + " REQ-BANK-019)."));
               }
             });
   }

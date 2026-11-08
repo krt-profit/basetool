@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.BankExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
@@ -135,6 +136,12 @@ class ExchangeRelaySeamParityTest {
     Map<String, Integer> otherStatus = new HashMap<>(ExchangeSeam.GATE_STATUSES);
     otherStatus.put("CLIENT_REVOKED", 403);
     assertThatThrownBy(() -> assertGateStatuses(otherStatus)).isInstanceOf(AssertionError.class);
+  }
+
+  @Test
+  void theBankSwitchGatesTheSeamsBankRouteFamily() {
+    assertThat(BankExchangeRoutes.PATH)
+        .isEqualTo(ExchangeSeam.RELAY_PREFIX + ExchangeSeam.BANK_PATH);
   }
 
   @Test
@@ -293,6 +300,7 @@ class ExchangeRelaySeamParityTest {
     List<Supplier<ExchangeProblemException>> refusals =
         List.of(
             ExchangeProblemException::exchangeDisabled,
+            ExchangeProblemException::bankExchangeDisabled,
             ExchangeProblemException::clientNotAllowed,
             ExchangeProblemException::clientSuspended,
             ExchangeProblemException::installationRevoked,
@@ -304,7 +312,7 @@ class ExchangeRelaySeamParityTest {
       ExchangeProblemException problem = refusal.get();
       answered.put(problem.code(), problem.status().value());
     }
-    assertThat(answered).hasSize(7).isEqualTo(new TreeMap<>(expected));
+    assertThat(answered).hasSize(8).isEqualTo(new TreeMap<>(expected));
   }
 
   /**

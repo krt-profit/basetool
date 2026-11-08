@@ -143,6 +143,8 @@ final class NotificationTargets {
           Map.entry("EXCHANGE_CLIENT_UPDATE_REQUIRED", focus(EXCHANGE_CLIENT, CONNECTED_APPS)),
           Map.entry("EXCHANGE_CLIENT_CAPABILITY_REMOVED", focus(EXCHANGE_CLIENT, CONNECTED_APPS)),
           Map.entry("EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
+          Map.entry("BANK_EXCHANGE_SWITCHED_ON", page(CONNECTED_APPS)),
+          Map.entry("BANK_EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
           Map.entry("INVENTORY_TRANSFERRED_TO_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", page(MY_LAGER)),

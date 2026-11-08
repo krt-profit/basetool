@@ -368,6 +368,7 @@ public class AdminAuditLogPageController {
                   "EXCHANGE_CLIENT_SUSPENDED",
                   "EXCHANGE_CLIENT_ACTIVATED",
                   "EXCHANGE_SWITCH_CHANGED",
+                  "BANK_EXCHANGE_SWITCH_CHANGED",
                   "EXCHANGE_CLIENT_DISCONNECTED",
                   "EXCHANGE_INSTALLATION_DISCONNECTED",
                   "EXCHANGE_MEMBER_DEPARTED",

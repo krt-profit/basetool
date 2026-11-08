@@ -115,6 +115,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the removed scopes | REQ-XCH-040 |
 | `EXCHANGE_SWITCHED_OFF` | `EXCHANGE_SWITCHED_OFF` | V281 | `EXCHANGE_CLIENT_HOLDERS` (any client, `contextAllExchangeClients`) | REQ-XCH-041 |
 | `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
+| `BANK_EXCHANGE_SWITCHED_ON` | `BANK_EXCHANGE_SWITCHED_ON` | V365 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
+| `BANK_EXCHANGE_SWITCHED_OFF` | `BANK_EXCHANGE_SWITCHED_OFF` | V365 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
 | `SUPPLY_DONATION_PLEDGED` | `SUPPLY_DONATION_PLEDGED` | V286 | `ORG_RELATIVE_ROLE` leadership and Logisticians of the receiving unit | REQ-SUP-016 |
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
@@ -1293,7 +1295,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `PURCHASING_DELEGATE_APPOINTED`, `PURCHASING_DELEGATE_REVOKED` | `/purchasing/delegates?focus={id}` |
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
-| `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
+| `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF`, `BANK_EXCHANGE_SWITCHED_ON`, `BANK_EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
 | `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
 | `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |

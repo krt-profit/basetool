@@ -400,6 +400,18 @@ public enum NotificationType {
   EXCHANGE_SWITCHED_OFF,
 
   /**
+   * An admin switched the bank on for connected applications (REQ-BXCH-006); notifies the admins
+   * and the Bankleitung and supersedes the other bank switch notice.
+   */
+  BANK_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched the bank off for connected applications (REQ-BXCH-006); notifies the admins
+   * and the Bankleitung and supersedes the other bank switch notice.
+   */
+  BANK_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit, excluding the actor; superseded when the pledge is
    * received, declined or withdrawn.
@@ -543,6 +555,8 @@ public enum NotificationType {
           EXCHANGE_CLIENT_UPDATE_REQUIRED,
           EXCHANGE_CLIENT_CAPABILITY_REMOVED,
           EXCHANGE_SWITCHED_OFF,
+          BANK_EXCHANGE_SWITCHED_ON,
+          BANK_EXCHANGE_SWITCHED_OFF,
           SUPPLY_DONATION_PLEDGED,
           SUPPLY_DONATION_RECEIVED,
           SUPPLY_DONATION_DECLINED,

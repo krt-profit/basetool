@@ -128,6 +128,8 @@ GET /api/v1/connected-apps/admin/clients/{id}/undo/installations | AdminExchange
 POST /api/v1/connected-apps/admin/clients/{id}/undo/preview | AdminExchangeBulkUndoController#preview | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#getSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#updateSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/settings/bank | AdminExchangeRegistryController#getBankSwitch | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/connected-apps/admin/settings/bank | AdminExchangeRegistryController#updateBankSwitch | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/undo-runs | AdminExchangeBulkUndoController#runs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/undo-runs/{runId} | AdminExchangeBulkUndoController#run | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/connected-apps/installations/{installationId} | ConnectedAppsController#disconnectInstallation | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated

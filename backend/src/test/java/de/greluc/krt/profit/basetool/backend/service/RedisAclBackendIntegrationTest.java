@@ -170,6 +170,7 @@ class RedisAclBackendIntegrationTest {
     ExchangeRegistrySnapshot snapshot =
         new ExchangeRegistrySnapshot(
             true,
+            false,
             new TreeMap<>(
                 Map.of(
                     "versekit",

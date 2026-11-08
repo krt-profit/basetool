@@ -110,6 +110,28 @@ class ExchangeRegistryReaderTest {
   }
 
   @Test
+  void theBankSwitchIsReadAndCountsAsOffWhenAbsentOrMalformed() {
+    when(values.get(KEY))
+        .thenReturn(
+            DOCUMENT.replace("\"enabled\":true,", "\"enabled\":true,\"bankEnabled\":true,"));
+    assertThat(reader.current().bankEnabled()).isTrue();
+
+    assertThat(
+            ExchangeRegistryReader.parse(JsonMapper.builder().build().readTree(DOCUMENT))
+                .bankEnabled())
+        .isFalse();
+    assertThat(
+            ExchangeRegistryReader.parse(
+                    JsonMapper.builder()
+                        .build()
+                        .readTree(
+                            DOCUMENT.replace(
+                                "\"enabled\":true,", "\"enabled\":true,\"bankEnabled\":\"yes\",")))
+                .bankEnabled())
+        .isFalse();
+  }
+
+  @Test
   void theRegistryIsCachedForItsLifetimeOnly() {
     when(values.get(KEY)).thenReturn(DOCUMENT);
 

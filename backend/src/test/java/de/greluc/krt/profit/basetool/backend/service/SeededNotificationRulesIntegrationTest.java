@@ -274,6 +274,18 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EXCHANGE_CLIENT_HOLDERS),
         rule(
+            NotificationEventType.BANK_EXCHANGE_SWITCHED_ON,
+            NotificationType.BANK_EXCHANGE_SWITCHED_ON,
+            true,
+            SelectorKind.ROLE,
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.BANK_EXCHANGE_SWITCHED_OFF,
+            NotificationType.BANK_EXCHANGE_SWITCHED_OFF,
+            true,
+            SelectorKind.ROLE,
+            SelectorKind.ROLE),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
