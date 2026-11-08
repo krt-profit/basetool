@@ -124,7 +124,15 @@ class BankNoticeIntegrationTest {
   void aRevokedApprovalClearsTheReadyToConfirmNotices() {
     approve();
 
-    creationService.createFromEvent(BankNotices.approvalRevoked(entityId));
+    creationService.createFromEvent(
+        BankNotices.approvalRevoked(
+            entityId,
+            accountId,
+            BankBookingRequestType.WITHDRAWAL,
+            new BigDecimal("2500000"),
+            "KB-0003",
+            "bank-requester",
+            ACTOR));
 
     assertThat(inbox(REQUESTER)).isEmpty();
     assertThat(inbox(MANAGER)).isEmpty();

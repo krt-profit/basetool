@@ -1776,6 +1776,16 @@ confirmable even when the employee cannot see the destination; capability gate o
 
 ### REQ-BANK-041 — Per-account approval limits & two-step owner approval
 
+> **Amended (owner-approved, ADR-0353):** the confirm of a flagged request **stays an attestation**:
+> it does not need an approval recorded in the app. But when the request needs approval
+> (`requires_owner_approval`), none was recorded (`owner_approval_granted = false`) and the employee
+> confirms on the checkbox alone, the bank-internal note (`staffNote`, REQ-BANK-054) **must name the
+> approver** — it must be non-blank after trimming, otherwise the confirm answers
+> `BANK_APPROVER_NOTE_REQUIRED` (400) and books nothing. With a recorded approval the note stays
+> optional. In the confirm dialog the note becomes mandatory on that path and shows the hint
+> „Wer hat freigegeben?". `BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED` is unchanged and carries no
+> free text (REQ-AUDIT-001); the note never leaves through the exchange.
+>
 > **Amended by REQ-BANK-042:** approval limits — and the two-step owner approval below — apply to
 > **withdrawal and transfer** requests only (money *leaving* an account). A **deposit** is never
 > subject to an approval limit: `requires_owner_approval` is always `false` and `applicable_limit`
@@ -1881,6 +1891,8 @@ sees an explicit warning in the confirmation dialog and must tick a mandatory
 **"Freigabe durch Kontoverantwortlichen erfolgt"** checkbox (pre-filled when (1) happened) before the
 request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
 flagged request cannot be confirmed without the checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409).
+Without step (1) the Notiz Bankmitarbeiter must name who approved (`BANK_APPROVER_NOTE_REQUIRED`,
+400; ADR-0353).
 
 **Queue markers (`/bank/requests`).** A flagged request carries a second chip next to its status: a
 success chip **"Freigegeben"** once the holder granted approval in-app, otherwise the status-neutral
@@ -1922,6 +1934,15 @@ approval completes the approver step, so the bank's confirmation becomes current
 derived in the frontend from the request's `requiresOwnerApproval` / `requiredApprover` /
 `ownerApprovalGranted` / `status` (`BankRequestSteps`); no new endpoint, field or audit event.
 
+**„Freigabe nötig" — the approver is told (REQ-NOTIF-033, ADR-0353).** A flagged request tells its
+required approver, and only them, that their approval is needed: the responsible holders over the
+limit, the Bankleitung on the middle KRT band, the OL above `T2` — never the requester. For them this
+notice replaces the generic „Neuer Buchungsantrag"; it clears on the approval, the rejection, the
+cancellation and the confirmation, comes back when the approval is revoked, is re-decided by a
+correction (REQ-BANK-056) and moves with a change of responsible holder (REQ-NOTIF-023). The KRT
+account's responsible holders, the OL, get no generic notice for its requests. The requests carrying
+the notice for a member are exactly those waiting for that member's approval.
+
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
 is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open
@@ -1938,7 +1959,13 @@ is exempt** — `createBookingRequest_byResponsibleHolder_needsNoApproval` (no l
 all), `createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval` and
 `createBookingRequest_krtByOlMember_bypassesAmountLadder`),
 `BankBookingRequestServiceTest` (snapshot at create;
-confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest`,
+confirm gate 409 + audit; pre-fill is UI-only; the attested confirm without an approver note is
+400 and books nothing, `confirm_attestedOverLimitWithoutApproverNote_isRefusedAndBooksNothing`, a
+recorded approval keeps the note optional,
+`confirm_overLimitWithRecordedApproval_booksWithoutApproverNote`), `DomainProblemContractTest`
+(`BANK_APPROVER_NOTE_REQUIRED` wire contract), `GlobalExceptionHandlerTest` and
+`BankRequestQueuePageControllerMvcTest` (frontend message and the „Wer hat freigegeben?" hint),
+`OrgUnitBankControllerTest`,
 `BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
 forced `false` even for management,
 `getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`),
@@ -1948,11 +1975,15 @@ swap) · **Code:**
 `bank/internal/BankAccountApprovalLimit`,
 `bank/internal/BankAccountApprovalLimitRepository`, `bank/internal/BankApprovalLimitService`,
 `bank/internal/OrgUnitBankAccessService` (resolution + authorization), `bank/internal/OrgUnitBankApprovalLimitService`
-(upsert/clear + audit), `bank/internal/BankBookingRequestService`, `db/migration/V193`, frontend
+(upsert/clear + audit), `bank/internal/BankBookingRequestService`,
+`bank/internal/BankOverLimitConfirmGate` (the confirm gate: checkbox and approver note),
+`db/migration/V193`, frontend
 `templates/bank/fragments/bank-approval-limits.html` + `bank/org-unit-bank.html` + `bank/bank-requests.html` +
 `static/js/bank/bank.js` (the `data-exempt` short-circuit in the live warning) ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
-[ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md) · **Issues:** —
+[ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md),
+[ADR-0353](../adr/0353-an-over-limit-confirm-stays-an-attestation-that-names-the-approver.md) ·
+**Issues:** #3115, #3152
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
@@ -2750,7 +2781,9 @@ movements, not a new audited activity. It adds no metric, endpoint or scheduled 
   transaction; a deposit accepts one although it accepts no Begründung.
 - [x] Confirming a booking request writes the employee's note onto **both** the request and the
   booked transaction.
-- [x] The note is optional everywhere: omitting it books normally and stores `null`.
+- [x] The note is optional everywhere: omitting it books normally and stores `null` — except on the
+  attested confirm of a flagged request without an in-app approval, where it must name the approver
+  (REQ-BANK-041, ADR-0353).
 - [x] An org-unit member's redacted booking row carries `note` and `justification` but **never**
   `staffNote`; the Halter-redacted statement PDF likewise omits it.
 - [x] A request row whose *only* detail is a staff note still renders as expandable.

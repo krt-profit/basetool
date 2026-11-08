@@ -128,6 +128,10 @@ class NotificationTargetsTest {
         "/org-unit-bank?focus=" + ID + "#tab=fremde",
         target("BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST"));
     assertEquals(
+        "/org-unit-bank?focus=" + ID + "#tab=fremde",
+        NotificationTargets.targetOf(
+            "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", "BANK_BOOKING_REQUEST", ID, BANK_STAFF));
+    assertEquals(
         "/org-unit-bank#tab=antraege",
         NotificationTargets.targetOf(
             "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST", null, MEMBER));

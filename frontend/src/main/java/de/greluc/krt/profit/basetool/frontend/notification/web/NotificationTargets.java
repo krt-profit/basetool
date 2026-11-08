@@ -96,6 +96,8 @@ final class NotificationTargets {
           Map.entry("BANK_BOOKING_REQUEST_CREATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_UPDATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", bankRequest(TAB_OWN_REQUESTS)),
+          Map.entry(
+              "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", orgUnitBankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_CONFIRMED", orgUnitBankRequest(TAB_OWN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_REJECTED", orgUnitBankRequest(TAB_OWN_REQUESTS)),
           Map.entry(

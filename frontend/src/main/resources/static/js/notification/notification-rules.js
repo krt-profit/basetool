@@ -91,6 +91,8 @@ function initNotificationRules() {
             'EXCHANGE_CLIENT_HOLDERS',
             'EVENT_RECIPIENTS',
             'SEAT_HOLDERS',
+            'REQUIRED_APPROVER',
+            'REQUEST_RESPONSIBLE',
         ];
 
         /** The kind a new, empty selector row starts with. */

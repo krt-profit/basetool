@@ -236,7 +236,11 @@
                             <th:block th:replace="~{kernel/fragments/scu-hint :: fieldHint('bank.field.staffNote.hint')}"></th:block>
                         </label>
                         <input type="text" id="bank-confirm-staff-note" name="staffNote" maxlength="500"
+                               data-approver-note aria-describedby="bank-confirm-approver-hint"
                                data-testid="bank-confirm-staff-note">
+                        <p class="bank-field-hint" id="bank-confirm-approver-hint" data-approver-note-hint hidden
+                           data-testid="bank-confirm-approver-hint"
+                           th:text="#{bank.field.staffNote.approverHint}">Wer hat freigegeben?</p>
                         <span class="bank-field-error" data-error-for="staffNote"></span>
                     </div>
                     <span class="bank-field-error" data-error-for="_global"></span>
