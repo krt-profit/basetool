@@ -1,6 +1,6 @@
 # ADR-0355 — Roles are held in the Basetool database
 
-- **Status:** Accepted; the cutover (#3151) is *Amendment 1*
+- **Status:** Accepted; the cutover (#3151) is *Amendment 1*, its follow-ups *Amendment 2*
 - **Date:** 2026-11-08
 - **Deciders:** @greluc
 - **Related:** spec [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-088) ·
@@ -67,3 +67,15 @@ Basetool.
 7. **Switch and rollback** follow `docs/deployment.md` → *Roles in the Basetool: the switch and its rollback*: a final roster sync on
    the previous release, then the deploy and the provisioner; back, the previous release, its
    provisioner and `scripts/restore-keycloak-realm-roles.py` from a `user_roles` export.
+
+## Amendment 2 — the cutover's follow-ups (#3151)
+
+1. **Grafana has its own admin role.** Grafana's login reads the client role `grafana-admin` of
+   the `grafana` client, assigned in Keycloak to the few Grafana admins; the Basetool's `Admin`
+   does not reach Grafana (REQ-OBS-008, ADR-0202 *Amendment 10*). The runbook assigns it before
+   the provisioner deletes the realm roles.
+2. **Bank holders follow a role change at once.** After a role change commits,
+   `BankHolderRoleChangeListener` reconciles that member's holder (REQ-BANK-029); the daily sweep
+   stays as the repair path.
+3. **`backend-service` gives `view-realm` back**, because no Basetool call reads the realm any
+   more (ADR-0202 *Amendment 10*).

@@ -193,12 +193,14 @@ sandbox/E2E realms carry the same scope and built-in mapper. Existing realms nee
 reviewed provisioner dry run and apply; shipping application images does not assign the scope.
 [Upstream upgrade contract](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/upgrading/topics/changes/changes-26_8_2.adoc#admin-rest-api-now-enforces-an-audience-check).
 
-The service account MUST hold `view-users` and `manage-users` of `realm-management`:
+The service account MUST hold `view-users` and `manage-users` of `realm-management`, and nothing
+else of it: no backend, frontend or ingest call reads the realm, so the provisioner takes
+`view-realm` back wherever the account still holds it (roles are held in the Basetool,
+REQ-SEC-088):
 
 |     Role     |                                                                                                 Why                                                                                                 |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `view-users` | list users (`GET /users`) and read a user's federated identity (Discord back-fill).                                                                                                                 |
-| `view-realm` | no backend call needs it since roles are held in the Basetool (REQ-SEC-088); the provisioner still grants it, and it is not taken back. |
 | `manage-users` | the admin-side account writes: moving a Discord link during an account merge (`POST`/`DELETE /users/{id}/federated-identity/discord`) and removing the merged-away account (REQ-SEC-026); the exchange disconnect's consent removal, session deletion and the `basetool-exchange` extension below (REQ-XCH-008). |
 
 **The `basetool-exchange` admin extension** comes with the `keycloak-spi` jar
@@ -214,7 +216,8 @@ the backend then logs a warning and leaves the shared sessions to the gateway's 
 > **Corrected 2026-09-22.** This table listed only the two `view-` roles. `KeycloakService` names
 > `manage-users` for the merge writes, and production's service account holds it (configuration
 > snapshot of 2026-09-22); the testing realm's did not. `scripts/provision-keycloak-realm.py` grants
-> all three — or, when its identity lacks `manage-users`, prints them for the Admin Console.
+> the two roles of the table — or, when its identity lacks `manage-users`, prints them for the
+> Admin Console.
 
 ## Token & session settings (source of truth for session behaviour)
 
