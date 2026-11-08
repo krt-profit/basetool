@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
@@ -410,6 +411,43 @@ class StockLevelIntegrationTest {
     jdbc.update("UPDATE material SET scwiki_deleted_at = NULL WHERE id = ?", material);
     jdbc.update("UPDATE game_item SET uex_deleted_at = NULL WHERE id = ?", item);
     assertThat(listed()).isEqualTo(2);
+  }
+
+  @Test
+  void levelsOfACatalogueEntryTheP4kRetiredAreHiddenWhileUexStillListsIt() throws Exception {
+    createdId(null, 2.0, null);
+    createItemLevel(1.0, null).andExpect(status().isCreated());
+
+    jdbc.update("UPDATE material SET p4k_hidden_at = now() WHERE id = ?", material);
+    jdbc.update(
+        "UPDATE game_item SET uex_item_id = 987653, p4k_deleted_at = now() WHERE id = ?", item);
+    assertThat(listed()).isZero();
+
+    jdbc.update("UPDATE material SET p4k_hidden_at = NULL WHERE id = ?", material);
+    jdbc.update("UPDATE game_item SET p4k_deleted_at = NULL WHERE id = ?", item);
+    assertThat(listed()).isEqualTo(2);
+  }
+
+  @Test
+  void aGameItemTheP4kRetiredIsRefusedOnCreateAndEditWhileTheLevelCanStillBeRemoved()
+      throws Exception {
+    String body = createItemLevel(1.0, null).andReturn().getResponse().getContentAsString();
+    UUID id = UUID.fromString(json.readTree(body).get("id").asString());
+    jdbc.update("UPDATE game_item SET p4k_hidden_at = now() WHERE id = ?", item);
+    entityManager.clear();
+
+    update(logistician, id, new StockLevelUpdateRequest(null, 2.0, null, 0L))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"))
+        .andExpect(jsonPath("$.gameItemId").value(item.toString()));
+    createItemLevel(3.0, null)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"));
+    assertThat(itemAudit("MIN_STOCK_LEVEL_CHANGED")).isEmpty();
+    mockMvc
+        .perform(
+            delete(PATH + "/" + id).param("version", "0").with(logisticianOf(logistician, unit)))
+        .andExpect(status().isNoContent());
   }
 
   @Test
@@ -840,7 +878,7 @@ class StockLevelIntegrationTest {
 
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Stock " + id);
+    TestPlaces.insertLocation(jdbc, id, "Stock " + id);
     return id;
   }
 

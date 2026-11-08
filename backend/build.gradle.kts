@@ -46,6 +46,7 @@ dependencies {
   implementation(libs.flyway.postgresql)
 
   implementation(libs.openpdf.core)
+  implementation(libs.zstd.jni)
   implementation(libs.guava)
   compileOnly(libs.errorprone.annotations)
   compileOnly(libs.spring.modulith.api)

@@ -335,6 +335,36 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void catalogueItemRetired400_mapsToTheRetiredItemKey() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "retired", null, 400, "CATALOGUE_ITEM_RETIRED", "corr-item", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("CATALOGUE_ITEM_RETIRED", body.get("code"));
+    assertEquals("error.catalogue.itemRetired", body.get("message"));
+  }
+
+  @Test
+  void catalogueBlueprintRetired400_mapsToTheRetiredBlueprintKey() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "retired", null, 400, "CATALOGUE_BLUEPRINT_RETIRED", "corr-bp", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("CATALOGUE_BLUEPRINT_RETIRED", body.get("code"));
+    assertEquals("error.catalogue.blueprintRetired", body.get("message"));
+  }
+
+  @Test
   void bankOwnerApprovalRequired409_mapsToDedicatedKey_notUnexpected() {
     BackendServiceException ex =
         new BackendServiceException(
@@ -375,6 +405,25 @@ class GlobalExceptionHandlerTest {
     assertNotNull(body);
     assertEquals("BANK_FOUR_EYES_REQUIRED", body.get("code"));
     assertEquals("error.bank.fourEyesRequired", body.get("message"));
+    assertEquals(Boolean.FALSE, body.get("reloadHint"));
+  }
+
+  @Test
+  void locationNotOffered400_mapsToDedicatedKey_notUnexpected() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "hidden place", null, 400, "LOCATION_NOT_OFFERED", "corr-loc", List.of(), null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ResponseEntity.class, result);
+    ResponseEntity<?> response = (ResponseEntity<?>) result;
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    @SuppressWarnings("unchecked")
+    Map<String, Object> body = (Map<String, Object>) response.getBody();
+    assertNotNull(body);
+    assertEquals("LOCATION_NOT_OFFERED", body.get("code"));
+    assertEquals("error.location.notOffered", body.get("message"));
     assertEquals(Boolean.FALSE, body.get("reloadHint"));
   }
 

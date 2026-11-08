@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OutpostDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -44,6 +47,7 @@ public class OutpostService {
 
   private final OutpostRepository outpostRepository;
   private final OutpostMapper outpostMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the paged outpost catalogue.
@@ -92,6 +96,12 @@ public class OutpostService {
     Outpost outpost = requireOutpost(id);
     outpost.setHasLoadingDock(value);
     outpost.setHasLoadingDockOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN,
+        outpost.getId(),
+        outpost.getName(),
+        null,
+        AuditDetails.of("hasLoadingDock", value));
     return outpostRepository.save(outpost);
   }
 
@@ -107,6 +117,12 @@ public class OutpostService {
   public Outpost clearLoadingDockOverride(UUID id) {
     Outpost outpost = requireOutpost(id);
     outpost.setHasLoadingDockOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED,
+        outpost.getId(),
+        outpost.getName(),
+        null,
+        null);
     return outpostRepository.save(outpost);
   }
 }

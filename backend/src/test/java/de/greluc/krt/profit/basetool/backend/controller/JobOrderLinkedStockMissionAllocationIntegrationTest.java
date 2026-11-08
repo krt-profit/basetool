@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +80,9 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
   private static final double ALLOCATED = 4.0;
 
   @Autowired private WebApplicationContext context;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
@@ -141,7 +146,7 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
       row.setUser(unitAMember);
       Location location = new Location();
       location.setName("Alloc Depot " + tag);
-      row.setLocation(locationRepository.save(location));
+      row.setLocation(locationRepository.save(TestPlaces.onOwnCity(location, cityRepository)));
       row.setMaterial(material);
       row.setQuality(500);
       row.setAmount(10.0);

@@ -82,6 +82,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
@@ -100,6 +101,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.StalePriceSweep;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexIdentityCensus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexValues;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kGuids;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiDimensionDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemManufacturerDto;
@@ -150,6 +152,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryServ
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.GameMedia;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
@@ -235,6 +239,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -383,6 +388,7 @@ class ArchitectureTest {
           ScWikiProperties.class,
           CommodityMiningData.class,
           ShipCatalogueFacts.class,
+          ManufacturerRefDto.class,
           GameItemKind.class,
           ItemCatalogueMetadata.class,
           ScWikiItemDto.class,
@@ -484,6 +490,7 @@ class ArchitectureTest {
           JobOrderItemStockEntryDto.class,
           JobOrderItemStockGroupDto.class,
           UexValues.class,
+          P4kGuids.class,
           UserDto.class,
           UserDtoRedaction.class,
           UserReferenceDto.class);
@@ -1237,6 +1244,52 @@ class ArchitectureTest {
                     call.getTargetOwner().isEquivalentTo(ownerScope)
                         && scopeMethod.equals(call.getTarget().getName())))
         .because("REQ-XCH-009: an ADMIN member acts on the exchange with own data only");
+  }
+
+  @Test
+  void outboundIntegrationsNeverReadAGameTextOrGameMedia() {
+    DescribedPredicate<JavaClass> selection = EXCHANGE_DOMAIN;
+    assertClassFloor("outboundIntegrationsNeverReadAGameTextOrGameMedia", selection, 160);
+    outboundIntegrationsNeverReadAGameTextOrGameMediaRule(selection).check(CLASSES);
+  }
+
+  static ArchRule outboundIntegrationsNeverReadAGameTextOrGameMediaRule(
+      DescribedPredicate<JavaClass> selection) {
+    return noClasses()
+        .that(selection)
+        .should()
+        .callMethodWhere(
+            DescribedPredicate.describe(
+                "the getter of a @GameText or @GameMedia field",
+                ArchitectureTest::readsGameContent))
+        .because(
+            "REQ-XCH-050: game texts and game media never leave the Basetool to a third party");
+  }
+
+  /**
+   * Tells whether a call reads a {@link GameText} or {@link GameMedia} field through its getter: a
+   * parameterless {@code getX()}, {@code isX()} or record-style {@code x()} whose owner, or a
+   * superclass of it, declares the annotated field {@code x}.
+   *
+   * @param call the call
+   * @return {@code true} for such a getter
+   */
+  static boolean readsGameContent(JavaMethodCall call) {
+    if (!call.getTarget().getParameterTypes().isEmpty()) {
+      return false;
+    }
+    String method = call.getTarget().getName();
+    Set<String> candidates = new HashSet<>(Set.of(method));
+    for (String prefix : List.of("get", "is")) {
+      if (method.length() > prefix.length() && method.startsWith(prefix)) {
+        String rest = method.substring(prefix.length());
+        candidates.add(Character.toLowerCase(rest.charAt(0)) + rest.substring(1));
+      }
+    }
+    return call.getTargetOwner().getAllFields().stream()
+        .filter(field -> candidates.contains(field.getName()))
+        .anyMatch(field ->
+            field.isAnnotatedWith(GameText.class) || field.isAnnotatedWith(GameMedia.class));
   }
 
   @Test

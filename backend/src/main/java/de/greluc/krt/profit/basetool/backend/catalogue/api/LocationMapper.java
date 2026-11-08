@@ -26,7 +26,9 @@ import org.mapstruct.Mapping;
 /** MapStruct mapper between Location entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
 public interface LocationMapper {
-  /** Maps a {@link Location} entity to its outbound DTO. */
+  /** Maps a {@link Location} entity to its outbound DTO, without the P4K names. */
+  @Mapping(target = "p4kName", ignore = true)
+  @Mapping(target = "p4kNameDe", ignore = true)
   LocationDto toDto(Location entity);
 
   /** Builds a new {@link Location} entity from the inbound DTO. */
@@ -34,6 +36,7 @@ public interface LocationMapper {
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "city", ignore = true)
   @Mapping(target = "spaceStation", ignore = true)
+  @Mapping(target = "referenceOnly", ignore = true)
   Location toEntity(LocationDto dto);
 
   /**

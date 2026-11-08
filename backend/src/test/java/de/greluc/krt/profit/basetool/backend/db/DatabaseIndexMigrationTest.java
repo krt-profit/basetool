@@ -141,6 +141,11 @@ class DatabaseIndexMigrationTest {
         "idx_bank_transaction_counterparty_user_id",
         "counterparty_user_id",
         "where (counterparty_user_id is not null)");
+    assertIndexExists(jdbc, "personal_blueprint", "idx_personal_blueprint_product_key");
+    assertIndexDefContains(
+        jdbc, "exchange_change", "idx_exchange_change_resource_key", "resource", "entity_key");
+    assertIndexDefContains(
+        jdbc, "exchange_journal", "idx_exchange_journal_resource_key", "resource", "entity_key");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendC
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
-import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialCreateAjaxRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasWriteRequest;
@@ -154,8 +153,6 @@ class CatalogueBackendClientTest {
     backend.answerEmpty();
     backend.answerJson("[]");
     backend.answerJson("{}");
-    backend.answerJson("{}");
-    backend.answerEmpty();
 
     client.materialPage(3);
     client.createMaterial(
@@ -168,8 +165,6 @@ class CatalogueBackendClientTest {
             4L));
     client.materialCategories();
     client.materialCategory(OTHER);
-    client.createMaterialCategory(new MaterialCategoryDto(null, "Ores", null));
-    client.deleteMaterialCategory(OTHER);
 
     backend.expect("GET", "/api/v1/materials?size=1000&sort=name,asc&includeHidden=true&page=3");
     assertThat(bodyOf(backend.expect("POST", "/api/v1/materials")))
@@ -178,9 +173,6 @@ class CatalogueBackendClientTest {
         .contains("\"name\":\"Gold\"", "\"version\":4");
     backend.expect("GET", "/api/v1/material-categories");
     backend.expect("GET", "/api/v1/material-categories/" + OTHER);
-    backend.expect(
-        "POST", "/api/v1/material-categories", "{\"id\":null,\"name\":\"Ores\",\"version\":null}");
-    backend.expect("DELETE", "/api/v1/material-categories/" + OTHER, null);
   }
 
   @Test
@@ -229,7 +221,8 @@ class CatalogueBackendClientTest {
         "{\"id\":\""
             + ID
             + "\",\"name\":\"Area18\",\"description\":\"ArcCorp city\",\"hidden\":true,"
-            + "\"homeLocation\":false,\"version\":3}");
+            + "\"homeLocation\":false,\"version\":3,\"starmapObjectId\":null,\"p4kName\":null,"
+            + "\"p4kNameDe\":null}");
   }
 
   @Test
@@ -298,7 +291,7 @@ class CatalogueBackendClientTest {
     client.enqueueP4kImport("{\"items\":[]}".getBytes(StandardCharsets.UTF_8), "catalog.json");
     assertThat(client.p4kImportJobs()).isEmpty();
     client.p4kImportJob(ID);
-    client.applyP4kImportJob(ID, true);
+    client.applyP4kImportJob(ID, true, false);
 
     RecordedRequest upload = backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs");
     assertThat(upload.getHeader("Content-Type")).startsWith("multipart/form-data");
@@ -306,7 +299,11 @@ class CatalogueBackendClientTest {
         .contains("name=\"file\"", "filename=\"catalog.json\"", "{\"items\":[]}");
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs");
     backend.expect("GET", "/api/v1/catalog/admin/import/p4k/jobs/" + ID);
-    backend.expect("POST", "/api/v1/catalog/admin/import/p4k/jobs/" + ID + "/apply?seedNew=true");
+    backend.expect(
+        "POST",
+        "/api/v1/catalog/admin/import/p4k/jobs/"
+            + ID
+            + "/apply?createItemsAndShips=true&overrideMassGuard=false");
   }
 
   @Test

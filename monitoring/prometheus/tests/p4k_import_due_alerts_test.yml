@@ -1,0 +1,65 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1h
+
+tests:
+  - name: a due import alerts only after 7 days
+    interval: 1h
+    input_series:
+      - series: 'basetool_p4k_import_due{job="basetool-backend"}'
+        values: "1x200"
+      - series: 'up{job="basetool-backend"}'
+        values: "1x200"
+    alert_rule_test:
+      - eval_time: 100h
+        alertname: P4kImportDue
+        exp_alerts: []
+      - eval_time: 170h
+        alertname: P4kImportDue
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "P4K import due for 7 days"
+              description: "UEX or the SC Wiki has reported a newer game version than the last P4K APPLY of known version for 7 days, no such APPLY exists, or the backend exports no due signal. Export a fresh LIVE catalogue with p4kx and import it on /admin/p4k-import (REQ-OBS-022)."
+
+  - name: an import that is not due stays silent
+    interval: 1h
+    input_series:
+      - series: 'basetool_p4k_import_due{job="basetool-backend"}'
+        values: "0x200"
+      - series: 'up{job="basetool-backend"}'
+        values: "1x200"
+    alert_rule_test:
+      - eval_time: 190h
+        alertname: P4kImportDue
+        exp_alerts: []
+
+  - name: an APPLY within the 7 days resets the wait
+    interval: 1h
+    input_series:
+      - series: 'basetool_p4k_import_due{job="basetool-backend"}'
+        values: "1x100 0x1 1x99"
+      - series: 'up{job="basetool-backend"}'
+        values: "1x200"
+    alert_rule_test:
+      - eval_time: 190h
+        alertname: P4kImportDue
+        exp_alerts: []
+
+  - name: a backend that exports no due signal counts as due
+    interval: 1h
+    input_series:
+      - series: 'up{job="basetool-backend"}'
+        values: "1x200"
+    alert_rule_test:
+      - eval_time: 170h
+        alertname: P4kImportDue
+        exp_alerts:
+          - exp_labels:
+              job: basetool-backend
+              severity: warning
+            exp_annotations:
+              summary: "P4K import due for 7 days"
+              description: "UEX or the SC Wiki has reported a newer game version than the last P4K APPLY of known version for 7 days, no such APPLY exists, or the backend exports no due signal. Export a fresh LIVE catalogue with p4kx and import it on /admin/p4k-import (REQ-OBS-022)."

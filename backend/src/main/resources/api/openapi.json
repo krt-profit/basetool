@@ -615,7 +615,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING", "CATALOGUE" ]
           }
         }, {
           "in" : "query",
@@ -734,7 +734,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING", "CATALOGUE" ]
           }
         }, {
           "in" : "query",
@@ -766,7 +766,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
           }
         }, {
           "in" : "query",
@@ -917,7 +917,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING", "CATALOGUE" ]
           }
         }, {
           "in" : "query",
@@ -1061,7 +1061,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING", "CATALOGUE" ]
           }
         }, {
           "in" : "query",
@@ -10562,7 +10562,7 @@
     "/api/v1/blueprints/products/search" : {
       "get" : {
         "description" : "Returns de-duplicated SC Wiki blueprint products matching the name filter, each marked with whether the calling user already owns it. Capped at a small result count for type-ahead use.",
-        "operationId" : "search_2",
+        "operationId" : "search_1",
         "parameters" : [ {
           "in" : "query",
           "name" : "q",
@@ -10843,6 +10843,121 @@
         "x-domain" : "joborder"
       }
     },
+    "/api/v1/catalog/admin/import/p4k/due" : {
+      "get" : {
+        "operationId" : "due",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kImportDueDto"
+                }
+              }
+            },
+            "description" : "The due signal.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Tell whether a P4K import is due.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
     "/api/v1/catalog/admin/import/p4k/jobs" : {
       "get" : {
         "operationId" : "listJobs",
@@ -11077,7 +11192,7 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Upload a P4K catalog and enqueue an async preview (dry-run) job.",
+        "summary" : "Upload a P4K catalogue and enqueue an async preview (dry-run) job.",
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
       }
@@ -11219,7 +11334,15 @@
           }
         }, {
           "in" : "query",
-          "name" : "seedNew",
+          "name" : "createItemsAndShips",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "overrideMassGuard",
           "required" : false,
           "schema" : {
             "type" : "boolean",
@@ -11325,7 +11448,945 @@
         "security" : [ {
           "bearer-jwt" : [ ]
         } ],
-        "summary" : "Enqueue an async apply job from a finished preview (optionally seeding).",
+        "summary" : "Enqueue an async apply job from a finished preview.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/jobs/{id}/changes" : {
+      "get" : {
+        "operationId" : "previewChanges",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "kind",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseP4kImportChangeDto"
+                }
+              }
+            },
+            "description" : "The report rows.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Page the change report a P4K preview job computed.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/materials" : {
+      "get" : {
+        "operationId" : "materials",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MaterialReferenceDto"
+                  }
+                }
+              }
+            },
+            "description" : "The live materials.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the materials a resource-join review case can assign.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/resource-groups" : {
+      "get" : {
+        "operationId" : "resourceGroups",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MaterialCategoryDto"
+                  }
+                }
+              }
+            },
+            "description" : "The live resource groups.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the resource groups a missing-group review case can assign.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/review-cases" : {
+      "get" : {
+        "operationId" : "openReviewCases",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseP4kReviewCaseDto"
+                }
+              }
+            },
+            "description" : "The open cases.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the open P4K review cases.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/review-cases/{id}/resolve" : {
+      "post" : {
+        "operationId" : "resolve_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/P4kReviewResolveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/P4kReviewCaseDto"
+                }
+              }
+            },
+            "description" : "The resolved case."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Resolve a P4K review case as keep, hide or an assignment.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/runs" : {
+      "get" : {
+        "operationId" : "runs_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseP4kImportRunDto"
+                }
+              }
+            },
+            "description" : "The runs.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the applied P4K import runs, newest first.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/import/p4k/runs/{id}/changes" : {
+      "get" : {
+        "operationId" : "runChanges",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "kind",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseP4kImportChangeDto"
+                }
+              }
+            },
+            "description" : "The report rows.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Page the change report of an applied P4K run.",
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
       }
@@ -11792,6 +12853,994 @@
           "bearer-jwt" : [ ]
         } ],
         "summary" : "Change a quality tier.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/shops" : {
+      "get" : {
+        "operationId" : "shops",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "starSystem",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "unlinkedOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseShopAdminDto"
+                }
+              }
+            },
+            "description" : "The shops.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the P4K shops with their UEX terminal links.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/shops/terminals" : {
+      "get" : {
+        "operationId" : "terminals",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ShopTerminalOptionDto"
+                  }
+                }
+              }
+            },
+            "description" : "The terminals.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Find the UEX terminals whose name contains a fragment.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/shops/{id}/terminal-link" : {
+      "put" : {
+        "operationId" : "changeLink_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ShopTerminalLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ShopAdminDto"
+                }
+              }
+            },
+            "description" : "The shop."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Set, clear or release a P4K shop's UEX terminal link by hand.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/starmap/objects" : {
+      "get" : {
+        "operationId" : "objects",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "starSystem",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseStarmapObjectAdminDto"
+                }
+              }
+            },
+            "description" : "The objects.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List the P4K starmap objects with their visibility.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/starmap/objects/{id}/visibility" : {
+      "put" : {
+        "operationId" : "overrideVisibility",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StarmapVisibilityRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StarmapObjectAdminDto"
+                }
+              }
+            },
+            "description" : "The object."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Set a starmap object visible or hidden, or back to the rule.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/starmap/places/{kind}" : {
+      "get" : {
+        "operationId" : "places",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "kind",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "unlinkedOnly",
+          "required" : false,
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseStarmapPlaceLinkDto"
+                }
+              }
+            },
+            "description" : "The rows.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "List one UEX location table's rows with their starmap links.",
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/catalog/admin/starmap/places/{kind}/{id}/link" : {
+      "put" : {
+        "operationId" : "changeLink",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "kind",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StarmapLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StarmapPlaceLinkDto"
+                }
+              }
+            },
+            "description" : "The row."
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Set, clear or release a UEX location's starmap link by hand.",
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
       }
@@ -26602,223 +28651,9 @@
         },
         "tags" : [ "catalogue" ],
         "x-domain" : "catalogue"
-      },
-      "post" : {
-        "operationId" : "create_6",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialCategoryDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialCategoryDto"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
       }
     },
     "/api/v1/material-categories/{id}" : {
-      "delete" : {
-        "operationId" : "delete_4",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
-      },
       "get" : {
         "operationId" : "getById",
         "parameters" : [ {
@@ -26857,126 +28692,6 @@
           },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
-      },
-      "put" : {
-        "operationId" : "update_7",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MaterialCategoryDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/MaterialCategoryDto"
-                }
-              }
-            },
-            "description" : "OK"
           },
           "400" : {
             "content" : {
@@ -31828,6 +33543,134 @@
           },
           "304" : {
             "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "tags" : [ "catalogue" ],
+        "x-domain" : "catalogue"
+      }
+    },
+    "/api/v1/materials/{id}/p4k-overrides/{field}" : {
+      "delete" : {
+        "operationId" : "releaseP4kOverride",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "field",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "RESOURCE_GROUP", "REFINED_MATERIAL" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "version",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaterialDto"
+                }
+              }
+            },
+            "description" : "OK"
           },
           "400" : {
             "content" : {
@@ -42834,7 +44677,7 @@
     },
     "/api/v1/notifications/{id}" : {
       "delete" : {
-        "operationId" : "delete_5",
+        "operationId" : "delete_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "id",
@@ -56147,6 +57990,282 @@
           "bearer-jwt" : [ ]
         } ],
         "summary" : "Create a personal inventory entry on behalf of the given user.",
+        "tags" : [ "personalinventory" ],
+        "x-domain" : "personalinventory"
+      }
+    },
+    "/api/v1/personal-inventory/admin/{userId}/locations" : {
+      "get" : {
+        "operationId" : "searchSelectableLocationsForUser",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PersonalInventoryLocationOption"
+                  }
+                }
+              }
+            },
+            "description" : "Up to 2000 matches, sorted by name.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Search the locations a specific user's entries may take.",
+        "tags" : [ "personalinventory" ],
+        "x-domain" : "personalinventory"
+      }
+    },
+    "/api/v1/personal-inventory/locations" : {
+      "get" : {
+        "operationId" : "searchSelectableLocations",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "q",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/PersonalInventoryLocationOption"
+                  }
+                }
+              }
+            },
+            "description" : "Up to 2000 matches, sorted by name.",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "security" : [ {
+          "bearer-jwt" : [ ]
+        } ],
+        "summary" : "Search the locations the caller may pick for a personal inventory entry.",
         "tags" : [ "personalinventory" ],
         "x-domain" : "personalinventory"
       }
@@ -73514,149 +75633,6 @@
         "x-domain" : "identity"
       }
     },
-    "/api/v1/uex/locations/search" : {
-      "get" : {
-        "operationId" : "search_1",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "q",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "limit",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/UexLocationDto"
-                  }
-                }
-              }
-            },
-            "description" : "Up to 2000 matches, sorted alphabetically.",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
-        "security" : [ {
-          "bearer-jwt" : [ ]
-        } ],
-        "summary" : "Search UEX cities and space stations by name (case insensitive).",
-        "tags" : [ "catalogue" ],
-        "x-domain" : "catalogue"
-      }
-    },
     "/api/v1/users" : {
       "get" : {
         "operationId" : "getAllUsers",
@@ -78060,11 +80036,11 @@
           },
           "domain" : {
             "type" : "string",
-            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING" ]
+            "enum" : [ "INVENTORY", "JOB_ORDER", "REFINERY", "PERSONAL_INVENTORY", "MISSION", "OPERATION", "ROLE", "MARKET", "HANGAR", "BLUEPRINT", "CONNECTED_APPS", "SUPPLY", "PURCHASING", "CATALOGUE" ]
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
           },
           "id" : {
             "type" : "string",
@@ -79173,6 +81149,12 @@
           "outputName" : {
             "type" : "string"
           },
+          "recipeModifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
+          },
           "requirementGroups" : {
             "type" : "array",
             "items" : {
@@ -79385,6 +81367,9 @@
           "manufacturerName" : {
             "type" : "string"
           },
+          "manufacturerNameDe" : {
+            "type" : "string"
+          },
           "name" : {
             "type" : "string"
           },
@@ -79522,6 +81507,10 @@
               "$ref" : "#/components/schemas/BlueprintRequirementModifierSegmentDto"
             }
           },
+          "valueKind" : {
+            "type" : "string",
+            "enum" : [ "MULTIPLIER", "ADDITIVE" ]
+          },
           "valueRangeType" : {
             "type" : "string"
           }
@@ -79557,6 +81546,10 @@
           },
           "propertyKey" : {
             "type" : "string"
+          },
+          "source" : {
+            "type" : "string",
+            "enum" : [ "P4K", "SCWIKI" ]
           },
           "unit" : {
             "type" : "string",
@@ -79601,6 +81594,30 @@
           }
         },
         "required" : [ "locationId" ]
+      },
+      "Build" : {
+        "type" : "object",
+        "properties" : {
+          "branch" : {
+            "type" : "string"
+          },
+          "changeNumber" : {
+            "type" : "string"
+          },
+          "channel" : {
+            "type" : "string"
+          },
+          "patchVersion" : {
+            "type" : "string"
+          },
+          "patchVersionOrigin" : {
+            "type" : "string",
+            "enum" : [ "PUBLIC_PATCH", "BRANCH_LOWER_BOUND" ]
+          },
+          "version" : {
+            "type" : "string"
+          }
+        }
       },
       "BulkCheckoutRequest" : {
         "type" : "object",
@@ -80152,6 +82169,10 @@
       "Counts" : {
         "type" : "object",
         "properties" : {
+          "completeness" : {
+            "type" : "string",
+            "enum" : [ "COMPLETE", "PARTIAL" ]
+          },
           "created" : {
             "type" : "integer",
             "format" : "int32"
@@ -80160,19 +82181,23 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "identityMismatches" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "matched" : {
             "type" : "integer",
             "format" : "int32"
           },
+          "review" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "unknownValues" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "unmatched" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "uuidBackfilled" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "uuidConflicts" : {
             "type" : "integer",
             "format" : "int32"
           }
@@ -80206,6 +82231,12 @@
             "type" : "number",
             "format" : "double"
           },
+          "counted" : {
+            "type" : "boolean"
+          },
+          "countedWithRefinery" : {
+            "type" : "boolean"
+          },
           "craftable" : {
             "type" : "integer",
             "format" : "int32"
@@ -80227,6 +82258,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "missingScu" : {
@@ -82072,6 +84106,12 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "noLongerInGame" : {
+            "type" : "boolean"
+          },
           "size" : {
             "type" : "integer",
             "format" : "int32"
@@ -82294,6 +84334,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"
@@ -82359,8 +84402,17 @@
           "manufacturer" : {
             "type" : "string"
           },
+          "manufacturerRef" : {
+            "$ref" : "#/components/schemas/ManufacturerRefDto"
+          },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "noLongerInGame" : {
+            "type" : "boolean"
           },
           "size" : {
             "type" : "integer",
@@ -82710,6 +84762,12 @@
       "ItemCatalogueDetailsDto" : {
         "type" : "object",
         "properties" : {
+          "availableAt" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ItemShopAvailabilityDto"
+            }
+          },
           "className" : {
             "type" : "string"
           },
@@ -82885,6 +84943,33 @@
             "type" : "string"
           },
           "webUrl" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ItemShopAvailabilityDto" : {
+        "type" : "object",
+        "properties" : {
+          "entityName" : {
+            "type" : "string"
+          },
+          "placeName" : {
+            "type" : "string"
+          },
+          "placeNameDe" : {
+            "type" : "string"
+          },
+          "registryName" : {
+            "type" : "string"
+          },
+          "shopId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "starSystem" : {
+            "type" : "string"
+          },
+          "terminalName" : {
             "type" : "string"
           }
         }
@@ -83722,6 +85807,47 @@
           }
         }
       },
+      "Kind" : {
+        "type" : "object",
+        "properties" : {
+          "added" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "changed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "completeness" : {
+            "type" : "string",
+            "enum" : [ "COMPLETE", "PARTIAL" ]
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          },
+          "matched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reappeared" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sweep" : {
+            "type" : "string",
+            "enum" : [ "SWEPT", "SKIPPED_PARTIAL", "SKIPPED_EMPTY", "SKIPPED_DUPLICATE_GUID", "SKIPPED_MASS_GUARD" ]
+          },
+          "unmatched" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "vanished" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "KommandoGroupDto" : {
         "type" : "object",
         "properties" : {
@@ -83958,6 +86084,16 @@
           "name" : {
             "type" : "string"
           },
+          "p4kName" : {
+            "type" : "string"
+          },
+          "p4kNameDe" : {
+            "type" : "string"
+          },
+          "starmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "version" : {
             "type" : "integer",
             "format" : "int64"
@@ -84025,11 +86161,40 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "nickname" : {
             "type" : "string"
           },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "wiki" : {
             "type" : "string"
+          }
+        }
+      },
+      "ManufacturerRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "abbreviation" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "p4kUuid" : {
+            "type" : "string",
+            "format" : "uuid"
           }
         }
       },
@@ -84086,6 +86251,9 @@
             "format" : "uuid"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "ownerId" : {
@@ -84325,11 +86493,23 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string",
+            "readOnly" : true
+          },
           "quantityType" : {
             "type" : "string"
           },
           "refinedMaterial" : {
             "$ref" : "#/components/schemas/MaterialDto"
+          },
+          "refinedMaterialManual" : {
+            "type" : "boolean",
+            "readOnly" : true
+          },
+          "resourceGroupManual" : {
+            "type" : "boolean",
+            "readOnly" : true
           },
           "type" : {
             "type" : "string"
@@ -84499,6 +86679,9 @@
             "type" : "string"
           },
           "materialName" : {
+            "type" : "string"
+          },
+          "materialNameDe" : {
             "type" : "string"
           },
           "quality" : {
@@ -84687,6 +86870,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "outpostName" : {
             "type" : "string"
           },
@@ -84827,6 +87013,9 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
           }
         }
       },
@@ -84838,6 +87027,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           },
           "quantityType" : {
@@ -87030,9 +89222,71 @@
           }
         }
       },
+      "P4kImportChangeDto" : {
+        "type" : "object",
+        "properties" : {
+          "changeType" : {
+            "type" : "string",
+            "enum" : [ "ADDED", "UNMATCHED", "REVIEW", "IDENTITY_MISMATCH", "UNKNOWN_VALUE", "CHANGED", "VANISHED", "REAPPEARED", "SWEEP_SKIPPED", "LOADOUT_ISSUES" ]
+          },
+          "className" : {
+            "type" : "string"
+          },
+          "fieldName" : {
+            "type" : "string"
+          },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          },
+          "nameEn" : {
+            "type" : "string"
+          },
+          "newValue" : {
+            "type" : "string"
+          },
+          "oldValue" : {
+            "type" : "string"
+          },
+          "recordPath" : {
+            "type" : "string"
+          },
+          "stillLiveElsewhere" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "P4kImportDueDto" : {
+        "type" : "object",
+        "properties" : {
+          "basisOrigin" : {
+            "type" : "string",
+            "enum" : [ "PUBLIC_PATCH", "BRANCH_LOWER_BOUND" ]
+          },
+          "basisVersion" : {
+            "type" : "string"
+          },
+          "due" : {
+            "type" : "boolean"
+          },
+          "uexVersion" : {
+            "type" : "string"
+          },
+          "wikiVersion" : {
+            "type" : "string"
+          }
+        }
+      },
       "P4kImportJobDto" : {
         "type" : "object",
         "properties" : {
+          "createItemsAndShips" : {
+            "type" : "boolean"
+          },
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
@@ -87056,15 +89310,15 @@
             "type" : "string",
             "enum" : [ "PREVIEW", "APPLY" ]
           },
+          "overrideMassGuard" : {
+            "type" : "boolean"
+          },
           "previewJobId" : {
             "type" : "string",
             "format" : "uuid"
           },
           "result" : {
             "$ref" : "#/components/schemas/P4kImportResultDto"
-          },
-          "seedNew" : {
-            "type" : "boolean"
           },
           "sourceFilename" : {
             "type" : "string"
@@ -87082,11 +89336,20 @@
       "P4kImportResultDto" : {
         "type" : "object",
         "properties" : {
+          "blueprintCategories" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
           "blueprints" : {
             "$ref" : "#/components/schemas/Counts"
           },
+          "build" : {
+            "$ref" : "#/components/schemas/Build"
+          },
           "commodities" : {
             "$ref" : "#/components/schemas/Counts"
+          },
+          "createItemsAndShips" : {
+            "type" : "boolean"
           },
           "dryRun" : {
             "type" : "boolean"
@@ -87101,17 +89364,164 @@
           "manufacturers" : {
             "$ref" : "#/components/schemas/Counts"
           },
+          "massGuardPercent" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "resourceGroups" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
           "runId" : {
             "type" : "string",
             "format" : "uuid"
           },
-          "seedingEnabled" : {
-            "type" : "boolean"
-          },
           "ships" : {
             "$ref" : "#/components/schemas/Counts"
+          },
+          "shops" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "starmapObjects" : {
+            "$ref" : "#/components/schemas/Counts"
+          },
+          "sweeps" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Sweep"
+            }
           }
         }
+      },
+      "P4kImportRunDto" : {
+        "type" : "object",
+        "properties" : {
+          "appliedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "buildBranch" : {
+            "type" : "string"
+          },
+          "buildVersion" : {
+            "type" : "string"
+          },
+          "changeNumber" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "channel" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kinds" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Kind"
+            }
+          },
+          "patchVersion" : {
+            "type" : "string"
+          },
+          "patchVersionOrigin" : {
+            "type" : "string",
+            "enum" : [ "PUBLIC_PATCH", "BRANCH_LOWER_BOUND" ]
+          }
+        }
+      },
+      "P4kReviewCaseDto" : {
+        "type" : "object",
+        "properties" : {
+          "className" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "firstRunId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          },
+          "lastRunId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "nameEn" : {
+            "type" : "string"
+          },
+          "otherRowId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "reason" : {
+            "type" : "string",
+            "enum" : [ "UNCLEAR_PLAYABILITY", "SEEDED_NOT_CREATABLE", "GUID_CONFLICT", "NAME_CONFLICT", "PRODUCT_KEY_UNRESOLVED", "PRODUCT_KEY_AMBIGUOUS", "STARMAP_LINK_AMBIGUOUS", "STARMAP_LINK_NOT_FOUND", "SHOP_LINK_AMBIGUOUS", "SHOP_LINK_NOT_FOUND", "RESOURCE_JOIN_NONE", "RESOURCE_JOIN_SEVERAL", "NO_RESOURCE_GROUP" ]
+          },
+          "resolution" : {
+            "type" : "string",
+            "enum" : [ "KEEP", "HIDE", "ASSIGN", "RESOLVED" ]
+          },
+          "resolvedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "rowId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "rowName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "REVIEWED" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "P4kReviewResolveRequest" : {
+        "type" : "object",
+        "properties" : {
+          "categoryId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "materialId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "resolution" : {
+            "type" : "string",
+            "enum" : [ "KEEP", "HIDE", "ASSIGN", "RESOLVED" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "resolution", "version" ]
       },
       "PageResponseAggregatedInventoryDto" : {
         "type" : "object",
@@ -88202,6 +90612,105 @@
           }
         }
       },
+      "PageResponseP4kImportChangeDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/P4kImportChangeDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseP4kImportRunDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/P4kImportRunDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseP4kReviewCaseDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/P4kReviewCaseDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "PageResponsePartnerDto" : {
         "type" : "object",
         "properties" : {
@@ -88499,6 +91008,39 @@
           }
         }
       },
+      "PageResponseShopAdminDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ShopAdminDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
       "PageResponseSpaceStationDto" : {
         "type" : "object",
         "properties" : {
@@ -88638,6 +91180,72 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/StarSystemDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseStarmapObjectAdminDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StarmapObjectAdminDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseStarmapPlaceLinkDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StarmapPlaceLinkDto"
             }
           },
           "page" : {
@@ -89184,6 +91792,12 @@
           "productName" : {
             "type" : "string"
           },
+          "recipeModifiers" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BlueprintRequirementModifierDto"
+            }
+          },
           "requirementGroups" : {
             "type" : "array",
             "items" : {
@@ -89272,13 +91886,9 @@
       "PersonalInventoryItemCreateRequest" : {
         "type" : "object",
         "properties" : {
-          "locationType" : {
+          "locationId" : {
             "type" : "string",
-            "enum" : [ "CITY", "SPACE_STATION" ]
-          },
-          "locationUexId" : {
-            "type" : "integer",
-            "format" : "int32"
+            "format" : "uuid"
           },
           "name" : {
             "type" : "string",
@@ -89296,7 +91906,7 @@
             "minimum" : 1
           }
         },
-        "required" : [ "locationType", "locationUexId", "name", "quantity" ]
+        "required" : [ "locationId", "name", "quantity" ]
       },
       "PersonalInventoryItemResponse" : {
         "type" : "object",
@@ -89309,16 +91919,16 @@
             "type" : "string",
             "format" : "uuid"
           },
+          "locationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "locationName" : {
             "type" : "string"
           },
           "locationType" : {
             "type" : "string",
-            "enum" : [ "CITY", "SPACE_STATION" ]
-          },
-          "locationUexId" : {
-            "type" : "integer",
-            "format" : "int32"
+            "enum" : [ "CITY", "SPACE_STATION", "OTHER" ]
           },
           "name" : {
             "type" : "string"
@@ -89343,13 +91953,9 @@
       "PersonalInventoryItemUpdateRequest" : {
         "type" : "object",
         "properties" : {
-          "locationType" : {
+          "locationId" : {
             "type" : "string",
-            "enum" : [ "CITY", "SPACE_STATION" ]
-          },
-          "locationUexId" : {
-            "type" : "integer",
-            "format" : "int32"
+            "format" : "uuid"
           },
           "name" : {
             "type" : "string",
@@ -89372,7 +91978,29 @@
             "minimum" : 0
           }
         },
-        "required" : [ "locationType", "locationUexId", "name", "quantity", "version" ]
+        "required" : [ "name", "quantity", "version" ]
+      },
+      "PersonalInventoryLocationOption" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "parentName" : {
+            "type" : "string"
+          },
+          "starSystemName" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "CITY", "SPACE_STATION", "OTHER" ]
+          }
+        }
       },
       "PledgeRequest" : {
         "type" : "object",
@@ -89505,7 +92133,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CATALOGUE_BLUEPRINT_RETIRED", "CATALOGUE_ITEM_RETIRED", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "LOCATION_NOT_OFFERED", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "P4K_UPLOAD_REJECTED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -89577,6 +92205,9 @@
           "materialName" : {
             "type" : "string"
           },
+          "materialNameDe" : {
+            "type" : "string"
+          },
           "maxProfitFullLoad" : {
             "type" : "number"
           },
@@ -89622,6 +92253,9 @@
             "format" : "uuid"
           },
           "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
             "type" : "string"
           }
         }
@@ -90724,6 +93358,9 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
           "uexReferencePrice" : {
             "type" : "number",
             "format" : "double"
@@ -90774,6 +93411,9 @@
             "format" : "int32"
           },
           "entry" : {
+            "type" : "string"
+          },
+          "entryDe" : {
             "type" : "string"
           },
           "needId" : {
@@ -91335,8 +93975,97 @@
           "name" : {
             "type" : "string"
           },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "noLongerInGame" : {
+            "type" : "boolean"
+          },
           "scu" : {
             "type" : "number"
+          }
+        }
+      },
+      "ShopAdminDto" : {
+        "type" : "object",
+        "properties" : {
+          "brand" : {
+            "type" : "string"
+          },
+          "commodityExchange" : {
+            "type" : "boolean"
+          },
+          "entityName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "itemListKnown" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "ARMOR", "BAR", "CARGO_ADMIN", "CLOTHING", "COMMEX", "CONVENIENCE_STORE", "COURIER", "DEALERSHIP", "ELECTRONICS", "FOOD", "MARKET_STALLS", "MEDICAL", "PERSONAL_WEAPON", "REFINERY", "SERVICE", "SHIP_PART", "SHIP_WEAPON", "SHOP_COMM", "SHOP_FOOD" ]
+          },
+          "manual" : {
+            "type" : "boolean"
+          },
+          "placeName" : {
+            "type" : "string"
+          },
+          "registryName" : {
+            "type" : "string"
+          },
+          "retired" : {
+            "type" : "boolean"
+          },
+          "starSystem" : {
+            "type" : "string"
+          },
+          "terminalId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "terminalName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ShopTerminalLinkRequest" : {
+        "type" : "object",
+        "properties" : {
+          "action" : {
+            "type" : "string",
+            "enum" : [ "SET", "CLEAR", "RELEASE" ]
+          },
+          "expectedManual" : {
+            "type" : "boolean"
+          },
+          "expectedTerminalId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "terminalId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "action", "expectedManual" ]
+      },
+      "ShopTerminalOptionDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "starSystem" : {
+            "type" : "string"
           }
         }
       },
@@ -91609,6 +94338,130 @@
           }
         }
       },
+      "StarmapLinkRequest" : {
+        "type" : "object",
+        "properties" : {
+          "action" : {
+            "type" : "string",
+            "enum" : [ "SET", "CLEAR", "RELEASE" ]
+          },
+          "expectedManual" : {
+            "type" : "boolean"
+          },
+          "expectedStarmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "starmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "action", "expectedManual" ]
+      },
+      "StarmapObjectAdminDto" : {
+        "type" : "object",
+        "properties" : {
+          "className" : {
+            "type" : "string"
+          },
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "hasPosition" : {
+            "type" : "boolean"
+          },
+          "hideInStarmap" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
+          },
+          "parentId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "retired" : {
+            "type" : "boolean"
+          },
+          "starSystem" : {
+            "type" : "string"
+          },
+          "storagePlaceId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "visibilityOverride" : {
+            "type" : "string",
+            "enum" : [ "VISIBLE", "HIDDEN" ]
+          },
+          "visible" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "StarmapPlaceLinkDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "STAR_SYSTEM", "ORBIT", "PLANET", "MOON", "CITY", "SPACE_STATION", "OUTPOST", "POI", "TERMINAL" ]
+          },
+          "manual" : {
+            "type" : "boolean"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "starSystem" : {
+            "type" : "string"
+          },
+          "starmapObjectClassName" : {
+            "type" : "string"
+          },
+          "starmapObjectGuid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "starmapObjectId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "StarmapVisibilityRequest" : {
+        "type" : "object",
+        "properties" : {
+          "override" : {
+            "type" : "string",
+            "enum" : [ "VISIBLE", "HIDDEN" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
       "StartPageUpdateRequest" : {
         "type" : "object",
         "properties" : {
@@ -91764,6 +94617,9 @@
           },
           "name" : {
             "type" : "string"
+          },
+          "nameDe" : {
+            "type" : "string"
           }
         }
       },
@@ -91864,6 +94720,35 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "Sweep" : {
+        "type" : "object",
+        "properties" : {
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "MANUFACTURER", "ITEM", "SHIP", "COMMODITY", "BLUEPRINT", "STARMAP_OBJECT", "SHOP", "RESOURCE_GROUP", "BLUEPRINT_CATEGORY" ]
+          },
+          "known" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "outcome" : {
+            "type" : "string",
+            "enum" : [ "SWEPT", "SKIPPED_PARTIAL", "SKIPPED_EMPTY", "SKIPPED_DUPLICATE_GUID", "SKIPPED_MASS_GUARD" ]
+          },
+          "reappeared" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "toStamp" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "vanished" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -92289,28 +95174,6 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
-          }
-        }
-      },
-      "UexLocationDto" : {
-        "type" : "object",
-        "properties" : {
-          "name" : {
-            "type" : "string"
-          },
-          "parentName" : {
-            "type" : "string"
-          },
-          "starSystemName" : {
-            "type" : "string"
-          },
-          "type" : {
-            "type" : "string",
-            "enum" : [ "CITY", "SPACE_STATION" ]
-          },
-          "uexId" : {
-            "type" : "integer",
-            "format" : "int32"
           }
         }
       },

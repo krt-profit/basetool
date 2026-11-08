@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -80,6 +82,8 @@ class RefineryMissionLinkContractTest {
   private static final double PROFIT = 750.0;
 
   @Autowired private WebApplicationContext context;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -200,7 +204,7 @@ class RefineryMissionLinkContractTest {
   private UUID order(Mission mission) {
     Location location = new Location();
     location.setName("Link Depot " + UUID.randomUUID());
-    location = locationRepository.save(location);
+    location = locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     RefineryOrder order = new RefineryOrder();
     order.setOwner(admin);
     order.setOwningOrgUnit(home);

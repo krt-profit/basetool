@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationExcepti
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -368,7 +369,7 @@ class InventoryPoolChangeIntegrationTest {
    */
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Pool " + id);
+    TestPlaces.insertLocation(jdbc, id, "Pool " + id);
     locations.add(id);
     return id;
   }

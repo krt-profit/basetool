@@ -243,4 +243,34 @@ public interface ExchangeJournalRepository extends JpaRepository<ExchangeJournal
      */
     long getEntries();
   }
+
+  /**
+   * Returns every key the blueprint journal holds.
+   *
+   * @return the distinct blueprint entity keys
+   */
+  @Query(
+      value = "SELECT DISTINCT entity_key FROM exchange_journal WHERE resource = 'BLUEPRINT'",
+      nativeQuery = true)
+  List<String> findBlueprintEntityKeys();
+
+  /**
+   * Moves the blueprint journal from one product key to another, the {@code productKey} of its
+   * recorded states included (REQ-XCH-015).
+   *
+   * @param from the name key
+   * @param to the GUID key
+   * @return the entries moved
+   */
+  @Modifying
+  @Query(
+      value =
+          "UPDATE exchange_journal SET entity_key = :to, before_state = CASE WHEN before_state IS"
+              + " NULL THEN NULL ELSE CAST(jsonb_set(CAST(before_state AS jsonb), '{productKey}',"
+              + " to_jsonb(CAST(:to AS text))) AS text) END, after_state = CASE WHEN after_state IS"
+              + " NULL THEN NULL ELSE CAST(jsonb_set(CAST(after_state AS jsonb), '{productKey}',"
+              + " to_jsonb(CAST(:to AS text))) AS text) END WHERE resource = 'BLUEPRINT' AND"
+              + " entity_key = :from",
+      nativeQuery = true)
+  int moveBlueprintKey(@Param("from") String from, @Param("to") String to);
 }

@@ -311,7 +311,7 @@
                                   th:with="unitResponsible=${unit.responsibleUser != null ? unit.responsibleUser.effectiveName : (unit.ship != null and unit.ship.owner != null ? unit.ship.owner.effectiveName : null)}">
                                 <span th:text="${unit.name}">Unit</span>
                                 <small>
-                                    <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.name}">Typ</span></th:block>
+                                    <th:block th:if="${unit.shipType != null}">&mdash; <span th:text="${unit.shipType.displayName(#locale)}">Typ</span> <span th:if="${unit.shipType.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span></th:block>
                                     <th:block th:if="${unitResponsible != null}">&middot; <span th:text="${unitResponsible}" th:title="#{mission.unit.responsible}">Owner</span></th:block>
                                     <th:block th:if="${unit.frequency != null}">&middot; <span class="data-value--mono" th:text="#{mission.unit.frequency} + ' ' + ${#numbers.formatDecimal(unit.frequency, 3, 'NONE', 2, 'DEFAULT')}">Freq</span></th:block>
                                     <span th:if="${!#strings.isEmpty(unit.note)}" class="notemark" th:title="${unit.note}" tabindex="0" th:attr="aria-label=#{mission.unit.note} + ': ' + ${unit.note}">&#x270E;</span>
@@ -515,7 +515,7 @@
                                     <td th:attr="data-label=#{nav.materials}">
                                         <ul class="goods-list" th:if="${order.goods != null and !#lists.isEmpty(order.goods)}">
                                             <li th:each="good : ${order.goods}">
-                                                <span th:text="${good.outputMaterial != null ? good.outputMaterial.name : '-'}">Material</span>
+                                                <span th:text="${good.outputMaterial != null ? good.outputMaterial.displayName(#locale) : '-'}">Material</span>
                                                 <span class="goods-amount" th:switch="${good.outputMaterial?.quantityType}">
                                                     <span th:case="'PIECE'" th:text="${good.outputQuantity != null} ? |${#numbers.formatInteger(good.outputQuantity, 1)} #{material.quantity.piece}| : '-'">10 St&uuml;ck</span>
                                                     <span th:case="*" th:text="${good.outputQuantity != null} ? |${#numbers.formatDecimal(good.outputQuantity / 100.0, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}| : '-'">10.500 SCU</span>
@@ -548,7 +548,7 @@
                             <tbody>
                                 <tr th:each="item : ${inventoryEntries}">
                                     <td>
-                                        <span class="cell-title" th:text="${item.material != null ? item.material.name : '-'}">Material</span>
+                                        <span class="cell-title" th:text="${item.material != null ? item.material.displayName(#locale) : '-'}">Material</span>
                                         <span th:if="${item.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
                                               th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                     </td>
@@ -1255,7 +1255,7 @@
                     <label th:text="#{mission.unit.shiptype}">Schiffstyp</label>
                     <select name="shipTypeId" id="add-unit-shiptype">
                         <option value="" selected>-</option>
-                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.name}">ShipType</option>
+                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}">ShipType</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1265,7 +1265,7 @@
                         <option th:each="ship : ${unitShipOptions}"
                                 th:if="${participantUserIds != null and ship.owner != null and participantUserIds.contains(ship.owner.id)}"
                                 th:value="${ship.id}"
-                                th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
+                                th:text="${ship.shipType.displayName(#locale) + ' (' + ship.owner.effectiveName + ')'}"
                                 th:data-type-id="${ship.shipType.id}"
                                 hidden disabled>Ship</option>
                     </select>
@@ -1364,7 +1364,7 @@
                     <label th:text="#{mission.unit.shiptype}">Schiffstyp</label>
                     <select name="shipTypeId" id="edit-unit-shiptype">
                         <option value="" selected>-</option>
-                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.name}">ShipType</option>
+                        <option th:each="st : ${allShipTypes}" th:value="${st.id}" th:text="${st.displayName(#locale)}">ShipType</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -1374,7 +1374,7 @@
                         <option th:each="ship : ${unitShipOptions}"
                                 th:if="${(participantUserIds != null and ship.owner != null and participantUserIds.contains(ship.owner.id)) or (assignedUnitShipIds != null and assignedUnitShipIds.contains(ship.id))}"
                                 th:value="${ship.id}"
-                                th:text="${ship.shipType.name + ' (' + ship.owner.effectiveName + ')'}"
+                                th:text="${ship.shipType.displayName(#locale) + ' (' + ship.owner.effectiveName + ')'}"
                                 th:data-type-id="${ship.shipType.id}"
                                 hidden disabled>Ship</option>
                     </select>

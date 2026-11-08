@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroup;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
@@ -45,9 +46,14 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredBlueprintException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableBlueprints;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -79,7 +85,8 @@ class JobOrderItemServiceTest {
     service =
         new JobOrderItemService(
             blueprintRepository,
-            gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
+            new SelectableBlueprints(blueprintRepository),
             materialRepository,
             materialMapper,
             qualityTierService,
@@ -340,6 +347,77 @@ class JobOrderItemServiceTest {
   }
 
   @Test
+  void buildItemLineRefusesAnItemTheP4kRetired() {
+    GameItem retired = gameItem("Ballista", GameItemKind.WEAPON);
+    retired.setP4kDeletedAt(Instant.now());
+    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    CreateJobOrderItemLineDto line =
+        new CreateJobOrderItemLineDto(
+            null, retired.getId(), UUID.randomUUID(), 1, List.of(), null, null);
+
+    assertThatThrownBy(() -> service.buildItemLine(line))
+        .isInstanceOf(RetiredGameItemException.class);
+  }
+
+  @Test
+  void buildItemLineRefusesABlueprintTheP4kRetired() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Blueprint retired = blueprint(weapon);
+    retired.setP4kDeletedAt(Instant.now());
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    CreateJobOrderItemLineDto line =
+        new CreateJobOrderItemLineDto(
+            null, weapon.getId(), retired.getId(), 1, List.of(), null, null);
+
+    assertThatThrownBy(() -> service.buildItemLine(line))
+        .isInstanceOf(RetiredBlueprintException.class);
+  }
+
+  @Test
+  void applyItemLineRefusesToKeepABlueprintTheP4kHidSinceTheLineWasOrdered() {
+    GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
+    Blueprint hidden = blueprint(weapon);
+    JobOrderItem existing = JobOrderItem.builder().amount(2).build();
+    existing.setId(UUID.randomUUID());
+    existing.setGameItem(weapon);
+    existing.setBlueprint(hidden);
+    hidden.setP4kHiddenAt(Instant.now());
+    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
+    when(blueprintRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+
+    assertThatThrownBy(() ->
+            service.applyItemLine(
+                existing,
+                new CreateJobOrderItemLineDto(
+                    existing.getId(), weapon.getId(), hidden.getId(), 3, List.of(), null, null)))
+        .isInstanceOf(RetiredBlueprintException.class);
+    assertThat(existing.getAmount()).isEqualTo(2);
+  }
+
+  @Test
+  void applyItemLineRefusesToKeepAnItemTheP4kHidSinceTheLineWasOrdered() {
+    GameItem hidden = gameItem("Ballista", GameItemKind.WEAPON);
+    Blueprint blueprint = blueprint(hidden);
+    JobOrderItem existing = JobOrderItem.builder().amount(2).build();
+    existing.setId(UUID.randomUUID());
+    existing.setGameItem(hidden);
+    existing.setBlueprint(blueprint);
+    hidden.setP4kHiddenAt(Instant.now());
+    when(gameItemRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+
+    assertThatThrownBy(() ->
+            service.applyItemLine(
+                existing,
+                new CreateJobOrderItemLineDto(
+                    existing.getId(), hidden.getId(), blueprint.getId(), 3, List.of(), null, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    assertThat(existing.getAmount()).isEqualTo(2);
+  }
+
+  @Test
   void aggregateMaterialsGroupsByMaterialAndQualitySummingAcrossLines() {
     Material steel = material("Steel", QuantityType.SCU);
     stubMapper(steel);
@@ -447,6 +525,85 @@ class JobOrderItemServiceTest {
     assertThat(preview.subAssemblies().get(0).quantity()).isEqualTo(6);
     assertThat(preview.subAssemblies().get(0).gameItem().name()).isEqualTo("Scope");
     assertThat(preview.unresolvedIngredients()).containsExactly("Unknownium");
+  }
+
+  @Test
+  void buildItemLineSnapshotsOnlyTheTwoChosenOptionsOfAChooseTwoOfThreeRecipe() {
+    GameItem legs = gameItem("Legs", GameItemKind.WEAPON);
+    Material paneling = material("Segment Paneling", QuantityType.SCU);
+    Material liner = material("Insulative Liner", QuantityType.SCU);
+    Material covering = material("Panel Covering", QuantityType.SCU);
+    Material extra = material("Optional Plating", QuantityType.SCU);
+    Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
+    when(gameItemRepository.findById(legs.getId())).thenReturn(Optional.of(legs));
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    JobOrderItem built =
+        service.buildItemLine(
+            new CreateJobOrderItemLineDto(
+                null, legs.getId(), blueprint.getId(), 2, List.of(), null, null));
+
+    assertThat(built.getMaterials())
+        .extracting(m -> m.getMaterial().getName())
+        .containsExactlyInAnyOrder("Segment Paneling", "Insulative Liner");
+    assertThat(requirementFor(built, paneling).getRequiredQuantity()).isEqualTo(0.06);
+    assertThat(requirementFor(built, liner).getRequiredQuantity()).isEqualTo(0.04);
+  }
+
+  @Test
+  void deriveForPreviewShowsOnlyTheChosenOptionsAndNoOptionalCost() {
+    GameItem legs = gameItem("Legs", GameItemKind.WEAPON);
+    Material paneling = material("Segment Paneling", QuantityType.SCU);
+    Material liner = material("Insulative Liner", QuantityType.SCU);
+    Material covering = material("Panel Covering", QuantityType.SCU);
+    Material extra = material("Optional Plating", QuantityType.SCU);
+    stubMapper(paneling);
+    stubMapper(liner);
+    Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
+    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+
+    ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 1);
+
+    assertThat(preview.materials())
+        .extracting(DerivedMaterialDto::requiredQuantity)
+        .containsExactly(0.03, 0.02);
+  }
+
+  /**
+   * The LIVE choose-2-of-3 blueprint {@code BP_CRAFT_thp_light_legs_01_01_01} as the P4K import
+   * stores it (three option groups, a craft fills two), plus one optional cost (REQ-P4K-027).
+   */
+  private static Blueprint chooseTwoOfThreeLegs(
+      GameItem output, Material paneling, Material liner, Material covering, Material extra) {
+    Blueprint blueprint = blueprint(output);
+    blueprint.setRequiredGroupCount(2);
+    Material[] materials = {paneling, liner, covering};
+    double[] scu = {0.03, 0.02, 0.03};
+    for (int i = 0; i < materials.length; i++) {
+      blueprint.addIngredient(inGroup(blueprint, resource(materials[i], scu[i], null), i, false));
+    }
+    blueprint.addIngredient(inGroup(blueprint, resource(extra, 0.01, null), 3, true));
+    return blueprint;
+  }
+
+  /**
+   * Puts a line into a new requirement group of its own.
+   *
+   * @param blueprint the recipe the group joins
+   * @param line the line
+   * @param index the group's position
+   * @param optional whether the group is an optional cost
+   * @return the line
+   */
+  private static BlueprintIngredient inGroup(
+      Blueprint blueprint, BlueprintIngredient line, int index, boolean optional) {
+    BlueprintRequirementGroup group = new BlueprintRequirementGroup();
+    group.setOrderIndex(index);
+    group.setRequiredCount(1);
+    group.setOptional(optional);
+    blueprint.addRequirementGroup(group);
+    line.setRequirementGroup(group);
+    return line;
   }
 
   @Test

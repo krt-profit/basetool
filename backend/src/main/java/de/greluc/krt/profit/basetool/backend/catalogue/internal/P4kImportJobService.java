@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJob;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -33,6 +37,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +50,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Transactional lifecycle and persistence of asynchronous P4K catalog-import jobs ({@link
+ * Transactional lifecycle and persistence of asynchronous P4K catalogue-import jobs ({@link
  * P4kImportJob} + {@link P4kImportJobPayload}): creation, the {@code PENDING → RUNNING → SUCCEEDED
  * | FAILED} transitions, payload handling, pruning and startup reconciliation.
  *
@@ -67,39 +72,43 @@ public class P4kImportJobService {
   private final P4kImportJobPayloadRepository payloadRepository;
   private final MeterRegistry meterRegistry;
   private final AdminDashboardLiveSync adminDashboardLiveSync;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Enqueues a new {@link P4kImportJobKind#PREVIEW PREVIEW} job in state {@link
-   * P4kImportJobStatus#PENDING PENDING}, persisting the uploaded catalog into the payload side
-   * table. The returned job is committed when this method returns, so the async worker (triggered
-   * afterwards) is guaranteed to see the row.
+   * P4kImportJobStatus#PENDING PENDING}, persisting the gate-checked upload, compressed, into the
+   * payload side table, and records the enqueue as a {@code CATALOGUE} audit event with the job as
+   * subject and the Build (REQ-P4K-046). The returned job is committed when this method returns, so
+   * the async worker (triggered afterwards) is guaranteed to see the row.
    *
-   * @param bytes the uploaded P4K catalog JSON
+   * @param upload the upload the gate accepted
    * @param filename the original upload filename for display, or {@code null}
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted preview job
-   * @throws BadRequestException if {@code bytes} is empty
    */
   @Transactional
   @NotNull
   public P4kImportJob createPreviewJob(
-      byte[] bytes, @Nullable String filename, @NotNull UUID createdBy) {
-    if (bytes == null || bytes.length == 0) {
-      throw new BadRequestException("The uploaded file is empty.");
-    }
+      @NotNull P4kAcceptedUpload upload, @Nullable String filename, @NotNull UUID createdBy) {
     P4kImportJob job = new P4kImportJob();
     job.setKind(P4kImportJobKind.PREVIEW);
     job.setStatus(P4kImportJobStatus.PENDING);
-    job.setSeedNew(false);
     job.setSourceFilename(trimFilename(filename));
-    job.setFileSizeBytes((long) bytes.length);
+    job.setFileSizeBytes(upload.uploadedBytes());
     job.setCreatedBy(createdBy);
     jobRepository.save(job);
 
     P4kImportJobPayload payload = new P4kImportJobPayload();
     payload.setJobId(job.getId());
-    payload.setContent(bytes);
+    payload.setContent(upload.storedPayload());
     payloadRepository.save(payload);
+    P4kBuild build = upload.build();
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_PREVIEW_ENQUEUED,
+        job.getId(),
+        build.version(),
+        null,
+        AuditDetails.of("branch", build.branch()).with("change", build.changeNumber()));
     return job;
   }
 
@@ -109,7 +118,8 @@ public class P4kImportJobService {
    * P4kImportJobPayloadRepository#copyPayload}). The returned job is committed on return.
    *
    * @param previewJobId the SUCCEEDED preview job to apply
-   * @param seedNew whether to seed brand-new unmatched player-facing rows
+   * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @param createdBy JWT {@code sub} of the enqueuing administrator
    * @return the persisted apply job
    * @throws NotFoundException if no job has the given id
@@ -119,7 +129,10 @@ public class P4kImportJobService {
   @Transactional
   @NotNull
   public P4kImportJob createApplyJob(
-      @NotNull UUID previewJobId, boolean seedNew, @NotNull UUID createdBy) {
+      @NotNull UUID previewJobId,
+      boolean createItemsAndShips,
+      boolean overrideMassGuard,
+      @NotNull UUID createdBy) {
     P4kImportJob preview =
         Entities.require(
             jobRepository.findById(previewJobId),
@@ -134,7 +147,8 @@ public class P4kImportJobService {
     P4kImportJob job = new P4kImportJob();
     job.setKind(P4kImportJobKind.APPLY);
     job.setStatus(P4kImportJobStatus.PENDING);
-    job.setSeedNew(seedNew);
+    job.setCreateItemsAndShips(createItemsAndShips);
+    job.setOverrideMassGuard(overrideMassGuard);
     job.setSourceFilename(preview.getSourceFilename());
     job.setFileSizeBytes(preview.getFileSizeBytes());
     job.setPreviewJobId(previewJobId);
@@ -191,6 +205,33 @@ public class P4kImportJobService {
   }
 
   /**
+   * Stores the change report a preview computed beside its upload (REQ-P4K-015); it expires with
+   * the job.
+   *
+   * @param jobId the preview job
+   * @param report the encoded report
+   * @throws IllegalStateException if the payload row is missing (pruned mid-run)
+   */
+  @Transactional
+  public void storePreviewReport(@NotNull UUID jobId, byte @NotNull [] report) {
+    if (payloadRepository.storePreviewReport(jobId, report) == 0) {
+      throw new IllegalStateException("Payload missing for P4K import job " + jobId);
+    }
+  }
+
+  /**
+   * Loads the change report a preview stored, without the upload beside it.
+   *
+   * @param jobId the preview job
+   * @return the encoded report, empty when the job has none or is gone
+   */
+  @Transactional(readOnly = true)
+  @NotNull
+  public Optional<byte[]> loadPreviewReport(@NotNull UUID jobId) {
+    return payloadRepository.findPreviewReport(jobId);
+  }
+
+  /**
    * Advances a job to {@link P4kImportJobStatus#RUNNING RUNNING} and stamps {@code started_at}.
    *
    * @param jobId the job id
@@ -236,15 +277,13 @@ public class P4kImportJobService {
 
   /**
    * Deletes a job's stored upload, reclaiming the bytes once they are no longer needed (an APPLY
-   * run is terminal). A no-op when the payload is already gone.
+   * run is terminal), without loading them. A no-op when the payload is already gone.
    *
    * @param jobId the job id
    */
   @Transactional
   public void deletePayload(@NotNull UUID jobId) {
-    if (payloadRepository.existsById(jobId)) {
-      payloadRepository.deleteById(jobId);
-    }
+    payloadRepository.deleteByJobId(jobId);
   }
 
   /**

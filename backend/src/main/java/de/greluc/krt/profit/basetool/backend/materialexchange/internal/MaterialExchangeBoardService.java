@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
@@ -268,27 +269,31 @@ public class MaterialExchangeBoardService {
     boolean isItem = item.getGameItem() != null;
     String locationName = item.getLocation() == null ? null : item.getLocation().getName();
     if (isItem) {
+      GameItem gameItem = Objects.requireNonNull(item.getGameItem());
       return new MaterialExchangeReleasableItemDto(
           item.getId(),
           MaterialExchangeOfferKind.ITEM,
-          Objects.requireNonNull(item.getGameItem()).getName(),
+          gameItem.getName(),
           QuantityType.PIECE,
           null,
           item.getAmount(),
           locationName,
           alreadyReleased,
-          Boolean.TRUE.equals(item.getStolen()));
+          Boolean.TRUE.equals(item.getStolen()),
+          gameItem.getNameDe());
     }
+    Material material = Objects.requireNonNull(item.getMaterial());
     return new MaterialExchangeReleasableItemDto(
         item.getId(),
         MaterialExchangeOfferKind.MATERIAL,
-        Objects.requireNonNull(item.getMaterial()).getName(),
-        item.getMaterial().getQuantityType(),
+        material.getName(),
+        material.getQuantityType(),
         item.getQuality(),
         item.getAmount(),
         locationName,
         alreadyReleased,
-        Boolean.TRUE.equals(item.getStolen()));
+        Boolean.TRUE.equals(item.getStolen()),
+        material.getNameDe());
   }
 
   /**
@@ -363,7 +368,7 @@ public class MaterialExchangeBoardService {
     } else {
       StockRow row = Objects.requireNonNull(item);
       Material mat = Objects.requireNonNull(row.getMaterial());
-      material = new MaterialReferenceDto(mat.getId(), mat.getName(), mat.getQuantityType());
+      material = MaterialReferenceDto.of(mat);
       quality = row.getQuality();
       amount = effectiveOfferedAmount(offer, row);
       availableAmount = mine ? row.getAmount() : null;

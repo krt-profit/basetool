@@ -23,10 +23,12 @@ uploaded export file's envelope.
 
 ### REQ-INV-006 — Import matches on the normalized `output_name`
 
-> [!note] Planned amendment — the name chain ends at a GUID key (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md), REQ-INV-070)
-> The match below resolves to the produced item's DataForge GUID, which keys the member's product;
-> a name that resolves to several GUIDs is `SUGGESTED` with the candidates.
+> [!note] The name chain ends at a GUID key (REQ-INV-070, [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
+> A product's key is its produced item's DataForge GUID (`ProductKeys`), or its normalised name
+> while the P4K import has given it none. The match below compares names and resolves to that
+> key: a name that names one product is `MATCHED`; a name that names several — recipes of one
+> name producing items with different GUIDs — is `SUGGESTED` with every one of them, unless a
+> learned alias decides it, and the member's pick is learned as an alias.
 
 The blueprint import and product search match the in-game/log product name against the master
 list of `blueprint.output_name`s, comparing both sides through the single
@@ -239,10 +241,9 @@ string only), via a single `BlueprintVariantFamilyResolver.familyKey(name)` both
 
 ### REQ-INV-019 — Structural tag match for the scmdb.net export
 
-> [!note] Planned amendment — the tag match ends at a GUID key (#2893;
-> [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md), REQ-INV-070)
-> A matched blueprint key resolves to the produced item's DataForge GUID, which keys the member's
-> product.
+> [!note] The tag match ends at a GUID key (REQ-INV-070, [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md))
+> The `scwiki_key → product_key` index maps to the product key, the produced item's DataForge
+> GUID where the P4K import stored one.
 
 The scmdb.net export uniquely carries, per blueprint, the **DataForge blueprint key** under `tag`
 (e.g. `BP_CRAFT_behr_rifle_ballistic_02_civilian`). That key is the same identifier the basetool

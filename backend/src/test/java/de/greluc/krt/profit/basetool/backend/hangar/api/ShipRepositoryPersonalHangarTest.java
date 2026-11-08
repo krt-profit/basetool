@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -49,6 +51,9 @@ import org.springframework.transaction.annotation.Transactional;
 class ShipRepositoryPersonalHangarTest {
 
   @Autowired private ShipRepository shipRepository;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private ManufacturerRepository manufacturerRepository;
@@ -274,7 +279,7 @@ class ShipRepositoryPersonalHangarTest {
   private Location newLocation(String name) {
     Location l = new Location();
     l.setName(name);
-    return locationRepository.save(l);
+    return locationRepository.save(TestPlaces.onOwnCity(l, cityRepository));
   }
 
   private Ship saveShip(

@@ -1,6 +1,7 @@
 # ADR-0336 — A complete P4K kind sweeps vanished rows behind a mass guard and every run keeps a change report
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted (implemented for the five base kinds; the category, starmap and shop tables
+  join the sweep with their areas)
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-011…016), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -66,7 +67,7 @@ which rows need a human decision.
 - `p4k_import_change` grows with every APPLY and is never pruned; no catalogue snapshot is kept.
 - The sweep gets its own requirement in the P4K catalogue spec, `docs/specs/p4k-catalogue.md`, and
   REQ-DATA-014 points to it. The review resolutions are audited (ADR-0346); the stamped count,
-  skipped sweeps and open review cases are monitored. Implementation is pending (B3).
+  skipped sweeps and open review cases are monitored (REQ-OBS-022).
 
 ## Alternatives considered
 

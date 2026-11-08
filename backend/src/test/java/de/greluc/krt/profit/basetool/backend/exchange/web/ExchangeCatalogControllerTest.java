@@ -27,6 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
@@ -57,6 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -85,6 +88,8 @@ class ExchangeCatalogControllerTest {
   @Autowired private LocationRepository locationRepository;
   @Autowired private ExchangeClientRepository clientRepository;
   @Autowired private ExchangeSettingsRepository settingsRepository;
+  @Autowired private CityRepository cityRepository;
+  @Autowired private JdbcTemplate jdbc;
   @MockitoSpyBean private ExchangeCatalogService catalogService;
   @MockitoBean private ExchangeRevocationMirror revocationMirror;
 
@@ -110,13 +115,20 @@ class ExchangeCatalogControllerTest {
                 roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow())));
     userRepository.saveAndFlush(member);
 
+    City place = new City();
+    place.setIdCity(990_461);
+    place.setName("Xch Catalogue City");
+    place.setHasRefineryTerminal(false);
+    cityRepository.saveAndFlush(place);
     Location visible = new Location();
     visible.setName("Xch Visible Station");
     visible.setHidden(false);
+    visible.setCity(place);
     locationRepository.saveAndFlush(visible);
     Location hidden = new Location();
     hidden.setName("Xch Hidden Station");
     hidden.setHidden(true);
+    hidden.setCity(place);
     locationRepository.saveAndFlush(hidden);
 
     client = new ExchangeClient();
@@ -157,6 +169,41 @@ class ExchangeCatalogControllerTest {
             "XCH_CAPABILITY:exchange.blueprints.read",
             "XCH_CAPABILITY:exchange.connect");
     assertThat(clients).containsExactly("versekit-test");
+  }
+
+  @Test
+  void aLinkedPlaceCarriesItsStarmapGuidAndCuratedName() throws Exception {
+    UUID cityGuid = UUID.fromString("5b0a2c7e-1f3d-4e8a-9c6b-2d4f8a1e7c30");
+    UUID nodeGuid = UUID.fromString("0d6e9a41-7c2b-4f15-8e3a-9b1c4d7e2f60");
+    City linked = new City();
+    linked.setIdCity(990_462);
+    linked.setName("Xch Linked City");
+    linked.setHasRefineryTerminal(false);
+    cityRepository.saveAndFlush(linked);
+    jdbc.update(
+        "UPDATE city SET starmap_object_id = ? WHERE id = ?",
+        starmapObject(cityGuid, "Xch Starmap City Text"),
+        linked.getId());
+    Location onCity = new Location();
+    onCity.setName("Xch Linked Station");
+    onCity.setCity(linked);
+    locationRepository.saveAndFlush(onCity);
+    Location onNode = new Location();
+    onNode.setName("Xch Node Station");
+    onNode.setStarmapObjectId(starmapObject(nodeGuid, "Xch Starmap Node Text"));
+    locationRepository.saveAndFlush(onNode);
+
+    mockMvc
+        .perform(relayed("exchange.connect"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.items[?(@.name == 'Xch Linked Station')].guid").value(cityGuid.toString()))
+        .andExpect(jsonPath("$.items[?(@.name == 'Xch Linked Station')].uex.id").value(990_462))
+        .andExpect(
+            jsonPath("$.items[?(@.name == 'Xch Node Station')].guid").value(nodeGuid.toString()))
+        .andExpect(jsonPath("$.items[?(@.name == 'Xch Node Station')].uex").doesNotExist())
+        .andExpect(jsonPath("$.items[?(@.name == 'Xch Visible Station')].guid").doesNotExist())
+        .andExpect(jsonPath("$.items[?(@.name =~ /Xch Starmap.*/)]").doesNotExist());
   }
 
   @Test
@@ -302,6 +349,23 @@ class ExchangeCatalogControllerTest {
    */
   private static @NotNull JwtRequestPostProcessor gateway() {
     return jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway"));
+  }
+
+  /**
+   * Stores a P4K starmap object.
+   *
+   * @param guid its GUID
+   * @param name its game-text name, which must never reach the exchange
+   * @return the row id
+   */
+  private @NotNull UUID starmapObject(@NotNull UUID guid, @NotNull String name) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO starmap_object (id, p4k_uuid, name, version) VALUES (?, ?, ?, 0)",
+        id,
+        guid,
+        name);
+    return id;
   }
 
   /**

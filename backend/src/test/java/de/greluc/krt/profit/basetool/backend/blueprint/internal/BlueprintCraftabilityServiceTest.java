@@ -62,6 +62,7 @@ class BlueprintCraftabilityServiceTest {
   private static final UUID BP_ID = UUID.randomUUID();
   private static final UUID MAT_A = UUID.randomUUID();
   private static final UUID MAT_B = UUID.randomUUID();
+  private static final UUID MAT_C = UUID.randomUUID();
   private static final UUID GI_A = UUID.randomUUID();
 
   @Mock private PersonalBlueprintService personalBlueprintService;
@@ -112,6 +113,152 @@ class BlueprintCraftabilityServiceTest {
     assertEquals(1000.0, dto.groups().get(0).effectiveQuality(), 1e-9);
     assertEquals(MAT_B, dto.groups().get(1).materialId());
     assertEquals(600.0, dto.groups().get(1).effectiveQuality(), 1e-9);
+  }
+
+  @Test
+  void aRecipeWideModifier_setsNoSlotsQualityFloor() {
+    Blueprint bp = twoSlotBlueprint();
+    bp.addRecipeModifier(higher(0.5, 1.5));
+    stubOwned(owned("widget", "Widget"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("widget", bp));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 1000, 25.0),
+                new CraftabilitySlice(MAT_A, 300, 100.0),
+                new CraftabilitySlice(MAT_B, 400, 12.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(500, material(dto, MAT_A).qualityFloor());
+    assertEquals(0, material(dto, MAT_B).qualityFloor());
+    assertEquals(12.0, material(dto, MAT_B).availableScu(), 1e-9);
+    assertEquals(2, dto.craftable());
+  }
+
+  /**
+   * The LIVE choose-2-of-3 blueprint {@code BP_CRAFT_thp_light_legs_01_01_01} as the P4K import
+   * stores it (see {@code p4k/blueprint-choose-2-of-3-live.json}): three option groups of which a
+   * craft fills two (REQ-P4K-027).
+   */
+  private static Blueprint chooseTwoOfThreeLegs() {
+    Blueprint bp = new Blueprint();
+    bp.setRequiredGroupCount(2);
+    String[] slots = {"SEGMENT PANELING", "INSULATIVE LINER", "PANEL COVERING"};
+    UUID[] materials = {MAT_A, MAT_B, MAT_C};
+    double[] scu = {0.03, 0.02, 0.03};
+    for (int i = 0; i < 3; i++) {
+      BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+      slot.setOrderIndex(i);
+      slot.setGroupKey(slots[i]);
+      slot.setRequiredCount(1);
+      bp.addRequirementGroup(slot);
+      bp.addIngredient(
+          resource(i, material(materials[i], "M" + i, QuantityType.SCU), scu[i], null, slot));
+    }
+    return bp;
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_isCraftableFromTheTwoCoveredOptions_andCountsOnlyThem() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 500, 1.0), new CraftabilitySlice(MAT_C, 500, 0.1)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(3, dto.craftable());
+    assertEquals(2, dto.materials().size());
+    assertEquals(MAT_A, dto.materials().get(0).materialId());
+    assertEquals(MAT_C, dto.materials().get(1).materialId());
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_withOneCoveredOption_isShortOnlyTheCheapestSecondOption() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 500, 1.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, false));
+
+    assertEquals(0, dto.craftable());
+    assertEquals(2, dto.materials().size());
+    assertEquals(0.02, material(dto, MAT_B).missingScu(), 1e-9);
+    assertTrue(dto.materials().stream().noneMatch(m -> MAT_C.equals(m.materialId())));
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_selectsItsOptionsAgainstTheRefineryInclusiveStockOnItsOwn() {
+    stubOwned(owned("legs", "Legs"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("legs", chooseTwoOfThreeLegs()));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_A, 500, 1.0)));
+    when(refineryOrderService.pendingYieldSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_C, 500, 0.1)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
+
+    assertEquals(0, dto.craftable());
+    assertEquals(3, dto.craftableWithRefinery());
+    CraftabilityMaterialDto liner = material(dto, MAT_B);
+    assertTrue(liner.counted());
+    assertFalse(liner.countedWithRefinery());
+    assertEquals(0.02, liner.missingScu(), 1e-9);
+    CraftabilityMaterialDto covering = material(dto, MAT_C);
+    assertFalse(covering.counted());
+    assertTrue(covering.countedWithRefinery());
+    assertEquals(3, covering.craftableWithRefinery());
+    assertEquals(0.0, covering.missingScuWithRefinery(), 1e-9);
+    assertTrue(material(dto, MAT_A).counted());
+    assertTrue(material(dto, MAT_A).countedWithRefinery());
+  }
+
+  @Test
+  void aChooseTwoOfThreeRecipe_measuresTheRefineryColumnsAgainstTheRefinerySelection() {
+    Blueprint bp = new Blueprint();
+    bp.setRequiredGroupCount(2);
+    Material iron = material(MAT_A, "Iron");
+    BlueprintRequirementGroup frame = slot(bp, 0, "FRAME");
+    bp.addIngredient(resource(0, iron, 2.0, null, frame));
+    BlueprintRequirementGroup liner = slot(bp, 1, "LINER");
+    bp.addIngredient(resource(1, material(MAT_B, "Tungsten"), 1.0, null, liner));
+    BlueprintRequirementGroup plating = slot(bp, 2, "PLATING");
+    bp.addIngredient(resource(2, iron, 3.0, null, plating));
+    bp.addIngredient(resource(3, material(MAT_C, "Copper"), 1.0, null, plating));
+    stubOwned(owned("armor", "Armor"));
+    when(blueprintProductService.resolveRepresentativeBlueprints(any()))
+        .thenReturn(Map.of("armor", bp));
+    when(craftableStockSource.ownedStockSlices(USER_ID))
+        .thenReturn(
+            List.of(
+                new CraftabilitySlice(MAT_A, 500, 20.0), new CraftabilitySlice(MAT_B, 500, 4.0)));
+    when(refineryOrderService.pendingYieldSlices(USER_ID))
+        .thenReturn(List.of(new CraftabilitySlice(MAT_C, 500, 100.0)));
+
+    BlueprintCraftabilityDto dto = only(service.computeForOwner(USER_ID, true));
+
+    assertEquals(4, dto.craftable());
+    assertEquals(4, dto.craftableWithRefinery());
+    CraftabilityMaterialDto ironRow = material(dto, MAT_A);
+    assertEquals(10, ironRow.craftable());
+    assertEquals(4, ironRow.craftableWithRefinery());
+  }
+
+  private static BlueprintRequirementGroup slot(Blueprint bp, int order, String key) {
+    BlueprintRequirementGroup slot = new BlueprintRequirementGroup();
+    slot.setOrderIndex(order);
+    slot.setGroupKey(key);
+    slot.setRequiredCount(1);
+    bp.addRequirementGroup(slot);
+    return slot;
   }
 
   @Test

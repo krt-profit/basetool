@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAlias;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasRepository;
@@ -57,6 +58,8 @@ class MaterialExternalAliasServiceTest {
   @Mock private MaterialExternalAliasRepository repository;
   @Mock private MaterialRepository materialRepository;
   @Mock private AuthHelperService authHelperService;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private MaterialExternalAliasService service;
 

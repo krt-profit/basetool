@@ -27,6 +27,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
@@ -403,9 +404,13 @@ async function importFromScmdb() {
                 );
 
                 if (matField.krtCombobox) {
-                    matField.krtCombobox.setValue(material.id, material.name, {
-                        quantityType: material.quantityType || '',
-                    });
+                    matField.krtCombobox.setValue(
+                        material.id,
+                        localisedName(material.name, material.nameDe),
+                        {
+                            quantityType: material.quantityType || '',
+                        },
+                    );
                 } else {
                     matField.value = material.id;
                 }
@@ -722,7 +727,7 @@ function loadDerivation(row, qualities) {
                 return krtHtml`
                     <div class="oc-material-line">
                         <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
-                        <span class="flex-2">${mat.name || ''}</span>
+                        <span class="flex-2">${localisedName(mat.name, mat.nameDe)}</span>
                         <span class="flex-1">${qty} ${unit}</span>
                         <select name="items[${idx}].materials[${mi}].quality" class="flex-1" data-quality-code="${storedQ || ''}"></select>
                     </div>`;
@@ -753,7 +758,7 @@ function loadDerivation(row, qualities) {
             if ((d.subAssemblies || []).length) {
                 const subLines = (d.subAssemblies ?? []).map((sa) => {
                     const gi = sa.gameItem || {};
-                    const itemLabel = sa.label || gi.name || '';
+                    const itemLabel = sa.label || localisedName(gi.name, gi.nameDe);
                     return krtHtml`<div class="oc-material-line">
                         <span class="flex-2">${itemLabel} &times; ${sa.quantity}</span>
                         <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${itemLabel}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
@@ -867,8 +872,10 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         submitter,
         toast: false,
         errorMessage: failedMessage,
-        onError(status) {
-            showFrontendErrorToast(status === 400 ? invalidMessage : failedMessage);
+        onError(status, problem) {
+            const retired = krtFetch.catalogueRetiredMessage(problem);
+            const fallback = status === 400 ? invalidMessage : failedMessage;
+            showFrontendErrorToast(retired || fallback);
             return true;
         },
         onSuccess(body) {

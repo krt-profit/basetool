@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -47,4 +48,34 @@ public interface P4kImportJobPayloadRepository extends JpaRepository<P4kImportJo
           """,
       nativeQuery = true)
   int copyPayload(@Param("targetJobId") UUID targetJobId, @Param("sourceJobId") UUID sourceJobId);
+
+  /**
+   * Stores a preview's change report on its payload row without reading or rewriting the upload.
+   *
+   * @param jobId the preview job
+   * @param report the encoded report
+   * @return the number of rows updated (1 when the payload exists, else 0)
+   */
+  @Modifying
+  @Query("UPDATE P4kImportJobPayload p SET p.previewReport = :report WHERE p.jobId = :jobId")
+  int storePreviewReport(@Param("jobId") UUID jobId, @Param("report") byte[] report);
+
+  /**
+   * Reads a preview's change report without the upload beside it.
+   *
+   * @param jobId the preview job
+   * @return the encoded report, empty when the payload is gone or holds no report
+   */
+  @Query("SELECT p.previewReport FROM P4kImportJobPayload p WHERE p.jobId = :jobId")
+  Optional<byte[]> findPreviewReport(@Param("jobId") UUID jobId);
+
+  /**
+   * Deletes a job's payload row without loading it.
+   *
+   * @param jobId the job
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("DELETE FROM P4kImportJobPayload p WHERE p.jobId = :jobId")
+  int deleteByJobId(@Param("jobId") UUID jobId);
 }

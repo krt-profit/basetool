@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -370,7 +371,7 @@ public class InventoryCheckoutService {
     if (dto.targetLocationId() != null
         && !dto.targetLocationId().equals(item.getLocation().getId())) {
       targetLocation =
-          Entities.require(
+          OfferedLocations.require(
               locationRepository.findById(dto.targetLocationId()), "Target location not found");
     }
 
@@ -1031,7 +1032,7 @@ public class InventoryCheckoutService {
     final Location targetLocation =
         request.targetLocationId() == null
             ? null
-            : Entities.require(
+            : OfferedLocations.require(
                 locationRepository.findById(request.targetLocationId()),
                 "Target location not found");
 

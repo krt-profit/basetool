@@ -22,11 +22,10 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.catalogue.web.MaterialCategoryController;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -34,16 +33,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 
 /**
- * Unit tests for {@link MaterialCategoryController}: service delegation and the mapper round-trip
- * on the write endpoints.
+ * Unit tests for {@link MaterialCategoryController}: service delegation of the reads, and no write
+ * endpoint (REQ-P4K-025).
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialCategoryControllerTest {
 
   @Mock private MaterialCategoryService service;
-  @Mock private MaterialCategoryMapper mapper;
 
   @InjectMocks private MaterialCategoryController controller;
 
@@ -74,47 +76,14 @@ class MaterialCategoryControllerTest {
   }
 
   @Test
-  void create_roundTripsDtoToEntityViaMapperAndBack() {
-    MaterialCategoryDto request = new MaterialCategoryDto(null, "NewCat", null);
-    MaterialCategory entity = new MaterialCategory();
-    MaterialCategory saved = new MaterialCategory();
-    MaterialCategoryDto persisted = new MaterialCategoryDto(UUID.randomUUID(), "NewCat", 1L);
-
-    when(mapper.toEntity(request)).thenReturn(entity);
-    when(service.create(entity)).thenReturn(saved);
-    when(mapper.toDto(saved)).thenReturn(persisted);
-
-    MaterialCategoryDto result = controller.create(request);
-
-    assertSame(persisted, result);
-    verify(service).create(entity);
-  }
-
-  @Test
-  void update_passesIdAndMappedEntityToService() {
-    UUID id = UUID.randomUUID();
-    MaterialCategoryDto request = new MaterialCategoryDto(id, "Renamed", 3L);
-    MaterialCategory entity = new MaterialCategory();
-    MaterialCategory updated = new MaterialCategory();
-    MaterialCategoryDto persisted = new MaterialCategoryDto(id, "Renamed", 4L);
-
-    when(mapper.toEntity(request)).thenReturn(entity);
-    when(service.update(id, entity)).thenReturn(updated);
-    when(mapper.toDto(updated)).thenReturn(persisted);
-
-    MaterialCategoryDto result = controller.update(id, request);
-
-    assertSame(persisted, result);
-    verify(service).update(id, entity);
-  }
-
-  @Test
-  void delete_delegatesIdToService() {
-    UUID id = UUID.randomUUID();
-
-    controller.delete(id);
-
-    verify(service).delete(id);
-    verifyNoMoreInteractions(service, mapper);
+  void noEndpointCreatesRenamesOrDeletesACategory() {
+    assertTrue(
+        Arrays.stream(MaterialCategoryController.class.getDeclaredMethods())
+            .noneMatch(m ->
+                m.isAnnotationPresent(PostMapping.class)
+                    || m.isAnnotationPresent(PutMapping.class)
+                    || m.isAnnotationPresent(PatchMapping.class)
+                    || m.isAnnotationPresent(DeleteMapping.class)),
+        "the P4K import owns the categories (REQ-P4K-025)");
   }
 }

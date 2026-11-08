@@ -198,7 +198,7 @@ public class ScWikiCommoditySyncService {
     if (material == null) {
       material = createWikiOnlyMaterial(dto, runId);
     }
-    applyWikiFields(material, dto, now);
+    applyWikiFields(material, dto, now, runId);
     if (material.getSourceSystems() == MaterialSourceSystem.UEX_ONLY) {
       material.setSourceSystems(MaterialSourceSystem.BOTH);
     }
@@ -364,20 +364,37 @@ public class ScWikiCommoditySyncService {
 
   /**
    * Writes only the Wiki-owned columns onto a material; the UEX-canonical name, code, kind, type,
-   * prices and {@code is_*} flags are never touched.
+   * prices and {@code is_*} flags are never touched. The density is P4K-led ({@link
+   * P4kLedColumns#write}): on a row the P4K matched the Wiki fills it only while it is empty, and a
+   * different Wiki density is reported (REQ-P4K-024).
    *
    * @param material the row to update
    * @param dto the Wiki commodity row
    * @param now timestamp for {@code scwiki_synced_at}
+   * @param runId current run id for event logging
    */
   private void applyWikiFields(
-      @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now) {
+      @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now, UUID runId) {
     material.setMiningData(dto.miningData());
     material.setScwikiUuid(dto.uuid());
     material.setScwikiKey(dto.key());
     material.setScwikiSlug(dto.slug());
-    if (dto.densityGramPerCc() != null) {
-      material.setDensityGramPerCc(dto.densityGramPerCc());
+    Double density = dto.densityGramPerCc();
+    if (density != null) {
+      P4kLedColumns led = new P4kLedColumns(material);
+      led.write(
+          "density_g_per_cc",
+          material.getDensityGramPerCc(),
+          density,
+          material::setDensityGramPerCc);
+      for (String disagreement : led.disagreements()) {
+        syncReportService.logCommodityEvent(
+            runId,
+            SyncEventType.P4K_DISAGREEMENT,
+            material.getP4kUuid(),
+            material.getName(),
+            disagreement);
+      }
     }
     material.setScwikiSyncedAt(now);
     material.setScwikiDeletedAt(null);

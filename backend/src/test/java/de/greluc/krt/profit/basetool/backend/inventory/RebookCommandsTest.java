@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.Rebook
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookedRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -99,10 +100,7 @@ class RebookCommandsTest {
     joins(otherMember, target);
     material = material("SCU");
     location = UUID.randomUUID();
-    jdbc.update(
-        "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)",
-        location,
-        "Rebook place " + location);
+    TestPlaces.insertLocation(jdbc, location, "Rebook place " + location);
     client = "rb-" + UUID.randomUUID().toString().substring(0, 8);
     jdbc.update(
         "INSERT INTO exchange_client (id, client_id, display_name, status, created_at)"

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.AggregatedInventor
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.Collections;
 import java.util.List;
@@ -223,8 +224,43 @@ class InventoryIndexListPatternRenderTest {
         .containsPattern(
             "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;view=items&amp;gameItemIds="
                 + GAME_ITEM_ID)
-        .containsPattern("class=\"cell-sub\">RSI<")
+        .contains(">RSI<")
         .doesNotContain("Max. Qualit");
+  }
+
+  /**
+   * A German page shows the item's and its manufacturer's German names and the manufacturer's
+   * abbreviation badge when it has no Fan Kit logo (REQ-P4K-022, REQ-P4K-023).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemsViewShowsGermanNamesAndTheManufacturerBadge() throws Exception {
+    ManufacturerRefDto maker =
+        new ManufacturerRefDto(
+            UUID.randomUUID(), "Roberts Space Industries", "RSI DE", "RSI", null);
+    AggregatedInventoryDto row =
+        new AggregatedInventoryDto(
+            null,
+            new InventoryGameItemReferenceDto(
+                GAME_ITEM_ID,
+                "Quantum Drive XL-1",
+                "Roberts Space Industries",
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                "Quantenantrieb XL-1",
+                maker),
+            null,
+            null,
+            7.0);
+
+    assertThat(render(pageOf(row), "view=items"))
+        .contains(">Quantenantrieb XL-1<")
+        .contains(">RSI DE<")
+        .contains("data-testid=\"manufacturer-badge\"");
   }
 
   /** A game item with a low level carries the „niedrig" marker in the items view (REQ-INV-068). */

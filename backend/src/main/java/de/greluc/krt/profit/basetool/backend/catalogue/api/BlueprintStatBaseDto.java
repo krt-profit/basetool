@@ -28,20 +28,24 @@ import org.jetbrains.annotations.NotNull;
  * @param propertyKey the SC Wiki property key the modifiers name, e.g. {@code "health_maxhealth"}
  * @param baseValue the base value in {@code unit}; a {@code PERCENT} value is a fraction of one
  * @param unit the unit of {@code baseValue}
+ * @param source where the value comes from, named in the chip's tooltip (REQ-P4K-030)
  */
 public record BlueprintStatBaseDto(
-    @NotNull String propertyKey, double baseValue, @NotNull BlueprintStatUnit unit) {
+    @NotNull String propertyKey,
+    double baseValue,
+    @NotNull BlueprintStatUnit unit,
+    @NotNull GameItemStatSource source) {
 
   /**
    * Maps a stored base value to its DTO.
    *
    * @param stat the stored stat row
-   * @return the DTO carrying the row's property key, value and unit
+   * @return the DTO carrying the row's property key, value, unit and source
    */
   @NotNull
   public static BlueprintStatBaseDto of(@NotNull GameItemStat stat) {
     BlueprintStatProperty property = stat.getProperty();
     return new BlueprintStatBaseDto(
-        property.getPropertyKey(), stat.getBaseValue(), property.getUnit());
+        property.getPropertyKey(), stat.getBaseValue(), property.getUnit(), stat.getSource());
   }
 }

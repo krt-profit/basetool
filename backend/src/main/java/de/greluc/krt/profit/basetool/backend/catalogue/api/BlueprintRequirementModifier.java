@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -43,6 +45,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
@@ -55,12 +58,15 @@ import org.jetbrains.annotations.UnmodifiableView;
  * <p>When {@link #getSegments()} is non-empty the stat does NOT move linearly between those two
  * endpoints — it follows the ordered, contiguous {@link BlueprintModifierSegment}s (a stepped /
  * piecewise-linear curve). Consumers must prefer the segments over the endpoint pair when present.
+ *
+ * <p>Exactly one owner is set: the {@link #requirementGroup} of a slot modifier, or the {@link
+ * #blueprint} of a recipe-wide modifier (the P4K's choose-n root selection, REQ-P4K-027).
  */
 @Entity
 @Table(name = "blueprint_requirement_modifier")
 @Getter
 @Setter
-@ToString(exclude = {"requirementGroup", "segments"})
+@ToString(exclude = {"requirementGroup", "blueprint", "segments"})
 @NoArgsConstructor
 public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
 
@@ -69,21 +75,30 @@ public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** Owning requirement group. */
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "requirement_group_id", nullable = false)
+  /** Owning requirement group of a slot modifier; {@code null} on a recipe-wide modifier. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "requirement_group_id")
+  @Nullable
   private BlueprintRequirementGroup requirementGroup;
 
-  /** Position within the group's modifier list (drives {@code @OrderBy}). */
+  /** Owning blueprint of a recipe-wide modifier; {@code null} on a slot modifier. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "blueprint_id")
+  @Nullable
+  private Blueprint blueprint;
+
+  /** Position within the owner's modifier list (drives {@code @OrderBy}). */
   @Column(name = "order_index", nullable = false)
   private Integer orderIndex;
 
   /** Internal stat key the modifier affects, e.g. {@code "weapon_damage"}. */
   @Column(name = "property_key")
+  @Nullable
   private String propertyKey;
 
   /** Human-readable stat name, e.g. {@code "Impact Force"}. */
   @Column(name = "label")
+  @Nullable
   private String label;
 
   /**
@@ -94,23 +109,38 @@ public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
 
   /** Lowest ingredient-quality value of the interpolation band (typically {@code 0}). */
   @Column(name = "quality_min")
+  @Nullable
   private Double qualityMin;
 
   /** Highest ingredient-quality value of the interpolation band (typically {@code 1000}). */
   @Column(name = "quality_max")
+  @Nullable
   private Double qualityMax;
 
   /** Stat multiplier applied at {@link #qualityMin} (e.g. {@code 0.95}). */
   @Column(name = "modifier_at_min_quality")
+  @Nullable
   private Double modifierAtMinQuality;
 
   /** Stat multiplier applied at {@link #qualityMax} (e.g. {@code 1.05}). */
   @Column(name = "modifier_at_max_quality")
+  @Nullable
   private Double modifierAtMaxQuality;
 
   /** Interpolation type between the two multiplier endpoints (currently {@code "linear"}). */
   @Column(name = "value_range_type", length = 32)
   private String valueRangeType;
+
+  /** The P4K {@code gameplayProperties} GUID of the affected stat, or {@code null}. */
+  @Column(name = "property_guid")
+  @Nullable
+  private UUID propertyGuid;
+
+  /** Whether the P4K's values are factors or summands; {@code null} on a Wiki modifier. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "value_kind", length = 16)
+  @Nullable
+  private BlueprintModifierValueKind valueKind;
 
   /**
    * Ordered segments of a stepped / piecewise-linear modifier; empty for the simple linear form.

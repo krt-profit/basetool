@@ -86,6 +86,7 @@ class UexItemSyncServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(gameItemRepository.findBySourceUuid(any())).thenCallRealMethod();
     lenient().when(self.getObject()).thenReturn(service);
     lenient().when(scWikiProperties.reconcileUuidlessByName()).thenReturn(true);
 
@@ -170,6 +171,36 @@ class UexItemSyncServiceTest {
     assertNotNull(persisted.getUexSyncedAt());
     assertNull(persisted.getScwikiSyncedAt());
     assertNull(persisted.getDescriptionEn());
+  }
+
+  @Test
+  void syncItems_keepsTheNameAndManufacturerTheP4kLeads_andRecordsTheUexName() {
+    UUID externalUuid = UUID.randomUUID();
+    Manufacturer p4kMaker = new Manufacturer();
+    p4kMaker.setId(UUID.randomUUID());
+    p4kMaker.setName("Gorgon Defender Industries");
+    GameItem matched = storedItem(7, externalUuid);
+    matched.setName("AllStop");
+    matched.setP4kName("AllStop");
+    matched.setManufacturer(p4kMaker);
+    matched.setP4kManufacturer(p4kMaker);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(
+            fetched(helmetDto(7, "AllStop Shield", externalUuid.toString(), helmetsCategory)));
+    when(gameItemRepository.findByUexItemId(7)).thenReturn(Optional.of(matched));
+    lenient()
+        .when(manufacturerAliasRepository.findCompanyRefs())
+        .thenReturn(List.of(ref(1, rsi.getId())));
+    lenient().when(manufacturerRepository.getReferenceById(rsi.getId())).thenReturn(rsi);
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    assertEquals("AllStop", matched.getName());
+    assertEquals("AllStop Shield", matched.getUexName());
+    assertSame(p4kMaker, matched.getManufacturer());
   }
 
   @Test
@@ -268,6 +299,36 @@ class UexItemSyncServiceTest {
             isNull(),
             isNull(),
             contains("sharedUuidDeclined=1"));
+  }
+
+  @Test
+  void syncItems_adoptsTheRowTheP4kSeededUnderTheSameGuid_insteadOfCreatingASecondRow() {
+    UUID guid = UUID.randomUUID();
+    GameItem seeded = new GameItem();
+    seeded.setId(UUID.randomUUID());
+    seeded.setP4kUuid(guid);
+    seeded.setName("Seeded Helmet");
+    seeded.setP4kName("Seeded Helmet");
+    seeded.setKind(GameItemKind.GENERIC);
+    seeded.setSourceSystems(GameItemSourceSystem.P4K);
+    when(categoryRefService.syncCategoriesResult())
+        .thenReturn(new UexCategoryRefService.CategorySyncResult(List.of(helmetsCategory), true));
+    when(uexClient.getItemsForCategory(3))
+        .thenReturn(fetched(helmetDto(8, "UEX Helmet Name", guid.toString(), helmetsCategory)));
+    when(gameItemRepository.findByUexItemId(8)).thenReturn(Optional.empty());
+    when(gameItemRepository.findByP4kUuidAndExternalUuidIsNull(guid))
+        .thenReturn(Optional.of(seeded));
+    when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    service.syncItems();
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    assertSame(seeded, saved.getValue());
+    assertEquals(guid, seeded.getExternalUuid());
+    assertEquals(8, seeded.getUexItemId());
+    assertEquals("Seeded Helmet", seeded.getName());
+    assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
   }
 
   @Test

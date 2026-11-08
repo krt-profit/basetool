@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDeletionObserver;
@@ -78,6 +79,8 @@ class MaterialServiceTest {
   @Mock private MaterialMapper materialMapper;
 
   @Mock private MaterialDeletionObserver materialDeletionObserver;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private MaterialService materialService;
 
@@ -233,15 +236,14 @@ class MaterialServiceTest {
     mat2.setName("Bexalite");
     mat2.setIsJobOrder(true);
 
-    when(materialRepository.findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc())
-        .thenReturn(List.of(mat1, mat2));
+    when(materialRepository.findPickableJobOrderMaterials()).thenReturn(List.of(mat1, mat2));
 
     List<Material> result = materialService.getAllJobOrderMaterials();
 
     assertEquals(2, result.size());
     assertEquals("Agricium", result.get(0).getName());
     assertEquals("Bexalite", result.get(1).getName());
-    verify(materialRepository).findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc();
+    verify(materialRepository).findPickableJobOrderMaterials();
   }
 
   @Test
@@ -268,14 +270,17 @@ class MaterialServiceTest {
             true,
             0L);
     Page<Material> expected = new PageImpl<>(List.of(visible));
-    when(materialRepository.findByIsVisibleTrue(pageRequest)).thenReturn(expected);
+    when(materialRepository.findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+            pageRequest))
+        .thenReturn(expected);
     when(materialMapper.toDto(visible)).thenReturn(read);
 
     Page<MaterialDto> result = materialService.getVisibleMaterials(pageRequest);
 
     assertEquals(1, result.getTotalElements());
     assertEquals(read, result.getContent().get(0));
-    verify(materialRepository).findByIsVisibleTrue(pageRequest);
+    verify(materialRepository)
+        .findByIsVisibleTrueAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(pageRequest);
     verify(materialRepository, never()).findAll(any(PageRequest.class));
   }
 

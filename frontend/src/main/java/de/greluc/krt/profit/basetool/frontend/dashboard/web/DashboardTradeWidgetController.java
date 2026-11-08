@@ -35,11 +35,13 @@ import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -100,18 +102,19 @@ public class DashboardTradeWidgetController {
     int limit = options.rows(DashboardWidgetType.MARKET, rows);
     BoardFilter filter = new BoardFilter(BOARD_TAB, limit, null, null, BOARD_SORT_NEWEST, null);
     List<MarketWidgetRow> lines = new ArrayList<>();
+    Locale locale = LocaleContextHolder.getLocale();
     long total = 0;
     if (resolved != DashboardStatus.REQUESTS) {
       PageResponse<MaterialExchangeOfferDto> offers = marketClient.offers(filter, false);
       if (offers != null) {
-        offers.content().forEach(offer -> lines.add(MarketWidgetRow.of(offer)));
+        offers.content().forEach(offer -> lines.add(MarketWidgetRow.of(offer, locale)));
         total += offers.totalElements();
       }
     }
     if (resolved != DashboardStatus.OFFERS) {
       PageResponse<MaterialRequestDto> wanted = marketClient.requests(filter);
       if (wanted != null) {
-        wanted.content().forEach(request -> lines.add(MarketWidgetRow.of(request)));
+        wanted.content().forEach(request -> lines.add(MarketWidgetRow.of(request, locale)));
         total += wanted.totalElements();
       }
     }

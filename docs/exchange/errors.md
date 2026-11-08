@@ -71,7 +71,7 @@ codes, whichever side refuses it.
 | Reason | Meaning | Client action |
 | --- | --- | --- |
 | `UNMATCHED` | The reference resolves to nothing. | Show it; offer `catalog/resolve`. |
-| `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `bt`. |
+| `AMBIGUOUS` | The reference resolves to several entries. | Ask the member to pick; send `guid` for a blueprint, else `bt`. |
 | `DEFAULT_NOT_REMOVABLE` | A default-granted blueprint cannot be removed. | Keep it. |
 | `STOCK_EARMARKED` | The lot's stock, the stock a `share` or `unshare` would move, or the part of an org-stock `book-out` its earmark lines do not cover, is reserved for a job order, mission or donation. | Ask the member to release the reservation in the web, or name the earmarks to take from. |
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |
@@ -88,6 +88,7 @@ codes, whichever side refuses it.
 | `QUANTITY_ABOVE_EXPECTED` | A stock `share` or `unshare` moves more than its `expectedQuantity`. | Move at most the amount the client last saw at the source. |
 | `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount, or an earmark op would earmark more of one kind than the entry holds. | Lower the earmarks. |
 | `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, one the entry is not earmarked to, or, for `allocation-add`, one it already is. | Read the [targets](resources/org-stock.md#the-targets) and the entry again. |
+| `ITEM_RETIRED` | The item is no longer in the game, or the Basetool hid it: an org-stock `book-in` of it, or a stock rise of it that the batch's falls of the same item do not cover. | Do not retry; tell the member the item can no longer be booked in. Lowering or moving the stock they hold still works. |
 
 ## Warnings
 

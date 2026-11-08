@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -93,7 +95,7 @@ class AdminP4kImportPageControllerTest {
         + kind
         + "\",\"status\":\""
         + status
-        + "\",\"seedNew\":false,\"sourceFilename\":\"p4k.json\",\"fileSizeBytes\":12,"
+        + "\",\"createItemsAndShips\":false,\"sourceFilename\":\"p4k.json\",\"fileSizeBytes\":12,"
         + "\"previewJobId\":null,\"result\":null,\"errorMessage\":null,"
         + "\"createdAt\":\"2026-06-05T19:00:00Z\",\"startedAt\":null,\"finishedAt\":null}";
   }
@@ -107,13 +109,13 @@ class AdminP4kImportPageControllerTest {
             .setHeader("Content-Type", "application/json")
             .setBody(jobJson(id.toString(), "PREVIEW", "PENDING")));
 
-    ResponseEntity<P4kImportJobDto> response = controller.enqueuePreview(catalog());
+    ResponseEntity<Object> response = controller.enqueuePreview(catalog());
 
     assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
-    assertNotNull(response.getBody());
-    assertEquals(id.toString(), response.getBody().id());
-    assertEquals("PREVIEW", response.getBody().kind());
-    assertEquals("PENDING", response.getBody().status());
+    P4kImportJobDto job = assertInstanceOf(P4kImportJobDto.class, response.getBody());
+    assertEquals(id.toString(), job.id());
+    assertEquals("PREVIEW", job.kind());
+    assertEquals("PENDING", job.status());
 
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
@@ -169,7 +171,7 @@ class AdminP4kImportPageControllerTest {
   }
 
   @Test
-  void applyJob_proxiesWithSeedFlagAndReturnsAcceptedJob() throws Exception {
+  void applyJob_proxiesTheCreateItemsAndShipsFlagAndReturnsAcceptedJob() throws Exception {
     UUID id = UUID.randomUUID();
     server.enqueue(
         new MockResponse()
@@ -177,7 +179,7 @@ class AdminP4kImportPageControllerTest {
             .setHeader("Content-Type", "application/json")
             .setBody(jobJson(UUID.randomUUID().toString(), "APPLY", "PENDING")));
 
-    ResponseEntity<P4kImportJobDto> response = controller.applyJob(id, true);
+    ResponseEntity<P4kImportJobDto> response = controller.applyJob(id, true, true);
 
     assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
     assertNotNull(response.getBody());
@@ -187,7 +189,10 @@ class AdminP4kImportPageControllerTest {
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
     assertEquals(
-        "/api/v1/catalog/admin/import/p4k/jobs/" + id + "/apply?seedNew=true", req.getPath());
+        "/api/v1/catalog/admin/import/p4k/jobs/"
+            + id
+            + "/apply?createItemsAndShips=true&overrideMassGuard=true",
+        req.getPath());
 
     verify(backendApiClient)
         .evict(
@@ -198,11 +203,32 @@ class AdminP4kImportPageControllerTest {
   }
 
   @Test
-  void enqueuePreview_onBackend400_propagatesAsBadRequest() {
-    server.enqueue(new MockResponse().setResponseCode(400).setBody("bad catalog"));
+  void enqueuePreview_onGateRefusal_relaysTheProblemCodeAndDetail() {
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(400)
+            .setHeader("Content-Type", "application/problem+json")
+            .setBody(
+                "{\"status\":400,\"code\":\"P4K_UPLOAD_REJECTED\","
+                    + "\"detail\":\"Only LIVE catalogues can be imported.\"}"));
+
+    ResponseEntity<Object> response = controller.enqueuePreview(catalog());
+
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    assertEquals(MediaType.APPLICATION_PROBLEM_JSON, response.getHeaders().getContentType());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("P4K_UPLOAD_REJECTED", body.get("code"));
+    assertEquals("Only LIVE catalogues can be imported.", body.get("detail"));
+  }
+
+  @Test
+  void applyJob_onBackend400_propagatesAsBadRequest() {
+    server.enqueue(new MockResponse().setResponseCode(400).setBody("older build"));
 
     ResponseStatusException ex =
-        assertThrows(ResponseStatusException.class, () -> controller.enqueuePreview(catalog()));
+        assertThrows(
+            ResponseStatusException.class,
+            () -> controller.applyJob(UUID.randomUUID(), false, false));
 
     assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }

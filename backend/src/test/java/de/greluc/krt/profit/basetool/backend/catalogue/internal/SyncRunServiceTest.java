@@ -22,10 +22,15 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.livesync.api.AdminDashboardLiveSync;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
@@ -39,6 +44,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -49,6 +55,7 @@ class SyncRunServiceTest {
   @Mock private ExternalSyncRunRepository repository;
   @Mock private AdminDashboardLiveSync liveSync;
   @Mock private LiveSyncPublisher catalogueUpdates;
+  @Mock private AuditRecorder auditRecorder;
   private final SyncRunProgress progress = new SyncRunProgress();
   private final Map<UUID, ExternalSyncRun> stored = new LinkedHashMap<>();
   private SyncRunService service;
@@ -70,7 +77,65 @@ class SyncRunServiceTest {
             new SimpleMeterRegistry(),
             liveSync,
             catalogueUpdates,
+            auditRecorder,
             new RecordingTransactionManager());
+  }
+
+  @Test
+  void finishedAttempt_recordsOneSystemSummaryWithItsCommittedOutcome() {
+    service.run(
+        SyncSourceSystem.UEX,
+        SyncAggregate.GAME_ITEM,
+        null,
+        () -> {
+          progress.fetched(5, 4, true);
+          progress.applied(3);
+          progress.failed(1);
+          progress.sweep(false);
+          return 3;
+        });
+
+    ExternalSyncRun run = stored.values().iterator().next();
+    ArgumentCaptor<AuditDetails> details = ArgumentCaptor.forClass(AuditDetails.class);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.CATALOGUE_SYNC_RUN_FINISHED),
+            eq(run.getId()),
+            eq("UEX GAME_ITEM"),
+            isNull(),
+            details.capture());
+    assertThat(details.getValue().toString())
+        .contains(
+            "source=UEX",
+            "aggregate=GAME_ITEM",
+            "status=PARTIAL",
+            "fetched=5",
+            "applied=3",
+            "failed=1",
+            "sweep=SKIPPED");
+  }
+
+  @Test
+  void thrownFailure_recordsAFailedSummary() {
+    assertThatThrownBy(() ->
+            service.run(
+                SyncSourceSystem.SCWIKI,
+                SyncAggregate.CATALOGUE,
+                null,
+                () -> {
+                  throw new IllegalStateException("upstream unavailable");
+                }))
+        .isInstanceOf(IllegalStateException.class);
+
+    ArgumentCaptor<AuditDetails> details = ArgumentCaptor.forClass(AuditDetails.class);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.CATALOGUE_SYNC_RUN_FINISHED),
+            any(),
+            eq("SCWIKI CATALOGUE"),
+            isNull(),
+            details.capture());
+    assertThat(details.getValue().toString()).contains("status=FAILED");
   }
 
   @Test
@@ -324,6 +389,7 @@ class SyncRunServiceTest {
             restoredMetrics,
             liveSync,
             catalogueUpdates,
+            auditRecorder,
             new RecordingTransactionManager());
 
     restored.recoverInterruptedAttempts();

@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
@@ -247,6 +248,33 @@ class ExchangeOrgStockWriteControllerTest {
                 holder,
                 mirage))
         .containsExactly(2.0);
+  }
+
+  @Test
+  void aBookInOfARetiredItemIsRefusedAndBooksNothing() throws Exception {
+    UUID staffel = orgUnit();
+    joins(member, staffel, true);
+    joins(holder, staffel, false);
+    UUID helmet = item("Helmet " + UUID.randomUUID());
+    jdbc.update("UPDATE game_item SET p4k_hidden_at = now() WHERE id = ?", helmet);
+    UUID area18 = location();
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookIn(staffel, ref(staffel, holder), helmet, area18, "2", "PIECE"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("ITEM_RETIRED"));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_item WHERE game_item_id = ?",
+                Integer.class,
+                helmet))
+        .isZero();
   }
 
   @Test
@@ -2101,7 +2129,7 @@ class ExchangeOrgStockWriteControllerTest {
    */
   private @NotNull UUID location() {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO location (id, name, hidden) VALUES (?, ?, false)", id, "Writes " + id);
+    TestPlaces.insertLocation(jdbc, id, "Writes " + id);
     locations.add(id);
     return id;
   }

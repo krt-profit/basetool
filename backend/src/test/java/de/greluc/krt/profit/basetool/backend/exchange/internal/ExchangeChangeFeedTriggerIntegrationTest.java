@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
@@ -28,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -65,9 +67,16 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "org_unit_membership",
           "app_user",
           "exchange_name_withholding",
-          "mission");
+          "mission",
+          "location",
+          "city",
+          "space_station",
+          "starmap_object");
 
   @Autowired private JdbcTemplate jdbc;
+
+  @Autowired private CityRepository cityRepository;
+
   @Autowired private UserRepository userRepository;
   @Autowired private ExchangeChangeRepository changeRepository;
   @Autowired private LocationRepository locationRepository;
@@ -899,7 +908,7 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   private @NotNull UUID location(@NotNull String name) {
     Location location = new Location();
     location.setName(name);
-    return locationRepository.saveAndFlush(location).getId();
+    return locationRepository.saveAndFlush(TestPlaces.onOwnCity(location, cityRepository)).getId();
   }
 
   /**

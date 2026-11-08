@@ -28,11 +28,12 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * The raw uploaded catalog bytes of one {@link P4kImportJob}, in a 1:1 side table keyed by the job
- * id ({@link #jobId}, not generated) so listing and polling jobs never loads the upload. Deleted
- * with its job via {@code ON DELETE CASCADE}.
+ * The large byte content of one {@link P4kImportJob}, the uploaded catalogue and a preview's change
+ * report, in a 1:1 side table keyed by the job id ({@link #jobId}, not generated) so listing and
+ * polling jobs never loads either. Deleted with its job via {@code ON DELETE CASCADE}.
  */
 @Entity
 @Table(name = "p4k_import_job_payload")
@@ -49,4 +50,12 @@ public class P4kImportJobPayload {
   /** The uploaded P4K catalog JSON, stored verbatim as {@code bytea}. */
   @Column(name = "content", nullable = false)
   private byte[] content;
+
+  /**
+   * The change report a PREVIEW computed, gzipped JSON of {@link P4kImportChangeDto} rows
+   * (REQ-P4K-015); {@code null} for an APPLY job and before the preview finished.
+   */
+  @Column(name = "preview_report")
+  @Nullable
+  private byte[] previewReport;
 }

@@ -73,11 +73,15 @@
     .admin-materials-table select {
         min-width: 8.5rem;
     }
-    .admin-materials-category-form {
-        margin-bottom: var(--space-3);
+    .admin-material-override {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1);
+        margin-top: var(--space-1);
     }
-    .admin-materials-categories .data-table {
-        margin-top: 0;
+    .admin-material-override[hidden] {
+        display: none;
     }
     @media (width <= 768px) {
         .admin-materials-table td:not(:first-child) {

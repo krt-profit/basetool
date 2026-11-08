@@ -31,7 +31,9 @@ import org.jetbrains.annotations.Nullable;
  * @param id the job id
  * @param kind whether the run previews or applies the catalog
  * @param status the lifecycle status
- * @param seedNew for an APPLY run, whether new unmatched rows are seeded
+ * @param createItemsAndShips for an APPLY run, whether unmatched playable items and ships are
+ *     created
+ * @param overrideMassGuard for an APPLY run, whether the admin overrode the sweep's mass guard
  * @param sourceFilename original upload filename, or {@code null}
  * @param fileSizeBytes size of the uploaded catalog in bytes, or {@code null}
  * @param previewJobId for an APPLY run, the preview it was launched from, else {@code null}
@@ -45,7 +47,8 @@ public record P4kImportJobDto(
     UUID id,
     P4kImportJobKind kind,
     P4kImportJobStatus status,
-    boolean seedNew,
+    boolean createItemsAndShips,
+    boolean overrideMassGuard,
     @Nullable String sourceFilename,
     Long fileSizeBytes,
     UUID previewJobId,

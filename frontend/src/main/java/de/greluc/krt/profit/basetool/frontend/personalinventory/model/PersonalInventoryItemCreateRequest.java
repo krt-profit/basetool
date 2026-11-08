@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.personalinventory.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.UUID;
 
 /**
  * Outbound write DTO for creating a personal inventory entry. Validation is enforced on the
@@ -30,8 +31,4 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  */
 @DtoMirror
 public record PersonalInventoryItemCreateRequest(
-    String name,
-    String note,
-    Integer locationUexId,
-    PersonalInventoryLocationType locationType,
-    Integer quantity) {}
+    String name, String note, UUID locationId, Integer quantity) {}

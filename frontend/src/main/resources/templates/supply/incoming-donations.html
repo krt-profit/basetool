@@ -47,7 +47,7 @@
                 <template>
                     <option th:each="n : ${openNeeds}" th:value="${n.id()}"
                             th:data-quantity-type="${n.quantityType()}"
-                            th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</option>
+                            th:text="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}">Quantanium</option>
                 </template>
             </div>
             <div class="table-responsive" th:if="${!#lists.isEmpty(donations)}">
@@ -64,7 +64,7 @@
                     <tbody>
                         <tr th:each="d : ${donations}" data-testid="supply-incoming-row" th:data-donation-id="${d.id()}" th:data-focus-id="${d.id()}">
                             <td>
-                                <span class="cell-title" th:text="${d.material() != null ? d.material().name() : d.gameItem().name()}">Quantanium</span>
+                                <span class="cell-title" th:text="${d.material() != null ? d.material().displayName(#locale) : d.gameItem().displayName(#locale)}">Quantanium</span>
                                 <span class="cell-sub">
                                     <span th:if="${d.gameItem() != null}" class="supply-item-chips" data-testid="supply-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${d.gameItem()})}"></span>
                                     <span th:if="${d.quality() != null}" th:text="#{supply.donation.quality(${#strings.toString(d.quality())})}">Q500</span>
@@ -87,7 +87,7 @@
                                                 data-testid="supply-donation-receive"
                                                 th:data-donation-id="${d.id()}" th:data-version="${d.version()}"
                                                 th:data-amount="${d.pledgedAmount()}"
-                                                th:data-entry="${d.material() != null ? d.material().name() : d.gameItem().name()}"
+                                                th:data-entry="${d.material() != null ? d.material().displayName(#locale) : d.gameItem().displayName(#locale)}"
                                                 th:data-quantity-type="${d.quantityType()}"
                                                 th:text="#{supply.donation.receive}">Empfang best&auml;tigen</button>
                                         <button type="button" class="btn btn-quiet-danger btn-xs" data-trigger="supply-donation-decline"
@@ -169,7 +169,7 @@
                             <option value="" th:text="#{supply.record.noNeed}">Keinem Bedarf zuordnen</option>
                             <option th:each="n : ${openNeeds}" th:value="${n.id()}"
                                     th:data-quantity-type="${n.quantityType()}"
-                                    th:text="${n.material() != null ? n.material().name() : n.gameItem().name()}">Quantanium</option>
+                                    th:text="${n.material() != null ? n.material().displayName(#locale) : n.gameItem().displayName(#locale)}">Quantanium</option>
                         </select>
                     </div>
                     <div id="supply-record-catalogue">
@@ -183,13 +183,13 @@
                         <div class="form-group" id="supply-record-material-row">
                             <label for="supply-record-material" th:text="#{supply.need.material}">Material</label>
                             <select id="supply-record-material">
-                                <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.name()}">Quantanium</option>
+                                <option th:each="m : ${materials}" th:value="${m.id()}" th:data-quantity-type="${m.quantityType()}" th:text="${m.displayName(#locale)}">Quantanium</option>
                             </select>
                         </div>
                         <div class="form-group" id="supply-record-item-row" hidden>
                             <label for="supply-record-item" th:text="#{supply.need.item}">Item</label>
                             <select id="supply-record-item">
-                                <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.name()}">Item</option>
+                                <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.displayName(#locale)}">Item</option>
                             </select>
                         </div>
                         <div class="form-group" id="supply-record-quality-row">

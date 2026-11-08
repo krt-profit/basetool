@@ -29,10 +29,13 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
@@ -59,6 +62,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -66,6 +70,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -144,6 +150,7 @@ class InventoryItemServiceTest {
             userRepository,
             materialRepository,
             gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,
@@ -617,6 +624,41 @@ class InventoryItemServiceTest {
     verify(inventoryItemRepository).save(any(InventoryItem.class));
   }
 
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void createInventoryItem_onAPlaceNoPickerOffers_isRefused(Location location) {
+    UUID userId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        new InventoryItemCreateDto(
+            userId,
+            materialId,
+            null,
+            location.getId(),
+            100,
+            10.0,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    User user = new User();
+    user.setId(userId);
+    Material material = new Material();
+    material.setId(materialId);
+    lenient().when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    lenient().when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+
+    assertThrows(
+        LocationNotOfferedException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
   @Test
   void createInventoryItem_stolenIsRefusedWhileTheMarkerIsSwitchedOff() {
     UUID userId = UUID.randomUUID();
@@ -662,6 +704,7 @@ class InventoryItemServiceTest {
             userRepository,
             materialRepository,
             gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,
@@ -1280,13 +1323,27 @@ class InventoryItemServiceTest {
     UUID gameItemId = UUID.randomUUID();
     InventoryItemCreateDto dto =
         itemCreateDto(userId, gameItemId, UUID.randomUUID(), null, null, null);
-    User user = new User();
-    user.setId(userId);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.empty());
 
     assertThrows(
         NotFoundException.class, () -> inventoryItemService.createInventoryItem(dto, userId));
+    verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
+  }
+
+  @Test
+  void createInventoryItem_gameItemTheP4kRetired_throwsRetired() {
+    UUID userId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    InventoryItemCreateDto dto =
+        itemCreateDto(userId, gameItemId, UUID.randomUUID(), null, null, null);
+    GameItem retired = new GameItem();
+    retired.setId(gameItemId);
+    retired.setP4kDeletedAt(Instant.now());
+    when(gameItemRepository.findById(gameItemId)).thenReturn(Optional.of(retired));
+
+    assertThrows(
+        RetiredGameItemException.class,
+        () -> inventoryItemService.createInventoryItem(dto, userId));
     verify(inventoryItemRepository, never()).save(any(InventoryItem.class));
   }
 

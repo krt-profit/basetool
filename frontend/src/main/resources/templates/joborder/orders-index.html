@@ -159,7 +159,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="mat : ${order.materials}">
-                                    <td class="orders-material-name" th:text="${mat.material.name}" th:title="${mat.material.name}">Titanium</td>
+                                    <td class="orders-material-name" th:text="${mat.material.displayName(#locale)}" th:title="${mat.material.displayName(#locale)}">Titanium</td>
                                     <td class="num" th:switch="${mat.material.quantityType}">
                                         <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                         <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
@@ -179,7 +179,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="agg : ${order.aggregatedMaterials}">
-                                    <td class="orders-material-name" th:text="${agg.material != null ? agg.material.name() : '-'}" th:title="${agg.material != null ? agg.material.name() : '-'}">Titanium</td>
+                                    <td class="orders-material-name" th:text="${agg.material != null ? agg.material.displayName(#locale) : '-'}" th:title="${agg.material != null ? agg.material.displayName(#locale) : '-'}">Titanium</td>
                                     <td class="num" th:switch="${agg.material != null ? agg.material.quantityType() : 'SCU'}">
                                         <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
                                         <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>

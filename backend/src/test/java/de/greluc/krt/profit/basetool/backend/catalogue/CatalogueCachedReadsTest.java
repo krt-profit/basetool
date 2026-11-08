@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
@@ -124,6 +123,9 @@ class CatalogueCachedReadsTest {
 
   private final Instant startedAt = Instant.now();
 
+  /** The signed-in admin; a real {@code app_user} row, since audited mutators name their actor. */
+  private final UUID adminId = UUID.randomUUID();
+
   @Autowired private CityController cityController;
   @Autowired private FrequencyTypeController frequencyTypeController;
   @Autowired private JobTypeController jobTypeController;
@@ -176,12 +178,17 @@ class CatalogueCachedReadsTest {
 
   @BeforeEach
   void seedAndSignInAsAdmin() {
+    new JdbcTemplate(dataSource)
+        .update(
+            "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)",
+            adminId,
+            "cat-admin-" + tag);
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(
                 Jwt.withTokenValue("catalogue-cached-reads")
                     .header("alg", "none")
-                    .subject(UUID.randomUUID().toString())
+                    .subject(adminId.toString())
                     .build(),
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     transactionTemplate.executeWithoutResult(status -> seed());
@@ -196,13 +203,15 @@ class CatalogueCachedReadsTest {
         cleanup.pop().run();
       }
     });
-    new JdbcTemplate(dataSource)
-        .update(
-            """
-            DELETE FROM audit_event WHERE actor_user_id IS NULL AND occurred_at >= ?
-              AND event_type = 'REFINERY_METHOD_UPDATED'
-            """,
-            Timestamp.from(startedAt));
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    jdbc.update(
+        """
+        DELETE FROM audit_event WHERE actor_user_id IS NULL AND occurred_at >= ?
+          AND event_type = 'REFINERY_METHOD_UPDATED'
+        """,
+        Timestamp.from(startedAt));
+    jdbc.update("DELETE FROM audit_event WHERE actor_user_id = ?", adminId);
+    jdbc.update("DELETE FROM app_user WHERE id = ?", adminId);
     clearCaches();
   }
 
@@ -552,7 +561,15 @@ class CatalogueCachedReadsTest {
                 locationController.updateLocation(
                     locationId,
                     new LocationDto(
-                        locationId, "Cat Location Renamed " + tag, "changed", false, false, 0L)),
+                        locationId,
+                        "Cat Location Renamed " + tag,
+                        "changed",
+                        false,
+                        false,
+                        0L,
+                        null,
+                        null,
+                        null)),
             node ->
                 pinFields(
                     node,
@@ -589,14 +606,6 @@ class CatalogueCachedReadsTest {
             () -> refiningMethodController.getRefiningMethod(refiningMethodId),
             this::renameRefiningMethodWithoutActor,
             node -> pinFields(node, Map.of("/name", "Cat Method Renamed " + tag))));
-    evictions.add(
-        new Eviction(
-            "material categories",
-            () -> materialCategoryController.getById(categoryId),
-            () ->
-                materialCategoryController.update(
-                    categoryId, new MaterialCategoryDto(categoryId, "Cat Ores Renamed " + tag, 0L)),
-            node -> pinFields(node, Map.of("/name", "Cat Ores Renamed " + tag))));
     evictions.add(
         new Eviction(
             "materials",

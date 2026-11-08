@@ -29,7 +29,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * @param propertyKey the SC Wiki property key the modifiers name
  * @param baseValue the base value in {@code unit}; a {@code PERCENT} value is a fraction of one
  * @param unit the unit name, e.g. {@code "NONE"}, {@code "PERCENT"} or {@code "CELSIUS"}
+ * @param source the value's source, {@code "P4K"} or {@code "SCWIKI"}, named in the chip's tooltip
  */
 @DtoMirror
 public record BlueprintStatBaseDto(
-    String propertyKey, double baseValue, @BackendEnumAsString String unit) {}
+    String propertyKey,
+    double baseValue,
+    @BackendEnumAsString String unit,
+    @BackendEnumAsString String source) {}

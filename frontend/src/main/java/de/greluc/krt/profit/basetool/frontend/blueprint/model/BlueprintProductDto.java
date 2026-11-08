@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code BlueprintProductDto}: one searchable blueprint product, the
@@ -31,6 +32,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
  * @param manufacturerName manufacturer of the produced item, or {@code null} if unresolved
  * @param exampleKey one representative SC Wiki recipe key, or {@code null}
  * @param ownedByCurrentUser whether the calling user already owns this product
+ * @param manufacturerNameDe the manufacturer's German name, or {@code null}; the picker JS shows it
+ *     on a German page (REQ-P4K-023)
  */
 @DtoMirror
 public record BlueprintProductDto(
@@ -39,4 +42,26 @@ public record BlueprintProductDto(
     int variantCount,
     String manufacturerName,
     String exampleKey,
-    boolean ownedByCurrentUser) {}
+    boolean ownedByCurrentUser,
+    @Nullable String manufacturerNameDe) {
+
+  /**
+   * Creates a product without a German manufacturer name.
+   *
+   * @param productKey normalized product identity
+   * @param name display name of the product
+   * @param variantCount number of active blueprint recipes that produce this product
+   * @param manufacturerName manufacturer of the produced item, or {@code null} if unresolved
+   * @param exampleKey one representative SC Wiki recipe key, or {@code null}
+   * @param ownedByCurrentUser whether the calling user already owns this product
+   */
+  public BlueprintProductDto(
+      String productKey,
+      String name,
+      int variantCount,
+      String manufacturerName,
+      String exampleKey,
+      boolean ownedByCurrentUser) {
+    this(productKey, name, variantCount, manufacturerName, exampleKey, ownedByCurrentUser, null);
+  }
+}

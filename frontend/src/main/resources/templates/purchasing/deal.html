@@ -27,7 +27,7 @@
                 <dd th:text="${deal.raisingOrgUnit().name()}">ARGON</dd>
                 <dt th:text="#{purchasing.deal.entry}">Material / Item</dt>
                 <dd class="flex-gap-sm">
-                    <span th:text="${deal.material() != null ? deal.material().name() : deal.gameItem().name()}">Quantanium</span>
+                    <span th:text="${deal.material() != null ? deal.material().displayName(#locale) : deal.gameItem().displayName(#locale)}">Quantanium</span>
                     <span class="chip chip--muted" th:if="${deal.qualityTier() != null}"
                           th:text="#{purchasing.deal.quality(${#locale.language == 'en' ? deal.qualityTier().labelEn() : deal.qualityTier().labelDe()})}">Qualit&auml;t: Keine</span>
                 </dd>

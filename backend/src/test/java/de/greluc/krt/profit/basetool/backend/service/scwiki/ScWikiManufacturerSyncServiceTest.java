@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncChunkWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncEventType;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunProgress;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.service.RecordingTransactionManager;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
@@ -138,6 +139,41 @@ class ScWikiManufacturerSyncServiceTest {
 
     assertEquals("AEGS", local.getScwikiCode());
     verify(manufacturerRepository, times(2)).save(local);
+  }
+
+  @Test
+  void aP4kKnownManufacturer_matchesByItsP4kGuid_keepsItsNameAndCode_andReportsTheDifference() {
+    UUID uuid = UUID.randomUUID();
+    Manufacturer local = manufacturer("Aegis Dynamics", "AEG");
+    local.setP4kUuid(uuid);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(uuid, "Aegis Dynamics Wiki", "AEGS"))));
+    when(manufacturerRepository.findByP4kUuid(uuid)).thenReturn(Optional.of(local));
+
+    assertEquals(1, service.syncManufacturers());
+
+    assertEquals("Aegis Dynamics", local.getName());
+    assertEquals("AEG", local.getAbbreviation());
+    assertEquals(uuid, local.getScwikiUuid());
+    assertEquals("AEGS", local.getScwikiCode());
+    verify(syncReportService)
+        .logP4kDisagreement(
+            eq(SyncSourceSystem.SCWIKI),
+            any(),
+            eq("manufacturer"),
+            eq(uuid),
+            eq("name"),
+            eq("Aegis Dynamics"),
+            eq("Aegis Dynamics Wiki"));
+    verify(syncReportService)
+        .logP4kDisagreement(
+            eq(SyncSourceSystem.SCWIKI),
+            any(),
+            eq("manufacturer"),
+            eq(uuid),
+            eq("abbreviation"),
+            eq("AEG"),
+            eq("AEGS"));
   }
 
   @Test

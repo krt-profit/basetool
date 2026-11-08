@@ -649,6 +649,8 @@ public class GlobalExceptionHandler {
     m.put(
         BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
         "error.orgUnit.seatRequiresKrtMember");
+    m.put("CATALOGUE_ITEM_RETIRED", "error.catalogue.itemRetired");
+    m.put("CATALOGUE_BLUEPRINT_RETIRED", "error.catalogue.blueprintRetired");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");
     m.put("SUPPLY_UNIT_CANNOT_RAISE", "error.supply.unitCannotRaise");
     m.put("SUPPLY_UNIT_CANNOT_RECEIVE", "error.supply.unitCannotReceive");
@@ -685,6 +687,7 @@ public class GlobalExceptionHandler {
     m.put("BANK_JUSTIFICATION_REQUIRED", "error.bank.justificationRequired");
     m.put("BANK_FEE_EXCEEDS_AMOUNT", "error.bank.feeExceedsAmount");
     m.put("DUPLICATE_ENTITY", "error.conflict.duplicate");
+    m.put("LOCATION_NOT_OFFERED", "error.location.notOffered");
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
     m.put(BackendServiceException.CODE_UNKNOWN, "error.unexpected");

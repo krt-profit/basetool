@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.blueprint.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code CraftabilityMaterialDto}: the craftability breakdown for
@@ -42,6 +43,9 @@ import java.util.UUID;
  * @param craftable crafts this material alone allows from inventory
  * @param craftableWithRefinery crafts this material alone allows including refinery yield
  * @param quantityType the unit of the {@code *Scu} figures, {@code "SCU"} or {@code "PIECE"}
+ * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
+ * @param counted whether the inventory-only craft consumes the material (REQ-P4K-027)
+ * @param countedWithRefinery whether the refinery-inclusive craft consumes the material
  */
 @DtoMirror
 public record CraftabilityMaterialDto(
@@ -57,4 +61,7 @@ public record CraftabilityMaterialDto(
     double missingScuWithRefinery,
     int craftable,
     int craftableWithRefinery,
-    @BackendEnumAsString String quantityType) {}
+    @BackendEnumAsString String quantityType,
+    @Nullable String materialNameDe,
+    boolean counted,
+    boolean countedWithRefinery) {}

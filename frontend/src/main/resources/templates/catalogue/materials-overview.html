@@ -59,10 +59,10 @@
                            data-check-class="matCheck" data-header-id="materialHeader">
                     <span th:text="#{filter.all}">Alle</span>
                 </label>
-                <label class="mtx-option" th:each="mat : ${materialNames}">
-                    <input type="checkbox" class="matCheck mtx-check" th:value="${mat}" checked data-all-id="matAll"
+                <label class="mtx-option" th:each="mat : ${materialLabels}">
+                    <input type="checkbox" class="matCheck mtx-check" th:value="${mat.key}" checked data-all-id="matAll"
                            data-check-class="matCheck" data-header-id="materialHeader">
-                    <span th:text="${mat}">Material</span>
+                    <span th:text="${mat.value}">Material</span>
                 </label>
             </div>
         </div>

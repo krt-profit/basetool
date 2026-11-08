@@ -47,6 +47,15 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   Optional<ShipType> findByExternalUuid(UUID externalUuid);
 
   /**
+   * Finds the ShipType row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<ShipType> findByP4kUuid(UUID p4kUuid);
+
+  /**
    * Finds a ship type by UEX's integer vehicle id, the fallback when the UEX payload carries no
    * UUID.
    *
@@ -190,8 +199,14 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
    */
   boolean existsByManufacturerId(UUID manufacturerId);
 
-  /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
-  Page<ShipType> findByHiddenFalse(Pageable pageable);
+  /**
+   * Pages the ship types the pickers offer: not hidden, not stamped by the P4K sweep and not hidden
+   * through a P4K review case (REQ-P4K-013).
+   *
+   * @param pageable page request
+   * @return paged pickable ship types
+   */
+  Page<ShipType> findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Pageable pageable);
 
   /**
    * Pages every ship type, hidden ones included, whose name contains {@code name}
@@ -209,9 +224,15 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
    *
    * @param name the search fragment
    * @param pageable page request
-   * @return paged matching non-hidden ship types
+   * @return paged matching ship types the pickers offer (REQ-P4K-013)
    */
-  Page<ShipType> findByHiddenFalseAndNameContainingIgnoreCase(String name, Pageable pageable);
+  @Query(
+      """
+      SELECT s FROM ShipType s WHERE s.hidden = false AND s.p4kDeletedAt IS NULL
+      AND s.p4kHiddenAt IS NULL
+      AND LOWER(s.name) LIKE LOWER(CONCAT('%', :#{escape([0])}, '%')) ESCAPE :#{escapeCharacter()}
+      """)
+  Page<ShipType> searchPickableByName(String name, Pageable pageable);
 
   /**
    * The UEX vehicle id and local id of every ship type that carries one, in one query — the item
@@ -222,4 +243,38 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   @Query(
       "SELECT s.uexVehicleId AS uexId, s.id AS id FROM ShipType s WHERE s.uexVehicleId IS NOT NULL")
   List<UexKeyRef> findUexVehicleRefs();
+
+  /**
+   * Lists the ship types that carry a UEX store URL, for the P4K store-slug cross-check
+   * (REQ-P4K-031).
+   *
+   * @return every ship type with a {@code url_store}
+   */
+  List<ShipType> findByUrlStoreIsNotNull();
+
+  /**
+   * Pairs each P4K variant class name with the ship type of its group base, for the class-name step
+   * of ship-type matching (REQ-P4K-032).
+   *
+   * @return one (variant class name, base ship type id) row per variant whose base has a row
+   */
+  @Query(
+      """
+      SELECT v.className AS className, s.id AS id FROM ShipTypeP4kVariant v, ShipType s
+      WHERE s.p4kUuid = v.baseUuid
+      """)
+  List<ClassNameKeyRef> findVariantBaseRefs();
+
+  /**
+   * Pairs each UEX vehicle id of the {@code ship_type_uex_alias} table with the ship types carrying
+   * its class name, for the UEX-id step of ship-type matching (REQ-DATA-026, REQ-P4K-032).
+   *
+   * @return one (UEX vehicle id, ship type id) row per alias and ship type carrying its class name
+   */
+  @Query(
+      """
+      SELECT a.uexVehicleId AS uexId, s.id AS id FROM ShipTypeUexAlias a, ShipType s
+      WHERE lower(s.className) = lower(a.className)
+      """)
+  List<UexKeyRef> findUexAliasRefs();
 }

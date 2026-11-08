@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Render-ready projection of the materials trade matrix for the client-side virtual-scroll grid
@@ -81,19 +82,41 @@ public record MatrixGridDto(
   /**
    * One material row of the matrix.
    *
-   * @param materialName material display name
+   * @param materialName material name, the key the filters and sorting use
    * @param isIllegal whether the material is contraband (drives a warning badge)
    * @param isVolatileQt whether the material decays during quantum travel (warning badge)
    * @param isVolatileTime whether the material has a real-time decay timer (warning badge)
    * @param prices sparse map from terminal name to that terminal's price cell; terminals absent
    *     from the map do not trade this material and render as an empty cell
+   * @param materialNameDe the material's German name, or {@code null}; the client shows it on a
+   *     German page (REQ-P4K-023)
    */
   public record Row(
       String materialName,
       @JsonProperty("isIllegal") boolean isIllegal,
       @JsonProperty("isVolatileQt") boolean isVolatileQt,
       @JsonProperty("isVolatileTime") boolean isVolatileTime,
-      Map<String, Cell> prices) {}
+      Map<String, Cell> prices,
+      @Nullable String materialNameDe) {
+
+    /**
+     * Creates a row without a German material name.
+     *
+     * @param materialName material name
+     * @param isIllegal whether the material is contraband
+     * @param isVolatileQt whether the material decays during quantum travel
+     * @param isVolatileTime whether the material has a real-time decay timer
+     * @param prices sparse map from terminal name to that terminal's price cell
+     */
+    public Row(
+        String materialName,
+        boolean isIllegal,
+        boolean isVolatileQt,
+        boolean isVolatileTime,
+        Map<String, Cell> prices) {
+      this(materialName, isIllegal, isVolatileQt, isVolatileTime, prices, null);
+    }
+  }
 
   /**
    * Buy/sell price pair for a single material×terminal cell. Either side may be {@code null} when

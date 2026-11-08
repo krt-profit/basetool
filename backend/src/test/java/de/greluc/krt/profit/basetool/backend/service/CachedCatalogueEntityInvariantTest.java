@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategory;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
@@ -47,8 +46,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.JobTypeService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.LocationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerService;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCategoryService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialP4kOverride;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.Outpost;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.OutpostRepository;
@@ -69,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -182,10 +182,9 @@ class CachedCatalogueEntityInvariantTest {
   @Autowired private JobTypeService jobTypeService;
   @Autowired private LocationService locationService;
   @Autowired private ManufacturerService manufacturerService;
-  @Autowired private MaterialCategoryService materialCategoryService;
-  @Autowired private MaterialService materialService;
   @Autowired private OutpostService outpostService;
   @Autowired private PoiService poiService;
+  @Autowired private MaterialService materialService;
   @Autowired private RefiningMethodService refiningMethodService;
   @Autowired private RoleService roleService;
   @Autowired private ShipTypeService shipTypeService;
@@ -345,7 +344,6 @@ class CachedCatalogueEntityInvariantTest {
     frequencyTypeCases(cases);
     jobTypeCases(cases);
     locationCases(cases);
-    materialCategoryCases(cases);
     materialCases(cases);
     refiningMethodCases(cases);
     roleCases(cases);
@@ -513,7 +511,10 @@ class CachedCatalogueEntityInvariantTest {
                           "changed",
                           true,
                           true,
-                          locationService.getLocation(id).version())));
+                          locationService.getLocation(id).version(),
+                          null,
+                          null,
+                          null)));
         });
     cases.put(
         "LocationService#deleteLocation",
@@ -521,32 +522,6 @@ class CachedCatalogueEntityInvariantTest {
           UUID id = location();
           return new Case(
               () -> locationService.getLocation(id), () -> locationService.deleteLocation(id));
-        });
-  }
-
-  private void materialCategoryCases(Map<String, Supplier<Case>> cases) {
-    cases.put(
-        "MaterialCategoryService#create",
-        () -> {
-          materialCategory();
-          return new Case(
-              materialCategoryService::findAll,
-              () -> trackMaterialCategory(materialCategoryService.create(newMaterialCategory())));
-        });
-    cases.put(
-        "MaterialCategoryService#update",
-        () -> {
-          UUID id = materialCategory();
-          return new Case(
-              () -> materialCategoryService.findById(id),
-              () -> materialCategoryService.update(id, newMaterialCategory()));
-        });
-    cases.put(
-        "MaterialCategoryService#delete",
-        () -> {
-          UUID id = materialCategory();
-          return new Case(
-              () -> materialCategoryService.findById(id), () -> materialCategoryService.delete(id));
         });
   }
 
@@ -576,6 +551,20 @@ class CachedCatalogueEntityInvariantTest {
                 details.setIsVisible(false);
                 materialService.updateMaterial(id, details);
               });
+        });
+    cases.put(
+        "MaterialService#releaseP4kOverride",
+        () -> {
+          UUID id = material();
+          JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+          jdbc.update("UPDATE material SET resource_group_manual = TRUE WHERE id = ?", id);
+          long version =
+              jdbc.queryForObject("SELECT version FROM material WHERE id = ?", Long.class, id);
+          return new Case(
+              () -> materialService.getMaterial(id),
+              () ->
+                  materialService.releaseP4kOverride(
+                      id, MaterialP4kOverride.RESOURCE_GROUP, version));
         });
     cases.put(
         "MaterialService#deleteMaterial",
@@ -978,8 +967,11 @@ class CachedCatalogueEntityInvariantTest {
   }
 
   private Location newLocation() {
+    UUID node = TestPlaces.visibleNode(new JdbcTemplate(dataSource));
+    cleanup.push(() -> deleteRow("starmap_object", node));
     Location location = new Location();
     location.setName("G19 location " + UUID.randomUUID());
+    location.setStarmapObjectId(node);
     return location;
   }
 
@@ -990,21 +982,6 @@ class CachedCatalogueEntityInvariantTest {
   private Location trackLocation(Location location) {
     cleanup.push(() -> deleteRow("location", location.getId()));
     return location;
-  }
-
-  private MaterialCategory newMaterialCategory() {
-    MaterialCategory category = new MaterialCategory();
-    category.setName("G19 category " + UUID.randomUUID());
-    return category;
-  }
-
-  private UUID materialCategory() {
-    return trackMaterialCategory(materialCategoryService.create(newMaterialCategory())).getId();
-  }
-
-  private MaterialCategory trackMaterialCategory(MaterialCategory category) {
-    cleanup.push(() -> deleteRow("material_category", category.getId()));
-    return category;
   }
 
   private MaterialCreateDto newMaterial() {

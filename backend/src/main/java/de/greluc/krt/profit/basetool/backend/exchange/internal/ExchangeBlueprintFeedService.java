@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.DefaultBlueprintKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
@@ -92,7 +93,7 @@ public class ExchangeBlueprintFeedService {
   /**
    * Returns the opaque key of a product.
    *
-   * @param productKey the normalised product key
+   * @param productKey the product key, a produced-item GUID or a fallback name key
    * @return the product key itself, or {@code h:} and its SHA-256 when it is too long
    */
   public static @NotNull String keyOf(@NotNull String productKey) {
@@ -169,7 +170,8 @@ public class ExchangeBlueprintFeedService {
   }
 
   /**
-   * Maps a blueprint; its {@code bt} is its key and the display name is cut to the published limit.
+   * Maps a blueprint; its {@code bt} is its key, its {@code guid} the produced item's GUID of a
+   * GUID-keyed product, and the display name is cut to the published limit.
    *
    * @param row the blueprint
    * @return the feed entry
@@ -179,7 +181,10 @@ public class ExchangeBlueprintFeedService {
     String name = row.getProductName();
     return new ExchangeBlueprintDto(
         key,
-        new ExchangeItemRefDto(key, name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name),
+        new ExchangeItemRefDto(
+            ProductKeys.guidOf(row.getProductKey()),
+            key,
+            name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name),
         row.getAcquiredAt(),
         defaultKeys.isDefault(row.getProductKey()),
         row.getNote(),

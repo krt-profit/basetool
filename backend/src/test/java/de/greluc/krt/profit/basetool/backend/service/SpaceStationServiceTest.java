@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SpaceStationService;
@@ -41,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class SpaceStationServiceTest {
 
   @Mock private SpaceStationRepository spaceStationRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private SpaceStationService service;
 

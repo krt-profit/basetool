@@ -83,7 +83,15 @@ not want booked out of stock). The service:
 - **Rejects `amount > (amount − manufacturedAmount)`** — producing more than the line still needs —
   with `ProductionAllocationException` → HTTP **422** (code `PRODUCTION_ALLOCATION`).
 - Computes the **required per-material demand** for `amount` units from the line's **snapshotted
-  recipe** (`JobOrderItemMaterial`, the same snapshot that feeds the aggregated-materials view):
+  recipe** (`JobOrderItemMaterial`, the same snapshot that feeds the aggregated-materials view). The
+  snapshot (`JobOrderItemService.applyItemLine`, and the create preview `deriveForPreview`) holds
+  the lines one craft consumes as `catalogue.api.RecipeGroupSelection` picks them, the selection
+  the craftability uses (REQ-INV-048): no optional cost (`is_optional`), and of a choose-n recipe
+  (`required_group_count`, REQ-P4K-027) exactly `n` option groups. An order can link only the
+  materials it snapshots, so the selection is measured against no stock: the `n` groups with the
+  smallest demand for one craft, equal ones in recipe order — the LIVE choose-2-of-3
+  `BP_CRAFT_thp_light_legs_01_01_01` (0.03 / 0.02 / 0.03 SCU) requires 0.05 SCU per unit, not
+  0.08. `skippedMaterialIds` stays the explicit override:
   `demand = roundForQuantityType(requiredQuantity × amount / lineAmount)` per material, summed per
   material id. A material listed in **`skippedMaterialIds`** ("nicht ausbuchen") is **excluded from
   the demand map**, so it is neither required to be covered nor may be named by a `consumption`
@@ -211,7 +219,8 @@ registry), and the receiver's apply map.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
-`JobOrderItemServiceTest` (aggregate reduced by manufactured units, 0 for a fully manufactured line),
+`JobOrderItemServiceTest` (aggregate reduced by manufactured units, 0 for a fully manufactured line,
+a choose-2-of-3 recipe snapshots two options and no optional cost),
 `JobOrderControllerTest` (`bookProduction` auth +
 mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but-undelivered),
 `V219MigrationTest` (backfill + CHECK constraints) · **Code:**
@@ -701,6 +710,16 @@ line with booked production renders its `id` as a hidden input, pins the amount 
 `manufacturedAmount`, drops its remove button, and shows how many units are already produced
 (`orders.create.item.producedLocked`).
 
+A line whose game item the P4K retired is refused on create and on every edit that keeps it, with
+HTTP 400 `CATALOGUE_ITEM_RETIRED` (REQ-P4K-013): the user picks another item. A line with booked
+production cannot change its item, so such an order can no longer be edited at all; reading it and
+the writes that take no item (status, production, handover) stay open.
+
+A line whose blueprint the P4K retired is refused the same way, with HTTP 400
+`CATALOGUE_BLUEPRINT_RETIRED` and the property `blueprintId` (REQ-P4K-013): the user picks another
+blueprint of the item. A blueprint change is allowed on a line with booked production, so such an
+order stays editable once the line names a listed blueprint.
+
 The editor MUST open with the order's stored **responsible** and **requesting** org units preselected.
 Both pickers are `required`, so an empty one makes the browser refuse the save before any request is
 sent — a line removal the user believes saved simply never reaches the server. The logistician update
@@ -718,6 +737,9 @@ with no error and no audit trace. The handover freeze did not cover it: it block
 `droppingALineWithBookedProduction_throwsBadRequest`,
 `loweringAmountBelowManufactured_throwsBadRequest`),
 `JobOrderItemServiceTest.applyItemLineReDerivesMaterialsInPlaceAndKeepsBookedProduction`,
+`JobOrderItemServiceTest.applyItemLineRefusesToKeepAnItemTheP4kHidSinceTheLineWasOrdered`,
+`JobOrderItemServiceTest.buildItemLineRefusesABlueprintTheP4kRetired`,
+`JobOrderItemServiceTest.applyItemLineRefusesToKeepABlueprintTheP4kHidSinceTheLineWasOrdered`,
 `JobOrderPageControllerItemEditMvcTest.editForm_itemOrder_preselectsStoredResponsibleAndRequestingOrgUnit` ·
 **Code:** `JobOrderService#reconcileItemLines` / `#assertLineEditable` / `#assertLineRemovable`,
 `JobOrderItemService#applyItemLine`, `CreateJobOrderItemLineDto#id`,

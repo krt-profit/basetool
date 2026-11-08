@@ -205,7 +205,7 @@
                 th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
                 data-trigger="od-toggle-inventory"
                >
-                <td th:text="${mat.material.name}"></td>
+                <td th:text="${mat.material.displayName(#locale)}"></td>
                 <td th:attr="data-label=#{orders.material.minQuality}">
                     <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${mat.qualityTier})}"></th:block>
                 </td>
@@ -232,7 +232,7 @@
                                 th:data-material-id="${mat.material.id}"
                                 th:data-quality="${mat.qualityTier != null ? mat.qualityTier.code : 'NONE'}"
                                 th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
-                                th:data-material-name="${mat.material.name}"
+                                th:data-material-name="${mat.material.displayName(#locale)}"
                                 th:data-quantity-type="${mat.material.quantityType}"
                                 th:data-open="${mat.openAmount}"
                                 th:data-claim-id="${c.id}"
@@ -251,7 +251,7 @@
                                 th:data-material-id="${mat.material.id}"
                                 th:data-quality="${mat.qualityTier != null ? mat.qualityTier.code : 'NONE'}"
                                 th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
-                                th:data-material-name="${mat.material.name}"
+                                th:data-material-name="${mat.material.displayName(#locale)}"
                                 th:data-quantity-type="${mat.material.quantityType}"
                                 th:data-open="${mat.openAmount}"
                                 th:text="#{orders.claim.add}">Eintragen</button>
@@ -297,8 +297,9 @@
                         <svg class="krt-icon od-prod-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
                     </button>
                     <span class="od-item-main">
-                    <span class="od-item-name" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}"></span>
+                    <span class="od-item-name" th:text="${item.gameItem != null ? item.gameItem.displayName(#locale) : '-'}"></span>
                     <span th:if="${item.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
+                    <span th:if="${item.gameItem != null and item.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                     <span th:if="${item.parentItemId != null}" class="subassembly-tag" th:text="#{orders.detail.item.subassembly}" th:title="#{orders.detail.item.subassembly}">Unterbaugruppe</span>
                     <span th:if="${item.blueprintStale}" class="chip chip--warning"
                           th:text="#{orders.detail.item.blueprintStale}"
@@ -308,7 +309,7 @@
                     <ul th:if="${isLogistician}" class="od-production-demand" hidden aria-hidden="true">
                         <li th:each="m : ${item.materials}"
                             th:data-material-id="${m.material != null ? m.material.id() : ''}"
-                            th:data-material-name="${m.material != null ? m.material.name() : ''}"
+                            th:data-material-name="${m.material != null ? m.material.displayName(#locale) : ''}"
                             th:data-quantity-type="${m.material != null ? m.material.quantityType() : 'SCU'}"
                             th:data-required-total="${m.requiredQuantity != null ? m.requiredQuantity : 0}"
                             th:data-quality-floor="${m.qualityTier != null ? m.qualityTier.minQuality : 0}"
@@ -335,7 +336,7 @@
                             data-trigger="od-open-production"
                             th:data-order-id="${order.id}"
                             th:data-item-id="${item.id}"
-                            th:data-item-name="${item.gameItem != null ? item.gameItem.name() : ''}"
+                            th:data-item-name="${item.gameItem != null ? item.gameItem.displayName(#locale) : ''}"
                             th:data-amount="${amt}"
                             th:data-manufactured="${mfg}"
                             th:data-version="${item.version}">
@@ -350,7 +351,7 @@
                         <span class="od-prod-demand-label" th:text="#{orders.detail.production.perUnit}">Bedarf je Stück</span>
                         <span class="od-prod-demand-value">
                             <th:block th:each="m,st : ${item.materials}" th:with="perUnit=${amt > 0 ? (m.requiredQuantity != null ? m.requiredQuantity : 0) / amt : 0}">
-                                <span th:text="${m.material != null ? m.material.name() : '-'}"></span>
+                                <span th:text="${m.material != null ? m.material.displayName(#locale) : '-'}"></span>
                                 <span th:switch="${m.material != null ? m.material.quantityType() : 'SCU'}">
                                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(perUnit, 1)} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${#numbers.formatDecimal(perUnit, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
@@ -428,7 +429,7 @@
                 th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
                 data-trigger="od-toggle-inventory"
                >
-                <td th:text="${agg.material != null ? agg.material.name() : '-'}"></td>
+                <td th:text="${agg.material != null ? agg.material.displayName(#locale) : '-'}"></td>
                 <td th:attr="data-label=#{orders.detail.aggregated.quality}">
                     <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${agg.qualityTier})}"></th:block>
                 </td>
@@ -457,7 +458,7 @@
                                         th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                         th:data-quality="${agg.qualityRequirement}"
                                         th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
-                                        th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                                        th:data-material-name="${agg.material != null ? agg.material.displayName(#locale) : ''}"
                                         th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                                         th:data-open="${agg.openAmount}"
                                         th:data-claim-id="${c.id}"
@@ -470,7 +471,7 @@
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
                                 th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
-                                th:data-material-name="${agg.material != null ? agg.material.name() : ''}"
+                                th:data-material-name="${agg.material != null ? agg.material.displayName(#locale) : ''}"
                                 th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                                 th:data-open="${agg.openAmount}"
                                 th:text="#{orders.claim.add}">Eintragen</button>
@@ -502,7 +503,7 @@
                 <tbody>
                 <tr th:each="inv : ${orphanedInventory}">
                     <td>
-                        <span th:text="${inv.material != null ? inv.material.name() : '-'}">Torite</span>
+                        <span th:text="${inv.material != null ? inv.material.displayName(#locale) : '-'}">Torite</span>
                         <span th:if="${inv.stolen}" class="chip chip--danger chip-xs" data-testid="stolen-chip"
                               th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                     </td>
@@ -695,7 +696,7 @@
                     <td>
                         <ul class="od-plain-list">
                             <li th:each="item : ${ho.items}">
-                                <span th:text="${item.material.name}"></span>
+                                <span th:text="${item.material.displayName(#locale)}"></span>
                                 <span th:text="#{orders.detail.handover.quality(${item.quality})}"></span>:
                                 <span th:if="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatInteger(item.amount, 1)} #{material.quantity.piece}|"></span>
                                 <span th:unless="${item.material.quantityType == 'PIECE'}" th:text="|${#numbers.formatDecimal(item.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
@@ -749,8 +750,8 @@
                     <td>
                         <ul class="od-plain-list">
                             <li th:each="entry : ${ho.entries}">
-                                <span th:text="${entry.gameItem != null ? entry.gameItem.name() : '-'}"></span>
-                                <span th:if="${entry.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${entry.gameItem})}"></span>:
+                                <span th:text="${entry.gameItem != null ? entry.gameItem.displayName(#locale) : '-'}"></span>
+                                <span th:if="${entry.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${entry.gameItem})}"></span><span th:if="${entry.gameItem != null and entry.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>:
                                 <span th:text="${#numbers.formatInteger(entry.amount, 1)}"></span>
                             </li>
                         </ul>
@@ -832,7 +833,7 @@
                         <label th:text="#{orders.material.name}" class="form-label-sm">Material</label>
                         <select class="w-full" th:field="*{materials[__${stat.index}__].materialId}" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
                             <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                            <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
+                            <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.displayName(#locale)}"></option>
                         </select>
                     </div>
                     <div>
@@ -1050,8 +1051,9 @@
                       th:with="outstanding=${(item.manufacturedAmount != null ? item.manufacturedAmount : 0) - (item.deliveredAmount != null ? item.deliveredAmount : 0)}">
                 <div th:if="${outstanding > 0}" class="item-handover-line od-line od-line--item">
                     <div>
-                        <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.name() : '-'}">Item</label>
+                        <label class="form-label-sm" th:text="${item.gameItem != null ? item.gameItem.displayName(#locale) : '-'}">Item</label>
                         <span th:if="${item.gameItem != null}" class="od-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${item.gameItem})}"></span>
+                    <span th:if="${item.gameItem != null and item.gameItem.noLongerInGame()}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
                         <div class="form-hint od-line__meta">
                             <span th:text="#{orders.detail.item.outstanding}">Ausstehend</span>:
                             <span th:text="${#numbers.formatInteger(outstanding, 1)}">0</span>
@@ -1061,7 +1063,7 @@
                     <div>
                         <label class="form-label-sm" th:text="#{orders.detail.itemHandover.amount}">Menge</label>
                         <input class="w-full" type="text" data-number-input step="1" min="1" th:max="${outstanding}" th:name="|entries[${stat.index}].amount|" value=""
-                               th:aria-label="${(item.gameItem != null ? item.gameItem.name() : '-') + ' · ' + #messages.msg('orders.detail.itemHandover.amount')}">
+                               th:aria-label="${(item.gameItem != null ? item.gameItem.displayName(#locale) : '-') + ' · ' + #messages.msg('orders.detail.itemHandover.amount')}">
                     </div>
                 </div>
             </th:block>

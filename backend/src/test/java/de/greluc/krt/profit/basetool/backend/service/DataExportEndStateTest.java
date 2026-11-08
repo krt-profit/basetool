@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
@@ -58,10 +59,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.io.IOException;
 import java.io.InputStream;
@@ -99,6 +100,8 @@ class DataExportEndStateTest {
   private static final String HIDDEN = "ZzzExportHiddenZzz";
 
   @Autowired private DataExportService dataExportService;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private JsonMapper jsonMapper;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
@@ -180,7 +183,7 @@ class DataExportEndStateTest {
     squadron = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
     location = new Location();
     location.setName("Zzz Export Hub");
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
     material = new Material();
     material.setName("Zzz Export Ore");
     material.setType(MaterialType.RAW);
@@ -278,8 +281,6 @@ class DataExportEndStateTest {
               .ownerUserId(owner.getId())
               .name("Probe " + OTHER)
               .note("Uebergabe an " + OTHER + " erledigt")
-              .locationUexId(1)
-              .locationType(PersonalInventoryLocationType.CITY)
               .locationNameSnapshot("Export City")
               .quantity(1)
               .build());

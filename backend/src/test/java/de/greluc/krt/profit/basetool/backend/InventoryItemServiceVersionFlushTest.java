@@ -109,6 +109,7 @@ class InventoryItemServiceVersionFlushTest {
             userRepository,
             materialRepository,
             null,
+            null,
             locationRepository,
             earmarkTargets,
             inventoryItemMapper,

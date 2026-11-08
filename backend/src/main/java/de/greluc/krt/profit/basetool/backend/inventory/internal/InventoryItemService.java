@@ -28,6 +28,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
@@ -87,6 +90,7 @@ public class InventoryItemService {
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final LocationRepository locationRepository;
   private final InventoryEarmarkLookup earmarkTargets;
   private final InventoryItemMapper inventoryItemMapper;
@@ -337,6 +341,7 @@ public class InventoryItemService {
    * @throws NotFoundException when any referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the job-order
    *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
+   * @throws RetiredGameItemException when the P4K retired the game item
    */
   @Transactional
   public InventoryItemDto createInventoryItem(
@@ -348,13 +353,15 @@ public class InventoryItemService {
         false,
         Boolean.TRUE.equals(dto.personal()),
         BookInRule.lager());
-    return inventoryItemMapper.toDto(create(dto, targetUserId, null));
+    GameItem gameItem =
+        dto.gameItemId() != null ? selectableGameItems.require(dto.gameItemId()) : null;
+    return inventoryItemMapper.toDto(create(dto, gameItem, targetUserId, null));
   }
 
   /**
    * Creates an entry for {@code dto.userId()} with a note, exactly as {@link #createInventoryItem}
-   * does but without its book-in check, for a pool write whose caller decided who may book
-   * (REQ-XCH-045).
+   * does but without its book-in check and its retired-item refusal, for a pool write whose caller
+   * decided who may book and refused a retired item per op (REQ-XCH-045, REQ-P4K-013).
    *
    * @param dto the entry, naming its holder
    * @param note the note, or {@code null} for none
@@ -362,30 +369,36 @@ public class InventoryItemService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   InventoryItem createInPool(@NotNull InventoryItemCreateDto dto, @Nullable String note) {
-    return create(dto, Objects.requireNonNull(dto.userId()), note);
+    GameItem gameItem =
+        dto.gameItemId() != null
+            ? Entities.require(gameItemRepository.findById(dto.gameItemId()), "GameItem not found")
+            : null;
+    return create(dto, gameItem, Objects.requireNonNull(dto.userId()), note);
   }
 
   /**
    * Validates, saves, audits and merges a new entry.
    *
    * @param dto the entry
+   * @param gameItem the game item {@code dto.gameItemId()} names, resolved by the caller, or {@code
+   *     null} for material stock
    * @param targetUserId the member who holds it
    * @param note the note, or {@code null} for none
    * @return the entry that holds the stock afterwards, merged or new
    */
   private @NotNull InventoryItem create(
-      @NotNull InventoryItemCreateDto dto, @NotNull UUID targetUserId, @Nullable String note) {
+      @NotNull InventoryItemCreateDto dto,
+      @Nullable GameItem gameItem,
+      @NotNull UUID targetUserId,
+      @Nullable String note) {
     final User user = Entities.require(userRepository.findById(targetUserId), "User not found");
     final Material material =
         dto.materialId() != null
             ? Entities.require(materialRepository.findById(dto.materialId()), "Material not found")
             : null;
-    final GameItem gameItem =
-        dto.gameItemId() != null
-            ? Entities.require(gameItemRepository.findById(dto.gameItemId()), "GameItem not found")
-            : null;
     final Location location =
-        Entities.require(locationRepository.findById(dto.locationId()), "Location not found");
+        OfferedLocations.require(
+            locationRepository.findById(dto.locationId()), "Location not found");
 
     if ((material == null) == (gameItem == null)) {
       throw new BadRequestException("Exactly one of materialId and gameItemId must be set");

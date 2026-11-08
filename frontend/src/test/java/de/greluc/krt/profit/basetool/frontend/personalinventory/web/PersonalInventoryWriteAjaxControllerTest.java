@@ -75,8 +75,8 @@ class PersonalInventoryWriteAjaxControllerTest {
   @WithMockUser
   void addAjax_valid_forwardsToBackendAndReturnsNoContent() throws Exception {
     String body =
-        "{\"name\":\"Medpen\",\"note\":null,\"locationUexId\":42,"
-            + "\"locationType\":\"CITY\",\"quantity\":5}";
+        "{\"name\":\"Medpen\",\"note\":null,"
+            + "\"locationId\":\"0c000001-0000-4000-8000-000000000001\",\"quantity\":5}";
 
     mockMvc
         .perform(
@@ -94,8 +94,7 @@ class PersonalInventoryWriteAjaxControllerTest {
   @Test
   @WithMockUser
   void addAjax_missingLocation_returns422AndDoesNotCallBackend() throws Exception {
-    String body =
-        "{\"name\":\"Medpen\",\"locationUexId\":null,\"locationType\":\"CITY\",\"quantity\":5}";
+    String body = "{\"name\":\"Medpen\",\"locationId\":null,\"quantity\":5}";
 
     mockMvc
         .perform(
@@ -123,9 +122,7 @@ class PersonalInventoryWriteAjaxControllerTest {
             new BackendServiceException(
                 "conflict", null, 409, "OPTIMISTIC_LOCK", null, Collections.emptyList(), null));
 
-    String body =
-        "{\"name\":\"Medpen\",\"locationUexId\":42,"
-            + "\"locationType\":\"CITY\",\"quantity\":5,\"version\":0}";
+    String body = "{\"name\":\"Medpen\",\"locationId\":null,\"quantity\":5,\"version\":0}";
 
     mockMvc
         .perform(

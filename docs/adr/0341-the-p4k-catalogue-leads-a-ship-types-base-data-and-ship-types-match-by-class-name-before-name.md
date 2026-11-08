@@ -1,6 +1,6 @@
 # ADR-0341 — The P4K catalogue leads a ship type's base data and ship types match by class name before name
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-031, REQ-P4K-032), [`docs/specs/p4k-catalogue.md`](../specs/p4k-catalogue.md) ·
@@ -56,9 +56,10 @@ resolves a `SHIP_TYPE` reference by `bt`, `scRecord` (`class_name`), `scGuid`, `
 - A ship whose cargo grids cannot all be read keeps its stored cargo value.
 - An exchange client or hangar import that relied on a duplicate name now gets `ambiguous` with
   candidates instead of the first match; no wrong ship is written.
-- A variant without a ship type of its own lands on its group base's ship type.
+- A variant without a ship type of its own lands on its group base's ship type; the P4K import keeps
+  the variant groups in `ship_type_p4k_variant` for that (migration `V350`).
 - The rules go into the P4K catalogue spec, `docs/specs/p4k-catalogue.md`, and REQ-XCH-012 moves
-  with the change. Implementation is pending.
+  with the change.
 
 ## Alternatives considered
 

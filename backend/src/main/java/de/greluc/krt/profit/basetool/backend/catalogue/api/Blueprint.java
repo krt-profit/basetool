@@ -50,10 +50,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
- * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint, keyed by {@link
- * #scwikiUuid}. It produces an output {@link GameItem} from ordered {@link BlueprintIngredient}s
- * and yields {@link BlueprintDismantleReturn}s when dismantled; it owns both child collections with
- * cascade and orphan removal.
+ * A crafting blueprint, keyed by its P4K GUID and its SC Wiki UUID. The P4K leads its recipe and
+ * the SC Wiki blueprint sync fills the gaps (REQ-P4K-027, ADR-0340). It produces an output {@link
+ * GameItem} from ordered {@link BlueprintIngredient}s and yields {@link BlueprintDismantleReturn}s
+ * when dismantled; it owns both child collections with cascade and orphan removal.
  */
 @Entity
 @Table(name = "blueprint")
@@ -62,25 +62,29 @@ import org.jetbrains.annotations.UnmodifiableView;
 @ToString(
     exclude = {
       "outputItem",
+      "category",
       "ingredients",
       "dismantleReturns",
       "requirementGroups",
+      "recipeModifiers",
       "summaryProperties"
     })
 @NoArgsConstructor
-public class Blueprint extends AbstractEntity<UUID> {
+public class Blueprint extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  /** SC Wiki blueprint UUID — the cross-sync identity key. UNIQUE at the DB level. */
-  @Column(name = "scwiki_uuid", nullable = false, unique = true)
+  /** SC Wiki blueprint UUID, unique; {@code null} on a P4K-seeded row the Wiki has not listed. */
+  @Column(name = "scwiki_uuid", unique = true)
+  @Nullable
   private UUID scwikiUuid;
 
   /** SC Wiki internal key, e.g. {@code "BP_CRAFT_AMRS_LaserCannon_S1"}. */
   @Column(name = "scwiki_key")
+  @Nullable
   private String scwikiKey;
 
   /**
@@ -95,24 +99,77 @@ public class Blueprint extends AbstractEntity<UUID> {
 
   /** Wiki display name of the output item (kept even when {@link #outputItem} is unresolved). */
   @Column(name = "output_name")
+  @Nullable
   private String outputName;
 
-  /** Wiki category UUID for the blueprint (informational; not resolved to an entity in R4). */
+  /**
+   * The DataForge GUID of the item the blueprint produces, written by the P4K import whether or not
+   * a {@code game_item} carries it; the key of a member's personal blueprint (REQ-P4K-029,
+   * ADR-0343). Never a Wiki UUID.
+   */
+  @Column(name = "produced_item_guid")
+  @Nullable
+  private UUID producedItemGuid;
+
+  /** The SC Wiki's category UUID, kept as the Wiki serves it. */
   @Column(name = "category_uuid")
   private UUID categoryUuid;
 
+  /** The P4K blueprint category ({@code categoryGuid}), or {@code null}. */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "category_id")
+  @Nullable
+  private BlueprintCategory category;
+
+  /**
+   * How many of the mandatory requirement groups one craft fills (a choose-n selection), or {@code
+   * null} when every group is required.
+   */
+  @Column(name = "required_group_count")
+  @Nullable
+  private Integer requiredGroupCount;
+
+  /** The P4K's craft time in seconds; the Wiki writes {@link #craftTimeSeconds} only without it. */
+  @Column(name = "p4k_craft_time_seconds")
+  @Nullable
+  private Integer p4kCraftTimeSeconds;
+
+  /** The P4K's {@code defaultAvailable}; the Wiki writes the flag only without it. */
+  @Column(name = "p4k_default_available")
+  @Nullable
+  private Boolean p4kDefaultAvailable;
+
+  /** The P4K's dismantle time in seconds; the Wiki writes the column only without it. */
+  @Column(name = "p4k_dismantle_time_seconds")
+  @Nullable
+  private Integer p4kDismantleTimeSeconds;
+
+  /** The P4K's dismantle efficiency; the Wiki writes the column and the returns only without it. */
+  @Column(name = "p4k_dismantle_efficiency")
+  @Nullable
+  private Double p4kDismantleEfficiency;
+
+  /**
+   * Whether the requirement groups and ingredient lines are the P4K's; the Wiki only fills them.
+   */
+  @Column(name = "p4k_recipe", nullable = false)
+  private boolean p4kRecipe;
+
   /** Craft time in seconds. */
   @Column(name = "craft_time_seconds")
+  @Nullable
   private Integer craftTimeSeconds;
 
   /**
    * Dismantle duration in seconds (Wiki {@code dismantle.time_seconds}); {@code null} if absent.
    */
   @Column(name = "dismantle_time_seconds")
+  @Nullable
   private Integer dismantleTimeSeconds;
 
   /** Fraction of inputs recovered on dismantle (Wiki {@code dismantle.efficiency}, e.g. 0.5). */
   @Column(name = "dismantle_efficiency")
+  @Nullable
   private Double dismantleEfficiency;
 
   /** Whether the recipe is unlocked by default (vs. mission-gated). */
@@ -147,21 +204,36 @@ public class Blueprint extends AbstractEntity<UUID> {
   private Instant scwikiDeletedAt;
 
   /**
-   * DataForge {@code __ref} blueprint GUID observed by the KRT P4K Reader import. Kept alongside
-   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
-   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
-   * stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code scwiki_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 
   /** Ordered ingredient lines (RESOURCE or ITEM). Owned with cascade + orphan removal. */
   @Getter(AccessLevel.NONE)
@@ -200,6 +272,21 @@ public class Blueprint extends AbstractEntity<UUID> {
   @OrderBy("orderIndex ASC")
   @BatchSize(size = 64)
   private List<BlueprintRequirementGroup> requirementGroups = new ArrayList<>();
+
+  /**
+   * Ordered recipe-wide stat modifiers: those of the P4K's choose-n root selection, which belong to
+   * no single slot (REQ-P4K-027). Owned, cascade + orphan.
+   */
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @OneToMany(
+      mappedBy = "blueprint",
+      cascade = CascadeType.ALL,
+      orphanRemoval = true,
+      fetch = FetchType.LAZY)
+  @OrderBy("orderIndex ASC")
+  @BatchSize(size = 64)
+  private List<BlueprintRequirementModifier> recipeModifiers = new ArrayList<>();
 
   /** Ordered summary stat roll-up (which stats this blueprint affects). Owned, cascade + orphan. */
   @Getter(AccessLevel.NONE)
@@ -273,6 +360,11 @@ public class Blueprint extends AbstractEntity<UUID> {
     dismantleReturns.removeLast();
   }
 
+  /** Clears all dismantle-return lines; orphan removal deletes them on flush. */
+  public void clearDismantleReturns() {
+    dismantleReturns.clear();
+  }
+
   /**
    * Returns the ordered requirement groups as an unmodifiable view. Mutate through {@link
    * #addRequirementGroup} / {@link #clearRequirementGroups}.
@@ -298,6 +390,33 @@ public class Blueprint extends AbstractEntity<UUID> {
   /** Clears all requirement groups; orphan removal deletes them (and their modifiers) on flush. */
   public void clearRequirementGroups() {
     requirementGroups.clear();
+  }
+
+  /**
+   * Returns the ordered recipe-wide modifiers as an unmodifiable view. Mutate through {@link
+   * #addRecipeModifier} / {@link #clearRecipeModifiers}.
+   *
+   * @return an unmodifiable view of the recipe-wide modifiers
+   */
+  @NotNull
+  @UnmodifiableView
+  public List<BlueprintRequirementModifier> getRecipeModifiers() {
+    return Collections.unmodifiableList(recipeModifiers);
+  }
+
+  /**
+   * Appends a recipe-wide modifier and sets its back-reference to this blueprint.
+   *
+   * @param modifier the modifier to add
+   */
+  public void addRecipeModifier(@NotNull BlueprintRequirementModifier modifier) {
+    modifier.setBlueprint(this);
+    recipeModifiers.add(modifier);
+  }
+
+  /** Clears all recipe-wide modifiers; orphan removal deletes them on flush. */
+  public void clearRecipeModifiers() {
+    recipeModifiers.clear();
   }
 
   /**

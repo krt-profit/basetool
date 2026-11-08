@@ -42,6 +42,7 @@ public record BlueprintDto(
     Double dismantleEfficiency,
     Instant scwikiSyncedAt,
     List<BlueprintRequirementGroupDto> requirementGroups,
+    List<BlueprintRequirementModifierDto> recipeModifiers,
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintSummaryPropertyDto> summaryProperties,
     List<BlueprintDismantleReturnDto> dismantleReturns,

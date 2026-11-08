@@ -217,7 +217,8 @@ public class PersonalInventoryBlueprintsPageController {
    */
   @NotNull
   private static PersonalBlueprintRecipeDto emptyRecipe() {
-    return new PersonalBlueprintRecipeDto(null, 0, List.of(), List.of(), List.of(), null);
+    return new PersonalBlueprintRecipeDto(
+        null, 0, List.of(), List.of(), List.of(), List.of(), null);
   }
 
   /**

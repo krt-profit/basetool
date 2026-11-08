@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
@@ -196,9 +197,10 @@ public class HangarService {
             .orElseThrow(() -> new BadRequestException("ShipType not found")));
     if (dto.locationId() != null) {
       ship.setLocation(
-          locationRepository
-              .findById(dto.locationId())
-              .orElseThrow(() -> new BadRequestException("Location not found")));
+          OfferedLocations.requireOffered(
+              locationRepository
+                  .findById(dto.locationId())
+                  .orElseThrow(() -> new BadRequestException("Location not found"))));
     }
     Ship saved = shipRepository.save(ship);
     auditRecorder.record(
@@ -368,9 +370,11 @@ public class HangarService {
 
     if (dto.locationId() != null) {
       ship.setLocation(
-          locationRepository
-              .findById(dto.locationId())
-              .orElseThrow(() -> new BadRequestException("Location not found")));
+          OfferedLocations.requireOfferedOrCurrent(
+              locationRepository
+                  .findById(dto.locationId())
+                  .orElseThrow(() -> new BadRequestException("Location not found")),
+              ship.getLocation()));
     } else {
       ship.setLocation(null);
     }
@@ -826,17 +830,18 @@ public class HangarService {
    * @param userId the calling user's id; only their ships are updated
    * @param locationId the curated home location to assign to every owned ship
    * @return the number of ships updated
-   * @throws BadRequestException when the location does not exist or is not a selectable home
-   *     location
+   * @throws BadRequestException when the location does not exist or is not a home location
+   * @throws de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException when
+   *     the location is hidden or reference-only
    */
   @Transactional
   public int setHomeLocationForMyShips(@NotNull UUID userId, @NotNull UUID locationId) {
     Location location =
-        locationRepository
-            .findById(locationId)
-            .orElseThrow(() -> new BadRequestException("Location not found"));
-    if (!Boolean.TRUE.equals(location.getHomeLocation())
-        || Boolean.TRUE.equals(location.getHidden())) {
+        OfferedLocations.requireOffered(
+            locationRepository
+                .findById(locationId)
+                .orElseThrow(() -> new BadRequestException("Location not found")));
+    if (!Boolean.TRUE.equals(location.getHomeLocation())) {
       throw new BadRequestException("Location is not a selectable home location");
     }
     int updated = shipRepository.setLocationForOwner(userId, location);

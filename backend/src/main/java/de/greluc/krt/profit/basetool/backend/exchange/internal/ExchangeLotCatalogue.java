@@ -55,6 +55,9 @@ public class ExchangeLotCatalogue {
   /** The result of a reference that resolves to several entries. */
   static final String AMBIGUOUS = "ambiguous";
 
+  /** The refusal of booking in an item the P4K retired (REQ-P4K-013). */
+  static final String ITEM_RETIRED = "ITEM_RETIRED";
+
   private final ExchangeResolveService resolveService;
   private final MaterialRepository materialRepository;
   private final GameItemRepository gameItemRepository;
@@ -164,6 +167,25 @@ public class ExchangeLotCatalogue {
      */
     static @NotNull Entry skip(@NotNull String result, @NotNull String reason) {
       return new Entry(null, null, QuantityType.SCU.name(), result, reason);
+    }
+
+    /**
+     * Whether the entry is an item the P4K swept or an admin hid, which no write may book in.
+     *
+     * @return {@code true} for a retired item
+     */
+    boolean retired() {
+      return gameItem != null && gameItem.isP4kRetired();
+    }
+
+    /**
+     * The entry as a book-in sees it: a retired item ends the op {@code rejected ITEM_RETIRED}.
+     *
+     * @return this entry, or the refusal of a retired item
+     */
+    @NotNull
+    Entry forBookIn() {
+      return retired() ? skip(ExchangeOps.REJECTED, ITEM_RETIRED) : this;
     }
   }
 }

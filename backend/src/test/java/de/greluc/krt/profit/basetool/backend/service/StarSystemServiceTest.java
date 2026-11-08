@@ -25,6 +25,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemService;
@@ -41,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class StarSystemServiceTest {
 
   @Mock private StarSystemRepository starSystemRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private StarSystemService starSystemService;
 

@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialCreateDt
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialOccurrenceService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialP4kOverride;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialSellingTerminalDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MaterialService;
@@ -321,6 +322,24 @@ public class MaterialController {
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull MaterialDto material) {
     return materialMapper.toDto(
         materialService.updateMaterial(id, materialMapper.toEntity(material)));
+  }
+
+  /**
+   * Hands an overridden resource group or refined material back to the P4K import; the next APPLY
+   * writes the P4K value (REQ-P4K-024, REQ-P4K-025).
+   *
+   * @param id material id
+   * @param field the overridden field
+   * @param version the material version the admin saw
+   * @return the material
+   */
+  @DeleteMapping("/{id}/p4k-overrides/{field}")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public MaterialDto releaseP4kOverride(
+      @PathVariable @NotNull UUID id,
+      @PathVariable @NotNull MaterialP4kOverride field,
+      @RequestParam long version) {
+    return materialMapper.toDto(materialService.releaseP4kOverride(id, field, version));
   }
 
   /**

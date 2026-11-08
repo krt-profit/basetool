@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemResponse;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemService;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryItemUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationOption;
 import de.greluc.krt.profit.basetool.backend.personalinventory.internal.PersonalInventoryLocationType;
 import java.time.Instant;
 import java.util.List;
@@ -69,7 +70,7 @@ class PersonalInventoryControllerTest {
   @Test
   void createShouldDelegateToServiceWithJwtSub() {
     PersonalInventoryItemCreateRequest req =
-        new PersonalInventoryItemCreateRequest("x", null, 1, PersonalInventoryLocationType.CITY, 1);
+        new PersonalInventoryItemCreateRequest("x", null, UUID.randomUUID(), 1);
     PersonalInventoryItemResponse expected = sampleResponse();
     when(service.createOwn(SUB, req)).thenReturn(expected);
 
@@ -88,8 +89,7 @@ class PersonalInventoryControllerTest {
   void updateShouldPropagatePathIdAndJwtSub() {
     UUID id = UUID.randomUUID();
     PersonalInventoryItemUpdateRequest req =
-        new PersonalInventoryItemUpdateRequest(
-            "y", null, 1, PersonalInventoryLocationType.CITY, 1, 0L);
+        new PersonalInventoryItemUpdateRequest("y", null, UUID.randomUUID(), 1, 0L);
     when(service.updateOwn(SUB, id, req)).thenReturn(sampleResponse());
 
     controller.update(id, req, SUB);
@@ -106,12 +106,23 @@ class PersonalInventoryControllerTest {
     verify(service).deleteOwn(SUB, id);
   }
 
+  @Test
+  void locationsShouldSearchTheCallersSelectableLocations() {
+    List<PersonalInventoryLocationOption> options =
+        List.of(
+            new PersonalInventoryLocationOption(
+                UUID.randomUUID(), PersonalInventoryLocationType.OTHER, "Hangar", null, null));
+    when(service.searchLocations(SUB, null, null)).thenReturn(options);
+
+    assertSame(options, controller.searchSelectableLocations(null, null, SUB));
+  }
+
   private static PersonalInventoryItemResponse sampleResponse() {
     return new PersonalInventoryItemResponse(
         UUID.randomUUID(),
         "x",
         null,
-        1,
+        UUID.randomUUID(),
         PersonalInventoryLocationType.CITY,
         "Lorville",
         1,

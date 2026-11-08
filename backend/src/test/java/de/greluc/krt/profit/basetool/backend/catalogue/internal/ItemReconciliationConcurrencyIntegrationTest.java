@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -62,6 +63,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
   @Autowired private GameItemStatRepository stats;
   @Autowired private List<GameItemReassignmentParticipant> participants;
   @Autowired private SyncReportService reports;
+  @Autowired private P4kMergeConflictRecorder p4kConflicts;
   @Autowired private StockCommands stock;
 
   @Test
@@ -82,7 +84,8 @@ class ItemReconciliationConcurrencyIntegrationTest {
     });
     observed.addAll(participants);
     ItemReconciliationService merger =
-        new ItemReconciliationService(items, redirects, recipes, prices, stats, observed, reports);
+        new ItemReconciliationService(
+            items, redirects, recipes, prices, stats, observed, reports, p4kConflicts);
 
     try (var pool = Executors.newFixedThreadPool(2)) {
       var booking =
@@ -198,10 +201,7 @@ class ItemReconciliationConcurrencyIntegrationTest {
           "INSERT INTO app_user (id, username, version) VALUES (?, ?, 0)",
           fixture.member(),
           "catalogue-lock-" + fixture.member());
-      jdbc.update(
-          "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)",
-          fixture.location(),
-          "Catalogue Lock " + fixture.location());
+      TestPlaces.insertLocation(jdbc, fixture.location(), "Catalogue Lock " + fixture.location());
       jdbc.update(
           "INSERT INTO game_item (id, name, uex_name, uex_item_id, kind, source_systems)"
               + " VALUES (?, 'Contended Item', 'Contended Item', ?, 'GENERIC', 'UEX_ONLY')",

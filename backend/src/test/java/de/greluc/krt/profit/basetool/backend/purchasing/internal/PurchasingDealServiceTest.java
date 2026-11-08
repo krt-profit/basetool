@@ -35,10 +35,13 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.PurposeBoundRequests;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -152,7 +155,7 @@ class PurchasingDealServiceTest {
             supplyNeeds,
             userRepository,
             materialRepository,
-            gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             qualityTierRepository,
             missionRepository,
             purposeBoundRequests,
@@ -533,6 +536,22 @@ class PurchasingDealServiceTest {
 
     assertThatThrownBy(() -> service.create(request(1.5, 1_000L, null, null)))
         .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void aDealForANeedWhoseGameItemTheP4kRetiredIsRefused() {
+    GameItem retired = new GameItem();
+    retired.setId(UUID.randomUUID());
+    retired.setP4kDeletedAt(Instant.EPOCH);
+    forCreate(
+        need(null, retired.getId(), null, false, 100.0, 0.0, true, null, NeedStatus.OPEN),
+        activeOrg());
+    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+    when(settingsService.classesInOrder()).thenReturn(classes());
+
+    assertThatThrownBy(() -> service.create(request(2, 1_000L, null, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(dealRepository, never()).saveAndFlush(any());
   }
 
   @Test

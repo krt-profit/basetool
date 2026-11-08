@@ -1485,4 +1485,75 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         .as("claimable remainder still fed to the modal")
         .contains("data-open=\"12.0\"");
   }
+
+  /** An ordered item the P4K retired keeps rendering, with the notice (REQ-P4K-013). */
+  @Test
+  void itemOrderDetail_retiredItem_showsTheNoLongerInGameNotice() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    JobOrderItemDto retired =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(
+                UUID.randomUUID(), "Retired Rifle", "WEAPON", null, null, null, null, true),
+            new BlueprintReferenceDto(UUID.randomUUID(), "Retired Rifle", "wiki-retired"),
+            1,
+            0,
+            0,
+            null,
+            List.of(),
+            false,
+            1L);
+    JobOrderItemDto live =
+        new JobOrderItemDto(
+            UUID.randomUUID(),
+            new GameItemReferenceDto(UUID.randomUUID(), "Live Rifle", "WEAPON"),
+            new BlueprintReferenceDto(UUID.randomUUID(), "Live Rifle", "wiki-live"),
+            1,
+            0,
+            0,
+            null,
+            List.of(),
+            false,
+            1L);
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            8,
+            null,
+            null,
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "ITEM",
+            true,
+            List.of(),
+            List.of(retired, live),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            null,
+            null,
+            false);
+    stubDetail(orderId, userId, order);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains("Retired Rifle", "Live Rifle", "Nicht mehr im Spiel")
+        .contains("data-testid=\"no-longer-in-game\"");
+  }
 }

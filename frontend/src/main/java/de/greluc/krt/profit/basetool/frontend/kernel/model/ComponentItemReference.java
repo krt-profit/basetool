@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.model;
 
+import java.util.Locale;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * A game-item reference that carries a ship component's type, size, grade and class (REQ-INV-061,
  * REQ-INV-062, REQ-INV-064).
@@ -26,11 +29,19 @@ package de.greluc.krt.profit.basetool.frontend.kernel.model;
 public interface ComponentItemReference {
 
   /**
-   * The item's display name.
+   * The item's name, the key search and matching use.
    *
    * @return the name
    */
   String name();
+
+  /**
+   * The name a page shows for the item (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  String displayName(@Nullable Locale locale);
 
   /**
    * The {@code ShipComponentType} name.

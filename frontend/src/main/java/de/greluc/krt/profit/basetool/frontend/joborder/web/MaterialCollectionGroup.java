@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionE
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -33,7 +34,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * One material's group row on the material collection page: its entries and their collection
  * progress (REQ-UI-027).
  *
- * @param materialName the material's display name; {@code null} for entries without one
+ * @param materialName the material's name, the grouping key; {@code null} for entries without one
  * @param entries the material's earmarked entries, in backend order
  * @param progress the delivered share of the group's earmarked amount
  */
@@ -81,5 +82,16 @@ public record MaterialCollectionGroup(
     return groups.stream()
         .map(MaterialCollectionGroup::progress)
         .reduce(new CollectionProgress(0, 0), CollectionProgress::plus);
+  }
+
+  /**
+   * Returns the material name the group row shows (REQ-P4K-023).
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when the group's material has one, else the name
+   */
+  @Nullable
+  public String materialDisplayName(@Nullable Locale locale) {
+    return entries.isEmpty() ? materialName : entries.getFirst().materialDisplayName(locale);
   }
 }

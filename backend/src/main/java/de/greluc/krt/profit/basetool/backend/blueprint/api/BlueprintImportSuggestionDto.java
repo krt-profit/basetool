@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.api;
 /**
  * One fuzzy-match candidate offered for an unmatched imported blueprint name.
  *
- * @param productKey normalized product key of the candidate (echoed back on apply)
+ * @param productKey product key of the candidate (echoed back on apply)
  * @param productName display spelling of the candidate product
  * @param score similarity to the external name in {@code [0.0, 1.0]} (1.0 = identical normalized)
  */

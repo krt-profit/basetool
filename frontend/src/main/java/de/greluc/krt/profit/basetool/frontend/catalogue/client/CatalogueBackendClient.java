@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialExternalAliasWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialMatrixItemDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialP4kOverride;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialSellingTerminalDto;
@@ -380,6 +381,25 @@ public class CatalogueBackendClient {
   }
 
   /**
+   * Hands an overridden field of a material back to the P4K import.
+   *
+   * @param id the material
+   * @param field the overridden field
+   * @param version the material version the admin saw
+   * @return the material, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public MaterialDto releaseMaterialP4kOverride(
+      @NotNull UUID id, @NotNull MaterialP4kOverride field, long version) {
+    return backendApiClient.delete(
+        "/api/v1/materials/{id}/p4k-overrides/{field}?version={version}",
+        MaterialDto.class,
+        id,
+        field.name(),
+        version);
+  }
+
+  /**
    * Lists every material category.
    *
    * @return the categories, or {@code null} when the backend sent no body
@@ -398,27 +418,6 @@ public class CatalogueBackendClient {
   @Nullable
   public MaterialCategoryDto materialCategory(@NotNull UUID id) {
     return backendApiClient.get("/api/v1/material-categories/{id}", MaterialCategoryDto.class, id);
-  }
-
-  /**
-   * Creates a material category.
-   *
-   * @param category the category, its name set
-   * @return the created category, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public MaterialCategoryDto createMaterialCategory(@NotNull MaterialCategoryDto category) {
-    return backendApiClient.post(
-        "/api/v1/material-categories", category, MaterialCategoryDto.class);
-  }
-
-  /**
-   * Deletes a material category; the backend refuses with {@code 409} while a material uses it.
-   *
-   * @param id the category
-   */
-  public void deleteMaterialCategory(@NotNull UUID id) {
-    backendApiClient.delete("/api/v1/material-categories/{id}", Void.class, id);
   }
 
   /**
@@ -695,23 +694,20 @@ public class CatalogueBackendClient {
    */
   @Nullable
   public P4kImportJobDto p4kImportJob(@NotNull UUID id) {
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        JOBS_URI + "/{id}",
-        webClient ->
-            webClient.get().uri(uriBuilder -> uriBuilder.path(JOBS_URI + "/{id}").build(id)),
-        spec -> spec.bodyToMono(P4kImportJobDto.class));
+    return backendApiClient.get(JOBS_URI + "/{id}", P4kImportJobDto.class, id);
   }
 
   /**
    * Enqueues the apply job of a finished P4K preview.
    *
    * @param id the preview job
-   * @param seedNew whether to insert game rows that match no existing row
+   * @param createItemsAndShips whether the run creates playable items and ships that match no row
+   * @param overrideMassGuard whether a kind is swept even above the mass guard (REQ-P4K-012)
    * @return the enqueued apply job, or {@code null} when the backend sent no body
    */
   @Nullable
-  public P4kImportJobDto applyP4kImportJob(@NotNull UUID id, boolean seedNew) {
+  public P4kImportJobDto applyP4kImportJob(
+      @NotNull UUID id, boolean createItemsAndShips, boolean overrideMassGuard) {
     return backendApiClient.execute(
         HttpMethod.POST,
         JOBS_URI + "/{id}/apply",
@@ -721,7 +717,8 @@ public class CatalogueBackendClient {
                 .uri(uriBuilder ->
                     uriBuilder
                         .path(JOBS_URI + "/{id}/apply")
-                        .queryParam("seedNew", seedNew)
+                        .queryParam("createItemsAndShips", createItemsAndShips)
+                        .queryParam("overrideMassGuard", overrideMassGuard)
                         .build(id)),
         spec -> spec.bodyToMono(P4kImportJobDto.class));
   }

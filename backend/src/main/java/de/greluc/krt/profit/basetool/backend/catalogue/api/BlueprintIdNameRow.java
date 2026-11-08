@@ -22,12 +22,16 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 import java.util.UUID;
 
 /**
- * Internal projection of an active {@code blueprint} row reduced to its id and SC Wiki output name,
- * used by {@code BlueprintProductService} to resolve a normalized {@code product_key} back to a
- * representative recipe id (the recipe graph is then loaded by id). Not a controller-boundary DTO —
- * produced by a JPQL constructor expression and consumed only inside the service.
+ * Internal projection of an active {@code blueprint} row reduced to its id, SC Wiki output name and
+ * produced-item GUID, used by {@code BlueprintProductService} to resolve a {@code product_key} back
+ * to a representative recipe id (the recipe graph is then loaded by id). Not a controller-boundary
+ * DTO — produced by a JPQL constructor expression and consumed only inside the service.
  *
  * @param id the blueprint primary key
  * @param outputName the SC Wiki output-item name (normalized, then grouped into a product)
+ * @param producedItemGuid the produced item's DataForge GUID, the product key when present, or
+ *     {@code null}
+ * @param retired whether the P4K sweep stamped the recipe or an admin hid it (REQ-P4K-013)
  */
-public record BlueprintIdNameRow(UUID id, String outputName) {}
+public record BlueprintIdNameRow(
+    UUID id, String outputName, UUID producedItemGuid, boolean retired) {}

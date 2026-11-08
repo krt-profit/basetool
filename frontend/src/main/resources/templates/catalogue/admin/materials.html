@@ -92,6 +92,10 @@
                                     <option value="" th:text="#{admin.materials.categories.unsorted}">Unsortiert</option>
                                     <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}" th:selected="${mat.category != null and mat.category.id == cat.id}">Category</option>
                                 </select>
+                                <div class="admin-material-override" data-p4k-override="RESOURCE_GROUP" data-testid="material-override-RESOURCE_GROUP" th:hidden="${mat.resourceGroupManual != true}">
+                                    <span class="chip chip--warning" th:title="#{admin.material.p4kOverride.manual.tooltip}" th:text="#{admin.material.p4kOverride.manual}">von Hand</span>
+                                    <button type="button" class="btn btn-ghost btn-xs" data-trigger="admin-materials-release-override" data-p4k-field="RESOURCE_GROUP" th:text="#{admin.material.p4kOverride.release}">An den Import zurückgeben</button>
+                                </div>
                             </td>
                             <td th:attr="data-label=#{admin.material.refined}">
                                 <th:block th:if="${mat?.type == 'RAW' or mat?.isManualRawMaterial == true}">
@@ -101,6 +105,10 @@
                                         <option th:each="rm : ${refinedMaterials}" th:value="${rm.id}" th:text="${rm.name}" th:selected="${mat.refinedMaterial != null and mat.refinedMaterial.id == rm.id}">Refined Material</option>
                                     </select>
                                     <span sec:authorize="!hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)" th:text="${mat.refinedMaterial != null ? mat.refinedMaterial.name : '-'}">-</span>
+                                    <div class="admin-material-override" data-p4k-override="REFINED_MATERIAL" data-testid="material-override-REFINED_MATERIAL" th:hidden="${mat.refinedMaterialManual != true}">
+                                        <span class="chip chip--warning" th:title="#{admin.material.p4kOverride.manual.tooltip}" th:text="#{admin.material.p4kOverride.manual}">von Hand</span>
+                                        <button type="button" class="btn btn-ghost btn-xs" data-trigger="admin-materials-release-override" data-p4k-field="REFINED_MATERIAL" th:text="#{admin.material.p4kOverride.release}">An den Import zurückgeben</button>
+                                    </div>
                                 </th:block>
                                 <th:block th:if="${mat?.type != 'RAW' and mat?.isManualRawMaterial != true}">
                                     <span>-</span>
@@ -118,43 +126,6 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${materialsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
-    </section>
-
-    <section class="card admin-materials-categories" aria-labelledby="material-categories-title">
-        <div class="card-head">
-            <h2 id="material-categories-title" class="card-title" th:text="#{admin.materials.categories.title}">Kategorien verwalten</h2>
-        </div>
-        <form method="post" th:action="@{/admin/materials/categories}" class="cluster gap-2 admin-materials-category-form" data-category-create>
-            <input type="text" name="name" required class="grow" th:placeholder="#{general.name}" th:attr="aria-label=#{general.name}">
-            <button type="submit" class="btn btn-ghost" th:text="#{general.add}">Hinzufügen</button>
-        </form>
-        <div data-category-table th:hidden="${categories == null or categories.isEmpty()}">
-            <div class="table-responsive">
-                <table class="data-table data-table--stack">
-                    <thead>
-                        <tr>
-                            <th th:text="#{admin.materials.categories.name}">Kategorie</th>
-                            <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="cat : ${categories}" data-category-row>
-                            <td><span class="cell-title" th:text="${cat.name}">Category Name</span></td>
-                            <td class="cell-actions">
-                                <form method="post" th:action="@{/admin/materials/categories/{id}/delete(id=${cat.id})}" class="m-0"
-                                      data-krt-confirm th:data-krt-confirm-message="#{admin.materials.categories.delete.confirm}"
-                                      th:data-category-id="${cat.id}">
-                                    <button type="submit" class="btn btn-quiet-danger btn-icon" th:title="#{general.delete}" th:aria-label="#{general.delete}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
-                                </form>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="empty-state" data-testid="empty-state" data-category-empty th:hidden="${categories != null and !categories.isEmpty()}">
-            <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.materials.categories.empty', 'admin.materials.categories.empty.text', null)}"></th:block>
-        </div>
     </section>
 </main>
 
@@ -230,14 +201,6 @@
 </th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    const CAT_MSG = {
-        createSuccess: /*[[#{notification.success.save}]]*/ 'Gespeichert.',
-        createError:   /*[[#{notification.error.save}]]*/ 'Speichern fehlgeschlagen.',
-        deleteSuccess: /*[[#{notification.success.delete}]]*/ 'Gelöscht.',
-        deleteError:   /*[[#{notification.error.delete}]]*/ 'Löschen fehlgeschlagen.',
-        deleteConfirm: /*[[#{admin.materials.categories.delete.confirm}]]*/ 'Wirklich löschen?',
-        deleteTitle:   /*[[#{general.delete}]]*/ 'Löschen'
-    };
     const CAT_CONFLICT = {
         title:                /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt',
         reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Bitte neu laden.',
@@ -249,6 +212,7 @@
     const MSG_UPDATE_ERROR = /*[[#{notification.error.save}]]*/ 'Fehler beim Speichern.';
     const MSG_CREATE_SUCCESS = /*[[#{admin.materials.create.success}]]*/ 'Material wurde angelegt.';
     const MSG_CREATE_ERROR = /*[[#{admin.materials.create.error}]]*/ 'Material konnte nicht angelegt werden.';
+    const MSG_OVERRIDE_RELEASED = /*[[#{admin.material.p4kOverride.released}]]*/ 'An den Import zurückgegeben.';
 </script>
 <script type="module" th:src="@{/js/catalogue/admin-materials.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>

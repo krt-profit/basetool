@@ -83,6 +83,24 @@ class BlueprintMapperTest {
     assertEquals("Hadanite", dto.ingredients().get(0).name());
     assertEquals("ITEM", dto.ingredients().get(0).kind());
     assertEquals(7, dto.ingredients().get(0).quantityUnits());
+    assertEquals(0, dto.recipeModifiers().size());
+  }
+
+  @Test
+  void toDto_mapsTheRecipeWideModifiersBesideTheGroups() {
+    Blueprint bp = new Blueprint();
+    BlueprintRequirementModifier recipeWide = new BlueprintRequirementModifier();
+    recipeWide.setOrderIndex(0);
+    recipeWide.setLabel("Damage Mitigation");
+    recipeWide.setModifierAtMaxQuality(1.15);
+    bp.addRecipeModifier(recipeWide);
+
+    BlueprintDto dto = mapper.toDto(bp);
+
+    assertEquals(0, dto.requirementGroups().size());
+    assertEquals(1, dto.recipeModifiers().size());
+    assertEquals("Damage Mitigation", dto.recipeModifiers().get(0).label());
+    assertEquals(1.15, dto.recipeModifiers().get(0).modifierAtMaxQuality());
   }
 
   @Test

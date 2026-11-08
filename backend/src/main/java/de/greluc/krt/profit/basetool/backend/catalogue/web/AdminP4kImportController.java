@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobRunner;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportJobService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kUploadGate;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
@@ -43,6 +44,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,9 +54,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Admin-only endpoints that run the KRT P4K Reader catalog import as asynchronous background jobs.
- * An upload only enqueues a job and returns {@code 202 Accepted}; {@link P4kImportJobRunner} does
- * the work and writes the result onto the job, which the page polls.
+ * Admin-only endpoints that run the P4K catalogue import (catalogue version 2) as asynchronous
+ * background jobs. An upload passes the synchronous {@link P4kUploadGate} and then only enqueues a
+ * job and returns {@code 202 Accepted}; {@link P4kImportJobRunner} does the work and writes the
+ * result onto the job, which the page polls.
  *
  * <ul>
  *   <li>{@code POST /jobs} — upload a catalog and enqueue a PREVIEW (dry-run) job.
@@ -71,8 +74,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(
     name = "Admin – P4K Import",
     description =
-        "Administrator endpoints for importing the KRT P4K Reader catalog (Game2.dcb master data)"
-            + " as asynchronous background jobs.")
+        "Administrator endpoints for importing the p4kx catalogue (schemaVersion 2, LIVE) as"
+            + " asynchronous background jobs.")
 @SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class AdminP4kImportController {
@@ -80,29 +83,38 @@ public class AdminP4kImportController {
   private final P4kImportJobService jobService;
   private final P4kImportJobRunner jobRunner;
   private final P4kImportJobMapper jobMapper;
+  private final P4kUploadGate uploadGate;
 
   /**
-   * Uploads a P4K catalog and enqueues a PREVIEW (dry-run) job. Returns immediately with the {@code
-   * PENDING} job; the background worker parses and reconciles it, and the page polls {@link
-   * #getJob(UUID)} for the result.
+   * Checks an uploaded catalogue at the gate and enqueues a PREVIEW (dry-run) job. Returns
+   * immediately with the {@code PENDING} job; the background worker reconciles it, and the page
+   * polls {@link #getJob(UUID)} for the result. A refused upload creates no job (REQ-P4K-001).
    *
-   * @param file the uploaded P4K catalog JSON
+   * @param file the uploaded catalogue: {@code .json}, {@code .json.gz} or {@code .json.zst}
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
+   * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued job
    */
   @PostMapping(value = "/jobs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  @Operation(summary = "Upload a P4K catalog and enqueue an async preview (dry-run) job.")
+  @Operation(summary = "Upload a P4K catalogue and enqueue an async preview (dry-run) job.")
   @ApiResponses({
     @ApiResponse(responseCode = "202", description = "Preview job enqueued."),
-    @ApiResponse(responseCode = "400", description = "File empty or unreadable."),
+    @ApiResponse(
+        responseCode = "400",
+        description =
+            "Refused by the gate (P4K_UPLOAD_REJECTED): not schemaVersion 2, not LIVE, no Build,"
+                + " or too large."),
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   @NotNull
   public ResponseEntity<P4kImportJobDto> enqueuePreview(
-      @RequestParam("file") @NotNull MultipartFile file, @CurrentUserId @NotNull UUID adminUserId) {
-    byte[] bytes = readBytes(file);
-    P4kImportJob job = jobService.createPreviewJob(bytes, file.getOriginalFilename(), adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, false);
+      @RequestParam("file") @NotNull MultipartFile file,
+      @CurrentUserId @NotNull UUID adminUserId,
+      @NotNull Authentication authentication) {
+    P4kImportJob job =
+        jobService.createPreviewJob(
+            uploadGate.check(readBytes(file)), file.getOriginalFilename(), adminUserId);
+    jobRunner.run(job.getId(), P4kImportJobKind.PREVIEW, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 
@@ -142,17 +154,21 @@ public class AdminP4kImportController {
 
   /**
    * Enqueues an APPLY job from a finished preview's stored upload (no re-upload needed). Returns
-   * immediately with the {@code PENDING} apply job; the background worker enriches / reconciles
-   * (and optionally seeds) the master data and the page polls for the result.
+   * immediately with the {@code PENDING} apply job; the background worker reconciles the master
+   * data, records the run and the page polls for the result.
    *
    * @param id the SUCCEEDED preview job to apply
-   * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched player-facing
-   *     records; {@code false} (default) to enrich existing rows only
+   * @param createItemsAndShips {@code true} to create unmatched playable items and ships
+   *     (REQ-P4K-009); {@code false} (default) creates nothing
+   * @param overrideMassGuard {@code true} to sweep a kind even when the sweep would stamp more of
+   *     it than the mass guard allows (REQ-P4K-012); {@code false} (default) skips that kind's
+   *     sweep
    * @param adminUserId the authenticated administrator (for the audit {@code created_by})
+   * @param authentication the administrator's authentication, which the background run acts under
    * @return {@code 202 Accepted} with the enqueued apply job
    */
   @PostMapping("/jobs/{id}/apply")
-  @Operation(summary = "Enqueue an async apply job from a finished preview (optionally seeding).")
+  @Operation(summary = "Enqueue an async apply job from a finished preview.")
   @ApiResponses({
     @ApiResponse(responseCode = "202", description = "Apply job enqueued."),
     @ApiResponse(
@@ -164,10 +180,14 @@ public class AdminP4kImportController {
   @NotNull
   public ResponseEntity<P4kImportJobDto> enqueueApply(
       @PathVariable("id") @NotNull UUID id,
-      @RequestParam(value = "seedNew", defaultValue = "false") boolean seedNew,
-      @CurrentUserId @NotNull UUID adminUserId) {
-    P4kImportJob job = jobService.createApplyJob(id, seedNew, adminUserId);
-    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, seedNew);
+      @RequestParam(value = "createItemsAndShips", defaultValue = "false")
+          boolean createItemsAndShips,
+      @RequestParam(value = "overrideMassGuard", defaultValue = "false") boolean overrideMassGuard,
+      @CurrentUserId @NotNull UUID adminUserId,
+      @NotNull Authentication authentication) {
+    P4kImportJob job =
+        jobService.createApplyJob(id, createItemsAndShips, overrideMassGuard, adminUserId);
+    jobRunner.run(job.getId(), P4kImportJobKind.APPLY, authentication);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(jobMapper.toDto(job));
   }
 

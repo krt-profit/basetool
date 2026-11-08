@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -37,17 +38,25 @@ class GameItemNamePrecedenceTest {
   }
 
   @Test
-  void theP4kNameReplacesAStaleNameOnlyWhenApplying() {
+  void theP4kNameReplacesAStaleNameAndAKeyOrPlaceholderNever() {
     GameItem gatling = item("Breakneck S4 Gatling");
 
-    assertTrue(GameItemNamePrecedence.applyP4kName(gatling, " AD6B Ballistic Gatling ", false));
-    assertEquals("Breakneck S4 Gatling", gatling.getName());
-    assertTrue(GameItemNamePrecedence.applyP4kName(gatling, " AD6B Ballistic Gatling ", true));
+    new P4kItemValues(
+            P4kItemValues.usableName(" AD6B Ballistic Gatling "),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)
+        .leadOnto(gatling);
+
     assertEquals("AD6B Ballistic Gatling", gatling.getName());
-    assertFalse(GameItemNamePrecedence.applyP4kName(gatling, "AD6B Ballistic Gatling", true));
-    assertFalse(GameItemNamePrecedence.applyP4kName(gatling, "@item_NameBEHR_Gatling", true));
-    assertFalse(GameItemNamePrecedence.applyP4kName(gatling, null, true));
-    assertEquals("AD6B Ballistic Gatling", gatling.getName());
+    assertNull(P4kItemValues.usableName("@item_NameBEHR_Gatling"));
+    assertNull(P4kItemValues.usableName("LOC_PLACEHOLDER"));
+    assertNull(P4kItemValues.usableName("<= PLACEHOLDER =>"));
+    assertNull(P4kItemValues.usableName(null));
   }
 
   @Test
@@ -62,7 +71,7 @@ class GameItemNamePrecedenceTest {
   @Test
   void theWikiNeverRenamesARowTheP4kKnows() {
     GameItem gatling = item("AD6B Ballistic Gatling");
-    gatling.setP4kSyncedAt(Instant.now());
+    gatling.setP4kName("AD6B Ballistic Gatling");
 
     GameItemNamePrecedence.applyWikiName(gatling, "AD6B Gatling");
 
@@ -93,7 +102,7 @@ class GameItemNamePrecedenceTest {
   @Test
   void theUexNameNeverReplacesAP4kName() {
     GameItem gatling = item("AD6B Ballistic Gatling");
-    gatling.setP4kSyncedAt(Instant.now());
+    gatling.setP4kName("AD6B Ballistic Gatling");
 
     GameItemNamePrecedence.applyUexName(gatling, "Breakneck S4 Gatling");
 
@@ -123,7 +132,7 @@ class GameItemNamePrecedenceTest {
   @Test
   void theUexNameFillsABlankNameEvenOnAP4kRow() {
     GameItem blank = item(null);
-    blank.setP4kSyncedAt(Instant.now());
+    blank.setP4kName("AD6B Ballistic Gatling");
 
     GameItemNamePrecedence.applyUexName(blank, "UEX Name");
 

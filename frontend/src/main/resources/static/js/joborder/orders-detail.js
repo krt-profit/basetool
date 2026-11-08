@@ -28,6 +28,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 /** @type {any[]} */
 export let cachedInventoryItems = [];
@@ -453,7 +454,7 @@ export function addHandoverItemRow() {
             isPiece ? 0 : 3,
             document.documentElement.lang,
         );
-        const matName = (inv.material && inv.material.name) || '';
+        const matName = inv.material ? localisedName(inv.material.name, inv.material.nameDe) : '';
         const userName = (inv.user && inv.user.effectiveName) || '';
         const optionLabel =
             fillPlaceholders(ORDER_HANDOVER_I18N.option, [
@@ -694,7 +695,9 @@ export function validateHandoverAmounts() {
         const sliceMax = orderSliceAmount(inv);
         if (entered > sliceMax) {
             const available = _handoverFmtAmount(sliceMax, isPiece);
-            const materialName = inv.material ? inv.material.name : sel.value;
+            const materialName = inv.material
+                ? localisedName(inv.material.name, inv.material.nameDe)
+                : sel.value;
             const msg = MSG_HANDOVER_REPORT_VALIDATION_AMOUNT.replace('{0}', materialName).replace(
                 '{1}',
                 available,

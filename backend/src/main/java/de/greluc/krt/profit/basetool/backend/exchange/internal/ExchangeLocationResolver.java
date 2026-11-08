@@ -30,7 +30,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Finds the non-hidden Lager location an exchange write names (REQ-XCH-016, REQ-XCH-017): by its
- * UEX place first, then by its exact name.
+ * starmap GUID first, then by its UEX place, then by its exact name; a reference that does not
+ * match at one step falls through to the next.
  */
 @Component
 @RequiredArgsConstructor
@@ -48,6 +49,12 @@ public class ExchangeLocationResolver {
    * @return the location, or empty when the place has none
    */
   public @NotNull Optional<Location> resolve(@NotNull ExchangeLocationRef ref) {
+    if (ref.guid() != null) {
+      Optional<Location> byGuid = locationRepository.findExchangeByGuid(ref.guid());
+      if (byGuid.isPresent()) {
+        return byGuid;
+      }
+    }
     if (ref.uex() != null) {
       List<Location> byPlace =
           CITY.equals(ref.uex().kind())
@@ -58,7 +65,8 @@ public class ExchangeLocationResolver {
       }
     }
     if (ref.name() != null) {
-      return locationRepository.findFirstByNameAndHiddenFalseOrderByIdAsc(ref.name());
+      return locationRepository.findFirstByNameAndHiddenFalseAndReferenceOnlyFalseOrderByIdAsc(
+          ref.name());
     }
     return Optional.empty();
   }

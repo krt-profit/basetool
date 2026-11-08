@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.backend.materialexchange.internal.Ma
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -56,6 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
 class MaterialExchangeRepositoryDataTest {
 
   @Autowired private MaterialExchangeOfferRepository offerRepository;
+
+  @Autowired private CityRepository cityRepository;
   @Autowired private MaterialExchangeInterestRepository interestRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private MaterialRepository materialRepository;
@@ -497,7 +501,7 @@ class MaterialExchangeRepositoryDataTest {
   private InventoryItem persistItem(User owner, String materialName, int quality, double amount) {
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     Material material = new Material();
     material.setName(materialName + "-" + UUID.randomUUID());
@@ -543,7 +547,7 @@ class MaterialExchangeRepositoryDataTest {
   private InventoryItem persistItemStockRow(User owner, String itemName, double amount) {
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());
-    locationRepository.save(location);
+    locationRepository.save(TestPlaces.onOwnCity(location, cityRepository));
 
     GameItem gameItem = new GameItem();
     gameItem.setName(itemName + "-" + UUID.randomUUID());

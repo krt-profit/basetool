@@ -920,7 +920,9 @@ function initInventoryInput() {
             onError(status, problem) {
                 let msg = INV_ADD_MSG.failed;
                 const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(problem);
+                const retired = krtFetch.catalogueRetiredMessage(problem);
                 if (ownerRequired) msg = ownerRequired;
+                else if (retired) msg = retired;
                 else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
                     msg = INV_ADD_MSG.personalAssignment;
                 else if (problem && problem.code === 'INVENTORY_ALLOCATION_AMOUNT_MISSING')

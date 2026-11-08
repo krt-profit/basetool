@@ -184,6 +184,14 @@ public interface ExchangeStockLotRow {
   Integer getUexSpaceStationId();
 
   /**
+   * The GUID of the P4K starmap object the location stands for, or {@code null} when it links none
+   * (REQ-P4K-037).
+   *
+   * @return the GUID
+   */
+  UUID getLocationGuid();
+
+  /**
    * The quality, {@code 0} for an item lot.
    *
    * @return the quality

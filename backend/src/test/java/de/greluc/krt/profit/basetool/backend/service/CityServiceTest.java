@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CityService;
@@ -41,6 +42,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CityServiceTest {
 
   @Mock private CityRepository cityRepository;
+
+  @Mock private AuditRecorder auditRecorder;
 
   @InjectMocks private CityService service;
 

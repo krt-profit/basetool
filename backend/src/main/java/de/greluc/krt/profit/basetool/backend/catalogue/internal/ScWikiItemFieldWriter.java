@@ -19,16 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiItemDto;
-import de.greluc.krt.profit.basetool.logging.LogSafe;
-import io.micrometer.core.instrument.MeterRegistry;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.time.Instant;
-import java.util.Locale;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -38,26 +34,39 @@ import org.springframework.util.StringUtils;
 
 /**
  * Applies Wiki item metadata without changing canonical identity or UEX-owned attributes; the
- * canonical name follows {@link GameItemNamePrecedence}.
+ * attributes the P4K leads are written only where the P4K value is {@code null}, and a differing
+ * Wiki value is reported ({@link P4kLedColumns#fillGap}, REQ-P4K-017…019); the canonical name
+ * follows {@link GameItemNamePrecedence}.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ScWikiItemFieldWriter {
-  private static final int MAX_CLASS_LOG_LENGTH = 64;
-  private static final int MAX_LOGGED_UNKNOWN_CLASSES = 32;
-  private final Set<String> unknownClassesLogged = ConcurrentHashMap.newKeySet();
-  private final MeterRegistry meterRegistry;
+
+  /** The source name the class resolver logs. */
+  private static final String SOURCE = "SC Wiki";
+
+  /** Resolves, counts and logs the Wiki's class values. */
+  private final ItemClassResolver itemClassResolver;
+
+  /** Receives the disagreements with the P4K. */
+  private final SyncReportService syncReportService;
 
   /**
-   * Writes the Wiki-owned attributes, source presence and, on a row the P4K import does not know,
-   * the canonical name; omitted size, grade and class stay intact.
+   * Writes the Wiki-owned attributes, source presence and, on a row without a P4K name, the
+   * canonical name; omitted size, grade and class stay intact, and an attribute the P4K holds a
+   * value for keeps it.
    *
    * @param item managed catalogue item
    * @param dto identity-verified source payload
+   * @param runId the Wiki run a disagreement is reported under
    * @param now source-sync timestamp
    */
-  public void apply(@NotNull GameItem item, @NotNull ScWikiItemDto dto, @NotNull Instant now) {
+  public void apply(
+      @NotNull GameItem item,
+      @NotNull ScWikiItemDto dto,
+      @NotNull UUID runId,
+      @NotNull Instant now) {
     item.setScwikiName(dto.name());
     GameItemNamePrecedence.applyWikiName(item, dto.name());
     item.setWikiMetadata(dto.metadata());
@@ -65,29 +74,44 @@ public class ScWikiItemFieldWriter {
     item.setClassName(dto.className());
     item.setClassification(dto.classification());
     item.setClassificationLabel(dto.classificationLabel());
-    item.setWikiType(dto.type());
+    P4kLedColumns led = new P4kLedColumns(item);
+    led.fillGap("wiki_type", item.getP4kType(), dto.type(), item::setWikiType);
     item.setWikiTypeLabel(dto.typeLabel());
-    item.setWikiSubType(dto.subType());
+    led.fillGap("wiki_sub_type", item.getP4kSubType(), dto.subType(), item::setWikiSubType);
     item.setWikiSubTypeLabel(dto.subTypeLabel());
     if (StringUtils.hasText(dto.size())) {
-      item.setSizeClass(parseSize(dto.size()));
+      led.fillGap("size_class", item.getP4kSize(), parseSize(dto.size()), item::setSizeClass);
     }
     if (StringUtils.hasText(dto.grade())) {
-      item.setGrade(dto.grade());
+      String p4kGrade = P4kGradeMapping.letter(item.getP4kType(), item.getP4kGradeRaw());
+      led.fillGap("grade", p4kGrade, dto.grade(), item::setGrade);
     }
     if (StringUtils.hasText(dto.itemClass())) {
-      item.setItemClass(resolveClass(dto.itemClass()));
+      led.fillGap(
+          "item_class",
+          item.getP4kItemClass(),
+          itemClassResolver.resolve(dto.itemClass(), SOURCE),
+          item::setItemClass);
     }
     item.setRarity(dto.rarity());
-    item.setMass(dto.mass());
+    led.fillGap("mass", item.getP4kMass(), dto.mass(), item::setMass);
+    for (String disagreement : led.disagreements()) {
+      syncReportService.logScwikiEvent(
+          runId,
+          SyncEventType.P4K_DISAGREEMENT,
+          "game_item",
+          item.getExternalUuid(),
+          item.getName(),
+          disagreement);
+    }
     if (dto.dimension() != null) {
       item.setDimensionX(dto.dimension().width());
       item.setDimensionY(dto.dimension().height());
       item.setDimensionZ(dto.dimension().length());
     }
     if (dto.description() != null) {
-      item.setDescriptionEn(dto.description().get("en_EN"));
-      item.setDescriptionDe(dto.description().get("de_DE"));
+      writeIfPresent(dto.description().get("en_EN"), item::setDescriptionEn);
+      writeIfPresent(dto.description().get("de_DE"), item::setDescriptionDe);
     }
     item.setIsBaseVariant(dto.isBaseVariant());
     item.setIsCraftable(dto.isCraftable());
@@ -96,19 +120,18 @@ public class ScWikiItemFieldWriter {
     item.setScwikiDeletedAt(null);
   }
 
-  private @Nullable ShipComponentClass resolveClass(@NotNull String wikiClass) {
-    ShipComponentClass resolved = ShipComponentClass.fromWikiClass(wikiClass);
-    if (resolved == null) {
-      meterRegistry.counter(CatalogueMetricNames.CATALOGUE_ITEM_CLASS_UNKNOWN).increment();
-      String value = LogSafe.text(wikiClass.strip(), MAX_CLASS_LOG_LENGTH);
-      if (unknownClassesLogged.size() < MAX_LOGGED_UNKNOWN_CLASSES
-          && unknownClassesLogged.add(value.toLowerCase(Locale.ROOT))) {
-        log.warn(
-            "Unknown SC Wiki item class '{}' — storing no class; add it to ShipComponentClass.",
-            value);
-      }
+  /**
+   * Writes a Wiki text that is present; a missing or blank locale keeps the stored text, which the
+   * P4K import may have filled.
+   *
+   * @param text the Wiki's text of one locale
+   * @param setter writes the column
+   */
+  private static void writeIfPresent(@Nullable String text, @NotNull Consumer<String> setter) {
+    String present = StringNormalization.blankToNull(text);
+    if (present != null) {
+      setter.accept(present);
     }
-    return resolved;
   }
 
   private static @Nullable Integer parseSize(String size) {

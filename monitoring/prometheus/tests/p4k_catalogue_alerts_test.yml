@@ -1,0 +1,141 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: an unknown class in the last run alerts
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_import_last_run_unknown_grades{job="basetool-backend"}'
+        values: "0x30"
+      - series: 'basetool_p4k_import_last_run_unknown_classes{job="basetool-backend"}'
+        values: "2x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: P4kImportUnknownValues
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Last P4K import read unknown grades or classes (2)"
+              description: "The last P4K APPLY read item grade or itemClass values the Basetool does not know and stored them as no value. Check the run's change report (UNKNOWN_VALUE rows) and extend the mapping (REQ-OBS-022, REQ-P4K-018, REQ-P4K-019)."
+
+  - name: a last run without unknown values stays silent
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_import_last_run_unknown_grades{job="basetool-backend"}'
+        values: "0x30"
+      - series: 'basetool_p4k_import_last_run_unknown_classes{job="basetool-backend"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: P4kImportUnknownValues
+        exp_alerts: []
+
+  - name: a null share rise above 5 points alerts
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_import_last_run_item_class_null_ratio_change{job="basetool-backend"}'
+        values: "0.06x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: P4kImportItemClassNullShareRose
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "P4K itemClass null share rose by more than 5 points"
+              description: "The share of catalogue items without itemClass rose by more than 5 percentage points against the previous P4K APPLY. A p4kx export may have lost the class; compare the two runs before relying on item classes (REQ-OBS-022)."
+
+  - name: a rise of exactly 5 points or a fall stays silent
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_import_last_run_item_class_null_ratio_change{job="basetool-backend"}'
+        values: "0.05x15 -0.2x15"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: P4kImportItemClassNullShareRose
+        exp_alerts: []
+      - eval_time: 28m
+        alertname: P4kImportItemClassNullShareRose
+        exp_alerts: []
+
+  - name: a review case open for more than 30 days alerts
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_review_case_open_oldest_age_seconds{job="basetool-backend"}'
+        values: "2600000x90"
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: P4kReviewCaseStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "P4K review case open for more than 30 days"
+              description: "The oldest open P4K review case is older than 30 days. Resolve the cases on /admin/p4k-import as keep or hide (REQ-OBS-022, REQ-P4K-016)."
+
+  - name: a younger review case stays silent
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_review_case_open_oldest_age_seconds{job="basetool-backend"}'
+        values: "2500000x90"
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: P4kReviewCaseStale
+        exp_alerts: []
+
+  - name: a job RUNNING for more than 3 hours alerts
+    interval: 5m
+    input_series:
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="RUNNING"}'
+        values: "1x48"
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="PENDING"}'
+        values: "0x48"
+    alert_rule_test:
+      - eval_time: 3h5m
+        alertname: P4kImportRunningStuck
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "A P4K import has been RUNNING for more than 3h"
+              description: "A P4K import job has stayed RUNNING for more than 3 hours — a run takes minutes plus at most one hour waiting for the sync lock, so the worker is wedged or the job's end could not be recorded. Check the backend log for the job; a backend restart marks it FAILED (REQ-OBS-011)."
+
+  - name: jobs that each finish stay silent although the queue is rarely empty
+    interval: 5m
+    input_series:
+      - series: 'basetool_p4k_import_job_pending_count{job="basetool-backend",status="RUNNING"}'
+        values: "1x23 0 1x23"
+    alert_rule_test:
+      - eval_time: 3h55m
+        alertname: P4kImportRunningStuck
+        exp_alerts: []
+
+  - name: a Channel refusal alerts at once
+    interval: 1m
+    input_series:
+      - series: 'basetool_p4k_import_rejected_total{job="basetool-backend",reason="channel"}'
+        values: "0x10 1x30"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: P4kImportChannelRejected
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Non-LIVE P4K catalogue uploaded"
+              description: "The P4K upload gate refused a catalogue of another Channel than LIVE within 24 hours: a test-Channel export was uploaded to this environment. Nothing was imported; check which file was used (REQ-OBS-022, REQ-P4K-001)."
+
+  - name: other refusal reasons and an old Channel refusal stay silent
+    interval: 1h
+    input_series:
+      - series: 'basetool_p4k_import_rejected_total{job="basetool-backend",reason="channel"}'
+        values: "0 1x30"
+      - series: 'basetool_p4k_import_rejected_total{job="basetool-backend",reason="older_build"}'
+        values: "0 5x30"
+    alert_rule_test:
+      - eval_time: 28h
+        alertname: P4kImportChannelRejected
+        exp_alerts: []

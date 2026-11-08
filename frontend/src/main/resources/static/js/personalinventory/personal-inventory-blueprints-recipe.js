@@ -3,12 +3,14 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import {
     computeModifierValue,
-    formatFactorPercent,
+    formatModifierChange,
     formatStatRange,
     indexBaseStats,
+    isAdditive,
 } from '/js/personalinventory/personal-inventory-blueprint-stats.js';
 
 /** @type {HTMLElement | null} */
@@ -450,6 +452,10 @@ function renderRecipe(recipe) {
     if (groups.length > 0) {
         const pane = recipeEl;
         const baseByKey = indexBaseStats(recipe.baseStats);
+        const recipeModifiers = recipe.recipeModifiers || [];
+        if (recipeModifiers.length > 0) {
+            pane.appendChild(renderRecipeWideBlock(recipeModifiers, baseByKey));
+        }
         groups.forEach((g, idx) => {
             pane.appendChild(renderQualityBlock(g, idx, baseByKey));
         });
@@ -493,7 +499,77 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         block.appendChild(el('div', 'quality-name', '–'));
     }
 
-    const mods = group.modifiers || [];
+    appendModifierAffects(
+        block,
+        group.modifiers || [],
+        slotQuality(groupIndex),
+        krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
+            (firstIngredientName ? ` ${firstIngredientName}` : ''),
+        baseByKey,
+    );
+    return block;
+}
+
+/**
+ * Renders the modifiers that apply to the whole recipe rather than one slot, with their own quality
+ * slider; no slot's craftability quality presets it.
+ *
+ * @param {BpRecipeModifier[]} modifiers the recipe-wide modifiers
+ * @param {Map<string, BpStatBase>} baseByKey the crafted item's stat base values per property key
+ * @returns {HTMLElement} the quality block
+ */
+function renderRecipeWideBlock(modifiers, baseByKey) {
+    const block = el('div', 'quality-block');
+    block.setAttribute('data-testid', 'bp-recipe-wide');
+    const label = krtI18nText(i18n().recipeWide, 'krtBlueprintsRecipeI18n.recipeWide');
+    block.appendChild(el('span', 'quality-source', label));
+    const hint = el('div', 'quality-name');
+    hint.appendChild(
+        el(
+            'small',
+            null,
+            krtI18nText(i18n().recipeWideHint, 'krtBlueprintsRecipeI18n.recipeWideHint'),
+        ),
+    );
+    block.appendChild(hint);
+    appendModifierAffects(
+        block,
+        modifiers,
+        null,
+        `${krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria')} ${label}`,
+        baseByKey,
+    );
+    return block;
+}
+
+/**
+ * The effective quality the craftability computed for one slot, under the current refinery toggle.
+ *
+ * @param {number} groupIndex the slot's position, matching the craftability groups
+ * @returns {number | null} the quality, null when the slot was not evaluated
+ */
+function slotQuality(groupIndex) {
+    const craftGroup =
+        activeCraftability && activeCraftability.groups && activeCraftability.groups[groupIndex];
+    if (!craftGroup) {
+        return null;
+    }
+    const eff = refineryOn ? craftGroup.effectiveQualityWithRefinery : craftGroup.effectiveQuality;
+    return eff ?? null;
+}
+
+/**
+ * Appends a block's stat chips and, for modifiers with a quality band, the quality slider that
+ * drives them.
+ *
+ * @param {HTMLElement} block the quality block
+ * @param {BpRecipeModifier[]} mods the modifiers
+ * @param {number | null} quality the slider's preset quality, null for the band's top
+ * @param {string} ariaLabel the slider's accessible name
+ * @param {Map<string, BpStatBase>} baseByKey the crafted item's stat base values per property key
+ * @returns {void}
+ */
+function appendModifierAffects(block, mods, quality, ariaLabel, baseByKey) {
     const banded = mods.filter((m) => {
         return (
             m.effectiveQualityMin != null &&
@@ -508,7 +584,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
     if (mods.length === 0) {
         affects.appendChild(el('span', 'krt-bp-recipe-dash', '–'));
         block.appendChild(affects);
-        return block;
+        return;
     }
 
     /** @type {StatChip[]} */
@@ -530,6 +606,14 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
             titleParts.push(
                 krtI18nText(i18n().statValueTitle, 'krtBlueprintsRecipeI18n.statValueTitle'),
             );
+            if (base.source) {
+                titleParts.push(
+                    krtI18nText(
+                        i18n()[`statSource${base.source}`],
+                        `krtBlueprintsRecipeI18n.statSource${base.source}`,
+                    ),
+                );
+            }
         }
         const bw = betterWhenText(m.betterWhen);
         if (bw) {
@@ -560,19 +644,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
             ),
         );
 
-        let defaultQ = qmax;
-        const craftGroup =
-            activeCraftability &&
-            activeCraftability.groups &&
-            activeCraftability.groups[groupIndex];
-        if (craftGroup) {
-            const eff = refineryOn
-                ? craftGroup.effectiveQualityWithRefinery
-                : craftGroup.effectiveQuality;
-            if (eff != null) {
-                defaultQ = Math.max(qmin, Math.min(qmax, eff));
-            }
-        }
+        const defaultQ = quality == null ? qmax : Math.max(qmin, Math.min(qmax, quality));
 
         const qrow = el('div', 'quality-row');
         const range = document.createElement('input');
@@ -581,11 +653,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         range.min = String(qmin);
         range.max = String(qmax);
         range.value = String(defaultQ);
-        range.setAttribute(
-            'aria-label',
-            krtI18nText(i18n().qualityAria, 'krtBlueprintsRecipeI18n.qualityAria') +
-                (firstIngredientName ? ` ${firstIngredientName}` : ''),
-        );
+        range.setAttribute('aria-label', ariaLabel);
         qrow.appendChild(range);
         const qval = el('span', 'quality-value');
         const qOut = el('output', null, String(Math.round(defaultQ)));
@@ -603,7 +671,7 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
         }
         if (banded[0] && banded[0].modifierAtMaxQuality != null) {
             hintParts.push(
-                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatFactorPercent(banded[0].modifierAtMaxQuality, document.documentElement.lang)}`,
+                `${formatNumber(Math.round(qmax), 0, document.documentElement.lang)} → ${formatModifierChange(banded[0].modifierAtMaxQuality, isAdditive(banded[0]), null, document.documentElement.lang, statUnitLabels())}`,
             );
         }
         if (hintParts.length > 0) {
@@ -629,7 +697,6 @@ function renderQualityBlock(group, groupIndex, baseByKey) {
     }
 
     block.appendChild(affects);
-    return block;
 }
 
 /**
@@ -651,19 +718,23 @@ function statUnitLabels() {
 }
 
 /**
- * Writes a chip's value for a modifier factor: „base → value" with the factor beside it when the
- * crafted item's base value is known, the factor alone otherwise.
+ * Writes a chip's value for a modifier value: „base → value" with the change beside it when the
+ * crafted item's base value is known, the change alone otherwise. A factor shows as a signed
+ * percentage, a summand of an additive modifier as a signed value in the stat's unit.
  *
  * @param {StatChip} chip the chip
- * @param {number | null | undefined} factor the modifier factor, null when unknown
- * @param {string} missing the text for an unknown factor
+ * @param {number | null | undefined} factor the modifier value, null when unknown
+ * @param {string} missing the text for an unknown value
  * @returns {void}
  */
 function showChipValue(chip, factor, missing) {
     const lang = document.documentElement.lang;
-    const factorText = factor == null ? missing : formatFactorPercent(factor, lang);
+    const additive = isAdditive(chip.modifier);
+    const units = statUnitLabels();
+    const factorText =
+        factor == null ? missing : formatModifierChange(factor, additive, chip.base, lang, units);
     if (chip.base && chip.factorOut) {
-        chip.out.textContent = formatStatRange(chip.base, factor, lang, statUnitLabels());
+        chip.out.textContent = formatStatRange(chip.base, factor, lang, units, additive);
         chip.factorOut.textContent = ` ${factorText}`;
         return;
     }
@@ -841,22 +912,46 @@ function craftCount(data) {
 }
 
 /**
+ * The name the page shows for a material of the breakdown (REQ-P4K-023).
+ *
+ * @param {ApiDto<'CraftabilityMaterialDto'>} m the material's breakdown
+ * @returns {string} the German name on a German page when there is one, else the name, `?` when
+ *     both are absent
+ */
+function shownMaterialName(m) {
+    return localisedName(m.materialName, m.materialNameDe) || '?';
+}
+
+/**
+ * The breakdown rows the craft under the current refinery setting consumes: of a choose-n recipe
+ * the two settings may count different option groups (REQ-P4K-027).
+ *
+ * @param {any} data the blueprint's craftability
+ * @returns {ApiDto<'CraftabilityMaterialDto'>[]} the counted rows in recipe order
+ */
+function countedMaterials(data) {
+    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
+    const materials = data.materials || [];
+    return materials.filter((m) => (refineryOn ? m.countedWithRefinery : m.counted));
+}
+
+/**
  * The materials that cap the craftable count under the current refinery setting: every material
  * whose own count equals the blueprint's count.
  *
  * @param {any} data the blueprint's craftability
- * @returns {string[]} the limiting material names, in recipe order; empty when none caps the count
+ * @returns {string[]} the limiting material names as the page shows them, in recipe order; empty
+ *     when none caps the count
  */
 function limitingNames(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     const count = craftCount(data);
     const names = materials
         .filter((m) => {
             return (refineryOn ? m.craftableWithRefinery : m.craftable) === count;
         })
         .map((m) => {
-            return m.materialName || '?';
+            return shownMaterialName(m);
         });
     if (names.length > 0) {
         return names;
@@ -1004,8 +1099,7 @@ function renderKpi(data) {
  * @returns {HTMLElement | null} the section, or null when no material was evaluated
  */
 function renderIngredients(data) {
-    /** @type {ApiDto<'CraftabilityMaterialDto'>[]} */
-    const materials = data.materials || [];
+    const materials = countedMaterials(data);
     if (materials.length === 0) {
         return null;
     }
@@ -1050,7 +1144,7 @@ function renderIngredients(data) {
         const unit = ` ${unitLabel(qt)}`;
         const row = el('tr');
         const nameCell = el('td');
-        nameCell.appendChild(el('span', 'cell-title', m.materialName || '?'));
+        nameCell.appendChild(el('span', 'cell-title', shownMaterialName(m)));
         row.appendChild(nameCell);
         const need = el('td', 'num', fmtAmount(m.requiredScu, qt) + unit);
         need.setAttribute('data-label', dict.colNeed || '');
@@ -1058,7 +1152,7 @@ function renderIngredients(data) {
         let stockState = 'is-ok';
         if (missing > 0) {
             stockState = 'is-short';
-        } else if (limits.has(m.materialName || '?')) {
+        } else if (limits.has(shownMaterialName(m))) {
             stockState = 'is-limit';
         }
         const stock = el('td', `num krt-bp-ing-stock ${stockState}`, fmtAmount(avail, qt) + unit);

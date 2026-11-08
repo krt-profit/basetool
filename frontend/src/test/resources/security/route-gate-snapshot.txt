@@ -52,11 +52,8 @@
 /admin/material-aliases/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialAliasesPageController#deleteAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/materials GET -> AdminMaterialsPageController#listMaterials gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/ajax POST -> AdminMaterialsPageController#createMaterialAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories POST -> AdminMaterialsPageController#createCategory gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#createCategoryAjax gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories/{id}/delete POST -> AdminMaterialsPageController#deleteCategory gate=class:hasRole('ADMIN') layout=yes
-/admin/materials/categories/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsPageController#deleteCategoryAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/materials/{id}/ajax PUT -> AdminMaterialsPageController#updateMaterialAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/materials/{id}/p4k-overrides/{field}/ajax DELETE headers=[X-Requested-With=XMLHttpRequest] -> AdminMaterialsRelayController#releaseP4kOverride gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/export/json GET -> DataExportProxyController#adminJson gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/export/pdf GET -> DataExportProxyController#adminPdf gate=method:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar GET -> MemberHangarPageController#viewMemberHangar gate=class:hasRole('ADMIN') layout=yes
@@ -103,10 +100,18 @@
 /admin/org-structure/squadrons/{id}/update POST -> AdminSquadronsPageController#updateSquadron gate=class:hasRole('ADMIN') layout=yes
 /admin/org-structure/squadrons/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSquadronsPageController#updateSquadronAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import GET -> AdminP4kImportPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/due GET -> AdminP4kReportController#due gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/jobs GET -> AdminP4kImportPageController#listJobs gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs POST consumes=[multipart/form-data] -> AdminP4kImportPageController#enqueuePreview gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id} GET -> AdminP4kImportPageController#getJob gate=class:hasRole('ADMIN') layout=yes
 /admin/p4k-import/jobs/{id}/apply POST -> AdminP4kImportPageController#applyJob gate=class:hasRole('ADMIN') layout=yes
+/admin/p4k-import/jobs/{id}/changes GET -> AdminP4kReportController#previewChanges gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/materials GET -> AdminP4kReportController#materials gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/resource-groups GET -> AdminP4kReportController#resourceGroups gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-cases GET -> AdminP4kReportController#openReviewCases gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-cases/{id}/resolve POST -> AdminP4kReportController#resolve gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/runs GET -> AdminP4kReportController#runs gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/runs/{id}/changes GET -> AdminP4kReportController#runChanges gate=class:hasRole('ADMIN') layout=no
 /admin/person-search GET -> AdminPersonSearchPageController#page gate=method:hasRole('ADMIN') layout=yes
 /admin/personal-blueprints GET -> AdminPersonalBlueprintsPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-blueprints/delete-all-users POST -> AdminPersonalBlueprintsPageController#deleteAllUsers gate=class:hasRole('ADMIN') layout=yes
@@ -118,6 +123,7 @@
 /admin/personal-blueprints/{userSub}/items/{id}/update-note POST -> AdminPersonalBlueprintsPageController#updateNote gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory GET -> AdminPersonalInventoryPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/add POST -> AdminPersonalInventoryPageController#add gate=class:hasRole('ADMIN') layout=yes
+/admin/personal-inventory/{userSub}/location-search GET -> PersonalInventoryLocationSearchController#memberLocationSearch gate=method:hasRole('ADMIN') layout=no
 /admin/personal-inventory/{userSub}/{id}/delete POST -> AdminPersonalInventoryPageController#delete gate=class:hasRole('ADMIN') layout=yes
 /admin/personal-inventory/{userSub}/{id}/update POST -> AdminPersonalInventoryPageController#update gate=class:hasRole('ADMIN') layout=yes
 /admin/purchasing GET -> PurchasingPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
@@ -129,6 +135,10 @@
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
+/admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
+/admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no
+/admin/shops/{id}/terminal-link POST -> AdminShopsController#changeLink gate=class:hasRole('ADMIN') layout=no
 /admin/special-commands GET -> AdminSpecialCommandsPageController#listSpecialCommands gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST -> AdminSpecialCommandsPageController#createSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#createSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
@@ -141,6 +151,12 @@
 /admin/special-commands/{id}/members/{userId}/lead POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#toggleMemberLeadAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST -> AdminSpecialCommandsPageController#updateSpecialCommand gate=class:hasRole('ADMIN') layout=yes
 /admin/special-commands/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSpecialCommandsPageController#updateSpecialCommandAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/starmap GET -> AdminStarmapPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/starmap/objects GET -> AdminStarmapController#objects gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/objects/{id}/storage-place POST -> AdminStarmapController#createStoragePlace gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/objects/{id}/visibility POST -> AdminStarmapController#overrideVisibility gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/places/{kind} GET -> AdminStarmapController#places gate=class:hasRole('ADMIN') layout=no
+/admin/starmap/places/{kind}/{id}/link POST -> AdminStarmapController#changeLink gate=class:hasRole('ADMIN') layout=no
 /admin/supply GET -> SupplyPageController#adminSettings gate=method:hasRole('ADMIN') layout=yes
 /admin/sync-reports GET -> AdminSyncReportsPageController#combined gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST -> AdminSyncReportsPageController#deleteOld gate=class:hasRole('ADMIN') layout=yes
@@ -561,7 +577,7 @@
 /personal-inventory/blueprints/{id}/recipe GET -> PersonalInventoryBlueprintsPageController#recipe gate=class:isAuthenticated() layout=yes
 /personal-inventory/blueprints/{id}/update-note POST -> PersonalInventoryBlueprintsPageController#updateNote gate=class:isAuthenticated() layout=yes
 /personal-inventory/blueprints/{id}/update-note POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryBlueprintsPageController#updateNoteAjax gate=class:isAuthenticated() layout=yes
-/personal-inventory/uex-search GET -> PersonalInventoryPageController#uexSearch gate=class:isAuthenticated() layout=yes
+/personal-inventory/location-search GET -> PersonalInventoryLocationSearchController#locationSearch gate=class:isAuthenticated() layout=no
 /personal-inventory/{id}/delete POST -> PersonalInventoryPageController#delete gate=class:isAuthenticated() layout=yes
 /personal-inventory/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> PersonalInventoryPageController#deleteAjax gate=class:isAuthenticated() layout=yes
 /personal-inventory/{id}/update POST -> PersonalInventoryPageController#update gate=class:isAuthenticated() layout=yes

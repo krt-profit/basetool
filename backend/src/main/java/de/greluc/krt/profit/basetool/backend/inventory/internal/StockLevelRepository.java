@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_ITEM;
+
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -35,23 +37,25 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
 
   /**
    * The levels of active units and of catalogue entries that are still listed, catalogue entries
-   * loaded; the {@code WHERE} clause is open for further conditions.
+   * loaded; an entry the P4K swept or an admin hid is no longer listed, whatever the other sources
+   * say (REQ-P4K-013). The {@code WHERE} clause is open for further conditions.
    */
   String ACTIVE_LEVELS =
       """
       SELECT l FROM StockLevel l
       JOIN FETCH l.orgUnit u
       LEFT JOIN FETCH l.material m
-      LEFT JOIN FETCH l.gameItem g
+      LEFT JOIN FETCH l.gameItem gi
       LEFT JOIN FETCH l.qualityTier t
       WHERE u.active = true
         AND m.scwikiDeletedAt IS NULL
-        AND (
-          (g.scwikiDeletedAt IS NULL AND g.uexDeletedAt IS NULL)
-          OR (g.scwikiSyncedAt IS NOT NULL AND g.scwikiDeletedAt IS NULL)
-          OR (g.uexItemId IS NOT NULL AND g.uexDeletedAt IS NULL)
-        )
-      """;
+        AND m.p4kDeletedAt IS NULL AND m.p4kHiddenAt IS NULL
+        AND\
+      """
+          + LISTED_ITEM
+          + "AND ((gi.scwikiDeletedAt IS NULL AND gi.uexDeletedAt IS NULL)"
+          + " OR (gi.scwikiSyncedAt IS NOT NULL AND gi.scwikiDeletedAt IS NULL)"
+          + " OR (gi.uexItemId IS NOT NULL AND gi.uexDeletedAt IS NULL))";
 
   /**
    * The scope and order clause of the levels the caller may see, following {@link #ACTIVE_LEVELS}.
@@ -64,7 +68,7 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, UUID> {
           OR (:activeOrgUnitId IS NOT NULL AND u.id = :activeOrgUnitId)
           OR (:activeOrgUnitId IS NULL AND u.id IN :memberOrgUnitIds)
         )
-      ORDER BY u.name, COALESCE(m.name, g.name), t.minQuality DESC NULLS LAST
+      ORDER BY u.name, COALESCE(m.name, gi.name), t.minQuality DESC NULLS LAST
       """;
 
   /**

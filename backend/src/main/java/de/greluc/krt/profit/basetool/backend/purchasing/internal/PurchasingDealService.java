@@ -24,9 +24,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.PurposeBoundRequests;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -95,7 +96,7 @@ public class PurchasingDealService {
   private final SupplyNeeds supplyNeeds;
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
-  private final GameItemRepository gameItemRepository;
+  private final SelectableGameItems selectableGameItems;
   private final QualityTierRepository qualityTierRepository;
   private final MissionRepository missionRepository;
   private final PurposeBoundRequests purposeBoundRequests;
@@ -166,6 +167,7 @@ public class PurchasingDealService {
    * @param request the deal
    * @return the created draft
    * @throws AccessDeniedException when the caller is no active delegate
+   * @throws RetiredGameItemException when the P4K retired the need's game item
    */
   @NotNull
   @Transactional
@@ -208,6 +210,7 @@ public class PurchasingDealService {
    * @return the updated draft
    * @throws PurchasingProblemException with {@code PURCHASING_DEAL_STATE} unless the deal is a
    *     draft
+   * @throws RetiredGameItemException when the P4K retired the need's game item
    */
   @NotNull
   @Transactional
@@ -435,7 +438,7 @@ public class PurchasingDealService {
     deal.setMaterial(
         need.materialId() == null ? null : materialRepository.getReferenceById(need.materialId()));
     deal.setGameItem(
-        need.gameItemId() == null ? null : gameItemRepository.getReferenceById(need.gameItemId()));
+        need.gameItemId() == null ? null : selectableGameItems.require(need.gameItemId()));
     deal.setQualityTier(
         need.qualityTierId() == null
             ? null

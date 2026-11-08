@@ -29,6 +29,11 @@ INSERT INTO city (id, name, id_city, has_refinery)
 VALUES ('66666666-6666-6666-6666-666666666666', 'E2E Personal Inventory City', 900001, false)
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO location (id, name, city_id, hidden)
+VALUES ('88888888-8888-8888-8888-888888888888', 'E2E Personal Inventory City',
+        '66666666-6666-6666-6666-666666666666', false)
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO location (id, version, created_at, updated_at, name, city_id, hidden)
 VALUES ('0e2e0000-0000-4000-8000-000000008001', 0, now(), now(),
         'E2E Collection Transfer Alt Hub', '11111111-1111-1111-1111-111111111111', false)

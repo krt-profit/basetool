@@ -33,11 +33,14 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
@@ -56,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.supply.api.NeedStatus;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemCode;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyProblemException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -63,6 +67,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -115,6 +121,7 @@ class SupplyDonationServiceTest {
             needService,
             materialRepository,
             gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             locationRepository,
             userRepository,
             orgUnitRepository,
@@ -216,6 +223,45 @@ class SupplyDonationServiceTest {
         .isInstanceOfSatisfying(
             SupplyProblemException.class,
             e -> assertThat(e.getProblemCode()).isEqualTo(SupplyProblemCode.SUPPLY_NEED_NOT_OPEN));
+  }
+
+  @Test
+  void aFreePledgeOfAGameItemTheP4kRetiredIsRefused() {
+    GameItem retired = retiredItem();
+    callerIs(DONOR);
+    unitAccepts(true);
+    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    assertThatThrownBy(() ->
+            service.pledge(
+                new PledgeRequest(null, unit.getId(), null, retired.getId(), null, 1.0, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(donationRepository, never()).save(any());
+  }
+
+  @Test
+  void aPledgeToANeedWhoseGameItemTheP4kRetiredIsRefused() {
+    SupplyNeed need = openNeed(0);
+    need.setMaterial(null);
+    need.setQualityTier(null);
+    need.setGameItem(retiredItem());
+    callerIs(DONOR);
+    when(needRepository.findById(need.getId())).thenReturn(Optional.of(need));
+    unitAccepts(true);
+
+    assertThatThrownBy(() ->
+            service.pledge(
+                new PledgeRequest(need.getId(), unit.getId(), null, null, null, 1.0, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(donationRepository, never()).save(any());
+  }
+
+  private static GameItem retiredItem() {
+    GameItem item = new GameItem();
+    item.setId(UUID.randomUUID());
+    item.setName("Retired gun");
+    item.setP4kHiddenAt(Instant.now());
+    return item;
   }
 
   @Test
@@ -399,6 +445,42 @@ class SupplyDonationServiceTest {
     assertThat(donation.getStatus()).isEqualTo(DonationStatus.PARTIALLY_RECEIVED);
     assertThat(donation.getReceivedAmount()).isEqualTo(1.5);
     verify(needService, never()).credit(any(), anyDouble());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void aReceiptOntoAPlaceNoPickerOffersIsRefused(Location place) {
+    SupplyDonation donation = pledged(4.0);
+    callerIs(HOLDER);
+    when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
+    when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
+    when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+    ReceiveDonationRequest request = new ReceiveDonationRequest(4.0, place.getId(), 2L);
+
+    assertThatThrownBy(() -> service.receive(donation.getId(), request))
+        .isInstanceOf(LocationNotOfferedException.class);
+    verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());
+    assertThat(donation.getStatus()).isEqualTo(DonationStatus.PLEDGED);
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+  void aRecordedDonationOntoAPlaceNoPickerOffersIsRefused(Location place) {
+    callerIs(HOLDER);
+    when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
+    unitAccepts(true);
+    when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
+    when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+    RecordDonationRequest request =
+        new RecordDonationRequest(
+            unit.getId(), null, material.getId(), null, 500, 3.0, null, place.getId());
+
+    assertThatThrownBy(() -> service.record(request))
+        .isInstanceOf(LocationNotOfferedException.class);
+    verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());
+    verify(donationRepository, never()).save(any(SupplyDonation.class));
   }
 
   @Test

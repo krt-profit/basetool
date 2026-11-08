@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -68,6 +69,7 @@ class ScWikiClientRunHistoryTest {
   @Mock private GameItemStatRepository stats;
   @Mock private ItemReconciliationService reconciliation;
   @Mock private AdminDashboardLiveSync dashboard;
+  @Mock private AuditRecorder audit;
   @Mock private LiveSyncPublisher catalogue;
   @Mock private ObjectProvider<ScWikiItemSyncService> self;
 
@@ -82,6 +84,7 @@ class ScWikiClientRunHistoryTest {
 
   @BeforeEach
   void setUp() throws Exception {
+    lenient().when(items.findBySourceUuid(any())).thenCallRealMethod();
     server = new MockWebServer();
     server.start();
     ScWikiProperties properties =
@@ -105,7 +108,8 @@ class ScWikiClientRunHistoryTest {
             metrics,
             progress);
     client.initClient();
-    SyncReportService report = new SyncReportService(reports, metrics, dashboard, runs, progress);
+    SyncReportService report =
+        new SyncReportService(reports, metrics, dashboard, audit, runs, progress);
     itemsSync =
         new ScWikiItemSyncService(
             client,
@@ -114,16 +118,21 @@ class ScWikiClientRunHistoryTest {
             blueprints,
             manufacturers,
             report,
-            stats,
-            new GameItemStatWriter(stats),
+            new GameItemStatWriter(stats, report),
             new ScWikiItemStatFollowUp(client, properties, stats, report),
             reconciliation,
-            new ScWikiItemFieldWriter(metrics),
+            new ScWikiItemFieldWriter(new ItemClassResolver(metrics), report),
             metrics,
             self);
     history =
         new SyncRunService(
-            runs, progress, metrics, dashboard, catalogue, new RecordingTransactionManager());
+            runs,
+            progress,
+            metrics,
+            dashboard,
+            catalogue,
+            audit,
+            new RecordingTransactionManager());
     try (var resource = getClass().getResourceAsStream("/catalogue/scwiki-item-metadata.json")) {
       assertNotNull(resource);
       itemFixture = new String(resource.readAllBytes(), StandardCharsets.UTF_8);

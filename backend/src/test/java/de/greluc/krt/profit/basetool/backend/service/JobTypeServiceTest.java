@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDesignationObserver;
@@ -53,6 +54,8 @@ class JobTypeServiceTest {
 
   @Mock private JobTypeRepository jobTypeRepository;
   @Mock private JobTypeDesignationObserver jobTypeDesignationObserver;
+  @Mock private AuditRecorder auditRecorder;
+
   @InjectMocks private JobTypeService jobTypeService;
 
   private static JobType missionLeadership() {

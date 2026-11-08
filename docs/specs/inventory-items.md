@@ -25,7 +25,7 @@ their stack identity is `user · gameItem · location · personal · owningOrgUn
 quality dimension). Only items that are the output of ≥ 1 active blueprint are bookable:
 the Lager item picker (`GET /api/v1/game-items`, `InventoryItemCatalogService`)
 offers only those (the catalog predicate is deliberately a superset of the order picker's
-RESOURCE-ingredient requirement, which the same read serves with `orderable=true`); the create path itself does not re-check it. Tenancy, owner escape, audit and append-only
+RESOURCE-ingredient requirement, which the same read serves with `orderable=true`); the create path itself does not re-check it, but it refuses an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). Tenancy, owner escape, audit and append-only
 semantics are identical to material rows.
 
 **Acceptance**
@@ -116,6 +116,9 @@ composition over the REQ-INV-026 merge helper), and is audited as
 (`@NotNull`); the production modal always sends it, and the transitional
 null-tolerant window (null ⇒ legacy no-stock behaviour) closed when the modal's
 book-in section shipped.
+
+**Storage place (REQ-P4K-039):** the book-in takes only a place a picker offers; a hidden or
+reference-only one is a `400` `LOCATION_NOT_OFFERED`.
 
 **On-behalf gate (2026-09-22, APPSEC-01).** The endpoint's own gate
 (`canEditJobOrder`) answers for the *order*, not for the member whose ledger receives

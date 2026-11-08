@@ -19,52 +19,117 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Summary of a P4K catalog import, shared by the preview ({@code dryRun}) and apply paths of {@code
- * P4kImportService}.
+ * The outcome of a P4K preview or APPLY, stored on its job. A preview counts as if "create new
+ * items and ships" were ticked, so its {@code created} is the would-be count (REQ-P4K-009).
  *
- * @param dryRun {@code true} for a preview that wrote nothing
- * @param seedingEnabled whether this run seeds new rows; always {@code true} for a preview
- * @param manufacturers manufacturer reconciliation counts
- * @param items item reconciliation counts
- * @param ships ship reconciliation counts
- * @param commodities commodity reconciliation counts
- * @param blueprints blueprint reconciliation counts
- * @param ingredientsResolved number of existing {@code blueprint_ingredient} rows whose FK was
- *     resolved via the stored Wiki UUID
- * @param runId the sync-report run id of the audit events; {@code null} for a preview
+ * @param dryRun {@code true} for a preview, which writes nothing
+ * @param createItemsAndShips whether unmatched playable items and ships are (or would be) created
+ * @param build the catalogue's Build
+ * @param manufacturers the manufacturer counts
+ * @param items the item counts
+ * @param ships the ship counts
+ * @param commodities the commodity counts
+ * @param blueprints the blueprint counts
+ * @param starmapObjects the starmap object counts; {@code unmatched} and {@code review} count the
+ *     UEX location rows left unlinked (REQ-P4K-035); {@code null} in a result stored before the
+ *     starmap was imported
+ * @param shops the shop counts; {@code unmatched} and {@code review} count the shops left without a
+ *     UEX terminal (REQ-P4K-043); {@code null} in a result stored before shops were imported
+ * @param resourceGroups the resource-group counts
+ * @param blueprintCategories the blueprint-category counts; {@code null} in a result stored before
+ *     the categories were imported
+ * @param ingredientsResolved blueprint ingredient lines whose material or item the run resolved:
+ *     the lines of the recipes the P4K delivers, and the newly linked lines of a recipe the Wiki
+ *     wrote
+ * @param runId the {@code p4k_import_run} of an APPLY, {@code null} for a preview
+ * @param sweeps the sweep result per kind (REQ-P4K-011, REQ-P4K-012), in the order of the kinds;
+ *     {@code null} in a result stored before the sweep existed
+ * @param massGuardPercent the share of a kind's live P4K-known rows above which the sweep holds the
+ *     kind back unless the admin overrides it ({@link P4kSweeper#MASS_GUARD_PERCENT}, REQ-P4K-012);
+ *     {@code null} in a result that names none
  */
 public record P4kImportResultDto(
     boolean dryRun,
-    boolean seedingEnabled,
+    boolean createItemsAndShips,
+    @Nullable Build build,
     Counts manufacturers,
     Counts items,
     Counts ships,
     Counts commodities,
     Counts blueprints,
+    @Nullable Counts starmapObjects,
+    @Nullable Counts shops,
+    Counts resourceGroups,
+    @Nullable Counts blueprintCategories,
     int ingredientsResolved,
-    @Nullable UUID runId) {
+    @Nullable UUID runId,
+    @Nullable List<Sweep> sweeps,
+    @Nullable Integer massGuardPercent) {
 
   /**
-   * Per-type reconciliation tally: {@link #matched}, {@link #created} and {@link #unmatched}
-   * partition the records with a usable join key; the other counts are sub-tallies over the matched
-   * rows.
+   * What the sweep did, or in a preview would do, with one kind (REQ-P4K-011, REQ-P4K-012).
    *
-   * @param matched records resolved to exactly one existing row
-   * @param uuidBackfilled matched rows whose missing canonical UUID was filled from the P4K GUID
-   * @param uuidConflicts matched rows whose existing canonical UUID differs from the P4K GUID
-   * @param enriched matched rows on which at least one fill-if-null field was written
-   * @param created records inserted, or in a preview insertable, as new {@code source = P4K} rows
-   * @param unmatched records resolving to no row or to several, neither enriched nor seeded
+   * @param kind the kind
+   * @param outcome whether it swept or why it skipped
+   * @param known the kind's live P4K-known rows, those no sweep stamped yet, the base of the mass
+   *     guard
+   * @param toStamp the rows the sweep stamps, or would have stamped
+   * @param vanished the rows the sweep stamped; in a preview the rows it would stamp
+   * @param reappeared stamped rows the run matched again
+   */
+  public record Sweep(
+      P4kKind kind,
+      @Nullable P4kSweepOutcome outcome,
+      int known,
+      int toStamp,
+      int vanished,
+      int reappeared) {}
+
+  /**
+   * The Build of the catalogue and the patch version derived from it (REQ-P4K-005).
+   *
+   * @param channel the Channel, always {@code LIVE}
+   * @param branch the build branch
+   * @param version the build version, for display only
+   * @param changeNumber the change number as the catalogue writes it
+   * @param patchVersion the patch version, or {@code null} when it is unknown
+   * @param patchVersionOrigin {@code PUBLIC_PATCH} or {@code BRANCH_LOWER_BOUND}, {@code null}
+   *     exactly when the version is unknown
+   */
+  public record Build(
+      String channel,
+      String branch,
+      String version,
+      String changeNumber,
+      @Nullable String patchVersion,
+      @Nullable P4kPatchVersionOrigin patchVersionOrigin) {}
+
+  /**
+   * The tally of one kind. A record held for review because of a GUID conflict or an earlier
+   * seeding is neither matched nor unmatched.
+   *
+   * @param completeness whether the catalogue listed the kind completely
+   * @param matched records matched to a row and stamped
+   * @param enriched matched rows on which at least one field was written
+   * @param identityMismatches matched rows whose SC Wiki UUID differs from the P4K GUID
+   * @param created rows created, or in a preview creatable
+   * @param unmatched records neither matched nor created, each an {@code UNMATCHED} report row
+   * @param review review cases the run found
+   * @param unknownValues closed-set values the import does not know, read as {@code null}
    */
   public record Counts(
+      @Nullable P4kCompleteness completeness,
       int matched,
-      int uuidBackfilled,
-      int uuidConflicts,
       int enriched,
+      int identityMismatches,
       int created,
-      int unmatched) {}
+      int unmatched,
+      int review,
+      int unknownValues) {}
 }

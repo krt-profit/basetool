@@ -20,6 +20,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 function initMaterialsMatrix() {
     /**
@@ -46,6 +47,7 @@ function initMaterialsMatrix() {
      *
      * @typedef {object} MatrixRow
      * @property {string} materialName the material
+     * @property {string | null} [materialNameDe] the material's German name
      * @property {boolean} [isIllegal] whether the material is illegal
      * @property {boolean} [isVolatileQt] whether it decays in quantum travel
      * @property {boolean} [isVolatileTime] whether it decays over time
@@ -659,9 +661,10 @@ function initMaterialsMatrix() {
             );
             appendWarnings(r);
             bodyHtml.push(
-                krtHtml`<span class="mtx-name__text">${
-                    r.materialName
-                }</span></span><span class="mtx-spread">${`${I18N.spread} ${spreadText}`}</span></td>`,
+                krtHtml`<span class="mtx-name__text">${localisedName(
+                    r.materialName,
+                    r.materialNameDe,
+                )}</span></span><span class="mtx-spread">${`${I18N.spread} ${spreadText}`}</span></td>`,
             );
             for (let i = 0; i < cols.length; i++) {
                 const c = cols[i];

@@ -435,6 +435,11 @@ interface KrtFetchApi {
      * problem; for page-local `onError` handlers (REQ-ORG-023).
      */
     ownerOrgUnitRequiredMessage(problem: any): string | null;
+    /**
+     * The localized message for a `CATALOGUE_ITEM_RETIRED` or `CATALOGUE_BLUEPRINT_RETIRED`
+     * problem, or `null` for any other problem; for page-local `onError` handlers (REQ-P4K-013).
+     */
+    catalogueRetiredMessage(problem: any): string | null;
     /** Redirects to the re-auth path when the response carries `X-Reauthenticate`. */
     maybeReauthenticate(response: Response): boolean;
     /** Redirects the window to a same-origin re-authentication path. */
@@ -979,6 +984,10 @@ interface Window {
     krtMemberEditI18n?: KrtI18nDict;
     krtDeletionRequestsI18n?: KrtI18nDict;
     krtP4kImportI18n?: KrtI18nDict;
+    /** Labels of the admin starmap page, from `starmap.html`. */
+    krtStarmapI18n?: KrtI18nDict;
+    /** Labels of the admin shops page, from `shops.html`. */
+    krtShopsI18n?: KrtI18nDict;
     krtBlueprintsImportI18n?: KrtI18nDict;
     krtBlueprintsRecipeI18n?: KrtI18nDict;
 

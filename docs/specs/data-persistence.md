@@ -760,6 +760,11 @@ Each writer therefore evicts the caches it can make stale **on completion**, thr
   even when a later step aborts (UEX is fail-fast; SC Wiki swallows per step). The P4K apply gates its
   eviction on the reconcile transaction having actually committed (`appliedMasterData`), so a
   rolled-back apply and every PREVIEW run correctly evict nothing.
+- **P4K writes announce through `P4kCatalogueChange`.** Every committed APPLY, whatever it
+  changed, and every review resolution that hides a row or assigns a resource group or material
+  (REQ-P4K-016, REQ-P4K-024, REQ-P4K-025) evict the P4K set after the commit and then publish the
+  global `CATALOGUE` live-sync event, on which the frontend evicts its catalogue caches and open
+  views refresh; a keep and a rolled-back write announce nothing.
 - The three per-writer cache-name sets (`UEX_SYNCED_CACHES`, `SCWIKI_SYNCED_CACHES`, `P4K_SYNCED_CACHES`)
   are the **single source of truth** for "this writer can make these stale". **A new cache added over a
   written table MUST be added to the matching set(s)**, or it silently lags the TTL again after a
@@ -767,7 +772,7 @@ Each writer therefore evicts the caches it can make stale **on completion**, thr
   data. (The UEX set covers the universe catalogues it rewrites — cities, star systems, locations,
   terminals, POIs, outposts — alongside the commodity / manufacturer / ship-type / refining-method
   caches; the P4K set covers the material / manufacturer / ship-type / blueprint-family caches its
-  apply reconciles.)
+  apply reconciles, and the locations, which carry their starmap objects' P4K names.)
 - This is also the sole scheduler evict hook for `BLUEPRINT_FAMILY_INDEX_CACHE`, which has no per-write
   hook of its own (CACHE-DIST-03); it is rebuilt by the SC Wiki blueprint sync and the P4K blueprint
   apply, so evicting it on their completion is both necessary and sufficient.
@@ -781,13 +786,15 @@ both**, so a single-entity entry can never survive a rename/delete while the lis
 cache is tolerated; the three sets are pinned so a written-table cache cannot be silently dropped);
 `UexSchedulerTest` / `ScWikiSchedulerTest` (the sweep evicts on completion **and** after a mid-sweep
 failure, and does not evict when the cross-scheduler gate skips the sweep); `P4kImportJobRunnerTest`
-(a committed APPLY evicts the P4K set, a PREVIEW and a rolled-back APPLY evict nothing);
+(a committed APPLY evicts the P4K set and publishes the catalogue event, a PREVIEW and a
+rolled-back APPLY do neither); `P4kCatalogueChangeTest` (evict, then publish, after the commit);
+`P4kReviewServiceTest` (a hide evicts on commit, a keep does not);
 `MaterialServiceCachingTest` (`getMaterial` populates only the by-id cache, the list reads only the list
 cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachingTest` /
 `OutpostServiceCachingTest` (each read populates its cache and every override mutator evicts it).
 
 **Enforced by:** `MasterDataCacheEvictionService`, `UexScheduler.runAllSyncSteps`,
-`ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict),
+`ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict), `P4kCatalogueChange` (APPLY and review resolution),
 `MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
 mutators).
 
@@ -1107,7 +1114,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 121 tables. Its machine-readable copy is
+The ownership map, 123 tables. Its machine-readable copy is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1117,7 +1124,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 41 | `blueprint`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_job`, `p4k_import_job_payload`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_uex_alias`, `space_station`, `star_system`, `terminal`, `uex_category` |
+| `catalogue` | 52 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1144,7 +1151,8 @@ The listed crossings:
 | The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship`, `inventory_item` (read) | A renamed unit re-announces its ships and, since V296, the lots of its pool in the exchange's key log (REQ-XCH-017, REQ-XCH-042, ADR-0261) |
 | The V296 org-stock triggers on `inventory_item` (extended), both allocation tables and `org_unit_membership` | `exchange_change` (write), `org_unit`, `inventory_item` (read) | A change of a pool's shared rows, an earmark or a join is written to the org-stock feed keyed by unit (REQ-XCH-042, ADR-0257) |
 | The V297 org-stock triggers on `app_user`, `exchange_name_withholding` and `mission` | `exchange_change` (write), `inventory_item`, `inventory_item_mission_allocation`, `org_unit` (read) | A holder's rename or name withholding, or the rename of an earmarked mission, re-announces the lots whose entries show it (REQ-XCH-043, REQ-XCH-044) |
-| `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station` (read) | Catalogue names joined into the exchange's stock lots |
+| The V359 change-feed triggers on `location`, `city`, `space_station` and `starmap_object` | `exchange_change` (write), `app_user`, `ship`, `inventory_item`, `org_unit` (read) | A change of what a place's location reference serialises to re-announces the ships, stock lots and org-stock lots at that place (REQ-XCH-018) |
+| `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station`, `starmap_object` (read) | Catalogue names and the place's starmap GUID joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
 
 **Acceptance**
@@ -1176,9 +1184,11 @@ listed with its reason:
   of its participants is checked to call (11 columns: reassigned, nulled or purged); or it outlives the account by design
   (`audit_event.target_user_id`, `bank_audit_event.target_user_id`, REQ-AUDIT-001; and
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
-  after every import run).
+  after every import run; `p4k_import_run.created_by`, the applying admin's id on a run, which
+  is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
+  case, never pruned, REQ-P4K-016).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 13 are not, each of which names the
+  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 15 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
@@ -1189,7 +1199,7 @@ listed with its reason:
   column that holds data about the member.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
-  `p4k_import_job.created_by` is listed as not merged. `UserAccountMergeCoverageTest` holds the
+  `p4k_import_job.created_by`, `p4k_import_run.created_by` and `p4k_review_case.resolved_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
   foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**
@@ -1398,7 +1408,7 @@ request and no sync writes it.
 > [REQ-P4K-030](p4k-catalogue.md#req-p4k-030--a-crafted-items-blueprint-stat-base-values-come-from-the-p4k-and-the-sc-wiki-fills-gaps)
 > / [ADR-0342](../adr/0342-blueprint-stat-base-values-come-from-the-p4k-catalogue-and-the-sc-wiki-fills-gaps.md)
 > — kept for the reasoning. The P4K catalogue leads the stat base values and the SC Wiki fills
-> gaps; the rule below holds until REQ-P4K-030 is implemented.
+> gaps (REQ-P4K-030, implemented in #3040); every stored value names its `source`.
 
 A blueprint modifier names the stat it changes by its SC Wiki `property_key` (`health_maxhealth`,
 `weapon_damage`, `armor_temperaturemin`, …) and gives only the factor a quality applies. The value

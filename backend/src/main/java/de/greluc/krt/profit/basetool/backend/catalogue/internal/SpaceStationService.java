@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -41,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SpaceStationService {
 
   private final SpaceStationRepository spaceStationRepository;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns the paged space-station catalogue.
@@ -76,6 +80,12 @@ public class SpaceStationService {
     SpaceStation station = getSpaceStation(id);
     station.setHasLoadingDock(value);
     station.setHasLoadingDockOverridden(true);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN,
+        station.getId(),
+        station.getName(),
+        null,
+        AuditDetails.of("hasLoadingDock", value));
     return spaceStationRepository.save(station);
   }
 
@@ -90,6 +100,12 @@ public class SpaceStationService {
   public SpaceStation clearLoadingDockOverride(UUID id) {
     SpaceStation station = getSpaceStation(id);
     station.setHasLoadingDockOverridden(false);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED,
+        station.getId(),
+        station.getName(),
+        null,
+        null);
     return spaceStationRepository.save(station);
   }
 }

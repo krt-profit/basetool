@@ -1,6 +1,6 @@
 # ADR-0343 — A personal blueprint is keyed by its produced item's GUID
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-029, REQ-INV-070) · REQ-INV-006 · REQ-INV-019 · the exchange spec · the audit
@@ -54,5 +54,3 @@ have a matched `game_item` row.
   observability spec gains the `bt` usage metric; the audit spec gains the merge event.
 - A `BACKFILL_AMBIGUOUS` sync-report event (a row's Wiki UUID differs from its P4K GUID) does not
   touch this key, which reads only the produced-item GUID.
-- Pending: the `producedItemGuid` column, the backfill, the merge, the reference migration, the
-  exchange field and the deprecation window.

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementGroupDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementIngredientDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRequirementModifierDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
 import java.util.List;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * @param variantCount number of recipe variants of the product; 0 when unresolved
  * @param requirementGroups the representative recipe's build slots with ingredients and per-quality
  *     stat modifiers; may be empty
+ * @param recipeModifiers the representative recipe's stat modifiers that apply to the whole recipe
+ *     rather than one slot; they set no slot's quality floor (REQ-P4K-027); may be empty
  * @param ingredients flat ingredient list, used when {@link #requirementGroups} is empty
  * @param baseStats the crafted item's stat base values per property key (REQ-INV-069); empty when
  *     none is stored
@@ -45,6 +48,7 @@ public record PersonalBlueprintRecipeResponse(
     String productName,
     int variantCount,
     List<BlueprintRequirementGroupDto> requirementGroups,
+    List<BlueprintRequirementModifierDto> recipeModifiers,
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintStatBaseDto> baseStats,
     @Nullable BlueprintCatalogueMetadata wikiMetadata) {}

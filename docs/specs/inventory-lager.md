@@ -1706,6 +1706,9 @@ the web maps a refusal to its existing problem, a command to its refusal value.
 - **Lot rebooking:** the rules and order of REQ-INV-060; the decision also names the amount each
   source row gives.
 - **Whole units** are counted in one place: game-item stock and `PIECE` materials.
+- **Storage place (REQ-P4K-039):** Einbuchen, transfer and the bulk Umbuchung set only a place a
+  picker offers; a hidden or reference-only one is a `400` `LOCATION_NOT_OFFERED`. An entry whose
+  place does not change keeps it.
 - The HTTP status, the problem detail and the refusal values stay as each surface defines them, and
   each mutation keeps its audit event (REQ-AUDIT-001). A command answers a fraction of piece or item
   stock as `UNIT_MISMATCH`, also in a dry run. Both surfaces compare an amount with the row's amount
@@ -1758,6 +1761,8 @@ hold.
   and stays until a Logistician changes it. Its edit dialog still offers that tier, selected and
   marked „Stufe inaktiv", so a change of minimum or target keeps the floor; the tier is not offered
   to a new level.
+- **Retired game item.** A level cannot be set for a game item the P4K retired, and a level that
+  holds one cannot be changed, only removed (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
 **Acceptance**
 
@@ -1771,6 +1776,8 @@ hold.
   requested and leave the low state unchanged. *`StockLevelIntegrationTest`.*
 - [x] A game-item level counts the item's free stock in whole units and takes no tier.
   *`StockLevelIntegrationTest`.*
+- [x] A retired game item is refused on create and change with `400`; its level can still be
+  removed. *`StockLevelIntegrationTest`.*
 
 **Enforced by:** `StockLevelAllocationTest` (pure allocation over plain rows),
 `StockLevelIntegrationTest` · **Code:** `inventory/internal/StockLevelAllocation`,
@@ -1835,8 +1842,9 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 - **Lifecycle.** Deleting a material deletes its levels with it, one audit event each. A level of
   an inactive unit or of a catalogue entry the catalogue no longer lists stays stored, is not
   shown, raises no notice and does not count in the gauge; it returns with the unit or the entry. A
-  game item is hidden once every source that owns it has marked it deleted. A deactivated tier only
-  flags the level (REQ-INV-067). None of these sends a notice.
+  game item is hidden once every source that owns it has marked it deleted, and a material or game
+  item the P4K swept or an admin hid is hidden whatever the other sources say (REQ-P4K-013). A
+  deactivated tier only flags the level (REQ-INV-067). None of these sends a notice.
 - **Audit** in the Lager area (`AuditDomain.INVENTORY`, REQ-AUDIT-001): `MIN_STOCK_LEVEL_SET` on
   create, `MIN_STOCK_LEVEL_CHANGED` only when a field changed (from / to of minimum, target and tier
   code), `MIN_STOCK_LEVEL_REMOVED` on delete, `MIN_STOCK_LEVEL_REMOVED_BY_CASCADE` per level the

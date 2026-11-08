@@ -1,6 +1,6 @@
 # ADR-0345 — The P4K starmap tree leads and UEX locations link to it
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the P4K catalogue spec (REQ-P4K-034…039, REQ-OBS-022) · the exchange spec · the audit spec · the observability
@@ -49,7 +49,9 @@ released object; the contract leaves the decision to the Basetool from `system`,
    name.
 8. **The personal inventory moves to a UUID FK.** `personal_inventory_item.location_uex_id` +
    `location_type` become a UUID FK; the name snapshot stays. No feature then references a place
-   by an external id.
+   by an external id. The migration drops both legacy columns in the same step, an owner-approved
+   single-phase exception to the two-phase drop of the migration README; the forward fix re-adds
+   them nullable from the linked city or station.
 9. **Visibility of unreleased objects.** Everything is imported. An object is **visible** when its
    `system` is linked to a live-available UEX star system, `hideInStarmap` is `false` and
    `position` is set. Only a visible object appears on the starmap and can carry a new storage
@@ -73,5 +75,17 @@ released object; the contract leaves the decision to the Basetool from `system`,
 - The P4K catalogue spec carries the starmap, linking and visibility rules; the exchange spec gains
   the additive `guid`; arc42 §12 gains *starmap object* (a node of the archive's location tree) and
   *storage place* (`location`, on any starmap node an admin picks).
-- Pending: both migration steps, the linking and its review, the visibility rule and override, and
-  the exchange field.
+
+## Amendment
+
+- **2026-11-05, step A shipped (#3043, @greluc):** the key points at `location.id`. A referenced
+  city or station without a storage place gets one marked `reference_only`, which no existing
+  `location` consumer offers and the UEX sync clears once the place is live; the member picker
+  offers the offered places plus the ones the owner's rows use; a row that resolves to no place
+  keeps its snapshot with a `null` key (REQ-P4K-039).
+- **2026-11-07, step B shipped (#3044):** `starmap_object` (V352) is imported by GUID; the
+  nine UEX tables link through `starmap_object_id` and `starmap_link_manual`, columns only the
+  linker and the admin's compare-and-set write, so a UEX sync never overwrites a link. A row left
+  unlinked is a review case of kind `STARMAP_OBJECT` that a later run closes once the row links. A
+  storage place on a node is created by an admin through `POST /api/v1/locations`, and the
+  database refuses a location without a city, a station or a node (`ck_location_place`).

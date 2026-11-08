@@ -23,16 +23,14 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -51,7 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>{@code *Own*} methods are owner-scoped via {@code findByIdAndOwnerUserId}; {@code *ForUser*}
  * methods act on any user and are restricted to ADMIN by the controller. A stale {@code version}
- * raises {@link ObjectOptimisticLockingFailureException} (409).
+ * raises {@link ObjectOptimisticLockingFailureException} (409). A write accepts only a location
+ * that is selectable for the item's owner (REQ-P4K-039, {@link PersonalInventoryItemRepository}).
  */
 @Service
 @RequiredArgsConstructor
@@ -68,10 +68,14 @@ public class PersonalInventoryItemService {
 
   public static final String DEFAULT_SORT_FIELD = "updatedAt";
 
+  /** The location-picker result cap when the caller names none. */
+  private static final int DEFAULT_LOCATION_RESULTS = 25;
+
+  /** The largest location-picker result. */
+  private static final int MAX_LOCATION_RESULTS = 2000;
+
   private final PersonalInventoryItemRepository repository;
   private final PersonalInventoryItemMapper mapper;
-  private final CityRepository cityRepository;
-  private final SpaceStationRepository spaceStationRepository;
   private final AuditRecorder auditRecorder;
 
   /**
@@ -105,20 +109,22 @@ public class PersonalInventoryItemService {
   }
 
   /**
-   * Creates an item owned by the caller, storing the location name resolved from the UEX mirror as
-   * a snapshot.
+   * Creates an item owned by the caller at a selectable location, storing the location's name as a
+   * snapshot.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param request create payload
    * @return the persisted DTO
+   * @throws NotFoundException when the location is unknown or not selectable for the owner
    */
   @Transactional
   public PersonalInventoryItemResponse createOwn(
       @NotNull UUID ownerUserId, @NotNull PersonalInventoryItemCreateRequest request) {
-    String snapshot = resolveLocationName(request.locationType(), request.locationUexId());
+    Location location = requireSelectable(ownerUserId, request.locationId());
     PersonalInventoryItem entity = mapper.toEntity(request);
     entity.setOwnerUserId(ownerUserId);
-    entity.setLocationNameSnapshot(snapshot);
+    entity.setLocation(location);
+    entity.setLocationNameSnapshot(location.getName());
     PersonalInventoryItem saved = repository.save(entity);
     log.info(
         "Created personal inventory item id={} for ownerUserId={}", saved.getId(), ownerUserId);
@@ -132,14 +138,16 @@ public class PersonalInventoryItemService {
   }
 
   /**
-   * Updates an owner-scoped item with explicit optimistic-lock check. Re-resolves the location
-   * snapshot only when the location reference actually changed.
+   * Updates an owner-scoped item with explicit optimistic-lock check. Re-takes the location
+   * snapshot only when the location actually changed.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id item primary key
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws NotFoundException when the item is missing or owned by someone else
+   * @throws NotFoundException when the item is missing, owned by someone else, or the new location
+   *     is not selectable
+   * @throws BadRequestException when the request drops the location of an item that has one
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -196,12 +204,14 @@ public class PersonalInventoryItemService {
   }
 
   /**
-   * Admin-scoped update by item id alone, with the optimistic-lock check.
+   * Admin-scoped update by item id alone, with the optimistic-lock check; the selectable locations
+   * are the item owner's.
    *
    * @param id item primary key
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
-   * @throws NotFoundException when the item id is unknown
+   * @throws NotFoundException when the item id is unknown or the new location is not selectable
+   * @throws BadRequestException when the request drops the location of an item that has one
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -232,48 +242,25 @@ public class PersonalInventoryItemService {
   }
 
   /**
-   * Combined search across the locally synced UEX cities and space stations. Returns at most {@code
-   * limit} entries, alphabetically sorted by name.
+   * Searches the locations selectable for the owner by name (REQ-P4K-039): every non-hidden storage
+   * place plus every location one of the owner's items references, case-insensitive and literal, by
+   * name.
+   *
+   * @param ownerUserId {@code app_user.id} of the inventory's owner
+   * @param query the name fragment, or {@code null}/blank for no filter
+   * @param limit the result cap, clamped to {@code [1, 2000]}; {@code null} means 25
+   * @return the matching picker entries, alphabetically
    */
-  public List<UexLocationDto> searchLocations(@Nullable String query, int limit) {
-    String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-    final int cap = Math.clamp(limit, 1, 2000);
-
-    List<UexLocationDto> hits = new ArrayList<>();
-    for (City c : cityRepository.findAll()) {
-      if (c.getIdCity() == null || c.getName() == null) {
-        continue;
-      }
-      if (!needle.isEmpty() && !c.getName().toLowerCase(Locale.ROOT).contains(needle)) {
-        continue;
-      }
-      hits.add(
-          new UexLocationDto(
-              c.getIdCity(),
-              PersonalInventoryLocationType.CITY,
-              c.getName(),
-              c.getStarSystemName(),
-              c.getPlanetName()));
-    }
-    for (SpaceStation s : spaceStationRepository.findAll()) {
-      if (s.getIdSpaceStation() == null || s.getName() == null) {
-        continue;
-      }
-      if (!needle.isEmpty() && !s.getName().toLowerCase(Locale.ROOT).contains(needle)) {
-        continue;
-      }
-      hits.add(
-          new UexLocationDto(
-              s.getIdSpaceStation(),
-              PersonalInventoryLocationType.SPACE_STATION,
-              s.getName(),
-              s.getStarSystemName(),
-              null));
-    }
-    hits.sort(
-        Comparator.comparing(
-            UexLocationDto::name, Comparator.nullsLast(String::compareToIgnoreCase)));
-    return hits.size() > cap ? hits.subList(0, cap) : hits;
+  public List<PersonalInventoryLocationOption> searchLocations(
+      @NotNull UUID ownerUserId, @Nullable String query, @Nullable Integer limit) {
+    String needle = query == null || query.isBlank() ? null : query.trim();
+    int cap = limit == null ? DEFAULT_LOCATION_RESULTS : Math.clamp(limit, 1, MAX_LOCATION_RESULTS);
+    return repository
+        .findSelectableLocations(
+            ownerUserId, LikePatterns.escapeNullable(needle), PageRequest.of(0, cap))
+        .stream()
+        .map(PersonalInventoryItemService::toOption)
+        .toList();
   }
 
   @NotNull
@@ -291,16 +278,18 @@ public class PersonalInventoryItemService {
       @NotNull PersonalInventoryItem entity, @NotNull PersonalInventoryItemUpdateRequest request) {
     OptimisticLock.check(
         entity.getVersion(), request.version(), PersonalInventoryItem.class, entity.getId());
-    boolean locationChanged =
-        !Objects.equals(entity.getLocationUexId(), request.locationUexId())
-            || !Objects.equals(entity.getLocationType(), request.locationType());
-    String snapshot =
-        locationChanged
-            ? resolveLocationName(request.locationType(), request.locationUexId())
-            : entity.getLocationNameSnapshot();
+    Location current = entity.getLocation();
+    UUID requested = request.locationId();
+    if (!Objects.equals(current == null ? null : current.getId(), requested)) {
+      if (requested == null) {
+        throw new BadRequestException("A personal inventory item keeps its location.");
+      }
+      Location location = requireSelectable(entity.getOwnerUserId(), requested);
+      entity.setLocation(location);
+      entity.setLocationNameSnapshot(location.getName());
+    }
 
     mapper.updateEntity(entity, request);
-    entity.setLocationNameSnapshot(snapshot);
     PersonalInventoryItem saved = repository.save(entity);
     log.info(
         "Updated personal inventory item id={} ownerUserId={}",
@@ -327,22 +316,35 @@ public class PersonalInventoryItemService {
   }
 
   /**
-   * Resolves the human-readable name of a UEX location from the local mirror. Throws {@link
-   * NotFoundException} (→ HTTP 404 via the global handler) if the referenced location does not
-   * exist – this prevents creating dangling references.
+   * Loads a location the owner may pick; anything else is a 404, so a write cannot reference a
+   * place the pickers do not offer.
    */
   @NotNull
-  private String resolveLocationName(
-      @NotNull PersonalInventoryLocationType type, @NotNull Integer uexId) {
-    return switch (type) {
-      case CITY ->
-          Entities.require(
-              cityRepository.findByIdCity(uexId).map(City::getName),
-              () -> "UEX city not found: id=" + uexId);
-      case SPACE_STATION ->
-          Entities.require(
-              spaceStationRepository.findByIdSpaceStation(uexId).map(SpaceStation::getName),
-              () -> "UEX space station not found: id=" + uexId);
-    };
+  private Location requireSelectable(@NotNull UUID ownerUserId, @NotNull UUID locationId) {
+    return Entities.require(
+        repository.findSelectableLocation(ownerUserId, locationId),
+        () -> "Location not selectable: id=" + locationId);
+  }
+
+  /**
+   * Builds the picker entry of a location from its city or space station.
+   *
+   * @param location a location with its city and station loaded
+   * @return the picker entry
+   */
+  @NotNull
+  private static PersonalInventoryLocationOption toOption(@NotNull Location location) {
+    City city = location.getCity();
+    SpaceStation station = location.getSpaceStation();
+    String system =
+        city != null
+            ? city.getStarSystemName()
+            : station != null ? station.getStarSystemName() : null;
+    return new PersonalInventoryLocationOption(
+        location.getId(),
+        PersonalInventoryLocationType.of(location),
+        location.getName(),
+        system,
+        city != null ? city.getPlanetName() : null);
   }
 }

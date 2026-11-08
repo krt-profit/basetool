@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Set;
@@ -29,6 +31,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Unit tests for {@link DefaultBlueprintKeyService}. */
 @ExtendWith(MockitoExtension.class)
@@ -58,5 +62,35 @@ class DefaultBlueprintKeyServiceTest {
     service.refresh();
     assertTrue(service.isDefault("new key"));
     assertFalse(service.isDefault("old key"));
+  }
+
+  @Test
+  void refreshAfterCommit_reloadsOnlyOnceTheTransactionCommits() {
+    when(repository.findAllProductKeys())
+        .thenReturn(Set.of("old key"))
+        .thenReturn(Set.of("new key"));
+    service.refresh();
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      service.refreshAfterCommit();
+      assertTrue(service.isDefault("old key"));
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+
+    assertTrue(service.isDefault("new key"));
+    verify(repository, times(2)).findAllProductKeys();
+  }
+
+  @Test
+  void refreshAfterCommit_reloadsAtOnceOutsideATransaction() {
+    when(repository.findAllProductKeys()).thenReturn(Set.of("key"));
+
+    service.refreshAfterCommit();
+
+    verify(repository).findAllProductKeys();
   }
 }

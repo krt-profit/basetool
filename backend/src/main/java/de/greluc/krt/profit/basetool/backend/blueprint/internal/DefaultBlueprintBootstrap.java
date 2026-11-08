@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -60,7 +60,7 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
   private final DefaultBlueprintRepository defaultBlueprintRepository;
   private final BlueprintProductService blueprintProductService;
   private final GameItemRepository gameItemRepository;
-  private final BlueprintNameNormalizer normalizer;
+  private final ProductKeys productKeys;
   private final DefaultBlueprintProvisioningService provisioningService;
   private final DefaultBlueprintKeyService keyService;
 
@@ -105,13 +105,14 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
    * @return {@code true} if a row was inserted
    */
   private boolean seedOne(String displayName) {
-    String key = normalizer.normalize(displayName);
+    Optional<ResolvedProduct> resolved = blueprintProductService.resolveUniqueByName(displayName);
+    String key =
+        resolved.map(ResolvedProduct::productKey).orElseGet(() -> productKeys.nameKey(displayName));
     if (key.isEmpty() || defaultBlueprintRepository.existsByProductKey(key)) {
       return false;
     }
     DefaultBlueprint entity = new DefaultBlueprint();
     entity.setCreatedBy("system");
-    Optional<ResolvedProduct> resolved = blueprintProductService.resolveByProductKey(key);
     if (resolved.isPresent()) {
       ResolvedProduct product = resolved.get();
       entity.setProductKey(product.productKey());

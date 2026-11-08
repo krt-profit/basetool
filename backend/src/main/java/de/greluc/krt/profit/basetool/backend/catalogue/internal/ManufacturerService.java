@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerMapper;
@@ -46,6 +49,7 @@ public class ManufacturerService {
 
   private final ManufacturerRepository manufacturerRepository;
   private final ManufacturerMapper manufacturerMapper;
+  private final AuditRecorder auditRecorder;
 
   /**
    * Returns a cached, paged manufacturer list.
@@ -60,7 +64,8 @@ public class ManufacturerService {
     Page<Manufacturer> page =
         includeHidden
             ? manufacturerRepository.findAll(pageable)
-            : manufacturerRepository.findByHiddenFalse(pageable);
+            : manufacturerRepository.findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(
+                pageable);
     return page.map(manufacturerMapper::toDto);
   }
 
@@ -99,6 +104,12 @@ public class ManufacturerService {
   public Manufacturer updateManufacturerVisibility(@NotNull UUID id, boolean hidden) {
     Manufacturer manufacturer = requireManufacturer(id);
     manufacturer.setHidden(hidden);
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED,
+        manufacturer.getId(),
+        manufacturer.getName(),
+        null,
+        AuditDetails.of("hidden", hidden));
     return manufacturerRepository.save(manufacturer);
   }
 }

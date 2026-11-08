@@ -20,6 +20,7 @@
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 import { krtTableSort } from '/js/kernel/krt-table-sort.js';
 
 /** @typedef {ApiDto<'ProfitCalculationDto'>} ProfitRow */
@@ -223,9 +224,10 @@ function renderRows(data) {
             item.maxProfitFullLoad,
         )}"><td><a class="row-link" data-testid="row-link" href="/materials/${encodeURIComponent(
             item.materialId || '',
-        )}"><span class="profit-rank">${rank}</span><span class="cell-title">${
-            item.materialName
-        }</span></a></td><td class="profit-route">${routeLine(
+        )}"><span class="profit-rank">${rank}</span><span class="cell-title">${localisedName(
+            item.materialName,
+            item.materialNameDe,
+        )}</span></a></td><td class="profit-route">${routeLine(
             'profit-route__buy',
             label('buy'),
             item.buyTerminalName,

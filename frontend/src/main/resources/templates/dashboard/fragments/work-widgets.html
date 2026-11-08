@@ -16,7 +16,7 @@
         <li th:each="level : ${lowLevels}">
             <a class="dash-link" data-testid="dashboard-low-stock-row" th:href="@{/inventory/stock-levels}">
                 <span class="cell-title">
-                    <span th:text="${level.entryName()}">Quantanium</span>
+                    <span th:text="${level.entryDisplayName(#locale)}">Quantanium</span>
                     <span th:if="${lowShowsUnit and level.orgUnit() != null}" class="chip" data-testid="dashboard-low-stock-unit"
                           th:title="${level.orgUnit().name()}" th:text="${level.orgUnit().shorthand()}">ALF</span>
                 </span>

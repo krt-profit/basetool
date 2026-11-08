@@ -26,6 +26,7 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtRefineryYield } from '/js/refinery/refinery-yield-badge.js';
+import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 krtRefineryYield.init(MATERIAL_YIELD_BONUSES, {
     help: MATERIAL_YIELD_BONUS_HELP,
@@ -409,6 +410,7 @@ krtEvents.on('change', 'rfc-import-file', (el) => {
 krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
     const materialId = el.getAttribute('data-material-id');
     const materialName = el.getAttribute('data-material-name') || '';
+    const materialLabel = el.getAttribute('data-material-label') || materialName;
     const entry = el.closest('.material-entry');
     const select = /** @type {KrtRefineryControl | null} */ (
         entry ? entry.querySelector('[id^="inputMaterialId_"]') : null
@@ -418,13 +420,14 @@ krtEvents.on('click', 'rfc-apply-suggestion', (el) => {
     const applySuggestion = (match) => {
         if (select.krtCombobox) {
             if (match) {
-                select.krtCombobox.setValue(materialId, match.name, {
+                const refined = match.refinedMaterial;
+                select.krtCombobox.setValue(materialId, localisedName(match.name, match.nameDe), {
                     quantityType: match.quantityType || '',
-                    refinedId: (match.refinedMaterial && match.refinedMaterial.id) || '',
-                    refinedName: (match.refinedMaterial && match.refinedMaterial.name) || '',
+                    refinedId: (refined && refined.id) || '',
+                    refinedName: refined ? localisedName(refined.name, refined.nameDe) : '',
                 });
             } else {
-                select.krtCombobox.setValue(materialId, materialName);
+                select.krtCombobox.setValue(materialId, materialLabel);
             }
         } else {
             select.value = materialId;

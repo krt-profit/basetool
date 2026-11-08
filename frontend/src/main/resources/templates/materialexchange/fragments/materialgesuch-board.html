@@ -19,7 +19,7 @@
                     th:aria-pressed="${selectedRequest != null and request.id() == selectedRequest.id()}">
                 <span class="mb-mrow-main">
                     <span class="mb-mrow-mat">
-                        <span class="mb-mrow-name" th:text="${request.kind() == 'ITEM' ? request.itemName() : request.material().name()}">Material</span>
+                        <span class="mb-mrow-name" th:text="${request.subjectDisplayName(#locale)}">Material</span>
                         <span th:if="${request.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                         <span th:if="${request.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${request.gameItem()})}"></span>
                     </span>
@@ -52,7 +52,7 @@
                     <div class="mb-dp-head">
                         <div class="mb-dp-title">
                             <h2>
-                                <span th:text="${request.kind() == 'ITEM' ? request.itemName() : request.material().name()}">Material</span>
+                                <span th:text="${request.subjectDisplayName(#locale)}">Material</span>
                                 <span th:if="${request.kind() == 'ITEM'}" class="mb-kind-tag" th:text="#{materialboerse.kind.item}">Item</span>
                                 <span th:if="${request.gameItem() != null}" class="mb-item-chips" data-testid="mb-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${request.gameItem()})}"></span>
                             </h2>
@@ -127,7 +127,7 @@
                             <button type="button" class="btn btn-ghost btn-xs" data-mg-edit
                                     th:data-request-id="${request.id()}" th:data-version="${request.version()}"
                                     th:data-kind="${request.kind()}"
-                                    th:data-subject="${request.kind() == 'ITEM' ? request.itemName() : request.material().name()}"
+                                    th:data-subject="${request.subjectDisplayName(#locale)}"
                                     th:data-min-quality="${request.minQuality()}"
                                     th:data-amount="${request.kind() == 'ITEM' ? request.itemQuantity() : request.requestedAmount()}"
                                     th:data-quantity-type="${request.kind() == 'ITEM' ? 'PIECE' : request.material().quantityType()}"

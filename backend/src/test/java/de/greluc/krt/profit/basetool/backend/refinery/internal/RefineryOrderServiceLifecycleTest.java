@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -72,6 +73,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -185,6 +188,21 @@ class RefineryOrderServiceLifecycleTest {
       assertThrows(
           NotFoundException.class,
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void throwsLocationNotOffered_whenNoPickerOffersThePlace(Location place) {
+      place.setSpaceStation(refineryLocation.getSpaceStation());
+      when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+      when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setLocation(place);
+
+      assertThrows(
+          LocationNotOfferedException.class,
+          () -> service.createRefineryOrder(OWNER_ID, incoming, null));
+      verify(refineryOrderRepository, never()).save(any());
     }
 
     @Test
@@ -780,6 +798,44 @@ class RefineryOrderServiceLifecycleTest {
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
 
       assertSame(refineryLocation, existing.getLocation());
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void locationKeptOnAPlaceNoPickerOffers_stillSaves(Location place) {
+      place.setSpaceStation(refineryLocation.getSpaceStation());
+      RefineryOrder existing = newSavedOrder();
+      existing.setLocation(place);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setLocation(place);
+
+      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+
+      assertSame(place, existing.getLocation());
+      verify(refineryOrderRepository).save(existing);
+    }
+
+    @ParameterizedTest
+    @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
+    void locationMovedOntoAPlaceNoPickerOffers_isRefused(Location place) {
+      place.setSpaceStation(refineryLocation.getSpaceStation());
+      RefineryOrder existing = newSavedOrder();
+      existing.setLocation(refineryLocation);
+      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
+
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setLocation(place);
+
+      assertThrows(
+          LocationNotOfferedException.class,
+          () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+      assertSame(refineryLocation, existing.getLocation());
+      verify(refineryOrderRepository, never()).save(any());
     }
 
     @Test

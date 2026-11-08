@@ -1,6 +1,6 @@
 # ADR-0346 — Catalogue admin activity is audited in its own domain
 
-- **Status:** Accepted (implementation pending)
+- **Status:** Accepted (partly implemented)
 - **Date:** 2026-11-05
 - **Deciders:** @greluc
 - **Related:** the audit spec (REQ-AUDIT-001, REQ-AUDIT-002) · the P4K catalogue spec (REQ-P4K-046) · the
@@ -60,5 +60,8 @@ methods and the UEX refinery sync are already audited in `REFINERY`, quality tie
   is unaffected, because the area is admin-only.
 - Later catalogue mutations — manual starmap and shop links, visibility overrides (ADR-0345,
   ADR-0347) — are events of this domain.
-- Pending: the domain, its event types and labels, the viewer tab and filter, and the alert
-  exclusion.
+- Built: the domain, its event types and labels, the viewer tab and filter, the alert exclusion,
+  the P4K preview and APPLY events, the manual sync-report delete and every existing master-data
+  mutation. The mass-guard override and review resolution types exist for their flows.
+- Pending: the UEX and Wiki sync summaries, recorded when the durable sync run finishes, and the
+  starmap, shop-link and visibility-override events of the flows that do not exist yet.

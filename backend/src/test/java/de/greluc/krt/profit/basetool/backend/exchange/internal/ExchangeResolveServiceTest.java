@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasRepository;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintExternalAliasSource;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintImportS
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ClassNameKeyRef;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository.ExchangeItemKeyRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -54,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.FuzzyNameMatcher;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -91,7 +94,7 @@ class ExchangeResolveServiceTest {
         new BlueprintImportService(
             JsonMapper.builder().build(),
             blueprintProductService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintAliasRepository,
             personalBlueprintRepository,
@@ -101,7 +104,7 @@ class ExchangeResolveServiceTest {
         new ExchangeResolveService(
             blueprintProductService,
             importService,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             new FuzzyNameMatcher(),
             blueprintRepository,
             gameItemRepository,
@@ -126,6 +129,35 @@ class ExchangeResolveServiceTest {
 
     assertThat(only(response).ref().bt()).isEqualTo("arclight pistol");
     verifyNoInteractions(blueprintRepository);
+  }
+
+  @Test
+  void aGuidResolvesItsProductAndTheAnswerCarriesTheGuid() {
+    UUID guid = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
+    products(guid.toString(), "Light Arms", "gallant rifle", "Gallant Rifle");
+
+    Result result =
+        only(
+            resolve(
+                ExchangeCatalogKind.BLUEPRINT,
+                new ExchangeItemRef(guid, null, null, null, null, null, "Gallant Rifle", null)));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().guid()).isEqualTo(guid);
+    assertThat(result.ref().bt()).isEqualTo(guid.toString());
+  }
+
+  @Test
+  void aDeprecatedNameKeyBtStillResolvesToItsGuidProductAndIsCounted() {
+    UUID guid = UUID.fromString("de20695c-eb2f-4b68-be6f-9806cbd205a7");
+    products(guid.toString(), "Light Arms");
+
+    Result result = only(resolve(ExchangeCatalogKind.BLUEPRINT, ref("light arms", null, null)));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().guid()).isEqualTo(guid);
+    assertThat(meterRegistry.counter(ExchangeMetricNames.EXCHANGE_BLUEPRINT_BT_REFS).count())
+        .isEqualTo(1.0);
   }
 
   @Test
@@ -182,8 +214,8 @@ class ExchangeResolveServiceTest {
     ExchangeResolveResponse response =
         resolve(
             ExchangeCatalogKind.BLUEPRINT,
-            new ExchangeItemRef("arclight pistol", null, null, null, "item_a", null, null),
-            new ExchangeItemRef(null, null, null, null, "item_b", "Arclight Pistol", "en"));
+            new ExchangeItemRef(null, "arclight pistol", null, null, null, "item_a", null, null),
+            new ExchangeItemRef(null, null, null, null, null, "item_b", "Arclight Pistol", "en"));
 
     assertThat(response.results()).allMatch(r -> r.status() == Status.RESOLVED);
     assertThat(response.warnings())
@@ -209,16 +241,24 @@ class ExchangeResolveServiceTest {
         resolve(
             ExchangeCatalogKind.SHIP_TYPE,
             new ExchangeItemRef(
-                null, null, null, null, "VEHICLE_NameDRAK_Cutlass_Black", "Something Else", null));
+                null,
+                null,
+                null,
+                null,
+                null,
+                "VEHICLE_NameDRAK_Cutlass_Black",
+                "Something Else",
+                null));
     ExchangeResolveResponse unknown =
         resolve(
             ExchangeCatalogKind.MATERIAL,
             new ExchangeItemRef(
-                null, null, null, null, "items_commodities_nope", "Agricium", null));
+                null, null, null, null, null, "items_commodities_nope", "Agricium", null));
     ExchangeResolveResponse known =
         resolve(
             ExchangeCatalogKind.MATERIAL,
-            new ExchangeItemRef(null, null, null, null, "items_commodities_agricium", null, null));
+            new ExchangeItemRef(
+                null, null, null, null, null, "items_commodities_agricium", null, null));
 
     assertThat(only(ship).ref().name()).isEqualTo("Cutlass Black");
     assertThat(ship.warnings()).isNull();
@@ -233,7 +273,7 @@ class ExchangeResolveServiceTest {
     products("arclight pistol", "Arclight Pistol");
     List<ExchangeItemRef> refs = new ArrayList<>();
     for (int i = 0; i < 60; i++) {
-      refs.add(new ExchangeItemRef(null, null, null, null, "item_" + i, null, null));
+      refs.add(new ExchangeItemRef(null, null, null, null, null, "item_" + i, null, null));
     }
 
     ExchangeResolveResponse response =
@@ -334,6 +374,71 @@ class ExchangeResolveServiceTest {
   }
 
   @Test
+  void aShipClassNameWinsOverADifferentShipTypeOfTheSameName() {
+    ShipType byClass = shipType("Gladius", "AEGS_Gladius");
+    ShipType byName = shipType("Aegis Gladius", "AEGS_Gladius_Valiant");
+    when(shipTypeRepository.findAll()).thenReturn(List.of(byClass, byName));
+
+    Result result =
+        only(resolve(ExchangeCatalogKind.SHIP_TYPE, ref(null, "aegs_gladius", "Aegis Gladius")));
+
+    assertThat(result.status()).isEqualTo(Status.RESOLVED);
+    assertThat(result.ref().bt()).isEqualTo(byClass.getId().toString());
+  }
+
+  @Test
+  void twoShipTypesWithTheSameNormalisedNameAnswerAmbiguousWithBoth() {
+    ShipType dash = shipType("Hornet-F7C", null);
+    ShipType space = shipType("Hornet F7C", null);
+    when(shipTypeRepository.findAll()).thenReturn(List.of(dash, space));
+
+    Result result = only(resolve(ExchangeCatalogKind.SHIP_TYPE, ref(null, null, "HORNET_F7C")));
+
+    assertThat(result.status()).isEqualTo(Status.AMBIGUOUS);
+    assertThat(result.candidates())
+        .extracting("bt")
+        .containsExactlyInAnyOrder(dash.getId().toString(), space.getId().toString());
+  }
+
+  @Test
+  void aVariantClassNameResolvesToItsOwnShipTypeElseToItsGroupBase() {
+    ShipType base = shipType("F7C Hornet Mk II", "ANVL_Hornet_F7C_Mk2");
+    ShipType own = shipType("F7C Hornet Mk II Heartseeker", "ANVL_Hornet_F7C_Mk2_Heartseeker");
+    when(shipTypeRepository.findAll()).thenReturn(List.of(base, own));
+    when(shipTypeRepository.findVariantBaseRefs())
+        .thenReturn(
+            List.of(
+                classRef("ANVL_Hornet_F7C_Mk2_Heartseeker", base.getId()),
+                classRef("ANVL_Hornet_F7C_Mk2_AI_Super", base.getId())));
+
+    ExchangeResolveResponse response =
+        resolve(
+            ExchangeCatalogKind.SHIP_TYPE,
+            ref(null, "ANVL_Hornet_F7C_Mk2_Heartseeker", null),
+            ref(null, "ANVL_Hornet_F7C_Mk2_AI_Super", null));
+
+    assertThat(response.results().get(0).ref().bt()).isEqualTo(own.getId().toString());
+    assertThat(response.results().get(1).ref().bt()).isEqualTo(base.getId().toString());
+  }
+
+  @Test
+  void aShipP4kGuidResolvesBeforeTheName() {
+    ShipType titan = shipType("Avenger Titan", "AEGS_Avenger_Titan");
+    titan.setP4kUuid(UUID.randomUUID());
+    ShipType other = shipType("Cutlass Black", null);
+    when(shipTypeRepository.findAll()).thenReturn(List.of(titan, other));
+
+    Result result =
+        only(
+            resolve(
+                ExchangeCatalogKind.SHIP_TYPE,
+                new ExchangeItemRef(
+                    null, null, null, titan.getP4kUuid(), null, null, "Cutlass Black", null)));
+
+    assertThat(result.ref().bt()).isEqualTo(titan.getId().toString());
+  }
+
+  @Test
   void everyReferenceIsCountedByKindAndStatus() {
     products("arclight pistol", "Arclight Pistol");
 
@@ -358,7 +463,14 @@ class ExchangeResolveServiceTest {
     for (int i = 0; i + 1 < keysAndNames.length; i += 2) {
       products.add(new ResolvedProduct(keysAndNames[i], keysAndNames[i + 1], null));
     }
-    lenient().when(blueprintProductService.allProducts()).thenReturn(products);
+    Map<String, List<ResolvedProduct>> byName = new LinkedHashMap<>();
+    for (ResolvedProduct p : products) {
+      byName
+          .computeIfAbsent(
+              new BlueprintNameNormalizer().normalize(p.productName()), _ -> new ArrayList<>())
+          .add(p);
+    }
+    lenient().when(blueprintProductService.productsByNameKey()).thenReturn(byName);
   }
 
   /**
@@ -383,7 +495,7 @@ class ExchangeResolveServiceTest {
    */
   private static @NotNull ExchangeItemRef ref(
       @Nullable String bt, @Nullable String scRecord, @Nullable String name) {
-    return new ExchangeItemRef(bt, scRecord, null, null, null, name, null);
+    return new ExchangeItemRef(null, bt, scRecord, null, null, null, name, null);
   }
 
   /**
@@ -411,6 +523,42 @@ class ExchangeResolveServiceTest {
     material.setType(MaterialType.RAW);
     material.setIsVisible(visible);
     return material;
+  }
+
+  /**
+   * Builds a ship type with an id.
+   *
+   * @param name the name
+   * @param className the class name, or {@code null}
+   * @return the ship type
+   */
+  private static @NotNull ShipType shipType(@NotNull String name, @Nullable String className) {
+    ShipType ship = new ShipType();
+    ship.setId(UUID.randomUUID());
+    ship.setName(name);
+    ship.setClassName(className);
+    return ship;
+  }
+
+  /**
+   * Builds a class-name projection row.
+   *
+   * @param className the class name
+   * @param id the ship type id it resolves to
+   * @return the row
+   */
+  private static @NotNull ClassNameKeyRef classRef(@NotNull String className, @NotNull UUID id) {
+    return new ClassNameKeyRef() {
+      @Override
+      public String getClassName() {
+        return className;
+      }
+
+      @Override
+      public UUID getId() {
+        return id;
+      }
+    };
   }
 
   /**

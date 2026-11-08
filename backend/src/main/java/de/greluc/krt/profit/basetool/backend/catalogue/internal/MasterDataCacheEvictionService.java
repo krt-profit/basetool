@@ -73,12 +73,14 @@ public class MasterDataCacheEvictionService {
           CacheConfig.BLUEPRINT_FAMILY_INDEX_CACHE);
 
   /**
-   * Caches a P4K catalog apply can make stale: materials, manufacturers, ship types and the
-   * blueprint master.
+   * Caches a P4K catalog apply can make stale: materials, their categories, manufacturers, ship
+   * types, the blueprint master and the locations, which carry their starmap objects' P4K names.
    */
   static final List<String> P4K_SYNCED_CACHES =
       List.of(
+          CacheConfig.LOCATIONS_CACHE,
           CacheConfig.MATERIALS_CACHE,
+          CacheConfig.MATERIAL_CATEGORIES_CACHE,
           CacheConfig.MATERIAL_BY_ID_CACHE,
           CacheConfig.MANUFACTURERS_CACHE,
           CacheConfig.SHIP_TYPES_CACHE,

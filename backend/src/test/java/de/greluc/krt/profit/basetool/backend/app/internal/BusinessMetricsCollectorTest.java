@@ -28,9 +28,20 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRep
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CatalogueMetricNames;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueStatBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncRunRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueRevision;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportBusinessGauges;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportRunRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewCaseRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kStampedRows;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -87,8 +98,15 @@ class BusinessMetricsCollectorTest {
   @Mock private OperationRepository operationRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private P4kImportJobRepository p4kImportJobRepository;
+  @Mock private P4kImportRunRepository p4kImportRunRepository;
+  @Mock private ExternalSyncRunRepository externalSyncRunRepository;
+  @Mock private GameItemRepository gameItemRepository;
+  @Mock private P4kImportChangeRepository p4kImportChangeRepository;
+  @Mock private P4kReviewCaseRepository p4kReviewCaseRepository;
+  @Mock private P4kStampedRows p4kStampedRows;
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private MaterialExchangeRequestRepository materialExchangeRequestRepository;
+  @Mock private GameItemStatRepository gameItemStatRepository;
 
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
@@ -107,8 +125,17 @@ class BusinessMetricsCollectorTest {
                 new OperationBusinessGauges(operationRepository),
                 new RefineryBusinessGauges(refineryOrderRepository),
                 new P4kImportBusinessGauges(p4kImportJobRepository),
+                new P4kCatalogueBusinessGauges(
+                    new P4kImportDueService(
+                        p4kImportRunRepository, externalSyncRunRepository, gameItemRepository),
+                    p4kImportRunRepository,
+                    p4kImportChangeRepository,
+                    p4kReviewCaseRepository,
+                    p4kStampedRows,
+                    new P4kCatalogueRevision()),
                 new MaterialExchangeBusinessGauges(
-                    materialExchangeOfferRepository, materialExchangeRequestRepository)),
+                    materialExchangeOfferRepository, materialExchangeRequestRepository),
+                new CatalogueStatBusinessGauges(gameItemStatRepository)),
             new TaskMetrics(registry));
     collector.registerGauges();
   }

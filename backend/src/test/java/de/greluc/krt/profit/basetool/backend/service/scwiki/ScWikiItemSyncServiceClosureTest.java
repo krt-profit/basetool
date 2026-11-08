@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemClassResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
@@ -99,6 +100,7 @@ class ScWikiItemSyncServiceClosureTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(gameItemRepository.findBySourceUuid(any())).thenCallRealMethod();
     config.putAll(Map.of("item-sync-enabled", true));
     rebuild();
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
@@ -118,12 +120,11 @@ class ScWikiItemSyncServiceClosureTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            gameItemStatRepository,
-            new GameItemStatWriter(gameItemStatRepository),
+            new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
                 scWikiClient, properties, gameItemStatRepository, syncReportService),
             itemReconciliationService,
-            new ScWikiItemFieldWriter(meterRegistry),
+            new ScWikiItemFieldWriter(new ItemClassResolver(meterRegistry), syncReportService),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -155,6 +156,31 @@ class ScWikiItemSyncServiceClosureTest {
     assertEquals(BlueprintStatProperty.HEALTH_MAX_HEALTH, stat.getValue().getProperty());
     assertEquals(550.0, stat.getValue().getBaseValue());
     assertSame(existing, stat.getValue().getGameItem());
+  }
+
+  @Test
+  void fillClosureItem_fillsTheRowTheP4kSeededUnderTheSameGuid() {
+    UUID guid = UUID.randomUUID();
+    GameItem seeded = new GameItem();
+    seeded.setId(UUID.randomUUID());
+    seeded.setP4kUuid(guid);
+    seeded.setName("P4K Seeded Item");
+    seeded.setSourceSystems(GameItemSourceSystem.P4K);
+    when(gameItemRepository.findByP4kUuidAndExternalUuidIsNull(guid))
+        .thenReturn(Optional.of(seeded));
+    ScWikiItemDto dto =
+        JsonMapper.builder()
+            .build()
+            .readValue(
+                "{\"uuid\":\"" + guid + "\",\"name\":\"P4K Seeded Item\"}", ScWikiItemDto.class);
+
+    ScWikiItemSyncService.ClosureOutcome outcome =
+        service.fillClosureItemWithinTransaction(UUID.randomUUID(), guid, dto, Instant.now());
+
+    assertEquals(ScWikiItemSyncService.ClosureOutcome.FILLED, outcome);
+    verify(gameItemRepository).save(seeded);
+    assertEquals(guid, seeded.getExternalUuid());
+    assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
   }
 
   @Test

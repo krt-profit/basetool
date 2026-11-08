@@ -40,7 +40,7 @@
         <li th:each="row : ${demandRows}">
             <a class="dash-link" data-testid="dashboard-material-demand-row" th:href="@{/orders/material-demand}">
                 <span class="cell-title">
-                    <span th:text="${row.material().name()}">Quantanium</span>
+                    <span th:text="${row.material().displayName(#locale)}">Quantanium</span>
                     <th:block th:replace="~{joborder/fragments/quality-tier :: badge(${row.qualityTier()})}"></th:block>
                     <span th:if="${demandShowsUnit and row.orgUnit() != null}" class="chip" data-testid="dashboard-material-demand-unit"
                           th:title="${row.orgUnit().name()}" th:text="${row.orgUnit().shorthand()}">ALF</span>

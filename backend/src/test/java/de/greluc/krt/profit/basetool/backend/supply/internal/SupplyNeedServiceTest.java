@@ -33,12 +33,15 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
@@ -113,7 +116,7 @@ class SupplyNeedServiceTest {
             needRepository,
             unitSettingRepository,
             materialRepository,
-            gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             qualityTierRepository,
             jobOrderRepository,
             settingsService,
@@ -221,6 +224,59 @@ class SupplyNeedServiceTest {
   }
 
   @Test
+  void aNeedForAGameItemTheP4kRetiredIsRefused() {
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    raisingUnit();
+    GameItem retired = retiredItem();
+    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+
+    assertThatThrownBy(() -> service.create(createRequest(null, retired.getId(), 2, false, null)))
+        .isInstanceOf(RetiredGameItemException.class);
+    verify(needRepository, never()).save(any());
+  }
+
+  @Test
+  void anEditOfANeedWhoseGameItemTheP4kRetiredIsRefused() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    need.setMaterial(null);
+    need.setQualityTier(null);
+    need.setGameItem(retiredItem());
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+
+    assertThatThrownBy(() ->
+            service.update(
+                need.getId(),
+                new UpdateNeedRequest(12.0, NeedPriority.LOW, false, null, null, null, 3L)))
+        .isInstanceOf(RetiredGameItemException.class);
+    assertThat(need.getAmount()).isEqualTo(10.0);
+    verify(needRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void aNeedWhoseGameItemTheP4kRetiredCanStillBeWithdrawn() {
+    SupplyNeed need = storedNeed(NeedStatus.OPEN, 10, 0);
+    need.setMaterial(null);
+    need.setQualityTier(null);
+    need.setGameItem(retiredItem());
+    when(needRepository.findByIdForUpdate(need.getId())).thenReturn(Optional.of(need));
+    when(accessPolicy.canManageUnit(UNIT)).thenReturn(true);
+    when(needRepository.saveAndFlush(need)).thenReturn(need);
+
+    service.withdraw(need.getId(), 3L);
+
+    assertThat(need.getStatus()).isEqualTo(NeedStatus.WITHDRAWN);
+  }
+
+  private static GameItem retiredItem() {
+    GameItem item = new GameItem();
+    item.setId(UUID.randomUUID());
+    item.setName("Retired gun");
+    item.setP4kDeletedAt(Instant.now());
+    return item;
+  }
+
+  @Test
   void leadRaisesNeedAsLogistician() {
     AccessGateService accessGateService = org.mockito.Mockito.mock(AccessGateService.class);
     when(accessGateService.hasRoleInOrgUnit(UNIT, "LOGISTICIAN")).thenReturn(true);
@@ -236,7 +292,7 @@ class SupplyNeedServiceTest {
             needRepository,
             unitSettingRepository,
             materialRepository,
-            gameItemRepository,
+            new SelectableGameItems(gameItemRepository),
             qualityTierRepository,
             jobOrderRepository,
             settingsService,

@@ -36,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintRequirementGroupDto;
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintRequirementModifierDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
@@ -81,6 +83,21 @@ class AdminBlueprintsPageControllerMvcTest {
    * @return a single-page envelope holding one minimal blueprint row
    */
   private static PageResponse<BlueprintDto> page(int total) {
+    return page(total, List.of(), List.of());
+  }
+
+  /**
+   * Builds a one-row blueprint page envelope with the given recipe.
+   *
+   * @param total total number of matching blueprints to report
+   * @param groups the blueprint's requirement groups
+   * @param recipeModifiers the blueprint's recipe-wide modifiers
+   * @return a single-page envelope holding the blueprint row
+   */
+  private static PageResponse<BlueprintDto> page(
+      int total,
+      List<BlueprintRequirementGroupDto> groups,
+      List<BlueprintRequirementModifierDto> recipeModifiers) {
     BlueprintDto dto =
         new BlueprintDto(
             UUID.randomUUID(),
@@ -95,7 +112,8 @@ class AdminBlueprintsPageControllerMvcTest {
             null,
             null,
             null,
-            List.of(),
+            groups,
+            recipeModifiers,
             List.of(),
             List.of(),
             List.of(),
@@ -103,6 +121,69 @@ class AdminBlueprintsPageControllerMvcTest {
             null);
     int totalPages = total == 0 ? 0 : (int) Math.ceil(total / 25.0);
     return new PageResponse<>(List.of(dto), 0, 25, total, totalPages, List.of());
+  }
+
+  /**
+   * Builds a modifier whose value does not depend on quality.
+   *
+   * @param label the stat name
+   * @return the modifier
+   */
+  private static BlueprintRequirementModifierDto modifier(String label) {
+    return new BlueprintRequirementModifierDto(
+        null, label, null, null, null, null, 1.1, "linear", "MULTIPLIER", List.of(), null, null);
+  }
+
+  /**
+   * A recipe-wide modifier renders in a row of its own, labelled as applying to the whole recipe,
+   * and the blueprint cell spans the slots and that row (REQ-P4K-027).
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_recipeWideModifiers_renderInARowForTheWholeRecipe() throws Exception {
+    BlueprintRequirementGroupDto slot =
+        new BlueprintRequirementGroupDto(
+            "Casing", "CASING", 1, List.of(modifier("Slot stat")), List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(1, List.of(slot), List.of(modifier("Recipe stat"))));
+
+    String html =
+        mockMvc
+            .perform(get("/admin/blueprints").param("fragment", "results").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).contains("rowspan=\"2\"").contains("Slot stat");
+    String recipeWide = html.substring(html.indexOf("data-testid=\"bp-recipe-wide\""));
+    assertThat(recipeWide.substring(0, recipeWide.indexOf("</tr>")))
+        .contains("das ganze Rezept</span>")
+        .contains("Recipe stat")
+        .doesNotContain("Slot stat");
+  }
+
+  /**
+   * A blueprint without recipe-wide modifiers renders no recipe-wide row.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void list_withoutRecipeWideModifiers_rendersNoRecipeWideRow() throws Exception {
+    BlueprintRequirementGroupDto slot =
+        new BlueprintRequirementGroupDto(
+            "Casing", "CASING", 1, List.of(modifier("Slot stat")), List.of());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(1, List.of(slot), List.of()));
+
+    mockMvc
+        .perform(get("/admin/blueprints").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("rowspan=\"1\"")))
+        .andExpect(content().string(not(containsString("bp-recipe-wide"))));
   }
 
   @Test

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerUexCompany;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.GameText;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -47,7 +48,7 @@ import org.jetbrains.annotations.Nullable;
 @NoArgsConstructor
 @AllArgsConstructor
 @BatchSize(size = 50)
-public class Manufacturer extends AbstractEntity<UUID> {
+public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
 
   @Getter(onMethod_ = @__(@Override))
   @Id
@@ -56,6 +57,14 @@ public class Manufacturer extends AbstractEntity<UUID> {
 
   @Column(nullable = false, unique = true)
   private String name;
+
+  /**
+   * The German name, written by the P4K import only (REQ-P4K-023); pages in German show it, and
+   * search and matching run on {@link #name}.
+   */
+  @Column(name = "name_de")
+  @Nullable
+  private String nameDe;
 
   /**
    * Short display code (e.g. {@code "AEGS"}). Not unique: several UEX company records of one brand
@@ -71,7 +80,14 @@ public class Manufacturer extends AbstractEntity<UUID> {
 
   @Column(columnDefinition = "TEXT")
   @Nullable
+  @GameText
   private String description;
+
+  /** The German description, written by the P4K import only (REQ-P4K-020). */
+  @Column(name = "description_de", columnDefinition = "TEXT")
+  @Nullable
+  @GameText
+  private String descriptionDe;
 
   private boolean hidden = false;
 
@@ -130,19 +146,34 @@ public class Manufacturer extends AbstractEntity<UUID> {
   private Instant scwikiDeletedAt;
 
   /**
-   * DataForge {@code __ref} manufacturer GUID observed by the KRT P4K Reader import. Kept alongside
-   * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it
-   * is null and unclaimed, but always records the P4K-observed GUID here so a UUID disagreement
-   * stays auditable. Not UNIQUE.
+   * The P4K GUID, the row's identity in the catalogue and unique per kind (REQ-P4K-007); the SC
+   * Wiki UUID stays in {@code scwiki_uuid}.
    */
-  @Column(name = "p4k_uuid")
+  @Column(name = "p4k_uuid", unique = true)
   private UUID p4kUuid;
 
   /** Last successful KRT P4K Reader import touch; non-null marks P4K participation. */
   @Column(name = "p4k_synced_at")
   private Instant p4kSyncedAt;
 
-  /** KRT P4K Reader soft-delete marker (reserved for a future orphan sweep). */
+  /**
+   * When the P4K sweep found the row gone from a complete catalogue (REQ-P4K-011), or {@code null};
+   * a later match clears it.
+   */
   @Column(name = "p4k_deleted_at")
+  @Nullable
   private Instant p4kDeletedAt;
+
+  /**
+   * When an admin hid the row through a P4K review case (REQ-P4K-016), or {@code null}; no match
+   * clears it.
+   */
+  @Column(name = "p4k_hidden_at")
+  @Nullable
+  private Instant p4kHiddenAt;
+
+  /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
+  @Column(name = "p4k_seen_run_id")
+  @Nullable
+  private UUID p4kSeenRunId;
 }

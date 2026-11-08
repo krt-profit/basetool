@@ -152,8 +152,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "SC-Wiki serves an item class the basetool does not know"
-          description: "The SC-Wiki item sync stored at least one ship component without a class in the last 24h because its class value is not one of Military, Civilian, Industrial, Stealth or Competition (REQ-DATA-024, ADR-0283). The sync itself succeeded; those components just show no class chip in the Lager. Grep the backend log for 'Unknown SC Wiki item class' to read the value, then add it to ShipComponentClass with its DE/EN labels, a design-system colour and a migration widening ck_game_item_item_class."
+          summary: "SC-Wiki or the P4K catalogue serves an item class the basetool does not know"
+          description: "The SC-Wiki item sync or a P4K APPLY stored at least one item without a class in the last 24h because its class value is not one of Military, Civilian, Industrial, Stealth or Competition (REQ-P4K-019, REQ-OBS-023, ADR-0337). The sync or import itself succeeded; those components just show no class chip in the Lager. Grep the backend log for 'Unknown SC Wiki item class' or 'Unknown P4K item class' to read the value, then add it to ShipComponentClass with its DE/EN labels, a design-system colour and a migration widening ck_game_item_item_class and ck_game_item_p4k_item_class."
 
       - alert: ScWikiItemStatsMissing
         expr: max(basetool_catalogue_items_with_stats) == 0
@@ -162,7 +162,7 @@ groups:
           severity: warning
         annotations:
           summary: "No game item carries a blueprint stat base value"
-          description: "After two days of SC-Wiki item syncs no game item has a row in game_item_stat, so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-DATA-027, ADR-0309). The sync reads the values from the item payload's stat blocks (durability, personal_weapon, vehicle_weapon, clothing, temperature_resistance, ...); a renamed block or field empties every value without failing the sync. Fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid}, compare its fields with ScWikiItemStatExtractor, and check that the item payload still says is_craftable=true. The series is absent while the item sync is disabled."
+          description: "For two days no game item has a row in game_item_stat from either source, neither source=\"P4K\" nor source=\"SCWIKI\", so the blueprint recipe view in Mein Inventar shows only the quality factors instead of the crafted item's values (REQ-P4K-030, REQ-OBS-023, ADR-0342). The P4K import writes the values of every catalogue item from the item's stats; the SC-Wiki item sync fills the items the catalogue does not cover. Check that a P4K APPLY ran and that its catalogue still carries stats blocks (P4kItemStatExtractor); for the Wiki, fetch one blueprint output with GET https://api.star-citizen.wiki/api/items/{uuid} and compare its fields with ScWikiItemStatExtractor."
 
       - alert: ScheduledJobStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention|exchange_change_retention|exchange_connection_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_change_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_change_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="exchange_connection_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="exchange_connection_retention"} == 1))
@@ -233,7 +233,15 @@ groups:
           severity: warning
         annotations:
           summary: "Exchange relays to the backend keep failing"
-          description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, an answer that breaks the v1 schema, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). Check the backend and its exchange layer and the gateway log lines 'Exchange relay to' or 'Exchange answer breaks'."
+          description: "The ingest gateway relayed admitted exchange requests but the backend answered unusably - 5xx, a refusal outside the exchange error registry, or no answer at all (unreachable, circuit open, no gateway token) - and the client got 502 BACKEND_RELAY_FAILED (REQ-XCH-011). An answer that breaks its contract is counted apart, see ExchangeAnswerContractBroken. Check the backend and its exchange layer and the gateway log lines 'Exchange relay to'."
+
+      - alert: ExchangeAnswerContractBroken
+        expr: sum by (client_id) (increase(basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"}[15m])) > 0 or sum by (client_id) (basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"} unless basetool_ingest_exchange_relay_total{outcome="answer_contract_broken"} offset 15m) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "The backend sent an exchange answer that breaks its contract"
+          description: "The ingest gateway refused a 2xx answer of the backend for client {{ $labels.client_id }} with 502 BACKEND_RELAY_FAILED, because it broke its v1 response schema or carried a property the schema does not declare (REQ-XCH-050). A new backend field that is not declared in the published schema is the usual cause; it may be a game text on its way to a third party. Find the route and the field path in the gateway log line 'Exchange answer breaks', then declare the field in the schema with its class in the field ratchet, or drop it from the exchange DTO."
 
       - alert: ExchangeLargeChangeSetsBusy
         expr: sum(increase(basetool_ingest_exchange_refused_total{reason="relay_busy"}[15m])) > 30
@@ -557,6 +565,16 @@ groups:
           summary: "Oldest pending P4K import >6h"
           description: "A P4K catalog import has been PENDING for more than 6 hours — imports normally finish in minutes, so the async worker is likely wedged. Check the backend logs and re-run the import."
 
+      # An APPLY waits up to krt.sync.coordinator.max-wait-ms (1 h) for the sync lock while RUNNING.
+      - alert: P4kImportRunningStuck
+        expr: max(basetool_p4k_import_job_pending_count{status="RUNNING"}) > 0
+        for: 3h
+        labels:
+          severity: warning
+        annotations:
+          summary: "A P4K import has been RUNNING for more than 3h"
+          description: "A P4K import job has stayed RUNNING for more than 3 hours — a run takes minutes plus at most one hour waiting for the sync lock, so the worker is wedged or the job's end could not be recorded. Check the backend log for the job; a backend restart marks it FAILED (REQ-OBS-011)."
+
       - alert: JobOrderStale
         expr: basetool_job_order_open_oldest_age_seconds > 15552000
         for: 1h
@@ -592,6 +610,50 @@ groups:
         annotations:
           summary: "P4K import failure in the last 24h"
           description: "At least one P4K catalog import reached FAILED in the last 24 hours. A repeatedly-failing import leaves an empty-looking pending queue; check the job list and backend logs for the error."
+
+      - alert: P4kImportDue
+        expr: (max(basetool_p4k_import_due{job="basetool-backend"}) == 1) or (absent(basetool_p4k_import_due{job="basetool-backend"}) and on() (max(up{job="basetool-backend"}) == 1))
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K import due for 7 days"
+          description: "UEX or the SC Wiki has reported a newer game version than the last P4K APPLY of known version for 7 days, no such APPLY exists, or the backend exports no due signal. Export a fresh LIVE catalogue with p4kx and import it on /admin/p4k-import (REQ-OBS-022)."
+
+      - alert: P4kImportUnknownValues
+        expr: (sum(basetool_p4k_import_last_run_unknown_grades{job="basetool-backend"}) + sum(basetool_p4k_import_last_run_unknown_classes{job="basetool-backend"})) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Last P4K import read unknown grades or classes ({{ $value }})"
+          description: "The last P4K APPLY read item grade or itemClass values the Basetool does not know and stored them as no value. Check the run's change report (UNKNOWN_VALUE rows) and extend the mapping (REQ-OBS-022, REQ-P4K-018, REQ-P4K-019)."
+
+      - alert: P4kImportItemClassNullShareRose
+        expr: max(basetool_p4k_import_last_run_item_class_null_ratio_change{job="basetool-backend"}) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K itemClass null share rose by more than 5 points"
+          description: "The share of catalogue items without itemClass rose by more than 5 percentage points against the previous P4K APPLY. A p4kx export may have lost the class; compare the two runs before relying on item classes (REQ-OBS-022)."
+
+      - alert: P4kReviewCaseStale
+        expr: max(basetool_p4k_review_case_open_oldest_age_seconds{job="basetool-backend"}) > 2592000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "P4K review case open for more than 30 days"
+          description: "The oldest open P4K review case is older than 30 days. Resolve the cases on /admin/p4k-import as keep or hide (REQ-OBS-022, REQ-P4K-016)."
+
+      - alert: P4kImportChannelRejected
+        expr: sum(increase(basetool_p4k_import_rejected_total{job="basetool-backend",reason="channel"}[24h])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Non-LIVE P4K catalogue uploaded"
+          description: "The P4K upload gate refused a catalogue of another Channel than LIVE within 24 hours: a test-Channel export was uploaded to this environment. Nothing was imported; check which file was used (REQ-OBS-022, REQ-P4K-001)."
 
       - alert: MailDeliveryFailing
         expr: sum(increase(basetool_mail_total{outcome="failed"}[1h])) > 2
@@ -764,7 +826,7 @@ groups:
           description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
       - alert: AuditDomainSilenceAnomaly
-        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS|SUPPLY|PURCHASING"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
+        expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PERSONAL_INVENTORY|MARKET|HANGAR|BLUEPRINT|CONNECTED_APPS|SUPPLY|PURCHASING|CATALOGUE"}[30d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
         keep_firing_for: 15m
         labels:

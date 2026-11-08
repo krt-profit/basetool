@@ -26,43 +26,22 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
- * Decides which source writes a game item's canonical {@code name}: the P4K import on every row it
- * knows, the SC Wiki on rows the P4K does not know, UEX only on rows neither knows (REQ-P4K-017).
+ * Decides which source writes a game item's canonical {@code name}: the P4K import on every row
+ * with a {@code p4k_name} ({@link P4kItemValues#leadOnto}), the SC Wiki on rows without one, UEX
+ * only on rows neither names (REQ-P4K-017).
  */
 public final class GameItemNamePrecedence {
 
   private GameItemNamePrecedence() {}
 
   /**
-   * Writes the archive name on a row the P4K import matched, unless it is a key or placeholder.
-   *
-   * @param item matched catalogue item
-   * @param p4kName display name of the catalogue record
-   * @param apply whether to write
-   * @return whether a real name differs (and was written when {@code apply})
-   */
-  static boolean applyP4kName(@NotNull GameItem item, @Nullable String p4kName, boolean apply) {
-    if (!P4kDisplayName.isReal(p4kName)) {
-      return false;
-    }
-    String name = p4kName.strip();
-    if (name.equals(item.getName())) {
-      return false;
-    }
-    if (apply) {
-      item.setName(name);
-    }
-    return true;
-  }
-
-  /**
-   * Writes the Wiki display name unless the P4K import knows the row.
+   * Writes the Wiki display name unless the row carries a P4K name.
    *
    * @param item managed catalogue item
    * @param wikiName display name of the Wiki payload
    */
   static void applyWikiName(@NotNull GameItem item, @Nullable String wikiName) {
-    if (item.getP4kSyncedAt() == null && isUsableWikiName(wikiName)) {
+    if (item.getP4kName() == null && isUsableWikiName(wikiName)) {
       item.setName(wikiName.strip());
     }
   }
@@ -95,7 +74,7 @@ public final class GameItemNamePrecedence {
   }
 
   private static boolean isNamedByP4kOrWiki(@NotNull GameItem item) {
-    return item.getP4kSyncedAt() != null
+    return item.getP4kName() != null
         || (item.getScwikiDeletedAt() == null && isUsableWikiName(item.getScwikiName()));
   }
 }

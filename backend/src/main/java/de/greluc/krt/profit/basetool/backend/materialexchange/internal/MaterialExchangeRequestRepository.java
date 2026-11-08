@@ -20,12 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -134,4 +136,27 @@ public interface MaterialExchangeRequestRepository
    * @return the number of the owner's requests in that status.
    */
   long countByStatusAndOwnerId(MaterialExchangeRequestStatus status, UUID ownerId);
+
+  /**
+   * Returns every blueprint product key an item request names.
+   *
+   * @return the distinct {@code item_product_key} values
+   */
+  @Query(
+      "SELECT DISTINCT e.itemProductKey FROM MaterialExchangeRequest e WHERE e.itemProductKey IS"
+          + " NOT NULL")
+  Set<String> findAllDistinctItemProductKeys();
+
+  /**
+   * Moves every row from one product key to another and bumps its version (REQ-INV-070).
+   *
+   * @param from the name key
+   * @param to the GUID key
+   * @return the rows moved
+   */
+  @Modifying
+  @Query(
+      "UPDATE MaterialExchangeRequest e SET e.itemProductKey = :to, e.version = e.version + 1"
+          + " WHERE e.itemProductKey = :from")
+  int moveItemProductKey(@Param("from") String from, @Param("to") String to);
 }

@@ -39,8 +39,14 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   /** Derived Spring-Data query - returns entities matching {@code NameIgnoreCase}. */
   Optional<Manufacturer> findByNameIgnoreCase(String name);
 
-  /** Derived Spring-Data query - returns entities matching {@code HiddenFalse}. */
-  Page<Manufacturer> findByHiddenFalse(Pageable pageable);
+  /**
+   * Pages the manufacturers the pickers offer: not hidden, not stamped by the P4K sweep and not
+   * hidden through a P4K review case (REQ-P4K-013).
+   *
+   * @param pageable page request
+   * @return paged pickable manufacturers
+   */
+  Page<Manufacturer> findByHiddenFalseAndP4kDeletedAtIsNullAndP4kHiddenAtIsNull(Pageable pageable);
 
   /**
    * Finds a manufacturer by its SC Wiki UUID, used to attach a manufacturer to a newly created
@@ -50,6 +56,15 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
    * @return matching manufacturer if present
    */
   Optional<Manufacturer> findByScwikiUuid(UUID scwikiUuid);
+
+  /**
+   * Finds the Manufacturer row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
+   * (REQ-P4K-007).
+   *
+   * @param p4kUuid the P4K GUID
+   * @return the row, if one holds the GUID
+   */
+  Optional<Manufacturer> findByP4kUuid(UUID p4kUuid);
 
   /**
    * Finds a manufacturer by short code against the local {@code abbreviation} (case-insensitive),

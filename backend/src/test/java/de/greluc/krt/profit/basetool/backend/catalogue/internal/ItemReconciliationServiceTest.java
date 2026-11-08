@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -31,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +51,133 @@ class ItemReconciliationServiceTest {
   @Mock private GameItemPriceRepository prices;
   @Mock private GameItemStatRepository stats;
   @Mock private SyncReportService reports;
+  @Mock private P4kMergeConflictRecorder p4kConflicts;
+
+  @Test
+  void differentP4kGuidsAreNeverMergedButGoToTheP4kReview() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    retired.setP4kUuid(UUID.randomUUID());
+    GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
+    canonical.setExternalUuid(UUID.randomUUID());
+    canonical.setP4kUuid(UUID.randomUUID());
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+    UUID runId = UUID.randomUUID();
+
+    assertThat(service().mergeExisting(canonical, retired.getId(), runId, sameItem())).isNull();
+
+    verify(p4kConflicts).record(retired, retired.getP4kUuid(), canonical, canonical.getP4kUuid());
+    verify(reports)
+        .logScwikiEvent(
+            eq(runId),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("game_item"),
+            eq(canonical.getExternalUuid()),
+            eq("Same Item"),
+            any());
+    verify(items, never()).saveAndFlush(any());
+    verify(items, never()).delete(any());
+    verifyNoInteractions(redirects, prices, stats, recipes);
+    assertThat(retired.getUexItemId()).isEqualTo(91);
+    assertThat(canonical.getUexItemId()).isNull();
+  }
+
+  @Test
+  void aP4kGuidOnlyTheRetiredRowHoldsMovesOntoTheSurvivor() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    UUID guid = UUID.randomUUID();
+    UUID seenRun = UUID.randomUUID();
+    Instant synced = Instant.parse("2026-11-01T10:00:00Z");
+    retired.setP4kUuid(guid);
+    retired.setNameKey("item_NameSameItem");
+    retired.setNameDe("Gleicher Gegenstand");
+    retired.setP4kSyncedAt(synced);
+    retired.setP4kSeenRunId(seenRun);
+    GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
+    canonical.setExternalUuid(UUID.randomUUID());
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+    List<UUID> retiredGuidAtFlush = new ArrayList<>();
+    when(items.saveAndFlush(retired))
+        .thenAnswer(_ -> {
+          retiredGuidAtFlush.add(retired.getP4kUuid());
+          assertThat(canonical.getP4kUuid()).isNull();
+          return retired;
+        });
+
+    assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))
+        .isSameAs(canonical);
+
+    assertThat(retiredGuidAtFlush).containsExactly((UUID) null);
+    assertThat(canonical.getP4kUuid()).isEqualTo(guid);
+    assertThat(canonical.getNameKey()).isEqualTo("item_NameSameItem");
+    assertThat(canonical.getNameDe()).isEqualTo("Gleicher Gegenstand");
+    assertThat(retired.getNameDe()).isNull();
+    assertThat(canonical.getP4kSyncedAt()).isEqualTo(synced);
+    assertThat(canonical.getP4kSeenRunId()).isEqualTo(seenRun);
+    verifyNoInteractions(p4kConflicts);
+  }
+
+  @Test
+  void theP4kValuesOfTheRetiredRowMoveAndLeadTheSurvivor() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    retired.setP4kUuid(UUID.randomUUID());
+    retired.setP4kName("Same Item P4K");
+    retired.setP4kType("Shield");
+    retired.setP4kSize(2);
+    retired.setP4kGradeRaw(3);
+    GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
+    canonical.setExternalUuid(UUID.randomUUID());
+    canonical.setSizeClass(3);
+    canonical.setGrade("A");
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+
+    assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))
+        .isSameAs(canonical);
+
+    assertThat(retired.getP4kName()).isNull();
+    assertThat(retired.getP4kGradeRaw()).isNull();
+    assertThat(canonical.getP4kName()).isEqualTo("Same Item P4K");
+    assertThat(canonical.getName()).isEqualTo("Same Item P4K");
+    assertThat(canonical.getP4kGradeRaw()).isEqualTo(3);
+    assertThat(canonical.getSizeClass()).isEqualTo(2);
+    assertThat(canonical.getGrade()).isEqualTo("C");
+  }
+
+  @Test
+  void aSurvivorWithAP4kNameKeepsIt() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    retired.setName("Same Item");
+    GameItem canonical = item(GameItemSourceSystem.BOTH);
+    canonical.setExternalUuid(UUID.randomUUID());
+    canonical.setP4kUuid(UUID.randomUUID());
+    canonical.setName("SAME item");
+    canonical.setP4kName("SAME item");
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+
+    assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))
+        .isSameAs(canonical);
+
+    assertThat(canonical.getName()).isEqualTo("SAME item");
+    assertThat(canonical.getUexName()).isEqualTo("Same Item");
+    assertThat(canonical.getUexItemId()).isEqualTo(91);
+  }
+
+  @Test
+  void aSurvivorWithoutP4kGuidTakesTheUexName() {
+    GameItem retired = item(GameItemSourceSystem.UEX_ONLY);
+    retired.setUexItemId(91);
+    GameItem canonical = item(GameItemSourceSystem.WIKI_ONLY);
+    canonical.setExternalUuid(UUID.randomUUID());
+    canonical.setName("SAME item");
+    when(items.lockReconciliationRows(any())).thenReturn(List.of(retired, canonical));
+
+    service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem());
+
+    assertThat(canonical.getName()).isEqualTo("Same Item");
+  }
 
   @Test
   void manyPricePairsAreLoadedInTwoReadsAndKeepTheirNewestValues() {
@@ -69,16 +199,7 @@ class ItemReconciliationServiceTest {
     }
     when(prices.findByGameItemId(retired.getId())).thenReturn(source);
     when(prices.findByGameItemId(canonical.getId())).thenReturn(target);
-    var service =
-        new ItemReconciliationService(items, redirects, recipes, prices, stats, List.of(), reports);
-
-    assertThat(
-            service.mergeExisting(
-                canonical,
-                retired.getId(),
-                UUID.randomUUID(),
-                new ItemReconciliationService.WikiIdentity(
-                    "Same Item", GameItemKind.GENERIC, null, null)))
+    assertThat(service().mergeExisting(canonical, retired.getId(), UUID.randomUUID(), sameItem()))
         .isSameAs(canonical);
 
     verify(prices).findByGameItemId(retired.getId());
@@ -87,6 +208,16 @@ class ItemReconciliationServiceTest {
     assertThat(target).allSatisfy(price -> assertThat(price.getPriceBuy()).isEqualTo(11d));
     assertThat(source.subList(10, 20))
         .allSatisfy(price -> assertThat(price.getGameItem()).isSameAs(canonical));
+  }
+
+  private ItemReconciliationService service() {
+    return new ItemReconciliationService(
+        items, redirects, recipes, prices, stats, List.of(), reports, p4kConflicts);
+  }
+
+  private static ItemReconciliationService.WikiIdentity sameItem() {
+    return new ItemReconciliationService.WikiIdentity(
+        "Same Item", GameItemKind.GENERIC, null, null);
   }
 
   private static GameItem item(GameItemSourceSystem source) {

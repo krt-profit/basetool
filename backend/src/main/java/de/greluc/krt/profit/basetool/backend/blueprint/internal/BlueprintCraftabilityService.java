@@ -34,6 +34,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection.LineDemand;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -62,7 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Reads only the caller's inventory and, optionally, open refinery yield. RESOURCE lines and
  * ITEM lines bridged to a material by name (ADR-0046) are evaluated, counting only stock at or
  * above the quality floor (see {@link BlueprintModifierMath#noDegradationFloor}). Every figure is
- * produced with and without the refinery yield.
+ * produced with and without the refinery yield, each from the lines {@link RecipeGroupSelection}
+ * counts against that stock.
  */
 @Service
 @RequiredArgsConstructor
@@ -100,12 +103,11 @@ public class BlueprintCraftabilityService {
     Map<String, Blueprint> recipes =
         blueprintProductService.resolveRepresentativeBlueprints(productKeys);
 
-    Map<UUID, List<CraftabilitySlice>> inventory =
-        slicesPerMaterial(craftableStockSource.ownedStockSlices(userId));
+    List<CraftabilitySlice> ownedSlices = craftableStockSource.ownedStockSlices(userId);
+    Map<UUID, List<CraftabilitySlice>> inventory = slicesPerMaterial(ownedSlices);
     Map<UUID, List<CraftabilitySlice>> withRefinery = inventory;
     if (includeRefinery) {
-      List<CraftabilitySlice> merged =
-          new ArrayList<>(craftableStockSource.ownedStockSlices(userId));
+      List<CraftabilitySlice> merged = new ArrayList<>(ownedSlices);
       merged.addAll(craftabilityYieldSource.pendingYieldSlices(userId));
       withRefinery = slicesPerMaterial(merged);
     }
@@ -186,7 +188,8 @@ public class BlueprintCraftabilityService {
   }
 
   /**
-   * Computes one blueprint's craftability from the pooled stock maps.
+   * Computes one blueprint's craftability from the pooled stock maps, selecting a choose-n recipe's
+   * option groups against each stock map on its own (REQ-P4K-027).
    *
    * @param blueprintId the owned blueprint id
    * @param recipe the representative recipe, or {@code null} when none resolved
@@ -208,124 +211,237 @@ public class BlueprintCraftabilityService {
           blueprintId, false, false, false, 0, 0, null, null, List.of(), List.of());
     }
 
-    List<BlueprintIngredient> flat = recipe.getIngredients();
-    boolean hasUnevaluatedItem = false;
+    Requirements counted = requirements(countedLines(recipe, inventory, itemBridges), itemBridges);
+    Requirements countedWithRefinery =
+        withRefinery == inventory
+            ? counted
+            : requirements(countedLines(recipe, withRefinery, itemBridges), itemBridges);
+    boolean hasUnevaluatedItem = counted.unevaluatedItem() || countedWithRefinery.unevaluatedItem();
 
-    Map<UUID, MaterialRequirement> requirements = new LinkedHashMap<>();
-    for (BlueprintIngredient ingredient : flat) {
-      Material material;
-      double rawRequired;
-      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
-        material = ingredient.getMaterial();
-        if (material == null || material.getId() == null) {
-          continue;
-        }
-        rawRequired = ingredient.getQuantityScu() == null ? 0.0d : ingredient.getQuantityScu();
-      } else {
-        material = bridgedItemMaterial(ingredient, itemBridges);
-        if (material == null || material.getId() == null) {
-          hasUnevaluatedItem = true;
-          continue;
-        }
-        rawRequired = ingredient.getQuantityUnits() == null ? 0.0d : ingredient.getQuantityUnits();
-      }
-      if (rawRequired <= 0.0d) {
-        continue;
-      }
-      QuantityType quantityType = material.getQuantityType();
-      double required = QuantityTypeRounding.roundForQuantityType(rawRequired, quantityType);
-      if (required <= 0.0d) {
-        continue;
-      }
-      int floor = slotFloor(ingredient);
-      Material requirementMaterial = material;
-      requirements
-          .computeIfAbsent(
-              material.getId(),
-              id -> new MaterialRequirement(id, requirementMaterial.getName(), quantityType))
-          .add(required, floor);
-    }
-
-    if (requirements.isEmpty()) {
+    if (counted.byMaterial().isEmpty() && countedWithRefinery.byMaterial().isEmpty()) {
       return new BlueprintCraftabilityDto(
           blueprintId, true, hasUnevaluatedItem, false, 0, 0, null, null, List.of(), List.of());
     }
+    return evaluate(
+        blueprintId,
+        recipe,
+        counted.byMaterial(),
+        countedWithRefinery.byMaterial(),
+        hasUnevaluatedItem,
+        inventory,
+        withRefinery,
+        itemBridges);
+  }
 
-    Map<UUID, MaterialResult> results = new LinkedHashMap<>();
-    int craftable = Integer.MAX_VALUE;
-    int craftableWithRefinery = Integer.MAX_VALUE;
-    double tightest = Double.MAX_VALUE;
-    double tightestWithRefinery = Double.MAX_VALUE;
-    String limiting = null;
-    String limitingWithRefinery = null;
+  /**
+   * The lines one craft counts against a stock map (REQ-P4K-027).
+   *
+   * @param recipe the representative recipe
+   * @param stock stock pooled per material
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the counted lines in recipe order
+   */
+  @NotNull
+  private static List<BlueprintIngredient> countedLines(
+      @NotNull Blueprint recipe,
+      @NotNull Map<UUID, List<CraftabilitySlice>> stock,
+      @NotNull Map<UUID, Material> itemBridges) {
+    return RecipeGroupSelection.countedLines(
+        recipe,
+        line -> {
+          Material material = demandMaterial(line, itemBridges);
+          return material == null ? null : lineDemand(line, material);
+        },
+        (materialId, floor) -> availability(stock.get(materialId), floor, 0.0d).available());
+  }
 
-    for (MaterialRequirement requirement : requirements.values()) {
-      Availability inv =
-          availability(
-              inventory.get(requirement.materialId), requirement.floor, requirement.required);
-      Availability ref =
-          availability(
-              withRefinery.get(requirement.materialId), requirement.floor, requirement.required);
-      results.put(requirement.materialId, new MaterialResult(requirement, inv, ref));
-
-      int countInv = (int) Math.floor(inv.available / requirement.required);
-      int countRef = (int) Math.floor(ref.available / requirement.required);
-      craftable = Math.min(craftable, countInv);
-      craftableWithRefinery = Math.min(craftableWithRefinery, countRef);
-
-      double ratioInv = inv.available / requirement.required;
-      if (ratioInv < tightest) {
-        tightest = ratioInv;
-        limiting = requirement.materialName;
+  /**
+   * Pools the material requirements of a set of lines; an ITEM line without a bridged material is
+   * flagged and left out.
+   *
+   * @param lines the lines
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the requirements per material and whether an item line could not be evaluated
+   */
+  @NotNull
+  private static Requirements requirements(
+      @NotNull List<BlueprintIngredient> lines, @NotNull Map<UUID, Material> itemBridges) {
+    boolean hasUnevaluatedItem = false;
+    Map<UUID, MaterialRequirement> requirements = new LinkedHashMap<>();
+    for (BlueprintIngredient ingredient : lines) {
+      Material material = demandMaterial(ingredient, itemBridges);
+      if (material == null) {
+        hasUnevaluatedItem |= ingredient.getKind() != BlueprintIngredientKind.RESOURCE;
+        continue;
       }
-      double ratioRef = ref.available / requirement.required;
-      if (ratioRef < tightestWithRefinery) {
-        tightestWithRefinery = ratioRef;
-        limitingWithRefinery = requirement.materialName;
+      LineDemand demand = lineDemand(ingredient, material);
+      if (demand == null) {
+        continue;
       }
+      requirements
+          .computeIfAbsent(
+              demand.materialId(),
+              id ->
+                  new MaterialRequirement(
+                      id, material.getName(), material.getNameDe(), material.getQuantityType()))
+          .add(demand.required(), demand.floor());
     }
+    return new Requirements(requirements, hasUnevaluatedItem);
+  }
 
-    List<CraftabilityMaterialDto> materials = new ArrayList<>(results.size());
-    for (MaterialResult result : results.values()) {
-      MaterialRequirement req = result.requirement;
+  /**
+   * Returns the material a line consumes: a RESOURCE line's material, or the material an ITEM line
+   * is bridged to (ADR-0046).
+   *
+   * @param ingredient the line
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the material with an id, or {@code null} when the line names none
+   */
+  @Nullable
+  private static Material demandMaterial(
+      @NotNull BlueprintIngredient ingredient, @NotNull Map<UUID, Material> itemBridges) {
+    Material material =
+        ingredient.getKind() == BlueprintIngredientKind.RESOURCE
+            ? ingredient.getMaterial()
+            : bridgedItemMaterial(ingredient, itemBridges);
+    return material == null || material.getId() == null ? null : material;
+  }
+
+  /**
+   * Returns what one craft needs of a line's material, rounded to the material's unit.
+   *
+   * @param ingredient the line
+   * @param material the material it consumes, with an id
+   * @return the demand, or {@code null} when one craft needs none of it
+   */
+  @Nullable
+  private static LineDemand lineDemand(
+      @NotNull BlueprintIngredient ingredient, @NotNull Material material) {
+    double rawRequired;
+    if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
+      rawRequired = ingredient.getQuantityScu() == null ? 0.0d : ingredient.getQuantityScu();
+    } else {
+      rawRequired = ingredient.getQuantityUnits() == null ? 0.0d : ingredient.getQuantityUnits();
+    }
+    if (rawRequired <= 0.0d) {
+      return null;
+    }
+    double required =
+        QuantityTypeRounding.roundForQuantityType(rawRequired, material.getQuantityType());
+    if (required <= 0.0d) {
+      return null;
+    }
+    return new LineDemand(material.getId(), required, slotFloor(ingredient));
+  }
+
+  /**
+   * Evaluates the pooled requirements of each side against its stock map; the breakdown lists the
+   * materials either side counts, and each side's columns use that side's own requirement.
+   *
+   * @param blueprintId the owned blueprint id
+   * @param recipe the representative recipe
+   * @param counted the requirements the inventory-only craft counts
+   * @param countedWithRefinery the requirements the refinery-inclusive craft counts
+   * @param hasUnevaluatedItem whether an item line could not be evaluated
+   * @param inventory stock pooled per material, inventory only
+   * @param withRefinery stock pooled per material, inventory plus open refinery yield
+   * @param itemBridges resolved ITEM-ingredient bridges
+   * @return the craftability entry
+   */
+  @NotNull
+  private BlueprintCraftabilityDto evaluate(
+      @NotNull UUID blueprintId,
+      @NotNull Blueprint recipe,
+      @NotNull Map<UUID, MaterialRequirement> counted,
+      @NotNull Map<UUID, MaterialRequirement> countedWithRefinery,
+      boolean hasUnevaluatedItem,
+      @NotNull Map<UUID, List<CraftabilitySlice>> inventory,
+      @NotNull Map<UUID, List<CraftabilitySlice>> withRefinery,
+      @NotNull Map<UUID, Material> itemBridges) {
+    Limit inventoryLimit = limit(counted, inventory);
+    Limit refineryLimit = limit(countedWithRefinery, withRefinery);
+
+    Map<UUID, MaterialRequirement> shown = new LinkedHashMap<>(counted);
+    countedWithRefinery.forEach(shown::putIfAbsent);
+    Map<UUID, MaterialResult> results = new LinkedHashMap<>();
+    List<CraftabilityMaterialDto> materials = new ArrayList<>(shown.size());
+    for (MaterialRequirement req : shown.values()) {
+      boolean inInventoryCraft = counted.containsKey(req.materialId);
+      boolean inRefineryCraft = countedWithRefinery.containsKey(req.materialId);
+      MaterialRequirement refReq = countedWithRefinery.getOrDefault(req.materialId, req);
+      Availability inv = availability(inventory.get(req.materialId), req.floor, req.required);
+      Availability ref =
+          availability(withRefinery.get(req.materialId), refReq.floor, refReq.required);
+      results.put(req.materialId, new MaterialResult(req, inv, ref));
       materials.add(
           new CraftabilityMaterialDto(
               req.materialId,
               req.materialName,
               round(req.required),
               req.floor,
-              round(result.inventory.available),
-              round(result.withRefinery.available),
-              roundNullable(result.inventory.effectiveQuality),
-              roundNullable(result.withRefinery.effectiveQuality),
-              round(result.inventory.missing),
-              round(result.withRefinery.missing),
-              (int) Math.floor(result.inventory.available / req.required),
-              (int) Math.floor(result.withRefinery.available / req.required),
-              req.quantityType));
+              round(inv.available),
+              round(ref.available),
+              roundNullable(inv.effectiveQuality),
+              roundNullable(ref.effectiveQuality),
+              inInventoryCraft ? round(inv.missing) : 0.0d,
+              inRefineryCraft ? round(ref.missing) : 0.0d,
+              (int) Math.floor(inv.available / req.required),
+              (int) Math.floor(ref.available / refReq.required),
+              req.quantityType,
+              req.materialNameDe,
+              inInventoryCraft,
+              inRefineryCraft));
     }
 
-    List<CraftabilityGroupDto> groups = buildGroups(recipe, flat, results, itemBridges);
+    List<CraftabilityGroupDto> groups = buildGroups(recipe, results, itemBridges);
 
     return new BlueprintCraftabilityDto(
         blueprintId,
         true,
         hasUnevaluatedItem,
         true,
-        craftable == Integer.MAX_VALUE ? 0 : craftable,
-        craftableWithRefinery == Integer.MAX_VALUE ? 0 : craftableWithRefinery,
-        limiting,
-        limitingWithRefinery,
+        inventoryLimit.crafts(),
+        refineryLimit.crafts(),
+        inventoryLimit.materialName(),
+        refineryLimit.materialName(),
         groups,
         materials);
+  }
+
+  /**
+   * Returns the crafts one side's requirements allow from its stock and the material that caps
+   * them.
+   *
+   * @param requirements the side's counted requirements
+   * @param stock the side's stock pooled per material
+   * @return the crafts, {@code 0} without requirements, and the tightest material's name
+   */
+  @NotNull
+  private static Limit limit(
+      @NotNull Map<UUID, MaterialRequirement> requirements,
+      @NotNull Map<UUID, List<CraftabilitySlice>> stock) {
+    int crafts = Integer.MAX_VALUE;
+    double tightest = Double.MAX_VALUE;
+    String limiting = null;
+    for (MaterialRequirement requirement : requirements.values()) {
+      Availability available =
+          availability(stock.get(requirement.materialId), requirement.floor, requirement.required);
+      double ratio = available.available / requirement.required;
+      crafts = Math.min(crafts, (int) Math.floor(ratio));
+      if (ratio < tightest) {
+        tightest = ratio;
+        limiting = requirement.materialName;
+      }
+    }
+    return new Limit(crafts == Integer.MAX_VALUE ? 0 : crafts, limiting);
   }
 
   /**
    * Builds the per-requirement-group overlay in recipe order, each with the effective quality of
    * its driving material.
    *
-   * @param recipe the representative recipe
-   * @param flat the recipe's flat ingredient list (group back-references set)
+   * @param recipe the representative recipe; its flat ingredient list carries the group
+   *     back-references
    * @param results the per-material results for this recipe
    * @param itemBridges resolved ITEM-ingredient bridges ({@code game_item} id to {@link Material})
    * @return the group overlays, in {@code requirementGroups} order
@@ -333,13 +449,13 @@ public class BlueprintCraftabilityService {
   @NotNull
   private List<CraftabilityGroupDto> buildGroups(
       @NotNull Blueprint recipe,
-      @NotNull List<BlueprintIngredient> flat,
       @NotNull Map<UUID, MaterialResult> results,
       @NotNull Map<UUID, Material> itemBridges) {
     List<BlueprintRequirementGroup> recipeGroups = recipe.getRequirementGroups();
     List<CraftabilityGroupDto> groups = new ArrayList<>(recipeGroups.size());
     for (BlueprintRequirementGroup group : recipeGroups) {
-      UUID drivingMaterialId = firstRequirementMaterialId(flat, group, itemBridges);
+      UUID drivingMaterialId =
+          firstRequirementMaterialId(recipe.getIngredients(), group, itemBridges);
       MaterialResult result = drivingMaterialId == null ? null : results.get(drivingMaterialId);
       groups.add(
           new CraftabilityGroupDto(
@@ -368,16 +484,9 @@ public class BlueprintCraftabilityService {
       if (!Objects.equals(ingredient.getRequirementGroup(), group)) {
         continue;
       }
-      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
-        Material material = ingredient.getMaterial();
-        if (material != null && material.getId() != null) {
-          return material.getId();
-        }
-      } else {
-        Material bridged = bridgedItemMaterial(ingredient, itemBridges);
-        if (bridged != null && bridged.getId() != null) {
-          return bridged.getId();
-        }
+      Material material = demandMaterial(ingredient, itemBridges);
+      if (material != null) {
+        return material.getId();
       }
     }
     return null;
@@ -402,7 +511,8 @@ public class BlueprintCraftabilityService {
 
   /**
    * Computes the quality floor for one ingredient line: the stricter of its {@code min_quality} and
-   * its slot's no-degradation floor.
+   * its slot's no-degradation floor. The blueprint's recipe-wide modifiers belong to no slot and
+   * set no floor (REQ-P4K-027).
    *
    * @param ingredient the RESOURCE ingredient line
    * @return the quality floor (0..1000)
@@ -500,14 +610,19 @@ public class BlueprintCraftabilityService {
   private static final class MaterialRequirement {
     private final UUID materialId;
     private final String materialName;
+    @Nullable private final String materialNameDe;
     private final QuantityType quantityType;
     private double required;
     private int floor;
 
     private MaterialRequirement(
-        UUID materialId, String materialName, @Nullable QuantityType quantityType) {
+        UUID materialId,
+        String materialName,
+        @Nullable String materialNameDe,
+        @Nullable QuantityType quantityType) {
       this.materialId = materialId;
       this.materialName = materialName;
+      this.materialNameDe = materialNameDe;
       this.quantityType = quantityType == null ? QuantityType.SCU : quantityType;
     }
 
@@ -538,4 +653,21 @@ public class BlueprintCraftabilityService {
    */
   private record MaterialResult(
       MaterialRequirement requirement, Availability inventory, Availability withRefinery) {}
+
+  /**
+   * The pooled requirements of a set of lines.
+   *
+   * @param byMaterial the requirement per material id, in line order
+   * @param unevaluatedItem whether an item line had no bridged material
+   */
+  private record Requirements(
+      @NotNull Map<UUID, MaterialRequirement> byMaterial, boolean unevaluatedItem) {}
+
+  /**
+   * The crafts one side's stock allows and the material that caps them.
+   *
+   * @param crafts the crafts
+   * @param materialName the tightest material's name, or {@code null} without requirements
+   */
+  private record Limit(int crafts, @Nullable String materialName) {}
 }

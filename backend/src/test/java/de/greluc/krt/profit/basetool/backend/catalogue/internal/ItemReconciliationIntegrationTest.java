@@ -21,11 +21,14 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,6 +59,25 @@ class ItemReconciliationIntegrationTest {
   @Autowired private ItemReconciliationService reconciliation;
   @Autowired private ObjectMapper mapper;
   @Autowired private JobOrderItemService orderItems;
+  @Autowired private BlueprintProducts blueprintProducts;
+
+  @Test
+  void aDuplicateStatProperty_keepsTheRetiredRowsP4kValueOverTheSurvivorsWikiValue() {
+    Pair pair = pair();
+    stat(pair.retired(), 11, "P4K");
+    stat(pair.canonical(), 99, "SCWIKI");
+
+    GameItem canonical = items.findById(pair.canonical()).orElseThrow();
+    reconciliation.mergeExisting(canonical, pair.retired(), UUID.randomUUID(), evidence());
+    entityManager.clear();
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT base_value, source FROM game_item_stat WHERE game_item_id = ?",
+                pair.canonical()))
+        .containsEntry("base_value", 11d)
+        .containsEntry("source", "P4K");
+  }
 
   @Test
   void everyReferenceSurvivesAndBothSourceStatesRemainArchived() {
@@ -198,8 +220,8 @@ class ItemReconciliationIntegrationTest {
     UUID terminal = insert("INSERT INTO terminal (id, name) VALUES (?, 'Catalogue Test Terminal')");
     price(pair.retired(), terminal, 11, 20);
     price(pair.canonical(), terminal, 22, 10);
-    stat(pair.retired(), 11);
-    stat(pair.canonical(), 99);
+    stat(pair.retired(), 11, "SCWIKI");
+    stat(pair.canonical(), 99, "SCWIKI");
     UUID oldest = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO game_item_redirect (id, canonical_id, retired_snapshot)"
@@ -512,8 +534,8 @@ class ItemReconciliationIntegrationTest {
   void aP4kLedCanonicalIdentityKeepsItsNameAndAttributes() {
     Pair pair = pair();
     jdbc.update(
-        "UPDATE game_item SET name = 'P4K Name', source_systems = 'P4K', p4k_synced_at = now(),"
-            + " mass = 100 WHERE id = ?",
+        "UPDATE game_item SET name = 'P4K Name', p4k_name = 'P4K Name', source_systems = 'P4K',"
+            + " p4k_synced_at = now(), mass = 100 WHERE id = ?",
         pair.canonical());
     GameItem canonical = items.findById(pair.canonical()).orElseThrow();
 
@@ -524,6 +546,45 @@ class ItemReconciliationIntegrationTest {
     assertThat(result.getName()).isEqualTo("P4K Name");
     assertThat(result.getMass()).isEqualTo(100d);
     assertThat(result.getUexItemId()).isEqualTo(pair.uexId());
+  }
+
+  @Test
+  void aGuidKeyedPersonalBlueprintStillResolvesToTheSurvivingItem() {
+    Pair pair = pair();
+    UUID guid = UUID.randomUUID();
+    jdbc.update("UPDATE game_item SET p4k_uuid = ? WHERE id = ?", guid, pair.retired());
+    jdbc.update(
+        "INSERT INTO blueprint (id, scwiki_uuid, output_item_id, output_name, produced_item_guid)"
+            + " VALUES (?, ?, ?, 'Survivor Arms', ?)",
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        pair.retired(),
+        guid);
+    UUID owner = member();
+    jdbc.update(
+        "INSERT INTO personal_blueprint (id, owner_user_id, product_key, product_name,"
+            + " output_item_id) VALUES (?, ?, ?, 'Survivor Arms', ?)",
+        UUID.randomUUID(),
+        owner,
+        guid.toString(),
+        pair.retired());
+    GameItem canonical = items.findById(pair.canonical()).orElseThrow();
+
+    reconciliation.mergeExisting(canonical, pair.retired(), UUID.randomUUID(), evidence());
+    entityManager.clear();
+
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT product_key, output_item_id FROM personal_blueprint"
+                    + " WHERE owner_user_id = ?",
+                owner))
+        .containsEntry("product_key", guid.toString())
+        .containsEntry("output_item_id", pair.canonical());
+    assertThat(items.findById(pair.canonical()).orElseThrow().getP4kUuid()).isEqualTo(guid);
+    assertThat(blueprintProducts.resolveByProductKey(guid.toString()))
+        .get()
+        .extracting(ResolvedProduct::outputItemId)
+        .isEqualTo(pair.canonical());
   }
 
   @Test
@@ -599,13 +660,23 @@ class ItemReconciliationIntegrationTest {
 
     assertThat(actual)
         .containsExactlyInAnyOrder(
-            "blueprint.output_item_id", "blueprint_ingredient.game_item_id",
-            "game_item_price.game_item_id", "game_item_stat.game_item_id",
-            "personal_blueprint.output_item_id", "default_blueprint.output_item_id",
-            "blueprint_external_alias.output_item_id", "inventory_item.game_item_id",
-            "inventory_stock_level.game_item_id", "job_order_item.game_item_id",
-            "supply_need.game_item_id", "supply_donation.game_item_id",
-            "purchasing_deal.game_item_id", "game_item_redirect.canonical_id");
+            "blueprint.output_item_id",
+            "blueprint_ingredient.game_item_id",
+            "game_item_price.game_item_id",
+            "game_item_stat.game_item_id",
+            "personal_blueprint.output_item_id",
+            "default_blueprint.output_item_id",
+            "blueprint_external_alias.output_item_id",
+            "inventory_item.game_item_id",
+            "inventory_stock_level.game_item_id",
+            "job_order_item.game_item_id",
+            "supply_need.game_item_id",
+            "supply_donation.game_item_id",
+            "purchasing_deal.game_item_id",
+            "game_item_redirect.canonical_id",
+            "ship_type_loadout_port.game_item_id",
+            "ship_type_paint.game_item_id",
+            "shop_item.game_item_id");
   }
 
   @Test
@@ -679,9 +750,9 @@ class ItemReconciliationIntegrationTest {
   }
 
   private UUID location() {
-    return insert(
-        "INSERT INTO location (id, name, hidden) VALUES (?, ?, false)",
-        "Catalogue " + UUID.randomUUID());
+    UUID id = UUID.randomUUID();
+    TestPlaces.insertLocation(jdbc, id, "Catalogue " + id);
+    return id;
   }
 
   private UUID floor(UUID unit, UUID item, double minimum, double target) {
@@ -704,12 +775,13 @@ class ItemReconciliationIntegrationTest {
         modified);
   }
 
-  private void stat(UUID item, double value) {
+  private void stat(UUID item, double value, String source) {
     insert(
-        "INSERT INTO game_item_stat (id, game_item_id, property, base_value)"
-            + " VALUES (?, ?, 'HEALTH_MAX_HEALTH', ?)",
+        "INSERT INTO game_item_stat (id, game_item_id, property, base_value, source)"
+            + " VALUES (?, ?, 'HEALTH_MAX_HEALTH', ?, ?)",
         item,
-        value);
+        value,
+        source);
   }
 
   private UUID insert(String sql, Object... values) {

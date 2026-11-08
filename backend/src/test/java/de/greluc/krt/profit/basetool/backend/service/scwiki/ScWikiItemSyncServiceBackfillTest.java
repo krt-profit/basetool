@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWriter;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemClassResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
@@ -61,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.scwiki.ScWikiIte
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +121,7 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(gameItemRepository.findBySourceUuid(any())).thenCallRealMethod();
     config.putAll(Map.of("item-sync-enabled", true, "sync-all-items", true));
     rebuild();
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
@@ -143,12 +144,11 @@ class ScWikiItemSyncServiceBackfillTest {
             blueprintRepository,
             manufacturerRepository,
             syncReportService,
-            gameItemStatRepository,
-            new GameItemStatWriter(gameItemStatRepository),
+            new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
                 scWikiClient, properties, gameItemStatRepository, syncReportService),
             itemReconciliationService,
-            new ScWikiItemFieldWriter(meterRegistry),
+            new ScWikiItemFieldWriter(new ItemClassResolver(meterRegistry), syncReportService),
             meterRegistry,
             self);
     lenient().when(self.getObject()).thenReturn(service);
@@ -165,19 +165,16 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
-  void syncItems_backfill_fetchesBlueprintOutputsWithoutStatsInFullAndSetsTheGauge() {
+  void syncItems_backfill_fetchesBlueprintOutputsWithoutStatsInFull() {
     stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Behring P4-AR"));
     UUID output = UUID.randomUUID();
     when(gameItemStatRepository.findBlueprintOutputUuidsWithoutStats()).thenReturn(List.of(output));
-    when(gameItemStatRepository.countItemsWithStats()).thenReturn(42L);
     when(scWikiClient.fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any()))
         .thenReturn(null);
 
     service.syncItems();
 
     verify(scWikiClient).fetchOne(eq(ITEMS), eq(output), eq(ScWikiItemDto.class), any());
-    assertEquals(
-        42.0, meterRegistry.get(CatalogueMetricNames.CATALOGUE_ITEMS_WITH_STATS).gauge().value());
   }
 
   @Test
@@ -256,6 +253,30 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   @Test
+  void backfill_adoptsTheRowTheP4kSeededUnderTheSameGuid_insteadOfCreatingASecondRow() {
+    UUID guid = UUID.randomUUID();
+    GameItem seeded = new GameItem();
+    seeded.setId(UUID.randomUUID());
+    seeded.setP4kUuid(guid);
+    seeded.setName("P4K Seeded Item");
+    seeded.setKind(GameItemKind.GENERIC);
+    seeded.setSourceSystems(GameItemSourceSystem.P4K);
+    stubPass(ITEMS, itemDto(guid, "P4K Seeded Item"));
+    when(gameItemRepository.findByP4kUuidAndExternalUuidIsNull(guid))
+        .thenReturn(Optional.of(seeded));
+
+    service.syncItems();
+
+    ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
+    verify(gameItemRepository).save(saved.capture());
+    assertSame(seeded, saved.getValue());
+    assertEquals(guid, seeded.getExternalUuid());
+    assertEquals(GameItemSourceSystem.P4K, seeded.getSourceSystems());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.CREATED_WIKI_ONLY), any(), any(), any(), any());
+  }
+
+  @Test
   void backfill_derivesKindFromSourceEndpoint_andCreatesWikiOnlyRows() {
     UUID armorUuid = UUID.randomUUID();
     UUID weaponUuid = UUID.randomUUID();
@@ -323,7 +344,7 @@ class ScWikiItemSyncServiceBackfillTest {
     existing.setName("P4K Archive Name");
     existing.setKind(GameItemKind.GENERIC);
     existing.setSourceSystems(GameItemSourceSystem.BOTH);
-    existing.setP4kSyncedAt(Instant.now());
+    existing.setP4kName("P4K Archive Name");
 
     stubPass(VEHICLE_ITEMS, itemDto(uuid, "Wiki Display Name"));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));

@@ -16,7 +16,7 @@ shows. It has no row id. Stock another member holds is never in a lot.
 | `material` | `{bt, name}`: a material, or a game item. `bt` is its Basetool id. |
 | `materialKind` | Materials only, see [below](#material-kind). |
 | `component` | Ship components only, see [below](#component). |
-| `location` | `{name, uex?}` of the warehouse location. |
+| `location` | `{name, uex?, guid?}` of the warehouse location. |
 | `quality` | 0 to 1000. Every material lot has the quality it is booked at; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}` in the material's own unit; SCU to three decimals, items in whole `PIECE`s. |
@@ -111,6 +111,8 @@ stock is all booked out, or moved to another member, arrives as a tombstone. Reb
 personal and shared, in the web or anywhere else, or moving shared stock to another pool, keeps the
 lot's `key` and `quantity` and brings the lot into the feed with its new `split`. A lot whose stock
 changes while a snapshot is read may move to a later page; its change follows in the feed either way.
+A lot is in the feed again when the `name`, `uex` or `guid` of its `location` changes, under the
+same `key`, so the `location` you hold is never stale.
 
 ## Changing the stock — `POST /exchange/v1/me/stock/changes`
 
@@ -152,6 +154,7 @@ steps; the first that fails ends it:
 | `stolen: true` needs the Basetool's stolen marking, which may be switched off | `rejected` `STOLEN_MARKING_DISABLED` |
 | The lot's stock is locked; its quantity must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
 | A lot already at `quantity` | `unchanged` |
+| A rise of an item no longer in the game, beyond what the batch's falls of that item still cover | `rejected` `ITEM_RETIRED` |
 | An empty lot whose last change came from the web, the app, the system, another client or another installation | `rejected` `REMOVED_ELSEWHERE` |
 | A fall larger than the lot's stock not reserved for a job order or mission | `rejected` `STOCK_EARMARKED` |
 
@@ -284,6 +287,12 @@ out and in.
 fall counts as a move, not as a removal for the mass-change guard, when the batch's rises of the same
 material or item cover all of it, falls taken in the batch's order. Sent in two batches, the fall
 counts as a removal.
+
+**Items no longer in the game.** An item the game no longer has, or one the Basetool hid, cannot be
+booked in: a rise of its lot is refused `ITEM_RETIRED`. A fall still applies, and so does a rise
+the same batch's falls of that item cover, so the member can still move or mark stock they hold:
+every fall of the batch counts, whether it comes before or after the rise, and a fall the server
+refuses covers no rise after it. Shares and unshares are not affected.
 
 ## The stock result
 

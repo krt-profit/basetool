@@ -109,8 +109,8 @@ its back/forward cache.
   re-read fresh (the optimistic-lock version) belong inside it.
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
-`MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) +
 `MaterialCollectionTransferInPlaceE2eTest` (row re-keyed after a transfer) +
+`MaterialAliasEmptyStateInPlaceE2eTest` (the empty state restored after the last row's delete) +
 `JobOrderReactivatePriorityInPlaceE2eTest` (header refreshed on reactivate) · **Code:**
 `krt-fetch.js`, the converted page handlers · **Issues:** #571, #572
 
@@ -808,7 +808,7 @@ controller-local `@ExceptionHandler` is bypassed.
   localized 413 (JSON `UPLOAD_TOO_LARGE` for XHR, the error page otherwise), not a 500.
 
 **The file relays cap below the multipart limit (APPSEC-03, 2026-09-22).** The multipart limit is
-64 MB because the admin P4K import needs it, and the edge proxy admits 2000 MB — so a relay that reads
+64,000,000 bytes, the P4K import's `UPLOAD_LIMIT` (REQ-P4K-002), and the edge proxy admits 2000 MB — so a relay that reads
 `file.getBytes()` before checking anything lets any member park 64 MB in the frontend heap per request,
 before the backend parser ever sees the upload and refuses it at its own cap. Every file relay
 therefore compares `MultipartFile#getSize()` against the backend parser's cap **before reading a
@@ -1285,6 +1285,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
 | `blueprints:{userId}`    | list                                                                                                                          | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
 | `catalogue` (global) | catalogue | no | `ROLE_ADMIN`, `ROLE_LOGISTICIAN` or `ROLE_KRT_MEMBER` (local check, matching the member catalogue reads) |
+| `catalogue-admin` (global) | starmap, shops (the admin starmap and shops pages, REQ-P4K-035, REQ-P4K-038, REQ-P4K-043), runs, review (the P4K import page's run history with its import-due banner and its review cases, REQ-P4K-014, REQ-P4K-016) | no | `ROLE_ADMIN` (local check; the backend publishes it after an admin's link, visibility or storage-place change, after a review resolution and after an APPLY) |
 
 Catalogue reconciliation is a backend writer into the existing `order:{id}` room. After committed
 item-reference replacements, `JobOrderItemReassignment` publishes `items`, `item-stock`,
@@ -1721,10 +1722,12 @@ cloning a **live** row must switch to an inert `<template>`/options-template sou
 ARIA ids, no native select left to re-enhance).
 
 **Bespoke pickers with a browse-everything mode.** One picker predates the `krt-searchable-select`
-standard and stays bespoke: the personal-inventory (Mein Inventar) **UEX location typeahead**
-(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/uex-search` →
-`GET /api/v1/uex/locations/search`). It searches server-side like the converted pickers — typing
-narrows the query and every UEX city / space station stays reachable — **but** it also renders on
+standard and stays bespoke: the personal-inventory (Mein Inventar) **location typeahead**
+(`static/js/personalinventory/personal-inventory.js` → `/personal-inventory/location-search` →
+`GET /api/v1/personal-inventory/locations`, the admin page through
+`/admin/personal-inventory/{userSub}/location-search`). It searches server-side like the converted
+pickers — typing narrows the query and every location the owner may pick stays reachable
+(REQ-P4K-039) — **but** it also renders on
 empty-query focus, a "browse everything" mode that returns up to the backend clamp (2000 rows). In
 that one mode "type a narrower term" cannot recover a hidden tail because the user has typed
 nothing, so the no-silent-truncation rule is honoured differently: when a response **fills** the

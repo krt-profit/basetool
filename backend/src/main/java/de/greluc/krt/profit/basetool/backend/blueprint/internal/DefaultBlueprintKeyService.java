@@ -28,9 +28,11 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * In-memory cache of the normalized product keys in the default-blueprint set (REQ-INV-016/017).
+ * In-memory cache of the product keys in the default-blueprint set (REQ-INV-016/017).
  *
  * <p>Answers whether an owned blueprint is a default, which marks a {@link
  * de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintResponse} non-removable and
@@ -45,10 +47,9 @@ public class DefaultBlueprintKeyService implements DefaultBlueprintKeys {
   private final AtomicReference<Set<String>> cache = new AtomicReference<>();
 
   /**
-   * Whether the given normalized product key belongs to the default set (and is therefore
-   * non-removable).
+   * Whether the given product key belongs to the default set (and is therefore non-removable).
    *
-   * @param productKey normalized product key, may be {@code null}
+   * @param productKey product key, may be {@code null}
    * @return {@code true} if the key is a default product key
    */
   @Override
@@ -59,6 +60,24 @@ public class DefaultBlueprintKeyService implements DefaultBlueprintKeys {
   /** Reloads the cached default product-key set from the database. */
   public void refresh() {
     cache.set(load());
+  }
+
+  /**
+   * Reloads the cached set once the current transaction commits, so a rolled-back change never
+   * reaches the cache; outside a transaction it reloads at once.
+   */
+  public void refreshAfterCommit() {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      refresh();
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            refresh();
+          }
+        });
   }
 
   /** Warms the cache once the application context is fully started. */

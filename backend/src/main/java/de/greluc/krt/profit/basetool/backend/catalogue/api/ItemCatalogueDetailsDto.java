@@ -19,13 +19,43 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
-/** Member-facing catalogue identity and its typed, attributed Wiki enrichment. */
+/**
+ * Member-facing catalogue identity, its typed, attributed Wiki enrichment and the shops whose known
+ * item lists name it.
+ *
+ * @param id the item
+ * @param name the item's name
+ * @param gameUuid the item's game asset identity, or {@code null}
+ * @param className the item's engine class, or {@code null}
+ * @param wikiMetadata the Wiki snapshot, or {@code null}
+ * @param availableAt the shops whose known item list names the item (REQ-P4K-044); empty means
+ *     unknown, never "sold nowhere"
+ */
 public record ItemCatalogueDetailsDto(
     UUID id,
     String name,
     @Nullable UUID gameUuid,
     @Nullable String className,
-    @Nullable ItemCatalogueMetadata wikiMetadata) {}
+    @Nullable ItemCatalogueMetadata wikiMetadata,
+    @NotNull @Unmodifiable List<ItemShopAvailabilityDto> availableAt) {
+
+  /**
+   * Copies the shop list.
+   *
+   * @param id the item
+   * @param name the item's name
+   * @param gameUuid the item's game asset identity
+   * @param className the item's engine class
+   * @param wikiMetadata the Wiki snapshot
+   * @param availableAt the shops whose known item list names the item
+   */
+  public ItemCatalogueDetailsDto {
+    availableAt = List.copyOf(availableAt);
+  }
+}

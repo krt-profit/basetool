@@ -42,6 +42,8 @@ import org.jetbrains.annotations.Nullable;
  * @param dismantleEfficiency fraction of inputs recovered on dismantle, or {@code null}
  * @param scwikiSyncedAt timestamp of the last successful SC Wiki sync touch
  * @param requirementGroups build slots with their ingredients and stat modifiers
+ * @param recipeModifiers stat modifiers that apply to the whole recipe rather than one slot; they
+ *     set no slot's quality floor (REQ-P4K-027)
  * @param ingredients the flat ingredient list (fallback when no groups are present)
  * @param summaryProperties roll-up of the stats this blueprint affects
  * @param dismantleReturns commodities recovered on dismantle
@@ -62,6 +64,7 @@ public record BlueprintDto(
     Double dismantleEfficiency,
     Instant scwikiSyncedAt,
     List<BlueprintRequirementGroupDto> requirementGroups,
+    List<BlueprintRequirementModifierDto> recipeModifiers,
     List<BlueprintRequirementIngredientDto> ingredients,
     List<BlueprintSummaryPropertyDto> summaryProperties,
     List<BlueprintDismantleReturnDto> dismantleReturns,

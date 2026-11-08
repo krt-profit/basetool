@@ -34,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequ
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
@@ -178,9 +177,6 @@ class MassAssignmentGuardTest {
               LocationDto.class,
               new DualUse(
                   FROZEN + "; create strips server-managed fields", Set.of("id"), Map.of())),
-          Map.entry(
-              MaterialCategoryDto.class,
-              new DualUse(FROZEN + "; create resets id and version", Set.of("id"), Map.of())),
           Map.entry(
               MaterialDto.class,
               new DualUse(

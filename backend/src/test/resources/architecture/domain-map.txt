@@ -144,6 +144,7 @@ class BlueprintIdNameRow catalogue recipe repository projection
 class BlueprintProductRow catalogue recipe repository projection
 class BlueprintReferenceDto catalogue recipe reference DTO
 class BlueprintIngredientKind catalogue recipe graph enum
+class RecipeGroupSelection catalogue recipe cost-line selection shared by craftability and item orders
 class UexCategory catalogue UEX category reference row
 class CraftabilityYieldSource blueprint pending-yield SPI of the craftability, implemented by the refinery (plan 5.3)
 class BlueprintEnvelopeReader blueprint upload-preview envelope SPI, implemented by the exchange (plan 5.3)

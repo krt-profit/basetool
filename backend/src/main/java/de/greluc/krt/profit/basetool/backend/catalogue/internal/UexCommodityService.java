@@ -53,7 +53,9 @@ import org.springframework.transaction.annotation.Transactional;
  * SyncChunkWriter} with no transaction held across HTTP calls. Price rows UEX no longer lists are
  * cleared via {@link MaterialPriceRepository#clearPricesByIds} unless nothing was written; an empty
  * or unchanged feed leaves local data untouched. A non-empty catalogue also replaces each listed
- * material's locations through {@link UexCommodityOccurrenceSync} (REQ-DATA-031).
+ * material's locations through {@link UexCommodityOccurrenceSync} (REQ-DATA-031). UEX never renames
+ * a material: a UEX name that differs from the name of a row the P4K matched is reported to {@code
+ * external_sync_report} (REQ-P4K-024).
  */
 @Slf4j
 @Service
@@ -75,6 +77,9 @@ public class UexCommodityService {
   /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
+  /** Records the name disagreements with the P4K. */
+  private final SyncReportService syncReportService;
+
   /**
    * Runs the full commodity + price sync (see class Javadoc). Deliberately holds no transaction:
    * each fetch runs with none open, and each chunk of rows commits on its own.
@@ -86,11 +91,16 @@ public class UexCommodityService {
     List<UexCommodityDto> commodities = commodityFetch.data();
 
     if (!commodities.isEmpty()) {
+      UUID runId = syncReportService.beginRun();
       SyncChunkWriter.Outcome<Integer> outcome =
           chunkWriter.write(
               commodities,
               SyncChunkWriter.DEFAULT_CHUNK_SIZE,
-              chunk -> chunk.stream().map(this::upsertCommodity).filter(id -> id != null).toList(),
+              chunk ->
+                  chunk.stream()
+                      .map(dto -> upsertCommodity(dto, runId))
+                      .filter(id -> id != null)
+                      .toList(),
               "commodity",
               dto ->
                   "(id="
@@ -205,11 +215,12 @@ public class UexCommodityService {
    * created.
    *
    * @param dto the inbound UEX commodity row
+   * @param runId the sync run, for the report of a name the P4K leads
    * @return the row's UEX commodity id once saved, or {@code null} when the row lacks an id or a
    *     name
    */
   @Nullable
-  private Integer upsertCommodity(@NotNull UexCommodityDto dto) {
+  private Integer upsertCommodity(@NotNull UexCommodityDto dto, @NotNull UUID runId) {
     if (dto.id() == null || dto.name() == null) {
       return null;
     }
@@ -238,6 +249,7 @@ public class UexCommodityService {
                       return newMaterial;
                     }));
 
+    reportNameDisagreement(material, dto, runId);
     material.setType(determineMaterialType(dto));
     material.setCode(dto.code());
     material.setKind(dto.kind());
@@ -418,6 +430,28 @@ public class UexCommodityService {
                   return materialRepository.save(newMaterial);
                 }))
         .getId();
+  }
+
+  /**
+   * Reports a UEX name that differs from the name of a row the P4K matched; the P4K name stays.
+   *
+   * @param material the resolved material
+   * @param dto the inbound UEX commodity row
+   * @param runId the sync run
+   */
+  private void reportNameDisagreement(
+      @NotNull Material material, @NotNull UexCommodityDto dto, @NotNull UUID runId) {
+    UUID p4kUuid = material.getP4kUuid();
+    if (p4kUuid != null) {
+      syncReportService.logP4kDisagreement(
+          SyncSourceSystem.UEX,
+          runId,
+          "commodity",
+          p4kUuid,
+          "name",
+          material.getName(),
+          dto.name());
+    }
   }
 
   @NotNull

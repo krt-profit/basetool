@@ -23,7 +23,8 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: 64MB
+      # the P4K catalogue contract's UPLOAD_LIMIT (P4kUploadGate)
+      max-file-size: 64000000B
       max-request-size: 72MB
   threads:
     virtual:

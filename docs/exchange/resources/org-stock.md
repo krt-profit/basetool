@@ -27,7 +27,7 @@ single entries are an extra, see [Entries](#entries).
 | `material` | `{bt, name}`: a material, or a game item, as in a [stock lot](stock.md#a-lot). |
 | `materialKind` | Materials only, as in a [stock lot](stock.md#material-kind). |
 | `component` | Ship components only, as in a [stock lot](stock.md#component). |
-| `location` | `{name, uex?}` of the warehouse location. |
+| `location` | `{name, uex?, guid?}` of the warehouse location. |
 | `quality` | 0 to 1000; an item lot has 0. |
 | `stolen` | Whether the stock is marked stolen. |
 | `quantity` | `{amount, unit}`, the summed amount in the material's own unit. |
@@ -133,7 +133,8 @@ lot when the pool no longer holds any of it. Store the new `nextCursor` after ev
 
 A lot changes when someone books stock into or out of the pool, moves it to another place, holder or
 unit, changes its quality, its stolen marker or its note, rebooks it between personal and shared,
-or earmarks it for a job order or a mission. For the entries it also changes when a holder's name
+or earmarks it for a job order or a mission, and when the `name`, `uex` or `guid` of its
+`location` changes. For the entries it also changes when a holder's name
 changes or they start or stop withholding it, and when an earmarked mission is renamed. A
 tombstone names the channel that removed the lot and, for a client, its `clientId`;
 `installationId` is set only when one of the member's own installations removed it.
@@ -357,6 +358,7 @@ listed with its reason. The entries an op created or changed reach you through t
 | `STOCK_OFFERED` | `stolen`, `move-pool` | The rest of the entry after a partial `stolen` or `move-pool` would hold less than it offers on the Basetool's material exchange. |
 | `OVER_ALLOCATION` | `book-in`, `allocation-add`, `allocation-change` | The earmarks of one kind add up to more than `quantity`, or, for an earmark op, to more than the entry holds. |
 | `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
+| `ITEM_RETIRED` | `book-in` | `material` resolves to an item the game no longer has, or one the Basetool hid; it cannot be booked in. The entries that hold it can still be taken from, moved and marked. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 
 ### The mass-change guard

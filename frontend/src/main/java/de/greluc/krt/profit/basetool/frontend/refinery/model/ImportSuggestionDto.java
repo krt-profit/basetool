@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.refinery.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code ImportSuggestionDto}: one ranked candidate material for an
@@ -29,6 +32,29 @@ import java.util.UUID;
  * @param id id of the candidate material (applied to the row's material select on pick)
  * @param name display name of the candidate, e.g. {@code "Stileron (Raw)"}
  * @param score similarity to the raw screen name in {@code [0.0, 1.0]}
+ * @param nameDe the candidate's German name, or {@code null} (REQ-P4K-023)
  */
 @DtoMirror
-public record ImportSuggestionDto(UUID id, String name, double score) {}
+public record ImportSuggestionDto(UUID id, String name, double score, @Nullable String nameDe) {
+
+  /**
+   * Creates a candidate without a German name.
+   *
+   * @param id id of the candidate material
+   * @param name display name of the candidate
+   * @param score similarity to the raw screen name in {@code [0.0, 1.0]}
+   */
+  public ImportSuggestionDto(UUID id, String name, double score) {
+    this(id, name, score, null);
+  }
+
+  /**
+   * Returns the name the page shows.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String displayName(@Nullable Locale locale) {
+    return LocalisedNames.display(name, nameDe, locale);
+  }
+}

@@ -23,7 +23,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Material payload. */
+/**
+ * Data transfer record carrying Material payload; {@code resourceGroupManual} and {@code
+ * refinedMaterialManual} tell whether a P4K APPLY keeps the admin's group and refined material
+ * (REQ-P4K-024, REQ-P4K-025).
+ */
 public record MaterialDto(
     UUID id,
     String name,
@@ -40,8 +44,53 @@ public record MaterialDto(
     @JsonProperty("isManualEntry") Boolean isManualEntry,
     @JsonProperty("isVisible") Boolean isVisible,
     Long version,
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable
-        CommodityMiningData miningData) {
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable CommodityMiningData miningData,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable String nameDe,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable Boolean resourceGroupManual,
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY) @Nullable Boolean refinedMaterialManual) {
+
+  /**
+   * Creates a material without a German name or override flags, which the P4K and the admin
+   * overrides write only.
+   */
+  public MaterialDto(
+      UUID id,
+      String name,
+      String type,
+      String quantityType,
+      String description,
+      MaterialDto refinedMaterial,
+      MaterialCategoryDto category,
+      Boolean isIllegal,
+      Boolean isVolatileQt,
+      Boolean isVolatileTime,
+      Boolean isManualRawMaterial,
+      Boolean isJobOrder,
+      Boolean isManualEntry,
+      Boolean isVisible,
+      Long version,
+      @Nullable CommodityMiningData miningData) {
+    this(
+        id,
+        name,
+        type,
+        quantityType,
+        description,
+        refinedMaterial,
+        category,
+        isIllegal,
+        isVolatileQt,
+        isVolatileTime,
+        isManualRawMaterial,
+        isJobOrder,
+        isManualEntry,
+        isVisible,
+        version,
+        miningData,
+        null,
+        null,
+        null);
+  }
 
   /** Creates the editable summary without source-owned mining enrichment. */
   public MaterialDto(

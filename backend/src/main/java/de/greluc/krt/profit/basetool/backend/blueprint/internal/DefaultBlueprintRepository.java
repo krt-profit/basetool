@@ -34,24 +34,24 @@ import org.springframework.stereotype.Repository;
 public interface DefaultBlueprintRepository extends JpaRepository<DefaultBlueprint, UUID> {
 
   /**
-   * Existence check on the normalized product key — backs the admin add idempotency (a duplicate
-   * add returns 409 before the unique constraint fires) and the seeder's per-entry guard.
+   * Existence check on the product key — backs the admin add idempotency (a duplicate add returns
+   * 409 before the unique constraint fires) and the seeder's per-entry guard.
    *
-   * @param productKey normalized product key
+   * @param productKey product key
    * @return {@code true} if a default already exists for the product
    */
   boolean existsByProductKey(String productKey);
 
   /**
-   * Looks up a default by its normalized product key.
+   * Looks up a default by its product key.
    *
-   * @param productKey normalized product key
+   * @param productKey product key
    * @return the default entry if present, empty otherwise
    */
   Optional<DefaultBlueprint> findByProductKey(String productKey);
 
   /**
-   * Returns the normalized product keys of every default blueprint.
+   * Returns the product keys of every default blueprint.
    *
    * @return every default product key; never {@code null}, possibly empty
    */

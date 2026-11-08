@@ -20,8 +20,21 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
-/** Data transfer record carrying Manufacturer payload. */
+/**
+ * Data transfer record carrying Manufacturer payload.
+ *
+ * @param id the manufacturer's id
+ * @param name its name
+ * @param abbreviation its short display code
+ * @param nickname its UEX nickname
+ * @param wiki its UEX wiki link
+ * @param description its description
+ * @param hidden whether an admin hid it from the pickers
+ * @param nameDe its German name, or {@code null} (REQ-P4K-023)
+ * @param p4kUuid its P4K GUID, the key of its Fan Kit logo (REQ-P4K-022), or {@code null}
+ */
 public record ManufacturerDto(
     UUID id,
     String name,
@@ -29,4 +42,29 @@ public record ManufacturerDto(
     String nickname,
     String wiki,
     String description,
-    boolean hidden) {}
+    boolean hidden,
+    @Nullable String nameDe,
+    @Nullable UUID p4kUuid) {
+
+  /**
+   * Creates a manufacturer without a German name and a P4K GUID.
+   *
+   * @param id the manufacturer's id
+   * @param name its name
+   * @param abbreviation its short display code
+   * @param nickname its UEX nickname
+   * @param wiki its UEX wiki link
+   * @param description its description
+   * @param hidden whether an admin hid it from the pickers
+   */
+  public ManufacturerDto(
+      UUID id,
+      String name,
+      String abbreviation,
+      String nickname,
+      String wiki,
+      String description,
+      boolean hidden) {
+    this(id, name, abbreviation, nickname, wiki, description, hidden, null, null);
+  }
+}

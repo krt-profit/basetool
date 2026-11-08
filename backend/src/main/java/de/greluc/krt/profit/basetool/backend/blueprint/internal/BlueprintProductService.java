@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.backend.blueprint.internal;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIdNameRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
@@ -54,11 +54,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service for the blueprint product search: active recipes grouped by normalized {@code
- * product_key} into products, each with a variant count, an example Wiki key, the manufacturer and
- * an owned-by-caller flag.
+ * Read service for the blueprint product search: active recipes grouped by {@code product_key} into
+ * products, each with a variant count, an example Wiki key, the manufacturer and an owned-by-caller
+ * flag. The key is the produced item's GUID, else the normalised output name ({@link ProductKeys},
+ * REQ-INV-070).
  *
- * <p>Grouping happens in memory, because PostgreSQL cannot compute the normalized key.
+ * <p>Grouping happens in memory, because PostgreSQL cannot compute the normalised name.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,7 +74,7 @@ public class BlueprintProductService implements BlueprintProducts {
 
   private final BlueprintRepository blueprintRepository;
   private final PersonalBlueprintRepository personalBlueprintRepository;
-  private final BlueprintNameNormalizer normalizer;
+  private final ProductKeys productKeys;
   private final BlueprintMapper blueprintMapper;
   private final GameItemStatRepository gameItemStatRepository;
 
@@ -92,7 +93,7 @@ public class BlueprintProductService implements BlueprintProducts {
     int cap = Math.clamp(limit, 1, MAX_LIMIT);
     String q = query == null ? "" : query.trim();
 
-    List<ProductAccumulator> products = new ArrayList<>(buildProductMap(q).values());
+    List<ProductAccumulator> products = new ArrayList<>(offerableProducts(q).values());
     products.sort(
         Comparator.comparing(
             p -> p.displayName, Comparator.nullsLast(String::compareToIgnoreCase)));
@@ -108,17 +109,18 @@ public class BlueprintProductService implements BlueprintProducts {
               p.variantCount,
               p.manufacturerName,
               p.exampleKey,
-              owned.contains(p.productKey)));
+              owned.contains(p.productKey),
+              p.manufacturerNameDe));
     }
     return out;
   }
 
   /**
-   * Resolves a normalized product key to its canonical product (display name and optional
-   * output-item id).
+   * Resolves a product key to its canonical product (display name and optional output-item id).
    *
-   * @param productKey normalized product key
-   * @return the resolved product, or empty for a blank key or one no active blueprint produces
+   * @param productKey product key
+   * @return the resolved product, or empty for a blank key or one no offerable blueprint produces
+   *     (REQ-P4K-013)
    */
   @Override
   @NotNull
@@ -126,7 +128,7 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKey == null || productKey.isBlank()) {
       return Optional.empty();
     }
-    ProductAccumulator p = buildProductMap("").get(productKey);
+    ProductAccumulator p = offerableProducts("").get(productKey);
     return p == null
         ? Optional.empty()
         : Optional.of(new ResolvedProduct(p.productKey, p.displayName, p.outputItemId));
@@ -136,8 +138,8 @@ public class BlueprintProductService implements BlueprintProducts {
    * Resolves a game item to its blueprint product, the identity of a stock-backed Materialbörse
    * item offer (REQ-MARKET-014, ADR-0108).
    *
-   * <p>Of the active blueprints producing the item, the lowest normalized product key is chosen, so
-   * the result is deterministic and equals that of a free-stated offer for the same item.
+   * <p>Of the active blueprints producing the item, the lowest product key is chosen, so the result
+   * is deterministic and equals that of a free-stated offer for the same item.
    *
    * @param gameItemId the game item to resolve, or {@code null}
    * @return the resolved product, or empty if the id is {@code null} or no active blueprint
@@ -150,9 +152,9 @@ public class BlueprintProductService implements BlueprintProducts {
       return Optional.empty();
     }
     return blueprintRepository.findByOutputItemId(gameItemId).stream()
-        .map(Blueprint::getOutputName)
-        .filter(name -> name != null && !name.isBlank())
-        .map(normalizer::normalize)
+        .filter(blueprint -> blueprint.getOutputName() != null)
+        .map(
+            blueprint -> productKeys.of(blueprint.getProducedItemGuid(), blueprint.getOutputName()))
         .filter(key -> !key.isEmpty())
         .sorted()
         .findFirst()
@@ -161,9 +163,10 @@ public class BlueprintProductService implements BlueprintProducts {
 
   /**
    * Resolves product keys to the game item each product produces, in one scan of the active
-   * recipes; an empty input issues no query.
+   * recipes; an empty input issues no query. The keys name existing references, so a recipe the P4K
+   * stamped or an admin hid still resolves (REQ-P4K-013).
    *
-   * @param productKeys the normalized product keys
+   * @param productKeys the product keys
    * @return product key to output-item id; keys without an active product or output item are absent
    */
   @Override
@@ -172,7 +175,8 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKeys.isEmpty()) {
       return Map.of();
     }
-    Map<String, ProductAccumulator> products = buildProductMap("");
+    Map<String, ProductAccumulator> products =
+        buildProductMap(blueprintRepository.findActiveProductRows(""));
     Map<String, UUID> ids = new HashMap<>();
     for (String key : productKeys) {
       ProductAccumulator product = key == null ? null : products.get(key);
@@ -184,13 +188,14 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Resolves a normalized product key to the recipe graph of its representative recipe: build slots
-   * with ingredients and per-quality stat modifiers, plus the variant count.
+   * Resolves a product key to the recipe graph of its representative recipe: build slots with
+   * ingredients and per-quality stat modifiers, plus the variant count.
    *
-   * <p>The representative is the first recipe of the group in {@code findActiveIdNameRows} order.
-   * Must run inside this service's read transaction.
+   * <p>The representative is the first recipe of the group in {@code findActiveIdNameRows} order, a
+   * live one whenever the group has one, and the variant count counts the recipes of its liveness
+   * (REQ-P4K-013). Must run inside this service's read transaction.
    *
-   * @param productKey normalized product key (see {@link BlueprintNameNormalizer})
+   * @param productKey product key (see {@link ProductKeys})
    * @return the recipe view, or empty if the key is blank or unknown
    */
   @NotNull
@@ -198,31 +203,33 @@ public class BlueprintProductService implements BlueprintProducts {
     if (productKey == null || productKey.isBlank()) {
       return Optional.empty();
     }
-    UUID representativeId = null;
-    String displayName = null;
+    BlueprintIdNameRow representative = null;
     int variantCount = 0;
     for (BlueprintIdNameRow row : blueprintRepository.findActiveIdNameRows()) {
-      if (row.outputName() == null || !normalizer.normalize(row.outputName()).equals(productKey)) {
+      if (row.outputName() == null
+          || !productKeys.of(row.producedItemGuid(), row.outputName()).equals(productKey)) {
         continue;
       }
-      if (representativeId == null) {
-        representativeId = row.id();
-        displayName = row.outputName();
+      if (representative == null) {
+        representative = row;
       }
-      variantCount++;
+      if (row.retired() == representative.retired()) {
+        variantCount++;
+      }
     }
-    if (representativeId == null) {
+    if (representative == null) {
       return Optional.empty();
     }
-    Blueprint recipe = blueprintRepository.findById(representativeId).orElse(null);
+    Blueprint recipe = blueprintRepository.findById(representative.id()).orElse(null);
     if (recipe == null) {
       return Optional.empty();
     }
     return Optional.of(
         new PersonalBlueprintRecipeResponse(
-            Objects.requireNonNull(displayName),
+            Objects.requireNonNull(representative.outputName()),
             variantCount,
             blueprintMapper.toGroupDtos(recipe.getRequirementGroups()),
+            blueprintMapper.toModifierDtos(recipe.getRecipeModifiers()),
             blueprintMapper.toIngredientDtos(recipe.getIngredients()),
             baseStats(recipe.getOutputItem()),
             recipe.getWikiMetadata()));
@@ -250,7 +257,7 @@ public class BlueprintProductService implements BlueprintProducts {
    * recipe as {@link #resolveRecipe(String)}. The entities are managed; their lazy collections must
    * be read inside this service's read transaction.
    *
-   * @param productKeys the normalized product keys (blank/null entries are ignored)
+   * @param productKeys the product keys (blank/null entries are ignored)
    * @return product key to representative {@link Blueprint}; keys with no active recipe are absent
    */
   @NotNull
@@ -270,7 +277,7 @@ public class BlueprintProductService implements BlueprintProducts {
       if (row.outputName() == null) {
         continue;
       }
-      String key = normalizer.normalize(row.outputName());
+      String key = this.productKeys.of(row.producedItemGuid(), row.outputName());
       if (wanted.contains(key)) {
         firstId.putIfAbsent(key, row.id());
       }
@@ -293,23 +300,81 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Returns every active product as a {@link ResolvedProduct} (normalized key + display name +
-   * optional resolved output-item id), de-duplicated by product key. Backs the Phase 4 import
-   * matching engine, which needs the full candidate set in memory to score fuzzy suggestions.
+   * Returns every product a new reference may name as a {@link ResolvedProduct} (product key +
+   * display name + optional resolved output-item id), de-duplicated by product key. Backs the Phase
+   * 4 import matching engine, which needs the full candidate set in memory to score fuzzy
+   * suggestions.
    *
-   * @return all active products, de-duplicated by normalized product key, in master-scan order
+   * @return all offerable products, de-duplicated by product key, in master-scan order
    */
   @Override
   @NotNull
   public List<ResolvedProduct> allProducts() {
-    return buildProductMap("").values().stream()
+    return offerableProducts("").values().stream()
         .map(p -> new ResolvedProduct(p.productKey, p.displayName, p.outputItemId))
         .toList();
   }
 
   /**
-   * Builds the index from lower-cased {@code scwiki_key} to normalized {@code product_key} over
-   * every active recipe, backing the scmdb.net import's tag match (REQ-INV-019).
+   * Indexes every product a new reference may name (REQ-P4K-013) by the name keys of its recipes'
+   * output names, so a name resolves to every product it names: one for a unique name, several when
+   * recipes of that name produce items with different GUIDs (REQ-INV-070).
+   *
+   * @return name key to the products it names, in master-scan order; never {@code null}
+   */
+  @Override
+  @NotNull
+  public Map<String, List<ResolvedProduct>> productsByNameKey() {
+    return nameIndex(offerableProducts(""));
+  }
+
+  /**
+   * Indexes every product an existing reference may still name by its recipes' name keys, as {@link
+   * #productsByNameKey()} does but with the recipes the P4K stamped or an admin hid, for moving
+   * references that already exist (REQ-P4K-013).
+   *
+   * @return name key to the products it names, in master-scan order; never {@code null}
+   */
+  @NotNull
+  Map<String, List<ResolvedProduct>> knownProductsByNameKey() {
+    return nameIndex(buildProductMap(blueprintRepository.findActiveProductRows("")));
+  }
+
+  /**
+   * Indexes products by the name keys of their recipes' output names.
+   *
+   * @param products the products by product key
+   * @return name key to the products it names, in the products' order
+   */
+  @NotNull
+  private static Map<String, List<ResolvedProduct>> nameIndex(
+      @NotNull Map<String, ProductAccumulator> products) {
+    Map<String, List<ResolvedProduct>> index = new LinkedHashMap<>();
+    for (ProductAccumulator p : products.values()) {
+      ResolvedProduct product = new ResolvedProduct(p.productKey, p.displayName, p.outputItemId);
+      for (String nameKey : p.nameKeys) {
+        index.computeIfAbsent(nameKey, _ -> new ArrayList<>()).add(product);
+      }
+    }
+    return index;
+  }
+
+  /**
+   * Resolves a product name to the one product it names.
+   *
+   * @param name the raw product name
+   * @return the product, or empty when the name names none or several
+   */
+  @NotNull
+  public Optional<ResolvedProduct> resolveUniqueByName(@Nullable String name) {
+    List<ResolvedProduct> products =
+        productsByNameKey().getOrDefault(productKeys.nameKey(name), List.of());
+    return products.size() == 1 ? Optional.of(products.getFirst()) : Optional.empty();
+  }
+
+  /**
+   * Builds the index from lower-cased {@code scwiki_key} to {@code product_key} over every active
+   * recipe, backing the scmdb.net import's tag match (REQ-INV-019).
    *
    * <p>A structural key that maps to two different product keys is excluded.
    *
@@ -329,8 +394,9 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Builds the index from lower-cased {@code scwiki_key} to every normalized {@code product_key} an
-   * active recipe with that key produces, keeping keys that name several products (REQ-XCH-012).
+   * Builds the index from lower-cased {@code scwiki_key} to every {@code product_key} an offerable
+   * recipe with that key produces (REQ-P4K-013), keeping keys that name several products
+   * (REQ-XCH-012).
    *
    * @return lower-cased {@code scwiki_key} to its product keys in first-seen order; never {@code
    *     null}
@@ -339,7 +405,7 @@ public class BlueprintProductService implements BlueprintProducts {
   @NotNull
   public Map<String, Set<String>> scwikiKeyToProductKeys() {
     Map<String, Set<String>> index = new LinkedHashMap<>();
-    for (BlueprintProductRow row : blueprintRepository.findActiveProductRows("")) {
+    for (BlueprintProductRow row : blueprintRepository.findOfferableProductRows("")) {
       if (row.scwikiKey() == null || row.outputName() == null) {
         continue;
       }
@@ -347,7 +413,7 @@ public class BlueprintProductService implements BlueprintProducts {
       if (tagKey.isEmpty()) {
         continue;
       }
-      String productKey = normalizer.normalize(row.outputName());
+      String productKey = productKeys.of(row.producedItemGuid(), row.outputName());
       if (productKey.isEmpty()) {
         continue;
       }
@@ -357,32 +423,43 @@ public class BlueprintProductService implements BlueprintProducts {
   }
 
   /**
-   * Loads the active blueprint rows matching {@code q} and groups them by normalized product key in
-   * first-seen order.
+   * Loads the products a new reference may name (REQ-P4K-013) whose recipes match {@code q}.
    *
    * @param q case-insensitive output-name substring ({@code ""} = no filter)
-   * @return product accumulators keyed by normalized product key
+   * @return product accumulators keyed by product key
    */
   @NotNull
-  private Map<String, ProductAccumulator> buildProductMap(String q) {
+  private Map<String, ProductAccumulator> offerableProducts(@NotNull String q) {
+    return buildProductMap(blueprintRepository.findOfferableProductRows(LikePatterns.escape(q)));
+  }
+
+  /**
+   * Groups blueprint rows by product key in first-seen order.
+   *
+   * @param rows the rows
+   * @return product accumulators keyed by product key
+   */
+  @NotNull
+  private Map<String, ProductAccumulator> buildProductMap(@NotNull List<BlueprintProductRow> rows) {
     Map<String, ProductAccumulator> map = new LinkedHashMap<>();
-    for (BlueprintProductRow row :
-        blueprintRepository.findActiveProductRows(LikePatterns.escape(q))) {
+    for (BlueprintProductRow row : rows) {
       if (row.outputName() == null) {
         continue;
       }
-      String key = normalizer.normalize(row.outputName());
+      String key = productKeys.of(row.producedItemGuid(), row.outputName());
       if (key.isEmpty()) {
         continue;
       }
       ProductAccumulator acc =
           map.computeIfAbsent(key, k -> new ProductAccumulator(k, row.outputName()));
       acc.variantCount++;
+      acc.nameKeys.add(productKeys.nameKey(row.outputName()));
       if (acc.exampleKey == null && row.scwikiKey() != null) {
         acc.exampleKey = row.scwikiKey();
       }
       if (acc.manufacturerName == null && row.manufacturerName() != null) {
         acc.manufacturerName = row.manufacturerName();
+        acc.manufacturerNameDe = row.manufacturerNameDe();
       }
       if (acc.outputItemId == null && row.outputItemId() != null) {
         acc.outputItemId = row.outputItemId();
@@ -415,9 +492,11 @@ public class BlueprintProductService implements BlueprintProducts {
   private static final class ProductAccumulator {
     private final String productKey;
     private final String displayName;
+    private final Set<String> nameKeys = new LinkedHashSet<>();
     private int variantCount;
     private @Nullable String exampleKey;
     private @Nullable String manufacturerName;
+    private @Nullable String manufacturerNameDe;
     private @Nullable UUID outputItemId;
 
     private ProductAccumulator(String productKey, String displayName) {

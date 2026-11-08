@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A product key resolved back to its canonical product, for stamping a new ownership row.
  *
- * @param productKey normalized product key
+ * @param productKey product key
  * @param productName canonical display name
  * @param outputItemId resolved output {@code game_item} id, or {@code null} if unresolved
  */

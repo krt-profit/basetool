@@ -20,45 +20,32 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * One commodity record from the P4K catalog, matched to {@code material} by {@link #guid} ({@code
- * scwiki_uuid}) first, then case-insensitively by {@link #name}.
+ * One entry of {@code commodities} in catalogue version 2, bound to the fields the import writes or
+ * matches on; every other field is skipped.
  *
- * <p>Any field may be {@code null} when the source did not resolve it.
- *
- * @param guid DataForge {@code __ref} GUID (string form of {@code material.scwiki_uuid})
- * @param className RSI engine class name (forensic; not persisted)
- * @param path source DCB record path (forensic; not persisted)
- * @param name English display name; matches {@code material.name}
- * @param nameDe German display name, or {@code null}
- * @param desc English description, filled into {@code material.description} when null
- * @param descDe German description, or {@code null}
- * @param nameKey raw {@code @LOC} name localization key, stored as {@code name_key} without the
- *     {@code @}
- * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)
- * @param typeGuid commodity {@code type} GUID (forensic; not persisted)
- * @param subtypeGuid commodity {@code subtype} GUID (forensic; not persisted)
- * @param displayType {@code SCItemPurchasableParams.displayType} (forensic; not persisted)
+ * @param guid the Record GUID, the commodity's identity
+ * @param className the Record name
+ * @param recordPath the record path without {@code .xml}
+ * @param name the localised name
+ * @param description the localised description, a game text
+ * @param typeGuid the GUID of its resource group, or {@code null}
+ * @param subtypeGuid the GUID of its {@code ResourceType}, an n:1 join and not a key, or {@code
+ *     null}
+ * @param densityGramsPerCubicCentimetre the density in g/cm³, or {@code null}
+ * @param refinedSubtypeGuid the {@code ResourceType} it refines into, or {@code null}
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record P4kCommodityDto(
-    String guid,
-    String className,
-    String path,
-    String name,
-    String nameDe,
-    String desc,
-    String descDe,
-    String nameKey,
-    String descKey,
-    String typeGuid,
-    String subtypeGuid,
-    String displayType) {
-
-  /** Decodes the escaped line breaks of both descriptions (REQ-DATA-025). */
-  public P4kCommodityDto {
-    desc = P4kText.decodeLineBreaks(desc);
-    descDe = P4kText.decodeLineBreaks(descDe);
-  }
-}
+    @Nullable String guid,
+    @Nullable String className,
+    @Nullable String recordPath,
+    @Nullable P4kLocalisedText name,
+    @Nullable P4kLocalisedText description,
+    @Nullable String typeGuid,
+    @Nullable String subtypeGuid,
+    @Nullable Double densityGramsPerCubicCentimetre,
+    @Nullable String refinedSubtypeGuid)
+    implements P4kRecord {}

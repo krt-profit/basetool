@@ -22,12 +22,15 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend view of a Materialbörse request (Gesuch), deserialized from the backend {@code
@@ -79,4 +82,22 @@ public record MaterialRequestDto(
     List<String> interestedHandles,
     boolean viewerInterested,
     @BackendEnumAsString String status,
-    Long version) {}
+    Long version) {
+
+  /** The {@link #kind} of an item request. */
+  private static final String ITEM_KIND = "ITEM";
+
+  /**
+   * Returns the name the page shows for the requested material or item (REQ-P4K-023); an item takes
+   * the German name of the catalogue game item it resolves to.
+   *
+   * @param locale the page locale
+   * @return the German name on a German page when there is one, else the name
+   */
+  public String subjectDisplayName(@Nullable Locale locale) {
+    if (ITEM_KIND.equals(kind)) {
+      return LocalisedNames.display(itemName, gameItem == null ? null : gameItem.nameDe(), locale);
+    }
+    return material.displayName(locale);
+  }
+}

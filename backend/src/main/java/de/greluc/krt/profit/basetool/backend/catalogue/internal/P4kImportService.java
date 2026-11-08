@@ -19,69 +19,54 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialSourceSystem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBlueprintDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCommodityDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kIngredientDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kItemDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRejectionReason;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kBuild;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogueFormatException;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogueHead;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogueReader;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kChangeNumber;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCompression;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kContentTooLargeException;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKindCompleteness;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.kernel.Quality;
-import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.time.Instant;
-import java.util.HashMap;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 
 /**
- * Import engine for the KRT P4K Reader catalog extracted from the game's {@code Data/Game2.dcb}. It
- * enriches, reconciles and optionally seeds the {@code game_item} / {@code ship_type} / {@code
- * manufacturer} / {@code material} / {@code blueprint} rows.
+ * The P4K import of catalogue version 2 (REQ-P4K-003…010, ADR-0335): it reads a stored upload,
+ * hands it to the reconcilers ({@link P4kReconcilers}), sweeps the complete kinds and, on APPLY,
+ * records the run, its counts per kind, its change report and its {@code CATALOGUE} audit event
+ * (REQ-P4K-046).
  *
  * <ul>
- *   <li>{@link #previewImport(byte[])} computes every action without writing anything.
- *   <li>{@link #applyImport(byte[], boolean)} applies them in one transaction, emitting {@code
- *       SyncReportService} events and pruning the P4K sync-report history.
+ *   <li>{@link #previewImport(byte[])} computes everything and writes nothing.
+ *   <li>{@link #applyImport(byte[], P4kApplyRequest)} writes it in one transaction, refusing an
+ *       older Build than the last applied run.
  * </ul>
- *
- * <p>Matched rows are enriched fill-if-null and stamped with {@code p4k_uuid} / {@code
- * p4k_synced_at}. A null canonical UUID is backfilled when unclaimed ({@link
- * SyncEventType#LINKED_VIA_NAME}); a differing one is kept and reported ({@link
- * SyncEventType#BACKFILL_AMBIGUOUS}). With seeding enabled, unmatched records that pass the
- * real-record filter become new {@code source = P4K} rows; seeded commodities are invisible until
- * reviewed. Manufacturers are processed first so items and ships can link to them.
  */
 @Service
 @RequiredArgsConstructor
@@ -89,1418 +74,483 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(readOnly = true)
 public class P4kImportService {
 
-  /** The longest name key the catalogue stores, matching the {@code name_key} columns. */
-  static final int MAX_NAME_KEY_LENGTH = 200;
-
-  /** The shape of a stored name key: no {@code @}, no whitespace. */
-  private static final Pattern NAME_KEY = Pattern.compile("^[^@\\s]+$");
-
-  /**
-   * Identifier tokens that mark a DataForge record as a developer / test / template asset rather
-   * than shippable player content. Matched as delimited words (see {@link #containsToken}) against
-   * engine identifiers ({@code class_name}, record {@code path}, blueprint {@code key},
-   * manufacturer {@code code}) — never against the localized display name.
-   */
-  private static final Set<String> DEV_TOKENS =
-      Set.of(
-          "test",
-          "template",
-          "dummy",
-          "placeholder",
-          "debug",
-          "tutorial",
-          "sample",
-          "proto",
-          "prototype",
-          "deprecated",
-          "unused",
-          "wip",
-          "ghost",
-          "dev");
-
-  private final ObjectMapper objectMapper;
-  private final GameItemRepository gameItemRepository;
-  private final ShipTypeRepository shipTypeRepository;
-  private final ManufacturerRepository manufacturerRepository;
-  private final MaterialRepository materialRepository;
-  private final BlueprintRepository blueprintRepository;
+  private final P4kCatalogueReader reader;
+  private final P4kImportProperties properties;
+  private final P4kReconcilers reconcilers;
+  private final P4kSweeper sweeper;
+  private final P4kProductKeyReview productKeyReview;
+  private final P4kImportRunRepository runRepository;
+  private final P4kImportRecorder recorder;
+  private final P4kReviewCaseRepository reviewCaseRepository;
+  private final P4kRejections rejections;
   private final SyncReportService syncReportService;
+  private final AuditRecorder auditRecorder;
+  private final P4kCatalogueRevision revision;
 
   /**
-   * Curated corrections for mislabeled blueprint {@code output_name}s, applied when seeding a
-   * blueprint's output name.
-   */
-  private final BlueprintOutputNameOverrides outputNameOverrides;
-
-  /**
-   * Previews a P4K catalog import: parses the upload and computes every reconciliation action —
-   * including how many brand-new rows seeding <em>would</em> create — without persisting anything
-   * or emitting audit rows.
+   * What an APPLY needs besides the catalogue.
    *
-   * @param bytes the uploaded P4K catalog JSON bytes
-   * @return the per-type action summary with {@code dryRun = true}, {@code seedingEnabled = true}
-   *     and {@code runId = null}
-   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
+   * @param jobId the APPLY job
+   * @param createdBy the administrator who uploaded the catalogue
+   * @param createItemsAndShips whether unmatched playable items and ships are created
+   * @param overrideMassGuard whether a kind is swept even when the sweep would stamp more of it
+   *     than the mass guard allows (REQ-P4K-012)
+   */
+  public record P4kApplyRequest(
+      @NotNull UUID jobId,
+      @NotNull UUID createdBy,
+      boolean createItemsAndShips,
+      boolean overrideMassGuard) {}
+
+  /**
+   * What a preview computed: its result and the change report an APPLY would write.
+   *
+   * @param result the result with {@code dryRun = true}
+   * @param changes the report rows in the order found, without a run
+   */
+  public record P4kPreview(
+      @NotNull P4kImportResultDto result, @NotNull @Unmodifiable List<P4kImportChange> changes) {}
+
+  /**
+   * Previews an import: everything an APPLY with "create new items and ships" ticked and without
+   * the mass-guard override would do, its change report included, without writing anything.
+   *
+   * @param payload the stored upload
+   * @return the result with {@code dryRun = true} and no run, and the report rows
+   * @throws BadRequestException when the payload is no readable version-2 LIVE catalogue, or its
+   *     Build is older than that of the last applied run, which an APPLY would refuse
    */
   @NotNull
-  public P4kImportResultDto previewImport(byte[] bytes) {
-    P4kCatalogDto catalog = parse(bytes);
-    return reconcile(catalog, false, true, null);
+  public P4kPreview previewImport(byte @NotNull [] payload) {
+    P4kCatalogue catalogue = read(payload);
+    P4kBuild build = requireBuild(catalogue.head());
+    refuseOlderBuild(build);
+    P4kImportContext context =
+        P4kImportContext.forPreview(
+            catalogue, Instant.now(), reviewCaseRepository.findAdminClosedKeys());
+    int ingredientsResolved = reconcile(payload, catalogue, context);
+    sweepAndFollow(catalogue, context, false);
+    return new P4kPreview(
+        result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
   }
 
   /**
-   * Applies a P4K catalog import: enriches and reconciles matching rows, seeds new rows for
-   * unmatched player-facing records when {@code seedNew} is set, emits the sync-report events and
-   * prunes the P4K report history.
+   * Applies an import in one transaction: refuses an older Build, records the run, reconciles every
+   * kind, stamps the matched rows with the run, sweeps the complete kinds, moves the personal
+   * blueprints onto the produced-item GUIDs (REQ-P4K-029) and stores the change report.
    *
-   * <p>All-or-nothing: any failure rolls back the entire run.
-   *
-   * @param bytes the uploaded P4K catalog JSON bytes
-   * @param seedNew {@code true} to insert new {@code source = P4K} rows for unmatched records that
-   *     pass the real-record filter; {@code false} to enrich existing rows only
-   * @return the per-type action summary with {@code dryRun = false} and the stamped {@code runId}
-   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
+   * @param payload the stored upload
+   * @param request the job, the uploader and the admin's choices
+   * @return the result with the run id
+   * @throws BadRequestException when the payload is unreadable or its Build is older than that of
+   *     the last applied run
    */
   @Transactional
   @NotNull
-  public P4kImportResultDto applyImport(byte[] bytes, boolean seedNew) {
-    P4kCatalogDto catalog = parse(bytes);
-    UUID runId = syncReportService.beginRun();
-    P4kImportResultDto result = reconcile(catalog, true, seedNew, runId);
-    syncReportService.logP4kEvent(
-        runId, SyncEventType.SYNC_RUN_SUMMARY, "catalog", null, null, summaryDetail(result));
+  public P4kImportResultDto applyImport(
+      byte @NotNull [] payload, @NotNull P4kApplyRequest request) {
+    P4kCatalogue catalogue = read(payload);
+    P4kBuild build = requireBuild(catalogue.head());
+    long changeNumber = refuseOlderBuild(build);
+    Instant now = Instant.now();
+    P4kImportRun run =
+        runRepository.save(newRun(catalogue.head(), build, changeNumber, request, now));
+    run.setItemClassNullShare(P4kItemClassShare.of(catalogue.items()));
+    P4kImportContext context =
+        P4kImportContext.forApply(
+            catalogue,
+            now,
+            run.getId(),
+            request.createItemsAndShips(),
+            reviewCaseRepository.findAdminClosedKeys());
+    int ingredientsResolved = reconcile(payload, catalogue, context);
+    List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
+    run.setKinds(kinds(catalogue.head(), context.getReport()));
+    recorder.record(run.getId(), context.getReport());
+    P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
+    overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
+    syncReportService.logP4kRunSummary(run.getId(), summary(result, context.getReport()));
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_APPLIED,
+        run.getId(),
+        run.getBuildVersion(),
+        null,
+        auditDetails(run, result)
+            .with("adminCategoriesRetired", context.getAdminCategoriesRetired()));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
-    log.info("P4K import applied (run {}): {}", runId, summaryDetail(result));
+    revision.changed();
+    log.info("P4K import applied (run {}): {}", run.getId(), summary(result, context.getReport()));
     return result;
   }
 
   /**
-   * Runs the full reconciliation across all five types. Manufacturers are processed first to build
-   * the GUID→entity index that item and ship linking consults (including any seeded this run).
+   * Sweeps the complete kinds, then hands the blueprints' produced-item GUIDs to the modules keyed
+   * by them (REQ-P4K-029).
    *
-   * @param catalog the parsed catalog
-   * @param apply {@code true} to persist mutations and emit audit rows; {@code false} for a dry run
-   * @param seed {@code true} to seed new rows for unmatched player-facing records
-   * @param runId the audit run id ({@code null} on a dry run)
-   * @return the aggregate result
+   * @param catalogue the catalogue
+   * @param context the run
+   * @param overrideMassGuard whether a kind is swept past the mass guard
+   * @return the kinds swept only because of the override
    */
   @NotNull
-  private P4kImportResultDto reconcile(
-      @NotNull P4kCatalogDto catalog, boolean apply, boolean seed, @Nullable UUID runId) {
-    Instant now = Instant.now();
-
-    Map<String, Manufacturer> manufacturerByGuid = new HashMap<>();
-    P4kImportResultDto.Counts manufacturers =
-        reconcileManufacturers(
-            catalog.manufacturers(), manufacturerByGuid, apply, seed, runId, now);
-    P4kImportResultDto.Counts items =
-        reconcileItems(catalog.items(), manufacturerByGuid, apply, seed, runId, now);
-    P4kImportResultDto.Counts ships =
-        reconcileShips(catalog.ships(), manufacturerByGuid, apply, seed, runId, now);
-    P4kImportResultDto.Counts commodities =
-        reconcileCommodities(catalog.commodities(), apply, seed, runId, now);
-
-    BlueprintOutcome blueprintOutcome =
-        reconcileBlueprints(catalog.blueprints(), apply, seed, runId, now);
-
-    return new P4kImportResultDto(
-        !apply,
-        seed,
-        manufacturers,
-        items,
-        ships,
-        commodities,
-        blueprintOutcome.counts(),
-        blueprintOutcome.ingredientsResolved(),
-        runId);
+  private List<P4kKind> sweepAndFollow(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context,
+      boolean overrideMassGuard) {
+    List<P4kKind> overridden = sweeper.sweep(catalogue, context, overrideMassGuard);
+    productKeyReview.follow(context, context.getNow());
+    return overridden;
   }
 
   /**
-   * Reconciles manufacturers: resolve by {@code scwiki_uuid} → {@code abbreviation} → {@code name},
-   * backfill {@code scwiki_uuid} (guarded), fill-if-null {@code scwiki_code} / {@code description},
-   * stamp the P4K lane, or seed a new manufacturer. Populates {@code byGuid} with the resolved (or
-   * seeded) entity keyed by the inbound P4K GUID so items / ships can link to it.
+   * Reconciles every kind of a catalogue, streaming its loadouts from the stored upload again.
    *
-   * @param dtos inbound manufacturer records (may be {@code null})
-   * @param byGuid output index (P4K GUID → manufacturer) the caller passes on to items / ships
-   * @param apply whether to persist mutations and emit audit rows
-   * @param seed whether to seed new rows for unmatched records
-   * @param runId the audit run id, or {@code null} on a dry run
-   * @param now the import timestamp stamped on {@code p4k_synced_at}
-   * @return the manufacturer counts
+   * @param payload the stored upload, streamed again for the loadouts
+   * @param catalogue the catalogue
+   * @param context the run
+   * @return the ingredient lines the blueprints resolved
+   */
+  private int reconcile(
+      byte @NotNull [] payload,
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kImportContext context) {
+    return reconcilers.reconcile(
+        catalogue,
+        action ->
+            read(
+                payload,
+                in -> {
+                  reader.readLoadouts(in, action);
+                  return null;
+                }),
+        context);
+  }
+
+  /**
+   * Reads a stored upload.
+   *
+   * @param payload the stored upload, compressed
+   * @return the catalogue
+   * @throws BadRequestException when it cannot be read or passes a size limit
    */
   @NotNull
-  private P4kImportResultDto.Counts reconcileManufacturers(
-      @Nullable List<P4kManufacturerDto> dtos,
-      @NotNull Map<String, Manufacturer> byGuid,
-      boolean apply,
-      boolean seed,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    CountsAccumulator counts = new CountsAccumulator();
-    if (dtos == null) {
-      return counts.toCounts();
-    }
-    for (P4kManufacturerDto dto : dtos) {
-      UUID guid = parseUuid(dto.guid());
-      Manufacturer target = resolveManufacturer(dto, guid);
-      if (target == null) {
-        if (maybeSeedManufacturer(dto, guid, byGuid, seed, apply, runId, now)) {
-          counts.created++;
-        } else {
-          counts.unmatched++;
-        }
-        continue;
-      }
-      counts.matched++;
-      if (guid != null) {
-        byGuid.put(dto.guid(), target);
-      }
-
-      backfillCanonicalUuid(
-          counts,
-          guid,
-          target.getScwikiUuid(),
-          () -> guid != null && manufacturerRepository.findByScwikiUuid(guid).isPresent(),
-          value -> {
-            if (apply) {
-              target.setScwikiUuid(value);
-            }
-          },
-          existing ->
-              logConflict(apply, runId, "manufacturer", existing, guid, dto.name(), "scwiki_uuid"),
-          apply,
-          runId,
-          "manufacturer",
-          dto.name());
-
-      boolean enriched = false;
-      enriched |=
-          fillIfNull(target.getScwikiCode(), dto.code(), v -> target.setScwikiCode(v), apply);
-      enriched |=
-          fillIfNull(target.getDescription(), dto.desc(), v -> target.setDescription(v), apply);
-      if (enriched) {
-        counts.enriched++;
-      }
-
-      stampP4k(apply, guid, now, v -> target.setP4kUuid(v), t -> target.setP4kSyncedAt(t));
-    }
-    return counts.toCounts();
+  private P4kCatalogue read(byte @NotNull [] payload) {
+    return Objects.requireNonNull(
+        read(payload, in -> reader.read(in, properties.heldLimitBytes())));
   }
 
   /**
-   * Resolves an inbound manufacturer to a local row through the chain {@code scwiki_uuid} →
-   * case-insensitive {@code abbreviation} → case-insensitive {@code name}.
+   * Hands the decompressed content of a stored upload to a reading step.
    *
-   * @param dto the inbound manufacturer
-   * @param guid the parsed GUID, or {@code null} when unparseable
-   * @return the matched manufacturer, or {@code null} if none matched
+   * @param payload the stored upload, compressed
+   * @param step reads the decompressed content
+   * @param <T> what the step returns
+   * @return the step's result
+   * @throws BadRequestException when it cannot be read or passes a size limit
    */
   @Nullable
-  private Manufacturer resolveManufacturer(@NotNull P4kManufacturerDto dto, @Nullable UUID guid) {
-    if (guid != null) {
-      Optional<Manufacturer> byUuid = manufacturerRepository.findByScwikiUuid(guid);
-      if (byUuid.isPresent()) {
-        return byUuid.get();
-      }
+  private <T> T read(byte @NotNull [] payload, @NotNull Function<InputStream, T> step) {
+    try (InputStream in =
+        P4kCompression.openDecompressed(payload, properties.decompressedLimitBytes())) {
+      return step.apply(in);
+    } catch (P4kCatalogueFormatException e) {
+      throw new BadRequestException("The stored catalogue is not readable catalogue JSON.", e);
+    } catch (P4kContentTooLargeException e) {
+      throw new BadRequestException("The stored catalogue exceeds a size limit.", e);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Reading an in-memory catalogue failed.", e);
     }
-    if (dto.code() != null && !dto.code().isBlank()) {
-      Optional<Manufacturer> byCode =
-          manufacturerRepository.findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(
-              dto.code().trim());
-      if (byCode.isPresent()) {
-        return byCode.get();
-      }
-    }
-    if (dto.name() != null && !dto.name().isBlank()) {
-      return manufacturerRepository.findByNameIgnoreCase(dto.name().trim()).orElse(null);
-    }
-    return null;
   }
 
   /**
-   * Reconciles items: resolve by {@code external_uuid} → unique case-insensitive {@code class_name}
-   * → unique case-insensitive {@code name}, backfill {@code external_uuid} (guarded), fill-if-null
-   * {@code class_name} / {@code manufacturer} / {@code mass} / {@code description_en} / {@code
-   * description_de}, refresh the name and name key, stamp the P4K lane, or seed a new item.
+   * Returns the Build of a catalogue that passes the gate's head rules.
    *
-   * @param dtos inbound item records (may be {@code null})
-   * @param manufacturerByGuid the GUID→manufacturer index built from the manufacturer pass
-   * @param apply whether to persist mutations and emit audit rows
-   * @param seed whether to seed new rows for unmatched records
-   * @param runId the audit run id, or {@code null} on a dry run
-   * @param now the import timestamp
-   * @return the item counts
+   * @param head the head
+   * @return the Build
+   * @throws BadRequestException when the head breaks a gate rule
    */
   @NotNull
-  private P4kImportResultDto.Counts reconcileItems(
-      @Nullable List<P4kItemDto> dtos,
-      @NotNull Map<String, Manufacturer> manufacturerByGuid,
-      boolean apply,
-      boolean seed,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    CountsAccumulator counts = new CountsAccumulator();
-    if (dtos == null) {
-      return counts.toCounts();
+  private static P4kBuild requireBuild(@NotNull P4kCatalogueHead head) {
+    P4kRejectionReason refusal = P4kUploadGate.headRefusal(head);
+    P4kBuild build = head.build();
+    if (refusal != null || build == null) {
+      throw new BadRequestException("The stored catalogue is no version-2 LIVE catalogue.");
     }
-    for (P4kItemDto dto : dtos) {
-      UUID guid = parseUuid(dto.guid());
-      GameItem target =
-          resolveSingle(
-              guid,
-              gameItemRepository::findByExternalUuid,
-              dto.className(),
-              gameItemRepository::findByClassNameIgnoreCase,
-              dto.name(),
-              gameItemRepository::findByNameIgnoreCase);
-      if (target == null) {
-        if (maybeSeedItem(dto, guid, manufacturerByGuid, seed, apply, runId, now)) {
-          counts.created++;
-        } else {
-          counts.unmatched++;
-        }
-        continue;
-      }
-      counts.matched++;
-
-      backfillExternalUuidGameItem(counts, target, guid, dto.name(), apply, runId);
-
-      boolean enriched = false;
-      enriched |=
-          fillIfNull(target.getClassName(), dto.className(), v -> target.setClassName(v), apply);
-      Manufacturer mfg = manufacturerByGuid.get(dto.manufacturerGuid());
-      enriched |= fillIfNull(target.getManufacturer(), mfg, v -> target.setManufacturer(v), apply);
-      enriched |= fillIfNull(target.getMass(), dto.mass(), v -> target.setMass(v), apply);
-      enriched |=
-          fillIfNull(target.getDescriptionEn(), dto.desc(), v -> target.setDescriptionEn(v), apply);
-      enriched |=
-          fillIfNull(
-              target.getDescriptionDe(), dto.descDe(), v -> target.setDescriptionDe(v), apply);
-      enriched |=
-          refreshNameKey(target.getNameKey(), dto.nameKey(), v -> target.setNameKey(v), apply);
-      enriched |= GameItemNamePrecedence.applyP4kName(target, dto.name(), apply);
-      if (enriched) {
-        counts.enriched++;
-      }
-
-      stampP4k(apply, guid, now, v -> target.setP4kUuid(v), t -> target.setP4kSyncedAt(t));
-    }
-    return counts.toCounts();
+    return build;
   }
 
   /**
-   * Reconciles ships: resolve by {@code external_uuid} → unique {@code class_name} or its UEX alias
-   * (REQ-DATA-026) → case-insensitive {@code name}, backfill {@code external_uuid} (guarded),
-   * fill-if-null {@code class_name} / {@code manufacturer} / {@code description_en} / {@code
-   * description_de}, stamp the P4K lane, or seed a new ship. Crew and SCU are deliberately left
-   * untouched on enriched rows and unset on seeded rows (the DCB entity does not carry them).
+   * Refuses a Build whose change number is lower than that of the last applied run (REQ-P4K-004).
    *
-   * @param dtos inbound ship records (may be {@code null})
-   * @param manufacturerByGuid the GUID→manufacturer index built from the manufacturer pass
-   * @param apply whether to persist mutations and emit audit rows
-   * @param seed whether to seed new rows for unmatched records
-   * @param runId the audit run id, or {@code null} on a dry run
-   * @param now the import timestamp
-   * @return the ship counts
+   * @param build the catalogue's Build, past the gate's head rules
+   * @return the Build's change number
+   * @throws BadRequestException when the Build is older; the refusal is logged and counted
    */
-  @NotNull
-  private P4kImportResultDto.Counts reconcileShips(
-      @Nullable List<P4kShipDto> dtos,
-      @NotNull Map<String, Manufacturer> manufacturerByGuid,
-      boolean apply,
-      boolean seed,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    CountsAccumulator counts = new CountsAccumulator();
-    if (dtos == null) {
-      return counts.toCounts();
-    }
-    for (P4kShipDto dto : dtos) {
-      UUID guid = parseUuid(dto.guid());
-      ShipType target =
-          resolveSingle(
-              guid,
-              shipTypeRepository::findByExternalUuid,
-              dto.className(),
-              shipTypeRepository::findByClassNameOrUexAlias,
-              dto.name(),
-              name ->
-                  shipTypeRepository.findByNameIgnoreCase(name).map(List::of).orElseGet(List::of));
-      if (target == null) {
-        if (maybeSeedShip(dto, guid, manufacturerByGuid, seed, apply, runId, now)) {
-          counts.created++;
-        } else {
-          counts.unmatched++;
-        }
-        continue;
-      }
-      counts.matched++;
-
-      backfillExternalUuidShipType(counts, target, guid, dto.name(), apply, runId);
-
-      boolean enriched = false;
-      enriched |=
-          fillIfNull(target.getClassName(), dto.className(), v -> target.setClassName(v), apply);
-      Manufacturer mfg = manufacturerByGuid.get(dto.manufacturerGuid());
-      enriched |= fillIfNull(target.getManufacturer(), mfg, v -> target.setManufacturer(v), apply);
-      enriched |=
-          fillIfNull(target.getDescriptionEn(), dto.desc(), v -> target.setDescriptionEn(v), apply);
-      enriched |=
-          fillIfNull(
-              target.getDescriptionDe(), dto.descDe(), v -> target.setDescriptionDe(v), apply);
-      enriched |=
-          refreshNameKey(target.getNameKey(), dto.nameKey(), v -> target.setNameKey(v), apply);
-      if (enriched) {
-        counts.enriched++;
-      }
-
-      stampP4k(apply, guid, now, v -> target.setP4kUuid(v), t -> target.setP4kSyncedAt(t));
-    }
-    return counts.toCounts();
-  }
-
-  /**
-   * Reconciles commodities against the {@code material} table: resolve by {@code scwiki_uuid} →
-   * case-insensitive {@code name}, backfill {@code scwiki_uuid} (guarded), fill-if-null {@code
-   * description}, stamp the P4K lane, or seed a new (invisible) material.
-   *
-   * @param dtos inbound commodity records (may be {@code null})
-   * @param apply whether to persist mutations and emit audit rows
-   * @param seed whether to seed new rows for unmatched records
-   * @param runId the audit run id, or {@code null} on a dry run
-   * @param now the import timestamp
-   * @return the commodity counts
-   */
-  @NotNull
-  private P4kImportResultDto.Counts reconcileCommodities(
-      @Nullable List<P4kCommodityDto> dtos,
-      boolean apply,
-      boolean seed,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    CountsAccumulator counts = new CountsAccumulator();
-    if (dtos == null) {
-      return counts.toCounts();
-    }
-    for (P4kCommodityDto dto : dtos) {
-      UUID guid = parseUuid(dto.guid());
-      Material target = resolveCommodity(dto, guid);
-      if (target == null) {
-        if (maybeSeedCommodity(dto, guid, seed, apply, runId, now)) {
-          counts.created++;
-        } else {
-          counts.unmatched++;
-        }
-        continue;
-      }
-      counts.matched++;
-
-      backfillCanonicalUuid(
-          counts,
-          guid,
-          target.getScwikiUuid(),
-          () -> guid != null && materialRepository.findByScwikiUuid(guid).isPresent(),
-          value -> {
-            if (apply) {
-              target.setScwikiUuid(value);
-            }
-          },
-          existing ->
-              logConflict(apply, runId, "material", existing, guid, dto.name(), "scwiki_uuid"),
-          apply,
-          runId,
-          "material",
-          dto.name());
-
-      boolean enriched =
-          fillIfNull(target.getDescription(), dto.desc(), v -> target.setDescription(v), apply);
-      enriched |=
-          refreshNameKey(target.getNameKey(), dto.nameKey(), v -> target.setNameKey(v), apply);
-      if (enriched) {
-        counts.enriched++;
-      }
-
-      stampP4k(apply, guid, now, v -> target.setP4kUuid(v), t -> target.setP4kSyncedAt(t));
-    }
-    return counts.toCounts();
-  }
-
-  /**
-   * Resolves an inbound commodity to a local material through the chain {@code scwiki_uuid} →
-   * case-insensitive {@code name}.
-   *
-   * @param dto the inbound commodity
-   * @param guid the parsed GUID, or {@code null}
-   * @return the matched material, or {@code null}
-   */
-  @Nullable
-  private Material resolveCommodity(@NotNull P4kCommodityDto dto, @Nullable UUID guid) {
-    if (guid != null) {
-      Optional<Material> byUuid = materialRepository.findByScwikiUuid(guid);
-      if (byUuid.isPresent()) {
-        return byUuid.get();
-      }
-    }
-    if (dto.name() != null && !dto.name().isBlank()) {
-      return materialRepository.findByNameIgnoreCase(dto.name().trim()).orElse(null);
-    }
-    return null;
-  }
-
-  /**
-   * Reconciles blueprints: resolve by {@code scwiki_uuid} → first {@code scwiki_key}, backfill
-   * {@code scwiki_uuid} (guarded), fill-if-null {@code scwiki_key} / {@code output_item} / {@code
-   * craft_time_seconds}, stamp the P4K lane, then resolve any still-unresolved existing ingredient
-   * lines; or seed a new blueprint (with its ingredient lines) for an unmatched record.
-   *
-   * @param dtos inbound blueprint records (may be {@code null})
-   * @param apply whether to persist mutations and emit audit rows
-   * @param seed whether to seed new rows for unmatched records
-   * @param runId the audit run id, or {@code null} on a dry run
-   * @param now the import timestamp
-   * @return the blueprint counts plus the count of ingredient lines newly resolved
-   */
-  @NotNull
-  private BlueprintOutcome reconcileBlueprints(
-      @Nullable List<P4kBlueprintDto> dtos,
-      boolean apply,
-      boolean seed,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    CountsAccumulator counts = new CountsAccumulator();
-    int ingredientsResolved = 0;
-    if (dtos == null) {
-      return new BlueprintOutcome(counts.toCounts(), 0);
-    }
-    for (P4kBlueprintDto dto : dtos) {
-      UUID guid = parseUuid(dto.guid());
-      Blueprint target = resolveBlueprint(dto, guid);
-      if (target == null) {
-        if (maybeSeedBlueprint(dto, guid, seed, apply, runId, now)) {
-          counts.created++;
-        } else {
-          counts.unmatched++;
-        }
-        continue;
-      }
-      counts.matched++;
-
-      backfillCanonicalUuid(
-          counts,
-          guid,
-          target.getScwikiUuid(),
-          () -> guid != null && blueprintRepository.findByScwikiUuid(guid).isPresent(),
-          value -> {
-            if (apply) {
-              target.setScwikiUuid(value);
-            }
-          },
-          existing ->
-              logConflict(apply, runId, "blueprint", existing, guid, dto.key(), "scwiki_uuid"),
-          apply,
-          runId,
-          "blueprint",
-          dto.key());
-
-      boolean enriched = false;
-      enriched |= fillIfNull(target.getScwikiKey(), dto.key(), v -> target.setScwikiKey(v), apply);
-      GameItem produced = resolveProducedItem(dto.producedItemGuid());
-      enriched |= fillIfNull(target.getOutputItem(), produced, v -> target.setOutputItem(v), apply);
-      enriched |=
-          fillIfNull(
-              target.getCraftTimeSeconds(),
-              dto.craftTimeSeconds(),
-              v -> target.setCraftTimeSeconds(v),
-              apply);
-      if (enriched) {
-        counts.enriched++;
-      }
-
-      stampP4k(apply, guid, now, v -> target.setP4kUuid(v), t -> target.setP4kSyncedAt(t));
-
-      ingredientsResolved += resolveExistingIngredients(target, apply);
-    }
-    return new BlueprintOutcome(counts.toCounts(), ingredientsResolved);
-  }
-
-  /**
-   * Resolves an inbound blueprint to a local row through the chain {@code scwiki_uuid} → first
-   * {@code scwiki_key}.
-   *
-   * @param dto the inbound blueprint
-   * @param guid the parsed GUID, or {@code null}
-   * @return the matched blueprint, or {@code null}
-   */
-  @Nullable
-  private Blueprint resolveBlueprint(@NotNull P4kBlueprintDto dto, @Nullable UUID guid) {
-    if (guid != null) {
-      Optional<Blueprint> byUuid = blueprintRepository.findByScwikiUuid(guid);
-      if (byUuid.isPresent()) {
-        return byUuid.get();
-      }
-    }
-    if (dto.key() != null && !dto.key().isBlank()) {
-      return blueprintRepository
-          .findFirstByScwikiKeyOrderByScwikiUuidAsc(dto.key().trim())
-          .orElse(null);
-    }
-    return null;
-  }
-
-  /**
-   * Resolves the produced item of a blueprint by its {@code __ref} GUID against {@code
-   * game_item.external_uuid}.
-   *
-   * @param producedItemGuid the produced item GUID string, or {@code null}
-   * @return the produced {@link GameItem}, or {@code null} if unparseable / not found
-   */
-  @Nullable
-  private GameItem resolveProducedItem(@Nullable String producedItemGuid) {
-    UUID guid = parseUuid(producedItemGuid);
-    if (guid == null) {
-      return null;
-    }
-    return gameItemRepository.findByExternalUuid(guid).orElse(null);
-  }
-
-  /**
-   * Resolves still-unresolved existing ingredient lines of a blueprint by their stored Wiki UUIDs:
-   * a RESOURCE line with a null {@code material} and a non-null {@code wiki_resource_uuid} is
-   * linked to {@code material.findByScwikiUuid(...)}; an ITEM line with a null {@code game_item}
-   * and a non-null {@code wiki_item_uuid} is linked to {@code game_item.findByExternalUuid(...)}.
-   * Only counts and (in apply mode) sets a line when the lookup actually finds a row.
-   *
-   * @param blueprint the matched blueprint whose ingredient lines to resolve
-   * @param apply whether to persist the FK link (dry run only counts)
-   * @return the number of ingredient lines newly resolvable / resolved
-   */
-  private int resolveExistingIngredients(@NotNull Blueprint blueprint, boolean apply) {
-    int resolved = 0;
-    for (BlueprintIngredient ingredient : blueprint.getIngredients()) {
-      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE
-          && ingredient.getMaterial() == null
-          && ingredient.getWikiResourceUuid() != null) {
-        Material material =
-            materialRepository.findByScwikiUuid(ingredient.getWikiResourceUuid()).orElse(null);
-        if (material != null) {
-          if (apply) {
-            ingredient.setMaterial(material);
-          }
-          resolved++;
-        }
-      } else if (ingredient.getKind() == BlueprintIngredientKind.ITEM
-          && ingredient.getGameItem() == null
-          && ingredient.getWikiItemUuid() != null) {
-        GameItem item =
-            gameItemRepository.findByExternalUuid(ingredient.getWikiItemUuid()).orElse(null);
-        if (item != null) {
-          if (apply) {
-            ingredient.setGameItem(item);
-          }
-          resolved++;
-        }
-      }
-    }
-    return resolved;
-  }
-
-  /**
-   * Seeds a brand-new {@code game_item} for an unmatched item record when seeding is on and the
-   * record looks like real player content. Requires a parseable GUID (the cross-source join key), a
-   * resolved display name and a non-dev identifier; guards the {@code external_uuid} UNIQUE column.
-   * In dry-run mode it performs every check but does not insert.
-   *
-   * @return {@code true} if a row was inserted (apply) or would be (dry run); {@code false} if the
-   *     record was filtered out
-   */
-  private boolean maybeSeedItem(
-      @NotNull P4kItemDto dto,
-      @Nullable UUID guid,
-      @NotNull Map<String, Manufacturer> manufacturerByGuid,
-      boolean seed,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    if (!seed
-        || guid == null
-        || !P4kDisplayName.isReal(dto.name())
-        || looksLikeDevAsset(dto.className(), dto.path())
-        || gameItemRepository.findByExternalUuid(guid).isPresent()) {
-      return false;
-    }
-    if (apply) {
-      GameItem item = new GameItem();
-      item.setName(dto.name().trim());
-      item.setExternalUuid(guid);
-      item.setClassName(StringNormalization.blankToNull(dto.className()));
-      item.setManufacturer(manufacturerByGuid.get(dto.manufacturerGuid()));
-      item.setMass(dto.mass());
-      item.setDescriptionEn(StringNormalization.blankToNull(dto.desc()));
-      item.setDescriptionDe(StringNormalization.blankToNull(dto.descDe()));
-      item.setKind(GameItemKind.GENERIC);
-      item.setSourceSystems(GameItemSourceSystem.P4K);
-      item.setNameKey(storedNameKey(dto.nameKey()));
-      item.setP4kUuid(guid);
-      item.setP4kSyncedAt(now);
-      gameItemRepository.save(item);
-      recordSeed(runId, "game_item", guid, item.getName());
-    }
-    return true;
-  }
-
-  /**
-   * Seeds a brand-new {@code ship_type} for an unmatched ship record. Requires a parseable GUID and
-   * a resolved, non-dev name; guards both the {@code name} and {@code external_uuid} UNIQUE
-   * columns.
-   *
-   * @return whether a row was (or would be) inserted
-   */
-  private boolean maybeSeedShip(
-      @NotNull P4kShipDto dto,
-      @Nullable UUID guid,
-      @NotNull Map<String, Manufacturer> manufacturerByGuid,
-      boolean seed,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    if (!seed
-        || guid == null
-        || !P4kDisplayName.isReal(dto.name())
-        || looksLikeDevAsset(dto.className(), dto.path())) {
-      return false;
-    }
-    String name = dto.name().trim();
-    if (shipTypeRepository.findByExternalUuid(guid).isPresent()
-        || shipTypeRepository.findByNameIgnoreCase(name).isPresent()) {
-      return false;
-    }
-    if (apply) {
-      ShipType ship = new ShipType();
-      ship.setName(name);
-      ship.setExternalUuid(guid);
-      ship.setClassName(StringNormalization.blankToNull(dto.className()));
-      ship.setManufacturer(manufacturerByGuid.get(dto.manufacturerGuid()));
-      ship.setDescriptionEn(StringNormalization.blankToNull(dto.desc()));
-      ship.setDescriptionDe(StringNormalization.blankToNull(dto.descDe()));
-      ship.setSourceSystems(GameItemSourceSystem.P4K);
-      ship.setNameKey(storedNameKey(dto.nameKey()));
-      ship.setP4kUuid(guid);
-      ship.setP4kSyncedAt(now);
-      shipTypeRepository.save(ship);
-      recordSeed(runId, "ship_type", guid, name);
-    }
-    return true;
-  }
-
-  /**
-   * Seeds a new {@code manufacturer} for an unmatched record and indexes it in {@code byGuid}, also
-   * in a dry run, so items and ships of the same run can link to it. Requires a parseable GUID, a
-   * resolved name and a non-blank code, and never re-seeds a manufacturer the run already knows.
-   *
-   * @return whether a row was (or would be) inserted
-   */
-  private boolean maybeSeedManufacturer(
-      @NotNull P4kManufacturerDto dto,
-      @Nullable UUID guid,
-      @NotNull Map<String, Manufacturer> byGuid,
-      boolean seed,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    if (!seed
-        || guid == null
-        || !P4kDisplayName.isReal(dto.name())
-        || dto.code() == null
-        || dto.code().isBlank()
-        || looksLikeDevAsset(dto.code())) {
-      return false;
-    }
-    String name = dto.name().trim();
-    String code = dto.code().trim();
-    if (manufacturerRepository.findByScwikiUuid(guid).isPresent()
-        || manufacturerRepository.findByNameIgnoreCase(name).isPresent()
-        || manufacturerRepository
-            .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(code)
-            .isPresent()) {
-      return false;
-    }
-    Manufacturer manufacturer = new Manufacturer();
-    manufacturer.setName(name);
-    manufacturer.setAbbreviation(code);
-    manufacturer.setScwikiUuid(guid);
-    manufacturer.setScwikiCode(code);
-    manufacturer.setDescription(StringNormalization.blankToNull(dto.desc()));
-    manufacturer.setP4kUuid(guid);
-    manufacturer.setP4kSyncedAt(now);
-    byGuid.put(dto.guid(), manufacturer);
-    if (apply) {
-      manufacturerRepository.save(manufacturer);
-      recordSeed(runId, "manufacturer", guid, name);
-    }
-    return true;
-  }
-
-  /**
-   * Seeds a brand-new {@code material} for an unmatched commodity record. Requires a parseable GUID
-   * and a resolved, non-dev name; guards the {@code name} and {@code scwiki_uuid} UNIQUE columns.
-   * The row is inserted {@code is_visible = false} and {@code type = NO_REFINE} so it stays out of
-   * trading flows until an admin reviews it (mirrors the SC-Wiki commodity sync).
-   *
-   * @return whether a row was (or would be) inserted
-   */
-  private boolean maybeSeedCommodity(
-      @NotNull P4kCommodityDto dto,
-      @Nullable UUID guid,
-      boolean seed,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    if (!seed
-        || guid == null
-        || !P4kDisplayName.isReal(dto.name())
-        || looksLikeDevAsset(dto.className(), dto.path())) {
-      return false;
-    }
-    String name = dto.name().trim();
-    if (materialRepository.findByScwikiUuid(guid).isPresent()
-        || materialRepository.findByNameIgnoreCase(name).isPresent()) {
-      return false;
-    }
-    if (apply) {
-      Material material = new Material();
-      material.setName(name);
-      material.setType(MaterialType.NO_REFINE);
-      material.setDescription(StringNormalization.blankToNull(dto.desc()));
-      material.setScwikiUuid(guid);
-      material.setIsVisible(false);
-      material.setSourceSystems(MaterialSourceSystem.P4K);
-      material.setNameKey(storedNameKey(dto.nameKey()));
-      material.setP4kUuid(guid);
-      material.setP4kSyncedAt(now);
-      materialRepository.save(material);
-      recordSeed(runId, "material", guid, name);
-    }
-    return true;
-  }
-
-  /**
-   * Seeds a brand-new {@code blueprint} (with its ingredient lines) for an unmatched record.
-   * Requires a parseable GUID (the NOT NULL + UNIQUE {@code scwiki_uuid}) and a non-dev {@code
-   * key}; guards {@code scwiki_uuid}. Ingredient lines are built from the catalog payload — a
-   * RESOURCE line carries {@code quantity_scu} and resolves its {@code material} by resource GUID,
-   * an ITEM line carries {@code quantity_units} and resolves its {@code game_item} by item GUID;
-   * the raw Wiki UUIDs are always stored so a later pass can resolve a then-unknown FK.
-   *
-   * @return whether a row was (or would be) inserted
-   */
-  private boolean maybeSeedBlueprint(
-      @NotNull P4kBlueprintDto dto,
-      @Nullable UUID guid,
-      boolean seed,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull Instant now) {
-    if (!seed
-        || guid == null
-        || dto.key() == null
-        || dto.key().isBlank()
-        || looksLikeDevAsset(dto.key(), dto.path())
-        || blueprintRepository.findByScwikiUuid(guid).isPresent()) {
-      return false;
-    }
-    if (apply) {
-      Blueprint blueprint = new Blueprint();
-      blueprint.setScwikiUuid(guid);
-      blueprint.setScwikiKey(dto.key().trim());
-      GameItem produced = resolveProducedItem(dto.producedItemGuid());
-      blueprint.setOutputItem(produced);
-      if (produced != null) {
-        blueprint.setOutputName(outputNameOverrides.correct(dto.key(), produced.getName()));
-      }
-      blueprint.setCraftTimeSeconds(dto.craftTimeSeconds());
-      blueprint.setP4kUuid(guid);
-      blueprint.setP4kSyncedAt(now);
-      if (dto.ingredients() != null) {
-        int orderIndex = 0;
-        for (P4kIngredientDto ing : dto.ingredients()) {
-          BlueprintIngredient line = buildIngredient(ing, orderIndex);
-          if (line != null) {
-            blueprint.addIngredient(line);
-            orderIndex++;
-          }
-        }
-      }
-      blueprintRepository.save(blueprint);
-      recordSeed(runId, "blueprint", guid, dto.key());
-    }
-    return true;
-  }
-
-  /**
-   * Builds one {@link BlueprintIngredient} line from a catalog ingredient, honouring the {@code
-   * blueprint_ingredient} CHECK constraints (RESOURCE ⇒ only {@code quantity_scu} + {@code
-   * material}; ITEM ⇒ only {@code quantity_units} + {@code game_item}). Returns {@code null} when
-   * the line carries neither a resource nor an item GUID (nothing to record).
-   *
-   * @param ing the catalog ingredient
-   * @param orderIndex the line's position in the recipe
-   * @return the built (unattached) line, or {@code null} to skip
-   */
-  @Nullable
-  private BlueprintIngredient buildIngredient(@NotNull P4kIngredientDto ing, int orderIndex) {
-    BlueprintIngredient line = new BlueprintIngredient();
-    line.setOrderIndex(orderIndex);
-    line.setWikiNameSnapshot(StringNormalization.blankToNull(ing.slot()));
-    line.setMinQuality(Quality.clampImported(ing.minQuality(), "P4K ingredient min_quality"));
-    UUID resourceGuid = parseUuid(ing.resourceGuid());
-    if (resourceGuid != null) {
-      line.setKind(BlueprintIngredientKind.RESOURCE);
-      line.setWikiResourceUuid(resourceGuid);
-      line.setMaterial(materialRepository.findByScwikiUuid(resourceGuid).orElse(null));
-      line.setQuantityScu(ing.quantityScu());
-      return line;
-    }
-    UUID itemGuid = parseUuid(ing.itemGuid());
-    if (itemGuid != null) {
-      line.setKind(BlueprintIngredientKind.ITEM);
-      line.setWikiItemUuid(itemGuid);
-      line.setGameItem(gameItemRepository.findByExternalUuid(itemGuid).orElse(null));
-      line.setQuantityUnits(ing.quantityUnits());
-      return line;
-    }
-    return null;
-  }
-
-  /**
-   * Logs a {@link SyncEventType#CREATED_FROM_P4K} event for a seeded row. No-op when no run is
-   * active (dry run).
-   *
-   * @param runId the audit run id, or {@code null}
-   * @param aggregate the sync-report aggregate label
-   * @param guid the seeded row's P4K GUID
-   * @param name the seeded row's name / key for the audit detail
-   */
-  private void recordSeed(
-      @Nullable UUID runId, @NotNull String aggregate, @NotNull UUID guid, @Nullable String name) {
-    if (runId == null) {
-      return;
-    }
-    syncReportService.logP4kEvent(
-        runId,
-        SyncEventType.CREATED_FROM_P4K,
-        aggregate,
-        guid,
-        name,
-        "Seeded new row from the P4K catalog (no UEX / SC-Wiki match).");
-  }
-
-  /**
-   * True when any of the given engine identifiers (class name, record path, blueprint key,
-   * manufacturer code) contains a {@link #DEV_TOKENS dev/test/template token} as a delimited word.
-   * Applied only to identifiers, never to the localized display name.
-   *
-   * @param identifiers the engine identifiers to scan ({@code null} entries ignored)
-   * @return {@code true} when the record smells like a non-shippable dev asset
-   */
-  private boolean looksLikeDevAsset(@Nullable String... identifiers) {
-    if (identifiers == null) {
-      return false;
-    }
-    for (String identifier : identifiers) {
-      if (identifier == null || identifier.isBlank()) {
-        continue;
-      }
-      String lower = identifier.toLowerCase(Locale.ROOT);
-      for (String token : DEV_TOKENS) {
-        if (containsToken(lower, token)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Whether {@code haystack} contains {@code token} as a delimited word — bounded by a
-   * non-alphanumeric character (or the string edge) on both sides. This matches {@code "test_gun"},
-   * {@code "gun/test"} and a bare {@code "test"} but not {@code "latest"} or {@code "contest"}.
-   *
-   * @param haystack the lower-cased identifier to scan
-   * @param token the lower-cased dev token to find
-   * @return {@code true} on a delimited-word match
-   */
-  private static boolean containsToken(@NotNull String haystack, @NotNull String token) {
-    int index = haystack.indexOf(token);
-    while (index >= 0) {
-      char before = index == 0 ? '/' : haystack.charAt(index - 1);
-      int end = index + token.length();
-      char after = end >= haystack.length() ? '/' : haystack.charAt(end);
-      if (!Character.isLetterOrDigit(before) && !Character.isLetterOrDigit(after)) {
-        return true;
-      }
-      index = haystack.indexOf(token, index + 1);
-    }
-    return false;
-  }
-
-  /**
-   * Resolves an inbound row to a single local entity through the standard chain: canonical UUID
-   * first, then a case-insensitive {@code class_name} match used only when it returns exactly one
-   * row, then a case-insensitive {@code name} match used only when it returns exactly one row.
-   *
-   * @param guid the parsed canonical GUID, or {@code null}
-   * @param byUuid the UUID finder ({@code external_uuid})
-   * @param className the inbound class name, or {@code null}
-   * @param byClassName the case-insensitive class-name finder (returns all matches)
-   * @param name the inbound display name, or {@code null}
-   * @param byName the case-insensitive name finder (returns all matches)
-   * @param <T> the entity type
-   * @return the single resolved entity, or {@code null} when nothing matched or a fallback was
-   *     ambiguous
-   */
-  @Nullable
-  private <T> T resolveSingle(
-      @Nullable UUID guid,
-      @NotNull Function<UUID, Optional<T>> byUuid,
-      @Nullable String className,
-      @NotNull Function<String, List<T>> byClassName,
-      @Nullable String name,
-      @NotNull Function<String, List<T>> byName) {
-    if (guid != null) {
-      Optional<T> hit = byUuid.apply(guid);
-      if (hit.isPresent()) {
-        return hit.get();
-      }
-    }
-    T byClass = single(className, byClassName);
-    if (byClass != null) {
-      return byClass;
-    }
-    return single(name, byName);
-  }
-
-  /**
-   * Applies a case-insensitive finder and returns the matched entity only when it is unambiguous
-   * (exactly one row); a blank key, no match, or more than one match all yield {@code null}.
-   *
-   * @param key the lookup value, or {@code null} / blank to skip
-   * @param finder the case-insensitive finder returning all matches
-   * @param <T> the entity type
-   * @return the single match, or {@code null}
-   */
-  @Nullable
-  private <T> T single(@Nullable String key, @NotNull Function<String, List<T>> finder) {
-    if (key == null || key.isBlank()) {
-      return null;
-    }
-    List<T> matches = finder.apply(key.trim());
-    return matches.size() == 1 ? matches.getFirst() : null;
-  }
-
-  /**
-   * Backfills a {@code game_item}'s {@code external_uuid} from the P4K GUID under the keep-both
-   * policy: fill only when currently null and unclaimed by another row; on a non-null differing
-   * value, log a conflict and leave it.
-   *
-   * @param counts the type's counter accumulator (mutated)
-   * @param target the matched game item
-   * @param guid the parsed P4K GUID, or {@code null}
-   * @param name the item name for the audit detail
-   * @param apply whether to persist the backfill and emit audit rows
-   * @param runId the audit run id, or {@code null}
-   */
-  private void backfillExternalUuidGameItem(
-      @NotNull CountsAccumulator counts,
-      @NotNull GameItem target,
-      @Nullable UUID guid,
-      @Nullable String name,
-      boolean apply,
-      @Nullable UUID runId) {
-    backfillCanonicalUuid(
-        counts,
-        guid,
-        target.getExternalUuid(),
-        () -> guid != null && gameItemRepository.findByExternalUuid(guid).isPresent(),
-        value -> {
-          if (apply) {
-            target.setExternalUuid(value);
-          }
-        },
-        existing -> logConflict(apply, runId, "game_item", existing, guid, name, "external_uuid"),
-        apply,
-        runId,
-        "game_item",
-        name);
-  }
-
-  /**
-   * Backfills a {@code ship_type}'s {@code external_uuid} from the P4K GUID under the keep-both
-   * policy: fill only when null and unclaimed; log a conflict on a differing value.
-   *
-   * @param counts the type's counter accumulator (mutated)
-   * @param target the matched ship
-   * @param guid the parsed P4K GUID, or {@code null}
-   * @param name the ship name for the audit detail
-   * @param apply whether to persist the backfill and emit audit rows
-   * @param runId the audit run id, or {@code null}
-   */
-  private void backfillExternalUuidShipType(
-      @NotNull CountsAccumulator counts,
-      @NotNull ShipType target,
-      @Nullable UUID guid,
-      @Nullable String name,
-      boolean apply,
-      @Nullable UUID runId) {
-    backfillCanonicalUuid(
-        counts,
-        guid,
-        target.getExternalUuid(),
-        () -> guid != null && shipTypeRepository.findByExternalUuid(guid).isPresent(),
-        value -> {
-          if (apply) {
-            target.setExternalUuid(value);
-          }
-        },
-        existing -> logConflict(apply, runId, "ship_type", existing, guid, name, "external_uuid"),
-        apply,
-        runId,
-        "ship_type",
-        name);
-  }
-
-  /**
-   * Backfills a row's canonical UUID under the keep-both policy. A null {@code existingUuid} with
-   * an unclaimed GUID is filled and counted as {@code uuidBackfilled} (logged as {@link
-   * SyncEventType#LINKED_VIA_NAME} on apply); a differing non-null value counts as {@code
-   * uuidConflicts} and invokes {@code onConflict}. A null or already-matching GUID is a no-op.
-   *
-   * @param counts the type's counter accumulator (mutated)
-   * @param guid the parsed P4K GUID, or {@code null}
-   * @param existingUuid the row's current canonical UUID, or {@code null}
-   * @param alreadyClaimed returns {@code true} when another row already holds the GUID; evaluated
-   *     only when a backfill is otherwise possible
-   * @param setter sets the canonical UUID on the row
-   * @param onConflict invoked with the existing UUID when a non-null differing value is found
-   * @param apply whether to emit the backfill audit row
-   * @param runId the audit run id, or {@code null}
-   * @param aggregate the sync-report aggregate label
-   * @param name the row name for the audit detail
-   */
-  private void backfillCanonicalUuid(
-      @NotNull CountsAccumulator counts,
-      @Nullable UUID guid,
-      @Nullable UUID existingUuid,
-      @NotNull BooleanSupplier alreadyClaimed,
-      @NotNull Consumer<UUID> setter,
-      @NotNull Consumer<UUID> onConflict,
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull String aggregate,
-      @Nullable String name) {
-    if (guid == null) {
-      return;
-    }
-    if (existingUuid == null) {
-      if (alreadyClaimed.getAsBoolean()) {
-        log.debug(
-            "P4K import: {} GUID {} already held by another row; skipping backfill of '{}'.",
-            aggregate,
-            guid,
-            name);
-        return;
-      }
-      setter.accept(guid);
-      counts.uuidBackfilled++;
-      if (apply && runId != null) {
-        syncReportService.logP4kEvent(
-            runId,
-            SyncEventType.LINKED_VIA_NAME,
-            aggregate,
-            guid,
-            name,
-            "Linked by name/slug fallback and backfilled the canonical UUID from the P4K catalog.");
-      }
-      return;
-    }
-    if (!existingUuid.equals(guid)) {
-      counts.uuidConflicts++;
-      onConflict.accept(existingUuid);
-    }
-  }
-
-  /**
-   * Logs a {@link SyncEventType#BACKFILL_AMBIGUOUS} event for a UUID conflict (existing canonical
-   * UUID differs from the P4K GUID, kept rather than overwritten). No-op outside apply mode.
-   *
-   * @param apply whether audit rows are being written
-   * @param runId the audit run id, or {@code null}
-   * @param aggregate the sync-report aggregate label
-   * @param existingUuid the row's current canonical UUID (kept)
-   * @param p4kGuid the conflicting P4K GUID (stored only in {@code p4k_uuid})
-   * @param name the row name for the audit detail
-   * @param column the canonical column name for the audit detail
-   */
-  private void logConflict(
-      boolean apply,
-      @Nullable UUID runId,
-      @NotNull String aggregate,
-      @NotNull UUID existingUuid,
-      @Nullable UUID p4kGuid,
-      @Nullable String name,
-      @NotNull String column) {
-    if (!apply || runId == null) {
-      return;
-    }
-    syncReportService.logP4kEvent(
-        runId,
-        SyncEventType.BACKFILL_AMBIGUOUS,
-        aggregate,
-        p4kGuid,
-        name,
-        "Existing "
-            + column
-            + " "
-            + existingUuid
-            + " differs from P4K GUID "
-            + p4kGuid
-            + "; kept existing, stored P4K GUID in p4k_uuid.");
-  }
-
-  /**
-   * Stamps the P4K provenance lane on a matched row: always sets {@code p4k_synced_at = now} and
-   * records the observed GUID in {@code p4k_uuid} (when parseable). No-op outside apply mode.
-   *
-   * @param apply whether to persist
-   * @param guid the parsed P4K GUID, or {@code null} (then {@code p4k_uuid} is left unchanged)
-   * @param now the import timestamp
-   * @param uuidSetter sets {@code p4k_uuid} on the row
-   * @param syncedAtSetter sets {@code p4k_synced_at} on the row
-   */
-  private void stampP4k(
-      boolean apply,
-      @Nullable UUID guid,
-      @NotNull Instant now,
-      @NotNull Consumer<UUID> uuidSetter,
-      @NotNull Consumer<Instant> syncedAtSetter) {
-    if (!apply) {
-      return;
-    }
-    if (guid != null) {
-      uuidSetter.accept(guid);
-    }
-    syncedAtSetter.accept(now);
-  }
-
-  /**
-   * Replaces a stored name key with the catalog's when the catalog carries a usable one that
-   * differs; the P4K catalog is the only source of name keys, so it always wins.
-   *
-   * @param current the row's current name key
-   * @param incoming the catalog's raw name key
-   * @param setter sets the name key on the row
-   * @param apply whether to write
-   * @return whether the row's name key changes
-   */
-  private boolean refreshNameKey(
-      @Nullable String current,
-      @Nullable String incoming,
-      @NotNull Consumer<String> setter,
-      boolean apply) {
-    String stored = storedNameKey(incoming);
-    if (stored == null || stored.equals(current)) {
-      return false;
-    }
-    if (apply) {
-      setter.accept(stored);
-    }
-    return true;
-  }
-
-  /**
-   * Converts a raw DataForge name key to its stored form.
-   *
-   * @param raw the raw key, e.g. {@code @item_NameBEHR_LaserCannon_S2}
-   * @return the key without the leading {@code @}, or {@code null} when it is blank, a {@code LOC_}
-   *     placeholder, longer than {@value #MAX_NAME_KEY_LENGTH} characters or holds an {@code @} or
-   *     whitespace
-   */
-  @Nullable
-  static String storedNameKey(@Nullable String raw) {
-    if (raw == null) {
-      return null;
-    }
-    String key = raw.strip();
-    if (key.startsWith("@")) {
-      key = key.substring(1);
-    }
-    if (key.isEmpty()
-        || key.length() > MAX_NAME_KEY_LENGTH
-        || key.regionMatches(true, 0, "LOC_", 0, 4)
-        || !NAME_KEY.matcher(key).matches()) {
-      return null;
-    }
-    return key;
-  }
-
-  /**
-   * Fill-if-null helper: when {@code current} is null and {@code incoming} is non-null, reports
-   * that a write would happen and (in apply mode) performs it via {@code setter}. An existing
-   * non-null value is never overwritten.
-   *
-   * @param current the row's current value
-   * @param incoming the candidate value from the catalog
-   * @param setter sets the value on the row
-   * @param apply whether to persist the write
-   * @param <V> the value type
-   * @return {@code true} if a write happened (apply) or would happen (dry run)
-   */
-  private <V> boolean fillIfNull(
-      @Nullable V current, @Nullable V incoming, @NotNull Consumer<V> setter, boolean apply) {
-    if (current != null || incoming == null) {
-      return false;
-    }
-    if (incoming instanceof String s && s.isBlank()) {
-      return false;
-    }
-    if (apply) {
-      setter.accept(incoming);
-    }
-    return true;
-  }
-
-  /**
-   * Binds the uploaded catalog bytes straight to a {@link P4kCatalogDto} in one pass, with no
-   * intermediate {@code JsonNode} tree, so a large catalog costs roughly the bound object rather
-   * than a full tree plus the DTO. Empty bytes, malformed JSON, or a non-object root (e.g. a JSON
-   * array) surface as a {@link BadRequestException} (HTTP 400), not a 500.
-   *
-   * @param bytes the uploaded catalog JSON bytes
-   * @return the parsed catalog (its arrays may be {@code null})
-   * @throws BadRequestException if the catalog is empty or not valid P4K catalog JSON
-   */
-  @NotNull
-  private P4kCatalogDto parse(byte[] bytes) {
-    if (bytes == null || bytes.length == 0) {
-      throw new BadRequestException("The uploaded file is empty.");
-    }
-    P4kCatalogDto catalog;
-    try {
-      catalog = objectMapper.readValue(bytes, P4kCatalogDto.class);
-    } catch (JacksonException e) {
-      log.warn("P4K import: failed to read catalog JSON — {}", e.getMessage());
+  private long refuseOlderBuild(@NotNull P4kBuild build) {
+    long changeNumber = Objects.requireNonNull(P4kChangeNumber.parse(build.changeNumber()));
+    Long highest = runRepository.findHighestChangeNumber().orElse(null);
+    if (highest != null && changeNumber < highest) {
+      rejections.record(P4kRejectionReason.OLDER_BUILD);
       throw new BadRequestException(
-          "The uploaded file is not valid P4K catalog JSON (manufacturers / items / ships /"
-              + " commodities / blueprints).");
+          "The catalogue's Build (change "
+              + changeNumber
+              + ") is older than the last applied one (change "
+              + highest
+              + ").");
     }
-    if (catalog == null) {
-      throw new BadRequestException("The uploaded file is empty or not a P4K catalog object.");
-    }
-    return catalog;
+    return changeNumber;
   }
 
   /**
-   * Leniently parses a DataForge {@code __ref} GUID string into a {@link UUID}. A null, blank, or
-   * malformed value yields {@code null} so one bad GUID never aborts the whole import (the record
-   * is reported as unmatched instead).
+   * Builds the run of an APPLY, without its kinds.
    *
-   * @param guid the GUID string, or {@code null}
-   * @return the parsed UUID, or {@code null}
-   */
-  @Nullable
-  private UUID parseUuid(@Nullable String guid) {
-    if (guid == null || guid.isBlank()) {
-      return null;
-    }
-    try {
-      return UUID.fromString(guid.trim());
-    } catch (IllegalArgumentException _) {
-      log.debug("P4K import: ignoring unparseable GUID '{}'", guid);
-      return null;
-    }
-  }
-
-  /**
-   * Renders the per-run {@link SyncEventType#SYNC_RUN_SUMMARY} detail string: a compact per-type
-   * tally plus the cross-cutting {@code ingredientsResolved} and the seeding mode.
-   *
-   * @param result the computed result
-   * @return the human-readable summary line
+   * @param head the catalogue head
+   * @param build the Build
+   * @param changeNumber the parsed change number
+   * @param request the APPLY request
+   * @param now the apply time
+   * @return the unsaved run
    */
   @NotNull
-  private String summaryDetail(@NotNull P4kImportResultDto result) {
-    return "P4K catalog import — manufacturers"
-        + fmt(result.manufacturers())
-        + " items"
-        + fmt(result.items())
-        + " ships"
-        + fmt(result.ships())
-        + " commodities"
-        + fmt(result.commodities())
-        + " blueprints"
-        + fmt(result.blueprints())
+  private static P4kImportRun newRun(
+      @NotNull P4kCatalogueHead head,
+      @NotNull P4kBuild build,
+      long changeNumber,
+      @NotNull P4kApplyRequest request,
+      @NotNull Instant now) {
+    P4kImportRun run = new P4kImportRun();
+    run.setJobId(request.jobId());
+    run.setChannel(P4kUploadGate.LIVE);
+    run.setBuildBranch(nonNull(build.branch()));
+    run.setBuildVersion(nonNull(build.version()));
+    run.setChangeNumber(changeNumber);
+    run.setBuildId(nonNull(build.buildId()));
+    P4kPatchVersion patch = P4kPatchVersion.of(build);
+    if (patch != null) {
+      run.setPatchVersion(patch.version());
+      run.setPatchVersionOrigin(patch.origin());
+    }
+    if (head.source() != null) {
+      run.setToolVersion(head.source().toolVersion());
+      run.setExportedAt(instantOrNull(head.source().exportedAt()));
+    }
+    run.setCreatedBy(request.createdBy());
+    run.setAppliedAt(now);
+    return run;
+  }
+
+  /**
+   * Builds the per-kind rows of a run.
+   *
+   * @param head the catalogue head
+   * @param report the run's report
+   * @return one row per kind
+   */
+  @NotNull
+  private static List<P4kImportRunKind> kinds(
+      @NotNull P4kCatalogueHead head, @NotNull P4kImportReport report) {
+    List<P4kImportRunKind> kinds = new ArrayList<>();
+    for (P4kKind kind : P4kKind.values()) {
+      P4kCompleteness completeness = completeness(head, kind);
+      P4kImportResultDto.Counts counts = report.counts(kind, completeness);
+      P4kImportResultDto.Sweep sweep = report.sweepResult(kind);
+      P4kKindCompleteness entry = head.completeness().get(kind.getCatalogueField());
+      P4kImportRunKind row = new P4kImportRunKind();
+      row.setKind(kind);
+      row.setCompleteness(completeness);
+      row.setCompletenessFilter(entry == null ? null : entry.filter());
+      row.setMatched(counts.matched());
+      row.setUnmatched(counts.unmatched());
+      row.setAdded(counts.created());
+      row.setChanged(counts.enriched());
+      row.setVanished(sweep.vanished());
+      row.setReappeared(sweep.reappeared());
+      row.setSweep(sweep.outcome());
+      kinds.add(row);
+    }
+    return kinds;
+  }
+
+  /**
+   * Assembles the result of a run.
+   *
+   * @param catalogue the catalogue
+   * @param build the Build
+   * @param context the run
+   * @param ingredientsResolved the ingredient lines the blueprints resolved
+   * @return the result
+   */
+  @NotNull
+  private static P4kImportResultDto result(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kBuild build,
+      @NotNull P4kImportContext context,
+      int ingredientsResolved) {
+    P4kCatalogueHead head = catalogue.head();
+    P4kImportReport report = context.getReport();
+    P4kPatchVersion patch = P4kPatchVersion.of(build);
+    P4kImportResultDto.Build buildDto =
+        new P4kImportResultDto.Build(
+            P4kUploadGate.LIVE,
+            nonNull(build.branch()),
+            nonNull(build.version()),
+            nonNull(build.changeNumber()),
+            patch == null ? null : patch.version(),
+            patch == null ? null : patch.origin());
+    return new P4kImportResultDto(
+        !context.isApply(),
+        context.isCreateItemsAndShips(),
+        buildDto,
+        report.counts(P4kKind.MANUFACTURER, completeness(head, P4kKind.MANUFACTURER)),
+        report.counts(P4kKind.ITEM, completeness(head, P4kKind.ITEM)),
+        report.counts(P4kKind.SHIP, completeness(head, P4kKind.SHIP)),
+        report.counts(P4kKind.COMMODITY, completeness(head, P4kKind.COMMODITY)),
+        report.counts(P4kKind.BLUEPRINT, completeness(head, P4kKind.BLUEPRINT)),
+        report.counts(P4kKind.STARMAP_OBJECT, completeness(head, P4kKind.STARMAP_OBJECT)),
+        report.counts(P4kKind.SHOP, completeness(head, P4kKind.SHOP)),
+        report.counts(P4kKind.RESOURCE_GROUP, completeness(head, P4kKind.RESOURCE_GROUP)),
+        report.counts(P4kKind.BLUEPRINT_CATEGORY, completeness(head, P4kKind.BLUEPRINT_CATEGORY)),
+        ingredientsResolved,
+        context.getRunId(),
+        Arrays.stream(P4kKind.values()).map(report::sweepResult).toList(),
+        P4kSweeper.MASS_GUARD_PERCENT);
+  }
+
+  /**
+   * Records the audit event of a kind swept on the admin's mass-guard override (REQ-P4K-012).
+   *
+   * @param run the run
+   * @param sweep the kind's sweep result
+   */
+  private void auditOverride(@NotNull P4kImportRun run, @NotNull P4kImportResultDto.Sweep sweep) {
+    double share = sweep.known() == 0 ? 0 : 100.0 * sweep.toStamp() / sweep.known();
+    auditRecorder.record(
+        AuditEventType.CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN,
+        run.getId(),
+        sweep.kind().name(),
+        null,
+        AuditDetails.of("kind", sweep.kind().name())
+            .with("count", sweep.toStamp())
+            .with("sharePercent", String.format(Locale.ROOT, "%.1f", share)));
+  }
+
+  /**
+   * Returns a kind's completeness.
+   *
+   * @param head the catalogue head
+   * @param kind the kind
+   * @return {@code COMPLETE} or {@code PARTIAL}
+   */
+  @NotNull
+  private static P4kCompleteness completeness(
+      @NotNull P4kCatalogueHead head, @NotNull P4kKind kind) {
+    return head.isComplete(kind) ? P4kCompleteness.COMPLETE : P4kCompleteness.PARTIAL;
+  }
+
+  /**
+   * Renders the run summary for {@code external_sync_report}.
+   *
+   * @param result the result
+   * @param report the run's report, for the loadout and paint counts
+   * @return one line with the counts per kind
+   */
+  @NotNull
+  private static String summary(
+      @NotNull P4kImportResultDto result, @NotNull P4kImportReport report) {
+    return Stream.of(
+                "manufacturers" + counts(result.manufacturers()),
+                "items" + counts(result.items()),
+                "ships" + counts(result.ships()),
+                "commodities" + counts(result.commodities()),
+                "blueprints" + counts(result.blueprints()),
+                "starmapObjects" + counts(Objects.requireNonNull(result.starmapObjects())),
+                "shops" + counts(Objects.requireNonNull(result.shops())),
+                "resourceGroups" + counts(result.resourceGroups()),
+                "blueprintCategories"
+                    + counts(Objects.requireNonNull(result.blueprintCategories())))
+            .collect(Collectors.joining(" ", "P4K catalogue import — ", ""))
         + "; ingredientsResolved="
         + result.ingredientsResolved()
-        + "; seeding="
-        + (result.seedingEnabled() ? "on" : "off");
+        + "; loadoutShips="
+        + report.loadoutShips()
+        + "; loadoutPorts="
+        + report.loadoutPorts()
+        + "; paintLinks="
+        + report.paintLinks()
+        + "; createItemsAndShips="
+        + result.createItemsAndShips();
   }
 
   /**
-   * Formats one {@link P4kImportResultDto.Counts} block for the run-summary detail string.
+   * Renders the audit payload of an APPLY: the Build, the run's choice and the counts per kind.
    *
-   * @param c the counts
-   * @return a compact {@code [m=…,bf=…,cf=…,en=…,cr=…,un=…]} fragment
+   * @param run the recorded run
+   * @param result the result
+   * @return the payload
    */
   @NotNull
-  private String fmt(@NotNull P4kImportResultDto.Counts c) {
-    return "[m="
-        + c.matched()
-        + ",bf="
-        + c.uuidBackfilled()
-        + ",cf="
-        + c.uuidConflicts()
-        + ",en="
-        + c.enriched()
-        + ",cr="
-        + c.created()
-        + ",un="
-        + c.unmatched()
-        + "]";
+  private static AuditDetails auditDetails(
+      @NotNull P4kImportRun run, @NotNull P4kImportResultDto result) {
+    return AuditDetails.of("branch", run.getBuildBranch())
+        .with("change", run.getChangeNumber())
+        .with("createItemsAndShips", result.createItemsAndShips())
+        .with("manufacturers", counts(result.manufacturers()))
+        .with("items", counts(result.items()))
+        .with("ships", counts(result.ships()))
+        .with("commodities", counts(result.commodities()))
+        .with("blueprints", counts(result.blueprints()))
+        .with("starmapObjects", counts(Objects.requireNonNull(result.starmapObjects())))
+        .with("shops", counts(Objects.requireNonNull(result.shops())))
+        .with("resourceGroups", counts(result.resourceGroups()))
+        .with("blueprintCategories", counts(Objects.requireNonNull(result.blueprintCategories())))
+        .with("ingredientsResolved", result.ingredientsResolved());
   }
 
   /**
-   * Mutable per-type counter accumulator used while scanning a type's records, converted to the
-   * immutable {@link P4kImportResultDto.Counts} record at the end. Package-private fields keep the
-   * inner accumulation terse; only {@link #toCounts()} is exposed to the result.
+   * Formats one kind's counts.
+   *
+   * @param c the counts
+   * @return a compact {@code [m=…,en=…,im=…,cr=…,un=…,rv=…,uv=…]} fragment
    */
-  private static final class CountsAccumulator {
-    private int matched;
-    private int uuidBackfilled;
-    private int uuidConflicts;
-    private int enriched;
-    private int created;
-    private int unmatched;
+  @NotNull
+  private static String counts(@NotNull P4kImportResultDto.Counts c) {
+    return "[m=%d,en=%d,im=%d,cr=%d,un=%d,rv=%d,uv=%d]"
+        .formatted(
+            c.matched(),
+            c.enriched(),
+            c.identityMismatches(),
+            c.created(),
+            c.unmatched(),
+            c.review(),
+            c.unknownValues());
+  }
 
-    /**
-     * Snapshots the accumulated counters into the immutable result record.
-     *
-     * @return the per-type counts
-     */
-    @NotNull
-    private P4kImportResultDto.Counts toCounts() {
-      return new P4kImportResultDto.Counts(
-          matched, uuidBackfilled, uuidConflicts, enriched, created, unmatched);
+  /**
+   * Returns a Build text, empty when absent.
+   *
+   * @param value the text, or {@code null}
+   * @return the text, or an empty string
+   */
+  @NotNull
+  private static String nonNull(@Nullable String value) {
+    return value == null ? "" : value;
+  }
+
+  /**
+   * Parses an RFC 3339 time.
+   *
+   * @param text the time text, or {@code null}
+   * @return the instant, or {@code null} when absent or not parseable
+   */
+  @Nullable
+  private static Instant instantOrNull(@Nullable String text) {
+    if (text == null) {
+      return null;
+    }
+    try {
+      return Instant.parse(text);
+    } catch (DateTimeParseException _) {
+      return null;
     }
   }
-
-  /**
-   * Blueprint reconciliation outcome: the per-type counts plus the cross-cutting count of
-   * ingredient lines whose FK this import resolved (which does not belong to any single {@link
-   * P4kImportResultDto.Counts} field).
-   *
-   * @param counts the blueprint counts
-   * @param ingredientsResolved the number of ingredient lines newly resolved
-   */
-  private record BlueprintOutcome(
-      @NotNull P4kImportResultDto.Counts counts, int ingredientsResolved) {}
 }

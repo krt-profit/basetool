@@ -39,7 +39,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Renders {@code /admin/p4k-import} on the list pattern (REQ-UI-027): page head under the
  * "Stammdaten" eyebrow, the upload and the job list as cards, the stacked job table whose rows the
- * page script fills, and the empty-state hook the script toggles.
+ * page script fills, the empty-state hook the script toggles, and the APPLY checkbox and Build line
+ * of the version-2 import (REQ-P4K-005, REQ-P4K-009).
  */
 @SpringBootTest
 class AdminP4kImportPagePatternRenderTest {
@@ -81,7 +82,13 @@ class AdminP4kImportPagePatternRenderTest {
         .containsPattern(
             "id=\"krt-p4k-jobs-empty\" class=\"empty-state\" data-testid=\"empty-state\" hidden")
         .contains("id=\"krt-p4k-apply-panel\"")
-        .contains("id=\"krt-p4k-results\"");
+        .contains("id=\"krt-p4k-results\"")
+        .contains("accept=\".json,.gz,.zst,")
+        .contains("type=\"checkbox\" id=\"krt-p4k-create-new\">")
+        .contains("id=\"krt-p4k-would-create\"")
+        .contains("id=\"krt-p4k-build-line\" hidden")
+        .contains("id=\"krt-p4k-build-patch\"")
+        .doesNotContain("krt-p4k-seed");
     assertThat(html)
         .contains("/css/pages/catalogue/admin-p4k-import.css")
         .contains("/js/catalogue/p4k-import.js");

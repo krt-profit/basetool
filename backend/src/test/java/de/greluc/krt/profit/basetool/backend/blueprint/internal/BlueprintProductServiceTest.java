@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.ProductKeys;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintCatalogueMetadata;
@@ -47,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatUnit;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatSource;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,14 +78,14 @@ class BlueprintProductServiceTest {
         new BlueprintProductService(
             blueprintRepository,
             personalBlueprintRepository,
-            new BlueprintNameNormalizer(),
+            new ProductKeys(new BlueprintNameNormalizer()),
             blueprintMapper,
             gameItemStatRepository);
   }
 
   private static BlueprintProductRow row(
       String outputName, String key, String manufacturer, UUID outputItemId) {
-    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId);
+    return new BlueprintProductRow(outputName, key, manufacturer, outputItemId, null, null);
   }
 
   private static Blueprint blueprint(String outputName) {
@@ -101,7 +103,7 @@ class BlueprintProductServiceTest {
   @Test
   void searchProducts_dedupesMultiVariantNamesAndCountsThem() {
     UUID itemId = UUID.randomUUID();
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_A", "Behring", itemId),
@@ -122,25 +124,25 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_passesTrimmedQueryToRepository() {
-    when(blueprintRepository.findActiveProductRows("pistol")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("pistol")).thenReturn(List.of());
 
     service.searchProducts("  pistol  ", 25, SUB);
 
-    verify(blueprintRepository).findActiveProductRows("pistol");
+    verify(blueprintRepository).findOfferableProductRows("pistol");
   }
 
   @Test
   void searchProducts_escapesLikeMetacharactersInTheQuery() {
-    when(blueprintRepository.findActiveProductRows("100\\%\\_a\\\\b")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("100\\%\\_a\\\\b")).thenReturn(List.of());
 
     service.searchProducts("100%_a\\b", 25, SUB);
 
-    verify(blueprintRepository).findActiveProductRows("100\\%\\_a\\\\b");
+    verify(blueprintRepository).findOfferableProductRows("100\\%\\_a\\\\b");
   }
 
   @Test
   void searchProducts_sortsAlphabeticallyAndCapsToLimit() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Bravo", "B", null, null),
@@ -157,7 +159,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_clampsNonPositiveLimitToOne() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
     noneOwned();
 
@@ -168,7 +170,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void searchProducts_marksProductsOwnedByCaller() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Alpha", "A", null, null), row("Bravo", "B", null, null)));
     when(personalBlueprintRepository.findAllByOwnerUserIdAndProductKeyIn(
             eq(SUB), org.mockito.ArgumentMatchers.any()))
@@ -187,7 +189,7 @@ class BlueprintProductServiceTest {
   @Test
   void resolveByProductKey_returnsCanonicalProductWithOutputItemId() {
     UUID itemId = UUID.randomUUID();
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Arclight Pistol", "BP_A", "Behring", itemId)));
 
     Optional<ResolvedProduct> resolved = service.resolveByProductKey("arclight pistol");
@@ -201,12 +203,12 @@ class BlueprintProductServiceTest {
   @Test
   void resolveByProductKey_returnsEmptyForBlankKey() {
     assertTrue(service.resolveByProductKey("  ").isEmpty());
-    verify(blueprintRepository, org.mockito.Mockito.never()).findActiveProductRows(anyString());
+    verify(blueprintRepository, org.mockito.Mockito.never()).findOfferableProductRows(anyString());
   }
 
   @Test
   void resolveByProductKey_returnsEmptyForUnknownKey() {
-    when(blueprintRepository.findActiveProductRows("")).thenReturn(List.of());
+    when(blueprintRepository.findOfferableProductRows("")).thenReturn(List.of());
 
     assertTrue(service.resolveByProductKey("does-not-exist").isEmpty());
   }
@@ -223,7 +225,7 @@ class BlueprintProductServiceTest {
     UUID outputItemId = UUID.randomUUID();
     when(blueprintRepository.findByOutputItemId(gameItemId))
         .thenReturn(List.of(blueprint("Arclight Pistol")));
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(List.of(row("Arclight Pistol", "BP_A", "Behring", outputItemId)));
 
     Optional<ResolvedProduct> resolved = service.resolveByGameItem(gameItemId);
@@ -242,7 +244,7 @@ class BlueprintProductServiceTest {
         .thenReturn(List.of(blueprint("Zeta Widget"), blueprint("Alpha Widget")));
     when(blueprintRepository.findByOutputItemId(itemReverseOrder))
         .thenReturn(List.of(blueprint("Alpha Widget"), blueprint("Zeta Widget")));
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Alpha Widget", "BP_ALPHA", null, null),
@@ -270,7 +272,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_mapsLowercasedKeyToProductKey() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_CRAFT_AMRS_LaserCannon_S1", null, null),
@@ -285,7 +287,7 @@ class BlueprintProductServiceTest {
 
   @Test
   void scwikiKeyToProductKeyIndex_excludesAmbiguousKeys() {
-    when(blueprintRepository.findActiveProductRows(""))
+    when(blueprintRepository.findOfferableProductRows(""))
         .thenReturn(
             List.of(
                 row("Arclight Pistol", "BP_DUP", null, null),
@@ -306,8 +308,8 @@ class BlueprintProductServiceTest {
     when(blueprintRepository.findActiveIdNameRows())
         .thenReturn(
             List.of(
-                new BlueprintIdNameRow(id1, "Arclight Pistol"),
-                new BlueprintIdNameRow(id2, "Arclight Pistol")));
+                new BlueprintIdNameRow(id1, "Arclight Pistol", null, false),
+                new BlueprintIdNameRow(id2, "Arclight Pistol", null, false)));
     Blueprint recipe = new Blueprint();
     var metadata =
         new BlueprintCatalogueMetadata(
@@ -341,11 +343,26 @@ class BlueprintProductServiceTest {
   }
 
   @Test
+  void resolveRecipe_countsOnlyTheLiveVariantsBesideALiveRepresentative() {
+    UUID live = UUID.randomUUID();
+    when(blueprintRepository.findActiveIdNameRows())
+        .thenReturn(
+            List.of(
+                new BlueprintIdNameRow(live, "Arclight Pistol", null, false),
+                new BlueprintIdNameRow(UUID.randomUUID(), "Arclight Pistol", null, true)));
+    when(blueprintRepository.findById(live)).thenReturn(Optional.of(new Blueprint()));
+
+    PersonalBlueprintRecipeResponse result = service.resolveRecipe("arclight pistol").orElseThrow();
+
+    assertEquals(1, result.variantCount());
+  }
+
+  @Test
   void resolveRecipe_carriesTheOutputItemsStatBaseValuesWithTheirUnits() {
     UUID id = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon")));
+        .thenReturn(List.of(new BlueprintIdNameRow(id, "Omnisky III Cannon", null, false)));
     GameItem item = new GameItem();
     item.setId(itemId);
     Blueprint recipe = new Blueprint();
@@ -354,23 +371,27 @@ class BlueprintProductServiceTest {
     when(gameItemStatRepository.findByGameItemId(itemId))
         .thenReturn(
             List.of(
-                stat(BlueprintStatProperty.WEAPON_DAMAGE, 97.2),
-                stat(BlueprintStatProperty.HEALTH_MAX_HEALTH, 550.0)));
+                stat(BlueprintStatProperty.WEAPON_DAMAGE, 97.2, GameItemStatSource.SCWIKI),
+                stat(BlueprintStatProperty.HEALTH_MAX_HEALTH, 550.0, GameItemStatSource.P4K)));
 
     PersonalBlueprintRecipeResponse result =
         service.resolveRecipe("omnisky iii cannon").orElseThrow();
 
     assertEquals(
         List.of(
-            new BlueprintStatBaseDto("health_maxhealth", 550.0, BlueprintStatUnit.NONE),
-            new BlueprintStatBaseDto("weapon_damage", 97.2, BlueprintStatUnit.NONE)),
+            new BlueprintStatBaseDto(
+                "health_maxhealth", 550.0, BlueprintStatUnit.NONE, GameItemStatSource.P4K),
+            new BlueprintStatBaseDto(
+                "weapon_damage", 97.2, BlueprintStatUnit.NONE, GameItemStatSource.SCWIKI)),
         result.baseStats());
   }
 
-  private static GameItemStat stat(BlueprintStatProperty property, double value) {
+  private static GameItemStat stat(
+      BlueprintStatProperty property, double value, GameItemStatSource source) {
     GameItemStat stat = new GameItemStat();
     stat.setProperty(property);
     stat.setBaseValue(value);
+    stat.setSource(source);
     return stat;
   }
 
@@ -383,7 +404,7 @@ class BlueprintProductServiceTest {
   @Test
   void resolveRecipe_returnsEmptyForUnknownKey() {
     when(blueprintRepository.findActiveIdNameRows())
-        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item")));
+        .thenReturn(List.of(new BlueprintIdNameRow(UUID.randomUUID(), "Other Item", null, false)));
 
     assertTrue(service.resolveRecipe("ghost").isEmpty());
   }

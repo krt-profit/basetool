@@ -157,7 +157,8 @@ public class ProfitCalculationService {
                 bestBuy.getTerminal().getName(),
                 location(bestBuy.getTerminal()),
                 bestSell.getTerminal().getName(),
-                location(bestSell.getTerminal())));
+                location(bestSell.getTerminal()),
+                material.getNameDe()));
       }
     }
 

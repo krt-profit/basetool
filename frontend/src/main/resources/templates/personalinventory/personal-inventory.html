@@ -63,7 +63,7 @@
                     <td><span class="cell-title" th:text="${item.name}">Name</span></td>
                     <td th:attr="data-label=#{personalInventory.field.location}">
                         <span class="krt-pi-location-marker"
-                              th:classappend="${item.locationType?.name() == 'CITY'} ? ' krt-pi-loc-city' : ' krt-pi-loc-station'"></span>
+                              th:classappend="${item.locationType?.name() == 'CITY' ? ' krt-pi-loc-city' : (item.locationType?.name() == 'SPACE_STATION' ? ' krt-pi-loc-station' : '')}"></span>
                         <span th:text="${item.locationName}">Ort</span>
                     </td>
                     <td class="num" th:attr="data-label=#{personalInventory.field.quantity}" th:text="${item.quantity}">1</td>
@@ -77,8 +77,7 @@
                                          data-name=${item.name},
                                          data-note=${item.note},
                                          data-quantity=${item.quantity},
-                                         data-location-uex-id=${item.locationUexId},
-                                         data-location-type=${item.locationType?.name()},
+                                         data-location-id=${item.locationId},
                                          data-location-name=${item.locationName}"
                                 th:title="#{personalInventory.action.edit}"
                                 th:aria-label="#{personalInventory.action.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
@@ -118,8 +117,7 @@
 
                 <input type="hidden" th:field="*{id}">
                 <input type="hidden" th:field="*{version}">
-                <input type="hidden" id="krt-pi-location-uex-id" th:field="*{locationUexId}">
-                <input type="hidden" id="krt-pi-location-type" th:field="*{locationType}">
+                <input type="hidden" id="krt-pi-location-id" th:field="*{locationId}">
 
                 <div class="form-group">
                     <label for="krt-pi-name" th:text="#{personalInventory.field.name}">Name</label>
@@ -192,7 +190,7 @@
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
     window.krtPersonalInventoryEndpoints = {
-        uexSearch: /*[[@{/personal-inventory/uex-search}]]*/ '/personal-inventory/uex-search'
+        locationSearch: /*[[@{/personal-inventory/location-search}]]*/ '/personal-inventory/location-search'
     };
 </script>
 <script type="module" th:src="@{/js/personalinventory/personal-inventory.js}" th:attr="nonce=${cspNonce}"></script>

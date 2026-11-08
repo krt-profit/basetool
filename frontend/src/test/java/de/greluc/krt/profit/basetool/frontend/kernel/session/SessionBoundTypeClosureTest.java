@@ -60,10 +60,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 class SessionBoundTypeClosureTest {
 
   /** Selection floor: session writes in the main classes when the test was added. */
-  private static final int MIN_WRITES = 317;
+  private static final int MIN_WRITES = 313;
 
   /** Selection floor: session-bound application types when the test was added. */
-  private static final int MIN_APPLICATION_TYPES = 21;
+  private static final int MIN_APPLICATION_TYPES = 20;
 
   /**
    * Session writes whose static type the scan cannot determine, resolved by review: {@code site ->
