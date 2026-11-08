@@ -159,6 +159,7 @@ class RefineryOrderStoreServiceTest {
     order.setId(ORDER_ID);
     order.setOwner(owner);
     order.setStatus(RefineryOrderStatus.IN_PROGRESS);
+    order.setGoods(new HashSet<>(Set.of(newGoodWithOutput(material))));
   }
 
   @Test
@@ -695,20 +696,39 @@ class RefineryOrderStoreServiceTest {
       assertEquals(1, good.getOutputQuantity());
     }
 
+    /**
+     * A material no good of the order outputs is refused before anything is booked, and no good's
+     * output quantity changes (REQ-REFINERY-022).
+     */
     @Test
-    void noMatchingGood_silentlySkipsTheUpdate() {
+    void materialThatIsNotAnOutput_isRefusedAndBooksNothing() {
       Material storedMaterial = newMaterial(QuantityType.SCU);
       Material differentOutputMaterial = newMaterial(QuantityType.SCU);
       RefineryGood good = newGoodWithOutput(differentOutputMaterial);
       good.setOutputQuantity(999);
       order.setGoods(new HashSet<>(Set.of(good)));
 
-      storeWithMaterial(storedMaterial, 50.0);
+      BadRequestException ex =
+          assertThrows(BadRequestException.class, () -> storeWithMaterial(storedMaterial, 50.0));
 
-      assertEquals(
-          999,
-          good.getOutputQuantity(),
-          "no match -> previous outputQuantity is preserved verbatim");
+      assertEquals("error.refinery_order.material_not_an_output", ex.getMessage());
+      assertEquals(999, good.getOutputQuantity());
+      assertNull(order.getStoredAt());
+      verify(inventoryItemRepository, never()).save(any());
+      verify(refineryOrderRepository, never()).save(any());
+    }
+
+    /** A grade no good carries books onto the good of the same material at another grade. */
+    @Test
+    void gradeNoGoodCarries_fallsBackToTheMaterialsGood() {
+      Material scuMaterial = newMaterial(QuantityType.SCU);
+      RefineryGood good = newGoodWithOutput(scuMaterial);
+      good.setQuality(733);
+      order.setGoods(new HashSet<>(Set.of(good)));
+
+      storeWithMaterial(scuMaterial, 3.0);
+
+      assertEquals(300, good.getOutputQuantity());
     }
 
     @Test
@@ -728,19 +748,25 @@ class RefineryOrderStoreServiceTest {
               + "crash the loop nor block the legitimate match");
     }
 
+    /** An order without goods has no output, so every item is refused (REQ-REFINERY-022). */
     @Test
-    void goodsCollectionIsNull_silentlyReturns() {
+    void orderWithoutGoods_refusesTheItem() {
       order.setGoods(null);
 
       stubLookupsForSingleItem();
 
-      refineryOrderService.storeRefineryOrder(
-          OWNER_ID,
-          ORDER_ID,
-          new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
-          false);
+      BadRequestException ex =
+          assertThrows(
+              BadRequestException.class,
+              () ->
+                  refineryOrderService.storeRefineryOrder(
+                      OWNER_ID,
+                      ORDER_ID,
+                      new RefineryOrderStoreDto(List.of(itemWithAmount(10.0, null))),
+                      false));
 
-      verify(refineryOrderRepository, times(1)).save(order);
+      assertEquals("error.refinery_order.material_not_an_output", ex.getMessage());
+      verify(refineryOrderRepository, never()).save(any());
     }
   }
 

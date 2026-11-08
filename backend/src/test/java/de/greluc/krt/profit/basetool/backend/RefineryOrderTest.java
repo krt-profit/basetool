@@ -571,12 +571,7 @@ class RefineryOrderTest {
 
   @Test
   void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
-    RefineryOrder order = new RefineryOrder();
-    order.setOwningOrgUnit(iridium);
-    order.setLocation(station);
-    order.setOwner(user1);
-    order.setRefiningMethod(dinyx);
-    order = refineryOrderRepository.save(order);
+    RefineryOrder order = storableOrder();
 
     RefineryOrderStoreItemDto itemDto =
         new RefineryOrderStoreItemDto(
@@ -689,12 +684,7 @@ class RefineryOrderTest {
 
   @Test
   void testStoreRefineryOrder_RejectsNegativeAmount() throws Exception {
-    RefineryOrder order = new RefineryOrder();
-    order.setOwningOrgUnit(iridium);
-    order.setLocation(station);
-    order.setOwner(user1);
-    order.setRefiningMethod(dinyx);
-    order = refineryOrderRepository.save(order);
+    RefineryOrder order = storableOrder();
 
     RefineryOrderStoreItemDto itemDto =
         new RefineryOrderStoreItemDto(
@@ -758,12 +748,59 @@ class RefineryOrderTest {
         refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
   }
 
+  /**
+   * A store line whose material is not an output of the order is refused with its own 400; the
+   * store books nothing and the order stays open (REQ-REFINERY-022).
+   */
+  @Test
+  void storeRefusesAMaterialThatIsNotAnOutputOfTheOrder() throws Exception {
+    RefineryOrder order = storableOrder();
+    RefineryOrderStoreItemDto output =
+        new RefineryOrderStoreItemDto(
+            quantanium.getId(), station.getId(), 100, 5.0, null, null, null, null, null);
+    RefineryOrderStoreItemDto foreign =
+        new RefineryOrderStoreItemDto(
+            gold.getId(), station.getId(), 100, 5.0, null, null, null, null, null);
+
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders/" + order.getId() + "/store")
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(user1.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("REFINERY_WRITE")))
+                .locale(java.util.Locale.ENGLISH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(
+                        new RefineryOrderStoreDto(List.of(output, foreign)))))
+        .andExpect(status().isBadRequest())
+        .andExpect(
+            jsonPath("$.detail")
+                .value(
+                    "This material is not an output of the refinery order and cannot be stored."));
+
+    RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
+    assertEquals(
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        stored.getStatus());
+    assertEquals(100, stored.getGoods().iterator().next().getOutputQuantity().intValue());
+    assertTrue(
+        inventoryItemRepository
+            .findMaterialRowsByUser(user1, org.springframework.data.domain.Pageable.unpaged())
+            .isEmpty(),
+        "nothing is booked for a refused store");
+  }
+
   /** Makes Iridium profit-eligible, so its members reach the job-order queue (REQ-ORG-003). */
   private void letIridiumReachTheJobOrderQueue() {
     iridium.setProfitEligible(true);
     iridium = squadronRepository.save(iridium);
   }
 
+  /** An open order of user1 whose one good outputs 100 units of Quantanium at grade 100. */
   private RefineryOrder storableOrder() {
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
@@ -772,6 +809,14 @@ class RefineryOrderTest {
     order.setRefiningMethod(dinyx);
     order.setStatus(
         de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN);
+    RefineryGood good = new RefineryGood();
+    good.setInputMaterial(quantanium);
+    good.setInputQuantity(100);
+    good.setOutputMaterial(quantanium);
+    good.setOutputQuantity(100);
+    good.setQuality(100);
+    good.setRefineryOrder(order);
+    order.setGoods(new HashSet<>(Set.of(good)));
     return refineryOrderRepository.save(order);
   }
 

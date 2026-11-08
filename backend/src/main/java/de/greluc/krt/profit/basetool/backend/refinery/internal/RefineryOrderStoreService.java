@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -97,8 +99,9 @@ public class RefineryOrderStoreService {
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order or any
    *     referenced id is unknown, or an item names a job order outside the caller's read scope
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
-   *     already stored, has no output goods, an item combines {@code personal} with a job order, or
-   *     an item names a job order that does not require its material
+   *     already stored, an item's material is not an output of the order's goods, an item combines
+   *     {@code personal} with a job order, or an item names a job order that does not require its
+   *     material
    */
   @Transactional
   public void storeRefineryOrder(
@@ -121,8 +124,14 @@ public class RefineryOrderStoreService {
 
     final RefineryOrderStatus previousStatus = order.getStatus();
     final Set<UUID> bookedOnto = new LinkedHashSet<>();
+    final List<RefineryGood> goods =
+        dto.items().stream()
+            .map(item -> requireOutputGood(order, item.materialId(), item.quality()))
+            .toList();
 
-    for (RefineryOrderStoreItemDto itemDto : dto.items()) {
+    for (int index = 0; index < dto.items().size(); index++) {
+      final RefineryOrderStoreItemDto itemDto = dto.items().get(index);
+      final RefineryGood good = goods.get(index);
       final Material mat =
           Entities.require(
               materialRepository.findById(itemDto.materialId()),
@@ -193,7 +202,7 @@ public class RefineryOrderStoreService {
           order.getMissionId());
       bookedOnto.add(assignee.getId());
 
-      updateGoodOutputQuantity(order, itemDto);
+      writeBackOutputQuantity(good, itemDto.amount());
     }
 
     order.setStatus(RefineryOrderStatus.COMPLETED);
@@ -267,37 +276,41 @@ public class RefineryOrderStoreService {
   }
 
   /**
-   * Writes the user's final stored amount back into the matching {@link
-   * de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood}, converting SCU back to
-   * units (×100).
+   * Resolves the good a store item books, refusing a material that is not an output of the order
+   * (REQ-REFINERY-022).
+   *
+   * @param order the order being stored
+   * @param materialId the material the item books
+   * @param quality the grade the item carries; a good of another grade matches when none carries it
+   * @return the good of that material and grade, or of that material at another grade
+   * @throws BadRequestException when no good of the order outputs the material
    */
-  private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
-    if (order.getGoods() == null
-        || itemDto == null
-        || itemDto.materialId() == null
-        || itemDto.amount() == null) {
-      return;
+  @NotNull
+  private RefineryGood requireOutputGood(
+      @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
+    RefineryGood good = findGood(order, materialId, quality);
+    if (good == null) {
+      good = findGood(order, materialId, null);
     }
-    RefineryGood target = findGood(order, itemDto.materialId(), itemDto.quality());
-    if (target == null) {
-      target = findGood(order, itemDto.materialId(), null);
+    if (good == null) {
+      throw new BadRequestException("error.refinery_order.material_not_an_output");
     }
-    if (target != null) {
-      RefineryGood good = target;
-      double amount = itemDto.amount();
-      String quantityTypeName =
-          good.getOutputMaterial().getQuantityType() != null
-              ? good.getOutputMaterial().getQuantityType().name()
-              : null;
-      long rawNew;
-      if ("SCU".equals(quantityTypeName)) {
-        rawNew = Math.round(amount * 100.0d);
-      } else {
-        rawNew = Math.round(amount);
-      }
-      int clamped = Math.clamp(rawNew, 1, Integer.MAX_VALUE);
-      good.setOutputQuantity(clamped);
-    }
+    return good;
+  }
+
+  /**
+   * Writes the stored amount back into the good's output quantity, converting SCU to units (×100)
+   * and clamping to at least one unit.
+   *
+   * @param good the good the item belongs to
+   * @param amount the stored amount in the material's quantity type
+   */
+  private void writeBackOutputQuantity(@NotNull RefineryGood good, double amount) {
+    long units =
+        good.getOutputMaterial().getQuantityType() == QuantityType.SCU
+            ? Math.round(amount * RefineryOrders.UNITS_PER_SCU)
+            : Math.round(amount);
+    good.setOutputQuantity(Math.clamp(units, 1, Integer.MAX_VALUE));
   }
 
   /**
@@ -306,10 +319,14 @@ public class RefineryOrderStoreService {
    * @param order the order whose goods to search
    * @param materialId the output material the item books
    * @param quality the grade the item carries, or {@code null} to match on the material alone
-   * @return the good, or {@code null} when none matches
+   * @return the good, or {@code null} when none matches or the order has no goods
    */
   @Nullable
-  private RefineryGood findGood(RefineryOrder order, UUID materialId, @Nullable Integer quality) {
+  private RefineryGood findGood(
+      @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
+    if (order.getGoods() == null) {
+      return null;
+    }
     for (RefineryGood good : order.getGoods()) {
       if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
         continue;
