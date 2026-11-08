@@ -233,6 +233,9 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
   offers no status choice. A `PUT` may set any status, as the edit form's status select does; this is
   deliberate (owner decision 2026-10-01) and only a stored order is locked. An order a `PUT` sets to
   `COMPLETED` without a store is accepted; it cannot be stored afterwards, so nothing is duplicated.
+- Store refuses (400 `error.refinery_order.material_not_an_output`) an item whose material is not the
+  output material of one of the order's goods; the store books nothing then. A good of another grade
+  of the same material takes the item's amount when no good carries the item's grade.
 - Store refuses (400) an item whose job order does not require the item's material, on the same terms
   as `POST /inventory` (REQ-ORDERS-018).
 - Store accepts an item's job order only when the caller sees it within the tenancy read scope, the

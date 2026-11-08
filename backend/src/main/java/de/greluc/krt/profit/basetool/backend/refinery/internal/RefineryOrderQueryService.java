@@ -192,7 +192,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
    */
   private static double toScu(int outputQuantityUnits, QuantityType quantityType) {
     if (quantityType == QuantityType.SCU) {
-      return outputQuantityUnits / 100.0d;
+      return outputQuantityUnits / RefineryOrders.UNITS_PER_SCU;
     }
     return outputQuantityUnits;
   }
