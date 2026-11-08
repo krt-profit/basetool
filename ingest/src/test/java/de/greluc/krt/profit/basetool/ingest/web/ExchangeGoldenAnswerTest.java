@@ -467,6 +467,7 @@ class ExchangeGoldenAnswerTest {
         "route-post-ship-changes",
         post(
             "/me/ships/changes", fixture("change-set--shipChangeSet/valid/link-then-upsert.json")));
+    routes.put("route-get-refinery-orders", get("/me/refinery-orders?limit=10"));
     routes.put("route-get-org-demand", get("/me/org-demand"));
     routes.put("route-get-org-units", get("/me/org-units"));
     routes.put("route-get-org-stock", get("/org-stock"));
@@ -511,6 +512,8 @@ class ExchangeGoldenAnswerTest {
         case "GET /api/v1/exchange/me/blueprints" -> fixture("page--blueprintPage/valid/feed.json");
         case "GET /api/v1/exchange/me/stock" -> fixture("page--stockPage/valid/snapshot.json");
         case "GET /api/v1/exchange/me/ships" -> SHIP_PAGE;
+        case "GET /api/v1/exchange/me/refinery-orders" ->
+            fixture("page--refineryOrderPage/valid/snapshot.json");
         case "GET /api/v1/exchange/me/org-demand" -> fixture("org-demand/valid/both-lists.json");
         case "GET /api/v1/exchange/me/org-units" -> fixture("org-unit-list/valid/all-kinds.json");
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");

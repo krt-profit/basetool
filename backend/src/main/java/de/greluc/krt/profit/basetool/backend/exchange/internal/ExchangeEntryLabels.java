@@ -104,6 +104,7 @@ public class ExchangeEntryLabels {
             }
           }
         }
+        case REFINERY_ORDER -> {}
         case null -> throw new NullPointerException("resource");
       }
     }

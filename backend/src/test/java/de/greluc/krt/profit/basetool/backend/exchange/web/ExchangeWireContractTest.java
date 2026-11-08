@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
@@ -149,6 +150,7 @@ class ExchangeWireContractTest {
           Map.entry("page--stockPage", ExchangeStockPageDto.class),
           Map.entry("page--shipPage", ExchangeShipPageDto.class),
           Map.entry("page--orgStockPage", ExchangeOrgStockPageDto.class),
+          Map.entry("page--refineryOrderPage", ExchangeRefineryOrderPageDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
@@ -220,6 +222,7 @@ class ExchangeWireContractTest {
     jdbc.update("DELETE FROM material_exchange_offer WHERE owner_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
     jdbc.update("DELETE FROM ship WHERE owner_id = ?", member);
+    deleteRefineryOrders();
     jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", member);
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
@@ -327,7 +330,7 @@ class ExchangeWireContractTest {
     }
     assertThat(items)
         .as("every paged resource shows its seeded entry")
-        .hasSize(4)
+        .hasSize(5)
         .allSatisfy((path, seen) -> assertThat(seen).as(path).isPositive());
     assertThat(
             mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + "/me/org-units")).path("items").size())
@@ -352,6 +355,7 @@ class ExchangeWireContractTest {
     jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
     jdbc.update("DELETE FROM ship WHERE owner_id = ?", member);
+    deleteRefineryOrders();
     Map<String, Integer> removed = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
       if (cursors.containsKey(operation.relayPath())) {
@@ -367,7 +371,7 @@ class ExchangeWireContractTest {
     }
     assertThat(removed)
         .as("every feed reports its removed entry")
-        .hasSize(3)
+        .hasSize(4)
         .allSatisfy((path, count) -> assertThat(count).as(path).isPositive());
   }
 
@@ -405,8 +409,8 @@ class ExchangeWireContractTest {
 
   /**
    * Seeds one owned blueprint, one stock lot at a UEX city, one Logistician membership of a
-   * Staffel, one shared material and one shared ship component lot in that Staffel's pool and one
-   * ship in that Staffel for the member.
+   * Staffel, one shared material and one shared ship component lot in that Staffel's pool, one ship
+   * in that Staffel and one running refinery order with one good for the member.
    */
   private void seed() {
     Blueprint blueprint = new Blueprint();
@@ -532,6 +536,34 @@ class ExchangeWireContractTest {
         shipType,
         member,
         orgUnit);
+
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO refinery_order (id, version, owner_id, location_id, mission_id,"
+            + " owning_org_unit_id, status, started_at, duration_minutes, expenses)"
+            + " VALUES (?, 0, ?, ?, ?, ?, 'IN_PROGRESS', now(), 120, 1500)",
+        order,
+        member,
+        location,
+        mission,
+        orgUnit);
+    jdbc.update(
+        "INSERT INTO refinery_good (id, version, input_material_id, input_quantity,"
+            + " output_material_id, output_quantity, quality, refinery_order_id)"
+            + " VALUES (?, 0, ?, 1200, ?, 900, 500, ?)",
+        UUID.randomUUID(),
+        material,
+        material,
+        order);
+  }
+
+  /** Deletes the member's refinery orders with their goods. */
+  private void deleteRefineryOrders() {
+    jdbc.update(
+        "DELETE FROM refinery_good WHERE refinery_order_id IN"
+            + " (SELECT id FROM refinery_order WHERE owner_id = ?)",
+        member);
+    jdbc.update("DELETE FROM refinery_order WHERE owner_id = ?", member);
   }
 
   /**

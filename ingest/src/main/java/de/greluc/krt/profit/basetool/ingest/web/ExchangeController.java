@@ -42,6 +42,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -66,6 +67,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.HandlerMapping;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -80,7 +82,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Slf4j
 @RestController
-@RequestMapping("/exchange/v1")
+@RequestMapping(ExchangeController.GATEWAY)
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class ExchangeController {
@@ -126,6 +128,29 @@ public class ExchangeController {
       "The exchange's storage budget is full; try again later.";
 
   private static final String BACKEND = "/api/v1/exchange";
+
+  /** The gateway path every route of this controller lies below. */
+  static final String GATEWAY = "/exchange/v1";
+
+  /** The member's blueprint feed below {@link #GATEWAY}. */
+  private static final String MEMBER_BLUEPRINTS = "/me/blueprints";
+
+  /** The member's stock feed below {@link #GATEWAY}. */
+  private static final String MEMBER_STOCK = "/me/stock";
+
+  /** The member's ship feed below {@link #GATEWAY}. */
+  private static final String MEMBER_SHIPS = "/me/ships";
+
+  /** The member's refinery-order feed below {@link #GATEWAY}. */
+  private static final String MEMBER_REFINERY_ORDERS = "/me/refinery-orders";
+
+  /** The page schema of each of the member's feeds. */
+  private static final Map<String, String> MEMBER_FEED_PAGES =
+      Map.of(
+          MEMBER_BLUEPRINTS, "page.schema.json#/$defs/blueprintPage",
+          MEMBER_STOCK, "page.schema.json#/$defs/stockPage",
+          MEMBER_SHIPS, "page.schema.json#/$defs/shipPage",
+          MEMBER_REFINERY_ORDERS, "page.schema.json#/$defs/refineryOrderPage");
 
   private static final Pattern CURSOR = Pattern.compile("^[A-Za-z0-9._:-]{1,128}$");
 
@@ -305,8 +330,9 @@ public class ExchangeController {
   }
 
   /**
-   * Returns a snapshot page of the member's blueprints, or with {@code cursor} the changes since
-   * it.
+   * Returns a snapshot page of one of the member's own feeds — the blueprints, the personal stock
+   * lots, the ships or the open and running refinery orders (REQ-XCH-051) — or with {@code cursor}
+   * the changes since it.
    *
    * @param cursor the cursor of the last page, or {@code null} for a new snapshot
    * @param limit the page size, 1 to 1000, or {@code null} for the default
@@ -314,64 +340,26 @@ public class ExchangeController {
    * @param acceptLanguage the caller's language
    * @return the page or a problem
    */
-  @GetMapping("/me/blueprints")
+  @GetMapping({MEMBER_BLUEPRINTS, MEMBER_STOCK, MEMBER_SHIPS, MEMBER_REFINERY_ORDERS})
   @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> blueprints(
+  public @NotNull ResponseEntity<?> memberFeed(
       @Nullable @RequestParam(required = false) String cursor,
       @Nullable @RequestParam(required = false) String limit,
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
+    String path =
+        String.valueOf(
+                Objects.requireNonNull(
+                    request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
+            .substring(GATEWAY.length());
     return page(
-        "/me/blueprints",
-        "page.schema.json#/$defs/blueprintPage",
+        path,
+        Objects.requireNonNull(MEMBER_FEED_PAGES.get(path)),
         cursor,
         limit,
         request,
         acceptLanguage);
-  }
-
-  /**
-   * Returns a snapshot page of the member's personal stock lots, or with {@code cursor} the changes
-   * since it.
-   *
-   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
-   * @param limit the page size, 1 to 1000, or {@code null} for the default
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the page or a problem
-   */
-  @GetMapping("/me/stock")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> stock(
-      @Nullable @RequestParam(required = false) String cursor,
-      @Nullable @RequestParam(required = false) String limit,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return page(
-        "/me/stock", "page.schema.json#/$defs/stockPage", cursor, limit, request, acceptLanguage);
-  }
-
-  /**
-   * Returns a snapshot page of the member's ships, or with {@code cursor} the changes since it.
-   *
-   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
-   * @param limit the page size, 1 to 1000, or {@code null} for the default
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the page or a problem
-   */
-  @GetMapping("/me/ships")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> ships(
-      @Nullable @RequestParam(required = false) String cursor,
-      @Nullable @RequestParam(required = false) String limit,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return page(
-        "/me/ships", "page.schema.json#/$defs/shipPage", cursor, limit, request, acceptLanguage);
   }
 
   /**

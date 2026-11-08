@@ -36,12 +36,16 @@ public enum ExchangeResource {
   SHIP,
 
   /** The shared stock of the member's units, keyed by unit and lot; its writes by entry. */
-  ORG_STOCK;
+  ORG_STOCK,
+
+  /** The member's own refinery orders, keyed by order id (REQ-XCH-051). */
+  REFINERY_ORDER;
 
   /**
    * The resource's name in a staged mass change ({@code ConnectedAppMassChangeRequestDto}).
    *
-   * @return {@code blueprints}, {@code stock}, {@code ships} or {@code org-stock}
+   * @return {@code blueprints}, {@code stock}, {@code ships}, {@code org-stock} or {@code
+   *     refinery-orders}
    */
   @NotNull
   public String massChangeName() {
@@ -50,6 +54,7 @@ public enum ExchangeResource {
       case STOCK -> "stock";
       case SHIP -> "ships";
       case ORG_STOCK -> "org-stock";
+      case REFINERY_ORDER -> "refinery-orders";
     };
   }
 
@@ -65,13 +70,15 @@ public enum ExchangeResource {
       case STOCK -> ExchangeCapability.STOCK_WRITE;
       case SHIP -> ExchangeCapability.HANGAR_WRITE;
       case ORG_STOCK -> ExchangeCapability.ORGSTOCK_WRITE;
+      case REFINERY_ORDER -> ExchangeCapability.REFINERY_WRITE;
     };
   }
 
   /**
    * The value of the {@code resource} tag on the resource's mass-change metric.
    *
-   * @return {@code blueprint}, {@code stock}, {@code ship} or {@code org_stock}
+   * @return {@code blueprint}, {@code stock}, {@code ship}, {@code org_stock} or {@code
+   *     refinery_order}
    */
   @NotNull
   public String metricTag() {
@@ -80,6 +87,7 @@ public enum ExchangeResource {
       case STOCK -> "stock";
       case SHIP -> "ship";
       case ORG_STOCK -> "org_stock";
+      case REFINERY_ORDER -> "refinery_order";
     };
   }
 

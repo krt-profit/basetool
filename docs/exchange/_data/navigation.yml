@@ -42,6 +42,8 @@
       path: resources/org-units.md
     - title: Org stock
       path: resources/org-stock.md
+    - title: Refinery orders
+      path: resources/refinery-orders.md
     - title: Drafts
       path: resources/drafts.md
 - section: Reference

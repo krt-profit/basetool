@@ -241,6 +241,8 @@ public class ExchangeMassChangeService {
             ? orgStockWriteService.apply(caller, changeSet)
             : orgStockWriteService.applyConfirmed(caller, changeSet);
       }
+      case REFINERY_ORDER ->
+          throw new BadRequestException("Refinery-order change sets are not held for confirmation");
     };
   }
 

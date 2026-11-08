@@ -279,7 +279,7 @@ FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read'), ('exchange.blue
              ('exchange.stock.read'), ('exchange.stock.write'), ('exchange.hangar.read'),
              ('exchange.hangar.write'), ('exchange.demand.read'), ('exchange.demand.details'), ('exchange.orgunits.read'),
              ('exchange.orgstock.read'), ('exchange.orgstock.details'),
-             ('exchange.orgstock.write'), ('exchange.drafts.blueprints'),
+             ('exchange.orgstock.write'), ('exchange.refinery.read'), ('exchange.drafts.blueprints'),
              ('exchange.drafts.refinery')) AS c (capability)
 UNION ALL
 SELECT '5a4d0000-0000-4000-8000-000000002302'::uuid, c.capability
