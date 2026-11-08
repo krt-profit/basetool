@@ -3418,6 +3418,25 @@ rendered only for a logistician, and a plain member sees their own name in a dis
 field submits nothing, so the server falls back to the order's owner, which for a non-logistician is
 the caller.
 
+**The exchange form of the rule** (ADR-0351, planned in epic #3163). An exchange pickup's store lines
+(REQ-XCH-053) and the receivers read (REQ-XCH-054) apply the same rule, but an exchange request
+carries no stored roles and no contextual grants (REQ-XCH-009), so `BookInPolicy.mayBookInFor`
+cannot answer on one. The rule is therefore decided from the database, as ADR-0257 decides the org
+stock's Logistician:
+
+- The member may always name themselves.
+- Another member may be named only when the member holds the Logistician grant — a membership's
+  `is_logistician` flag or a leadership rank, computed by the one method the web's authority
+  converter and ADR-0257 share, with the cascade the web's grant has — on an org unit the receiver
+  belongs to, and the receiver does not withhold their name (REQ-XCH-044). The admin role, the
+  admin all-scope and a pin count for nothing.
+- A line's org unit is a direct membership of the receiver, or a unit on which the member holds that
+  grant.
+- A receiver is named by the client-scoped `ref` of the receivers read, never by a user id; an
+  unknown and a refused `ref` are both `RECEIVER_UNKNOWN`, so the line reveals no member's
+  existence. The check runs before any row is written,
+  and a refused line refuses the whole pickup.
+
 **Acceptance**
 
 - [x] A non-logistician storing their own order with a foreign `items[].userId` → `403`, and no
@@ -3427,6 +3446,9 @@ the caller.
 - [x] A logistician may still book onto another member.
 - [x] The receiver picker is absent for a non-logistician, including on a split row and on the
   flash-attribute re-render after a validation error.
+- [ ] Over the exchange, a plain member's store line naming another member is `RECEIVER_UNKNOWN` and
+  books nothing; a Logistician of a unit the receiver belongs to may name them; an `ADMIN` without
+  that grant may not; a member withholding their name is never accepted. *Planned — #3171.*
 
 **Enforced by:** `RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderStoreService#storeRefineryOrder`,
 `RefineryOrderPageController#viewOrderDetail`, `refinery/refinery-orders-details.html` · **Mirrors:**

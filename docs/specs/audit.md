@@ -126,7 +126,16 @@ web, naming its client (REQ-AUDIT-005):
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
-  (`REFINERY_ORDERS_REASSIGNED`).
+  (`REFINERY_ORDERS_REASSIGNED`). *Planned (ADR-0351, epic #3163):* an exchange client's
+  refinery-order writes (REQ-XCH-052…056) record the same events under the client's id — a create
+  `REFINERY_ORDER_CREATED`, an update, a goods op and a pickup without store lines
+  `REFINERY_ORDER_UPDATED`, a cancel `REFINERY_ORDER_CANCELED`, a pickup with store lines
+  `REFINERY_ORDER_STORED` with its `INVENTORY_RECEIVED_FROM_REFINERY` rows — plus two new types:
+  the hard delete `REFINERY_ORDER_DELETED` (order id, last status, location id and the number of
+  goods rows; no free text) and the undo's recreation of a deleted order `REFINERY_ORDER_RESTORED`
+  (order id and the number of goods rows restored), beside the undo's own `EXCHANGE_CHANGES_UNDONE`.
+  Both new types join the viewer's Raffinerie event-type filter and the DE/EN labels when they are
+  built.
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
   notifications and notification-rule selectors — as a single summary event

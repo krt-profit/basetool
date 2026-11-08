@@ -11,7 +11,8 @@
 > [ADR-0344](../adr/0344-game-texts-and-game-media-never-leave-the-basetool-to-third-parties.md),
 > [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
-> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md)
+> [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
+> [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
 
 # External client exchange
 
@@ -20,7 +21,9 @@
 Approved external client software — VerseKit first, our own SC Extractor second — lets a member keep
 blueprints, their stock in the Lager and their ships in step between that program and the
 Basetool, and read what their own units still need. A Logistician of a unit can also read and keep
-that unit's shared stock (REQ-XCH-042…046, ADR-0257). It does so only through the **exchange API**
+that unit's shared stock (REQ-XCH-042…046, ADR-0257), and a client can create, change, pick up,
+cancel and delete the member's own refinery orders (REQ-XCH-051…056, ADR-0351, planned in epic
+#3163). It does so only through the **exchange API**
 on the ingest gateway, never through the backend API. This spec states what must hold; the ADRs
 above say why. The work is tracked in epic #2078; each requirement names the work package (WP) and
 sub-issue that implements it.
@@ -61,13 +64,19 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
+| `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
 
 The three `org-stock` rows are built: the read, as a snapshot and a feed (REQ-XCH-042), with
 `exchange.orgstock.details` (REQ-XCH-043), the writes `book-in`, `book-out`, `sell`,
 `move-location`, `move-holder`, `move-pool`, `note`, `stolen` and the earmark ops, the roster and
 the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the member's Logistician
 units to the org demand (REQ-XCH-047).
-| `POST /exchange/v1/me/drafts/blueprints` · `…/drafts/refinery-orders` | `exchange.drafts.blueprints` / `.refinery` | REQ-XCH-019 |
+
+> [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
+> The table gains four rows as they are built: `GET /exchange/v1/me/refinery-orders`
+> (`exchange.refinery.read`, REQ-XCH-051), `POST …/me/refinery-orders/changes`
+> (`exchange.refinery.write`, REQ-XCH-052…055), and `GET …/me/refinery-orders/receivers` and
+> `…/me/refinery-orders/job-orders?material=` (`exchange.refinery.store`, REQ-XCH-054).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -294,6 +303,12 @@ granted to the client in the registry (`403 SCOPE_MISSING`); the backend's excha
 the relayed capabilities again (`@PreAuthorize("@exchangeGate.allows(…)")`). Each scope stamps the
 `basetool-ingest` audience, and the gateway enforces that audience on exchange routes in code, not
 only by property.
+
+> [!note] Planned — three refinery capabilities (ADR-0351, epic #3163)
+> `exchange.refinery.read`, `exchange.refinery.write` and `exchange.refinery.store` join the list
+> as they are built (REQ-XCH-051…054). `.store` is no `.details` capability: it gates the two
+> store-choice reads of its own and is required, beside `.write`, for every change set that holds a
+> `pickup` with store lines.
 
 **Acceptance**
 
@@ -678,6 +693,12 @@ shared rows of the member's units and, for a Logistician of the unit, names thei
 writes them; the demand details (REQ-XCH-047) carry the orders' Auftraggeber and comment. Both
 decide from the database, never from a stored role and never with the admin all-scope or pin, and
 the org stock names no member who withholds their name (REQ-XCH-044).
+
+> [!note] Planned — a third exception: the refinery store choices (ADR-0351, epic #3163)
+> A pickup's store lines (REQ-XCH-053) may book onto another member, and the receivers read
+> (REQ-XCH-054) names the members the member may book onto. Both decide from the database by the
+> rule of REQ-SEC-039 for exchange requests, never from a stored role and never with the admin
+> all-scope or pin, and name no member who withholds their name.
 
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
@@ -1473,7 +1494,8 @@ staged and answered with `MASS_CHANGE_CONFIRMATION_REQUIRED` and a confirmation 
 „Verbundene Anwendungen". Removals are `remove`, a quantity set to 0, a lot's reductions
 accumulated to ≥ 90 % within the window, and a ship update that changes name and type; a move
 within one batch is not a removal. Only the member's browser session can confirm. The org stock
-counts per client, writer and pool instead, with its own removals (REQ-XCH-046).
+counts per client, writer and pool instead, with its own removals (REQ-XCH-046). For refinery
+orders only a `delete` is a removal; `cancel` and `good-remove` never count (REQ-XCH-055, planned).
 
 **Acceptance**
 
@@ -1576,7 +1598,8 @@ Each exchange write is journaled for 90 days. The member can undo a client's wri
 in time from „Verbundene Anwendungen" — the org-stock writes they made as a Logistician included
 (REQ-XCH-046); undo is version-checked, skips and reports rows the member
 changed afterwards or a merge removed, and does not restore Materialbörse offers. An admin can run
-the same undo for every member of one client at once (REQ-XCH-034).
+the same undo for every member of one client at once (REQ-XCH-034). Refinery-order writes are
+journaled and undone by their own rules (REQ-XCH-056, planned).
 
 **Acceptance**
 
@@ -1663,7 +1686,9 @@ Responses carry `RateLimit` and `Retry-After` headers. The account check has its
 | change sets of more than 100 ops relayed at once, over all clients and members | 4 | in-process bulkhead `exchangeLargeChangeSets` (`resilience4j.bulkhead.instances.…max-concurrent-calls`) |
 
 The write routes are the six `…/changes` and `…/drafts/…` routes (`ExchangeRoutes`); the org
-stock's change set counts once more for every op after its first (REQ-XCH-045). A request over
+stock's change set counts once more for every op after its first (REQ-XCH-045). The refinery-order
+change set (REQ-XCH-052, planned) becomes the seventh and counts **once per request**, however many
+ops it holds, as the blueprint, stock and ship sets do (ADR-0351). A request over
 a per-period limit is `429 RATE_LIMITED`, over the quota `429 QUOTA_EXCEEDED`, each with
 `Retry-After` (the quota's until the next UTC day); a quota that cannot be counted is `503
 SERVICE_UNAVAILABLE` with `Retry-After: 30`, never a free pass. Every attempt at a write route
@@ -1743,6 +1768,22 @@ about 24 cached answers, at most 24 × 32.5 KiB ≈ 0.8 MiB even when every answ
 cacheable one, beside one 32.5 KiB reservation — well inside 4 MiB, which leaves room for staged
 drafts and mass changes. With the former 24 h window and 1 MiB, 576 answers a day filled the
 member's budget once an answer averaged about 1.3 KiB (#3061).
+
+The refinery orders (REQ-XCH-051…056, planned) fit the same sizes (estimate of #3149, owner
+decision #3162). With about six ops per order — a create with its goods, three timer updates, a
+goods correction and a pickup — each sent as a change set of its own, a typical member (3 to 10
+orders a day) writes 18 to 60 change sets a day, 4 to 12 % of the 500, and a heavy one (30 orders)
+about 180, 36 %; a set holds 1 to 8 ops, far from the 500-op cap, the 2 MiB body and the 100-op
+bulkhead. The busiest hour holds about 25 KiB of the member's 4 MiB in practice and at most about
+0.6 MiB when every answer is the largest cacheable one. Reads count against the per-minute buckets
+only; the busiest burst, a pickup with its job-order lookups, is about 11 requests of 120 a minute.
+Counting every op instead, as the org stock does, would take a heavy member to 78 % of the quota on
+refinery alone, which is why the set counts once. The quota is one counter per client and member
+over every write route: a heavy member whose client also syncs stock and ships reaches about 420 of
+500 in the worst case. The default therefore stays, and a client that syncs all three gets a
+registry `writesPerDay` override instead — VerseKit 2000, set in the production registry after the
+release under the owner's per-action approval and recorded in
+[`approved-clients.md`](../legal/approved-clients.md).
 
 **When a refused write may retry.** The sets are scored by expiry, so the refusal's
 `Retry-After` is read from them: for every scope the write's charge would overflow, a read-only
@@ -2183,8 +2224,22 @@ After each committed exchange write the backend publishes live-sync frames on th
 sections the web pages and the app listen on (Lager, Blueprints, Hangar, and the Materialbörse when
 offers changed) — `ExchangeLiveSync`, see REQ-XCH-013.
 
+**Refinery orders** (ADR-0351, planned in epic #3163). A committed refinery-order write — every op
+of REQ-XCH-052…055, its confirmation and its undo — publishes, after the commit, into the rooms the
+frontend already has: `refinery` with the section `queue` (the list) and `refinery-order/{id}` with
+the sections `order` and `store` (the detail page). A pickup with store lines also publishes the
+Lager's room, as a stock change set does. `livesync.api.LiveSyncTopicClass` gains both rooms, and
+`LiveSyncTopicRegistryParityTest` and `LiveSyncSectionMapParityTest` hold them in step with the
+frontend. A page with unsaved input shows the "updates available" notice it shows for any peer's
+change and overwrites nothing; a later save is decided by the order's section counters
+(REQ-REFINERY-029). When a client deletes an order whose detail page is open, the page stays where
+it is, locks its forms and shows a notice that the client deleted the order, with a link to the
+list — no redirect and no silent loss of input. A client learns of a web change only from the feed
+(REQ-XCH-051); no push channel to clients exists.
+
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
-(#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086)
+(#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames planned
+(#3168…#3171)
 
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
@@ -3176,6 +3231,265 @@ REQ-OBS-011).
 **Enforced by:** the tests above · **Code:** `GameText`, `GameMedia`,
 `ExchangeSchemas#answerBreaches`, `ExchangeAnswers`, `ExchangeRelay` · **Status:** built (#3041)
 
+### REQ-XCH-051 — A client reads the member's refinery orders as a feed
+
+Decided in [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md).
+`GET /exchange/v1/me/refinery-orders` (`exchange.refinery.read`) serves every refinery order whose
+owner is the member, whatever created it — the web, a draft, this or another client — keyed per
+owner as the hangar feed is, with the snapshot, cursor, paging and tombstone semantics of
+REQ-XCH-013.
+
+- **Snapshot** (no `cursor`): only the orders in `OPEN` or `IN_PROGRESS`, paged by order id and
+  ending with the feed cursor.
+- **Feed** (with `cursor`): every change to every own order since the cursor, whatever its status,
+  old `COMPLETED` and `CANCELED` orders the client never saw included; completing, cancelling and a
+  reopening in the web arrive as ordinary changes.
+- **Key**: the order's Basetool id, the same id the write ops name (REQ-XCH-052).
+- **Content**: every field but the owner, who is always the member — the location, the refining
+  method, `startedAt`, `durationMinutes`, `endsAt`, the status, `pickedUpAt`, `storedAt`, the goods
+  with their row ids, `expenses`, `otherExpenses`, `oreSales`, the mission as an id only, the owning
+  org unit as an id, the client marker (the creating client's name, or none for an order the web
+  created) and the two section counters `gameData` and `finances` (REQ-REFINERY-029).
+  `clientKey` is carried only to the client that created the order; every other client sees the
+  marker without it.
+- **Tombstones**: on a hard delete (REQ-XCH-055) and when the order moves to another owner (user
+  deletion, `REFINERY_ORDERS_REASSIGNED`), with the usual `removedBy` and `removedAt`, and the
+  `clientKey` for the creating client. A cancel is a status change, not a tombstone. A change of the
+  order's location reference or of its owning unit re-announces it under the same key.
+- **Triggers**: `AFTER` row triggers on `refinery_order` and on its goods record the order in
+  `exchange_change` (ADR-0224), so a write that bypasses the services still appears, and the
+  changes of one order and its goods appear once per feed page.
+
+The read reveals nothing beyond what the web shows the member about their own orders; the mission
+is named by id only.
+
+**Acceptance**
+
+- [ ] A snapshot holds the member's open and running orders and no other member's; a feed read from
+  its cursor carries a completed, a cancelled and a reopened order as changes.
+- [ ] An order created in the web, by a draft and by another client appears with its marker; only
+  the creating client sees its `clientKey`.
+- [ ] A hard delete and an owner reassignment leave a tombstone; a cancel does not; a location
+  reference change re-announces the order.
+- [ ] A goods row change announces its order once; a bulk write bypassing the services appears in
+  the feed.
+- [ ] Without the scope the gateway answers `403 SCOPE_MISSING` and the backend refuses a relayed
+  request the same way.
+
+**Status:** planned — #3167 (scopes, triggers, read); the provenance and counters it serves come with
+#3165 and #3166
+
+### REQ-XCH-052 — A client writes the member's refinery orders in one change set
+
+`POST /exchange/v1/me/refinery-orders/changes` (`exchange.refinery.write`) applies a change set of
+1 to 500 ops with an `Idempotency-Key` (REQ-XCH-020) and an optional `dryRun`, through the shared
+runner (ADR-0285): the ops are decided in order, one result per op, with no shared rollback. A
+`dryRun` decides every op and writes nothing. The set counts **once** against the daily write quota
+(REQ-XCH-023). Every write goes through the refinery module's own services, so its rules, its
+audit under the client (REQ-AUDIT-005) and its notices (REQ-REFINERY-023, -024) apply as in the
+web.
+
+- **Ops.** `create`, `update`, `good-add`, `good-update`, `good-remove`, `pickup` (REQ-XCH-053),
+  `cancel` and `delete` (REQ-XCH-055).
+- **Addressing.** Every op but `create` names its order by `id` or by the client's own
+  `clientKey`, so an order created earlier in the same set can be changed or picked up at once. An
+  order of another owner, and a `clientKey` another client set, is unknown to the caller
+  (`ORDER_UNKNOWN`).
+- **Client key.** A `create` carries a `clientKey` of at most 128 characters, unique per owner and
+  client. A `create` whose key already names an order of the member is refused `ALREADY_EXISTS`; its
+  result names the existing order's id, so the client adopts it, and nothing is overwritten.
+- **References.** The location, the refining method and a good's material are `ref`s resolved
+  **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id or
+  exact name, a method by its code or exact name, a material by `bt`, `scGuid`, `uexId` or exact
+  name. Nothing is matched fuzzily, because no member reviews a direct write: an unknown reference is
+  `UNMATCHED`, one naming several entries `AMBIGUOUS`, a place without a location
+  `LOCATION_UNKNOWN`. The location must be a refinery the web's picker offers (REQ-REFINERY-020),
+  else `NOT_A_REFINERY`; a good's input material must be `RAW` or manual-raw, else
+  `MATERIAL_NOT_RAW`.
+- **`create`.** The owning org unit `orgUnit` `{id}` is required and must be one of the member's
+  direct memberships, the set `GET /me/org-units` returns (`NOT_A_MEMBER`); the server never picks
+  one. The status is `OPEN` or `IN_PROGRESS` (REQ-REFINERY-022); the order carries the client as its
+  creator (REQ-REFINERY-027). Goods, `expenses`, `otherExpenses` and `oreSales` are optional.
+- **Timer.** `endsAt` is written, `durationMinutes` is optional: the server stores
+  `startedAt = endsAt − durationMinutes`; without a duration `startedAt` is the time of the write and
+  `durationMinutes` the rest until `endsAt`. A changed start re-arms the ready notice as a web edit
+  does (REQ-REFINERY-023).
+- **`update`.** Partial: it carries only the fields it changes — location, method, timer, status,
+  `expenses`, `otherExpenses`, `oreSales` — and leaves every absent field as it is. The status is
+  `OPEN` or `IN_PROGRESS`; `COMPLETED` comes only from a pickup and `CANCELED` only from a cancel or
+  delete. A stored order's status is locked (`ORDER_STORED`, REQ-REFINERY-022). The mission link and
+  the owning unit stay web-only.
+- **Goods ops.** `good-add` adds one row and returns its id; `good-update` and `good-remove` name a
+  row by its existing id, and a row of another order is `GOOD_UNKNOWN`.
+- **Section counters.** An op echoes the counter of each section it touches (REQ-REFINERY-029):
+  `gameData` for the location, method, timer, status, the goods ops, `pickup` and `cancel`;
+  `finances` for `expenses`, `otherExpenses` and `oreSales`; both for `delete`. A stale counter is
+  `VERSION_CONFLICT` for that op only. Within one set the expected counter is what the earlier ops
+  left: every applied op that touches a section raises its counter by one.
+- **Follow-on refusals.** Once an op on an order is refused, every later op on the same order in
+  the set is refused `PRECEDING_OP_REJECTED`.
+- **Result.** An applied op answers the order id, the ids of the goods rows it created and the new
+  section counters, so a client writes on without reading the feed first.
+- **Refusal reasons**, per op in the change result: `UNMATCHED`, `AMBIGUOUS`, `LOCATION_UNKNOWN`,
+  `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `NOT_A_MEMBER`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
+  `ALREADY_EXISTS`, `VERSION_CONFLICT`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`, and those of
+  REQ-XCH-053 and REQ-XCH-055. Each is additive within `v1` (REQ-XCH-026) and listed in
+  `docs/exchange/errors.md`.
+
+**Acceptance**
+
+- [ ] A create with a client key, an update of the timer and a goods add in one set apply in order;
+  the result carries the order id, the new row id and the counters; the web shows the order with the
+  client's marker.
+- [ ] A second create with the same key is `ALREADY_EXISTS` naming the existing order; another
+  client's key and another owner's order are `ORDER_UNKNOWN`.
+- [ ] A fuzzy-only or unknown reference is refused, a location that is not an offered refinery is
+  `NOT_A_REFINERY`, a refined input material `MATERIAL_NOT_RAW`, a unit the member is not a direct
+  member of `NOT_A_MEMBER`.
+- [ ] An update after a web edit of the other section applies; after a web edit of its own section
+  it is `VERSION_CONFLICT`, and every later op on that order in the set is `PRECEDING_OP_REJECTED`.
+- [ ] `dryRun` decides every op and writes nothing; the set counts once against the quota.
+
+**Status:** planned — #3168 (create, update, goods ops, client key, live sync, journal)
+
+### REQ-XCH-053 — A pickup closes an order and books stock only with store lines
+
+A `pickup` op reports that the member collected an order's yield in the game. It sets the status
+`COMPLETED` with `pickedUpAt` and the reporting client (REQ-REFINERY-028), and echoes `gameData`.
+
+- **Precondition.** An `OPEN` or `IN_PROGRESS` order is closed, also before its `endsAt`, because
+  the game is the truth and `endsAt` is only derived. An order already `COMPLETED`, stored or not, is
+  `unchanged`. A `CANCELED` order is refused `ORDER_CANCELED`.
+- **Without store lines** nothing is booked, for a client whose own stock sync books the goods. The
+  order's status stays editable in the web as for an order completed without a store, and the web
+  may store it later; a double booking beside the client's stock sync is the member's accepted risk.
+- **With store lines** the op carries the lines of the web's store dialog — material, location,
+  quality, amount, receiving member, personal, job order, org unit, note — and the server stores the
+  order exactly as the web does (`RefineryOrderStoreService`), so REQ-REFINERY-022 applies in full:
+  `storedAt` is set, each line books an inventory row with its
+  `INVENTORY_RECEIVED_FROM_REFINERY` event, and the order is stored exactly once. **All or
+  nothing**: when one line is refused, the whole op is refused with that line's reason and nothing
+  changes.
+- **Rules of a line.** Its material must be an output material of one of the order's goods
+  (`MATERIAL_NOT_AN_OUTPUT`); its location one the Lager offers (`LOCATION_UNKNOWN`); its receiver
+  named by a `ref` of the receivers read (REQ-XCH-054) and allowed by REQ-SEC-039's exchange rule
+  (`RECEIVER_UNKNOWN`); its org unit a direct membership of the receiver or a unit in which the
+  member may book for others (`ORG_UNIT_NOT_ALLOWED`); its job order active, visible to the member
+  and requiring the line's material (`JOB_ORDER_INVALID`, one answer for all three, so a refusal
+  reveals no foreign order). A receiver with several memberships needs the unit named: an exchange
+  request has no active-context pin.
+- **Scope.** A change set that holds a `pickup` with store lines while the client lacks
+  `exchange.refinery.store` is refused as a whole with `403 SCOPE_MISSING`, before any op runs. A
+  pickup without lines needs only `exchange.refinery.write`.
+- **Notices.** A pickup suppresses the ready notice without more, because REQ-REFINERY-023 selects
+  only `OPEN` and `IN_PROGRESS` orders without `storedAt`.
+
+**Acceptance**
+
+- [ ] A pickup without lines closes a running order before its end, books nothing and leaves the
+  status editable in the web; the web shows „Abgeholt" with the client.
+- [ ] A pickup of a completed order is `unchanged`; of a cancelled one `ORDER_CANCELED`.
+- [ ] A pickup with lines stores as the web's store does and locks the order through `storedAt`; one
+  refused line refuses the op and books nothing.
+- [ ] A line whose material is no output, whose receiver or unit the rule refuses, or whose job
+  order is unknown, invisible or does not need the material, is refused with its reason.
+- [ ] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing.
+
+**Status:** planned — #3170 (pickup without store lines), #3171 (store lines)
+
+### REQ-XCH-054 — A client reads the store choices under its own scope
+
+`exchange.refinery.store` grants two reads a client needs to offer the web's store choices, and is
+required for every pickup that carries store lines (REQ-XCH-053). Locations come from
+`GET /exchange/v1/catalog/locations` and the member's own units from `GET /exchange/v1/me/org-units`
+(REQ-XCH-018, -048); both reads keep every acting path literal (REQ-SEC-080).
+
+- **Receivers.** `GET /exchange/v1/me/refinery-orders/receivers` lists the members the member may
+  book onto, decided from the database by REQ-SEC-039's exchange rule: the member themselves, and
+  for a member who may book for others, the members that rule admits. Each receiver is a
+  client-scoped `ref` (the HMAC pseudonym of REQ-XCH-043) with the name the web shows and the
+  receiver's direct memberships (`id`, `name`, `kind`). Members who withhold their name
+  (REQ-XCH-044) are left out; the member themselves is always listed.
+- **Job orders.** `GET /exchange/v1/me/refinery-orders/job-orders?material=<bt>` lists the active
+  job orders the member can see that require the material, as the web's `/orders/lookup` filters
+  the store dialog's picker (the job-order gate of REQ-XCH-018 and the tenancy read scope of the
+  member's memberships, REQ-ORG-003), with id, `number` and status. A material that names nothing
+  answers an empty list. A client may keep the answer for its session.
+
+**Acceptance**
+
+- [ ] A plain member's receivers list holds only the member; a member who may book for others also
+  gets the members the rule admits, with their direct memberships, and never one who withholds their
+  name.
+- [ ] The job-order read lists the visible active orders that need the material and none of another
+  unit the member cannot see.
+- [ ] Without `exchange.refinery.store` both reads are `403 SCOPE_MISSING` at the gateway and the
+  backend.
+
+**Status:** planned — #3171
+
+### REQ-XCH-055 — A client cancels or hard-deletes an order; only a delete counts as a removal
+
+- **`cancel`** sets `CANCELED` through the refinery's own cancel, audited
+  `REFINERY_ORDER_CANCELED`; it echoes `gameData`. A cancelled order is `unchanged`. A stored order
+  can be cancelled, as in the web.
+- **`delete`** removes an own order without `storedAt`, whatever created it: also an order picked up
+  without store lines and an order linked to a mission, which then drops out of that mission. It
+  echoes `gameData` and `finances`. A stored order is refused `ORDER_STORED`, because it is the
+  record behind booked stock; cancelling it stays possible. The order's goods rows go with it;
+  booked stock is untouched, since inventory rows carry no reference to the order. The delete is
+  audited `REFINERY_ORDER_DELETED` in the Raffinerie trail under the client (REQ-AUDIT-005), with
+  the order id, its last status, its location and the number of goods rows — no free text. The feed
+  carries the tombstone of REQ-XCH-051.
+- **The web** keeps cancel as its only removal; a hard delete exists only through the exchange.
+- **Mass-change guard.** Only `delete` counts as a removal (REQ-XCH-021); `cancel` and
+  `good-remove` never count. A set above the guard's rule is held for the member's confirmation as
+  for every resource.
+
+**Acceptance**
+
+- [ ] A cancel sets `CANCELED` and keeps the order in the feed as a change.
+- [ ] A delete removes an open, a picked-up and a mission-linked order with its goods, leaves the
+  member's stock as it was, is audited `REFINERY_ORDER_DELETED` under the client and leaves a
+  tombstone; a stored order is `ORDER_STORED`.
+- [ ] A set that deletes more orders than the guard allows is held and applies only after the
+  member confirms it; cancels and goods removals never trip it.
+
+**Status:** planned — #3169
+
+### REQ-XCH-056 — Refinery-order writes are journaled and undone by section
+
+Every applied op is journaled (REQ-XCH-022) under its own `ExchangeJournalAction` with a typed
+refinery journal state (ADR-0285): the order's fields, goods with their ids, `clientKey`, client
+marker, mission link and section counters before and after. The member's undo and the admin's bulk
+undo (REQ-XCH-034) restore it as follows:
+
+- **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
+  `clientKey`, client marker and every field; the mission link only while that mission still
+  exists. The feed shows it again under the same key. The restore is audited
+  `REFINERY_ORDER_RESTORED`; the undo itself stays `EXCHANGE_CHANGES_UNDONE`.
+- **`create`** — the order is removed while neither section counter moved since; otherwise it is
+  skipped `CHANGED_AFTERWARDS`. The feed carries a tombstone.
+- **`update`, goods ops and `cancel`** — the touched section goes back to its earlier state while
+  that section's counter is unchanged since; otherwise skipped `CHANGED_AFTERWARDS`.
+- **`pickup`** — without store lines the status goes back and `pickedUpAt` is cleared, under the
+  same counter check; with store lines it is skipped `STOCK_BOOKED`, because the booked stock is the
+  member's to take back in the Lager.
+
+An order no longer the member's, or whose restore names a location, method or material that is
+gone, is skipped `GONE`.
+
+**Acceptance**
+
+- [ ] An undo recreates a deleted order under its old ids with its client key and marker, and the
+  feed shows it again; it is audited `REFINERY_ORDER_RESTORED`.
+- [ ] An undo removes an unchanged create and skips one changed in the web; it rolls back an update
+  of one section after a web edit of the other.
+- [ ] An undo of a pickup without lines reopens the order; one with lines is skipped `STOCK_BOOKED`.
+
+**Status:** planned — #3168 (journal, undo of create, update and goods ops), #3169 (undo of cancel
+and delete), #3170 (undo of a pickup)
+
 ## Threat model
 
 | Threat | Countered by |
@@ -3208,6 +3522,8 @@ REQ-OBS-011).
 | Token leakage via backups, diagnostics or a problem-report webhook | client security requirements (REQ-XCH-027) |
 | A switchable issuer used for phishing | only through a developer environment variable, never in the UI (REQ-XCH-027) |
 | The installation label as a spoofing channel or PC-name leak | length and character limits, always after the client name, never logged or audited (REQ-XCH-007) |
+| A faulty or malicious client release deleting or rewriting the member's refinery orders | own orders only; a stored order cannot be deleted; section counters refuse a write over a web edit; journal, the member's and the admin's undo, a deleted order restored under its old ids; the guard counts every delete; audit naming the client (REQ-XCH-052/-055/-056) — accepted (ADR-0351) |
+| A client booking a pickup's yield onto other members | only with its own capability `exchange.refinery.store`; receivers and units decided from the database by the web's rule, never from a stored role; all or nothing, stored exactly once; names withheld on request (REQ-XCH-053/-054, REQ-SEC-039) — accepted (ADR-0351) |
 | Game texts or game media reaching a third party through a new field | classification by content (`@GameText`, `@GameMedia`), the getter rule, the field ratchet over DTOs and v1 schemas, and the fail-closed gateway that answers an undeclared property `502` (REQ-XCH-050, ADR-0344) |
 
 ## Out of scope

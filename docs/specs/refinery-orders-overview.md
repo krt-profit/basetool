@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
-> **Owner area:** REFINERY · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-08.
+> **Owner area:** REFINERY · **Related ADRs:** [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+> (REQ-REFINERY-022, -027…029)
 
 # Refinery-order overview list
 
@@ -245,6 +246,21 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 - Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
   are already `COMPLETED`.
 
+> [!note] Planned — the exchange's create and pickup (ADR-0351, epic #3163)
+> Three exchange paths join this requirement as they are built, and leave the web's create and
+> store unchanged:
+>
+> - **A client create** (REQ-XCH-052) sets its status, `OPEN` or `IN_PROGRESS`, because a client
+>   reads running orders from the game. `COMPLETED` comes only from a pickup and `CANCELED` only from
+>   a cancel or delete; `storedAt`, `id`, the owner and the counters stay server-managed.
+> - **A pickup with store lines** (REQ-XCH-053) stores through this same store operation, so it
+>   books exactly once and sets `storedAt`; a refused line refuses the whole pickup and books
+>   nothing. A pickup without store lines sets `COMPLETED` without `storedAt`
+>   (REQ-REFINERY-028): such an order stays editable like one a `PUT` completed, and the member may
+>   reopen and then store it in the web.
+> - **A client's hard delete** (REQ-XCH-055) refuses an order with `storedAt` set, so the record
+>   behind booked stock is never deleted; the web keeps cancelling through `DELETE`.
+
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
 `RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`)
 · **Code:** `RefineryOrderService.updateRefineryOrder` / `RefineryOrderStoreService.storeRefineryOrder`,
@@ -305,11 +321,86 @@ and its tooltip in place (REQ-FE-001).
 **Code:** `UexRefineryYieldDto`, `UexRefinerySyncService`, `RefineryYield`,
 `RefineryYieldBonusDto`, `RefineryOrderQueryService`, `refinery-yield-badge.js`
 
+### REQ-REFINERY-027 — An order shows the client that created it and the last change
+
+Decided in [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+(variant A of the prototype on `prototype/refinery-client-marker`). An order records the exchange
+client that created it, or none for an order created in the web (a saved draft included), and the
+source — the web or a named client — and time of its last change. The creator never changes; every
+write that changes the order or its goods, from either channel, moves the last change. Nothing is
+VerseKit-specific: the name shown is the client's display name from the registry (REQ-XCH-003).
+
+- **List** (`/refinery-orders`): an order a client created carries an info chip (`.chip--info`)
+  with the client's name next to its number; a picked-up order (REQ-REFINERY-028) shows „via
+  <client>" after its status.
+- **Detail head**: the same chip next to the status badge.
+- **Assigned card**: „Erstellt von <client | Web>", which never changes, and „Zuletzt geändert:
+  <client | Web>, <time>". A web edit keeps the chip and moves only the last change.
+- Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`); a change made by a client
+  reaches an open list or detail page live (REQ-XCH-030, REQ-FE-001…010).
+- The exchange feed carries the creator as the client marker (REQ-XCH-051).
+
+**Acceptance**
+
+- [ ] An order a client created shows the chip in the list and the detail head and „Erstellt von
+  <client>"; an order created in the web shows no chip and „Erstellt von Web".
+- [ ] A web edit of a client's order keeps the chip and shows „Zuletzt geändert: Web" with its
+  time; a client's update of a web order shows that client as the last change and adds no chip.
+
+**Status:** planned — #3166
+
+### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
+
+An order closed by an exchange `pickup` (REQ-XCH-053) carries `pickedUpAt` and the client that
+reported it beside its status `COMPLETED`; the status enum is unchanged. An order in `COMPLETED`
+with `pickedUpAt` and without `storedAt` gets its own label and progress step **„Abgeholt"**
+(Läuft → Abholbereit → Abgeholt) and „via <client>"; with `storedAt` it stays „Eingelagert". Such an
+order's status stays editable in the web, as for an order completed without a store
+(REQ-REFINERY-022). The ready notice ignores it, since REQ-REFINERY-023 selects only open and
+running orders without `storedAt`.
+
+**Acceptance**
+
+- [ ] A pickup without store lines shows „Abgeholt via <client>" in the list and the detail page;
+  a pickup with store lines shows „Eingelagert".
+- [ ] The labels come from the bundles in DE and EN.
+
+**Status:** planned — #3166 (marker and labels), #3170 (the pickup that sets it)
+
+### REQ-REFINERY-029 — An order is locked per section: game data and finances
+
+An order's optimistic lock is two independent counters instead of one order version, as the
+repository's fine-grained locking rule asks:
+
+| Section | Fields |
+| --- | --- |
+| **game data** (`gameData`) | location, refining method, timer (`startedAt`, `durationMinutes`), status, goods, the pickup and store markers |
+| **finances** (`finances`) | `expenses`, `otherExpenses`, `oreSales` |
+
+A write echoes the counter of each section whose fields it changes and is refused `409` only when
+that section changed since; a section it leaves as it is is not checked. Every applied write raises
+the counter of each section it changed by one. The mission link and the owning unit belong to
+neither section, so a mission edit collides with neither. The web's edit form, the store, the
+cancel and every exchange op (REQ-XCH-052) use the same counters, and the read DTO and the
+exchange feed carry both.
+
+**Acceptance**
+
+- [ ] A finance edit in the web and a concurrent timer update by a client both apply; two
+  concurrent edits of the same section give one `409`.
+- [ ] A mission link change moves neither counter.
+- [ ] The edit form echoes both counters and a stale one of an unchanged section does not refuse
+  the save.
+
+**Status:** planned — #3165
+
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered
   by [`refinery-screenshot-import.md`](refinery-screenshot-import.md) and the controller's other
-  handlers; this spec only governs the list view's pagination. The store dialog's personal marker
+  handlers; this spec governs the list view's pagination, the refinery locations, storing exactly
+  once, the goods' input amount, the yield badge and an order's provenance, pickup marker and section
+  counters (REQ-REFINERY-027…029). The store dialog's personal marker
   (booking refinery output straight into the receiver's private pool) is specified in
   [`inventory-lager.md`](inventory-lager.md) `REQ-INV-035`.
 - User-chosen sort columns. The UI sorts each segment by the fixed order of REQ-REFINERY-019; the
