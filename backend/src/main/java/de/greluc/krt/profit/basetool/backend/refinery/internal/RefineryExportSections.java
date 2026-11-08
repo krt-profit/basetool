@@ -27,8 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The refinery's part of the Art. 15 / Art. 20 data export: the member's refinery orders
- * (REQ-SEC-058).
+ * The refinery's part of the Art. 15 / Art. 20 data export: the member's refinery orders with their
+ * provenance and pickup marker (REQ-SEC-058, REQ-REFINERY-027).
  */
 @Component
 public class RefineryExportSections implements PersonalDataExportSection {
@@ -43,7 +43,9 @@ public class RefineryExportSections implements PersonalDataExportSection {
                 "Created by the member.",
                 """
                 SELECT r.status, r.started_at, r.duration_minutes, r.expenses, r.ore_sales,
-                       l.name AS location, r.created_at
+                       l.name AS location, r.created_at, r.created_source, r.created_client,
+                       r.last_change_source, r.last_change_client, r.last_changed_at,
+                       r.picked_up_at, r.picked_up_client
                 FROM refinery_order r LEFT JOIN location l ON l.id = r.location_id
                 WHERE r.owner_id = :userId ORDER BY r.created_at
                 """)

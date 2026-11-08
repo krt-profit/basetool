@@ -381,7 +381,20 @@ class RefineryOrderTest {
     order.setGoods(new HashSet<>(Set.of(good)));
     order = refineryOrderRepository.save(order);
 
-    order.setRefiningMethod(ferron);
+    RefineryOrder updatePayload = new RefineryOrder();
+    updatePayload.setId(order.getId());
+    updatePayload.setVersion(order.getVersion());
+    updatePayload.setLocation(order.getLocation());
+    updatePayload.setOwner(order.getOwner());
+    updatePayload.setOwningOrgUnit(order.getOwningOrgUnit());
+    updatePayload.setRefiningMethod(ferron);
+    RefineryGood updatedGood = new RefineryGood();
+    updatedGood.setInputMaterial(quantanium);
+    updatedGood.setInputQuantity(100);
+    updatedGood.setOutputMaterial(quantanium);
+    updatedGood.setOutputQuantity(100);
+    updatedGood.setQuality(100);
+    updatePayload.setGoods(new HashSet<>(Set.of(updatedGood)));
     mockMvc
         .perform(
             put("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
@@ -396,7 +409,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(payload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();

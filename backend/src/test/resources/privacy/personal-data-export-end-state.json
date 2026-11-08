@@ -326,7 +326,14 @@
       "expenses" : 100.0,
       "ore_sales" : null,
       "location" : "Zzz Export Hub",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "created_source" : "WEB",
+      "created_client" : null,
+      "last_change_source" : "WEB",
+      "last_change_client" : null,
+      "last_changed_at" : "<instant>",
+      "picked_up_at" : null,
+      "picked_up_client" : null
     } ],
     "truncated" : false
   }, {
