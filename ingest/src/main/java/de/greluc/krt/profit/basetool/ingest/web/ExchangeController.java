@@ -19,6 +19,14 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.CHANGES;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.GATEWAY;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_BLUEPRINTS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_REFINERY_ORDERS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_SHIPS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_STOCK;
+
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
@@ -82,7 +90,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Slf4j
 @RestController
-@RequestMapping(ExchangeController.GATEWAY)
+@RequestMapping(GATEWAY)
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class ExchangeController {
@@ -129,34 +137,13 @@ public class ExchangeController {
 
   private static final String BACKEND = "/api/v1/exchange";
 
-  /** The gateway path every route of this controller lies below. */
-  static final String GATEWAY = "/exchange/v1";
-
-  /** The member's blueprint feed below {@link #GATEWAY}. */
-  private static final String MEMBER_BLUEPRINTS = "/me/blueprints";
-
-  /** The member's stock feed below {@link #GATEWAY}. */
-  private static final String MEMBER_STOCK = "/me/stock";
-
-  /** The member's ship feed below {@link #GATEWAY}. */
-  private static final String MEMBER_SHIPS = "/me/ships";
-
-  /** The member's refinery-order feed below {@link #GATEWAY}. */
-  private static final String MEMBER_REFINERY_ORDERS = "/me/refinery-orders";
-
-  /** The prefix of the member's own resources below {@link #GATEWAY}. */
-  private static final String MEMBER = "/me/";
-
-  /** The change-set path below each of the member's feeds. */
-  private static final String CHANGES = "/changes";
-
-  /** The change-set definition in {@code change-set.schema.json} of each member resource. */
+  /** The change-set definition in {@code change-set.schema.json} of each of the member's feeds. */
   private static final Map<String, String> MEMBER_CHANGE_SETS =
       Map.of(
-          "blueprints", "blueprintChangeSet",
-          "stock", "stockChangeSet",
-          "ships", "shipChangeSet",
-          "refinery-orders", "refineryOrderChangeSet");
+          MEMBER_BLUEPRINTS, "blueprintChangeSet",
+          MEMBER_STOCK, "stockChangeSet",
+          MEMBER_SHIPS, "shipChangeSet",
+          MEMBER_REFINERY_ORDERS, "refineryOrderChangeSet");
 
   /** The page schema of each of the member's feeds. */
   private static final Map<String, String> MEMBER_FEED_PAGES =
@@ -365,14 +352,10 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    String path =
-        String.valueOf(
-                Objects.requireNonNull(
-                    request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
-            .substring(GATEWAY.length());
+    String feed = matchedFeed(request);
     return page(
-        path,
-        Objects.requireNonNull(MEMBER_FEED_PAGES.get(path)),
+        feed,
+        Objects.requireNonNull(MEMBER_FEED_PAGES.get(feed)),
         cursor,
         limit,
         request,
@@ -626,19 +609,29 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
+    String feed = matchedFeed(request);
+    return changes(
+        feed.substring(MEMBER.length()),
+        Objects.requireNonNull(MEMBER_CHANGE_SETS.get(feed)),
+        false,
+        body,
+        request,
+        acceptLanguage);
+  }
+
+  /**
+   * Reads the member feed a request of a feed or of its change set matched.
+   *
+   * @param request a request a member-feed route matched
+   * @return the feed below {@code /exchange/v1}, such as {@code /me/stock}
+   */
+  private static @NotNull String matchedFeed(@NotNull HttpServletRequest request) {
     String path =
         String.valueOf(
                 Objects.requireNonNull(
                     request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
             .substring(GATEWAY.length());
-    String resource = path.substring(MEMBER.length(), path.length() - CHANGES.length());
-    return changes(
-        resource,
-        Objects.requireNonNull(MEMBER_CHANGE_SETS.get(resource)),
-        false,
-        body,
-        request,
-        acceptLanguage);
+    return path.endsWith(CHANGES) ? path.substring(0, path.length() - CHANGES.length()) : path;
   }
 
   /**
