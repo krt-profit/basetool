@@ -60,8 +60,9 @@ class CrossStaffelJobOrderE2eTest {
 
   /**
    * Seeds the cross-Staffel precondition: an Officer homed in Staffel A (IRIDIUM), a fresh Staffel
-   * B with {@code test-member} homed in it, a job-order material, a job order owned by A, and a
-   * B-owned inventory item linked to that order.
+   * B with {@code test-member} a member of B and of A, a job-order material, a job order owned by
+   * A, and a B-owned inventory item that member links to the order. The membership in A is what
+   * lets the member see the order and earmark to it (REQ-ORDERS-018).
    */
   @BeforeAll
   static void setUp() {
@@ -78,13 +79,12 @@ class CrossStaffelJobOrderE2eTest {
           true);
       String staffelBId =
           seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E JobOrder B", "EJOB");
-      seeder.assignStaffelMembership(
+      seeder.assignTwoStaffelMemberships(
           ADMIN_USER,
           ADMIN_PASSWORD,
           seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD),
           staffelBId,
-          false,
-          false);
+          IRIDIUM_ID);
       materialId =
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E CrossStaffel Mat");
       String bLocationId =
@@ -99,8 +99,15 @@ class CrossStaffelJobOrderE2eTest {
               650,
               80);
       bInventoryItemId =
-          seeder.createInventoryItemForJobOrder(
-              MEMBER_USER, MEMBER_PASSWORD, materialId, bLocationId, jobOrderId, 750, 60);
+          seeder.createInventoryItemForJobOrderOwnedBy(
+              MEMBER_USER,
+              MEMBER_PASSWORD,
+              materialId,
+              bLocationId,
+              jobOrderId,
+              750,
+              60,
+              staffelBId);
     }
   }
 
