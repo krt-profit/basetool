@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE – Raffinerie: Client-Markierung</title>
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/tokens.css">
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/colors_and_type.css">
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/krt-components.css">
+<style>
+  body { background: var(--color-bg-black, #0F0F0F); color: var(--color-gray-1); margin: 0; padding: 24px 24px 96px; font-family: var(--font-body, Lato, sans-serif); }
+  .proto-note { font-size: .75rem; color: var(--color-gray-2-text); margin-bottom: 16px; border-left: 3px solid var(--color-primary); padding: 6px 10px; background: #1A1D21; }
+  .proto-note strong { color: var(--color-white); }
+  h2 { text-transform: uppercase; font-size: .8rem; letter-spacing: .1em; color: var(--color-gray-2-text); margin: 28px 0 10px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { text-align: left; background: #1A1D21; color: var(--color-gray-2-text); text-transform: uppercase; font-size: .66rem; letter-spacing: .08em; padding: 8px 10px; }
+  td { padding: 9px 10px; border-top: 1px solid #36373B; vertical-align: middle; }
+  .page-title { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .page-title h1 { margin: 0; font-size: 1.3rem; text-transform: uppercase; }
+  .muted { color: var(--color-gray-2-text); font-size: .78rem; }
+  .src { display: inline-flex; gap: 6px; align-items: center; }
+  .src-glyph { width: 18px; height: 18px; border: 1px solid var(--color-info); color: var(--color-info-text); font-size: .6rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; }
+  .legend { display: flex; justify-content: space-between; align-items: baseline; text-transform: uppercase; font-size: .72rem; letter-spacing: .08em; color: var(--color-gray-2-text); border-bottom: 1px solid #36373B; padding-bottom: 6px; margin: 14px 0 8px; }
+  .legend .chip { text-transform: none; letter-spacing: 0; }
+  .fields { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; font-size: .85rem; }
+  .fields div span { display: block; font-size: .66rem; text-transform: uppercase; color: var(--color-gray-2-text); }
+  .timeline { list-style: none; margin: 0; padding: 0; font-size: .8rem; }
+  .timeline li { padding: 8px 0 8px 14px; border-left: 2px solid #36373B; position: relative; }
+  .timeline li::before { content: ''; position: absolute; left: -5px; top: 13px; width: 8px; height: 8px; background: var(--color-gray-2); }
+  .timeline li.client::before { background: var(--color-info); }
+  .timeline li.web::before { background: var(--color-primary); }
+  .timeline time { color: var(--color-gray-2-text); font-size: .72rem; display: block; }
+  .switcher { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #fff; color: #141414; border-radius: 999px; display: flex; align-items: center; gap: 12px; padding: 6px 10px; font: 700 .8rem Lato, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.6); z-index: 10; }
+  .switcher button { border: 0; background: #141414; color: #fff; border-radius: 999px; width: 28px; height: 28px; cursor: pointer; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="proto-note"><strong>PROTOTYPE, wegwerfen.</strong> Frage: Wie zeigt das Web, dass ein Client (VerseKit) einen Raffinerieauftrag angelegt, geändert oder abgeholt hat? Drei Varianten über <code>?variant=A|B|C</code> oder die Pfeiltasten. Daten sind erfunden.</div>
+<div id="root"></div>
+<div class="switcher" role="toolbar" aria-label="Prototyp-Variante">
+  <button type="button" id="prev" aria-label="Vorherige Variante">‹</button>
+  <span id="label"></span>
+  <button type="button" id="next" aria-label="Nächste Variante">›</button>
+</div>
+<script>
+const orders = [
+  { id: '#7A21', loc: 'CRU-L1', method: 'Dinyx Solventation', status: 'Läuft', cls: 'status-planned', ends: 'heute 21:40', client: 'VerseKit', created: 'VerseKit', lastBy: 'VerseKit', lastAt: '18:42' },
+  { id: '#7A1F', loc: 'ARC-L1', method: 'Ferron Exchange', status: 'Abholbereit', cls: 'status-active', ends: 'heute 17:05', client: 'VerseKit', created: 'VerseKit', lastBy: 'Web (du)', lastAt: '17:20' },
+  { id: '#7A0C', loc: 'HUR-L2', method: 'Cormack', status: 'Abgeholt', cls: 'status-completed', ends: 'gestern 22:10', client: 'VerseKit', created: 'Web (du)', lastBy: 'VerseKit', lastAt: 'gestern 22:31', pickedUp: true },
+  { id: '#79F2', loc: 'MIC-L1', method: 'Pyrometric Chromalysis', status: 'Eingelagert', cls: 'status-completed', ends: '02.11. 09:00', client: null, created: 'Web (du)', lastBy: 'Web (du)', lastAt: '02.11. 10:12' }
+];
+const detail = orders[1];
+
+const variants = {
+  A: { name: 'Chip am Auftrag', render: () => `
+    <h2>Liste</h2>
+    <div class="card card--flush"><table>
+      <thead><tr><th>Auftrag</th><th>Raffinerie</th><th>Status</th><th>Fertig</th></tr></thead>
+      <tbody>${orders.map(o => `<tr>
+        <td><strong>${o.id}</strong> ${o.client ? `<span class="chip chip--info">${o.client}</span>` : ''}</td>
+        <td>${o.loc}</td>
+        <td><span class="status-pill ${o.cls}">${o.status}</span>${o.pickedUp ? ` <span class="muted">via ${o.client}</span>` : ''}</td>
+        <td>${o.ends}</td></tr>`).join('')}</tbody></table></div>
+    <h2>Detail</h2>
+    <div class="page-title"><h1>Auftrag ${detail.id}</h1><span class="status-pill ${detail.cls}">${detail.status}</span><span class="chip chip--info">${detail.client}</span></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="card">${section('1 · Raffinerie', '')}${section('3 · Materialien', '')}${section('4 · Finanzen', '')}</div>
+      <aside class="card"><span class="kpi-label">Zugeordnet</span>
+        <p style="margin:6px 0">Kein Einsatz</p>
+        <p class="muted">Besitzer greluc · ALPHA</p>
+        <p class="muted">Angelegt von <strong>${detail.created}</strong> · zuletzt geändert: ${detail.lastBy}, ${detail.lastAt}</p></aside>
+    </div>` },
+
+  B: { name: 'Verlauf im Detail', render: () => `
+    <h2>Liste</h2>
+    <div class="card card--flush"><table>
+      <thead><tr><th>Auftrag</th><th>Raffinerie</th><th>Status</th><th>Fertig</th></tr></thead>
+      <tbody>${orders.map(o => `<tr>
+        <td><span class="src">${o.client ? '<span class="src-glyph" title="Synchronisiert mit ' + o.client + '">VK</span>' : ''}<strong>${o.id}</strong></span></td>
+        <td>${o.loc}</td><td><span class="status-pill ${o.cls}">${o.status}</span></td><td>${o.ends}</td></tr>`).join('')}</tbody></table></div>
+    <h2>Detail</h2>
+    <div class="page-title"><h1>Auftrag ${detail.id}</h1><span class="status-pill ${detail.cls}">${detail.status}</span></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="card">${section('1 · Raffinerie', '')}${section('3 · Materialien', '')}${section('4 · Finanzen', '')}</div>
+      <aside class="card"><span class="kpi-label">Verlauf</span>
+        <ul class="timeline" style="margin-top:8px">
+          <li class="web"><time>heute 17:20</time>Finanzen geändert · <strong>Web (du)</strong></li>
+          <li class="client"><time>heute 14:02</time>Laufzeit geändert · <strong>VerseKit</strong></li>
+          <li class="client"><time>heute 13:58</time>Angelegt · <strong>VerseKit</strong></li>
+        </ul></aside>
+    </div>` },
+
+  C: { name: 'Quelle pro Abschnitt', render: () => `
+    <h2>Liste</h2>
+    <div class="card card--flush"><table>
+      <thead><tr><th>Auftrag</th><th>Raffinerie</th><th>Status</th><th>Fertig</th><th>Quelle</th></tr></thead>
+      <tbody>${orders.map(o => `<tr>
+        <td><strong>${o.id}</strong></td><td>${o.loc}</td><td><span class="status-pill ${o.cls}">${o.status}</span></td><td>${o.ends}</td>
+        <td class="muted">${o.client ? o.client + ' · ' + o.lastAt : 'Web'}</td></tr>`).join('')}</tbody></table></div>
+    <h2>Detail</h2>
+    <div class="alert alert-warning" style="margin-bottom:12px">Dieser Auftrag wird mit <strong>VerseKit</strong> synchronisiert. Änderungen hier sieht VerseKit beim nächsten Abgleich.</div>
+    <div class="page-title"><h1>Auftrag ${detail.id}</h1><span class="status-pill ${detail.cls}">${detail.status}</span></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="card">
+        ${section('1 · Raffinerie', '<span class="chip chip--info">VerseKit · 13:58</span>')}
+        ${section('3 · Materialien', '<span class="chip chip--info">VerseKit · 14:02</span>')}
+        ${section('4 · Finanzen', '<span class="chip chip--primary">Web (du) · 17:20</span>')}
+      </div>
+      <aside class="card"><span class="kpi-label">Zugeordnet</span><p style="margin:6px 0">Kein Einsatz</p><p class="muted">Besitzer greluc · ALPHA</p></aside>
+    </div>` }
+};
+
+function section(title, badge) {
+  return `<div class="legend"><span>${title}</span>${badge}</div>
+    <div class="fields"><div><span>Raffinerie</span>ARC-L1</div><div><span>Methode</span>Ferron Exchange</div><div><span>Fertig</span>heute 17:05</div></div>`;
+}
+
+const keys = Object.keys(variants);
+function current() { const v = new URLSearchParams(location.search).get('variant'); return keys.includes(v) ? v : 'A'; }
+function show(v) {
+  const url = new URL(location.href); url.searchParams.set('variant', v); history.replaceState(null, '', url);
+  document.getElementById('root').innerHTML = variants[v].render();
+  document.getElementById('label').textContent = v + ' (' + variants[v].name + ')';
+}
+function step(d) { const i = keys.indexOf(current()); show(keys[(i + d + keys.length) % keys.length]); }
+document.getElementById('prev').onclick = () => step(-1);
+document.getElementById('next').onclick = () => step(1);
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') step(-1);
+  if (e.key === 'ArrowRight') step(1);
+});
+show(current());
+</script>
+</body>
+</html>
