@@ -225,7 +225,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
 
   @Test
   @WithMockUser
-  void view_rendersScExtractorReleaseLink_besideTheJsonImportTrigger() throws Exception {
+  void view_rendersVersekitLink_besideTheJsonImportTrigger() throws Exception {
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -249,24 +249,20 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     mockMvc
         .perform(get("/personal-inventory/blueprints"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("id=\"krt-bp-extractor-link\"")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
+        .andExpect(content().string(containsString("id=\"krt-bp-versekit-link\"")))
+        .andExpect(content().string(containsString("href=\"https://versekit.xharig.com/\"")))
         .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
         .andExpect(result -> {
           String html = result.getResponse().getContentAsString();
           assertTrue(
-              html.indexOf("krt-bp-extractor-link") < html.indexOf("id=\"krt-bp-list\""),
-              "extractor link must render in the add bar, above the swapped collection list");
+              html.indexOf("krt-bp-versekit-link") < html.indexOf("id=\"krt-bp-list\""),
+              "VerseKit link must render in the add bar, above the swapped collection list");
         });
   }
 
   /**
    * The page follows the hand-off draft: „Mein Inventar" with the „Persönlich" eyebrow, one primary
-   * action that opens the add dialog, „Importieren" as a ghost button, the extractor link and „Alle
+   * action that opens the add dialog, „Importieren" as a ghost button, the VerseKit link and „Alle
    * löschen" in the overflow menu, both tab counts, and exactly one search on the page — the
    * catalogue search lives in the dialog.
    */
@@ -314,7 +310,7 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     assertTrue(actions.contains("data-modal-id=\"krt-bp-add-modal\""), actions);
     assertTrue(actions.contains("id=\"krt-bp-import-open\" class=\"btn btn-ghost\""), actions);
     assertTrue(actions.contains("data-testid=\"overflow-menu-toggle\""), actions);
-    assertTrue(actions.contains("id=\"krt-bp-extractor-link\""), actions);
+    assertTrue(actions.contains("id=\"krt-bp-versekit-link\""), actions);
     assertTrue(actions.contains("id=\"krt-bp-delete-all-open\""), actions);
     assertTrue(main.contains("<span class=\"tab-count\">118</span>"), main);
     assertTrue(main.contains("<span class=\"tab-count\">1</span>"), main);

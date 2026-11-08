@@ -25,12 +25,12 @@
             </button>
             <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='krt-bp-menu', items=~{::bp-menu-items})}">
                 <th:block th:ref="bp-menu-items">
-                    <a id="krt-bp-extractor-link" class="overflow-menu__item" role="menuitem"
-                       href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
+                    <a id="krt-bp-versekit-link" class="overflow-menu__item" role="menuitem"
+                       href="https://versekit.xharig.com/"
                        target="_blank" rel="noopener noreferrer"
-                       th:title="#{scExtractor.download.title}">
+                       th:title="#{versekit.link.title}">
                         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
-                        <span th:text="#{scExtractor.download.button}">SC Extractor laden</span>
+                        <span th:text="#{versekit.link.button}">VerseKit laden</span>
                         <svg class="krt-icon krt-bp-menu-external" aria-hidden="true"><use href="#krt-icon-external-link"/></svg>
                     </a>
                     <button type="button" id="krt-bp-delete-all-open" role="menuitem"

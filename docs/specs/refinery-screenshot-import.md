@@ -382,41 +382,40 @@ ingest must never persist a refinery order without that human review-and-save st
 (`POST /exchange/v1/me/drafts/refinery-orders`, REQ-XCH-019) since SC Extractor 2.10.0; the
 gateway's own `/v1/refinery-extract` is removed. The rule above is unchanged.
 
-### REQ-REFINERY-021 — SC Extractor release link in the create page's import bar
+### REQ-REFINERY-021 — VerseKit link in the create page's import bar
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-REFINERY-019` until 2026-09-22; that id also named the server-side pagination of the refinery-order list in [`refinery-orders-overview.md`](refinery-orders-overview.md), which keeps it.
 
-The screenshot import (REQ-REFINERY-013) consumes an extract the user has to produce with the
-desktop **Basetool SC Extractor** first, so the import bar on `/refinery-orders/create` carries the
-way to obtain that tool directly next to the import trigger it feeds. This is the refinery-side twin
-of the Blueprints add bar's `REQ-INV-038`
+The desktop **Basetool SC Extractor** is discontinued and its repository archived; **VerseKit**
+offers its features and syncs with the Basetool. The import bar on `/refinery-orders/create`
+therefore carries the way to VerseKit directly next to the import trigger. This is the
+refinery-side twin of the Blueprints add bar's `REQ-INV-038`
 ([`personal-inventory-blueprints.md`](personal-inventory-blueprints.md)); both surfaces share one
 message key and one URL.
 
-- Renders as `<a id="refineryExtractorLink" class="btn btn-ghost" data-testid="refinery-extractor-link">`
+- Renders as `<a id="refineryVersekitLink" class="btn btn-ghost" data-testid="refinery-versekit-link">`
   with the `#krt-icon-download` glyph, placed **immediately after** the
   `refinery-import-button` trigger and before the `.import-extract-help` hint.
 - It renders **inside** `#refineryImportForm`, not as a sibling of the form: `.import-extract-bar`
   puts the flex row on the *form*, so an element outside it drops out of the row. The anchor
   submits nothing and reads nothing from the form.
-- Targets GitHub's canonical latest-release redirect
-  `https://github.com/krt-profit/basetool-sc-extractor/releases/latest`, hardcoded in the template
-  (same external-link pattern as `kernel/fragments/footer.html`) — no configuration property.
+- Targets `https://versekit.xharig.com/`, hardcoded in the template (same external-link pattern as
+  `kernel/fragments/footer.html`) — no configuration property.
 - Opens in a new tab (`target="_blank"` with `rel="noopener noreferrer"`), so a draft already
   flashed onto the page (REQ-REFINERY-014) is never discarded by the click.
 - Sits outside the swapped `#refineryImportFormContainer` fragment, alongside the file picker
   (REQ-REFINERY-013), so the in-place import twin's re-render leaves it untouched.
-- Label and tooltip come from the shared bundle keys `scExtractor.download.button` / `.title`
+- Label and tooltip come from the shared bundle keys `versekit.link.button` / `.title`
   (DE + EN), **not** from a page-scoped key — the same control exists on the Blueprints page.
 
 **Acceptance criteria:**
 
 - [x] The create page renders the link inside the import form, directly after the import button,
-  pointing at the extractor repository's `releases/latest` URL.
+  pointing at `https://versekit.xharig.com/`.
 - [x] The link opens in a new tab and carries `rel="noopener noreferrer"`.
 - [x] After an in-place import re-render the link is still present and unchanged.
 
-**Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersScExtractorReleaseLink_besideTheImportButton`
+**Enforced by:** `RefineryOrderCreateImportRenderTest#createPage_rendersVersekitLink_besideTheImportButton`
 · **Code:** [`refinery/refinery-orders-create.html`](../../frontend/src/main/resources/templates/refinery/refinery-orders-create.html)
 
 ## Traceability

@@ -178,29 +178,25 @@ class RefineryOrderCreateImportRenderTest {
   }
 
   @Test
-  void createPage_rendersScExtractorReleaseLink_besideTheImportButton() throws Exception {
+  void createPage_rendersVersekitLink_besideTheImportButton() throws Exception {
     mockMvc
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery/refinery-orders-create"))
-        .andExpect(content().string(containsString("data-testid=\"refinery-extractor-link\"")))
-        .andExpect(
-            content()
-                .string(
-                    containsString(
-                        "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
+        .andExpect(content().string(containsString("data-testid=\"refinery-versekit-link\"")))
+        .andExpect(content().string(containsString("href=\"https://versekit.xharig.com/\"")))
         .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
         .andExpect(result -> {
           String html = result.getResponse().getContentAsString();
           int form = html.indexOf("<form id=\"refineryImportForm\"");
-          int link = html.indexOf("id=\"refineryExtractorLink\"");
+          int link = html.indexOf("id=\"refineryVersekitLink\"");
           int formEnd = html.indexOf("</form>", form);
           assertTrue(
               form >= 0 && link > form && link < formEnd,
-              "extractor link must render inside the import form, which owns the flex row");
+              "VerseKit link must render inside the import form, which owns the flex row");
           assertTrue(
               html.indexOf("data-testid=\"refinery-import-button\"") < link,
-              "extractor link must follow the import button it accompanies");
+              "VerseKit link must follow the import button it accompanies");
         });
   }
 
