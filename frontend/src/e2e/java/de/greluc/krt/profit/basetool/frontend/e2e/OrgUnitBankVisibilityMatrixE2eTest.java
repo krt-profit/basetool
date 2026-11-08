@@ -32,6 +32,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -45,7 +46,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <p>Covers {@code ORG_UNIT} and {@code SPECIAL} accounts across the grantee kinds plus the admin
  * override; the {@code CARTEL} singletons stay with the unit tests. Asserts that only a Bereich or
  * OL seat auto-sees a Sonderkonto, that a Sonderkonto offers no role buckets, and that individual
- * and all-members grants open it (REQ-BANK-037).
+ * and all-members grants open it (REQ-BANK-037), and that a hidden account's drill-in answers 404
+ * like an unknown id (REQ-BANK-066).
  */
 @Tag("e2e")
 class OrgUnitBankVisibilityMatrixE2eTest {
@@ -129,10 +131,10 @@ class OrgUnitBankVisibilityMatrixE2eTest {
             BEREICH_USER, BEREICH_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
         "a Bereichsleiter may open the Sonderkonto drill-in");
     assertEquals(
-        403,
+        404,
         seeder.attemptGetStatus(
             MEMBER_USER, MEMBER_PASSWORD, "/api/v1/bank/org-units/accounts/" + specialAccountId),
-        "a plain member is denied the Sonderkonto drill-in");
+        "a plain member gets the Sonderkonto drill-in answered like an unknown account");
   }
 
   @Test
@@ -144,19 +146,26 @@ class OrgUnitBankVisibilityMatrixE2eTest {
         balancesContain(NONVIEWER_USER, NONVIEWER_PASSWORD, orgUnitAccountId),
         "a non-viewer's balances must not contain the Staffel account");
     assertEquals(
-        403,
+        404,
+        seeder.attemptGetStatus(
+            NONVIEWER_USER,
+            NONVIEWER_PASSWORD,
+            "/api/v1/bank/org-units/accounts/" + UUID.randomUUID()),
+        "an unknown account id answers 404 on the drill-in");
+    assertEquals(
+        404,
         seeder.attemptGetStatus(
             NONVIEWER_USER,
             NONVIEWER_PASSWORD,
             "/api/v1/bank/org-units/accounts/" + specialAccountId),
-        "a non-viewer is denied the Sonderkonto drill-in");
+        "a non-viewer gets the Sonderkonto drill-in answered like an unknown account");
     assertEquals(
-        403,
+        404,
         seeder.attemptGetStatus(
             NONVIEWER_USER,
             NONVIEWER_PASSWORD,
             "/api/v1/bank/org-units/accounts/" + orgUnitAccountId),
-        "a non-viewer is denied the Staffel-account drill-in");
+        "a non-viewer gets the Staffel-account drill-in answered like an unknown account");
   }
 
   @Test

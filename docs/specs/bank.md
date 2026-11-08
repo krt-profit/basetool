@@ -3139,7 +3139,9 @@ ids cannot be probed by comparing the two answers.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest`
 (`accountRoutes_answerHiddenAndUnknownAccountsWithTheSameNotFound`,
-`getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot`, `*_byPlainViewer_*`) ·
+`getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot`, `*_byPlainViewer_*`),
+`OrgUnitBankVisibilityMatrixE2eTest` (the drill-in of a hidden Sonderkonto and Staffel account
+answers `404` like an unknown id, through the real token chain) ·
 **Code:** `bank/internal/OrgUnitBankAccessService#requireViewableAccount`,
 `bank/internal/OrgUnitBankAccessService#requireDisclosedAccount`,
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
