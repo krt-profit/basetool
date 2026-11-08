@@ -74,9 +74,10 @@ the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the memb
 units to the org demand (REQ-XCH-047).
 
 > [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
-> The read is built (REQ-XCH-051). The table gains its further rows as they are built:
-> `POST …/me/refinery-orders/changes` (`exchange.refinery.write`, REQ-XCH-052…055) and the two
-> store-choice reads (`exchange.refinery.store`, REQ-XCH-054).
+> The read is built (REQ-XCH-051). The table gains three more rows as they are built:
+> `POST …/me/refinery-orders/changes` (`exchange.refinery.write`, REQ-XCH-052…055), and
+> `GET …/me/store-choices/receivers` and `…/me/store-choices/job-orders?material=`
+> (`exchange.refinery.store`, REQ-XCH-054).
 
 Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter admits nothing
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
@@ -3411,15 +3412,17 @@ A `pickup` op reports that the member collected an order's yield in the game. It
 `exchange.refinery.store` grants two reads a client needs to offer the web's store choices, and is
 required for every pickup that carries store lines (REQ-XCH-053). Locations come from
 `GET /exchange/v1/catalog/locations` and the member's own units from `GET /exchange/v1/me/org-units`
-(REQ-XCH-018, -048); both reads keep every acting path literal (REQ-SEC-080).
+(REQ-XCH-018, -048); both reads keep every acting path literal (REQ-SEC-080). They form a resource
+of their own, the store choices, so a later warehouse book-in can reuse them; today
+`exchange.refinery.store` is the only scope that grants them.
 
-- **Receivers.** `GET /exchange/v1/me/refinery-orders/receivers` lists the members the member may
+- **Receivers.** `GET /exchange/v1/me/store-choices/receivers` lists the members the member may
   book onto, decided from the database by REQ-SEC-039's exchange rule: the member themselves, and
   for a member who may book for others, the members that rule admits. Each receiver is a
   client-scoped `ref` (the HMAC pseudonym of REQ-XCH-043) with the name the web shows and the
   receiver's direct memberships (`id`, `name`, `kind`). Members who withhold their name
   (REQ-XCH-044) are left out; the member themselves is always listed.
-- **Job orders.** `GET /exchange/v1/me/refinery-orders/job-orders?material=<bt>` lists the active
+- **Job orders.** `GET /exchange/v1/me/store-choices/job-orders?material=<bt>` lists the active
   job orders the member can see that require the material, as the web's `/orders/lookup` filters
   the store dialog's picker (the job-order gate of REQ-XCH-018 and the tenancy read scope of the
   member's memberships, REQ-ORG-003), with id, `number` and status. A material that names nothing
