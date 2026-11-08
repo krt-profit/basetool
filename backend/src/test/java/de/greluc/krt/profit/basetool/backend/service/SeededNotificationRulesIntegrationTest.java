@@ -173,6 +173,11 @@ class SeededNotificationRulesIntegrationTest {
             SelectorKind.ACCOUNT_GRANT,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
+            false,
+            SelectorKind.REQUIRED_APPROVER),
+        rule(
             NotificationEventType.BANK_GRANT_CHANGED,
             NotificationType.BANK_GRANT_CHANGED,
             true,

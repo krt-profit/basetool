@@ -61,6 +61,7 @@ const CODE_FIELD = {
     BANK_SPLIT_TOO_SMALL: 'splitPercent',
     BANK_JUSTIFICATION_REQUIRED: 'justification',
     BANK_FEE_EXCEEDS_AMOUNT: 'amount',
+    BANK_APPROVER_NOTE_REQUIRED: 'staffNote',
 };
 
 /**

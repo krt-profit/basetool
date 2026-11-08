@@ -21,7 +21,10 @@ package de.greluc.krt.profit.basetool.backend.bank.api.events;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
@@ -46,7 +49,8 @@ public interface BankBookingRequestEvent extends NotificationEvent {
   Set<NotificationType> OPEN_REQUEST_NOTICES =
       Set.of(
           NotificationType.BANK_BOOKING_REQUEST_CREATED,
-          NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+          NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+          NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
 
   /**
    * The notification types a decision on a request clears: its open notices and its
@@ -57,7 +61,42 @@ public interface BankBookingRequestEvent extends NotificationEvent {
       Set.of(
           NotificationType.BANK_BOOKING_REQUEST_CREATED,
           NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+          NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
           NotificationType.BANK_BOOKING_REQUEST_APPROVED);
+
+  /**
+   * The approval-needed notice outranks the generic open notices, so the required approver holds
+   * one notice per request (REQ-NOTIF-033).
+   */
+  @Unmodifiable
+  Map<NotificationType, Set<NotificationType>> APPROVER_NOTICE_PRECEDENCE =
+      Map.of(
+          NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
+          Set.of(
+              NotificationType.BANK_BOOKING_REQUEST_CREATED,
+              NotificationType.BANK_BOOKING_REQUEST_UPDATED));
+
+  /**
+   * Every booking-request event concerns the request it is tagged with.
+   *
+   * @return {@link #entityId()}
+   */
+  @Override
+  default UUID contextBankRequestId() {
+    return entityId();
+  }
+
+  /**
+   * For the required approver the approval-needed notice replaces the generic one.
+   *
+   * @return {@link #APPROVER_NOTICE_PRECEDENCE}
+   */
+  @NotNull
+  @Unmodifiable
+  @Override
+  default Map<NotificationType, Set<NotificationType>> outrankedNotificationTypes() {
+    return APPROVER_NOTICE_PRECEDENCE;
+  }
 
   /**
    * The loose entity-type tag shared by all bank-booking-request events.

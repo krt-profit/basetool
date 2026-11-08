@@ -337,8 +337,9 @@ public enum NotificationEventType {
   BANK_BOOKING_REQUEST_APPROVED,
 
   /**
-   * The approval of a booking request was revoked (REQ-BANK-057). Creates no notification; clears
-   * the request's ready-to-confirm notices.
+   * The approval of a booking request was revoked (REQ-BANK-057). Clears the request's
+   * ready-to-confirm notices; the default rule tells the required approver again that their
+   * approval is needed (REQ-NOTIF-033).
    */
   BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
 

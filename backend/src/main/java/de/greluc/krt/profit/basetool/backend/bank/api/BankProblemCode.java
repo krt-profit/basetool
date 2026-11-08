@@ -72,6 +72,12 @@ public enum BankProblemCode implements ProblemCode {
   /** The booking needs the owner's approval first. */
   BANK_OWNER_APPROVAL_REQUIRED(HttpStatus.CONFLICT),
 
+  /**
+   * An attested over-limit confirm left the note that names the approver blank (REQ-BANK-041,
+   * ADR-0353).
+   */
+  BANK_APPROVER_NOTE_REQUIRED(HttpStatus.BAD_REQUEST),
+
   /** The requester of a booking request may neither approve nor confirm it (REQ-BANK-062). */
   BANK_FOUR_EYES_REQUIRED(HttpStatus.CONFLICT),
 

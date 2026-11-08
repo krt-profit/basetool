@@ -23,9 +23,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRecipientDirectory;
@@ -38,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionRecipientDirectoryImpl;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitMembershipRecipientDirectory;
 import java.util.List;
@@ -61,12 +69,15 @@ class RecipientDirectoriesTest {
   private static final UUID ACCOUNT = UUID.randomUUID();
   private static final UUID ALICE = UUID.randomUUID();
   private static final UUID BOB = UUID.randomUUID();
+  private static final UUID CAROL = UUID.randomUUID();
 
   @Mock private UserRepository userRepository;
   @Mock private RoleRepository roleRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private BankAccountGrantRepository bankAccountGrantRepository;
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
+  @Mock private BankAccountRepository bankAccountRepository;
+  @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private ExchangeInstallationRepository exchangeInstallationRepository;
@@ -82,7 +93,12 @@ class RecipientDirectoriesTest {
     orgUnits = new OrgUnitMembershipRecipientDirectory(orgUnitMembershipRepository);
     accounts =
         new OrgUnitBankRecipientDirectory(
-            bankAccountGrantRepository, orgUnitBankResponsibilityService);
+            bankAccountGrantRepository,
+            bankAccountRepository,
+            bankBookingRequestRepository,
+            orgUnitBankResponsibilityService,
+            orgUnitMembershipRepository,
+            roles);
     resolution =
         new RecipientResolutionService(
             roles,
@@ -200,5 +216,91 @@ class RecipientDirectoriesTest {
 
     assertThat(resolution.resolveAccountGrantHolders(ACCOUNT)).containsExactly(ALICE);
     assertThat(resolution.resolveAccountResponsibleHolders(ACCOUNT)).containsExactly(BOB);
+  }
+
+  @Test
+  void theKrtAccountsResponsibleHoldersAreNotToldOfEveryRequest() {
+    when(bankAccountRepository.findById(ACCOUNT))
+        .thenReturn(Optional.of(account(BankAccountType.CARTEL)));
+
+    assertThat(resolution.resolveRequestResponsibleHolders(ACCOUNT)).isEmpty();
+  }
+
+  @Test
+  void anotherAccountsResponsibleHoldersAreToldOfEveryRequest() {
+    when(bankAccountRepository.findById(ACCOUNT))
+        .thenReturn(Optional.of(account(BankAccountType.ORG_UNIT)));
+    when(orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(ACCOUNT))
+        .thenReturn(Set.of(BOB));
+
+    assertThat(resolution.resolveRequestResponsibleHolders(ACCOUNT)).containsExactly(BOB);
+  }
+
+  @Test
+  void theMiddleKrtBandWaitsForTheBankleitungButNeverForTheRequester() {
+    UUID request = pending(BankRequestApprover.BANK_MANAGEMENT, false);
+    when(userRepository.findUserIdsByRoleCode("BANK_MANAGEMENT")).thenReturn(Set.of(ALICE, CAROL));
+
+    assertThat(resolution.resolveRequiredApprovers(request)).containsExactly(ALICE);
+  }
+
+  @Test
+  void theTopKrtBandWaitsForEveryOlMember() {
+    UUID request = pending(BankRequestApprover.ORGANISATIONSLEITUNG, false);
+    when(orgUnitMembershipRepository.findUserIdsByRole(MembershipRole.OL_MEMBER))
+        .thenReturn(Set.of(ALICE, BOB));
+
+    assertThat(resolution.resolveRequiredApprovers(request)).containsExactlyInAnyOrder(ALICE, BOB);
+  }
+
+  @Test
+  void anOverLimitRequestWaitsForTheAccountsResponsibleHolders() {
+    UUID request = pending(BankRequestApprover.RESPONSIBLE_HOLDER, false);
+    when(orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(ACCOUNT))
+        .thenReturn(Set.of(BOB));
+
+    assertThat(resolution.resolveRequiredApprovers(request)).containsExactly(BOB);
+  }
+
+  @Test
+  void anApprovedRequestWaitsForNobody() {
+    UUID request = pending(BankRequestApprover.BANK_MANAGEMENT, true);
+
+    assertThat(resolution.resolveRequiredApprovers(request)).isEmpty();
+    verifyNoInteractions(userRepository);
+  }
+
+  @Test
+  void aDecidedRequestWaitsForNobody() {
+    BankBookingRequest request = request(BankRequestApprover.BANK_MANAGEMENT, false);
+    request.setStatus(BankBookingRequestStatus.CONFIRMED);
+    when(bankBookingRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
+
+    assertThat(resolution.resolveRequiredApprovers(request.getId())).isEmpty();
+  }
+
+  private static BankAccount account(BankAccountType type) {
+    BankAccount account = new BankAccount();
+    account.setId(ACCOUNT);
+    account.setType(type);
+    return account;
+  }
+
+  private static BankBookingRequest request(BankRequestApprover approver, boolean approved) {
+    BankBookingRequest request = new BankBookingRequest();
+    request.setId(UUID.randomUUID());
+    request.setAccount(account(BankAccountType.CARTEL));
+    request.setStatus(BankBookingRequestStatus.PENDING);
+    request.setRequestedBy(CAROL);
+    request.setRequiresOwnerApproval(true);
+    request.setRequiredApprover(approver);
+    request.setOwnerApprovalGranted(approved);
+    return request;
+  }
+
+  private UUID pending(BankRequestApprover approver, boolean approved) {
+    BankBookingRequest request = request(approver, approved);
+    when(bankBookingRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
+    return request.getId();
   }
 }

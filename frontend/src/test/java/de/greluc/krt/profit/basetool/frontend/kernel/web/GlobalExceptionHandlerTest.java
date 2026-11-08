@@ -390,6 +390,27 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void bankApproverNoteRequired400_mapsToDedicatedKey_notUnexpected() {
+    BackendServiceException ex =
+        new BackendServiceException(
+            "approver not named",
+            null,
+            400,
+            "BANK_APPROVER_NOTE_REQUIRED",
+            "corr-bank",
+            List.of(),
+            null);
+
+    Object result = handler.handleBackendServiceException(ex, jsonRequest(), new ConcurrentModel());
+
+    ResponseEntity<?> response = assertInstanceOf(ResponseEntity.class, result);
+    assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    Map<?, ?> body = assertInstanceOf(Map.class, response.getBody());
+    assertEquals("BANK_APPROVER_NOTE_REQUIRED", body.get("code"));
+    assertEquals("error.bank.approverNoteRequired", body.get("message"));
+  }
+
+  @Test
   void bankFourEyesRequired409_mapsToDedicatedKey_notUnexpected() {
     BackendServiceException ex =
         new BackendServiceException(

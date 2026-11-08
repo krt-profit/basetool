@@ -280,6 +280,14 @@ public enum NotificationType {
   BANK_BOOKING_REQUEST_APPROVED,
 
   /**
+   * An over-limit booking request waits for the recipient's approval (REQ-NOTIF-033), rendered with
+   * {@code type}, {@code amount}, {@code accountNo} and {@code requester}. Resolved via the {@code
+   * REQUIRED_APPROVER} selector; replaces the recipient's generic new-request notice on that
+   * request and is cleared by its approval, decision or cancellation.
+   */
+  BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
+
+  /**
    * The recipient's bank access to an account was granted or changed (REQ-BANK-058), rendered with
    * {@code accountNo}, the {@code grantChange} word and the three rights words.
    */
@@ -530,6 +538,7 @@ public enum NotificationType {
           INVENTORY_POOL_CHANGED_BY_OTHER,
           INVENTORY_STOCK_LEVEL_LOW,
           BANK_BOOKING_REQUEST_APPROVED,
+          BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
           BANK_GRANT_CHANGED,
           BANK_GRANT_REVOKED,
           BANK_PAYOUT_RECEIVED,

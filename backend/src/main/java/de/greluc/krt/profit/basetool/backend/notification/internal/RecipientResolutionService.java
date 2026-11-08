@@ -112,6 +112,30 @@ public class RecipientResolutionService {
   }
 
   /**
+   * Resolves the responsible holders told of every request on the given bank account, the {@code
+   * REQUEST_RESPONSIBLE} selector's recipients (REQ-NOTIF-033).
+   *
+   * @param accountId the bank account
+   * @return their user subs; never {@code null}, empty on the KRT account
+   */
+  @NotNull
+  public Set<UUID> resolveRequestResponsibleHolders(@NotNull UUID accountId) {
+    return accountRecipientDirectory.requestResponsibleHoldersOf(accountId);
+  }
+
+  /**
+   * Resolves the members whose approval a booking request still waits for, the {@code
+   * REQUIRED_APPROVER} selector's recipients (REQ-NOTIF-033).
+   *
+   * @param requestId the booking request
+   * @return their user subs; never {@code null}, empty when no approval is outstanding
+   */
+  @NotNull
+  public Set<UUID> resolveRequiredApprovers(@NotNull UUID requestId) {
+    return accountRecipientDirectory.requiredApproversOf(requestId);
+  }
+
+  /**
    * Resolves the registered participants of a mission, the {@code MISSION_PARTICIPANTS} selector's
    * recipients (REQ-NOTIF-024).
    *

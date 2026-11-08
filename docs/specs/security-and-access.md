@@ -6396,7 +6396,7 @@ Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.
   and sees only that role of a role set; anyone else gets `403`
   (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
   `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
-- **Its own counter.** `app_user.roles_version` guards a user's role set (V360) and is echoed on every
+- **Its own counter.** `app_user.roles_version` guards a user's role set (V361) and is echoed on every
   change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
   role change, so a role change and an edit of the user record never collide. A change that leaves
   the role set as it is writes nothing.
@@ -6412,7 +6412,7 @@ Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.
   `USER_ROLE_WITHDRAWN` (subject and target the member, details the `role` code and, for the
   bootstrap grant, `source=bootstrap`; REQ-AUDIT-001), counts
   `basetool_user_role_changes_total{role,action}`, tells the member through `USER_ROLE_CHANGED`
-  (not mutable, V361) and calls the `RolesChangedObserver`s.
+  (not mutable, V362) and calls the `RolesChangedObserver`s.
 
 Until the cutover the login and the daily roster sync still write the roles from the token, and the
 backend reads them from the token; this requirement and the cutover ship in the same release.

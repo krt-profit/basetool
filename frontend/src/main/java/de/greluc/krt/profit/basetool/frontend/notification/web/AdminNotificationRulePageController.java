@@ -206,6 +206,7 @@ public class AdminNotificationRulePageController {
           "INVENTORY_POOL_CHANGED_BY_OTHER",
           "INVENTORY_STOCK_LEVEL_LOW",
           "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_BOOKING_REQUEST_APPROVAL_NEEDED",
           "BANK_GRANT_CHANGED",
           "BANK_GRANT_REVOKED",
           "BANK_PAYOUT_RECEIVED",
@@ -256,7 +257,9 @@ public class AdminNotificationRulePageController {
           "MISSION_LEADERSHIP",
           "EXCHANGE_CLIENT_HOLDERS",
           "EVENT_RECIPIENTS",
-          "SEAT_HOLDERS");
+          "SEAT_HOLDERS",
+          "REQUIRED_APPROVER",
+          "REQUEST_RESPONSIBLE");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code

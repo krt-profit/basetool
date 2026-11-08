@@ -115,7 +115,8 @@ class NotificationLifecycleEventsTest {
     assertThat(event.resolvesNotificationTypes())
         .containsExactlyInAnyOrder(
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
-            NotificationType.BANK_BOOKING_REQUEST_UPDATED);
+            NotificationType.BANK_BOOKING_REQUEST_UPDATED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
     assertThat(event.renderParams())
         .containsEntry("amount", "1500")
         .containsEntry("accountNo", "KB-0042")

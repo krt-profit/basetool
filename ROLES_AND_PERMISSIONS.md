@@ -943,7 +943,7 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 | Submit a **withdrawal / transfer** request on a **visible** requestable account (`OrgUnitBankRequestService#createBookingRequest`, `OrgUnitBankAccessService#canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
 | Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
 | **Approve/revoke** an over-limit request („Anträge an unsere Konten" tab, account in one's own responsibility)                                |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
-| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`)                                         |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
+| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`; without an in-app approval the staff note must name the approver, otherwise 400 `BANK_APPROVER_NOTE_REQUIRED`) |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
