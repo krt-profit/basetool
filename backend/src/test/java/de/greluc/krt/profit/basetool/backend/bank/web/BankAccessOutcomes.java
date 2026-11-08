@@ -65,12 +65,12 @@ final class BankAccessOutcomes {
   @Unmodifiable
   static Map<String, String> recorded() {
     Map<String, String> outcomes = new HashMap<>();
-    try (InputStream stream = BankAccessOutcomes.class.getResourceAsStream(RESOURCE)) {
-      if (stream == null) {
-        return Map.of();
-      }
-      BufferedReader reader =
-          new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+    InputStream stream = BankAccessOutcomes.class.getResourceAsStream(RESOURCE);
+    if (stream == null) {
+      return Map.of();
+    }
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
       reader
           .lines()
           .filter(line -> !line.isBlank() && !line.equals(HEADER))
