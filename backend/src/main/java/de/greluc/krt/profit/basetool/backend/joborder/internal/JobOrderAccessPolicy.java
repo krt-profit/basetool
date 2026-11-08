@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -38,7 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The job-order module's access policy: the read and edit gates of an order, of its owner panels
  * and of the requester side, evaluated on the scope kernel (plan §5.4, ADR-0236). It also decides
- * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}).
+ * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}) and answers other modules'
+ * scope question on an order ({@link JobOrderVisibility}).
  *
  * <p>The list-side half of the scope rule is {@link JobOrderScope#PREDICATE}; the queue list adds
  * the assignee grant beside it ({@code JobOrderRepository#findScopedJobOrders}), so list and gate
@@ -52,7 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service(JobOrderAccessPolicy.BEAN_NAME)
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
+public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibility {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "jobOrderAccessPolicy";
@@ -95,6 +97,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy {
    * @param order the order to inspect; never {@code null}
    * @return {@code true} iff the order is in the caller's read scope
    */
+  @Override
   public boolean canSeeJobOrderInScope(@NotNull JobOrder order) {
     if (!requestScopeResolver.canViewJobOrders()) {
       return false;

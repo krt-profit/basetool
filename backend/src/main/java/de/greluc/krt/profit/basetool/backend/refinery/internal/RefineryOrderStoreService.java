@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
@@ -70,6 +71,12 @@ public class RefineryOrderStoreService {
   private final MaterialRepository materialRepository;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
+
+  /**
+   * Limits a line's earmark to the job orders the active-order lookup offers (REQ-REFINERY-022).
+   */
+  private final JobOrderVisibility jobOrderVisibility;
+
   private final OrgUnitStampingService orgUnitStampingService;
   private final StockCommands stockCommands;
   private final AuditRecorder auditRecorder;
@@ -88,7 +95,7 @@ public class RefineryOrderStoreService {
    * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
    *     non-logistician names another user as an item's receiving stock owner
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order or any
-   *     referenced id is unknown
+   *     referenced id is unknown, or an item names a job order outside the caller's read scope
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
    *     already stored, has no output goods, an item combines {@code personal} with a job order, or
    *     an item names a job order that does not require its material
@@ -158,7 +165,9 @@ public class RefineryOrderStoreService {
       if (itemDto.jobOrderId() != null) {
         jobOrder =
             Entities.require(
-                jobOrderRepository.findById(itemDto.jobOrderId()),
+                jobOrderRepository
+                    .findById(itemDto.jobOrderId())
+                    .filter(jobOrderVisibility::canSeeJobOrderInScope),
                 () -> "JobOrder not found: " + itemDto.jobOrderId());
         assertMaterialRequiredByJobOrder(mat, jobOrder);
       }
