@@ -1751,7 +1751,6 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
-          "view-realm",
           "view-users"
         ]
       },

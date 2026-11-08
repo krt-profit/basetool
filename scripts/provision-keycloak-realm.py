@@ -37,6 +37,9 @@ RETIRED_APPLICATION_ROLES = ["KRT Member", "Bank Employee", "Bank Management", "
 RETIRED_APPLICATION_ROLES_REASON = "held in the Basetool's user_roles, ADR-0355"
 ROLES_SCOPE = "roles"
 
+GRAFANA_ADMIN_ROLE = "grafana-admin"
+GRAFANA_ROLES_CLAIM = "grafana_roles"
+
 RETIRED_REALM_ROLE = "Officer"
 RETIRED_ROLE_REASON = "retired with the OFFICER role, ADR-0300"
 
@@ -190,8 +193,9 @@ class ClientSpec:
     are unions: missing entries are added, extra ones reported, and `withheld_*` entries removed
     wherever found; `withheld_scope_reasons` names why for one scope, else `withheld_scope_reason`,
     when set, for the scopes instead of `withheld_reason`. With `exact_mappers`, every client-level protocol mapper not in `mappers` is
-    removed instead of reported. `value_env` names the environment variable that supplies a
-    confidential client's credential; only that name is ever printed. `credential_hint`, when set,
+    removed instead of reported. `withheld_service_account_roles` are taken back from the service
+    account wherever it holds them, for `withheld_service_account_reason`. `value_env` names the
+    environment variable that supplies a confidential client's credential; only that name is ever printed. `credential_hint`, when set,
     replaces the host-.env instruction for where a generated secret goes.
     """
 
@@ -215,6 +219,8 @@ class ClientSpec:
     client_roles: list[dict] = field(default_factory=list)
     realm_role_scope: list[str] | None = None
     service_account_roles: dict[str, list[str]] | None = None
+    withheld_service_account_roles: dict[str, list[str]] = field(default_factory=dict)
+    withheld_service_account_reason: str = ""
     env_vars_to_fill: list[str] = field(default_factory=list)
     env_doc_hint: str = ""
     unmanaged_fields: set[str] = field(default_factory=set)
@@ -443,8 +449,11 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             service_account_roles={
                 "<realm>": [f"default-roles-{realm}"],
-                "realm-management": ["manage-users", "view-realm", "view-users"],
+                "realm-management": ["manage-users", "view-users"],
             },
+            withheld_service_account_roles={"realm-management": ["view-realm"]},
+            withheld_service_account_reason=("no Basetool call needs it; roles are "
+                                             + RETIRED_APPLICATION_ROLES_REASON),
             env_vars_to_fill=["KEYCLOAK_ADMIN_CLIENT_SECRET"],
             env_doc_hint=" (the backend's user sync authenticates with it)",
         ),
@@ -536,19 +545,24 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_scopes=[OFFLINE_ACCESS],
             withheld_scope_reason=_NO_OFFLINE_SESSION,
             mappers=[{
-                "name": "realm roles",
-                "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                "name": "client roles",
+                "protocolMapper": "oidc-usermodel-client-role-mapper",
                 "config": {
                     "access.token.claim": "true",
-                    "claim.name": "realm_access.roles",
+                    "claim.name": GRAFANA_ROLES_CLAIM,
                     "id.token.claim": "true",
                     "introspection.token.claim": "true",
                     "jsonType.label": "String",
                     "lightweight.claim": "false",
                     "multivalued": "true",
+                    "usermodel.clientRoleMapping.clientId": "grafana",
                     "userinfo.token.claim": "true",
                 },
             }],
+            exact_mappers=True,
+            client_roles=[{"name": GRAFANA_ADMIN_ROLE,
+                           "description": "Grafana server admin; assigned by hand to the "
+                                          "few Grafana admins"}],
             env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
             env_doc_hint=" (Grafana's generic_oauth login reads it)",
         ))
@@ -1289,53 +1303,95 @@ class Planner:
         return {r.get("name") for r in (self.kc.get(
             f"users/{user_id}/role-mappings/clients/{container_uuid}") or [])}
 
-    def _manual_grant(self, spec: ClientSpec, missing: dict[str, list[str]], reason: str) -> None:
-        lines = [f"{spec.client_id}: service-account roles could not be {reason} — this needs an "
+    def _manual_roles(self, spec: ClientSpec, roles: dict[str, list[str]], problem: str,
+                      instruction: str) -> None:
+        """Hand a role change the provisioning identity cannot make to the operator."""
+        lines = [f"{spec.client_id}: service-account roles could not be {problem} — this needs an "
                  f"identity holding manage-users (the provisioning client deliberately does not). "
-                 f"Grant by hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
-                 f"roles -> Assign role:"]
-        for container, names in sorted(missing.items()):
+                 f"By hand: Admin Console -> Clients -> {spec.client_id} -> Service account "
+                 f"roles -> {instruction}"]
+        for container, names in sorted(roles.items()):
             for name in names:
                 source = ("realm role" if container == "<realm>"
                           else f"client '{container}' role")
                 lines.append(f"      {source} '{name}'")
         self.manual.append("\n".join(lines))
 
+    def _manual_grant(self, spec: ClientSpec, missing: dict[str, list[str]], reason: str) -> None:
+        self._manual_roles(spec, missing, reason, "Assign role:")
+
+    def _manual_withdrawal(self, spec: ClientSpec, surplus: dict[str, list[str]],
+                           reason: str) -> None:
+        self._manual_roles(spec, surplus, reason, "select and Unassign, if held:")
+
     def _plan_service_account_roles(self, spec: ClientSpec, uuid: str) -> list[Change]:
-        if not spec.service_account_roles:
+        granted = spec.service_account_roles or {}
+        withheld = spec.withheld_service_account_roles
+        if not granted and not withheld:
             return []
         try:
             user_id, held = self._service_account_state(uuid)
-            for container in spec.service_account_roles:
-                if container != "<realm>":
-                    held[container] = self._held_client_roles(user_id, container)
+            for container in {*granted, *withheld} - {"<realm>"}:
+                held[container] = self._held_client_roles(user_id, container)
         except (KcadmError, KeyError):
-            self._manual_grant(spec, spec.service_account_roles, "read")
+            if granted:
+                self._manual_grant(spec, granted, "read")
+            if withheld:
+                self._manual_withdrawal(spec, withheld, "read")
             return []
         missing = {c: [n for n in names if n not in held.get(c, set())]
-                   for c, names in spec.service_account_roles.items()}
+                   for c, names in granted.items()}
         missing = {c: names for c, names in missing.items() if names}
-        if not missing:
-            return []
-        return [Change(f"+ service-account roles {self._role_summary(missing)}",
-                       lambda: self._grant_service_account_roles(spec, uuid, missing),
-                       service_account=True)]
+        surplus = {c: [n for n in names if n in held.get(c, set())]
+                   for c, names in withheld.items()}
+        surplus = {c: names for c, names in surplus.items() if names}
+        changes: list[Change] = []
+        if missing:
+            changes.append(Change(f"+ service-account roles {self._role_summary(missing)}",
+                                  lambda: self._grant_service_account_roles(spec, uuid, missing),
+                                  service_account=True))
+        if surplus:
+            changes.append(Change(
+                f"- service-account roles {self._role_summary(surplus)} withdrawn "
+                f"({spec.withheld_service_account_reason})",
+                lambda: self._withdraw_service_account_roles(spec, uuid, surplus),
+                service_account=True))
+        return changes
+
+    def _role_container(self, user_id: str, container: str,
+                        held: dict[str, set[str]]) -> tuple[dict[str, dict], str, set[str]]:
+        """One container's roles by name, the user's role-mapping path there, and the names held."""
+        if container == "<realm>":
+            available = {r.get("name"): r for r in (self.kc.get("roles") or [])}
+            return available, f"users/{user_id}/role-mappings/realm", held["<realm>"]
+        container_uuid = self.client_uuid(container)
+        available = {r.get("name"): r for r in
+                     (self.kc.get(f"clients/{container_uuid}/roles") or [])}
+        return (available, f"users/{user_id}/role-mappings/clients/{container_uuid}",
+                self._held_client_roles(user_id, container))
+
+    def _withdraw_service_account_roles(self, spec: ClientSpec, uuid: str,
+                                        roles: dict[str, list[str]]) -> None:
+        try:
+            user_id, held = self._service_account_state(uuid)
+            for container, names in sorted(roles.items()):
+                available, path, have = self._role_container(user_id, container, held)
+                take = [available[n] for n in names if n in have and n in available]
+                if take:
+                    self.kc.delete(path,
+                                   f"service-account roles withdrawn: "
+                                   f"{', '.join(r['name'] for r in take)}",
+                                   [{"id": r["id"], "name": r["name"]} for r in take])
+        except (KcadmError, KeyError) as error:
+            print(f"  could not withdraw: {str(error).splitlines()[0]}")
+            self._manual_withdrawal(spec, roles, "withdrawn")
 
     def _grant_service_account_roles(self, spec: ClientSpec, uuid: str,
                                      roles: dict[str, list[str]]) -> None:
         try:
             user_id, held = self._service_account_state(uuid)
             for container, names in sorted(roles.items()):
-                if container == "<realm>":
-                    available = {r.get("name"): r for r in (self.kc.get("roles") or [])}
-                    path = f"users/{user_id}/role-mappings/realm"
-                    have = held["<realm>"]
-                else:
-                    container_uuid = self.client_uuid(container)
-                    available = {r.get("name"): r for r in
-                                 (self.kc.get(f"clients/{container_uuid}/roles") or [])}
-                    path = f"users/{user_id}/role-mappings/clients/{container_uuid}"
-                    have = self._held_client_roles(user_id, container)
+                available, path, have = self._role_container(user_id, container, held)
                 grant = [available[n] for n in names if n not in have and n in available]
                 absent = [n for n in names if n not in available]
                 if absent:

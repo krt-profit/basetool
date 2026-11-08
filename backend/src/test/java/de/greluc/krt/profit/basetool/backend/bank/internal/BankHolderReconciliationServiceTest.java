@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -190,5 +191,107 @@ class BankHolderReconciliationServiceTest {
     verify(holderRepository, never()).save(any());
     verify(bankAuditService, never()).record(any(), any(), any(), any(), any());
     assertFalse(manual.isRoleManaged(), "a manual holder is never flipped to role-managed");
+  }
+
+  @Test
+  void reconcileUser_makesAMemberWhoGainedABankRoleAnActiveRoleManagedHolder() {
+    User user = member("new-banker");
+    when(userRepository.hasAnyRoleCode(eq(user.getId()), any())).thenReturn(true);
+    when(holderRepository.findByUserId(user.getId())).thenReturn(Optional.empty());
+    when(userRepository.findPlainById(user.getId())).thenReturn(Optional.of(user));
+    when(holderRepository.save(any(BankHolder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.reconcileUser(user.getId());
+
+    ArgumentCaptor<BankHolder> saved = ArgumentCaptor.forClass(BankHolder.class);
+    verify(holderRepository).save(saved.capture());
+    assertTrue(saved.getValue().isActive());
+    assertTrue(saved.getValue().isRoleManaged());
+    assertEquals(user, saved.getValue().getUser());
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.HOLDER_REGISTERED),
+            any(),
+            any(),
+            eq(user.getId()),
+            eq("new-banker"));
+  }
+
+  @Test
+  void reconcileUser_deactivatesTheHolderOfAMemberWhoLostTheBankRoles() {
+    User user = member("ex-banker");
+    BankHolder holder = holder(user, true, true);
+    when(userRepository.hasAnyRoleCode(eq(user.getId()), any())).thenReturn(false);
+    when(holderRepository.findByUserId(user.getId())).thenReturn(Optional.of(holder));
+    when(holderRepository.save(any(BankHolder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(holderPostingRepository.holderTotal(holder.getId())).thenReturn(BigDecimal.ZERO);
+
+    service.reconcileUser(user.getId());
+
+    assertFalse(holder.isActive());
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.HOLDER_DEACTIVATED),
+            any(),
+            any(),
+            eq(user.getId()),
+            eq("ex-banker"));
+  }
+
+  @Test
+  void reconcileUser_reactivatesTheHolderOfAMemberWhoRegainedABankRole() {
+    User user = member("returner");
+    BankHolder holder = holder(user, false, true);
+    when(userRepository.hasAnyRoleCode(eq(user.getId()), any())).thenReturn(true);
+    when(holderRepository.findByUserId(user.getId())).thenReturn(Optional.of(holder));
+    when(holderRepository.save(any(BankHolder.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.reconcileUser(user.getId());
+
+    assertTrue(holder.isActive());
+    verify(bankAuditService)
+        .record(
+            eq(BankAuditEventType.HOLDER_REACTIVATED),
+            any(),
+            any(),
+            eq(user.getId()),
+            eq("returner"));
+  }
+
+  @Test
+  void reconcileUser_leavesAManualHolderAndAMemberWithoutBankRoleAlone() {
+    User manualUser = member("manual");
+    when(userRepository.hasAnyRoleCode(eq(manualUser.getId()), any())).thenReturn(false);
+    when(holderRepository.findByUserId(manualUser.getId()))
+        .thenReturn(Optional.of(holder(manualUser, true, false)));
+    User plainMember = member("pilot");
+    when(userRepository.hasAnyRoleCode(eq(plainMember.getId()), any())).thenReturn(false);
+    when(holderRepository.findByUserId(plainMember.getId())).thenReturn(Optional.empty());
+
+    service.reconcileUser(manualUser.getId());
+    service.reconcileUser(plainMember.getId());
+
+    verify(holderRepository, never()).save(any());
+    verify(bankAuditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  private static User member(String username) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(username);
+    return user;
+  }
+
+  private static BankHolder holder(User user, boolean active, boolean roleManaged) {
+    BankHolder holder = new BankHolder();
+    holder.setId(UUID.randomUUID());
+    holder.setUser(user);
+    holder.setHandle(user.getUsername());
+    holder.setActive(active);
+    holder.setRoleManaged(roleManaged);
+    return holder;
   }
 }

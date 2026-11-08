@@ -391,8 +391,8 @@ handle rule is REQ-SEC-072's.*
   instead of surfacing a `500`.
 - [x] A `LINKED` `UserApprovalEvent` is recorded against the surviving account (no PII / free text).
   Discord registration is **not** a unified-audit area, so no `AuditEventType`/viewer-filter change.
-- [ ] Operator: the sync service account is granted `manage-users` (on top of `view-users` /
-  `view-realm`) before deploy, or the link action `403`s at the Keycloak write.
+- [ ] Operator: the sync service account is granted `manage-users` (on top of `view-users`)
+  before deploy, or the link action `403`s at the Keycloak write.
 
 **Enforced by:** `UserRegistrationServiceTest` (link happy path + guards: stale version, non-PENDING,
 self / non-active / already-linked target, no-Discord-identity) · `KeycloakServiceTest`

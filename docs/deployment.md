@@ -1691,19 +1691,33 @@ switch. Every write below needs @greluc's explicit approval for this host.
        < scripts/role-assignments-export.sql > roles.tsv
    ```
 
-4. **Promote the release.**
-5. **Bring the realm to the new shape** with the provisioner (ADR-0202 amendment 9), dry run first:
+4. **Assign `grafana-admin` to the Grafana admins before the provisioner deletes the realm roles.**
+   Grafana's login reads the client role `grafana-admin` of the `grafana` client from the release
+   on (REQ-OBS-008), no longer the realm role `Admin`. In the Admin Console, create the role if the
+   realm lacks it (*Clients → `grafana` → Roles → Create role*, name `grafana-admin`; the
+   provisioner creates the same role on any realm without it), then give it to each Grafana admin
+   (*Users → <user> → Role mapping → Assign role → Filter by clients → `grafana-admin`*). Until
+   step 6 adds the client's `client roles` mapper, a new Grafana login is denied; an open Grafana
+   session is not affected, so run step 6 right after the promotion.
+5. **Promote the release.**
+6. **Bring the realm to the new shape** with the provisioner (ADR-0202 amendments 9 and 10), dry
+   run first:
 
    ```sh
-   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --frontend-client confidential            # dry run
-   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --frontend-client confidential --apply
+   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --grafana-origin <grafana-origin> --frontend-client confidential            # dry run
+   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --grafana-origin <grafana-origin> --frontend-client confidential --apply
    ```
 
-   The dry run lists `- default scope 'roles' withheld (…)` for `basetool-frontend` and
+   The dry run lists `- default scope 'roles' withheld (…)` for `basetool-frontend`,
    `- realm role '<name>' deleted with its user mappings and its place in 'default-roles-basetool'
-   (…)` for each of the four roles, and exits `2`. Grafana's login reads the `Admin` realm role
-   (`GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH`); settle its replacement before this apply, or
-   nobody can sign in to Grafana afterwards.
+   (…)` for each of the four roles, for `grafana` `+ mapper 'client roles' -> …` and
+   `- grafana: mapper 'realm roles' (…) removed (…)`, and for `backend-service`
+   `- service-account roles realm-management:view-realm withdrawn (…)`, and exits `2`. When the
+   provisioning identity cannot read or change that service account (it holds no `manage-users`),
+   the withdrawal is printed under `[manual]` instead: unassign `view-realm` under *Clients →
+   `backend-service` → Service account roles* by hand. Then sign in to Grafana as one of its admins
+   to confirm the gate. The rollback's previous provisioner grants `view-realm` again and restores
+   Grafana's realm-role mapper.
 
 **Rollback.** Redeploy the previous release, run **its** provisioner (it creates the four realm
 roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back
