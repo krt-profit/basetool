@@ -33,6 +33,11 @@
 
     <div th:if="${errorToast}" class="alert alert-danger" role="alert" th:text="#{__${errorToast}__}">Fehler</div>
 
+    <div id="refinery-order-deleted" class="alert alert-warning" role="status" data-testid="refinery-order-deleted" hidden>
+        <span th:text="#{refineryorder.deleted.notice}">Eine verbundene Anwendung hat diesen Auftrag gelöscht.</span>
+        <a th:href="@{/refinery-orders}" th:text="#{refineryorder.deleted.backToList}">Zur Auftragsliste</a>
+    </div>
+
     <div id="refinery-order-results">
     <th:block th:fragment="refineryOrderSection">
     <div class="rod-layout"

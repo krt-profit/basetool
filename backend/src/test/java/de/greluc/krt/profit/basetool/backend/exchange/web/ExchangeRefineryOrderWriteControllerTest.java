@@ -27,10 +27,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeRequestDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMassChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoResultDto;
@@ -85,6 +88,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   @Autowired private ExchangeClientRepository clientRepository;
   @Autowired private ExchangeSettingsRepository settingsRepository;
   @Autowired private ExchangeUndoService undoService;
+  @Autowired private ExchangeMassChangeService massChangeService;
   @Autowired private JdbcTemplate jdbc;
 
   private MockMvc mockMvc;
@@ -101,6 +105,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   private UUID refined;
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> materials = new ArrayList<>();
+  private final List<UUID> missions = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -143,6 +148,7 @@ class ExchangeRefineryOrderWriteControllerTest {
       jdbc.update("DELETE FROM user_roles WHERE user_id = ?", id);
       jdbc.update("DELETE FROM app_user WHERE id = ?", id);
     }
+    missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     jdbc.update("DELETE FROM exchange_client WHERE client_id IN (?, ?)", client, otherClient);
     for (UUID id : locations) {
       UUID city = jdbc.queryForObject("SELECT city_id FROM location WHERE id = ?", UUID.class, id);
@@ -426,6 +432,211 @@ class ExchangeRefineryOrderWriteControllerTest {
   }
 
   @Test
+  void aCancelSetsCanceledAsAChangeIsUnchangedTheSecondTimeAndIsUndoneBySection() throws Exception {
+    String first = changes(client, create("c-1")).andReturn().getResponse().getContentAsString();
+    UUID id = UUID.fromString(JsonPath.read(first, "$.orders[0].id"));
+    String cursor =
+        JsonPath.read(
+            relayed(get(FEED), client).andReturn().getResponse().getContentAsString(),
+            "$.nextCursor");
+    Instant since = Instant.now();
+
+    changes(client, cancel(id, 0))
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.orders[0].versions.gameData").value(1))
+        .andExpect(jsonPath("$.orders[0].versions.finances").value(0));
+    changes(client, cancel(id, 1))
+        .andExpect(jsonPath("$.unchanged").value(1))
+        .andExpect(jsonPath("$.results[0].result").value("unchanged"));
+
+    assertThat(statusOf(id)).isEqualTo("CANCELED");
+    assertThat(audited("REFINERY_ORDER_CANCELED", id)).isEqualTo(1);
+    String feed =
+        relayed(get(FEED).param("cursor", cursor), client)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(feed, "$.items[?(@.id == '" + id + "')].status"))
+        .containsExactly("CANCELED");
+    assertThat(JsonPath.<List<Object>>read(feed, "$.removed[?(@.key == '" + id + "')]")).isEmpty();
+
+    ExchangeUndoResultDto result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isEqualTo(1);
+    assertThat(statusOf(id)).isEqualTo("IN_PROGRESS");
+  }
+
+  @Test
+  void aDeleteRemovesAnOpenAPickedUpAndAMissionLinkedOrderButRefusesAStoredOne() throws Exception {
+    String first =
+        changes(
+                client,
+                createWith(
+                    "d-1",
+                    refineryRef(),
+                    unit,
+                    "[{\"input\": {\"bt\": \""
+                        + ore
+                        + "\"}, \"inputQuantity\": 500, \"outputQuantity\": 400,"
+                        + " \"quality\": 700}]"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID open = UUID.fromString(JsonPath.read(first, "$.orders[0].id"));
+    String cursor =
+        JsonPath.read(
+            relayed(get(FEED), client).andReturn().getResponse().getContentAsString(),
+            "$.nextCursor");
+    UUID pickedUp = ownOrder();
+    jdbc.update(
+        "UPDATE refinery_order SET status = 'COMPLETED', picked_up_at = now(),"
+            + " picked_up_client = ? WHERE id = ?",
+        client,
+        pickedUp);
+    UUID linked = ownOrder();
+    jdbc.update("UPDATE refinery_order SET mission_id = ? WHERE id = ?", mission(), linked);
+    UUID stored = ownOrder();
+    jdbc.update("UPDATE refinery_order SET stored_at = now() WHERE id = ?", stored);
+
+    changes(
+            client,
+            delete(stored)
+                + ","
+                + delete(open)
+                + ","
+                + delete(pickedUp)
+                + ","
+                + delete(linked)
+                + ","
+                + cancel(open, 0))
+        .andExpect(jsonPath("$.applied").value(3))
+        .andExpect(jsonPath("$.results[0].reason").value("ORDER_STORED"))
+        .andExpect(jsonPath("$.results[1].index").value(4))
+        .andExpect(jsonPath("$.results[1].reason").value("ORDER_UNKNOWN"));
+
+    for (UUID gone : List.of(open, pickedUp, linked)) {
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT COUNT(*) FROM refinery_order WHERE id = ?", Integer.class, gone))
+          .isZero();
+      assertThat(audited("REFINERY_ORDER_DELETED", gone)).isEqualTo(1);
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM refinery_good WHERE refinery_order_id = ?",
+                Integer.class,
+                open))
+        .isZero();
+    assertThat(statusOf(stored)).isEqualTo("OPEN");
+    String feed =
+        relayed(get(FEED).param("cursor", cursor), client)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(feed, "$.removed[?(@.key == '" + open + "')].clientKey"))
+        .containsExactly("d-1");
+    assertThat(JsonPath.<List<Object>>read(feed, "$.removed[?(@.key == '" + linked + "')]"))
+        .hasSize(1);
+  }
+
+  @Test
+  void deletesAboveTheGuardAreHeldAndApplyOnceConfirmedWhileCancelsNeverTripIt() throws Exception {
+    List<UUID> orders = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      orders.add(ownOrder());
+    }
+    changes(client, String.join(",", orders.stream().map(id -> cancel(id, 0)).toList()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(6));
+    String deletes =
+        String.join(
+            ",",
+            orders.stream()
+                .map(id ->
+                    "{\"op\": \"delete\", \"id\": \""
+                        + id
+                        + "\", \"versions\": {\"gameData\": 1, \"finances\": 0}}")
+                .toList());
+
+    changes(client, deletes)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MASS_CHANGE_CONFIRMATION_REQUIRED"));
+    assertThat(ownedOrders()).isEqualTo(6);
+
+    ConnectedAppMassChangeResultDto confirmed =
+        massChangeService.confirm(
+            member,
+            new ConnectedAppMassChangeRequestDto(
+                client, KEY, "refinery-orders", "{\"ops\": [" + deletes + "]}", Instant.now()));
+
+    assertThat(confirmed.applied()).isEqualTo(6);
+    assertThat(ownedOrders()).isZero();
+  }
+
+  @Test
+  void anUndoRecreatesADeletedOrderUnderItsIdsWithItsKeyMarkerAndMission() throws Exception {
+    String first =
+        changes(
+                client,
+                createWith(
+                    "u-1",
+                    refineryRef(),
+                    unit,
+                    "[{\"input\": {\"bt\": \""
+                        + ore
+                        + "\"}, \"inputQuantity\": 500, \"outputQuantity\": 400,"
+                        + " \"quality\": 700}]"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID id = UUID.fromString(JsonPath.read(first, "$.orders[0].id"));
+    UUID good = UUID.fromString(JsonPath.read(first, "$.orders[0].goods[0]"));
+    UUID linkedMission = mission();
+    jdbc.update(
+        "UPDATE refinery_order SET mission_id = ?, expenses = 1200 WHERE id = ?",
+        linkedMission,
+        id);
+    Instant since = Instant.now();
+    changes(client, delete(id)).andExpect(jsonPath("$.applied").value(1));
+    String cursor =
+        JsonPath.read(
+            relayed(get(FEED), client).andReturn().getResponse().getContentAsString(),
+            "$.nextCursor");
+
+    ExchangeUndoResultDto result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isEqualTo(1);
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "SELECT status, created_source, created_client, owning_org_unit_id, mission_id,"
+                + " expenses, game_data_version, finances_version FROM refinery_order"
+                + " WHERE id = ?",
+            id);
+    assertThat(row.get("status")).isEqualTo("OPEN");
+    assertThat(row.get("created_source")).isEqualTo("CLIENT");
+    assertThat(row.get("created_client")).isEqualTo(client);
+    assertThat(row.get("owning_org_unit_id")).isEqualTo(unit);
+    assertThat(row.get("mission_id")).isEqualTo(linkedMission);
+    assertThat(row.get("expenses")).isEqualTo(1200.0);
+    assertThat(((Number) row.get("game_data_version")).longValue()).isEqualTo(1L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT input_quantity FROM refinery_good WHERE id = ? AND refinery_order_id = ?",
+                Integer.class,
+                good,
+                id))
+        .isEqualTo(500);
+    assertThat(audited("REFINERY_ORDER_RESTORED", id)).isEqualTo(1);
+    String feed =
+        relayed(get(FEED).param("cursor", cursor), client)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(feed, "$.items[?(@.id == '" + id + "')].clientKey"))
+        .containsExactly("u-1");
+  }
+
+  @Test
   void withoutTheWriteCapabilityTheChangeSetIsRefused() throws Exception {
     mockMvc
         .perform(
@@ -503,6 +714,92 @@ class ExchangeRefineryOrderWriteControllerTest {
         + location
         + (goods == null ? "" : ", \"goods\": " + goods)
         + "}";
+  }
+
+  /**
+   * A cancel of an order.
+   *
+   * @param id the order
+   * @param gameData the echoed game-data counter
+   * @return the op
+   */
+  private static @NotNull String cancel(@NotNull UUID id, long gameData) {
+    return "{\"op\": \"cancel\", \"id\": \""
+        + id
+        + "\", \"versions\": {\"gameData\": "
+        + gameData
+        + "}}";
+  }
+
+  /**
+   * A delete of an order whose counters are both still at 0.
+   *
+   * @param id the order
+   * @return the op
+   */
+  private static @NotNull String delete(@NotNull UUID id) {
+    return "{\"op\": \"delete\", \"id\": \""
+        + id
+        + "\", \"versions\": {\"gameData\": 0,"
+        + " \"finances\": 0}}";
+  }
+
+  /**
+   * Reads an order's status.
+   *
+   * @param id the order
+   * @return its status
+   */
+  private @NotNull String statusOf(@NotNull UUID id) {
+    return jdbc.queryForObject("SELECT status FROM refinery_order WHERE id = ?", String.class, id);
+  }
+
+  /**
+   * Counts the audit events of one type about one order.
+   *
+   * @param type the event type
+   * @param id the order
+   * @return the number of events
+   */
+  private int audited(@NotNull String type, @NotNull UUID id) {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM audit_event WHERE event_type = ? AND subject_id = ?",
+        Integer.class,
+        type,
+        id);
+  }
+
+  /**
+   * Counts the member's orders.
+   *
+   * @return the number of orders the member owns
+   */
+  private int ownedOrders() {
+    return jdbc.queryForObject(
+        "SELECT COUNT(*) FROM refinery_order WHERE owner_id = ?", Integer.class, member);
+  }
+
+  /**
+   * Inserts and commits an open order of the member at the test refinery, counters at 0.
+   *
+   * @return its id
+   */
+  private @NotNull UUID ownOrder() {
+    UUID id = foreignOrder();
+    jdbc.update("UPDATE refinery_order SET owner_id = ? WHERE id = ?", member, id);
+    return id;
+  }
+
+  /**
+   * Inserts and commits a mission.
+   *
+   * @return its id
+   */
+  private @NotNull UUID mission() {
+    UUID id = UUID.randomUUID();
+    jdbc.update("INSERT INTO mission (id, name, version) VALUES (?, ?, 0)", id, "Op " + id);
+    missions.add(id);
+    return id;
   }
 
   /**

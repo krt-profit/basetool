@@ -56,6 +56,26 @@ function refineryStoreModalOpen() {
     return !!modal && window.getComputedStyle(modal).display !== 'none';
 }
 
+/**
+ * Shows that a connected application deleted the order and locks every form of the page, keeping
+ * what the user typed on screen; the page stays where it is (REQ-XCH-055).
+ */
+function lockDeletedOrder() {
+    const page = document.querySelector('main.refinery-order');
+    const notice = document.getElementById('refinery-order-deleted');
+    if (notice) {
+        notice.hidden = false;
+    }
+    if (!page) return;
+    page.querySelectorAll('form').forEach((form) => {
+        Array.from(form.elements).forEach((control) => {
+            if ('disabled' in control) {
+                control.disabled = true;
+            }
+        });
+    });
+}
+
 function initRefineryOrdersDetails() {
     refinerySeam = krtPageSections.create({
         dict() {
@@ -68,14 +88,27 @@ function initRefineryOrdersDetails() {
         sections: {
             order: { container: '#refinery-order-results', fragmentValue: 'order' },
             store: { container: '#refinery-store-results', fragmentValue: 'store' },
+            deleted: { container: '#refinery-order-deleted' },
         },
         pageUrl() {
             return window.refineryOrderId ? `/refinery-orders/${window.refineryOrderId}` : null;
         },
         topic: refineryTopic,
         receiver: {
-            busyTest() {
-                return refineryStoreModalOpen();
+            busyTest(sectionKey) {
+                return sectionKey !== 'deleted' && refineryStoreModalOpen();
+            },
+            refresh(keys, run) {
+                if (keys.includes('deleted')) {
+                    lockDeletedOrder();
+                    return;
+                }
+                run(keys).then((swapped) => {
+                    const notice = document.getElementById('refinery-order-deleted');
+                    if (notice && swapped.some(Boolean)) {
+                        notice.hidden = true;
+                    }
+                });
             },
             pill: {
                 label() {

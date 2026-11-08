@@ -74,9 +74,9 @@ the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the memb
 units to the org demand (REQ-XCH-047).
 
 > [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
-> The read (REQ-XCH-051) and the change set with `create`, `update` and the goods ops
-> (REQ-XCH-052) are built; `pickup`, `cancel` and `delete` join the change set with REQ-XCH-053
-> and REQ-XCH-055. The table gains two more rows as they are built:
+> The read (REQ-XCH-051) and the change set with `create`, `update`, the goods ops (REQ-XCH-052),
+> `cancel` and `delete` (REQ-XCH-055) are built; `pickup` joins the change set with
+> REQ-XCH-053. The table gains two more rows as they are built:
 > `GET …/me/store-choices/receivers` and `…/me/store-choices/job-orders?material=`
 > (`exchange.refinery.store`, REQ-XCH-054).
 
@@ -1499,7 +1499,7 @@ staged and answered with `MASS_CHANGE_CONFIRMATION_REQUIRED` and a confirmation 
 accumulated to ≥ 90 % within the window, and a ship update that changes name and type; a move
 within one batch is not a removal. Only the member's browser session can confirm. The org stock
 counts per client, writer and pool instead, with its own removals (REQ-XCH-046). For refinery
-orders only a `delete` is a removal; `cancel` and `good-remove` never count (REQ-XCH-055, planned).
+orders only a `delete` is a removal; `cancel` and `good-remove` never count (REQ-XCH-055).
 
 **Acceptance**
 
@@ -2231,19 +2231,21 @@ offers changed) — `ExchangeLiveSync`, see REQ-XCH-013.
 **Refinery orders** (ADR-0351, planned in epic #3163). A committed refinery-order write — every op
 of REQ-XCH-052…055, its confirmation and its undo — publishes, after the commit, into the rooms the
 frontend already has: `refinery` with the section `queue` (the list) and `refinery-order/{id}` with
-the sections `order` and `store` (the detail page). A pickup with store lines also publishes the
+the sections `order` and `store` (the detail page), and `deleted` when a client deletes the order. A pickup with store lines also publishes the
 Lager's room, as a stock change set does. `livesync.api.LiveSyncTopicClass` gains both rooms, and
 `LiveSyncTopicRegistryParityTest` and `LiveSyncSectionMapParityTest` hold them in step with the
 frontend. A page with unsaved input shows the "updates available" notice it shows for any peer's
 change and overwrites nothing; a later save is decided by the order's section counters
 (REQ-REFINERY-029). When a client deletes an order whose detail page is open, the page stays where
 it is, locks its forms and shows a notice that the client deleted the order, with a link to the
-list — no redirect and no silent loss of input. A client learns of a web change only from the feed
+list — no redirect and no silent loss of input; the section `deleted` of its room carries that
+news (`refinery-orders-details.js`), and a later `order` frame whose section loads again, after
+the member's undo, hides the notice. A client learns of a web change only from the feed
 (REQ-XCH-051); no push channel to clients exists.
 
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
-(#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames planned
-(#3168…#3171)
+(#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames built for the
+writes, cancels and deletes (#3168, #3169), the pickup's planned (#3170, #3171)
 
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
@@ -3377,7 +3379,7 @@ commit, into the `refinery` room (section `queue`) and the order's `refinery-ord
 `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
 `ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
 `RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373` · **Status:** implemented for `create`,
-`update` and the goods ops — #3168; `pickup`, `cancel` and `delete` follow with #3169 and #3170
+`update` and the goods ops — #3168, `cancel` and `delete` — #3169; `pickup` follows with #3170
 
 ### REQ-XCH-053 — A pickup closes an order and books stock only with store lines
 
@@ -3475,32 +3477,52 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
   `good-remove` never count. A set above the guard's rule is held for the member's confirmation as
   for every resource.
 
+- **Within a set** a `cancel` of a cancelled order is `unchanged`, and every op after a
+  `delete` of the same order is `ORDER_UNKNOWN`; a `create` may then reuse the deleted
+  order's `clientKey`. A held set comes back through `ExchangeMassChangeService` as the
+  resource `refinery-orders` and applies without asking the guard again.
+
 **Acceptance**
 
-- [ ] A cancel sets `CANCELED` and keeps the order in the feed as a change.
-- [ ] A delete removes an open, a picked-up and a mission-linked order with its goods, leaves the
+- [x] A cancel sets `CANCELED` and keeps the order in the feed as a change.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A delete removes an open, a picked-up and a mission-linked order with its goods, leaves the
   member's stock as it was, is audited `REFINERY_ORDER_DELETED` under the client and leaves a
-  tombstone; a stored order is `ORDER_STORED`.
-- [ ] A set that deletes more orders than the guard allows is held and applies only after the
+  tombstone; a stored order is `ORDER_STORED`. *`ExchangeRefineryOrderWriteControllerTest`;
+  stock is untouched by construction, since inventory rows carry no reference to the order.*
+- [x] A set that deletes more orders than the guard allows is held and applies only after the
   member confirms it; cancels and goods removals never trip it.
+  *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`.*
+- [x] An open detail page of a deleted order locks its forms and shows the notice with the link to
+  the list. *`RefineryOrderDetailPatternRenderTest` (the notice), `LiveSyncSectionMapParityTest`
+  (the `deleted` section).*
 
-**Status:** planned — #3169
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
+`RefineryOrderDetailPatternRenderTest` · **Code:** `ExchangeRefineryOrderWriteService`,
+`RefineryExchangeWriter`/`RefineryExchangeWrites`, `ExchangeMassChangeService`, `V374` ·
+**Status:** implemented — #3169
 
 ### REQ-XCH-056 — Refinery-order writes are journaled and undone by section
 
 Every applied op is journaled (REQ-XCH-022) under its own `ExchangeJournalAction` with a typed
 refinery journal state (ADR-0285): the fields a client writes — location, method, timer, status,
 `expenses`, `otherExpenses`, `oreSales` —, the goods with their ids and both section counters,
-before and after; the `delete` of #3169 adds the client marker and the mission link. The
+before and after; a `delete` adds what the order held beyond them — the client marker, the unit,
+the mission link, the creation time and the pickup and ready-notice markers. The
 `clientKey` stays in `exchange_refinery_order_link`, which keeps it after the order is gone. The
 journal actions are `REFINERY_CREATE`, `REFINERY_UPDATE`, `REFINERY_GOOD_ADD`,
-`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`). Writes of one change set share their
+`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`), `REFINERY_CANCEL` and
+`REFINERY_DELETE` (`V374`); a delete is journaled as a removal for the guard. Writes of one change set share their
 transaction and time, so the undo orders an order's writes by its counters, which every write
 raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as follows:
 
 - **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
   `clientKey`, client marker and every field; the mission link only while that mission still
-  exists. The feed shows it again under the same key. The restore is audited
+  exists, the owning unit only while the member is still a direct member of it (else none). Both
+  counters come back one above the deleted order's, so a client's stale echo is refused. Sections
+  the client's earlier writes in the span touched go back to their state before the first of them,
+  under the counter check below; an order the client also created in the span stays gone. The feed
+  shows it again under the same key. The restore is audited
   `REFINERY_ORDER_RESTORED`; the undo itself stays `EXCHANGE_CHANGES_UNDONE`.
 - **`create`** — the order is removed with its goods, audited `REFINERY_ORDER_DELETED`, while
   neither section counter moved since; otherwise it is skipped `CHANGED_AFTERWARDS`. The feed
@@ -3508,7 +3530,8 @@ raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as 
 - **`update`, goods ops and `cancel`** — the sections the client's writes touched go back to their
   state before the client's first write in the span, goods rows under their old ids, while each of
   those sections' counters shows no other write since or in between; otherwise the order is skipped
-  `CHANGED_AFTERWARDS`. A section the client did not touch is left as it is.
+  `CHANGED_AFTERWARDS`. A section the client did not touch is left as it is. The undo of a cancel
+  sets the status back also on a stored order, since the cancel changed it there too.
 - **`pickup`** — without store lines the status goes back and `pickedUpAt` is cleared, under the
   same counter check; with store lines it is skipped `STOCK_BOOKED`, because the booked stock is the
   member's to take back in the Lager.
@@ -3518,8 +3541,9 @@ gone, is skipped `GONE`.
 
 **Acceptance**
 
-- [ ] An undo recreates a deleted order under its old ids with its client key and marker, and the
-  feed shows it again; it is audited `REFINERY_ORDER_RESTORED`.
+- [x] An undo recreates a deleted order under its old ids with its client key and marker, and the
+  feed shows it again; it is audited `REFINERY_ORDER_RESTORED`. An undo of a cancel reopens the
+  order. *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
 - [x] An undo removes an unchanged create and skips one changed in the web; it brings a removed
   good back under its id and rolls back the finances of the same order.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
@@ -3527,7 +3551,7 @@ gone, is skipped `GONE`.
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`
 · **Code:** `ExchangeRefineryOrderJournal`, `ExchangeUndoService`, `V373` · **Status:** partially
-implemented — #3168 (journal, undo of create, update and goods ops); #3169 (undo of cancel and
+implemented — #3168 (journal, undo of create, update and goods ops), #3169 (undo of cancel and
 delete), #3170 (undo of a pickup)
 
 ## Threat model

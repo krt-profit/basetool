@@ -107,6 +107,8 @@ pages update at once, and a changed timer re-arms the ready notice as a web edit
 | `good-add` | `id` or `clientKey`, `versions`, `good` | Adds one good; the result names the new row's id. |
 | `good-update` | `id` or `clientKey`, `versions`, `goodId`, and any of `input`, `inputQuantity`, `outputQuantity`, `quality` | Changes the fields of one good it carries. |
 | `good-remove` | `id` or `clientKey`, `versions`, `goodId` | Removes one good. |
+| `cancel` | `id` or `clientKey`, `versions` with `gameData` | Cancels the order as the web does, stored or not; a cancelled order is `unchanged`. |
+| `delete` | `id` or `clientKey`, `versions` with `gameData` and `finances` | Removes an order that is not stored, with its goods; a stored one is `ORDER_STORED`. |
 
 Every op may carry an `opId` of your own, echoed in its result.
 
@@ -154,6 +156,8 @@ op touches, is `VERSION_CONFLICT` for that op only. Within one set the expected 
 earlier ops left: every applied op raises the counter of each section it touches by one. A finance
 update from your client therefore never collides with a timer edit in the web, and the reverse.
 
+A `cancel` sends `gameData`, a `delete` both counters.
+
 Once an op on an order is refused, every later op on the same order in the set is `rejected` as
 `PRECEDING_OP_REJECTED`, so a set never applies the second half of a change whose first half
 failed.
@@ -186,7 +190,7 @@ them, and write on without reading the feed first.
 
 | Case | `result` | `reason` |
 | --- | --- | --- |
-| `update` that changes nothing | `unchanged` | — |
+| `update` that changes nothing, `cancel` of a cancelled order | `unchanged` | — |
 | A location, method or material that matches nothing | `unmatched` | `UNMATCHED` |
 | A location, method or material that matches several | `ambiguous` | `AMBIGUOUS` |
 | A place without a location | `rejected` | `LOCATION_UNKNOWN` |
@@ -198,21 +202,27 @@ them, and write on without reading the feed first.
 | `create` with a `clientKey` the member's orders already carry; `id` names the order | `rejected` | `ALREADY_EXISTS` |
 | A stale or missing counter of a section the op touches | `rejected` | `VERSION_CONFLICT` |
 | An op on an order an earlier op of the set was refused for | `rejected` | `PRECEDING_OP_REJECTED` |
-| A status change of an order whose yield was booked into stock | `rejected` | `ORDER_STORED` |
+| A status change or a `delete` of an order whose yield was booked into stock | `rejected` | `ORDER_STORED` |
+| Any op after a `delete` of the same order in the set | `rejected` | `ORDER_UNKNOWN` |
 
 On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `Idempotency-Key`.
 
 **Dry run.** `dryRun: true` decides every op and writes nothing; its result has no `orders`.
 
 **Quota.** A change set counts **once** against the daily write quota, whatever its op count
-([limits](../sync-guide.md#rate-limits-quota-and-back-off)). No op of this route counts as a
-removal for the [mass-change guard](../sync-guide.md#the-mass-change-guard).
+([limits](../sync-guide.md#rate-limits-quota-and-back-off)). Only a `delete` counts as a removal
+for the [mass-change guard](../sync-guide.md#the-mass-change-guard); a set that deletes too many
+orders is held for the member's confirmation. A `cancel` and a `good-remove` never count.
+
+**Delete.** A `delete` removes the order and its goods; stock already booked from it stays. Your
+feed carries its tombstone, with the `clientKey` when your client created the order.
 
 **Undo.** The member can undo your client's writes on *Connected applications*. Undoing a `create`
-removes the order while neither of its counters moved since; undoing an `update` or a goods op
-restores the sections it touched while their counters are unchanged. A write changed afterwards is
-skipped as *changed afterwards*. An undo reaches your feed like a web edit
-([sync guide](../sync-guide.md#undo)).
+removes the order while neither of its counters moved since; undoing an `update`, a goods op or a
+`cancel` restores the sections it touched while their counters are unchanged. Undoing a `delete`
+brings the order back under its `id`, its goods under their ids, with its `clientKey`; the feed
+shows it again under the same key. A write changed afterwards is skipped as *changed afterwards*.
+An undo reaches your feed like a web edit ([sync guide](../sync-guide.md#undo)).
 
 ## Errors
 

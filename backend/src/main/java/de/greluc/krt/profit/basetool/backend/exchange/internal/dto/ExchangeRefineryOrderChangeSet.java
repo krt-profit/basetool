@@ -57,13 +57,19 @@ public record ExchangeRefineryOrderChangeSet(
   /** The op that removes a good. */
   public static final String GOOD_REMOVE = "good-remove";
 
+  /** The op that cancels an order. */
+  public static final String CANCEL = "cancel";
+
+  /** The op that removes an order with its goods. */
+  public static final String DELETE = "delete";
+
   /**
    * One write. Every op but {@code create} names its order by {@code id} or {@code clientKey}; a
    * field the op's kind does not use is ignored.
    *
    * @param opId the client's id for the op, echoed in the result, or {@code null}
-   * @param op {@code create}, {@code update}, {@code good-add}, {@code good-update} or {@code
-   *     good-remove}
+   * @param op {@code create}, {@code update}, {@code good-add}, {@code good-update}, {@code
+   *     good-remove}, {@code cancel} or {@code delete}
    * @param id the order's Basetool id, or {@code null}
    * @param clientKey the client's own key of the order; required for a create
    * @param versions the counters of the sections the op touches, as the client last saw them
@@ -87,7 +93,8 @@ public record ExchangeRefineryOrderChangeSet(
   @Schema(name = "RefineryOrderOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
-      @NotNull @Pattern(regexp = "^(create|update|good-add|good-update|good-remove)$") String op,
+      @NotNull @Pattern(regexp = "^(create|update|good-add|good-update|good-remove|cancel|delete)$")
+          String op,
       @Nullable @Size(min = 1, max = 128) String id,
       @Nullable @Size(min = 1, max = 128) String clientKey,
       @Nullable @Valid Versions versions,

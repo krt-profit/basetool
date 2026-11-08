@@ -53,4 +53,13 @@ public interface RefineryExchangeReader {
   @NotNull
   @Unmodifiable
   List<RefineryExchangeOrder> orders(@NotNull UUID owner, @NotNull Collection<UUID> ids);
+
+  /**
+   * Counts the owner's orders, whatever their status, as the mass-change guard's current count
+   * (REQ-XCH-021).
+   *
+   * @param owner the owning member
+   * @return the number of orders the member owns
+   */
+  long count(@NotNull UUID owner);
 }

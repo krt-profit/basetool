@@ -95,7 +95,7 @@ codes, whichever side refuses it.
 | `GOOD_UNKNOWN` | A refinery-order `good-update` or `good-remove` names a `goodId` that is not a good of the order. | Pull the feed and use the good ids it shows. |
 | `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
 | `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
-| `ORDER_STORED` | A refinery-order op changes the status of an order whose yield was booked into stock. | Do not retry; the status is locked. |
+| `ORDER_STORED` | A refinery-order op changes the status of, or deletes, an order whose yield was booked into stock. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
 
 ## Warnings
 

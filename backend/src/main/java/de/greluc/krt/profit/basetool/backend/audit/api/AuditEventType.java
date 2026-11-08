@@ -233,6 +233,8 @@ public enum AuditEventType {
   REFINERY_ORDER_CANCELED(AuditDomain.REFINERY),
   /** A refinery order was removed with its goods (REQ-XCH-055, REQ-XCH-056). */
   REFINERY_ORDER_DELETED(AuditDomain.REFINERY),
+  /** The undo of a client's delete recreated a refinery order under its ids (REQ-XCH-056). */
+  REFINERY_ORDER_RESTORED(AuditDomain.REFINERY),
   /** A refinery order was completed, storing its yields to inventory. */
   REFINERY_ORDER_STORED(AuditDomain.REFINERY),
   /** An admin created a refining-method reference row. */

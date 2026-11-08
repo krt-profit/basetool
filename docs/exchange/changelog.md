@@ -5,6 +5,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-08
 
+- **New: refinery-order ops `cancel` and `delete`.** `cancel` cancels an order as the web does
+  and echoes `gameData`; `delete` removes an order that is not stored, with its goods, and echoes
+  both counters. A `delete` counts as a removal for the mass-change guard; the feed carries its
+  tombstone ([refinery orders](resources/refinery-orders.md)).
 - **New: refinery orders.** `GET /exchange/v1/me/refinery-orders` with the scope
   `exchange.refinery.read` serves the member's own refinery orders: a snapshot of the open and
   running ones, and a feed of every change of every own order, completed and cancelled ones

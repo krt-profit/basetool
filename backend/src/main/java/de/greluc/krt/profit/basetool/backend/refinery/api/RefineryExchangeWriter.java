@@ -62,7 +62,9 @@ public interface RefineryExchangeWriter {
 
   /**
    * Writes the parts an edit carries to one of the member's orders, raising each written section's
-   * counter by one; the caller has checked the counters on the locked order.
+   * counter by one; the caller has checked the counters on the locked order. A client's write never
+   * changes a stored order's status; the member's undo may set back the status a client's cancel
+   * changed.
    *
    * @param owner the member
    * @param clientId the client that writes, or {@code null} for the member's undo
@@ -72,7 +74,8 @@ public interface RefineryExchangeWriter {
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
    *     such order
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the location is
-   *     not a refinery, a material may not be refined, or the status of a stored order would change
+   *     not a refinery, a material may not be refined, or a client would change the status of a
+   *     stored order
    */
   @NotNull
   RefineryExchangeOrder edit(
@@ -82,14 +85,46 @@ public interface RefineryExchangeWriter {
       @NotNull RefineryExchangeEdit edit);
 
   /**
+   * Cancels one of the member's orders as the web's cancel does, stored or not, raising the
+   * game-data counter by one, audited {@code REFINERY_ORDER_CANCELED} (REQ-XCH-055).
+   *
+   * @param owner the member
+   * @param clientId the client that cancels
+   * @param orderId the order, not yet cancelled
+   * @return the saved order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
+   *     such order
+   */
+  @NotNull
+  RefineryExchangeOrder cancel(
+      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId);
+
+  /**
    * Removes one of the member's orders that is not stored, with its goods, audited {@code
-   * REFINERY_ORDER_DELETED}.
+   * REFINERY_ORDER_DELETED}; booked stock is left as it is (REQ-XCH-055).
    *
    * @param owner the member
    * @param orderId the order
+   * @return what the order held beyond the fields a client writes, for its undo
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
    *     such order
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when it is stored
    */
-  void delete(@NotNull UUID owner, @NotNull UUID orderId);
+  @NotNull
+  RefineryExchangeOrigin delete(@NotNull UUID owner, @NotNull UUID orderId);
+
+  /**
+   * Recreates a removed order of the member under its former id, its goods under their former row
+   * ids, audited {@code REFINERY_ORDER_RESTORED} (REQ-XCH-056). The last change is the member's.
+   *
+   * @param owner the member
+   * @param restore the order as it comes back
+   * @return the recreated order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the location, the
+   *     method or a material is gone
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when a material may
+   *     not be refined or the unit is no direct membership of the member
+   */
+  @NotNull
+  RefineryExchangeOrder restore(@NotNull UUID owner, @NotNull RefineryExchangeRestore restore);
 }

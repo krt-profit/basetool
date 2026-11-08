@@ -104,6 +104,14 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   long countByStatus(RefineryOrderStatus status);
 
   /**
+   * Counts a member's refinery orders, whatever their status (REQ-XCH-021).
+   *
+   * @param ownerId the owning member
+   * @return the number of orders the member owns
+   */
+  long countByOwnerId(@NotNull UUID ownerId);
+
+  /**
    * Finds the creation timestamp of the oldest refinery order in the given status, for the "oldest
    * open refinery order age" gauge (REQ-OBS-011).
    *
@@ -430,4 +438,86 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       @Param("output") UUID output,
       @Param("outputQuantity") int outputQuantity,
       @Param("quality") int quality);
+
+  /**
+   * Inserts an order under the id it had before, unstored, with the member's undo as its last
+   * change, for the undo of a client's delete (REQ-XCH-056); the generated id of a JPA insert
+   * cannot carry it.
+   *
+   * @param row the order's columns
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id,
+                                      mission_id, started_at, duration_minutes,
+                                      refining_method_id, expenses, other_expenses, ore_sales,
+                                      status, ready_notified_at, owning_org_unit_id,
+                                      game_data_version, finances_version, created_source,
+                                      created_client, last_change_source, last_changed_at,
+                                      picked_up_at, picked_up_client)
+          VALUES (:#{#row.id()}, 0,
+                  COALESCE(CAST(:#{#row.createdAt()} AS timestamptz), now()), now(),
+                  :#{#row.owner()}, :#{#row.location()}, CAST(:#{#row.mission()} AS uuid),
+                  CAST(:#{#row.startedAt()} AS timestamptz),
+                  CAST(:#{#row.durationMinutes()} AS bigint), CAST(:#{#row.method()} AS uuid),
+                  CAST(:#{#row.expenses()} AS double precision),
+                  CAST(:#{#row.otherExpenses()} AS double precision),
+                  CAST(:#{#row.oreSales()} AS double precision), :#{#row.status()},
+                  CAST(:#{#row.readyNotifiedAt()} AS timestamptz),
+                  CAST(:#{#row.orgUnit()} AS uuid),
+                  :#{#row.gameDataVersion()}, :#{#row.financesVersion()},
+                  CASE WHEN CAST(:#{#row.createdClient()} AS varchar) IS NULL THEN 'WEB'
+                       ELSE 'CLIENT' END,
+                  CAST(:#{#row.createdClient()} AS varchar), 'WEB', now(),
+                  CAST(:#{#row.pickedUpAt()} AS timestamptz),
+                  CAST(:#{#row.pickedUpClient()} AS varchar))
+          """)
+  void insertOrder(@Param("row") RestoredRow row);
+
+  /**
+   * The columns of an order the undo of a client's delete inserts again.
+   *
+   * @param id the former id
+   * @param createdAt the creation time, or {@code null} for now
+   * @param owner the owning member
+   * @param location the location
+   * @param mission the linked mission, or {@code null}
+   * @param startedAt the run's start, or {@code null}
+   * @param durationMinutes the run's length, or {@code null}
+   * @param method the refining method, or {@code null}
+   * @param expenses the refining costs, or {@code null}
+   * @param otherExpenses further costs, or {@code null}
+   * @param oreSales the raw-ore revenue, or {@code null}
+   * @param status the status name
+   * @param readyNotifiedAt when the ready notice was raised, or {@code null}
+   * @param orgUnit the owning unit, or {@code null}
+   * @param gameDataVersion the game-data counter
+   * @param financesVersion the finances counter
+   * @param createdClient the creating client, or {@code null} for the web
+   * @param pickedUpAt when a client reported the pickup, or {@code null}
+   * @param pickedUpClient that client, or {@code null}
+   */
+  record RestoredRow(
+      @NotNull UUID id,
+      @Nullable Instant createdAt,
+      @NotNull UUID owner,
+      @NotNull UUID location,
+      @Nullable UUID mission,
+      @Nullable Instant startedAt,
+      @Nullable Long durationMinutes,
+      @Nullable UUID method,
+      @Nullable Double expenses,
+      @Nullable Double otherExpenses,
+      @Nullable Double oreSales,
+      @NotNull String status,
+      @Nullable Instant readyNotifiedAt,
+      @Nullable UUID orgUnit,
+      long gameDataVersion,
+      long financesVersion,
+      @Nullable String createdClient,
+      @Nullable Instant pickedUpAt,
+      @Nullable String pickedUpClient) {}
 }

@@ -78,6 +78,11 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
         .toList();
   }
 
+  @Override
+  public long count(@NotNull UUID owner) {
+    return refineryOrderRepository.countByOwnerId(owner);
+  }
+
   /**
    * Maps an order with its loaded graph.
    *

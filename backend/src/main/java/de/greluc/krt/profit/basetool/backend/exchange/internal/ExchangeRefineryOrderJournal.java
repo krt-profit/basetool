@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRestore;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
 import java.math.BigDecimal;
@@ -48,8 +50,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Owns the journal state of a refinery order and sets the order back on an undo (REQ-XCH-056,
- * ADR-0285): a create is removed, an update or goods op restores the sections it touched, each only
- * while that section's counter shows no write but the client's since.
+ * ADR-0285): a create is removed, an update, goods op or cancel restores the sections it touched,
+ * each only while that section's counter shows no write but the client's since, and a delete
+ * recreates the order under its former ids.
  */
 @Component
 @RequiredArgsConstructor
@@ -80,10 +83,15 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   @Override
   public @Nullable String restore(
       @NotNull UndoScope scope, @NotNull List<ExchangeJournalEntry> group) {
-    UUID orderId = parse(group.getFirst().getEntityKey());
-    List<Step> steps = steps(group);
+    ExchangeJournalEntry newest = group.getFirst();
+    UUID orderId = parse(newest.getEntityKey());
+    boolean deleted = newest.getAction() == ExchangeJournalAction.REFINERY_DELETE;
+    List<Step> steps = steps(deleted ? group.subList(1, group.size()) : group);
     if (orderId == null || steps == null) {
       return ExchangeUndoService.GONE;
+    }
+    if (deleted) {
+      return recreate(scope, orderId, read(newest.getBeforeState()), steps);
     }
     Optional<RefineryExchangeOrder> current = writer.lockOwn(scope.member(), orderId);
     if (current.isEmpty()) {
@@ -101,7 +109,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       return null;
     }
     boolean gameData = touched.gameData() != null;
-    if (gameData && !restorable(base, current.get())) {
+    if (gameData && !restorable(base, current.get().location().id())) {
       return ExchangeUndoService.GONE;
     }
     writer.edit(
@@ -120,6 +128,70 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
                     base.expenses(), base.otherExpenses(), base.oreSales())
                 : null,
             gameData ? base.goods().stream().map(Good::toEdit).toList() : null));
+    return null;
+  }
+
+  /**
+   * Recreates an order the client deleted under its former ids: the sections the client's earlier
+   * writes touched as they were before the first of them, every other part as it was when deleted,
+   * with its client marker, the unit while the member still belongs to it directly and the mission
+   * while it exists. An order the client also created stays gone.
+   *
+   * @param scope the member and the client
+   * @param orderId the order
+   * @param removed the order as the delete found it, or {@code null} when it does not read
+   * @param steps the client's earlier writes to the order, oldest first
+   * @return {@code null} when recreated or nothing is to recreate, {@code CHANGED_AFTERWARDS} when
+   *     another write moved a touched section before the delete, {@code GONE} when the state does
+   *     not read or names a location, method or material that is no longer there
+   */
+  private @Nullable String recreate(
+      @NotNull UndoScope scope,
+      @NotNull UUID orderId,
+      @Nullable State removed,
+      @NotNull List<Step> steps) {
+    RefineryExchangeOrigin origin = removed == null ? null : removed.origin();
+    if (removed == null || origin == null) {
+      return ExchangeUndoService.GONE;
+    }
+    if (!steps.isEmpty() && steps.getFirst().before() == null) {
+      return null;
+    }
+    Touched touched = touched(steps);
+    if (touched == null
+        || (touched.gameData() != null && touched.gameData() != removed.gameData())
+        || (touched.finances() != null && touched.finances() != removed.finances())) {
+      return ExchangeUndoService.CHANGED_AFTERWARDS;
+    }
+    State base = steps.isEmpty() ? removed : Objects.requireNonNull(steps.getFirst().before());
+    State gameData = touched.gameData() != null ? base : removed;
+    State finances = touched.finances() != null ? base : removed;
+    if (!restorable(gameData, removed.location())) {
+      return ExchangeUndoService.GONE;
+    }
+    UUID unit = origin.orgUnitId();
+    writer.restore(
+        scope.member(),
+        new RefineryExchangeRestore(
+            orderId,
+            new RefineryExchangeEdit(
+                gameData.location(),
+                new RefineryExchangeEdit.Method(gameData.method()),
+                new RefineryExchangeEdit.Timer(gameData.startedAt(), gameData.durationMinutes()),
+                gameData.status(),
+                new RefineryExchangeEdit.Finances(
+                    finances.expenses(), finances.otherExpenses(), finances.oreSales()),
+                gameData.goods().stream().map(Good::toEdit).toList()),
+            removed.gameData() + 1,
+            removed.finances() + 1,
+            new RefineryExchangeOrigin(
+                origin.createdAt(),
+                origin.createdClient(),
+                unit != null && scope.memberships().get().contains(unit) ? unit : null,
+                origin.missionId(),
+                origin.pickedUpAt(),
+                origin.pickedUpClient(),
+                origin.readyNotifiedAt())));
     return null;
   }
 
@@ -179,16 +251,16 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    * Whether every catalogue entry the earlier game data names can be written back.
    *
    * @param base the earlier state
-   * @param current the order now
+   * @param currentLocation the location the order has now, or had when deleted
    * @return {@code true} when its location is the current one or an offered refinery, its method
    *     exists and every input material exists and may be refined
    */
-  private boolean restorable(@NotNull State base, @NotNull RefineryExchangeOrder current) {
+  private boolean restorable(@NotNull State base, @NotNull UUID currentLocation) {
     Optional<Location> location = locationRepository.findById(base.location());
     boolean placeOk =
         location
             .filter(place ->
-                place.getId().equals(current.location().id())
+                place.getId().equals(currentLocation)
                     || (OfferedLocations.isOffered(place)
                         && RefineryExchangeRules.hostsRefinery(place)))
             .isPresent();
@@ -260,6 +332,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    * @param goods the goods with their row ids
    * @param gameData the game-data counter
    * @param finances the finances counter
+   * @param origin what a deleted order held beyond the fields a client writes, for its recreation;
+   *     {@code null} on every write but a delete
    */
   record State(
       @NotNull UUID location,
@@ -273,7 +347,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       @Nullable Double oreSales,
       @NotNull @Unmodifiable List<Good> goods,
       long gameData,
-      long finances) {
+      long finances,
+      @Nullable RefineryExchangeOrigin origin) {
 
     /**
      * Captures an order.
@@ -294,7 +369,32 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           order.oreSales(),
           order.goods().stream().map(Good::of).toList(),
           order.gameDataVersion(),
-          order.financesVersion());
+          order.financesVersion(),
+          null);
+    }
+
+    /**
+     * Adds what the order held beyond the fields a client writes, as its delete reports it.
+     *
+     * @param removed the deleted order's origin
+     * @return the state of the deleted order
+     */
+    @NotNull
+    State deleted(@NotNull RefineryExchangeOrigin removed) {
+      return new State(
+          location,
+          locationName,
+          method,
+          startedAt,
+          durationMinutes,
+          status,
+          expenses,
+          otherExpenses,
+          oreSales,
+          goods,
+          gameData,
+          finances,
+          removed);
     }
 
     /**
@@ -317,6 +417,9 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       state.put("goods", goods.stream().map(Good::toJournal).toList());
       state.put("gameData", gameData);
       state.put("finances", finances);
+      if (origin != null) {
+        state.put("origin", originToJournal(origin));
+      }
       return state;
     }
 
@@ -339,7 +442,6 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           || !finances.isNumber()) {
         return null;
       }
-      String startedAt = ExchangeJournalJson.text(node, "startedAt");
       List<Good> goods = new ArrayList<>();
       JsonNode rows = node.get("goods");
       if (rows != null && rows.isArray()) {
@@ -354,7 +456,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           location,
           Objects.requireNonNullElse(ExchangeJournalJson.text(node, "locationName"), ""),
           ExchangeJournalJson.uuid(node, "method"),
-          startedAt == null ? null : Instant.parse(startedAt),
+          instant(node, "startedAt"),
           longOrNull(node, "durationMinutes"),
           status,
           doubleOrNull(node, "expenses"),
@@ -362,8 +464,71 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
           doubleOrNull(node, "oreSales"),
           List.copyOf(goods),
           gameData.longValue(),
-          finances.longValue());
+          finances.longValue(),
+          originOf(node.get("origin")));
     }
+  }
+
+  /**
+   * Turns a deleted order's origin into the journal's JSON shape; an unset field is written as
+   * {@code null}.
+   *
+   * @param origin the origin
+   * @return the origin as the journal stores it
+   */
+  private static @NotNull Map<String, Object> originToJournal(
+      @NotNull RefineryExchangeOrigin origin) {
+    Map<String, Object> state = new LinkedHashMap<>();
+    state.put("createdAt", text(origin.createdAt()));
+    state.put("client", origin.createdClient());
+    state.put("orgUnit", text(origin.orgUnitId()));
+    state.put("mission", text(origin.missionId()));
+    state.put("pickedUpAt", text(origin.pickedUpAt()));
+    state.put("pickedUpClient", origin.pickedUpClient());
+    state.put("readyNotifiedAt", text(origin.readyNotifiedAt()));
+    return state;
+  }
+
+  /**
+   * Reads a deleted order's origin the journal stores.
+   *
+   * @param node the origin, or {@code null} for a state without one
+   * @return the origin, or {@code null} when the state holds none
+   */
+  private static @Nullable RefineryExchangeOrigin originOf(@Nullable JsonNode node) {
+    if (node == null || !node.isObject()) {
+      return null;
+    }
+    return new RefineryExchangeOrigin(
+        instant(node, "createdAt"),
+        ExchangeJournalJson.text(node, "client"),
+        ExchangeJournalJson.uuid(node, "orgUnit"),
+        ExchangeJournalJson.uuid(node, "mission"),
+        instant(node, "pickedUpAt"),
+        ExchangeJournalJson.text(node, "pickedUpClient"),
+        instant(node, "readyNotifiedAt"));
+  }
+
+  /**
+   * Writes a value as the journal's text.
+   *
+   * @param value the value, or {@code null}
+   * @return its text, or {@code null}
+   */
+  private static @Nullable String text(@Nullable Object value) {
+    return value == null ? null : value.toString();
+  }
+
+  /**
+   * Reads a point in time of a state.
+   *
+   * @param node the state
+   * @param field the field
+   * @return the instant, or {@code null} when absent
+   */
+  private static @Nullable Instant instant(@NotNull JsonNode node, @NotNull String field) {
+    String value = ExchangeJournalJson.text(node, field);
+    return value == null ? null : Instant.parse(value);
   }
 
   /**

@@ -110,12 +110,12 @@ public enum LiveSyncTopicClass {
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET
-   * /api/v1/refinery-orders/{id}}; sections {@code order} and {@code store}.
+   * /api/v1/refinery-orders/{id}}; sections {@code order}, {@code store} and {@code deleted}.
    */
   REFINERY_ORDER(
       "refinery-order",
       true,
-      Set.of("order", "store"),
+      Set.of("order", "store", "deleted"),
       false,
       "refinery_order",
       "/api/v1/refinery-orders/{id}",

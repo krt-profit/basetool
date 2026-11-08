@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -73,6 +74,7 @@ public class ExchangeMassChangeService {
   private final ExchangeStockWriteService stockWriteService;
   private final ExchangeShipWriteService shipWriteService;
   private final ExchangeOrgStockWriteService orgStockWriteService;
+  private final ExchangeRefineryOrderWriteService refineryOrderWriteService;
   private final AuditRecorder auditRecorder;
   private final MeterRegistry meterRegistry;
   private final ObjectMapper objectMapper;
@@ -241,8 +243,14 @@ public class ExchangeMassChangeService {
             ? orgStockWriteService.apply(caller, changeSet)
             : orgStockWriteService.applyConfirmed(caller, changeSet);
       }
-      case REFINERY_ORDER ->
-          throw new BadRequestException("Refinery-order change sets are not held for confirmation");
+      case REFINERY_ORDER -> {
+        ExchangeRefineryOrderChangeSet read = read(request, ExchangeRefineryOrderChangeSet.class);
+        ExchangeRefineryOrderChangeSet changeSet =
+            new ExchangeRefineryOrderChangeSet(read.ops(), dryRun);
+        yield dryRun
+            ? refineryOrderWriteService.apply(caller, changeSet)
+            : refineryOrderWriteService.applyConfirmed(caller, changeSet);
+      }
     };
   }
 

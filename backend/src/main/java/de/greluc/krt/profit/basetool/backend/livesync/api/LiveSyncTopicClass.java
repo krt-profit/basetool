@@ -87,7 +87,7 @@ public enum LiveSyncTopicClass {
 
   /**
    * One refinery order's detail page, keyed by the order's id; an exchange write pokes {@code
-   * order} (REQ-XCH-030).
+   * order}, an exchange delete {@code deleted} (REQ-XCH-030, REQ-XCH-055).
    */
   REFINERY_ORDER("refinery-order", true, "refinery_order"),
 
@@ -165,7 +165,7 @@ public enum LiveSyncTopicClass {
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
       case REFINERY -> Set.of("queue");
-      case REFINERY_ORDER -> Set.of("order", "store");
+      case REFINERY_ORDER -> Set.of("order", "store", "deleted");
       case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;
     };
   }

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefin
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,10 +48,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-056,
- * ADR-0351): creates under the client's key, partial updates and goods ops, each through the
- * refinery module's own writer, decided in order against the section counters the earlier ops left,
- * and journaled for the undo. The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285).
+ * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-055,
+ * REQ-XCH-056, ADR-0351): creates under the client's key, partial updates, goods ops, cancels and
+ * deletes, each through the refinery module's own writer, decided in order against the section
+ * counters the earlier ops left, and journaled for the undo. The {@link ExchangeChangeSetRunner}
+ * runs the change set (ADR-0285); a delete counts for the mass-change guard.
  *
  * <p>References resolve exactly in the plan; everything that depends on the order — its address, an
  * earlier refusal, the counters, the goods — is decided when the op runs, so a refusal of one op
@@ -83,12 +85,17 @@ public class ExchangeRefineryOrderWriteService
   /** The status a create starts in when it names none. */
   private static final String OPEN = "OPEN";
 
+  /** The status a cancel sets. */
+  private static final String CANCELED = "CANCELED";
+
   private final ExchangeRefineryOrderReferences references;
   private final RefineryExchangeWriter writer;
   private final ExchangeRefineryOrderLinkRepository linkRepository;
   private final ExchangeJournalService journalService;
   private final ExchangeChangeSetRunner runner;
   private final ExchangeLiveSync liveSync;
+  private final ExchangeMassChangeGuard guard;
+  private final RefineryExchangeReader reader;
 
   /**
    * Plans and applies one change set in one transaction.
@@ -121,19 +128,43 @@ public class ExchangeRefineryOrderWriteService
   }
 
   /**
-   * Never holds a set back: no op of these kinds removes an order (REQ-XCH-055).
+   * Applies a change set the member confirmed after the mass-change guard held it back, without
+   * asking the guard again (REQ-XCH-021).
+   *
+   * @param caller the client, installation and member the change set was staged for
+   * @param changeSet the writes
+   * @return the counts, the order every applied op wrote and the detail of every op that was not
+   *     applied
+   * @throws BadRequestException when an op lacks a field its kind requires
+   */
+  @Transactional
+  public @NotNull ExchangeChangeResultDto applyConfirmed(
+      @NotNull ExchangeCaller caller, @NotNull ExchangeRefineryOrderChangeSet changeSet) {
+    return runner.run(caller, this, changeSet, false);
+  }
+
+  /**
+   * Counts the set's deletes against the member's orders; a delete is the only removal, so a cancel
+   * or a goods removal never holds a set back (REQ-XCH-055).
    *
    * @param caller the caller
    * @param changeSet the writes
    * @param plan the plan
-   * @return {@code false}
+   * @return {@code true} when the member must confirm the set
    */
   @Override
   public boolean holdsBack(
       @NotNull ExchangeCaller caller,
       @NotNull ExchangeRefineryOrderChangeSet changeSet,
       @NotNull List<Planned<Change>> plan) {
-    return false;
+    long removals =
+        plan.stream()
+            .filter(p ->
+                p instanceof Write<Change>(Change change)
+                    && ExchangeRefineryOrderChangeSet.DELETE.equals(change.op().op()))
+            .count();
+    return guard.requiresConfirmation(
+        caller, ExchangeResource.REFINERY_ORDER, reader.count(caller.member()), removals);
   }
 
   /**
@@ -185,7 +216,9 @@ public class ExchangeRefineryOrderWriteService
    */
   private static void requireFields(@NotNull Op op) {
     boolean addressed = op.id() != null || op.clientKey() != null;
-    boolean gameDataEcho = op.versions() != null && op.versions().gameData() != null;
+    ExchangeRefineryOrderChangeSet.Versions versions = op.versions();
+    boolean gameDataEcho = versions != null && versions.gameData() != null;
+    boolean financesEcho = versions != null && versions.finances() != null;
     boolean complete =
         switch (op.op()) {
           case ExchangeRefineryOrderChangeSet.CREATE ->
@@ -196,6 +229,8 @@ public class ExchangeRefineryOrderWriteService
           case ExchangeRefineryOrderChangeSet.GOOD_UPDATE,
               ExchangeRefineryOrderChangeSet.GOOD_REMOVE ->
               addressed && gameDataEcho && op.goodId() != null;
+          case ExchangeRefineryOrderChangeSet.CANCEL -> addressed && gameDataEcho;
+          case ExchangeRefineryOrderChangeSet.DELETE -> addressed && gameDataEcho && financesEcho;
           default -> false;
         };
     if (!complete || (op.durationMinutes() != null && op.endsAt() == null)) {
@@ -261,8 +296,11 @@ public class ExchangeRefineryOrderWriteService
     /** The orders the set has met, by the client's key. */
     private final Map<String, Slot> byKey = new HashMap<>();
 
-    /** The orders the set wrote. */
+    /** The orders the set wrote and kept. */
     private final Set<UUID> written = new LinkedHashSet<>();
+
+    /** The orders the set deleted. */
+    private final Set<UUID> deleted = new LinkedHashSet<>();
 
     /**
      * Starts a run.
@@ -284,7 +322,7 @@ public class ExchangeRefineryOrderWriteService
         return create(change);
       }
       Slot slot = address(op);
-      if (slot == null) {
+      if (slot == null || slot.deleted) {
         return Outcome.rejected(ORDER_UNKNOWN);
       }
       if (slot.refused) {
@@ -298,6 +336,8 @@ public class ExchangeRefineryOrderWriteService
               case ExchangeRefineryOrderChangeSet.GOOD_ADD -> goodAdd(slot, change);
               case ExchangeRefineryOrderChangeSet.GOOD_UPDATE -> goodUpdate(slot, change);
               case ExchangeRefineryOrderChangeSet.GOOD_REMOVE -> goodRemove(slot, op);
+              case ExchangeRefineryOrderChangeSet.CANCEL -> cancel(slot, op);
+              case ExchangeRefineryOrderChangeSet.DELETE -> delete(slot, op);
               default -> throw new BadRequestException("Unknown refinery-order op");
             };
       }
@@ -315,7 +355,7 @@ public class ExchangeRefineryOrderWriteService
 
     @Override
     public void announce() {
-      liveSync.refineryOrdersChanged(written);
+      liveSync.refineryOrdersChanged(written, deleted);
     }
 
     /**
@@ -330,6 +370,9 @@ public class ExchangeRefineryOrderWriteService
       Slot known = byKey.get(key);
       if (known == null) {
         known = linked(key);
+      }
+      if (known != null && known.deleted) {
+        known = null;
       }
       if (known != null) {
         known.refused = true;
@@ -549,6 +592,94 @@ public class ExchangeRefineryOrderWriteService
     }
 
     /**
+     * Decides and writes a cancel through the refinery's own cancel (REQ-XCH-055).
+     *
+     * @param slot the order
+     * @param op the cancel
+     * @return the outcome; {@code unchanged} for an order already cancelled
+     */
+    private @NotNull Outcome cancel(@NotNull Slot slot, @NotNull Op op) {
+      if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
+        return Outcome.rejected(VERSION_CONFLICT);
+      }
+      RefineryExchangeOrder current = slot.current;
+      if (current != null && CANCELED.equals(current.status())) {
+        return Outcome.UNCHANGED;
+      }
+      if (dryRun || slot.id == null) {
+        slot.advance(true, false);
+        return Outcome.APPLIED;
+      }
+      RefineryExchangeOrder before = Objects.requireNonNull(current);
+      RefineryExchangeOrder after = writer.cancel(caller.member(), caller.clientId(), slot.id);
+      journal(slot.id, ExchangeJournalAction.REFINERY_CANCEL, before, after);
+      slot.current = after;
+      written.add(slot.id);
+      return applied(after, List.of());
+    }
+
+    /**
+     * Decides and writes a delete of an order that is not stored, journaled as a removal for the
+     * mass-change guard (REQ-XCH-055).
+     *
+     * @param slot the order
+     * @param op the delete
+     * @return the outcome
+     */
+    private @NotNull Outcome delete(@NotNull Slot slot, @NotNull Op op) {
+      ExchangeRefineryOrderChangeSet.Versions versions = Objects.requireNonNull(op.versions());
+      if (!slot.gameDataIs(versions.gameData()) || !slot.financesAre(versions.finances())) {
+        return Outcome.rejected(VERSION_CONFLICT);
+      }
+      RefineryExchangeOrder current = slot.current;
+      if (current != null && current.storedAt() != null) {
+        return Outcome.rejected(ORDER_STORED);
+      }
+      slot.deleted = true;
+      if (dryRun || slot.id == null) {
+        return Outcome.APPLIED;
+      }
+      State removed =
+          State.of(Objects.requireNonNull(current))
+              .deleted(writer.delete(caller.member(), slot.id));
+      journalService.record(
+          caller,
+          batch,
+          ExchangeJournalAction.REFINERY_DELETE,
+          slot.id.toString(),
+          true,
+          removed.toJournal(),
+          null);
+      slot.current = null;
+      written.remove(slot.id);
+      deleted.add(slot.id);
+      return Outcome.APPLIED;
+    }
+
+    /**
+     * Journals one write of an order for the undo.
+     *
+     * @param id the order
+     * @param action the journal action
+     * @param before the order before the write
+     * @param after the order after it
+     */
+    private void journal(
+        @NotNull UUID id,
+        @NotNull ExchangeJournalAction action,
+        @NotNull RefineryExchangeOrder before,
+        @NotNull RefineryExchangeOrder after) {
+      journalService.record(
+          caller,
+          batch,
+          action,
+          id.toString(),
+          false,
+          State.of(before).toJournal(),
+          State.of(after).toJournal());
+    }
+
+    /**
      * Writes an edit through the refinery module, or in a dry run only advances the counters.
      *
      * @param slot the order
@@ -570,14 +701,7 @@ public class ExchangeRefineryOrderWriteService
       }
       RefineryExchangeOrder before = Objects.requireNonNull(slot.current);
       RefineryExchangeOrder after = writer.edit(caller.member(), caller.clientId(), slot.id, edit);
-      journalService.record(
-          caller,
-          batch,
-          action,
-          slot.id.toString(),
-          false,
-          State.of(before).toJournal(),
-          State.of(after).toJournal());
+      journal(slot.id, action, before, after);
       slot.current = after;
       written.add(slot.id);
       Set<UUID> held = new LinkedHashSet<>();
@@ -745,6 +869,9 @@ public class ExchangeRefineryOrderWriteService
 
     /** Whether an op on the order was refused. */
     private boolean refused;
+
+    /** Whether an op of the set deleted the order, or would in a dry run. */
+    private boolean deleted;
 
     /** The game-data counter a dry run advanced past the stored one. */
     private long gameDataSteps;

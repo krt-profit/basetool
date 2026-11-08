@@ -128,16 +128,15 @@ web, naming its client (REQ-AUDIT-005):
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
   (`REFINERY_ORDERS_REASSIGNED`). An exchange client's refinery-order writes (REQ-XCH-052)
   record the same events under the client's id: a create `REFINERY_ORDER_CREATED`, an update
-  and a goods op `REFINERY_ORDER_UPDATED`. The removal of an order with its goods is
+  and a goods op `REFINERY_ORDER_UPDATED`, a cancel `REFINERY_ORDER_CANCELED` (the previous
+  status, as the web's cancel). The removal of an order with its goods is
   `REFINERY_ORDER_DELETED` (order id, last status, location and the number of goods rows; no free
-  text), today written by the undo of a client's create (REQ-XCH-056) beside the undo's own
-  `EXCHANGE_CHANGES_UNDONE`; it is in the viewer's Raffinerie event-type filter with its DE/EN
-  labels. *Planned (ADR-0351, epic #3163):* a pickup without store lines records
-  `REFINERY_ORDER_UPDATED`, a cancel `REFINERY_ORDER_CANCELED`, a pickup with store lines
-  `REFINERY_ORDER_STORED` with its `INVENTORY_RECEIVED_FROM_REFINERY` rows, the client's hard
-  delete `REFINERY_ORDER_DELETED`, and the undo's recreation of a deleted order the new
-  `REFINERY_ORDER_RESTORED` (order id and the number of goods rows restored), which joins the
-  filter and the labels when it is built.
+  text), written by the client's hard delete (REQ-XCH-055) and by the undo of a client's create
+  (REQ-XCH-056) beside the undo's own `EXCHANGE_CHANGES_UNDONE`. The undo's recreation of a
+  deleted order is `REFINERY_ORDER_RESTORED` (order id and the number of goods rows restored).
+  Both are in the viewer's Raffinerie event-type filter with their DE/EN labels. *Planned
+  (ADR-0351, epic #3163):* a pickup without store lines records `REFINERY_ORDER_UPDATED`, a pickup
+  with store lines `REFINERY_ORDER_STORED` with its `INVENTORY_RECEIVED_FROM_REFINERY` rows.
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
   notifications and notification-rule selectors — as a single summary event

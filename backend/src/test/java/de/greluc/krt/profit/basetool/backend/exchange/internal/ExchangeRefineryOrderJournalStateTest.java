@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderJournal.Good;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderJournal.State;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -49,7 +50,40 @@ class ExchangeRefineryOrderJournalStateTest {
             400.0,
             List.of(new Good(UUID.randomUUID(), UUID.randomUUID(), 500, 400, 700)),
             3L,
-            1L);
+            1L,
+            null);
+
+    State read = State.read(mapper.readTree(mapper.writeValueAsString(state.toJournal())));
+
+    assertThat(read).isEqualTo(state);
+  }
+
+  @Test
+  void aDeletedOrdersStateKeepsItsMarkerUnitMissionAndPickup() {
+    State state =
+        new State(
+                UUID.randomUUID(),
+                "ARC-L1",
+                null,
+                null,
+                null,
+                "COMPLETED",
+                null,
+                null,
+                null,
+                List.of(),
+                5L,
+                2L,
+                null)
+            .deleted(
+                new RefineryExchangeOrigin(
+                    Instant.parse("2030-01-01T09:00:00Z"),
+                    "vk-client",
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    Instant.parse("2030-01-01T11:00:00Z"),
+                    "vk-client",
+                    null));
 
     State read = State.read(mapper.readTree(mapper.writeValueAsString(state.toJournal())));
 

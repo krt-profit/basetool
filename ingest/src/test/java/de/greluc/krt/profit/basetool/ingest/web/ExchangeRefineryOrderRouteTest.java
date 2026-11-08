@@ -188,6 +188,17 @@ class ExchangeRefineryOrderRouteTest {
   }
 
   @Test
+  void aCancelAndADeleteAreRelayedWithTheWriteCapability() throws Exception {
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any()))
+        .thenReturn(ok(RESULT));
+
+    post(example("change-set--refineryOrderChangeSet/valid/cancel-and-delete.json"))
+        .andExpect(status().isOk());
+
+    verify(relay).forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any());
+  }
+
+  @Test
   void aChangeSetCountsOnceAgainstTheWriteQuotaWhateverItsOpCount() throws Exception {
     when(relay.forward(any(), anyString(), any(), any(), any())).thenReturn(ok(RESULT));
 
@@ -205,7 +216,8 @@ class ExchangeRefineryOrderRouteTest {
           "create-without-client-key.json",
           "update-without-order.json",
           "duration-without-ends-at.json",
-          "unknown-op.json"
+          "unknown-op.json",
+          "delete-without-finances.json"
         }) {
       post(example("change-set--refineryOrderChangeSet/invalid/" + invalid))
           .andExpect(status().isBadRequest())

@@ -251,16 +251,17 @@ A **client create** (REQ-XCH-052, `RefineryExchangeWrites`) sets its status, `OP
 pickup and `CANCELED` only from a cancel or delete; `storedAt`, `id`, the owner and the counters stay
 server-managed, and the web's create is unchanged.
 
+A client's hard delete (REQ-XCH-055) refuses an order with `storedAt` set, so the record behind
+booked stock is never deleted; the web keeps cancelling through `DELETE`.
+
 > [!note] Planned — the exchange's pickup (ADR-0351, epic #3163)
-> Two exchange paths join this requirement as they are built, and leave the web's store unchanged:
+> An exchange path joins this requirement as it is built, and leaves the web's store unchanged:
 >
 > - **A pickup with store lines** (REQ-XCH-053) stores through this same store operation, so it
 >   books exactly once and sets `storedAt`; a refused line refuses the whole pickup and books
 >   nothing. A pickup without store lines sets `COMPLETED` without `storedAt`
 >   (REQ-REFINERY-028): such an order stays editable like one a `PUT` completed, and the member may
 >   reopen and then store it in the web.
-> - **A client's hard delete** (REQ-XCH-055) refuses an order with `storedAt` set, so the record
->   behind booked stock is never deleted; the web keeps cancelling through `DELETE`.
 
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
 `RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`)
@@ -339,6 +340,9 @@ VerseKit-specific: the name shown is the client's display name from the registry
   <client | Web>, <time>". A web edit keeps the chip and moves only the last change.
 - Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`); a change made by a client
   reaches an open list or detail page live (REQ-XCH-030, REQ-FE-001…010).
+- **Deleted by a client** (REQ-XCH-055): an open detail page of the order stays where it is, locks
+  its forms, keeps what the member typed on screen and shows a notice that a connected application
+  deleted the order, with a link to the list; no redirect.
 - The exchange feed carries the creator as the client marker (REQ-XCH-051).
 - **Storage:** migration `V372` adds `created_source` / `created_client`, `last_change_source` /
   `last_change_client`, `last_changed_at` and the pickup marker `picked_up_at` /
@@ -369,7 +373,8 @@ VerseKit-specific: the name shown is the client's display name from the registry
 `refinery-orders-details.html`, migration `V372`
 
 **Status:** implemented — the web side and the feed's marker (#3166, #3167), and the client
-writes that set a client source (#3168, `RefineryExchangeWrites`)
+writes that set a client source (#3168, `RefineryExchangeWrites`); the deleted notice (#3169,
+`refinery-orders-details.js`)
 
 ### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
 

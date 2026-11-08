@@ -57,6 +57,9 @@ public class ExchangeLiveSync {
   /** The section of a refinery order's detail room that holds the order's fields and goods. */
   static final String REFINERY_ORDER = "order";
 
+  /** The section of a refinery order's detail room that announces the order's deletion. */
+  static final String REFINERY_ORDER_DELETED = "deleted";
+
   private final LiveSyncPublisher publisher;
 
   /**
@@ -96,12 +99,27 @@ public class ExchangeLiveSync {
    * @param orders the orders the write changed, created or removed
    */
   public void refineryOrdersChanged(@NotNull Collection<UUID> orders) {
-    if (orders.isEmpty()) {
+    refineryOrdersChanged(orders, List.of());
+  }
+
+  /**
+   * Refreshes the refinery-order list after the commit, the detail page of every written order, and
+   * tells the detail page of every deleted order that it is gone (REQ-XCH-030, REQ-XCH-055).
+   *
+   * @param orders the orders the write changed or created
+   * @param deleted the orders the write deleted
+   */
+  public void refineryOrdersChanged(
+      @NotNull Collection<UUID> orders, @NotNull Collection<UUID> deleted) {
+    if (orders.isEmpty() && deleted.isEmpty()) {
       return;
     }
     afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.REFINERY), REFINERY_QUEUE);
     orders.forEach(order ->
         afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER));
+    deleted.forEach(order ->
+        afterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER_DELETED));
   }
 
   /**

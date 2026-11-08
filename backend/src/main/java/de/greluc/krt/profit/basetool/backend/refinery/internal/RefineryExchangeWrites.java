@@ -33,8 +33,12 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRestore;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
@@ -74,6 +78,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   private final LocationRepository locationRepository;
   private final RefiningMethodRepository refiningMethodRepository;
   private final MaterialRepository materialRepository;
+  private final MissionRepository missionRepository;
   private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
@@ -148,7 +153,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
     boolean runTimeChanged = false;
     List<RefineryExchangeEdit.Good> reinserted = List.of();
     if (edit.touchesGameData()) {
-      runTimeChanged = applyGameData(order, edit);
+      runTimeChanged = applyGameData(order, edit, clientId != null);
       if (edit.goods() != null) {
         reinserted = setGoods(order, edit.goods());
       }
@@ -165,7 +170,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
     }
     RefineryOrder saved = refineryOrderRepository.saveAndFlush(order);
     if (!reinserted.isEmpty()) {
-      reinsert(saved, reinserted);
+      reinsert(saved.getId(), reinserted);
       entityManager.refresh(saved);
     }
     if (runTimeChanged
@@ -186,11 +191,31 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   }
 
   @Override
-  public void delete(@NotNull UUID owner, @NotNull UUID orderId) {
+  public @NotNull RefineryExchangeOrder cancel(
+      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    final RefineryOrderStatus previousStatus = order.getStatus();
+    order.setStatus(RefineryOrderStatus.CANCELED);
+    RefineryOrderSection.GAME_DATA.advance(order);
+    order.getProvenance().recordClientChange(clientId, Instant.now());
+    RefineryOrder saved = refineryOrderRepository.saveAndFlush(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_CANCELED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        owner,
+        AuditDetails.of("previousStatus", previousStatus));
+    return RefineryExchangeReads.toRow(saved);
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrigin delete(@NotNull UUID owner, @NotNull UUID orderId) {
     RefineryOrder order = requireOwn(owner, orderId);
     if (order.getStoredAt() != null) {
       throw new BadRequestException("error.refinery_order.stored");
     }
+    final RefineryExchangeOrigin origin = originOf(order);
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_DELETED,
         order.getId(),
@@ -201,6 +226,82 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
             .with("goods", order.getGoods().size()));
     refineryOrderRepository.delete(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(orderId));
+    return origin;
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder restore(
+      @NotNull UUID owner, @NotNull RefineryExchangeRestore restore) {
+    User user = Entities.require(userRepository.findById(owner), "error.user.not_found");
+    RefineryExchangeEdit edit = restore.edit();
+    RefineryExchangeOrigin origin = restore.origin();
+    UUID location =
+        Entities.require(
+                locationRepository.findById(Objects.requireNonNull(edit.locationId(), "location")),
+                "error.location.not_found")
+            .getId();
+    UUID methodId = edit.method() == null ? null : edit.method().id();
+    UUID method =
+        methodId == null
+            ? null
+            : Entities.require(
+                    refiningMethodRepository.findById(methodId), "error.refining_method.not_found")
+                .getId();
+    OrgUnit unit = orgUnitStampingService.resolveOwnerMembershipTarget(user, origin.orgUnitId());
+    UUID linked = origin.missionId();
+    UUID mission = linked != null && missionRepository.existsById(linked) ? linked : null;
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    RefineryExchangeEdit.Finances finances = edit.finances();
+    refineryOrderRepository.insertOrder(
+        new RefineryOrderRepository.RestoredRow(
+            restore.id(),
+            origin.createdAt(),
+            owner,
+            location,
+            mission,
+            timer == null ? null : timer.startedAt(),
+            timer == null ? null : timer.durationMinutes(),
+            method,
+            finances == null ? null : RefineryOrderService.zeroToNull(finances.expenses()),
+            finances == null ? null : RefineryOrderService.zeroToNull(finances.otherExpenses()),
+            finances == null ? null : RefineryOrderService.zeroToNull(finances.oreSales()),
+            RefineryOrderStatus.valueOf(Objects.requireNonNull(edit.status(), "status")).name(),
+            origin.readyNotifiedAt(),
+            unit == null ? null : unit.getId(),
+            restore.gameDataVersion(),
+            restore.financesVersion(),
+            origin.createdClient(),
+            origin.pickedUpAt(),
+            origin.pickedUpClient()));
+    if (edit.goods() != null) {
+      reinsert(restore.id(), edit.goods());
+    }
+    RefineryOrder saved = requireOwn(owner, restore.id());
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_RESTORED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        owner,
+        AuditDetails.of("goods", saved.getGoods().size()));
+    return RefineryExchangeReads.toRow(saved);
+  }
+
+  /**
+   * Reads what an order holds beyond the fields a client writes.
+   *
+   * @param order the order
+   * @return its creation, unit, mission, pickup and notice markers
+   */
+  private static @NotNull RefineryExchangeOrigin originOf(@NotNull RefineryOrder order) {
+    RefineryOrderProvenance provenance = order.getProvenance();
+    return new RefineryExchangeOrigin(
+        order.getCreatedAt(),
+        provenance.getCreatedClient(),
+        order.getOwningOrgUnit() == null ? null : order.getOwningOrgUnit().getId(),
+        order.getMissionId(),
+        provenance.getPickedUpAt(),
+        provenance.getPickedUpClient(),
+        order.getReadyNotifiedAt());
   }
 
   /**
@@ -208,13 +309,15 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
    *
    * @param order the locked, managed order
    * @param edit the edit
+   * @param byClient whether a client writes, which may not change a stored order's status
    * @return {@code true} when the start or the length of the run changed
-   * @throws BadRequestException when the status of a stored order would change
+   * @throws BadRequestException when a client would change the status of a stored order
    */
-  private boolean applyGameData(@NotNull RefineryOrder order, @NotNull RefineryExchangeEdit edit) {
+  private boolean applyGameData(
+      @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit edit, boolean byClient) {
     RefineryOrderStatus status =
         edit.status() == null ? null : RefineryOrderStatus.valueOf(edit.status());
-    if (status != null && order.getStoredAt() != null && status != order.getStatus()) {
+    if (byClient && status != null && order.getStoredAt() != null && status != order.getStatus()) {
       throw new BadRequestException("error.refinery_order.stored_status_locked");
     }
     if (edit.locationId() != null) {
@@ -315,16 +418,15 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   /**
    * Inserts the goods an undo brings back under their former ids.
    *
-   * @param order the flushed order
+   * @param orderId the flushed or inserted order
    * @param goods the goods
    */
-  private void reinsert(
-      @NotNull RefineryOrder order, @NotNull List<RefineryExchangeEdit.Good> goods) {
+  private void reinsert(@NotNull UUID orderId, @NotNull List<RefineryExchangeEdit.Good> goods) {
     for (RefineryExchangeEdit.Good good : goods) {
       Material input = input(good.inputMaterialId());
       refineryOrderRepository.insertGood(
           Objects.requireNonNull(good.id()),
-          order.getId(),
+          orderId,
           input.getId(),
           good.inputQuantity(),
           RefineryExchangeRules.output(input).getId(),

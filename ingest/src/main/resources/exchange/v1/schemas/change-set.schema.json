@@ -1677,7 +1677,117 @@
               ]
             }
           ]
+        },
+        {
+          "type": "object",
+          "description": "Cancels the order as the web's cancel does, stored or not. An order already cancelled is unchanged.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "cancel"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryGameDataVersion"
+            }
+          },
+          "required": [
+            "op",
+            "versions"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Removes an order that is not stored, with its goods; booked stock stays. A stored order is refused ORDER_STORED. Counts as a removal for the mass-change guard.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "delete"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryBothVersions"
+            }
+          },
+          "required": [
+            "op",
+            "versions"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ]
         }
+      ]
+    },
+    "refineryBothVersions": {
+      "type": "object",
+      "description": "Both section counters the client last saw. A difference in either answers VERSION_CONFLICT.",
+      "properties": {
+        "gameData": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finances": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "gameData",
+        "finances"
       ]
     }
   }

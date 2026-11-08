@@ -273,6 +273,21 @@ class RefineryOrderDetailPatternRenderTest {
         .contains("data-ready-at=");
   }
 
+  /**
+   * The page carries the hidden notice a client's delete reveals, with its link to the list
+   * (REQ-XCH-055).
+   */
+  @Test
+  void thePageCarriesTheHiddenDeletedNoticeWithTheLinkToTheList() throws Exception {
+    String html = render(RefineryOrderStatus.OPEN, null, null);
+
+    assertThat(html)
+        .containsPattern(
+            "id=\"refinery-order-deleted\"[^>]*data-testid=\"refinery-order-deleted\"[^>]*hidden")
+        .contains("Eine verbundene Anwendung hat diesen Auftrag gelöscht.")
+        .containsPattern("href=\"/refinery-orders\">Zur Auftragsliste<");
+  }
+
   /** A stored run shows the completed steps and offers neither storing nor canceling. */
   @Test
   void storedRunOffersNoStoreOrCancel() throws Exception {
