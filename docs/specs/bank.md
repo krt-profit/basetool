@@ -3147,6 +3147,32 @@ answers `404` like an unknown id, through the real token chain) ·
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
 REQ-BANK-038, REQ-BANK-056
 
+## Tests
+
+### Bank access characterisation matrix
+
+`BankAccessCharacterisationTest` (backend, `bank/web`) pins the web outcome of every bank access
+rule against Postgres, through the real endpoints and the real token chain, with roles seeded in
+`user_roles`. It is the baseline the move of the rules behind one bank access policy must keep
+(#3154, #3155), and the exchange routes answer the same rows (`REQ-BXCH-*`).
+
+- **Matrix** (`BankAccessMatrix`): 14 actors (member, Staffelleiter, SK lead, Bereichsleiter,
+  Profit-Bereichsleiter, OL member, bank employee without a grant, with a flagless grant and with
+  each grant flag, Bankleitung, admin, pending registration) × 9 accounts (own, Spezialkommando's
+  and foreign `ORG_UNIT`, `AREA`, `CARTEL`, `CARTEL_BANK`, `SPECIAL` with and without a view grant,
+  a closed account) × 28 operations (views, lists, settings, holder view, foreign requests and
+  staff queue; raising each type, correcting, cancelling, confirming by type, rejecting, approving,
+  four-eyes; configuring visibility, target, limits and the KRT tiers; staff direct bookings) ×
+  3 amount bands (below `T1`, between `T1` and `T2` and over the member limits, above `T2`) ×
+  3 active-org-unit pins (none, own Staffel, own Bereich) where they matter: 4,354 cases.
+- **Expected outcomes:** `src/test/resources/bank/bank-access-matrix.tsv`, one line per case with
+  the status and the problem code or the access-relevant fields of the answer. A run writes what
+  it observed to `backend/build/bank-access-matrix/bank-access-matrix.tsv`; an intended change of
+  an outcome replaces the recorded file in the same PR, and the reviewer reads the diff.
+- **Reuse:** the seeded world (`BankAccessSeeder`, `BankAccessWorld`) and the case list are
+  independent of the web driver (`BankWebAccessDriver`), so another path runs the same rows with a
+  driver of its own.
+
 ## Out of scope
 
 - **Accounts for individual players** — an explicit owner decision: players appear only
