@@ -342,7 +342,7 @@ class OperationFinanceServiceTest {
     RefineryOrderDto dto =
         new RefineryOrderDto(
             null, null, null, null, null, null, expenses, null, oreSales, null, null, null,
-            List.of(), null, null, null);
+            List.of(), null, null, null, null);
     return new RefineryOrderLine(
         RefineryOrderFigures.of(missionId, null, oreSales, expenses, null), dto);
   }

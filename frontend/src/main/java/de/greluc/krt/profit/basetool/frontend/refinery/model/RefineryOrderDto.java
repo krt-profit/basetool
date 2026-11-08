@@ -36,7 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * Frontend mirror of the backend {@code RefineryOrderDto}; must match it field for field.
  *
  * <p>{@code owningOrgUnitId} is the owning-org-unit picker output sent on create; {@code null}
- * stamps the owner's home Staffel.
+ * stamps the owner's home Staffel. {@code provenance} is read-only: the creating client, the last
+ * change and the pickup marker (REQ-REFINERY-027), {@code null} on a request.
  */
 @DtoMirror
 public record RefineryOrderDto(
@@ -55,7 +56,8 @@ public record RefineryOrderDto(
     RefineryOrderStatus status,
     SquadronReferenceDto owningSquadron,
     Long version,
-    UUID owningOrgUnitId) {
+    UUID owningOrgUnitId,
+    @Nullable RefineryOrderProvenanceDto provenance) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */

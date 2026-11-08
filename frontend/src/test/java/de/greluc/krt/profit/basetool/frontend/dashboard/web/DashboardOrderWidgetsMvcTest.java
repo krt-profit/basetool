@@ -188,6 +188,7 @@ class DashboardOrderWidgetsMvcTest {
         List.of(),
         null,
         1L,
+        null,
         null);
   }
 

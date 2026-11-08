@@ -339,15 +339,30 @@ VerseKit-specific: the name shown is the client's display name from the registry
 - Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`); a change made by a client
   reaches an open list or detail page live (REQ-XCH-030, REQ-FE-001…010).
 - The exchange feed carries the creator as the client marker (REQ-XCH-051).
+- **Storage:** migration `V372` adds `created_source` / `created_client`, `last_change_source` /
+  `last_change_client`, `last_changed_at` and the pickup marker `picked_up_at` /
+  `picked_up_client` to `refinery_order`; a `CLIENT` source always names its client id, a `WEB`
+  source never does (check constraints), and existing orders read as web orders whose last change
+  is their `updated_at`. The web's create, update, cancel and store record a web change. The read
+  DTOs carry it as `provenance` with each client named by its registry display name, or by its id
+  once the registry no longer holds it; a page of orders reads the names in one query.
 
 **Acceptance**
 
-- [ ] An order a client created shows the chip in the list and the detail head and „Erstellt von
+- [x] An order a client created shows the chip in the list and the detail head and „Erstellt von
   <client>"; an order created in the web shows no chip and „Erstellt von Web".
-- [ ] A web edit of a client's order keeps the chip and shows „Zuletzt geändert: Web" with its
+- [x] A web edit of a client's order keeps the chip and shows „Zuletzt geändert: Web" with its
   time; a client's update of a web order shows that client as the last change and adds no chip.
 
-**Status:** planned — #3166
+**Enforced by:** `RefineryOrderProvenanceStampingTest`, `RefineryOrderStoreServiceTest`
+(`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `RefineryOrderProvenanceReadTest`,
+`RefineryOrderMapperTest`, `RefineryOrdersListPatternRenderTest`,
+`RefineryOrderDetailPatternRenderTest` · **Code:** `RefineryOrderProvenance`,
+`RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
+`refinery-orders-details.html`, migration `V372`
+
+**Status:** web side implemented (#3166); the client writes that set a client source arrive with
+#3168
 
 ### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
 
@@ -359,13 +374,23 @@ order's status stays editable in the web, as for an order completed without a st
 (REQ-REFINERY-022). The ready notice ignores it, since REQ-REFINERY-023 selects only open and
 running orders without `storedAt`.
 
+The web derives the label from the markers alone (`RefineryProgress.State.PICKED_UP`): an order
+reopened to `OPEN` or `IN_PROGRESS` reads by its run again, and an order with `pickedUpAt` and
+`storedAt` shows „Eingelagert" with „via <client>". A picked-up order offers no store action, as
+for any `COMPLETED` order.
+
 **Acceptance**
 
-- [ ] A pickup without store lines shows „Abgeholt via <client>" in the list and the detail page;
+- [x] A pickup without store lines shows „Abgeholt via <client>" in the list and the detail page;
   a pickup with store lines shows „Eingelagert".
-- [ ] The labels come from the bundles in DE and EN.
+- [x] The labels come from the bundles in DE and EN.
 
-**Status:** planned — #3166 (marker and labels), #3170 (the pickup that sets it)
+**Enforced by:** `RefineryProgressTest` (`aPickupWithoutStoreIsItsOwnState`,
+`aPickedUpRowIsClosed`), `RefineryOrdersListPatternRenderTest` (`rendersTheClientChipAndThePickup`),
+`RefineryOrderDetailPatternRenderTest` · **Code:** `RefineryProgress.state`,
+`RefineryOrderProvenanceDto.pickedUpWithoutStore`, `RefineryOrderProvenance.recordPickup`
+
+**Status:** marker and labels implemented (#3166); the pickup op that sets it arrives with #3170
 
 ### REQ-REFINERY-029 — An order is locked per section: game data and finances
 

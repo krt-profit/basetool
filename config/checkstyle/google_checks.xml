@@ -756,7 +756,7 @@
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthRefineryImportService"/>
-      <property name="max" value="174"/>
+      <property name="max" value="157"/>
     </module>
     <module name="MethodLength">
       <property name="id" value="methodLengthJobOrderItemProductionService"/>

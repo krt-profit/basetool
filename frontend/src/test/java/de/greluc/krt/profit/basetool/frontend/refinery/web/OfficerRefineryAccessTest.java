@@ -226,6 +226,7 @@ class OfficerRefineryAccessTest {
             RefineryOrderStatus.OPEN,
             null,
             1L,
+            null,
             null);
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))

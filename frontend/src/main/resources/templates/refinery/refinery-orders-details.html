@@ -13,8 +13,8 @@
 <main class="refinery-order">
     <div class="page-head" data-testid="page-head"
          th:with="headState=${orderState != null ? orderState.name() : null},
-                  headStateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  headStateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} }">
+                  headStateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'PICKED_UP': 'refinery.status.pickedUp', 'CANCELED': 'refineryorder.status.CANCELED'} },
+                  headStateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'PICKED_UP': 'status-completed', 'CANCELED': 'status-canceled'} }">
         <div class="page-head__main">
             <a class="page-eyebrow" th:href="@{/refinery-orders}" data-testid="page-eyebrow"
               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
@@ -24,6 +24,9 @@
                 <span th:if="${headState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
                       th:classappend="${headStateClasses.get(headState)}"
                       th:text="#{${headStateKeys.get(headState)}}">Abholbereit</span>
+                <span th:if="${order != null and order.provenance != null and order.provenance.createdByClient != null}" class="chip chip--info" data-testid="refinery-client-chip"
+                      th:title="#{refineryorder.client.chip(${order.provenance.createdByClient})}"
+                      th:text="${order.provenance.createdByClient}">VerseKit</span>
             </div>
         </div>
     </div>
@@ -34,8 +37,8 @@
     <th:block th:fragment="refineryOrderSection">
     <div class="rod-layout"
          th:with="stateName=${orderState != null ? orderState.name() : null},
-                  stateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  stateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} },
+                  stateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'PICKED_UP': 'refinery.status.pickedUp', 'CANCELED': 'refineryorder.status.CANCELED'} },
+                  stateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'PICKED_UP': 'status-completed', 'CANCELED': 'status-canceled'} },
                   openRun=${stateName == 'RUNNING' or stateName == 'READY'},
                   sales=${refineryOrderForm.oreSales ?: 0},
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
@@ -223,7 +226,7 @@
             <div class="card card--accent rod-status" data-testid="refinery-status-card">
                 <div class="rod-status__head">
                     <ol class="ablauf rod-steps">
-                        <li class="step" th:classappend="${stateName == 'RUNNING'} ? 'step--now' : (${stateName == 'READY' or stateName == 'COMPLETED'} ? 'step--done')">
+                        <li class="step" th:classappend="${stateName == 'RUNNING'} ? 'step--now' : (${stateName == 'READY' or stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done')">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
                                 <span class="step-title" th:text="#{refinery.status.running}">Läuft</span>
@@ -231,7 +234,7 @@
                                       th:text="#{refineryorder.step.start(${#temporals.format(@relativeDays.local(order.startedAt), 'dd.MM. HH:mm')})}">Start 02.10. 18:40</span>
                             </span>
                         </li>
-                        <li class="step" th:classappend="${stateName == 'READY'} ? 'step--now' : (${stateName == 'COMPLETED'} ? 'step--done')">
+                        <li class="step" th:classappend="${stateName == 'READY'} ? 'step--now' : (${stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done')">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
                                 <span class="step-title" th:text="#{refinery.status.ready}">Abholbereit</span>
@@ -241,10 +244,12 @@
                                       th:text="#{refineryorder.step.end(${#temporals.format(@relativeDays.local(orderEndsAt), 'dd.MM. HH:mm')})}">Fertig 03.10. 09:00</span>
                             </span>
                         </li>
-                        <li class="step" th:classappend="${stateName == 'COMPLETED'} ? 'step--done'">
+                        <li class="step" th:classappend="${stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done'" data-testid="refinery-step-closed">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
-                                <span class="step-title" th:text="#{refinery.status.stored}">Eingelagert</span>
+                                <span class="step-title" th:text="${stateName == 'PICKED_UP'} ? #{refinery.status.pickedUp} : #{refinery.status.stored}">Eingelagert</span>
+                                <span class="step-meta" th:if="${order != null and order.provenance != null and order.provenance.pickedUpByClient != null}" data-testid="refinery-picked-up-via"
+                                      th:text="#{refineryorder.list.via(${order.provenance.pickedUpByClient})}">via VerseKit</span>
                             </span>
                         </li>
                     </ol>
@@ -282,6 +287,10 @@
                 <span class="kpi-label" th:text="#{refineryorder.assigned.title}">Zugeordnet</span>
                 <p class="rod-assigned__title" th:text="${order.mission != null ? order.mission.name : #messages.msg('refineryorder.assigned.noMission')}">Quantanium-Abbau</p>
                 <p class="rod-assigned__meta"><span th:text="#{refineryorder.assigned.owner(${order.owner != null ? order.owner.effectiveName : '—'})}">Besitzer greluc</span><th:block th:if="${order.owningSquadron != null}"> &middot; <span th:text="${order.owningSquadron.name}">ALPHA</span></th:block></p>
+                <p th:if="${order.provenance != null}" class="rod-assigned__meta" data-testid="refinery-provenance"
+                   th:with="web=#{refineryorder.assigned.web},created=${order.provenance.createdByClient ?: web},changed=${order.provenance.lastChangedByClient ?: web}"
+                   ><span th:text="#{refineryorder.assigned.createdBy(${created})}">Erstellt von VerseKit</span><th:block th:if="${order.provenance.lastChangedAt != null}"> &middot; <span
+                      th:text="#{refineryorder.assigned.lastChange(${changed}, ${#temporals.format(@relativeDays.local(order.provenance.lastChangedAt), 'dd.MM. HH:mm')})}">Zuletzt geändert: Web, 08.11. 17:20</span></th:block></p>
             </div>
         </aside>
     </div>

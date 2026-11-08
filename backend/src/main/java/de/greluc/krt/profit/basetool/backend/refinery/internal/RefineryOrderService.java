@@ -126,6 +126,7 @@ public class RefineryOrderService {
     order.setVersion(null);
     order.setStatus(RefineryOrderStatus.OPEN);
     order.setStoredAt(null);
+    order.setProvenance(RefineryOrderProvenance.createdInWeb(Instant.now()));
 
     User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
@@ -308,6 +309,7 @@ public class RefineryOrderService {
           });
     }
 
+    order.getProvenance().recordWebChange(Instant.now());
     RefineryOrder saved = refineryOrderRepository.save(order);
     if (runTimeChanged
         || saved.getStatus() == RefineryOrderStatus.COMPLETED
@@ -400,6 +402,7 @@ public class RefineryOrderService {
 
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
+    order.getProvenance().recordWebChange(Instant.now());
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceByOther(order, userId, "CANCELED");

@@ -4568,6 +4568,9 @@
             "type" : "number",
             "format" : "double"
           },
+          "provenance" : {
+            "$ref" : "#/components/schemas/RefineryOrderProvenanceDto"
+          },
           "refiningMethod" : {
             "$ref" : "#/components/schemas/RefiningMethodDto"
           },
@@ -4584,6 +4587,32 @@
           }
         },
         "required" : [ "goods", "location" ]
+      },
+      "RefineryOrderProvenanceDto" : {
+        "type" : "object",
+        "properties" : {
+          "createdByClient" : {
+            "type" : "string"
+          },
+          "lastChangedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastChangedByClient" : {
+            "type" : "string"
+          },
+          "pickedUpAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "pickedUpByClient" : {
+            "type" : "string"
+          },
+          "storedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
       },
       "RefiningMethodDto" : {
         "type" : "object",

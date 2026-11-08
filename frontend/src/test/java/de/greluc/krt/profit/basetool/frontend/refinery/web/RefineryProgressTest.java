@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -109,6 +110,29 @@ class RefineryProgressTest {
       @Nullable Instant startedAt,
       @Nullable Long duration,
       @NotNull List<RefineryGoodDto> goods) {
+    return order(owner, canEdit, status, startedAt, duration, goods, null);
+  }
+
+  /**
+   * An order of {@code owner} with its provenance.
+   *
+   * @param owner the owner id
+   * @param canEdit the backend's edit verdict
+   * @param status the backend status
+   * @param startedAt the start, or {@code null}
+   * @param duration the duration in minutes, or {@code null}
+   * @param goods the goods
+   * @param provenance the provenance, or {@code null}
+   * @return the order
+   */
+  private static @NotNull RefineryOrderListDto order(
+      @NotNull UUID owner,
+      boolean canEdit,
+      @NotNull String status,
+      @Nullable Instant startedAt,
+      @Nullable Long duration,
+      @NotNull List<RefineryGoodDto> goods,
+      @Nullable RefineryOrderProvenanceDto provenance) {
     return new RefineryOrderListDto(
         UUID.fromString("00000000-0000-0000-0000-000000001047"),
         new UserReferenceDto(owner, "vexx", null, "Vexx", 0),
@@ -126,21 +150,72 @@ class RefineryProgressTest {
         goods,
         null,
         1L,
-        canEdit);
+        canEdit,
+        provenance);
+  }
+
+  /**
+   * The provenance of an order a client picked up.
+   *
+   * @param storedAt when the yield was stored, or {@code null}
+   * @return the provenance
+   */
+  private static @NotNull RefineryOrderProvenanceDto pickedUp(@Nullable Instant storedAt) {
+    Instant pickup = NOW.minusSeconds(600);
+    return new RefineryOrderProvenanceDto(
+        "VerseKit", "VerseKit", pickup, pickup, "VerseKit", storedAt);
   }
 
   /** An open order is running until its end, ready from it on, and ready without a known end. */
   @Test
   void stateFollowsTheEnd() {
-    assertThat(RefineryProgress.state("OPEN", NOW.plusSeconds(60), NOW))
+    assertThat(RefineryProgress.state("OPEN", NOW.plusSeconds(60), null, NOW))
         .isEqualTo(RefineryProgress.State.RUNNING);
-    assertThat(RefineryProgress.state("IN_PROGRESS", NOW, NOW))
+    assertThat(RefineryProgress.state("IN_PROGRESS", NOW, null, NOW))
         .isEqualTo(RefineryProgress.State.READY);
-    assertThat(RefineryProgress.state("OPEN", null, NOW)).isEqualTo(RefineryProgress.State.READY);
-    assertThat(RefineryProgress.state("COMPLETED", NOW.plusSeconds(60), NOW))
+    assertThat(RefineryProgress.state("OPEN", null, null, NOW))
+        .isEqualTo(RefineryProgress.State.READY);
+    assertThat(RefineryProgress.state("COMPLETED", NOW.plusSeconds(60), null, NOW))
         .isEqualTo(RefineryProgress.State.COMPLETED);
-    assertThat(RefineryProgress.state("CANCELED", null, NOW))
+    assertThat(RefineryProgress.state("CANCELED", null, null, NOW))
         .isEqualTo(RefineryProgress.State.CANCELED);
+  }
+
+  /**
+   * A completed order a client picked up reads „Abgeholt" until it is stored, then „Eingelagert";
+   * the pickup marker alone does not close an order whose status is open again (REQ-REFINERY-028).
+   */
+  @Test
+  void aPickupWithoutStoreIsItsOwnState() {
+    assertThat(RefineryProgress.state("COMPLETED", NOW, pickedUp(null), NOW))
+        .isEqualTo(RefineryProgress.State.PICKED_UP);
+    assertThat(RefineryProgress.state("COMPLETED", NOW, pickedUp(NOW), NOW))
+        .isEqualTo(RefineryProgress.State.COMPLETED);
+    assertThat(RefineryProgress.state("OPEN", null, pickedUp(null), NOW))
+        .isEqualTo(RefineryProgress.State.READY);
+    assertThat(RefineryProgress.state("CANCELED", null, pickedUp(null), NOW))
+        .isEqualTo(RefineryProgress.State.CANCELED);
+  }
+
+  /** A picked-up row is closed: it cannot be stored from the list and shows no meter. */
+  @Test
+  void aPickedUpRowIsClosed() {
+    RefineryListRow row =
+        RefineryListRow.of(
+            order(
+                VIEWER,
+                true,
+                "COMPLETED",
+                NOW.minusSeconds(7200),
+                60L,
+                List.of(good("Gold-Erz", "Gold", 100, 90)),
+                pickedUp(null)),
+            NOW,
+            Locale.GERMAN);
+
+    assertThat(row.state()).isEqualTo(RefineryProgress.State.PICKED_UP);
+    assertThat(row.storable()).isFalse();
+    assertThat(row.ready()).isFalse();
   }
 
   /** Progress is the elapsed share of the duration, clamped to 0..100. */

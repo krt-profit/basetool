@@ -105,6 +105,7 @@ class RefineryOrderStorageCalculationTest {
             RefineryOrderStatus.OPEN,
             null,
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
@@ -162,6 +163,7 @@ class RefineryOrderStorageCalculationTest {
             RefineryOrderStatus.OPEN,
             null,
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
@@ -234,6 +236,7 @@ class RefineryOrderStorageCalculationTest {
             RefineryOrderStatus.OPEN,
             null,
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))

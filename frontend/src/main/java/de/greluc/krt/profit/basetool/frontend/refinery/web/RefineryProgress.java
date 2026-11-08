@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -64,6 +65,8 @@ public final class RefineryProgress {
     READY,
     /** The yield was stored; the run is closed. */
     COMPLETED,
+    /** A client reported the pickup and nothing was stored: „Abgeholt" (REQ-REFINERY-028). */
+    PICKED_UP,
     /** The order was canceled. */
     CANCELED
   }
@@ -101,15 +104,22 @@ public final class RefineryProgress {
    * @param status the order status as the backend names it; an unknown or {@code null} status
    *     counts as open
    * @param endsAt the end of the run, or {@code null} when unknown
+   * @param provenance the order's provenance, whose pickup marker turns a completed, unstored order
+   *     into {@link State#PICKED_UP}; {@code null} when unknown
    * @param now the instant to judge against
    * @return the state of the order
    */
   @NotNull
   @Contract(pure = true)
   public static State state(
-      @Nullable String status, @Nullable Instant endsAt, @NotNull Instant now) {
+      @Nullable String status,
+      @Nullable Instant endsAt,
+      @Nullable RefineryOrderProvenanceDto provenance,
+      @NotNull Instant now) {
     if ("COMPLETED".equals(status)) {
-      return State.COMPLETED;
+      return RefineryOrderProvenanceDto.pickedUpWithoutStore(provenance)
+          ? State.PICKED_UP
+          : State.COMPLETED;
     }
     if ("CANCELED".equals(status)) {
       return State.CANCELED;

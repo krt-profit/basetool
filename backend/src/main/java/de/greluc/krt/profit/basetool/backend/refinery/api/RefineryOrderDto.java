@@ -39,7 +39,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>{@code owningOrgUnitId} is the picker output on create, resolved by {@code
  * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
- * inadmissible pick is rejected with 400 (REQ-ORG-016).
+ * inadmissible pick is rejected with 400 (REQ-ORG-016). {@code provenance} is read-only: the
+ * creating client, the last change and the pickup marker (REQ-REFINERY-027).
  */
 public record RefineryOrderDto(
     @Nullable UUID id,
@@ -57,4 +58,5 @@ public record RefineryOrderDto(
     @NotEmpty List<@Valid RefineryGoodDto> goods,
     @Nullable SquadronReferenceDto owningSquadron,
     @Nullable Long version,
-    @Nullable UUID owningOrgUnitId) {}
+    @Nullable UUID owningOrgUnitId,
+    @Nullable RefineryOrderProvenanceDto provenance) {}

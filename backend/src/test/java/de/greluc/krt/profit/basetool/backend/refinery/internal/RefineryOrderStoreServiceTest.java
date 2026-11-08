@@ -58,6 +58,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -209,6 +210,21 @@ class RefineryOrderStoreServiceTest {
         OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
 
     assertTrue(order.getStoredAt() != null);
+  }
+
+  /** A store in the web is the order's last change, at the store time (REQ-REFINERY-027). */
+  @Test
+  void aWebStoreIsTheLastChange() {
+    order.setProvenance(
+        RefineryOrderProvenance.createdByClient("versekit", Instant.parse("2026-11-01T10:00:00Z")));
+    stubLookupsForSingleItem();
+
+    refineryOrderService.storeRefineryOrder(
+        OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
+
+    assertEquals(RefineryChangeSource.WEB, order.getProvenance().getLastChangeSource());
+    assertEquals(order.getStoredAt(), order.getProvenance().getLastChangedAt());
+    assertEquals("versekit", order.getProvenance().getCreatedClient());
   }
 
   @Test

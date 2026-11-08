@@ -58,7 +58,7 @@ class RefineryOrderFinanceReadsTest {
   private static RefineryOrderDto dto() {
     return new RefineryOrderDto(
         null, null, null, null, null, null, null, null, null, null, null, null, List.of(), null,
-        null, null);
+        null, null, null);
   }
 
   @Test
