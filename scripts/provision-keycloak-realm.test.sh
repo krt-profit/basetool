@@ -423,6 +423,16 @@ if verb == "delete":
             r for r in data["client_scope_mappings"].get(parts[1], []) if r["name"] not in removed]
         save()
         sys.exit(0)
+    if parts[0] == "users" and parts[2:4] == ["role-mappings", "clients"] and len(parts) == 5:
+        if data["forbid_user_reads"]:
+            fail("HTTP 403 Forbidden")
+        held = data["users"][parts[1]]["client_roles"].get(parts[4], [])
+        removed = {r["id"] for r in body}
+        if not removed <= set(held):
+            fail("stub: a role-mapping delete names a role the user does not hold")
+        data["users"][parts[1]]["client_roles"][parts[4]] = [rid for rid in held if rid not in removed]
+        save()
+        sys.exit(0)
     fail(f"stub: unexpected delete {path}")
 
 fail(f"stub: unexpected verb {verb}")
@@ -548,7 +558,7 @@ assert_eq "$(query "$state" "[p['name'] for p in d['profiles']['profiles']]")" \
 assert_eq "$(grep -cE '^(create|update|delete) client-policies' "${state}/calls.log" || true)" "0" \
   "the apply never writes the client-policy lists"
 assert_eq "$(query "$state" "sorted(r['name'] for u in d['users'].values() if u['client']==client('backend-service')['id'] for rid in u['client_roles'].get('c-rm', []) for r in d['client_roles']['c-rm'] if r['id']==rid)")" \
-  "['manage-users', 'view-realm', 'view-users']" "backend-service's service account holds its realm-management roles"
+  "['manage-users', 'view-users']" "backend-service's service account holds its realm-management roles, without view-realm"
 assert_eq "$(query "$state" "d['realm']['revokeRefreshToken'], d['realm']['offlineSessionMaxLifespan']")" \
   "(False, 7776000)" "the realm token settings match production"
 assert_not_contains "$output" "$SECRET_MARKER" "no generated client secret is printed"
@@ -769,6 +779,13 @@ make_stub "$state" empty
 run_provisioner "$state" --apply --grafana-origin https://grafana.testing.example >/dev/null
 assert_eq "$(query "$state" "client('grafana')['redirectUris']")" \
   "['https://grafana.testing.example/login/generic_oauth']" "grafana's redirect comes from --grafana-origin"
+assert_eq "$(query "$state" "[r['name'] for r in d['client_roles'][client('grafana')['id']]]")" \
+  "['grafana-admin']" "grafana carries the client role grafana-admin"
+assert_eq "$(query "$state" "mappers('grafana')")" "['client roles']" \
+  "grafana's only mapper is its client-role mapper; no realm role reaches its token"
+assert_eq "$(query "$state" "[(m['protocolMapper'], m['config']['usermodel.clientRoleMapping.clientId'], m['config']['claim.name'], m['config']['id.token.claim'], m['config']['userinfo.token.claim']) for m in d['client_mappers'][client('grafana')['id']]]")" \
+  "[('oidc-usermodel-client-role-mapper', 'grafana', 'grafana_roles', 'true', 'true')]" \
+  "the mapper puts grafana's client roles into the ID token and userinfo as grafana_roles"
 output="$(KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --public-origin "https://testing.example/" \
   --kcadm-command "false" 2>&1 || true)"
 assert_contains "$output" "no path and no trailing slash" "a trailing slash is refused before anything is read"
@@ -1269,6 +1286,65 @@ p.write_text(json.dumps(d), encoding="utf-8")
     rm -rf "$state"
   done
 done
+
+echo "24. backend-service's service account gives view-realm back; a realm it cannot read is handed to the operator"
+VIEW_REALM_LINE="- service-account roles realm-management:view-realm withdrawn (no Basetool call needs it; roles are held in the Basetool's user_roles, ADR-0355)"
+state="$(mktemp -d)"
+make_stub "$state" testing
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["users"]["u-backend"]["client_roles"]["c-rm"] = ["rm-manage-users", "rm-view-realm", "rm-view-users"]
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state")"
+assert_contains "$output" "  ${VIEW_REALM_LINE}" "the dry run names the withdrawal and why"
+assert_not_contains "$output" "+ service-account roles realm-management:" "and grants backend-service nothing"
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "sorted(r['name'] for rid in d['users']['u-backend']['client_roles']['c-rm'] for r in d['client_roles']['c-rm'] if r['id']==rid)")" \
+  "['manage-users', 'view-users']" "the service account keeps manage-users and view-users only"
+assert_eq "$(grep -cxF 'delete users/u-backend/role-mappings/clients/c-rm' "${state}/calls.log" || true)" "1" \
+  "the withdrawal is one role-mapping delete"
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second apply is empty"
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+d["forbid_user_reads"] = True
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state")"
+assert_contains "$output" "Service account roles -> select and Unassign, if held:" "an unreadable account is handed to the operator"
+assert_contains "$output" "client 'realm-management' role 'view-realm'" "with the role to take back"
+rm -rf "$state"
+
+echo "25. an existing grafana client gets grafana-admin and loses its realm-role mapper"
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply --grafana-origin https://grafana.testing.example >/dev/null
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(p.read_text(encoding="utf-8"))
+uuid = next(c["id"] for c in d["clients"] if c["clientId"] == "grafana")
+d["client_roles"][uuid] = []
+d["client_mappers"][uuid].append({"id": "m-realm-roles", "name": "realm roles", "protocol": "openid-connect",
+    "protocolMapper": "oidc-usermodel-realm-role-mapper", "config": {"claim.name": "realm_access.roles"}})
+p.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state" --grafana-origin https://grafana.testing.example)"
+planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ' | sort)"
+expected="$(printf '%s\n' \
+  "  + client role 'grafana-admin'" \
+  "  - grafana: mapper 'realm roles' (oidc-usermodel-realm-role-mapper realm_access.roles) removed (not in this client's spec)" | sort)"
+assert_eq "$planned" "$expected" "the dry run creates the role and removes the realm-role mapper, nothing else"
+output="$(run_provisioner "$state" --apply --grafana-origin https://grafana.testing.example)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "mappers('grafana')")" "['client roles']" "only the client-role mapper is left"
+rm -rf "$state"
 
 echo
 if [[ $tests_failed -gt 0 ]]; then

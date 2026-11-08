@@ -1251,9 +1251,11 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 Every user holding `ROLE_BANK_EMPLOYEE` or `ROLE_BANK_MANAGEMENT` is automatically present as
 an **active** `bank_holder` row, reconciled idempotently at the end of every Keycloak user
 reconciliation (`UserSyncService#syncFromKeycloak` — the daily `UserSyncTask` and the admin's
-manual sync) over `UserRepository.findUserIdsByRoleCode` (ADR-0040). It deliberately does **not**
-run on login, so a freshly granted bank role becomes a holder on the next sync, not the next
-request. A `bank_holder.role_managed` flag marks
+manual sync) over `UserRepository.findUserIdsByRoleCode` (ADR-0040), and for the one member after
+every committed role change (`UserRolesChangedEvent` → `BankHolderRoleChangeListener` →
+`BankHolderReconciliationService#reconcileUser`, in a transaction of its own), so a bank role
+granted or withdrawn in the Basetool reaches the holder registry at once. A failed per-member
+reconcile is logged and left to the next sweep. A `bank_holder.role_managed` flag marks
 role-derived holders. When a user loses **all** bank roles, their `role_managed` holder is
 **auto-deactivated** — it accepts no new incoming money, but its (possibly negative, ADR-0039)
 balance survives and must be reconciled to zero by a holder→holder Umbuchung (REQ-BANK-031).
@@ -1268,6 +1270,9 @@ reconcile; management may still register any tool user as a custodian.
   balance and ledger history; a manually-registered holder is unaffected.
 - [x] The reconcile never hard-deletes a holder and never alters a manual holder's
   `role_managed = false`.
+- [x] A committed bank-role assignment makes the member an active holder without waiting for the
+  sync, its withdrawal deactivates the holder, and a rolled-back change leaves the registry alone
+  (`BankHolderRoleChangeIntegrationTest`).
 
 **Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `bank/internal/BankHolderReconciliationService`, `identity/api/UserSyncService` (sync hook), `identity/internal/UserSyncTask`, `identity/api/UserRepository#findUserIdsByRoleCode`, `bank/internal/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 

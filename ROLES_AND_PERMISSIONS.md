@@ -267,16 +267,17 @@ like `ROLE_MISSION_MANAGER`, still scope-checked). `MISSION_READ`, `MISSION_WRIT
 and `ROLE_MANAGE` are seeded but checked by no endpoint — every member- and role-management
 endpoint has been `hasRole('ADMIN')` since the Phase-4 lockdown.
 
-### Monitoring UI (Grafana) — realm role `Admin` only
+### Monitoring UI (Grafana) — client role `grafana-admin` only
 
 The operations-monitoring UI (epic [#936](https://github.com/krt-profit/basetool/issues/936),
 ADR-0072) is a **separate, admin-only surface** — the only monitoring component with a public route.
 It is published through the native nginx edge (`docker/edge/conf.d/40-grafana.conf.template`) and
 authenticated through **Keycloak OIDC**, and login is granted **only** to
-holders of the realm role `Admin`: Grafana's `role_attribute_path` maps that realm role to Grafana's
-server-admin and `role_attribute_strict` denies everyone else (an Officer or KRT Member cannot reach
-it). The app-authority table above does **not** apply to Grafana — access is purely the realm-role
-gate. All other monitoring components (Prometheus, Alertmanager, Loki, Tempo, exporters) have no
+holders of the Keycloak client role `grafana-admin` on the `grafana` client: Grafana's
+`role_attribute_path` maps it to Grafana's server-admin and `role_attribute_strict` denies everyone
+else. The owner assigns the role in Keycloak to the few Grafana admins; the Basetool's own `Admin`
+role does not grant it. The app-authority table above does **not** apply to Grafana — access is
+purely the client-role gate. All other monitoring components (Prometheus, Alertmanager, Loki, Tempo, exporters) have no
 public route at all. See [`docs/specs/observability.md`](docs/specs/observability.md) REQ-OBS-008.
 
 ### Contextual roles from OrgUnit memberships

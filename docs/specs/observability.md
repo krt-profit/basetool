@@ -962,7 +962,11 @@ not silent — so the only detector was a human reading a log export.
 
 - **Admin-only UIs:** Grafana is the **only** monitoring UI, published via the native edge
   (ADR-0162, `docker/edge/conf.d/40-grafana.conf.template`) and authenticated through Keycloak OIDC
-  restricted to the realm role `Admin` (`ROLES_AND_PERMISSIONS.md`). No other monitoring component
+  restricted to the client role `grafana-admin` of the `grafana` client (`ROLES_AND_PERMISSIONS.md`):
+  the client's `client roles` mapper puts it into the ID token and userinfo as `grafana_roles`, and
+  `GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH` maps it to Grafana's server admin under
+  `ROLE_ATTRIBUTE_STRICT`. The provisioner creates the role; it is assigned by hand to the few
+  Grafana admins and is independent of the Basetool's own roles. No other monitoring component
   (Prometheus, Alertmanager, Loki, Tempo, exporters) has a public route. Inside the host, two ports
   are published on **loopback only** so the host-native Alloy can reach them (`loki` on
   `127.0.0.1:3100`, `tempo`'s OTLP receiver on `127.0.0.1:4327`, `PODMAN_LOOPBACK_PUBLISH` in
@@ -1223,7 +1227,7 @@ Binding conditions on this retention:
   (`tasks/27-observability.yml`); a size cap that binds first deletes sooner, which stays inside the
   approved retention.
 - **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
-  restricted to the realm role `Admin` (REQ-OBS-008).
+  restricted to the client role `grafana-admin` (REQ-OBS-008).
 - **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
   the temporary IP storage. `frontend/src/main/resources/templates/shell/privacy.html` §3.8 plus the
   `privacy.h2_3_8` / `privacy.p_3_8_1` / `privacy.p_3_8_2` keys in the DE/EN bundles document the
