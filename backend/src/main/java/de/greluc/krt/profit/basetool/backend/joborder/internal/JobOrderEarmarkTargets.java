@@ -36,7 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Tells the Lager the running number of the job orders its stock is earmarked to and what an order
- * requires.
+ * requires. The requirement reads answer only for an order the caller sees within the tenancy scope
+ * ({@link JobOrderAccessPolicy#canSeeJobOrderInScope}), so a Lager earmark never names an order of
+ * a foreign org unit (REQ-ORDERS-018, REQ-ORG-003).
  */
 @Component
 @RequiredArgsConstructor
@@ -44,6 +46,7 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
 
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Override
   @Transactional(readOnly = true)
@@ -63,6 +66,7 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
   public @Nullable Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId) {
     return jobOrderRepository
         .findById(jobOrderId)
+        .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
         .map(jobOrderItemService::requiredMaterialIds)
         .orElse(null);
   }
@@ -72,6 +76,7 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
   public @Nullable Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId) {
     return jobOrderRepository
         .findById(jobOrderId)
+        .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
         .map(jobOrderItemService::requiredGameItemIds)
         .orElse(null);
   }

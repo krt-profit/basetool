@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationExcepti
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -81,6 +83,7 @@ class InventoryItemServiceAllocationTest {
   @Mock private InventoryEarmarkLookup earmarkTargets;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private JobOrderItemService jobOrderItemService;
+  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private AuditService auditService;
   @Mock private InventoryAggregationService inventoryAggregationService;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
@@ -90,8 +93,13 @@ class InventoryItemServiceAllocationTest {
   /** Wires the job-order requirement lookup over the mocked order repository and item service. */
   @BeforeEach
   void wireJobOrders() {
+    lenient()
+        .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
+        .thenReturn(true);
     ReflectionTestUtils.setField(
-        service, "jobOrders", new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService));
+        service,
+        "jobOrders",
+        new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy));
   }
 
   private final UUID itemId = UUID.randomUUID();

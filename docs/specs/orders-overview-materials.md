@@ -88,6 +88,16 @@ client-side: each order option carries a `data-materials` CSV built from `requir
 (the item-mode sibling `data-game-items` from `requiredGameItemIds`), and `inventory-input.js`
 filters the rows to the option whose CSV contains the picked material/game item.
 
+**Tenancy scope (REQ-ORG-003).** Every one of these write seams — the check-in allocations of
+`POST /api/v1/inventory`, `POST /api/v1/inventory/{id}/allocation`, and the pool earmarks the
+exchange writes — MUST accept only a job order the caller sees within the tenancy scope, by the
+same rule `GET /api/v1/orders/lookup` lists orders with (`JobOrderAccessPolicy.canSeeJobOrderInScope`:
+the caller reaches the queue, and the order has no responsible unit, a Spezialkommando's, or one
+in the caller's read scope). An order outside that scope MUST be refused with the same `404` as
+an unknown id, so the answer does not reveal that it exists. The requirement reads of
+`EarmarkTargets.JobOrders` (implemented by `JobOrderEarmarkTargets`) answer only for such an order,
+which puts the rule on every seam at once.
+
 The lookup projection (`/api/v1/orders/lookup`; with `withNeeds=true` it also carries each order's
 outstanding need per material bucket for the Lager pickers, REQ-INV-039 in
 [`inventory-lager.md`](inventory-lager.md)) MUST list each active order **at most once**, even
