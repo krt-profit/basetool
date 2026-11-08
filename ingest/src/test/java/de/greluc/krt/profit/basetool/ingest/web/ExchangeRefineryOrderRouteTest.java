@@ -176,6 +176,18 @@ class ExchangeRefineryOrderRouteTest {
   }
 
   @Test
+  void aPickupWithoutStoreLinesIsRelayedWithTheWriteCapabilityAlone() throws Exception {
+    grant(Set.of("exchange.connect", "exchange.refinery.read", "exchange.refinery.write"));
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any()))
+        .thenReturn(ok(RESULT));
+
+    post(example("change-set--refineryOrderChangeSet/valid/pickup.json"))
+        .andExpect(status().isOk());
+
+    verify(relay).forward(eq(HttpMethod.POST), eq(BACKEND_CHANGES), any(), any(), any());
+  }
+
+  @Test
   void withoutTheWriteCapabilityAChangeSetIsRefusedScopeMissing() throws Exception {
     grant(Set.of("exchange.connect", "exchange.refinery.read"));
 
@@ -217,7 +229,8 @@ class ExchangeRefineryOrderRouteTest {
           "update-without-order.json",
           "duration-without-ends-at.json",
           "unknown-op.json",
-          "delete-without-finances.json"
+          "delete-without-finances.json",
+          "pickup-without-versions.json"
         }) {
       post(example("change-set--refineryOrderChangeSet/invalid/" + invalid))
           .andExpect(status().isBadRequest())

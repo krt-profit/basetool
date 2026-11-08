@@ -109,6 +109,7 @@ pages update at once, and a changed timer re-arms the ready notice as a web edit
 | `good-remove` | `id` or `clientKey`, `versions`, `goodId` | Removes one good. |
 | `cancel` | `id` or `clientKey`, `versions` with `gameData` | Cancels the order as the web does, stored or not; a cancelled order is `unchanged`. |
 | `delete` | `id` or `clientKey`, `versions` with `gameData` and `finances` | Removes an order that is not stored, with its goods; a stored one is `ORDER_STORED`. |
+| `pickup` | `id` or `clientKey`, `versions` | Reports the yield collected in the game: the order becomes `COMPLETED` with `pickedUpAt`. Nothing is booked into stock. |
 
 Every op may carry an `opId` of your own, echoed in its result.
 
@@ -128,9 +129,16 @@ Every op may carry an `opId` of your own, echoed in its result.
   refinery the web offers for refinery orders, else `NOT_A_REFINERY`; a place without a location
   is `LOCATION_UNKNOWN`.
 - **Method.** `{code}` or `{name}`, resolved by its code first, then by its exact name.
-- **Status.** `OPEN`, the default of a create, or `IN_PROGRESS`. `COMPLETED` and `CANCELED` are
-  not written here. An order whose yield was booked into stock keeps its status: changing it is
-  `ORDER_STORED`.
+- **Status.** `OPEN`, the default of a create, or `IN_PROGRESS`. `COMPLETED` comes only from a
+  `pickup`, and `CANCELED` is not written here. An order whose yield was booked into stock keeps
+  its status: changing it is `ORDER_STORED`.
+- **Pickup.** A `pickup` closes an `OPEN` or `IN_PROGRESS` order, also before its `endsAt`,
+  because the game is the truth. The order becomes `COMPLETED`, the feed shows `pickedUpAt`, and
+  the web shows it as picked up with your client's name. Nothing is booked into stock: send it
+  when your own stock sync books the goods. An order already `COMPLETED` is `unchanged`, so a
+  repeated pickup is harmless; a cancelled one is `ORDER_CANCELED`. The member may still change
+  the status in the web afterwards. A pickup carries no further field; a pickup that books the
+  yield into stock is not available yet.
 - **Timer.** `endsAt` is RFC 3339 in UTC; `durationMinutes` needs `endsAt`. With both, the server
   stores `startedAt = endsAt - durationMinutes`. Without a duration the run starts at the time of
   the write, and `durationMinutes` is the rest until `endsAt`, rounded up to whole minutes, so
@@ -150,7 +158,8 @@ nothing is `unmatched`, one that matches several `ambiguous`. Resolve doubtful n
 ### Counters in a change set
 
 Every op but `create` sends `versions`, the counter of **each section it touches** as you last saw
-it: `gameData` for the location, the method, the timer, the status and the goods ops, `finances`
+it: `gameData` for the location, the method, the timer, the status, the goods ops and `pickup`,
+`finances`
 for `expenses`, `otherExpenses` and `oreSales`. A stale counter, or a missing one for a section the
 op touches, is `VERSION_CONFLICT` for that op only. Within one set the expected counter is what the
 earlier ops left: every applied op raises the counter of each section it touches by one. A finance
@@ -191,6 +200,8 @@ them, and write on without reading the feed first.
 | Case | `result` | `reason` |
 | --- | --- | --- |
 | `update` that changes nothing, `cancel` of a cancelled order | `unchanged` | — |
+| `pickup` of an order already `COMPLETED` | `unchanged` | — |
+| `pickup` of a cancelled order | `rejected` | `ORDER_CANCELED` |
 | A location, method or material that matches nothing | `unmatched` | `UNMATCHED` |
 | A location, method or material that matches several | `ambiguous` | `AMBIGUOUS` |
 | A place without a location | `rejected` | `LOCATION_UNKNOWN` |
@@ -212,17 +223,18 @@ On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `
 **Quota.** A change set counts **once** against the daily write quota, whatever its op count
 ([limits](../sync-guide.md#rate-limits-quota-and-back-off)). Only a `delete` counts as a removal
 for the [mass-change guard](../sync-guide.md#the-mass-change-guard); a set that deletes too many
-orders is held for the member's confirmation. A `cancel` and a `good-remove` never count.
+orders is held for the member's confirmation. A `cancel`, a `good-remove` and a `pickup` never count.
 
 **Delete.** A `delete` removes the order and its goods; stock already booked from it stays. Your
 feed carries its tombstone, with the `clientKey` when your client created the order.
 
 **Undo.** The member can undo your client's writes on *Connected applications*. Undoing a `create`
 removes the order while neither of its counters moved since; undoing an `update`, a goods op or a
-`cancel` restores the sections it touched while their counters are unchanged. Undoing a `delete`
-brings the order back under its `id`, its goods under their ids, with its `clientKey`; the feed
-shows it again under the same key. A write changed afterwards is skipped as *changed afterwards*.
-An undo reaches your feed like a web edit ([sync guide](../sync-guide.md#undo)).
+`cancel` restores the sections it touched while their counters are unchanged; undoing a `pickup`
+sets the status back and clears `pickedUpAt` under the same check. Undoing a `delete` brings the
+order back under its `id`, its goods under their ids, with its `clientKey`; the feed shows it again
+under the same key. A write changed afterwards is skipped as *changed afterwards*. An undo reaches
+your feed like a web edit ([sync guide](../sync-guide.md#undo)).
 
 ## Errors
 

@@ -96,6 +96,7 @@ codes, whichever side refuses it.
 | `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
 | `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
 | `ORDER_STORED` | A refinery-order op changes the status of, or deletes, an order whose yield was booked into stock. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
+| `ORDER_CANCELED` | A refinery-order `pickup` names an order that was cancelled. | Do not retry; pull the feed for the order's status. |
 
 ## Warnings
 

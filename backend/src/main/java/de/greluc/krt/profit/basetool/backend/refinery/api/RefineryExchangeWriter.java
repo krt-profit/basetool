@@ -100,6 +100,36 @@ public interface RefineryExchangeWriter {
       @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId);
 
   /**
+   * Closes one of the member's open or running orders as collected in the game: status {@code
+   * COMPLETED} with the client's pickup marker, the game-data counter raised by one and nothing
+   * booked (REQ-XCH-053, REQ-REFINERY-028); the caller has checked the status and the counter on
+   * the locked order.
+   *
+   * @param owner the member
+   * @param clientId the client that reports the pickup
+   * @param orderId the order
+   * @return the saved order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
+   *     such order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the order is
+   *     neither {@code OPEN} nor {@code IN_PROGRESS}
+   */
+  @NotNull
+  RefineryExchangeOrder pickUp(
+      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId);
+
+  /**
+   * Removes a client's pickup marker from one of the member's orders, for the undo of a pickup; the
+   * status and the counters are left to the undo's own edit (REQ-XCH-056).
+   *
+   * @param owner the member
+   * @param orderId the order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the member owns no
+   *     such order
+   */
+  void clearPickup(@NotNull UUID owner, @NotNull UUID orderId);
+
+  /**
    * Removes one of the member's orders that is not stored, with its goods, audited {@code
    * REFINERY_ORDER_DELETED}; booked stock is left as it is (REQ-XCH-055).
    *

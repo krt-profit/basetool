@@ -146,4 +146,10 @@ public class RefineryOrderProvenance {
     pickedUpClient = clientId;
     recordClientChange(clientId, at);
   }
+
+  /** Removes the pickup marker; the last change is left to the write that removes it. */
+  public void clearPickup() {
+    pickedUpAt = null;
+    pickedUpClient = null;
+  }
 }

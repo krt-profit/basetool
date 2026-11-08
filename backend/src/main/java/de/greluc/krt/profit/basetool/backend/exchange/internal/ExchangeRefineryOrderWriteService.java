@@ -48,11 +48,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-055,
- * REQ-XCH-056, ADR-0351): creates under the client's key, partial updates, goods ops, cancels and
- * deletes, each through the refinery module's own writer, decided in order against the section
- * counters the earlier ops left, and journaled for the undo. The {@link ExchangeChangeSetRunner}
- * runs the change set (ADR-0285); a delete counts for the mass-change guard.
+ * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-053,
+ * REQ-XCH-055, REQ-XCH-056, ADR-0351): creates under the client's key, partial updates, goods ops,
+ * cancels, deletes and pickups without store lines, each through the refinery module's own writer,
+ * decided in order against the section counters the earlier ops left, and journaled for the undo.
+ * The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285); a delete counts for the
+ * mass-change guard.
  *
  * <p>References resolve exactly in the plan; everything that depends on the order — its address, an
  * earlier refusal, the counters, the goods — is decided when the op runs, so a refusal of one op
@@ -82,10 +83,16 @@ public class ExchangeRefineryOrderWriteService
   /** The refusal of a status change on a stored order. */
   static final String ORDER_STORED = "ORDER_STORED";
 
+  /** The refusal of a pickup of a cancelled order. */
+  static final String ORDER_CANCELED = "ORDER_CANCELED";
+
   /** The status a create starts in when it names none. */
   private static final String OPEN = "OPEN";
 
-  /** The status a cancel sets. */
+  /** The status of a picked-up order. */
+  private static final String COMPLETED = "COMPLETED";
+
+  /** The status of a cancelled order. */
   private static final String CANCELED = "CANCELED";
 
   private final ExchangeRefineryOrderReferences references;
@@ -231,6 +238,7 @@ public class ExchangeRefineryOrderWriteService
               addressed && gameDataEcho && op.goodId() != null;
           case ExchangeRefineryOrderChangeSet.CANCEL -> addressed && gameDataEcho;
           case ExchangeRefineryOrderChangeSet.DELETE -> addressed && gameDataEcho && financesEcho;
+          case ExchangeRefineryOrderChangeSet.PICKUP -> addressed && gameDataEcho;
           default -> false;
         };
     if (!complete || (op.durationMinutes() != null && op.endsAt() == null)) {
@@ -338,6 +346,7 @@ public class ExchangeRefineryOrderWriteService
               case ExchangeRefineryOrderChangeSet.GOOD_REMOVE -> goodRemove(slot, op);
               case ExchangeRefineryOrderChangeSet.CANCEL -> cancel(slot, op);
               case ExchangeRefineryOrderChangeSet.DELETE -> delete(slot, op);
+              case ExchangeRefineryOrderChangeSet.PICKUP -> pickup(slot, op);
               default -> throw new BadRequestException("Unknown refinery-order op");
             };
       }
@@ -613,6 +622,37 @@ public class ExchangeRefineryOrderWriteService
       RefineryExchangeOrder before = Objects.requireNonNull(current);
       RefineryExchangeOrder after = writer.cancel(caller.member(), caller.clientId(), slot.id);
       journal(slot.id, ExchangeJournalAction.REFINERY_CANCEL, before, after);
+      slot.current = after;
+      written.add(slot.id);
+      return applied(after, List.of());
+    }
+
+    /**
+     * Decides and writes a pickup without store lines (REQ-XCH-053): an open or running order is
+     * closed whatever its end, a completed one is left, a cancelled one is refused.
+     *
+     * @param slot the order
+     * @param op the pickup
+     * @return the outcome
+     */
+    private @NotNull Outcome pickup(@NotNull Slot slot, @NotNull Op op) {
+      RefineryExchangeOrder current = slot.current;
+      String status = current == null ? null : current.status();
+      if (COMPLETED.equals(status)) {
+        return Outcome.UNCHANGED;
+      }
+      if (CANCELED.equals(status)) {
+        return Outcome.rejected(ORDER_CANCELED);
+      }
+      if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
+        return Outcome.rejected(VERSION_CONFLICT);
+      }
+      if (dryRun || slot.id == null || current == null) {
+        slot.advance(true, false);
+        return Outcome.APPLIED;
+      }
+      RefineryExchangeOrder after = writer.pickUp(caller.member(), caller.clientId(), slot.id);
+      journal(slot.id, ExchangeJournalAction.REFINERY_PICKUP, current, after);
       slot.current = after;
       written.add(slot.id);
       return applied(after, List.of());

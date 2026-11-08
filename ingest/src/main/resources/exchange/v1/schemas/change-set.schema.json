@@ -1769,6 +1769,52 @@
               ]
             }
           ]
+        },
+        {
+          "type": "object",
+          "description": "Reports the order's yield collected in the game: an OPEN or IN_PROGRESS order becomes COMPLETED with pickedUpAt, also before endsAt, and nothing is booked into stock. A completed order answers unchanged, a cancelled one ORDER_CANCELED.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "pickup"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryGameDataVersion"
+            }
+          },
+          "required": [
+            "op",
+            "versions"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ]
         }
       ]
     },

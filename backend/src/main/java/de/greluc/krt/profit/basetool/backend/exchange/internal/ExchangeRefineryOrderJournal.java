@@ -50,9 +50,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Owns the journal state of a refinery order and sets the order back on an undo (REQ-XCH-056,
- * ADR-0285): a create is removed, an update, goods op or cancel restores the sections it touched,
- * each only while that section's counter shows no write but the client's since, and a delete
- * recreates the order under its former ids.
+ * ADR-0285): a create is removed, an update, goods op, cancel or pickup restores the sections it
+ * touched, each only while that section's counter shows no write but the client's since, a pickup's
+ * marker is cleared with its status, and a delete recreates the order under its former ids.
  */
 @Component
 @RequiredArgsConstructor
@@ -90,8 +90,11 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
     if (orderId == null || steps == null) {
       return ExchangeUndoService.GONE;
     }
+    boolean pickedUp =
+        group.stream()
+            .anyMatch(entry -> entry.getAction() == ExchangeJournalAction.REFINERY_PICKUP);
     if (deleted) {
-      return recreate(scope, orderId, read(newest.getBeforeState()), steps);
+      return recreate(scope, orderId, read(newest.getBeforeState()), steps, pickedUp);
     }
     Optional<RefineryExchangeOrder> current = writer.lockOwn(scope.member(), orderId);
     if (current.isEmpty()) {
@@ -128,6 +131,9 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
                     base.expenses(), base.otherExpenses(), base.oreSales())
                 : null,
             gameData ? base.goods().stream().map(Good::toEdit).toList() : null));
+    if (pickedUp) {
+      writer.clearPickup(scope.member(), orderId);
+    }
     return null;
   }
 
@@ -135,12 +141,14 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
    * Recreates an order the client deleted under its former ids: the sections the client's earlier
    * writes touched as they were before the first of them, every other part as it was when deleted,
    * with its client marker, the unit while the member still belongs to it directly and the mission
-   * while it exists. An order the client also created stays gone.
+   * while it exists, and without the pickup marker when the client's writes include its pickup. An
+   * order the client also created stays gone.
    *
    * @param scope the member and the client
    * @param orderId the order
    * @param removed the order as the delete found it, or {@code null} when it does not read
    * @param steps the client's earlier writes to the order, oldest first
+   * @param pickedUp whether the client's writes include the pickup of the order
    * @return {@code null} when recreated or nothing is to recreate, {@code CHANGED_AFTERWARDS} when
    *     another write moved a touched section before the delete, {@code GONE} when the state does
    *     not read or names a location, method or material that is no longer there
@@ -149,7 +157,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
       @NotNull UndoScope scope,
       @NotNull UUID orderId,
       @Nullable State removed,
-      @NotNull List<Step> steps) {
+      @NotNull List<Step> steps,
+      boolean pickedUp) {
     RefineryExchangeOrigin origin = removed == null ? null : removed.origin();
     if (removed == null || origin == null) {
       return ExchangeUndoService.GONE;
@@ -189,8 +198,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
                 origin.createdClient(),
                 unit != null && scope.memberships().get().contains(unit) ? unit : null,
                 origin.missionId(),
-                origin.pickedUpAt(),
-                origin.pickedUpClient(),
+                pickedUp ? null : origin.pickedUpAt(),
+                pickedUp ? null : origin.pickedUpClient(),
                 origin.readyNotifiedAt())));
     return null;
   }

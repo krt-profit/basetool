@@ -649,6 +649,157 @@ class ExchangeRefineryOrderWriteControllerTest {
         .andExpect(status().isForbidden());
   }
 
+  @Test
+  void aPickupClosesARunningOrderBeforeItsEndAndBooksNothing() throws Exception {
+    String created =
+        changes(
+                client,
+                create("vk-p1")
+                    + ","
+                    + """
+                    {"op": "update", "clientKey": "vk-p1", "versions": {"gameData": 0},
+                     "endsAt": "2099-01-01T12:00:00Z", "durationMinutes": 90}
+                    """)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    UUID id = UUID.fromString(JsonPath.read(created, "$.orders[0].id"));
+    int stock = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_item", Integer.class);
+    String snapshot = relayed(get(FEED), client).andReturn().getResponse().getContentAsString();
+    String cursor = JsonPath.read(snapshot, "$.nextCursor");
+
+    changes(client, pickup("\"clientKey\": \"vk-p1\"", 1))
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.orders[0].id").value(id.toString()))
+        .andExpect(jsonPath("$.orders[0].versions.gameData").value(2))
+        .andExpect(jsonPath("$.orders[0].versions.finances").value(0));
+
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "SELECT status, picked_up_at, picked_up_client, stored_at, last_change_client"
+                + " FROM refinery_order WHERE id = ?",
+            id);
+    assertThat(row.get("status")).isEqualTo("COMPLETED");
+    assertThat(row.get("picked_up_at")).isNotNull();
+    assertThat(row.get("picked_up_client")).isEqualTo(client);
+    assertThat(row.get("last_change_client")).isEqualTo(client);
+    assertThat(row.get("stored_at")).isNull();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM inventory_item", Integer.class))
+        .isEqualTo(stock);
+    String feed =
+        relayed(get(FEED).param("cursor", cursor), client)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(feed, "$.items[?(@.id == '" + id + "')].pickedUpAt"))
+        .hasSize(1)
+        .doesNotContainNull();
+  }
+
+  @Test
+  void aPickupOfACompletedOrderIsUnchangedOfACancelledOneRefusedAndOfAStaleCounterAConflict()
+      throws Exception {
+    UUID completed = ownOrder("COMPLETED");
+    UUID canceled = ownOrder("CANCELED");
+    UUID open = ownOrder("OPEN");
+
+    changes(
+            client,
+            pickup("\"id\": \"" + completed + "\"", 0)
+                + ","
+                + pickup("\"id\": \"" + canceled + "\"", 0)
+                + ","
+                + pickup("\"id\": \"" + open + "\"", 3))
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("unchanged"))
+        .andExpect(jsonPath("$.results[1].reason").value("ORDER_CANCELED"))
+        .andExpect(jsonPath("$.results[2].reason").value("VERSION_CONFLICT"));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT status FROM refinery_order WHERE id IN (?, ?, ?) ORDER BY status",
+                String.class,
+                completed,
+                canceled,
+                open))
+        .containsExactly("CANCELED", "COMPLETED", "OPEN");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM refinery_order WHERE owner_id = ? AND picked_up_at IS NOT"
+                    + " NULL",
+                Integer.class,
+                member))
+        .isZero();
+  }
+
+  @Test
+  void anUndoOfAPickupReopensTheOrderAndClearsTheMarker() throws Exception {
+    UUID id = ownOrder("IN_PROGRESS");
+    Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
+    changes(client, pickup("\"id\": \"" + id + "\"", 0)).andExpect(jsonPath("$.applied").value(1));
+
+    ExchangeUndoResultDto result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isEqualTo(1);
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "SELECT status, picked_up_at, picked_up_client FROM refinery_order WHERE id = ?", id);
+    assertThat(row.get("status")).isEqualTo("IN_PROGRESS");
+    assertThat(row.get("picked_up_at")).isNull();
+    assertThat(row.get("picked_up_client")).isNull();
+  }
+
+  @Test
+  void anUndoOfAPickupAndADeleteRecreatesTheOrderRunningAndWithoutTheMarker() throws Exception {
+    UUID id = ownOrder("IN_PROGRESS");
+    Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
+    changes(client, pickup("\"id\": \"" + id + "\"", 0)).andExpect(jsonPath("$.applied").value(1));
+    changes(
+            client,
+            "{\"op\": \"delete\", \"id\": \""
+                + id
+                + "\", \"versions\": {\"gameData\": 1, \"finances\": 0}}")
+        .andExpect(jsonPath("$.applied").value(1));
+
+    ExchangeUndoResultDto result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isEqualTo(1);
+    Map<String, Object> row =
+        jdbc.queryForMap(
+            "SELECT status, picked_up_at, picked_up_client FROM refinery_order WHERE id = ?", id);
+    assertThat(row.get("status")).isEqualTo("IN_PROGRESS");
+    assertThat(row.get("picked_up_at")).isNull();
+    assertThat(row.get("picked_up_client")).isNull();
+  }
+
+  /**
+   * A pickup without store lines.
+   *
+   * @param address the {@code id} or {@code clientKey} member, without braces
+   * @param gameData the echoed game-data counter
+   * @return the op
+   */
+  private static @NotNull String pickup(@NotNull String address, long gameData) {
+    return "{\"op\": \"pickup\", " + address + ", \"versions\": {\"gameData\": " + gameData + "}}";
+  }
+
+  /**
+   * Inserts and commits an order of the member at the test refinery.
+   *
+   * @param status its status
+   * @return its id
+   */
+  private @NotNull UUID ownOrder(@NotNull String status) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO refinery_order (id, version, owner_id, location_id, status, last_changed_at)"
+            + " VALUES (?, 0, ?, ?, ?, now())",
+        id,
+        member,
+        refinery,
+        status);
+    return id;
+  }
+
   /**
    * Posts a change set.
    *
