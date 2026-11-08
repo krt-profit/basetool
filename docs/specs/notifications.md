@@ -42,13 +42,13 @@ is the notification-engine view of it; the linked requirement is canonical.
 |---|---|---|---|---|
 | `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` + `ROLE` ADMIN | REQ-NOTIF-008 |
 | `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 | `ORG_RELATIVE_ROLE` OFFICER / LEAD on `RESPONSIBLE` | REQ-NOTIF-017 |
-| `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V364 · V364 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
+| `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
 | `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` only | REQ-NOTIF-018 |
-| `BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER` | `BANK_BOOKING_REQUEST_UPDATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V269 + V364 · V364 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` first, so the new notice replaces the old one | REQ-NOTIF-018/-033, [REQ-BANK-056](bank.md) |
+| `BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER` | `BANK_BOOKING_REQUEST_UPDATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V269 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` first, so the new notice replaces the old one | REQ-NOTIF-018/-033, [REQ-BANK-056](bank.md) |
 | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | V269 | `EVENT_RECIPIENT` (each member who became a responsible holder of the account); rendered with `accountNo` and the number of requests `pending` their approval | [REQ-BANK-034](bank.md) |
-| `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V364 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023/-033, [REQ-BANK-034](bank.md) |
+| `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023/-033, [REQ-BANK-034](bank.md) |
 | `DISCORD_REGISTRATION_PENDING` | `DISCORD_REGISTRATION_PENDING` | V174 | `ROLE` ADMIN (`exclude_actor = false`) | REQ-NOTIF-012 ([discord-integration.md](discord-integration.md)) |
 | `DISCORD_REGISTRATION_DECIDED` | none (no rule) | — | supersedes `DISCORD_REGISTRATION_PENDING` only (approve, reject, deletion while pending) | REQ-NOTIF-012, REQ-NOTIF-018 |
 | `JOB_ORDER_CLOSED` | none (no rule) | — | supersedes `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` only (completed, rejected, deleted) | REQ-NOTIF-008, REQ-NOTIF-018 |
@@ -1369,7 +1369,7 @@ Notifications are not audited, so this adds no audit event. Rendered with `type`
 `notification/api/SelectorKind#{REQUIRED_APPROVER,REQUEST_RESPONSIBLE}`,
 `notification/internal/RuleEvaluationService`, `bank/internal/OrgUnitBankRecipientDirectory`,
 `bank/api/events/BankBookingRequestEvent`, `bank/api/events/BankNotices#approvalRevoked`,
-`db/migration/V364` · **Related:** REQ-NOTIF-018, REQ-NOTIF-023, REQ-BANK-026, REQ-BANK-041 ·
+`db/migration/V360` · **Related:** REQ-NOTIF-018, REQ-NOTIF-023, REQ-BANK-026, REQ-BANK-041 ·
 **Decision:** ADR-0353
 
 ## Out of scope (v1)
