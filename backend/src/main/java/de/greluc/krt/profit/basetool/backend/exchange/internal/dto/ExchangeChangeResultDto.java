@@ -26,8 +26,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The compact outcome of a change set: counts, and per-op detail only for ops that were not applied
- * (REQ-XCH-015…-017).
+ * The compact outcome of a change set: counts, per-op detail for ops that were not applied, and for
+ * refinery orders the entry each applied op wrote (REQ-XCH-015…-017, REQ-XCH-052).
  *
  * @param dryRun whether nothing was written
  * @param applied the ops that changed something, or would have in a dry run
@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Unmodifiable;
  *     resources
  * @param offersRemoved the Materialbörse offers a stock book-out removed, or {@code null} for other
  *     resources
+ * @param orders the order each applied refinery-order op wrote, or {@code null} when no op wrote
+ *     one, always for other resources and in a dry run
  * @param detachedFromMissions the mission units the removed ships were detached from, or {@code
  *     null} for other resources
  */
@@ -50,6 +52,7 @@ public record ExchangeChangeResultDto(
     @NotNull @Unmodifiable List<OpResult> results,
     @Nullable Integer offersReduced,
     @Nullable Integer offersRemoved,
+    @Nullable @Unmodifiable List<OrderResult> orders,
     @Nullable Integer detachedFromMissions) {
 
   /**
@@ -59,8 +62,30 @@ public record ExchangeChangeResultDto(
    * @param opId the client's id for the op, or {@code null}
    * @param result {@code unchanged}, {@code unmatched}, {@code ambiguous} or {@code rejected}
    * @param reason the error-registry code of a refusal, or {@code null}
+   * @param id the existing order an {@code ALREADY_EXISTS} refusal names, or {@code null}
    */
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public record OpResult(
-      int index, @Nullable String opId, @NotNull String result, @Nullable String reason) {}
+      int index,
+      @Nullable String opId,
+      @NotNull String result,
+      @Nullable String reason,
+      @Nullable String id) {}
+
+  /**
+   * The order one applied refinery-order op wrote (REQ-XCH-052).
+   *
+   * @param index the op's position in the change set
+   * @param opId the client's id for the op, or {@code null}
+   * @param id the order's id
+   * @param goods the ids of the goods rows the op created, or {@code null} when it created none
+   * @param versions the order's section counters after the op
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record OrderResult(
+      int index,
+      @Nullable String opId,
+      @NotNull String id,
+      @Nullable @Unmodifiable List<String> goods,
+      @NotNull ExchangeRefineryOrderDto.Versions versions) {}
 }

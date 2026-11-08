@@ -191,6 +191,7 @@ class Smoke:
         routes = {"blueprintChangeSet": "/exchange/v1/me/blueprints/changes",
                   "stockChangeSet": "/exchange/v1/me/stock/changes",
                   "shipChangeSet": "/exchange/v1/me/ships/changes",
+                  "refineryOrderChangeSet": "/exchange/v1/me/refinery-orders/changes",
                   "orgStockChangeSet": "/exchange/v1/org-stock/changes"}
         for folder in sorted(examples.glob("change-set--*")):
             kind = folder.name.split("--", 1)[1]

@@ -16,6 +16,7 @@
     },
     {
       "id": "5b3e4d6c-8f7a-4c9d-8e1f-2a3b4c5d6e7f",
+      "clientKey": "wo-CRU-L1-0007",
       "createdBy": {
         "clientId": "versekit",
         "name": "VerseKit"
@@ -39,6 +40,7 @@
   "removed": [
     {
       "key": "3f1c2b4a-6d5e-4a7b-8c9d-0e1f2a3b4c5d",
+      "clientKey": "wo-ARC-L1-0042",
       "removedAt": "2026-11-08T12:00:00Z",
       "removedBy": {
         "channel": "system"

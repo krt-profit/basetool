@@ -86,10 +86,11 @@ public record RefineryExchangeOrder(
   /**
    * A refining method.
    *
+   * @param id the method's id
    * @param code the method's code, or {@code null} when the catalogue has none
    * @param name the method's name
    */
-  public record Method(@Nullable String code, @NotNull String name) {}
+  public record Method(@NotNull UUID id, @Nullable String code, @NotNull String name) {}
 
   /**
    * One good: an input material refined into an output material.

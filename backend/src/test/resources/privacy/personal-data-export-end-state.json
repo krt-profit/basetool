@@ -150,6 +150,12 @@
       "source_channel" : "system",
       "source_client" : null,
       "changed_at" : "<instant>"
+    }, {
+      "resource" : "REFINERY_ORDER",
+      "entity_key" : "<uuid>",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -184,6 +190,16 @@
       "client_id" : "zzz-export-client",
       "external_id" : "ext-1",
       "ship_id" : "<uuid>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeRefineryOrderKeys",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "client_key" : "key-1",
+      "refinery_order_id" : "<uuid>",
       "created_at" : "<instant>"
     } ],
     "truncated" : false

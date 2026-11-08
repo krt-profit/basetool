@@ -29,10 +29,10 @@ import java.util.UUID;
  *
  * @param since the start of the span; clamped to the journal's retention
  * @param installationId the one installation to undo, or {@code null} for all
- * @param resource {@code BLUEPRINT}, {@code STOCK}, {@code SHIP} or {@code ORG_STOCK} to undo only
- *     that, or {@code null} for all
+ * @param resource {@code BLUEPRINT}, {@code STOCK}, {@code SHIP}, {@code ORG_STOCK} or {@code
+ *     REFINERY_ORDER} to undo only that, or {@code null} for all
  */
 public record ExchangeBulkUndoRequest(
     @NotNull Instant since,
     UUID installationId,
-    @Pattern(regexp = "^(BLUEPRINT|STOCK|SHIP|ORG_STOCK)$") String resource) {}
+    @Pattern(regexp = "^(BLUEPRINT|STOCK|SHIP|ORG_STOCK|REFINERY_ORDER)$") String resource) {}

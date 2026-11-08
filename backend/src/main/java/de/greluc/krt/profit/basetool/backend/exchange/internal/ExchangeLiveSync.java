@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,12 @@ public class ExchangeLiveSync {
 
   /** The section of the Materialbörse room's offer board. */
   static final String BOARD = "board";
+
+  /** The section of the refinery-order list room. */
+  static final String REFINERY_QUEUE = "queue";
+
+  /** The section of a refinery order's detail room that holds the order's fields and goods. */
+  static final String REFINERY_ORDER = "order";
 
   private final LiveSyncPublisher publisher;
 
@@ -80,6 +87,21 @@ public class ExchangeLiveSync {
     if (offersChanged) {
       afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD), BOARD);
     }
+  }
+
+  /**
+   * Refreshes the refinery-order list and the detail page of every written order after the commit
+   * (REQ-XCH-030, ADR-0351).
+   *
+   * @param orders the orders the write changed, created or removed
+   */
+  public void refineryOrdersChanged(@NotNull Collection<UUID> orders) {
+    if (orders.isEmpty()) {
+      return;
+    }
+    afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.REFINERY), REFINERY_QUEUE);
+    orders.forEach(order ->
+        afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER));
   }
 
   /**

@@ -14,6 +14,22 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 - **New: scopes `exchange.refinery.write` and `exchange.refinery.store`.** They are registered for
   the refinery-order writes and the store of a picked-up order, whose routes follow in a later
   entry.
+- **New: refinery-order writes.** `POST /exchange/v1/me/refinery-orders/changes` with the scope
+  `exchange.refinery.write` applies a change set of the ops `create`, `update`, `good-add`,
+  `good-update` and `good-remove` (`#/$defs/refineryOrderChangeSet`). An op names its order by `id`
+  or by the client's own `clientKey`, echoes the counters of the sections it touches, and is
+  decided in order; the set counts once against the daily write quota
+  ([refinery orders](resources/refinery-orders.md#changing-orders--post-exchangev1merefinery-orderschanges)).
+- **New: per-op reasons `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
+  `ALREADY_EXISTS`, `PRECEDING_OP_REJECTED` and `ORDER_STORED`.** They refuse refinery-order ops;
+  `NOT_A_MEMBER`, `LOCATION_UNKNOWN` and `VERSION_CONFLICT` refuse them too ([errors](errors.md)).
+- **New: `orders` and `results[].id` in a change result.** A refinery-order change set that is not
+  a dry run answers one `orders` entry per applied op, with the order's `id`, the ids of the goods
+  rows it created and its counters after the op. A `create` refused `ALREADY_EXISTS` names the
+  existing order in its result's `id`. Both fields are optional in `change-result.schema.json`.
+- **New: `clientKey` on a refinery-order tombstone.** The tombstone of an order a client created
+  carries the order's `clientKey`, for that client only; `tombstone.schema.json` gains the optional
+  field.
 
 ## 2026-11-07
 

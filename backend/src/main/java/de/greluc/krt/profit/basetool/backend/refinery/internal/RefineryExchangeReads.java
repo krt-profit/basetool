@@ -84,7 +84,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
    * @param order the order
    * @return the exchange row with its section counters and provenance
    */
-  private static @NotNull RefineryExchangeOrder toRow(@NotNull RefineryOrder order) {
+  static @NotNull RefineryExchangeOrder toRow(@NotNull RefineryOrder order) {
     RefiningMethod method = order.getRefiningMethod();
     OrgUnit unit = order.getOwningOrgUnit();
     RefineryOrderProvenance provenance = order.getProvenance();
@@ -97,7 +97,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
         place(order.getLocation()),
         method == null
             ? null
-            : new RefineryExchangeOrder.Method(method.getCode(), method.getName()),
+            : new RefineryExchangeOrder.Method(method.getId(), method.getCode(), method.getName()),
         order.getStartedAt(),
         order.getDurationMinutes(),
         order.getEndsAt(),

@@ -39,8 +39,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Names journaled exchange entries for the member — a blueprint, a material or item, a ship type —
- * with one lookup per catalogue however many entries there are (REQ-XCH-022, REQ-XCH-032).
+ * Names journaled exchange entries for the member — a blueprint, a material or item, a ship type, a
+ * refinery order's location — with one lookup per catalogue however many entries there are
+ * (REQ-XCH-022, REQ-XCH-032).
  */
 @Component
 @RequiredArgsConstructor
@@ -104,7 +105,12 @@ public class ExchangeEntryLabels {
             }
           }
         }
-        case REFINERY_ORDER -> {}
+        case REFINERY_ORDER -> {
+          String location = text(state, "locationName");
+          if (location != null) {
+            labels.put(entry.getId(), location);
+          }
+        }
         case null -> throw new NullPointerException("resource");
       }
     }

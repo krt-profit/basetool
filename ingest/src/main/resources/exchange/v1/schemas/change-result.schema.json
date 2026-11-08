@@ -46,6 +46,12 @@
           "reason": {
             "type": "string",
             "pattern": "^[A-Z][A-Z0-9_]{2,63}$"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The existing order a refinery-order create refused ALREADY_EXISTS names. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
           }
         },
         "required": [
@@ -65,6 +71,63 @@
     "offersRemoved": {
       "type": "integer",
       "minimum": 0
+    },
+    "orders": {
+      "type": "array",
+      "maxItems": 500,
+      "description": "Refinery-order change sets only, not in a dry run: one entry per applied op.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The order's id. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+          },
+          "goods": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "The ids of the goods rows the op created.",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "versions": {
+            "type": "object",
+            "description": "The order's section counters after the op.",
+            "properties": {
+              "gameData": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "finances": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "gameData",
+              "finances"
+            ]
+          }
+        },
+        "required": [
+          "index",
+          "id",
+          "versions"
+        ]
+      }
     },
     "cursor": {
       "type": "string",

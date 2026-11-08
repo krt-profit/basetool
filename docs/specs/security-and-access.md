@@ -4955,6 +4955,8 @@ client write, kept 90 days; the states scrubbed like other free text, since a no
 can name somebody), what an admin's bulk undo left alone for the member (`exchangeBulkUndoSkips`:
 run, client, resource, reason and when the run started, kept 90 days) and the ship links
 (`exchangeShipLinks`: client, the installation's id for the ship, the ship and when it was linked)
+and the refinery-order keys (`exchangeRefineryOrderKeys`: client, the client's key, the order and
+when the client created it)
 — REQ-XCH-007, -008, -013, -017, -022, -034.
 
 **Rows that name the member in a role somebody else gave them** have a section each, so every

@@ -563,7 +563,8 @@ Concrete handling, in order:
   the installations (a revoked one is the deny-list entry for its key), the client revocations, the
   change sequence, the write journal, the ship links and an admin bulk undo's per-member skips —
   `exchange_installation`, `exchange_client_revocation`, `exchange_change`, `exchange_journal`,
-  `exchange_ship_link`, `exchange_bulk_undo_skip` (`V249`, `V252`–`V254`, `V256`) — each reference
+  `exchange_ship_link`, `exchange_refinery_order_link`, `exchange_bulk_undo_skip` (`V249`,
+  `V252`–`V254`, `V256`, `V373`) — each reference
   `app_user(id)` with `ON DELETE CASCADE` and go with the account; `UserIdentityColumnForeignKeyTest`
   holds them to it like every other `user_id` column. The bulk-undo run itself stays and keeps its
   counts; its `requested_by` is `ON DELETE SET NULL` (`V256`).
@@ -1141,7 +1142,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |
 | `supply` | 3 | `supply_donation`, `supply_need`, `supply_unit_setting` |
 | `purchasing` | 11 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_setting_governing_area`, `purchasing_unit_pause` |
-| `exchange` | 11 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_settings`, `exchange_ship_link` |
+| `exchange` | 12 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_refinery_order_link`, `exchange_settings`, `exchange_ship_link` |
 
 The listed crossings:
 

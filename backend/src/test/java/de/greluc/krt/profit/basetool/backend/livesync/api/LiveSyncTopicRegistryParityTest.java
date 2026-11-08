@@ -116,7 +116,7 @@ class LiveSyncTopicRegistryParityTest {
         .as(
             "a room the backend never publishes into is a room this registry should not name; the"
                 + " backend also publishes committed catalogue reference changes (ADR-0274)")
-        .contains(key("order", true))
+        .contains(key("order", true), key("refinery", false), key("refinery-order", true))
         .doesNotContain(
             key("bank", false),
             key("bank", true),
@@ -125,8 +125,6 @@ class LiveSyncTopicRegistryParityTest {
             key("missions", false),
             key("operation", true),
             key("orders", false),
-            key("refinery", false),
-            key("refinery-order", true),
             key("orgunit-bank", false),
             key("org-structure", false),
             key("exchange-clients", false));

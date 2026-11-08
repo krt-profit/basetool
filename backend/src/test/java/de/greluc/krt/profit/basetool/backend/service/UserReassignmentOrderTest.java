@@ -87,7 +87,8 @@ class UserReassignmentOrderTest {
               + "notification_mute.user_id[notification_type]|",
           "150:ExchangeUserReassignment|exchange_installation.user_id"
               + "[exchange_client_id+key_thumbprint],"
-              + "exchange_ship_link.user_id[client_id+installation_key+external_id]"
+              + "exchange_ship_link.user_id[client_id+installation_key+external_id],"
+              + "exchange_refinery_order_link.user_id[client_id+client_key]"
               + "|exchange_client_revocation.user_id,exchange_change.user_id,"
               + "exchange_journal.user_id,exchange_bulk_undo_run.requested_by,"
               + "exchange_bulk_undo_skip.user_id,exchange_name_withholding.user_id",
@@ -130,7 +131,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(71);
+    assertThat(all).doesNotHaveDuplicates().hasSize(72);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

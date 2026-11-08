@@ -1445,6 +1445,121 @@
         "x-domain" : "exchange"
       }
     },
+    "/api/v1/exchange/me/refinery-orders/changes" : {
+      "post" : {
+        "description" : "Gateway-only. Ops decided in order against the section counters the earlier ops left.",
+        "operationId" : "refineryOrderChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeRefineryOrderChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: change my refinery orders",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/me/ships" : {
       "get" : {
         "description" : "Gateway-only. Without a cursor a snapshot, with one the changes since it.",
@@ -2853,6 +2968,12 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrderResult"
+            }
+          },
           "results" : {
             "type" : "array",
             "items" : {
@@ -3647,9 +3768,29 @@
         },
         "required" : [ "orders", "schemaVersion" ]
       },
+      "ExchangeRefineryOrderChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryOrderOp"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
       "ExchangeRefineryOrderDto" : {
         "type" : "object",
         "properties" : {
+          "clientKey" : {
+            "type" : "string"
+          },
           "createdBy" : {
             "$ref" : "#/components/schemas/Creator"
           },
@@ -4036,6 +4177,9 @@
       "ExchangeTombstoneDto" : {
         "type" : "object",
         "properties" : {
+          "clientKey" : {
+            "type" : "string"
+          },
           "key" : {
             "type" : "string"
           },
@@ -4447,6 +4591,9 @@
       "OpResult" : {
         "type" : "object",
         "properties" : {
+          "id" : {
+            "type" : "string"
+          },
           "index" : {
             "type" : "integer",
             "format" : "int32"
@@ -4459,6 +4606,30 @@
           },
           "result" : {
             "type" : "string"
+          }
+        }
+      },
+      "OrderResult" : {
+        "type" : "object",
+        "properties" : {
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "index" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "opId" : {
+            "type" : "string"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/Versions"
           }
         }
       },
@@ -4791,6 +4962,21 @@
           }
         }
       },
+      "RefineryMethodRef" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1
+          }
+        }
+      },
       "RefineryOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -4875,6 +5061,160 @@
           }
         },
         "required" : [ "goods", "location" ]
+      },
+      "RefineryOrderOp" : {
+        "type" : "object",
+        "properties" : {
+          "clientKey" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "endsAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "good" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpGood"
+          },
+          "goodId" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryOrderOpGood"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "id" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "method" : {
+            "$ref" : "#/components/schemas/RefineryMethodRef"
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^(create|update|good-add|good-update|good-remove)$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpUnit"
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "status" : {
+            "type" : "string",
+            "pattern" : "^(OPEN|IN_PROGRESS)$"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpVersions"
+          }
+        },
+        "required" : [ "op" ]
+      },
+      "RefineryOrderOpGood" : {
+        "type" : "object",
+        "properties" : {
+          "input" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "input", "inputQuantity", "outputQuantity", "quality" ]
+      },
+      "RefineryOrderOpUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "id" ]
+      },
+      "RefineryOrderOpVersions" : {
+        "type" : "object",
+        "properties" : {
+          "finances" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "gameData" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        }
       },
       "RefineryOrderProvenanceDto" : {
         "type" : "object",

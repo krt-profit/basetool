@@ -26,7 +26,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -39,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
@@ -213,9 +213,15 @@ public class RefineryOrderService {
     return mission.getId();
   }
 
+  /**
+   * Stores a money field: 0 means "not set" and is persisted as {@code null}.
+   *
+   * @param value the requested value
+   * @return the value, or {@code null} for {@code null} and 0
+   */
   @Contract("null -> null")
   @Nullable
-  private static Double zeroToNull(@Nullable Double value) {
+  static Double zeroToNull(@Nullable Double value) {
     if (value == null) {
       return null;
     }
@@ -448,8 +454,7 @@ public class RefineryOrderService {
               materialRepository.findById(good.getInputMaterial().getId()),
               "error.material.input.not_found");
 
-      if (inMat.getType() != MaterialType.RAW
-          && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
+      if (!RefineryExchangeRules.refinable(inMat)) {
         throw new IllegalArgumentException(
             "Refinery goods input must be of type RAW. Material '"
                 + inMat.getName()
@@ -472,11 +477,7 @@ public class RefineryOrderService {
 
         good.setOutputMaterial(outMat);
       } else {
-        if (inMat.getRefinedMaterial() != null) {
-          good.setOutputMaterial(inMat.getRefinedMaterial());
-        } else {
-          good.setOutputMaterial(inMat);
-        }
+        good.setOutputMaterial(RefineryExchangeRules.output(inMat));
       }
     } else {
       throw new BadRequestException("error.refinery_order.input_material_required");
@@ -549,16 +550,8 @@ public class RefineryOrderService {
    * @param location the order's chosen location
    * @throws IllegalArgumentException when the location hosts no live refinery terminal
    */
-  private void validateLocationHasRefinery(Location location) {
-    boolean hasRefinery = false;
-    if (location.getCity() != null
-        && Boolean.TRUE.equals(location.getCity().getHasRefineryTerminal())) {
-      hasRefinery = true;
-    } else if (location.getSpaceStation() != null
-        && Boolean.TRUE.equals(location.getSpaceStation().getHasRefineryTerminal())) {
-      hasRefinery = true;
-    }
-    if (!hasRefinery) {
+  static void validateLocationHasRefinery(Location location) {
+    if (!RefineryExchangeRules.hostsRefinery(location)) {
       throw new IllegalArgumentException("Selected location does not have a refinery.");
     }
   }

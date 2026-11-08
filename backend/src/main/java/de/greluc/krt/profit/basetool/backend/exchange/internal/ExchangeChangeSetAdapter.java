@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderDto;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * What one exchange resource contributes to the {@link ExchangeChangeSetRunner}: how it plans a
@@ -149,8 +151,20 @@ interface ExchangeChangeSetAdapter<S, C> {
    * @param result {@code applied}, {@code unchanged}, {@code unmatched}, {@code ambiguous} or
    *     {@code rejected}, which is also the write counter's {@code outcome} label
    * @param reason the error-registry code of a refusal, or {@code null}
+   * @param written the entry an applied op wrote, or the existing entry a refusal names; {@code
+   *     null} for resources whose result names no entry
    */
-  record Outcome(@NotNull String result, @Nullable String reason) {
+  record Outcome(@NotNull String result, @Nullable String reason, @Nullable Written written) {
+
+    /**
+     * The outcome of an op whose result names no entry.
+     *
+     * @param result the result
+     * @param reason the error-registry code of a refusal, or {@code null}
+     */
+    Outcome(@NotNull String result, @Nullable String reason) {
+      this(result, reason, null);
+    }
 
     /** The outcome of an op that changed something, or would have in a dry run. */
     static final Outcome APPLIED = new Outcome(ExchangeOps.APPLIED, null);
@@ -168,6 +182,19 @@ interface ExchangeChangeSetAdapter<S, C> {
       return new Outcome(ExchangeOps.REJECTED, reason);
     }
   }
+
+  /**
+   * The entry an op names in the result: the order an applied refinery-order op wrote, or the
+   * existing order an {@code ALREADY_EXISTS} refusal names (REQ-XCH-052).
+   *
+   * @param id the entry's id
+   * @param goods the ids of the goods rows the op created, or {@code null} when it created none
+   * @param versions the section counters after an applied op, or {@code null} for a refusal
+   */
+  record Written(
+      @NotNull String id,
+      @Nullable @Unmodifiable List<String> goods,
+      @Nullable ExchangeRefineryOrderDto.Versions versions) {}
 
   /**
    * The resource-specific counts of a change set's result.

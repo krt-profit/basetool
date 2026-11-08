@@ -246,13 +246,14 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 - Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
   are already `COMPLETED`.
 
-> [!note] Planned — the exchange's create and pickup (ADR-0351, epic #3163)
-> Three exchange paths join this requirement as they are built, and leave the web's create and
-> store unchanged:
+A **client create** (REQ-XCH-052, `RefineryExchangeWrites`) sets its status, `OPEN` or
+`IN_PROGRESS`, because a client reads running orders from the game. `COMPLETED` comes only from a
+pickup and `CANCELED` only from a cancel or delete; `storedAt`, `id`, the owner and the counters stay
+server-managed, and the web's create is unchanged.
+
+> [!note] Planned — the exchange's pickup (ADR-0351, epic #3163)
+> Two exchange paths join this requirement as they are built, and leave the web's store unchanged:
 >
-> - **A client create** (REQ-XCH-052) sets its status, `OPEN` or `IN_PROGRESS`, because a client
->   reads running orders from the game. `COMPLETED` comes only from a pickup and `CANCELED` only from
->   a cancel or delete; `storedAt`, `id`, the owner and the counters stay server-managed.
 > - **A pickup with store lines** (REQ-XCH-053) stores through this same store operation, so it
 >   books exactly once and sets `storedAt`; a refused line refuses the whole pickup and books
 >   nothing. A pickup without store lines sets `COMPLETED` without `storedAt`
@@ -362,8 +363,8 @@ VerseKit-specific: the name shown is the client's display name from the registry
 `RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
 `refinery-orders-details.html`, migration `V372`
 
-**Status:** web side and the feed's marker implemented (#3166, #3167); the client writes that set a
-client source arrive with #3168
+**Status:** implemented — the web side and the feed's marker (#3166, #3167), and the client
+writes that set a client source (#3168, `RefineryExchangeWrites`)
 
 ### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
 

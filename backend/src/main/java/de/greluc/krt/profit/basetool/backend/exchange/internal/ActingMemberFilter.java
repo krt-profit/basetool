@@ -109,6 +109,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
           "/api/v1/exchange/me/org-demand",
           "/api/v1/exchange/me/org-units",
           "/api/v1/exchange/me/refinery-orders",
+          "/api/v1/exchange/me/refinery-orders/changes",
           "/api/v1/exchange/me/ships",
           "/api/v1/exchange/me/ships/changes",
           "/api/v1/exchange/me/stock",

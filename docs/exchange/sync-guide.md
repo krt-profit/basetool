@@ -49,6 +49,16 @@ snapshot and send a `link` for each match before any `upsert` without `shipId`; 
 matched ship is created twice. Links belong to one installation, so a second installation links its
 own ids. See [ships](resources/ships.md#links).
 
+## Refinery orders: your own key
+
+Give every order your client creates a `clientKey` of your own and keep it with the order. A
+`create` that is retried, or sent by a second installation, is then refused `ALREADY_EXISTS` with
+the existing order's `id` instead of making a second order: adopt that id. Later ops can name the
+order by the same key, and the feed and its tombstones carry the key to your client only. Each op
+echoes the counters of the sections it touches, `gameData` or `finances`, so your timer updates
+never collide with a finance edit in the web. See
+[refinery orders](resources/refinery-orders.md#counters-in-a-change-set).
+
 ## Removing
 
 Remove on the server only what is **in the baseline and gone locally**: a diff against the last
@@ -86,10 +96,11 @@ data) treats the resync as a first sync: add-only.
 
 ## Conflicts
 
-A stock op carries `expectedQuantity`, and a ship `upsert` or `remove` carries `version`: the value
-from your baseline. When the server holds something else, the op is refused per op as
-`VERSION_CONFLICT` and the rest of the batch is applied. Pull, merge the server's value with your
-local change, and resend the op in a new batch. The server locks what it checks, so of two
+A stock op carries `expectedQuantity`, a ship `upsert` or `remove` carries `version`, and a
+refinery-order op the counters of the sections it touches: the value from your baseline. When the
+server holds something else, the op is refused per op as `VERSION_CONFLICT` and the rest of the
+batch is applied. Pull, merge the server's value with your local change, and resend the op in a
+new batch. The server locks what it checks, so of two
 concurrent writes to one lot or ship, one wins and the other gets the conflict.
 
 ## Idempotency keys
@@ -148,6 +159,7 @@ What counts as a removal:
 | Ships | a `remove`, and an `upsert` that changes both the name and the ship type |
 | Stock | a lot set to 0, or cut to at most a tenth of what it held before your client's first change to it within the 24 hours — unless the batch's rises of the same material or item cover the fall (a move) |
 | Org stock | a `book-out`, `sell`, `move-pool` or `move-holder` into another pool, counted per pool instead of per resource, against the pool's entries ([org stock](resources/org-stock.md#the-mass-change-guard)) |
+| Refinery orders | none of the ops `create`, `update`, `good-add`, `good-update` and `good-remove` |
 
 For example, with 40 blueprints and no removals in the window, a batch may remove 8 (8 × 5 = 40, not
 more than 40); a batch removing 9 is held. Spreading removals over many small batches does not help,

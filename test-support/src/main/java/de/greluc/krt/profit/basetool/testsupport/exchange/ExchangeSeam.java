@@ -178,6 +178,14 @@ public final class ExchangeSeam {
               "page.schema.json#/$defs/refineryOrderPage"),
           new RelayOperation(
               "POST",
+              "/me/refinery-orders/changes",
+              "/me/refinery-orders/changes",
+              "exchange.refinery.write",
+              false,
+              "change-set.schema.json#/$defs/refineryOrderChangeSet",
+              "change-result.schema.json"),
+          new RelayOperation(
+              "POST",
               "/org-stock/changes",
               "/org-stock/changes",
               "exchange.orgstock.write",
@@ -275,10 +283,10 @@ public final class ExchangeSeam {
 
   /**
    * The capability scopes the realm and the registry already grant whose routes the gateway does
-   * not serve: the refinery-order writes and store choices (REQ-XCH-052…054).
+   * not serve: the refinery-order store choices (REQ-XCH-053, REQ-XCH-054).
    */
   public static final @Unmodifiable Set<String> ROUTELESS_SCOPES =
-      Set.of("exchange.refinery.write", "exchange.refinery.store");
+      Set.of("exchange.refinery.store");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).

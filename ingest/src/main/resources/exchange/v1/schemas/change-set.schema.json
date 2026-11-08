@@ -78,6 +78,20 @@
         }
       }
     },
+    "refineryOrderChangeSet": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "properties": {
+        "ops": {
+          "items": {
+            "$ref": "#/$defs/refineryOrderOp"
+          }
+        }
+      }
+    },
     "jobOrderLine": {
       "type": "object",
       "properties": {
@@ -1215,6 +1229,453 @@
             "op",
             "shipId",
             "version"
+          ]
+        }
+      ]
+    },
+    "refineryMethodRef": {
+      "type": "object",
+      "description": "A refining method, resolved exactly: first by its code, then by its exact name.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "code"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
+      ]
+    },
+    "refineryGood": {
+      "type": "object",
+      "description": "One good of an order. The output material follows from the input as in the web: its refined material, else the input itself.",
+      "properties": {
+        "input": {
+          "$ref": "item-ref.schema.json",
+          "description": "The input material, RAW or manual-raw, resolved exactly."
+        },
+        "inputQuantity": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Whole units, 100 to the SCU."
+        },
+        "outputQuantity": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The yield in whole units, 100 to the SCU."
+        },
+        "quality": {
+          "$ref": "quality.schema.json"
+        }
+      },
+      "required": [
+        "input",
+        "inputQuantity",
+        "outputQuantity",
+        "quality"
+      ]
+    },
+    "refineryOrderVersions": {
+      "type": "object",
+      "description": "The counters of the sections the op touches, as the client last saw them. A difference answers VERSION_CONFLICT.",
+      "properties": {
+        "gameData": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finances": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "refineryGameDataVersion": {
+      "type": "object",
+      "description": "The game-data counter the client last saw. A difference answers VERSION_CONFLICT.",
+      "properties": {
+        "gameData": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "gameData"
+      ]
+    },
+    "refineryOrderOp": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Creates an order owned by the member, marked as created by the client.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "create"
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, unique per member and client. A known key answers ALREADY_EXISTS with the existing order's id."
+            },
+            "orgUnit": {
+              "type": "object",
+              "description": "The owning org unit: one of the units GET /me/org-units returns.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "location": {
+              "$ref": "location-ref.schema.json",
+              "description": "The refinery: a location the web's picker offers."
+            },
+            "method": {
+              "$ref": "#/$defs/refineryMethodRef"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS"
+              ],
+              "default": "OPEN"
+            },
+            "endsAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the run ends, RFC 3339 in UTC. The server stores startedAt = endsAt - durationMinutes."
+            },
+            "durationMinutes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The run's length; without it the run starts at the time of the write."
+            },
+            "expenses": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "The refining costs in aUEC; 0 clears them."
+            },
+            "otherExpenses": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "Further costs in aUEC; 0 clears them."
+            },
+            "oreSales": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "Revenue from selling raw ore in aUEC; 0 clears it."
+            },
+            "goods": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "$ref": "#/$defs/refineryGood"
+              }
+            }
+          },
+          "required": [
+            "op",
+            "clientKey",
+            "orgUnit",
+            "location"
+          ],
+          "dependentRequired": {
+            "durationMinutes": [
+              "endsAt"
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "description": "Changes the fields it carries and leaves every absent field as it is.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "update"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryOrderVersions"
+            },
+            "location": {
+              "$ref": "location-ref.schema.json"
+            },
+            "method": {
+              "$ref": "#/$defs/refineryMethodRef"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "IN_PROGRESS"
+              ]
+            },
+            "endsAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the run ends, RFC 3339 in UTC. The server stores startedAt = endsAt - durationMinutes."
+            },
+            "durationMinutes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The run's length; without it the run starts at the time of the write."
+            },
+            "expenses": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "The refining costs in aUEC; 0 clears them."
+            },
+            "otherExpenses": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "Further costs in aUEC; 0 clears them."
+            },
+            "oreSales": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000,
+              "description": "Revenue from selling raw ore in aUEC; 0 clears it."
+            }
+          },
+          "required": [
+            "op",
+            "versions"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ],
+          "dependentRequired": {
+            "durationMinutes": [
+              "endsAt"
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "description": "Adds one good to the order; the result names the new row's id.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "good-add"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryGameDataVersion"
+            },
+            "good": {
+              "$ref": "#/$defs/refineryGood"
+            }
+          },
+          "required": [
+            "op",
+            "versions",
+            "good"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Changes the fields of one good it carries.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "good-update"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryGameDataVersion"
+            },
+            "goodId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The good's row id from the feed or an earlier result."
+            },
+            "input": {
+              "$ref": "item-ref.schema.json"
+            },
+            "inputQuantity": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "outputQuantity": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "quality": {
+              "$ref": "quality.schema.json"
+            }
+          },
+          "required": [
+            "op",
+            "versions",
+            "goodId"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Removes one good from the order.",
+          "properties": {
+            "opId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Echoed in the result."
+            },
+            "op": {
+              "const": "good-remove"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The order's id from the feed or an earlier result. Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
+            },
+            "clientKey": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The client's own key of the order, as an alternative to id; also names an order an earlier create of the same change set made."
+            },
+            "versions": {
+              "$ref": "#/$defs/refineryGameDataVersion"
+            },
+            "goodId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The good's row id from the feed or an earlier result."
+            }
+          },
+          "required": [
+            "op",
+            "versions",
+            "goodId"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "id"
+              ]
+            },
+            {
+              "required": [
+                "clientKey"
+              ]
+            }
           ]
         }
       ]

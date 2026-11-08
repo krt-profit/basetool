@@ -939,6 +939,62 @@
         ]
       }
     },
+    "/exchange/v1/me/refinery-orders/changes": {
+      "post": {
+        "operationId": "refinery_orders_write",
+        "summary": "Create and update the member's own refinery orders and their goods, as in the web.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/refineryOrderChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
     "/exchange/v1/me/org-demand": {
       "get": {
         "operationId": "demand_read",

@@ -64,6 +64,7 @@ public class ExchangeRefineryOrderFeedService {
   private final ExchangeFeedReader feedReader;
   private final LocationRepository locationRepository;
   private final KnownExchangeClients knownClients;
+  private final ExchangeRefineryOrderLinkRepository linkRepository;
 
   /**
    * Returns one page of the member's refinery orders.
@@ -111,7 +112,8 @@ public class ExchangeRefineryOrderFeedService {
         more
             ? ExchangeFeedCursor.snapshot(at, delivered.getLast().id()).format()
             : ExchangeFeedCursor.feed(at).format();
-    References refs = references(delivered);
+    References refs =
+        references(caller, delivered.stream().map(RefineryExchangeOrder::id).toList(), delivered);
     return new ExchangeRefineryOrderPageDto(
         delivered.stream().map(order -> toDto(order, refs)).toList(), List.of(), next, more);
   }
@@ -135,7 +137,9 @@ public class ExchangeRefineryOrderFeedService {
             .orders(member, changes.keys().stream().map(UUID::fromString).toList())
             .stream()
             .collect(Collectors.toMap(order -> order.id().toString(), Function.identity()));
-    References refs = references(current.values());
+    References refs =
+        references(
+            caller, changes.keys().stream().map(UUID::fromString).toList(), current.values());
     List<ExchangeRefineryOrderDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();
     for (String key : changes.keys()) {
@@ -143,21 +147,37 @@ public class ExchangeRefineryOrderFeedService {
       if (order != null) {
         items.add(toDto(order, refs));
       } else {
-        removed.add(changes.tombstone(key, key));
+        removed.add(changes.tombstone(key, key).withClientKey(refs.clientKeys().get(key)));
       }
     }
     return new ExchangeRefineryOrderPageDto(items, removed, changes.nextCursor(), changes.more());
   }
 
   /**
-   * Reads what the given orders name by id: their locations' starmap GUIDs and their creating
-   * clients' display names, one query each.
+   * Reads what the page names by id: its orders' locations' starmap GUIDs, their creating clients'
+   * display names and the caller's own keys of every delivered key, one query each.
    *
-   * @param orders the orders
+   * @param caller the caller, whose client alone sees its keys
+   * @param keys every order the page delivers, a removed one included
+   * @param orders the orders the page serves with their state
    * @return the references
    */
-  private @NotNull References references(@NotNull Collection<RefineryExchangeOrder> orders) {
-    return new References(guids(orders), clientNames(orders));
+  private @NotNull References references(
+      @NotNull ExchangeCaller caller,
+      @NotNull Collection<UUID> keys,
+      @NotNull Collection<RefineryExchangeOrder> orders) {
+    Map<String, String> clientKeys =
+        keys.isEmpty()
+            ? Map.of()
+            : linkRepository
+                .findByUserIdAndClientIdAndRefineryOrderIdIn(
+                    caller.member(), caller.clientId(), keys)
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        link -> link.getRefineryOrderId().toString(),
+                        ExchangeRefineryOrderLink::getClientKey));
+    return new References(guids(orders), clientNames(orders), clientKeys);
   }
 
   /**
@@ -207,6 +227,7 @@ public class ExchangeRefineryOrderFeedService {
     String creator = order.createdByClient();
     return new ExchangeRefineryOrderDto(
         order.id().toString(),
+        refs.clientKeys().get(order.id().toString()),
         creator == null
             ? null
             : new ExchangeRefineryOrderDto.Creator(
@@ -261,7 +282,10 @@ public class ExchangeRefineryOrderFeedService {
    *
    * @param guids the starmap GUID by location id
    * @param clientNames the display name by client id
+   * @param clientKeys the caller's own key by order id
    */
   private record References(
-      @NotNull Map<UUID, UUID> guids, @NotNull Map<String, String> clientNames) {}
+      @NotNull Map<UUID, UUID> guids,
+      @NotNull Map<String, String> clientNames,
+      @NotNull Map<String, String> clientKeys) {}
 }

@@ -77,18 +77,25 @@ codes, whichever side refuses it.
 | `STOLEN_MARKING_DISABLED` | The Basetool does not yet keep stolen stock apart. | Keep the lot local until the server supports it. |
 | `REMOVED_ELSEWHERE` | The entry has a live tombstone from another channel or installation; for a ship, the named `shipId` was removed there. | Ask the member; resend with `override: true` only if they agree. |
 | `UNIT_MISMATCH` | The quantity's unit does not match the material's. | Fix the unit. |
-| `LOCATION_UNKNOWN` | The place has no warehouse location. | Offer a place from `catalog/locations`. |
+| `LOCATION_UNKNOWN` | The place has no warehouse location; for a refinery order, it has no location. | Offer a place from `catalog/locations`. |
 | `LINK_TARGET_TAKEN` | The server ship is already linked to another external id of this installation. | Pull and re-link. |
-| `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked. | Pull, merge, retry this op. |
+| `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked, and a refinery-order op whose counter of a section it touches is stale or missing ([counters](resources/refinery-orders.md#counters-in-a-change-set)). | Pull, merge, retry this op. |
 | `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, a `move-holder` into such a pool or to the entry's own holder in another pool, or an op on an entry that is unknown, personal or in another pool. | Do not retry; offer only the units the org stock marks `logistician: true`. |
 | `HOLDER_UNKNOWN` | An org-stock `book-in` or `move-holder` names a holder who is not on the receiving unit's roster. | Read the roster again and let the member pick. |
 | `INSUFFICIENT_STOCK` | An org-stock op takes or marks more than the entry holds, a stock `share` more than the lot's personal amount, or an `unshare` more than the member's own stock in the pool. | Pull and retry with the entry's amount. |
 | `STOCK_OFFERED` | A partial org-stock `stolen` or `move-pool`, or a stock `share` or `unshare`, would leave the stock below what it offers on the Basetool's material exchange. | Take less, or ask the holder to lower the offer in the web. |
-| `NOT_A_MEMBER` | A stock `share` names a unit the member is not a direct member of. | Offer only the units of `GET /me/org-units`. |
+| `NOT_A_MEMBER` | A stock `share` or a refinery-order `create` names a unit the member is not a direct member of. | Offer only the units of `GET /me/org-units`. |
 | `QUANTITY_ABOVE_EXPECTED` | A stock `share` or `unshare` moves more than its `expectedQuantity`. | Move at most the amount the client last saw at the source. |
 | `OVER_ALLOCATION` | The earmarks of one kind of an org-stock `book-in` add up to more than its amount, or an earmark op would earmark more of one kind than the entry holds. | Lower the earmarks. |
 | `EARMARK_TARGET_INVALID` | An org-stock earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, one the entry is not earmarked to, or, for `allocation-add`, one it already is. | Read the [targets](resources/org-stock.md#the-targets) and the entry again. |
 | `ITEM_RETIRED` | The item is no longer in the game, or the Basetool hid it: an org-stock `book-in` of it, or a stock rise of it that the batch's falls of the same item do not cover. | Do not retry; tell the member the item can no longer be booked in. Lowering or moving the stock they hold still works. |
+| `NOT_A_REFINERY` | A refinery order's location is not a refinery the web offers for refinery orders. | Offer only refinery locations. |
+| `MATERIAL_NOT_RAW` | A refinery good's input is not a raw material. | Send the raw material the good refines. |
+| `ORDER_UNKNOWN` | A refinery-order op names no order of the member: an unknown `id`, another owner's order, or a `clientKey` your client never set. | Pull the feed; drop the order locally when it is gone. |
+| `GOOD_UNKNOWN` | A refinery-order `good-update` or `good-remove` names a `goodId` that is not a good of the order. | Pull the feed and use the good ids it shows. |
+| `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
+| `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
+| `ORDER_STORED` | A refinery-order op changes the status of an order whose yield was booked into stock. | Do not retry; the status is locked. |
 
 ## Warnings
 

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSet
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Planned;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Skip;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Write;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Written;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -78,6 +79,7 @@ public class ExchangeChangeSetRunner {
     int applied = 0;
     int unchanged = 0;
     List<ExchangeChangeResultDto.OpResult> results = new ArrayList<>();
+    List<ExchangeChangeResultDto.OrderResult> orders = new ArrayList<>();
     for (int i = 0; i < plan.size(); i++) {
       Outcome outcome =
           switch (plan.get(i)) {
@@ -87,8 +89,18 @@ public class ExchangeChangeSetRunner {
       if (!dryRun) {
         count(caller, adapter.resource(), outcome.result());
       }
+      Written written = outcome.written();
       if (ExchangeOps.APPLIED.equals(outcome.result())) {
         applied++;
+        if (written != null && written.versions() != null) {
+          orders.add(
+              new ExchangeChangeResultDto.OrderResult(
+                  i,
+                  adapter.opId(changeSet, i),
+                  written.id(),
+                  written.goods(),
+                  written.versions()));
+        }
         continue;
       }
       if (ExchangeOps.UNCHANGED.equals(outcome.result())) {
@@ -96,7 +108,11 @@ public class ExchangeChangeSetRunner {
       }
       results.add(
           new ExchangeChangeResultDto.OpResult(
-              i, adapter.opId(changeSet, i), outcome.result(), outcome.reason()));
+              i,
+              adapter.opId(changeSet, i),
+              outcome.result(),
+              outcome.reason(),
+              written == null ? null : written.id()));
     }
     if (!dryRun && applied > 0) {
       execution.announce();
@@ -110,6 +126,7 @@ public class ExchangeChangeSetRunner {
         List.copyOf(results),
         effects.offersReduced(),
         effects.offersRemoved(),
+        orders.isEmpty() ? null : List.copyOf(orders),
         effects.detachedFromMissions());
   }
 

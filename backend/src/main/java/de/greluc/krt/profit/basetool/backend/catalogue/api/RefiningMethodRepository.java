@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,4 +39,13 @@ public interface RefiningMethodRepository extends JpaRepository<RefiningMethod, 
    * @return the refining method with that name (any case), if one exists
    */
   Optional<RefiningMethod> findByNameIgnoreCase(String name);
+
+  /**
+   * Exact code lookup for an exchange write (REQ-XCH-052); the code is not unique, so a caller
+   * treats several rows as ambiguous.
+   *
+   * @param code the method's code, compared exactly
+   * @return every refining method with that code
+   */
+  List<RefiningMethod> findAllByCode(String code);
 }

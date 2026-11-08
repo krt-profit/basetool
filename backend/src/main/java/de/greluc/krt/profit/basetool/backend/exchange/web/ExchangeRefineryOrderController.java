@@ -22,11 +22,15 @@ package de.greluc.krt.profit.basetool.backend.exchange.web;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeFeedReader;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderFeedService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderWriteService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,13 +38,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The member's own refinery orders for an exchange client, reachable only from the ingest gateway
- * (REQ-XCH-051).
+ * The member's own refinery orders for an exchange client, reachable only from the ingest gateway:
+ * the feed and the change set (REQ-XCH-051, REQ-XCH-052).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/me/refinery-orders")
@@ -50,6 +56,9 @@ public class ExchangeRefineryOrderController {
 
   /** Reads the snapshot and the feed. */
   private final ExchangeRefineryOrderFeedService feedService;
+
+  /** Applies the change sets. */
+  private final ExchangeRefineryOrderWriteService writeService;
 
   /**
    * Returns a snapshot page of the open and running orders, or with {@code cursor} every order
@@ -76,5 +85,28 @@ public class ExchangeRefineryOrderController {
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(
         feedService.page(ExchangeCaller.of((SubjectAuthentication) authentication), cursor, limit));
+  }
+
+  /**
+   * Applies a change set to the member's own refinery orders (REQ-XCH-052).
+   *
+   * @param changeSet the creates, updates and goods ops
+   * @param authentication the relayed acting member the gate admitted
+   * @return the result, with the order every applied op wrote
+   */
+  @NotNull
+  @PostMapping("/changes")
+  @PreAuthorize("@exchangeGate.allows('exchange.refinery.write', authentication)")
+  @Operation(
+      summary = "Exchange: change my refinery orders",
+      description =
+          "Gateway-only. Ops decided in order against the section counters the earlier ops left.")
+  @ApiResponse(responseCode = "200", description = "The result")
+  @ApiResponse(responseCode = "400", description = "An op lacks a field its kind requires")
+  public ResponseEntity<ExchangeChangeResultDto> refineryOrderChanges(
+      @NotNull @Valid @RequestBody ExchangeRefineryOrderChangeSet changeSet,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        writeService.apply(ExchangeCaller.of((SubjectAuthentication) authentication), changeSet));
   }
 }

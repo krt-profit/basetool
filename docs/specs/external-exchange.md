@@ -59,7 +59,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/blueprints` · `POST …/changes` | `exchange.blueprints.read` / `.write` | REQ-XCH-015 |
 | `GET /exchange/v1/me/stock` · `POST …/changes` | `exchange.stock.read` / `.write` | REQ-XCH-016 |
 | `GET /exchange/v1/me/ships` · `POST …/changes` | `exchange.hangar.read` / `.write` | REQ-XCH-017 |
-| `GET /exchange/v1/me/refinery-orders` | `exchange.refinery.read` | REQ-XCH-051 |
+| `GET /exchange/v1/me/refinery-orders` · `POST …/changes` | `exchange.refinery.read` / `.write` | REQ-XCH-051, REQ-XCH-052 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
@@ -74,8 +74,9 @@ the targets (REQ-XCH-045). `exchange.demand.details` adds the orders of the memb
 units to the org demand (REQ-XCH-047).
 
 > [!note] Planned — the refinery-order routes (ADR-0351, epic #3163)
-> The read is built (REQ-XCH-051). The table gains three more rows as they are built:
-> `POST …/me/refinery-orders/changes` (`exchange.refinery.write`, REQ-XCH-052…055), and
+> The read (REQ-XCH-051) and the change set with `create`, `update` and the goods ops
+> (REQ-XCH-052) are built; `pickup`, `cancel` and `delete` join the change set with REQ-XCH-053
+> and REQ-XCH-055. The table gains two more rows as they are built:
 > `GET …/me/store-choices/receivers` and `…/me/store-choices/job-orders?material=`
 > (`exchange.refinery.store`, REQ-XCH-054).
 
@@ -305,10 +306,10 @@ the relayed capabilities again (`@PreAuthorize("@exchangeGate.allows(…)")`). E
 `basetool-ingest` audience, and the gateway enforces that audience on exchange routes in code, not
 only by property.
 
-> [!note] Planned — the routes of two refinery capabilities (ADR-0351, epic #3163)
-> The three refinery scopes are registered, in the Keycloak realm and the registry's CHECK; only
-> `.read` opens a route so far (REQ-XCH-051), `.write` and `.store` open theirs as they are built
-> (REQ-XCH-052…054). `.store` is no `.details` capability: it gates the two
+> [!note] Planned — the routes of the store capability (ADR-0351, epic #3163)
+> The three refinery scopes are registered, in the Keycloak realm and the registry's CHECK;
+> `.read` and `.write` open their routes (REQ-XCH-051, REQ-XCH-052), `.store` opens its own as it
+> is built (REQ-XCH-054). `.store` is no `.details` capability: it gates the two
 > store-choice reads of its own and is required, beside `.write`, for every change set that holds a
 > `pickup` with store lines.
 
@@ -1602,7 +1603,7 @@ in time from „Verbundene Anwendungen" — the org-stock writes they made as a 
 (REQ-XCH-046); undo is version-checked, skips and reports rows the member
 changed afterwards or a merge removed, and does not restore Materialbörse offers. An admin can run
 the same undo for every member of one client at once (REQ-XCH-034). Refinery-order writes are
-journaled and undone by their own rules (REQ-XCH-056, planned).
+journaled and undone section by section (REQ-XCH-056).
 
 **Acceptance**
 
@@ -1690,7 +1691,7 @@ Responses carry `RateLimit` and `Retry-After` headers. The account check has its
 
 The write routes are the six `…/changes` and `…/drafts/…` routes (`ExchangeRoutes`); the org
 stock's change set counts once more for every op after its first (REQ-XCH-045). The refinery-order
-change set (REQ-XCH-052, planned) becomes the seventh and counts **once per request**, however many
+change set (REQ-XCH-052) is the seventh and counts **once per request**, however many
 ops it holds, as the blueprint, stock and ship sets do (ADR-0351). A request over
 a per-period limit is `429 RATE_LIMITED`, over the quota `429 QUOTA_EXCEEDED`, each with
 `Retry-After` (the quota's until the next UTC day); a quota that cannot be counted is `503
@@ -1772,7 +1773,7 @@ cacheable one, beside one 32.5 KiB reservation — well inside 4 MiB, which leav
 drafts and mass changes. With the former 24 h window and 1 MiB, 576 answers a day filled the
 member's budget once an answer averaged about 1.3 KiB (#3061).
 
-The refinery orders (REQ-XCH-051…056, planned) fit the same sizes (estimate of #3149, owner
+The refinery orders (REQ-XCH-051…056) fit the same sizes (estimate of #3149, owner
 decision #3162). With about six ops per order — a create with its goods, three timer updates, a
 goods correction and a pickup — each sent as a change set of its own, a typical member (3 to 10
 orders a day) writes 18 to 60 change sets a day, 4 to 12 % of the 500, and a heavy one (30 orders)
@@ -2422,7 +2423,7 @@ it changed, and is audited and instrumented. Re-activating the client stays a se
 (`ADMIN`, answers `202` with the run) undoes the client's journal entries recorded at or after
 `since`, clamped to the configured retention (`app.exchange.change-retention.max-age`), that are not
 undone yet, the org-stock writes of every writer included (REQ-XCH-046); `resource` is `BLUEPRINT`,
-`STOCK`, `SHIP` or `ORG_STOCK`, `installationId` one installation of that client. A `since` in the future is `400`. `…/undo/preview` answers the members and entries in scope
+`STOCK`, `SHIP`, `ORG_STOCK` or `REFINERY_ORDER`, `installationId` one installation of that client. A `since` in the future is `400`. `…/undo/preview` answers the members and entries in scope
 and whether the client is still active, writing nothing; `…/undo/installations?since=` lists the
 client's installations with writes in the span (member name, last seen, disconnected, count — never
 the member-given label), at most 500, for choosing one. `GET /api/v1/connected-apps/admin/undo-runs` lists
@@ -2525,7 +2526,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 20 relay operations on 19 backend
+byte-identical (D-05 of the domain modularisation plan): the 21 relay operations on 20 backend
 paths, their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
@@ -2592,9 +2593,9 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 20 relay operations with their gateway route, backend path, capability, paging and published
+- the 21 relay operations with their gateway route, backend path, capability, paging and published
   schemas — against the backend's eleven exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 18 exact paths, the gateway's `ExchangeRoutes` and its relay
+  expressions, `ActingMemberFilter`'s 20 exact paths, the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
 - the five relay headers, the eighteen capability scopes (`exchange.orgstock.details`,
@@ -2655,7 +2656,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  20 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  21 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2669,7 +2670,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 20 relay operations and 101 schemas; `openapi.json` holds
+- [x] The relay document holds exactly the 21 relay operations and 110 schemas; `openapi.json` holds
   none of them and the 64 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
@@ -3272,9 +3273,9 @@ is named by id only.
 - [x] A snapshot holds the member's open and running orders and no other member's; a feed read from
   its cursor carries a completed, a cancelled and a reopened order as changes.
   *`ExchangeRefineryOrderControllerTest`.*
-- [ ] An order created in the web, by a draft and by another client appears with its marker; only
-  the creating client sees its `clientKey`. *(The marker of a web and a client order holds,
-  `ExchangeRefineryOrderControllerTest`; the `clientKey` comes with #3168.)*
+- [x] An order created in the web, by a draft and by another client appears with its marker; only
+  the creating client sees its `clientKey`, on the order and on its tombstone.
+  *`ExchangeRefineryOrderControllerTest`, `ExchangeRefineryOrderWriteControllerTest`.*
 - [x] A hard delete and an owner reassignment leave a tombstone; a cancel does not; a location
   reference change re-announces the order. *`ExchangeRefineryOrderControllerTest`,
   `ExchangeChangeFeedTriggerIntegrationTest`.*
@@ -3285,10 +3286,11 @@ is named by id only.
 
 **Enforced by:** `ExchangeRefineryOrderControllerTest`, `ExchangeChangeFeedTriggerIntegrationTest`,
 `ExchangeRefineryOrderRouteTest`, `ExchangeWireContractTest` · **Code:**
-`ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370` · **Status:** partially
+`ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370`, `V373` · **Status:**
 implemented — #3167 (scopes, triggers, read); `versions` carries the two section counters of
-#3165 and `createdBy` and `pickedUpAt` the provenance of #3166; `clientKey` is served once #3168
-stores it
+#3165, `createdBy` and `pickedUpAt` the provenance of #3166, and `clientKey` the link table of
+#3168 (`exchange_refinery_order_link`, kept without a foreign key to the order so a tombstone still
+names it)
 
 ### REQ-XCH-052 — A client writes the member's refinery orders in one change set
 
@@ -3322,9 +3324,10 @@ web.
   one. The status is `OPEN` or `IN_PROGRESS` (REQ-REFINERY-022); the order carries the client as its
   creator (REQ-REFINERY-027). Goods, `expenses`, `otherExpenses` and `oreSales` are optional.
 - **Timer.** `endsAt` is written, `durationMinutes` is optional: the server stores
-  `startedAt = endsAt − durationMinutes`; without a duration `startedAt` is the time of the write and
-  `durationMinutes` the rest until `endsAt`. A changed start re-arms the ready notice as a web edit
-  does (REQ-REFINERY-023).
+  `startedAt = endsAt − durationMinutes`; without a duration `durationMinutes` is the rest from the
+  time of the write until `endsAt`, rounded up to whole minutes, and `startedAt` follows from it, so
+  the stored end stays `endsAt`. A create without `endsAt` starts at the write without a duration,
+  as in the web. A changed start re-arms the ready notice as a web edit does (REQ-REFINERY-023).
 - **`update`.** Partial: it carries only the fields it changes — location, method, timer, status,
   `expenses`, `otherExpenses`, `oreSales` — and leaves every absent field as it is. The status is
   `OPEN` or `IN_PROGRESS`; `COMPLETED` comes only from a pickup and `CANCELED` only from a cancel or
@@ -3349,19 +3352,32 @@ web.
 
 **Acceptance**
 
-- [ ] A create with a client key, an update of the timer and a goods add in one set apply in order;
-  the result carries the order id, the new row id and the counters; the web shows the order with the
-  client's marker.
-- [ ] A second create with the same key is `ALREADY_EXISTS` naming the existing order; another
+- [x] A create with a client key, an update of the timer and a goods add in one set apply in order;
+  the result carries the order id, the new row id and the counters; the order carries the client as
+  its creator. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A second create with the same key is `ALREADY_EXISTS` naming the existing order; another
   client's key and another owner's order are `ORDER_UNKNOWN`.
-- [ ] A fuzzy-only or unknown reference is refused, a location that is not an offered refinery is
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] An unknown reference is refused, a location that is not an offered refinery is
   `NOT_A_REFINERY`, a refined input material `MATERIAL_NOT_RAW`, a unit the member is not a direct
-  member of `NOT_A_MEMBER`.
-- [ ] An update after a web edit of the other section applies; after a web edit of its own section
+  member of `NOT_A_MEMBER`. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] An update after a web edit of the other section applies; after a web edit of its own section
   it is `VERSION_CONFLICT`, and every later op on that order in the set is `PRECEDING_OP_REJECTED`.
-- [ ] `dryRun` decides every op and writes nothing; the set counts once against the quota.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] `dryRun` decides every op and writes nothing; the set counts once against the quota.
+  *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`.*
 
-**Status:** planned — #3168 (create, update, goods ops, client key, live sync, journal)
+The result lists each applied op in `orders` (index, `opId`, order id, created goods row ids,
+counters) and names the existing order of an `ALREADY_EXISTS` refusal in its `results` item's `id`;
+both are additive fields of `change-result.schema.json`. Each applied write publishes, after the
+commit, into the `refinery` room (section `queue`) and the order's `refinery-order` room (section
+`order`) (REQ-XCH-030).
+
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
+`ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
+`ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
+`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373` · **Status:** implemented for `create`,
+`update` and the goods ops — #3168; `pickup`, `cancel` and `delete` follow with #3169 and #3170
 
 ### REQ-XCH-053 — A pickup closes an order and books stock only with store lines
 
@@ -3473,18 +3489,26 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
 ### REQ-XCH-056 — Refinery-order writes are journaled and undone by section
 
 Every applied op is journaled (REQ-XCH-022) under its own `ExchangeJournalAction` with a typed
-refinery journal state (ADR-0285): the order's fields, goods with their ids, `clientKey`, client
-marker, mission link and section counters before and after. The member's undo and the admin's bulk
-undo (REQ-XCH-034) restore it as follows:
+refinery journal state (ADR-0285): the fields a client writes — location, method, timer, status,
+`expenses`, `otherExpenses`, `oreSales` —, the goods with their ids and both section counters,
+before and after; the `delete` of #3169 adds the client marker and the mission link. The
+`clientKey` stays in `exchange_refinery_order_link`, which keeps it after the order is gone. The
+journal actions are `REFINERY_CREATE`, `REFINERY_UPDATE`, `REFINERY_GOOD_ADD`,
+`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`). Writes of one change set share their
+transaction and time, so the undo orders an order's writes by its counters, which every write
+raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as follows:
 
 - **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
   `clientKey`, client marker and every field; the mission link only while that mission still
   exists. The feed shows it again under the same key. The restore is audited
   `REFINERY_ORDER_RESTORED`; the undo itself stays `EXCHANGE_CHANGES_UNDONE`.
-- **`create`** — the order is removed while neither section counter moved since; otherwise it is
-  skipped `CHANGED_AFTERWARDS`. The feed carries a tombstone.
-- **`update`, goods ops and `cancel`** — the touched section goes back to its earlier state while
-  that section's counter is unchanged since; otherwise skipped `CHANGED_AFTERWARDS`.
+- **`create`** — the order is removed with its goods, audited `REFINERY_ORDER_DELETED`, while
+  neither section counter moved since; otherwise it is skipped `CHANGED_AFTERWARDS`. The feed
+  carries a tombstone with the `clientKey` for the creating client.
+- **`update`, goods ops and `cancel`** — the sections the client's writes touched go back to their
+  state before the client's first write in the span, goods rows under their old ids, while each of
+  those sections' counters shows no other write since or in between; otherwise the order is skipped
+  `CHANGED_AFTERWARDS`. A section the client did not touch is left as it is.
 - **`pickup`** — without store lines the status goes back and `pickedUpAt` is cleared, under the
   same counter check; with store lines it is skipped `STOCK_BOOKED`, because the booked stock is the
   member's to take back in the Lager.
@@ -3496,12 +3520,15 @@ gone, is skipped `GONE`.
 
 - [ ] An undo recreates a deleted order under its old ids with its client key and marker, and the
   feed shows it again; it is audited `REFINERY_ORDER_RESTORED`.
-- [ ] An undo removes an unchanged create and skips one changed in the web; it rolls back an update
-  of one section after a web edit of the other.
+- [x] An undo removes an unchanged create and skips one changed in the web; it brings a removed
+  good back under its id and rolls back the finances of the same order.
+  *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
 - [ ] An undo of a pickup without lines reopens the order; one with lines is skipped `STOCK_BOOKED`.
 
-**Status:** planned — #3168 (journal, undo of create, update and goods ops), #3169 (undo of cancel
-and delete), #3170 (undo of a pickup)
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`
+· **Code:** `ExchangeRefineryOrderJournal`, `ExchangeUndoService`, `V373` · **Status:** partially
+implemented — #3168 (journal, undo of create, update and goods ops); #3169 (undo of cancel and
+delete), #3170 (undo of a pickup)
 
 ## Threat model
 

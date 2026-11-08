@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * the member (REQ-XCH-051).
  *
  * @param id the order's Basetool id, the feed key the write ops name
+ * @param clientKey the creating client's own key, carried only to that client, or {@code null}
  * @param createdBy the client marker, or {@code null} for an order created in the web
  * @param versions the counters of the order's two sections
  * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}
@@ -52,6 +53,7 @@ import org.jetbrains.annotations.Unmodifiable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeRefineryOrderDto(
     @NotNull String id,
+    @Nullable String clientKey,
     @Nullable Creator createdBy,
     @NotNull Versions versions,
     @NotNull String status,

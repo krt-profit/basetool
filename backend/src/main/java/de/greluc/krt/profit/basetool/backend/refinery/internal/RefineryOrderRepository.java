@@ -398,4 +398,36 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query("SELECT o FROM RefineryOrder o WHERE o.owner.id = :owner AND o.id IN :ids")
   List<RefineryOrder> findExchangeOrders(
       @Param("owner") UUID owner, @Param("ids") Collection<UUID> ids);
+
+  /**
+   * Inserts a good under an id it had before, which the undo of an exchange write brings back
+   * (REQ-XCH-056); the generated id of a JPA insert cannot carry it.
+   *
+   * @param id the good's former row id
+   * @param order the order
+   * @param input the input material
+   * @param inputQuantity the input amount in units
+   * @param output the output material
+   * @param outputQuantity the yield in units
+   * @param quality the quality from 0 to 1000
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          INSERT INTO refinery_good (id, version, created_at, updated_at, input_material_id,
+                                     input_quantity, output_material_id, output_quantity, quality,
+                                     refinery_order_id)
+          VALUES (:id, 0, now(), now(), :input, :inputQuantity, :output, :outputQuantity, :quality,
+                  :order)
+          """)
+  void insertGood(
+      @Param("id") UUID id,
+      @Param("order") UUID order,
+      @Param("input") UUID input,
+      @Param("inputQuantity") int inputQuantity,
+      @Param("output") UUID output,
+      @Param("outputQuantity") int outputQuantity,
+      @Param("quality") int quality);
 }

@@ -87,6 +87,7 @@ function initConnectedApps() {
                 STOCK: text('resourceStock'),
                 SHIP: text('resourceShip'),
                 ORG_STOCK: text('resourceOrgStock'),
+                REFINERY_ORDER: text('resourceRefineryOrder'),
             },
         };
     }

@@ -48,7 +48,9 @@ public class ExchangeUserReassignment extends OwnedRowsReassignment {
             OwnedRows.deduped(
                 "exchange_installation", "user_id", "exchange_client_id", "key_thumbprint"),
             OwnedRows.deduped(
-                "exchange_ship_link", "user_id", "client_id", "installation_key", "external_id")),
+                "exchange_ship_link", "user_id", "client_id", "installation_key", "external_id"),
+            OwnedRows.deduped(
+                "exchange_refinery_order_link", "user_id", "client_id", "client_key")),
         List.of(
             "exchange_client_revocation.user_id",
             "exchange_change.user_id",

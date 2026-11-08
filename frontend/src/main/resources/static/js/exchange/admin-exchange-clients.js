@@ -506,6 +506,7 @@ function initAdminExchangeClients() {
                     STOCK: text(data, 'resourceStock'),
                     SHIP: text(data, 'resourceShip'),
                     ORG_STOCK: text(data, 'resourceOrgStock'),
+                    REFINERY_ORDER: text(data, 'resourceRefineryOrder'),
                 },
             };
         }

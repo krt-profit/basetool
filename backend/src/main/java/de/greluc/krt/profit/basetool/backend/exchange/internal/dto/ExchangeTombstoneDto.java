@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A removal in the change feed, naming who removed the entry (REQ-XCH-013).
@@ -28,6 +30,35 @@ import org.jetbrains.annotations.NotNull;
  * @param key the removed entry's opaque key
  * @param removedAt when it was removed
  * @param removedBy who removed it
+ * @param clientKey a removed refinery order's key, only for the client that created it
+ *     (REQ-XCH-051), or {@code null}
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeTombstoneDto(
-    @NotNull String key, @NotNull Instant removedAt, @NotNull ExchangeRemovedByDto removedBy) {}
+    @NotNull String key,
+    @NotNull Instant removedAt,
+    @NotNull ExchangeRemovedByDto removedBy,
+    @Nullable String clientKey) {
+
+  /**
+   * Creates a tombstone without a client key.
+   *
+   * @param key the removed entry's opaque key
+   * @param removedAt when it was removed
+   * @param removedBy who removed it
+   */
+  public ExchangeTombstoneDto(
+      @NotNull String key, @NotNull Instant removedAt, @NotNull ExchangeRemovedByDto removedBy) {
+    this(key, removedAt, removedBy, null);
+  }
+
+  /**
+   * Returns this tombstone carrying a refinery order's client key.
+   *
+   * @param key the creating client's key, or {@code null}
+   * @return the tombstone
+   */
+  public @NotNull ExchangeTombstoneDto withClientKey(@Nullable String key) {
+    return new ExchangeTombstoneDto(this.key, removedAt, removedBy, key);
+  }
+}

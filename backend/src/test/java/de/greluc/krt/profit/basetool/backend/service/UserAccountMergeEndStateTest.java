@@ -60,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
  * is dropped, which row of a bystander and which row recording an act stays, and the {@code
  * USER_MERGED} audit row with its exact details and key order.
  *
- * <p>The source account owns rows in every one of the 27 followed columns, the target holds the
+ * <p>The source account owns rows in every one of the 28 followed columns, the target holds the
  * same key in every table with a unique constraint, and a bystander owns a row of each kind. The
  * expectation list is spelled out here, independent of the code under test, so the steps can move
  * into the owning modules.
@@ -100,6 +100,7 @@ class UserAccountMergeEndStateTest {
     EXPECTED_MOVED.put("notification_mute.user_id", 1);
     EXPECTED_MOVED.put("exchange_installation.user_id", 1);
     EXPECTED_MOVED.put("exchange_ship_link.user_id", 1);
+    EXPECTED_MOVED.put("exchange_refinery_order_link.user_id", 1);
   }
 
   @Autowired private UserAccountMergeService mergeService;
@@ -143,7 +144,7 @@ class UserAccountMergeEndStateTest {
 
     Map<String, Integer> targetBefore = counts(target);
     Map<String, Integer> bystanderBefore = counts(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(27);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -234,7 +235,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=31");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
@@ -675,6 +676,13 @@ class UserAccountMergeEndStateTest {
         user,
         external,
         ship);
+    jdbc.update(
+        "INSERT INTO exchange_refinery_order_link (id, user_id, client_id, client_key,"
+            + " refinery_order_id) VALUES (?, ?, 'merge-client', ?, ?)",
+        UUID.randomUUID(),
+        user,
+        external,
+        UUID.randomUUID());
   }
 
   private UUID auditEventBy(UUID actor) {

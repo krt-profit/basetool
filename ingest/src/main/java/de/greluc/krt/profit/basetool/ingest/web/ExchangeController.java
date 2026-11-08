@@ -144,6 +144,20 @@ public class ExchangeController {
   /** The member's refinery-order feed below {@link #GATEWAY}. */
   private static final String MEMBER_REFINERY_ORDERS = "/me/refinery-orders";
 
+  /** The prefix of the member's own resources below {@link #GATEWAY}. */
+  private static final String MEMBER = "/me/";
+
+  /** The change-set path below each of the member's feeds. */
+  private static final String CHANGES = "/changes";
+
+  /** The change-set definition in {@code change-set.schema.json} of each member resource. */
+  private static final Map<String, String> MEMBER_CHANGE_SETS =
+      Map.of(
+          "blueprints", "blueprintChangeSet",
+          "stock", "stockChangeSet",
+          "ships", "shipChangeSet",
+          "refinery-orders", "refineryOrderChangeSet");
+
   /** The page schema of each of the member's feeds. */
   private static final Map<String, String> MEMBER_FEED_PAGES =
       Map.of(
@@ -523,57 +537,42 @@ public class ExchangeController {
   }
 
   /**
-   * Adds or removes blueprints.
+   * Applies a change set to one of the member's own resources — the blueprints, the stock lots, the
+   * ships or the refinery orders (REQ-XCH-052); each set counts once against the daily write quota,
+   * whatever its op count.
    *
    * @param body the change set
    * @param request the admitted request
    * @param acceptLanguage the caller's language
    * @return the change result or a problem
    */
-  @PostMapping(value = "/me/blueprints/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(
+      value = {
+        MEMBER_BLUEPRINTS + CHANGES,
+        MEMBER_STOCK + CHANGES,
+        MEMBER_SHIPS + CHANGES,
+        MEMBER_REFINERY_ORDERS + CHANGES
+      },
+      consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> blueprintChanges(
+  public @NotNull ResponseEntity<?> memberChanges(
       @NotNull @RequestBody JsonNode body,
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return changes("blueprints", "blueprintChangeSet", false, body, request, acceptLanguage);
-  }
-
-  /**
-   * Sets the quantities of stock lots.
-   *
-   * @param body the change set
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the change result or a problem
-   */
-  @PostMapping(value = "/me/stock/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> stockChanges(
-      @NotNull @RequestBody JsonNode body,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return changes("stock", "stockChangeSet", false, body, request, acceptLanguage);
-  }
-
-  /**
-   * Links, creates, updates or removes ships.
-   *
-   * @param body the change set
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the change result or a problem
-   */
-  @PostMapping(value = "/me/ships/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> shipChanges(
-      @NotNull @RequestBody JsonNode body,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return changes("ships", "shipChangeSet", false, body, request, acceptLanguage);
+    String path =
+        String.valueOf(
+                Objects.requireNonNull(
+                    request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
+            .substring(GATEWAY.length());
+    String resource = path.substring(MEMBER.length(), path.length() - CHANGES.length());
+    return changes(
+        resource,
+        Objects.requireNonNull(MEMBER_CHANGE_SETS.get(resource)),
+        false,
+        body,
+        request,
+        acceptLanguage);
   }
 
   /**
