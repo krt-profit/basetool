@@ -112,8 +112,8 @@ class LocationDeleteInUseIntegrationTest {
   private void refineryOrder(Location location) {
     UUID orderId = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO refinery_order (id, owner_id, location_id, status, version)"
-            + " VALUES (?, ?, ?, 'OPEN', 0)",
+        "INSERT INTO refinery_order (id, owner_id, location_id, status, version, last_changed_at)"
+            + " VALUES (?, ?, ?, 'OPEN', 0, now())",
         orderId,
         owner.getId(),
         location.getId());

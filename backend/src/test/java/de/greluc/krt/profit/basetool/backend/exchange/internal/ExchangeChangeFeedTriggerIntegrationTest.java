@@ -991,7 +991,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
   private @NotNull UUID refineryOrder(@NotNull UUID owner, @NotNull UUID location) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO refinery_order (id, version, owner_id, location_id) VALUES (?, 0, ?, ?)",
+        "INSERT INTO refinery_order (id, version, owner_id, location_id, last_changed_at)"
+            + " VALUES (?, 0, ?, ?, now())",
         id,
         owner,
         location);

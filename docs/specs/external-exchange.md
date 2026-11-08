@@ -3273,7 +3273,8 @@ is named by id only.
   its cursor carries a completed, a cancelled and a reopened order as changes.
   *`ExchangeRefineryOrderControllerTest`.*
 - [ ] An order created in the web, by a draft and by another client appears with its marker; only
-  the creating client sees its `clientKey`.
+  the creating client sees its `clientKey`. *(The marker of a web and a client order holds,
+  `ExchangeRefineryOrderControllerTest`; the `clientKey` comes with #3168.)*
 - [x] A hard delete and an owner reassignment leave a tombstone; a cancel does not; a location
   reference change re-announces the order. *`ExchangeRefineryOrderControllerTest`,
   `ExchangeChangeFeedTriggerIntegrationTest`.*
@@ -3285,9 +3286,9 @@ is named by id only.
 **Enforced by:** `ExchangeRefineryOrderControllerTest`, `ExchangeChangeFeedTriggerIntegrationTest`,
 `ExchangeRefineryOrderRouteTest`, `ExchangeWireContractTest` · **Code:**
 `ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370` · **Status:** partially
-implemented — #3167 (scopes, triggers, read); both `versions` counters read the order's single
-version until #3165 splits it, and `createdBy`, `clientKey` and `pickedUpAt` are served once
-#3166 and #3168 store them
+implemented — #3167 (scopes, triggers, read); `versions` carries the two section counters of
+#3165 and `createdBy` and `pickedUpAt` the provenance of #3166; `clientKey` is served once #3168
+stores it
 
 ### REQ-XCH-052 — A client writes the member's refinery orders in one change set
 

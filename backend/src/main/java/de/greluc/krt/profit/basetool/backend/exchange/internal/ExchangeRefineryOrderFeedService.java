@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -62,6 +63,7 @@ public class ExchangeRefineryOrderFeedService {
   private final RefineryExchangeReader refineryReader;
   private final ExchangeFeedReader feedReader;
   private final LocationRepository locationRepository;
+  private final KnownExchangeClients knownClients;
 
   /**
    * Returns one page of the member's refinery orders.
@@ -109,9 +111,9 @@ public class ExchangeRefineryOrderFeedService {
         more
             ? ExchangeFeedCursor.snapshot(at, delivered.getLast().id()).format()
             : ExchangeFeedCursor.feed(at).format();
-    Map<UUID, UUID> guids = guids(delivered);
+    References refs = references(delivered);
     return new ExchangeRefineryOrderPageDto(
-        delivered.stream().map(order -> toDto(order, guids)).toList(), List.of(), next, more);
+        delivered.stream().map(order -> toDto(order, refs)).toList(), List.of(), next, more);
   }
 
   /**
@@ -133,18 +135,45 @@ public class ExchangeRefineryOrderFeedService {
             .orders(member, changes.keys().stream().map(UUID::fromString).toList())
             .stream()
             .collect(Collectors.toMap(order -> order.id().toString(), Function.identity()));
-    Map<UUID, UUID> guids = guids(current.values());
+    References refs = references(current.values());
     List<ExchangeRefineryOrderDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();
     for (String key : changes.keys()) {
       RefineryExchangeOrder order = current.get(key);
       if (order != null) {
-        items.add(toDto(order, guids));
+        items.add(toDto(order, refs));
       } else {
         removed.add(changes.tombstone(key, key));
       }
     }
     return new ExchangeRefineryOrderPageDto(items, removed, changes.nextCursor(), changes.more());
+  }
+
+  /**
+   * Reads what the given orders name by id: their locations' starmap GUIDs and their creating
+   * clients' display names, one query each.
+   *
+   * @param orders the orders
+   * @return the references
+   */
+  private @NotNull References references(@NotNull Collection<RefineryExchangeOrder> orders) {
+    return new References(guids(orders), clientNames(orders));
+  }
+
+  /**
+   * Reads the display names of the given orders' creating clients in one query.
+   *
+   * @param orders the orders
+   * @return the display name by client id; a client the registry no longer holds is absent
+   */
+  private @NotNull Map<String, String> clientNames(
+      @NotNull Collection<RefineryExchangeOrder> orders) {
+    Set<String> clients =
+        orders.stream()
+            .map(RefineryExchangeOrder::createdByClient)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return clients.isEmpty() ? Map.of() : knownClients.displayNames(clients);
   }
 
   /**
@@ -168,21 +197,27 @@ public class ExchangeRefineryOrderFeedService {
    * Maps an order.
    *
    * @param order the order
-   * @param guids the starmap GUID by location id
+   * @param refs the page's location GUIDs and client names
    * @return the feed entry
    */
   private static @NotNull ExchangeRefineryOrderDto toDto(
-      @NotNull RefineryExchangeOrder order, @NotNull Map<UUID, UUID> guids) {
+      @NotNull RefineryExchangeOrder order, @NotNull References refs) {
     RefineryExchangeOrder.Place place = order.location();
     RefineryExchangeOrder.Method method = order.method();
+    String creator = order.createdByClient();
     return new ExchangeRefineryOrderDto(
         order.id().toString(),
+        creator == null
+            ? null
+            : new ExchangeRefineryOrderDto.Creator(
+                creator,
+                ExchangeStockFeedService.cut(refs.clientNames().getOrDefault(creator, creator))),
         new ExchangeRefineryOrderDto.Versions(order.gameDataVersion(), order.financesVersion()),
         order.status(),
         new ExchangeLocationDto(
             ExchangeStockFeedService.cut(place.name()),
             ExchangeCatalogService.uex(place.uexCityId(), place.uexSpaceStationId()),
-            guids.get(place.id())),
+            refs.guids().get(place.id())),
         method == null
             ? null
             : new ExchangeRefineryOrderDto.Method(
@@ -190,6 +225,7 @@ public class ExchangeRefineryOrderFeedService {
         order.startedAt(),
         order.durationMinutes(),
         order.endsAt(),
+        order.pickedUpAt(),
         order.storedAt(),
         order.expenses(),
         order.otherExpenses(),
@@ -219,4 +255,13 @@ public class ExchangeRefineryOrderFeedService {
         good.outputQuantity(),
         good.quality());
   }
+
+  /**
+   * What one page's orders name by id, read once per page.
+   *
+   * @param guids the starmap GUID by location id
+   * @param clientNames the display name by client id
+   */
+  private record References(
+      @NotNull Map<UUID, UUID> guids, @NotNull Map<String, String> clientNames) {}
 }

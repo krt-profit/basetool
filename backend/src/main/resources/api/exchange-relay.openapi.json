@@ -2655,6 +2655,17 @@
           }
         }
       },
+      "Creator" : {
+        "type" : "object",
+        "properties" : {
+          "clientId" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "Entry" : {
         "type" : "object",
         "properties" : {
@@ -3639,6 +3650,9 @@
       "ExchangeRefineryOrderDto" : {
         "type" : "object",
         "properties" : {
+          "createdBy" : {
+            "$ref" : "#/components/schemas/Creator"
+          },
           "durationMinutes" : {
             "type" : "integer",
             "format" : "int64"
@@ -3681,6 +3695,10 @@
           "otherExpenses" : {
             "type" : "number",
             "format" : "double"
+          },
+          "pickedUpAt" : {
+            "type" : "string",
+            "format" : "date-time"
           },
           "startedAt" : {
             "type" : "string",

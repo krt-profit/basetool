@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRevocationRow;
@@ -97,6 +98,8 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeStockPageDto.class, "page.schema.json#/$defs/stockPage"),
           Map.entry(ExchangeShipPageDto.class, "page.schema.json#/$defs/shipPage"),
           Map.entry(ExchangeOrgStockPageDto.class, "page.schema.json#/$defs/orgStockPage"),
+          Map.entry(
+              ExchangeRefineryOrderPageDto.class, "page.schema.json#/$defs/refineryOrderPage"),
           Map.entry(ExchangeChangeResultDto.class, "change-result.schema.json"),
           Map.entry(
               ExchangeBlueprintChangeSet.class, "change-set.schema.json#/$defs/blueprintChangeSet"),

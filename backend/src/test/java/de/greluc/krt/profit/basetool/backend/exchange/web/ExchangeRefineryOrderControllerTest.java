@@ -147,7 +147,8 @@ class ExchangeRefineryOrderControllerTest {
     jdbc.update(
         """
         UPDATE refinery_order SET refining_method_id = ?, owning_org_unit_id = ?,
-               started_at = ?, duration_minutes = 90, expenses = 1250.5, ore_sales = 400
+               started_at = ?, duration_minutes = 90, expenses = 1250.5, ore_sales = 400,
+               game_data_version = 3, finances_version = 1
         WHERE id = ?
         """,
         method,
@@ -156,6 +157,10 @@ class ExchangeRefineryOrderControllerTest {
         open);
     UUID good = good(open, quantainium, refined);
     UUID running = order(member, "IN_PROGRESS");
+    jdbc.update(
+        "UPDATE refinery_order SET created_source = 'CLIENT', created_client = ? WHERE id = ?",
+        client,
+        running);
     order(member, "COMPLETED");
     order(member, "CANCELED");
     order(other, "OPEN");
@@ -172,8 +177,8 @@ class ExchangeRefineryOrderControllerTest {
 
     String first = "$.items[?(@.id == '" + open + "')]";
     assertThat(JsonPath.<List<String>>read(body, first + ".status")).containsExactly("OPEN");
-    assertThat(JsonPath.<List<Integer>>read(body, first + ".versions.gameData")).containsExactly(0);
-    assertThat(JsonPath.<List<Integer>>read(body, first + ".versions.finances")).containsExactly(0);
+    assertThat(JsonPath.<List<Integer>>read(body, first + ".versions.gameData")).containsExactly(3);
+    assertThat(JsonPath.<List<Integer>>read(body, first + ".versions.finances")).containsExactly(1);
     assertThat(JsonPath.<List<String>>read(body, first + ".location.name"))
         .containsExactly("ARC-L1 Refinery " + refinery);
     assertThat(JsonPath.<List<String>>read(body, first + ".method.code")).containsExactly("DINYX");
@@ -190,6 +195,8 @@ class ExchangeRefineryOrderControllerTest {
     assertThat(JsonPath.<List<String>>read(body, first + ".orgUnitId"))
         .containsExactly(unit.toString());
     assertThat(JsonPath.<List<Object>>read(body, first + ".owner")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(body, first + ".createdBy")).isEmpty();
+    assertThat(JsonPath.<List<Object>>read(body, first + ".pickedUpAt")).isEmpty();
     assertThat(JsonPath.<List<String>>read(body, first + ".goods[0].id"))
         .containsExactly(good.toString());
     assertThat(JsonPath.<List<String>>read(body, first + ".goods[0].input.bt"))
@@ -207,6 +214,10 @@ class ExchangeRefineryOrderControllerTest {
     assertThat(JsonPath.<List<String>>read(body, second + ".status"))
         .containsExactly("IN_PROGRESS");
     assertThat(JsonPath.<List<Object>>read(body, second + ".method")).isEmpty();
+    assertThat(JsonPath.<List<String>>read(body, second + ".createdBy.clientId"))
+        .containsExactly(client);
+    assertThat(JsonPath.<List<String>>read(body, second + ".createdBy.name"))
+        .containsExactly("VerseKit");
     assertThat(JsonPath.<List<Object>>read(body, second + ".endsAt")).isEmpty();
     assertThat(JsonPath.<List<List<Object>>>read(body, second + ".goods"))
         .containsExactly(List.of());
@@ -245,7 +256,15 @@ class ExchangeRefineryOrderControllerTest {
     order(member, "OPEN");
     String cursor = snapshotEnd();
 
-    jdbc.update("UPDATE refinery_order SET status = 'COMPLETED' WHERE id = ?", completed);
+    jdbc.update(
+        """
+        UPDATE refinery_order SET status = 'COMPLETED', picked_up_at = ?, picked_up_client = ?,
+               created_source = 'CLIENT', created_client = 'retired-client'
+        WHERE id = ?
+        """,
+        Timestamp.from(Instant.parse("2026-11-08T09:12:00Z")),
+        client,
+        completed);
     jdbc.update("UPDATE refinery_order SET status = 'CANCELED' WHERE id = ?", cancelled);
     jdbc.update("UPDATE refinery_order SET status = 'OPEN' WHERE id = ?", reopened);
 
@@ -259,6 +278,11 @@ class ExchangeRefineryOrderControllerTest {
             .getContentAsString();
     assertThat(JsonPath.<List<String>>read(body, "$.items[?(@.id == '" + completed + "')].status"))
         .containsExactly("COMPLETED");
+    String done = "$.items[?(@.id == '" + completed + "')]";
+    assertThat(JsonPath.<List<String>>read(body, done + ".pickedUpAt"))
+        .containsExactly("2026-11-08T09:12:00Z");
+    assertThat(JsonPath.<List<String>>read(body, done + ".createdBy.name"))
+        .containsExactly("retired-client");
     assertThat(JsonPath.<List<String>>read(body, "$.items[?(@.id == '" + cancelled + "')].status"))
         .containsExactly("CANCELED");
     assertThat(JsonPath.<List<String>>read(body, "$.items[?(@.id == '" + reopened + "')].status"))
@@ -359,8 +383,8 @@ class ExchangeRefineryOrderControllerTest {
   private @NotNull UUID order(@NotNull UUID owner, @NotNull String status) {
     UUID id = UUID.randomUUID();
     jdbc.update(
-        "INSERT INTO refinery_order (id, version, owner_id, location_id, status)"
-            + " VALUES (?, 0, ?, ?, ?)",
+        "INSERT INTO refinery_order (id, version, owner_id, location_id, status, last_changed_at)"
+            + " VALUES (?, 0, ?, ?, ?, now())",
         id,
         owner,
         refinery,

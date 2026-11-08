@@ -540,8 +540,9 @@ class ExchangeWireContractTest {
     UUID order = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO refinery_order (id, version, owner_id, location_id, mission_id,"
-            + " owning_org_unit_id, status, started_at, duration_minutes, expenses)"
-            + " VALUES (?, 0, ?, ?, ?, ?, 'IN_PROGRESS', now(), 120, 1500)",
+            + " owning_org_unit_id, status, started_at, duration_minutes, expenses,"
+            + " last_changed_at)"
+            + " VALUES (?, 0, ?, ?, ?, ?, 'IN_PROGRESS', now(), 120, 1500, now())",
         order,
         member,
         location,

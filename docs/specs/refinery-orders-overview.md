@@ -357,12 +357,13 @@ VerseKit-specific: the name shown is the client's display name from the registry
 **Enforced by:** `RefineryOrderProvenanceStampingTest`, `RefineryOrderStoreServiceTest`
 (`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `RefineryOrderProvenanceReadTest`,
 `RefineryOrderMapperTest`, `RefineryOrdersListPatternRenderTest`,
-`RefineryOrderDetailPatternRenderTest` · **Code:** `RefineryOrderProvenance`,
+`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderControllerTest` (the feed's `createdBy`) ·
+**Code:** `RefineryOrderProvenance`,
 `RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
 `refinery-orders-details.html`, migration `V372`
 
-**Status:** web side implemented (#3166); the client writes that set a client source arrive with
-#3168
+**Status:** web side and the feed's marker implemented (#3166, #3167); the client writes that set a
+client source arrive with #3168
 
 ### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
 
@@ -428,8 +429,9 @@ and sends only those; an edit that changed nothing sends no request.
 - [x] The edit form echoes both counters and a stale one of an unchanged section does not refuse
   the save.
 
-**Status:** implemented for the web and the order API — #3165 (`RefineryOrderSectionCounterTest`,
-`RefineryOrderChangedPartsTest`); the exchange ops follow with REQ-XCH-052.
+**Status:** implemented for the web, the order API and the exchange feed — #3165
+(`RefineryOrderSectionCounterTest`, `RefineryOrderChangedPartsTest`), #3167
+(`ExchangeRefineryOrderControllerTest`); the exchange ops follow with REQ-XCH-052.
 
 ## Out of scope
 

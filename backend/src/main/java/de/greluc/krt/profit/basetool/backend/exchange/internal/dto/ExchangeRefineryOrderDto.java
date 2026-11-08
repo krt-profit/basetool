@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * the member (REQ-XCH-051).
  *
  * @param id the order's Basetool id, the feed key the write ops name
+ * @param createdBy the client marker, or {@code null} for an order created in the web
  * @param versions the counters of the order's two sections
  * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}
  * @param location the refinery's location
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param startedAt when the run started, or {@code null}
  * @param durationMinutes the run's length in minutes, or {@code null}
  * @param endsAt when the run ends, or {@code null} while start or length is unset
+ * @param pickedUpAt when a client reported the yield collected, or {@code null}
  * @param storedAt when the yield was booked into stock, or {@code null}
  * @param expenses the refining costs in aUEC, or {@code null} when not set
  * @param otherExpenses the other costs in aUEC, or {@code null} when not set
@@ -50,6 +52,7 @@ import org.jetbrains.annotations.Unmodifiable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeRefineryOrderDto(
     @NotNull String id,
+    @Nullable Creator createdBy,
     @NotNull Versions versions,
     @NotNull String status,
     @NotNull ExchangeLocationDto location,
@@ -57,6 +60,7 @@ public record ExchangeRefineryOrderDto(
     @Nullable Instant startedAt,
     @Nullable Long durationMinutes,
     @Nullable Instant endsAt,
+    @Nullable Instant pickedUpAt,
     @Nullable Instant storedAt,
     @Nullable Double expenses,
     @Nullable Double otherExpenses,
@@ -64,6 +68,14 @@ public record ExchangeRefineryOrderDto(
     @Nullable UUID missionId,
     @Nullable UUID orgUnitId,
     @NotNull @Unmodifiable List<Good> goods) {
+
+  /**
+   * The connected application that created the order (REQ-REFINERY-027).
+   *
+   * @param clientId the client's id in the exchange registry
+   * @param name the client's display name, or its id when the registry no longer holds it
+   */
+  public record Creator(@NotNull String clientId, @NotNull String name) {}
 
   /**
    * The section counters a write echoes (REQ-REFINERY-029).

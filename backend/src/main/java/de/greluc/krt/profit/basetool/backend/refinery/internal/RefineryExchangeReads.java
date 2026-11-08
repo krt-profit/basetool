@@ -82,17 +82,18 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
    * Maps an order with its loaded graph.
    *
    * @param order the order
-   * @return the exchange row, both section counters read from the order's one version
+   * @return the exchange row with its section counters and provenance
    */
   private static @NotNull RefineryExchangeOrder toRow(@NotNull RefineryOrder order) {
-    long version = order.getVersion() == null ? 0 : order.getVersion();
     RefiningMethod method = order.getRefiningMethod();
     OrgUnit unit = order.getOwningOrgUnit();
+    RefineryOrderProvenance provenance = order.getProvenance();
     return new RefineryExchangeOrder(
         order.getId(),
         order.getStatus().name(),
-        version,
-        version,
+        Objects.requireNonNullElse(order.getGameDataVersion(), 0L),
+        Objects.requireNonNullElse(order.getFinancesVersion(), 0L),
+        provenance.getCreatedClient(),
         place(order.getLocation()),
         method == null
             ? null
@@ -100,6 +101,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
         order.getStartedAt(),
         order.getDurationMinutes(),
         order.getEndsAt(),
+        provenance.getPickedUpAt(),
         order.getStoredAt(),
         order.getExpenses(),
         order.getOtherExpenses(),

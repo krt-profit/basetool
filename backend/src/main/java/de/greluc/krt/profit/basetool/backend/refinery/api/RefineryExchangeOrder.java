@@ -33,11 +33,14 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}
  * @param gameDataVersion the counter of the game-data section (REQ-REFINERY-029)
  * @param financesVersion the counter of the finances section (REQ-REFINERY-029)
+ * @param createdByClient the exchange client that created the order, or {@code null} when the web
+ *     did (REQ-REFINERY-027)
  * @param location the refinery's location
  * @param method the refining method, or {@code null} when none is set
  * @param startedAt when the run started, or {@code null}
  * @param durationMinutes the run's length in minutes, or {@code null}
  * @param endsAt {@code startedAt + durationMinutes}, or {@code null} when either is unset
+ * @param pickedUpAt when an exchange client reported the pickup, or {@code null} (REQ-REFINERY-028)
  * @param storedAt when the yield was booked into stock, or {@code null}
  * @param expenses the refining costs in aUEC, or {@code null} when not set
  * @param otherExpenses the other costs in aUEC, or {@code null} when not set
@@ -51,11 +54,13 @@ public record RefineryExchangeOrder(
     @NotNull String status,
     long gameDataVersion,
     long financesVersion,
+    @Nullable String createdByClient,
     @NotNull Place location,
     @Nullable Method method,
     @Nullable Instant startedAt,
     @Nullable Long durationMinutes,
     @Nullable Instant endsAt,
+    @Nullable Instant pickedUpAt,
     @Nullable Instant storedAt,
     @Nullable Double expenses,
     @Nullable Double otherExpenses,

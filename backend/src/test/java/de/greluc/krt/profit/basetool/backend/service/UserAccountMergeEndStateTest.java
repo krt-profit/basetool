@@ -456,8 +456,8 @@ class UserAccountMergeEndStateTest {
 
   private void refineryOrder(UUID owner) {
     jdbc.update(
-        "INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id)"
-            + " VALUES (?, 0, now(), now(), ?, ?)",
+        "INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id,"
+            + " last_changed_at) VALUES (?, 0, now(), now(), ?, ?, now())",
         UUID.randomUUID(),
         owner,
         location);
