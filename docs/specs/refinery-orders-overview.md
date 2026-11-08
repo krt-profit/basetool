@@ -235,12 +235,17 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
   `COMPLETED` without a store is accepted; it cannot be stored afterwards, so nothing is duplicated.
 - Store refuses (400) an item whose job order does not require the item's material, on the same terms
   as `POST /inventory` (REQ-ORDERS-018).
+- Store accepts an item's job order only when the caller sees it within the tenancy read scope, the
+  same rule `GET /api/v1/orders/lookup` filters the store dialog's job-order picker by (REQ-ORG-003;
+  the assignee grant does not count). An order outside that scope is refused with the same 404 as an
+  unknown id, before its requirements are read, so the store reveals no foreign order's existence.
 - Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
   are already `COMPLETED`.
 
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
-`RefineryOrderStoreServiceTest` · **Code:** `RefineryOrderService.updateRefineryOrder` /
-`storeRefineryOrder`
+`RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`)
+· **Code:** `RefineryOrderService.updateRefineryOrder` / `RefineryOrderStoreService.storeRefineryOrder`,
+`JobOrderVisibility`
 
 ### Write requests and settings (wave 6 of the API cut)
 

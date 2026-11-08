@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
@@ -103,6 +104,7 @@ class RefineryOrderStoreServiceTest {
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderItemService jobOrderItemService;
+  @Mock private JobOrderVisibility jobOrderVisibility;
   @Mock private RefineryYieldRepository refineryYieldRepository;
   @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private BookInPolicy bookInPolicy;
@@ -215,6 +217,7 @@ class RefineryOrderStoreServiceTest {
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
@@ -227,6 +230,35 @@ class RefineryOrderStoreServiceTest {
                 false));
 
     verify(inventoryItemRepository, never()).save(any());
+  }
+
+  /**
+   * A job order outside the caller's read scope is refused exactly like an unknown id, before its
+   * requirements are read (REQ-REFINERY-022).
+   */
+  @Test
+  void refusesAJobOrderOutsideTheCallersScopeLikeAnUnknownOne() {
+    stubLookupsForSingleItem();
+    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder jobOrder =
+        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
+    jobOrder.setId(JOB_ORDER_ID);
+    when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
+    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(false);
+
+    NotFoundException ex =
+        assertThrows(
+            NotFoundException.class,
+            () ->
+                refineryOrderService.storeRefineryOrder(
+                    OWNER_ID,
+                    ORDER_ID,
+                    new RefineryOrderStoreDto(List.of(item(null, JOB_ORDER_ID))),
+                    false));
+
+    assertEquals("JobOrder not found: " + JOB_ORDER_ID, ex.getMessage());
+    verify(jobOrderItemService, never()).requiredMaterialIds(any());
+    verify(inventoryItemRepository, never()).save(any());
+    verify(refineryOrderRepository, never()).save(any());
   }
 
   @Nested

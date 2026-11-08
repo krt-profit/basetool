@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
@@ -41,11 +42,16 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.model.*;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -59,6 +65,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStor
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +114,10 @@ class RefineryOrderTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
+
+  @Autowired private JobOrderRepository jobOrderRepository;
+
+  @Autowired private QualityTierRepository qualityTierRepository;
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -702,5 +713,98 @@ class RefineryOrderTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(storeDto)))
         .andExpect(status().isBadRequest());
+  }
+
+  /**
+   * A member may not earmark refinery output for a job order outside their read scope; the store
+   * answers 404 like an unknown id and books nothing (REQ-REFINERY-022, REQ-ORG-003).
+   */
+  @Test
+  void storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
+    letIridiumReachTheJobOrderQueue();
+    Squadron foreign = new Squadron();
+    foreign.setName("Refinery-Foreign");
+    foreign.setShorthand("RFX");
+    foreign.setProfitEligible(true);
+    foreign = squadronRepository.save(foreign);
+    JobOrder foreignOrder = openJobOrderNeeding(foreign, quantanium);
+    RefineryOrder order = storableOrder();
+
+    mockMvc
+        .perform(storeRequest(order.getId(), foreignOrder.getId()))
+        .andExpect(status().isNotFound());
+
+    assertEquals(
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
+    assertTrue(
+        inventoryItemRepository
+            .findMaterialRowsByUser(user1, org.springframework.data.domain.Pageable.unpaged())
+            .isEmpty(),
+        "nothing is booked for a refused store");
+  }
+
+  /** A job order of the caller's own squadron stays a valid earmark target of the store. */
+  @Test
+  void storeEarmarksAJobOrderOfTheCallersOwnSquadron() throws Exception {
+    letIridiumReachTheJobOrderQueue();
+    JobOrder ownOrder = openJobOrderNeeding(iridium, quantanium);
+    RefineryOrder order = storableOrder();
+
+    mockMvc.perform(storeRequest(order.getId(), ownOrder.getId())).andExpect(status().isOk());
+
+    assertEquals(
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
+        refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
+  }
+
+  /** Makes Iridium profit-eligible, so its members reach the job-order queue (REQ-ORG-003). */
+  private void letIridiumReachTheJobOrderQueue() {
+    iridium.setProfitEligible(true);
+    iridium = squadronRepository.save(iridium);
+  }
+
+  private RefineryOrder storableOrder() {
+    RefineryOrder order = new RefineryOrder();
+    order.setOwningOrgUnit(iridium);
+    order.setLocation(station);
+    order.setOwner(user1);
+    order.setRefiningMethod(dinyx);
+    order.setStatus(
+        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN);
+    return refineryOrderRepository.save(order);
+  }
+
+  private JobOrder openJobOrderNeeding(OrgUnit responsible, Material material) {
+    JobOrder jobOrder =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(responsible)
+            .handle("refinery-store-test")
+            .status(JobOrderStatus.OPEN)
+            .build();
+    jobOrder.addMaterial(
+        JobOrderMaterial.builder()
+            .material(material)
+            .qualityTier(qualityTierRepository.findByCode("NONE").orElseThrow())
+            .amount(10.0)
+            .build());
+    return jobOrderRepository.save(jobOrder);
+  }
+
+  private org.springframework.test.web.servlet.RequestBuilder storeRequest(
+      UUID orderId, UUID jobOrderId) {
+    RefineryOrderStoreItemDto itemDto =
+        new RefineryOrderStoreItemDto(
+            quantanium.getId(), station.getId(), 100, 5.0, null, jobOrderId, null, null, null);
+    return post("/api/v1/refinery-orders/" + orderId + "/store")
+        .with(
+            jwt()
+                .jwt(builder -> builder.subject(user1.getId().toString()))
+                .authorities(
+                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                    new SimpleGrantedAuthority("REFINERY_WRITE")))
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new RefineryOrderStoreDto(List.of(itemDto))));
   }
 }
