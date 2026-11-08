@@ -95,8 +95,8 @@ public class BankRequestController {
   /**
    * Confirms a pending request: records the holder(s) and books the deposit / withdrawal / transfer
    * onto the ledger (REQ-BANK-023/-040/-041). Requires the per-account capability matching the
-   * request type and, for an over-limit request, the responsible-holder approval attestation — both
-   * enforced in the service.
+   * request type and, for an over-limit request, the responsible-holder approval attestation plus,
+   * without an in-app approval, a staff note naming the approver — all enforced in the service.
    *
    * @param id the request to confirm
    * @param request the holder(s), the over-limit approval attestation and the echoed version

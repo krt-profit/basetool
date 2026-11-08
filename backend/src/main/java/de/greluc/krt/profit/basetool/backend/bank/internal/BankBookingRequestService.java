@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
@@ -735,6 +736,9 @@ public class BankBookingRequestService {
    * @param authentication the current authentication (capability check)
    * @return the confirmed request
    * @throws NotFoundException when the request does not exist
+   * @throws BankApproverNoteRequiredException when the request needs approval, none was recorded in
+   *     the app and {@code staffNote} is blank, so nothing names the approver (REQ-BANK-041,
+   *     ADR-0353)
    * @throws AccessDeniedException when the employee lacks the matching per-account capability
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING}, {@code
    *     BANK_FOUR_EYES_REQUIRED} (the caller raised the request and is no admin, REQ-BANK-062),
@@ -757,12 +761,7 @@ public class BankBookingRequestService {
     requireVersion(request, version);
     requirePending(request);
     requireSecondPerson(request);
-    if (request.isRequiresOwnerApproval() && !ownerApprovalConfirmed) {
-      throw new BankConflictException(
-          BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED,
-          "The request exceeds the requester's approval limit; confirm the responsible holder's"
-              + " approval first");
-    }
+    BankOverLimitConfirmGate.require(request, ownerApprovalConfirmed, staffNote);
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
