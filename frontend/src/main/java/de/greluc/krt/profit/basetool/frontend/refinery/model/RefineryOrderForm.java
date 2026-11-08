@@ -64,7 +64,25 @@ public class RefineryOrderForm {
   private UUID locationId;
   private UUID missionId;
   private RefineryOrderStatus status;
-  private Long version;
+
+  /** The game-data counter the edit form echoes (REQ-REFINERY-029). */
+  private Long gameDataVersion;
+
+  /** The finances counter the edit form echoes (REQ-REFINERY-029). */
+  private Long financesVersion;
+
+  /**
+   * Whether the edit form changed its game-data fields; {@code null} when the page script did not
+   * report it, which writes the section.
+   */
+  private Boolean gameDataChanged;
+
+  /** Whether the edit form changed its finance fields; {@code null} writes the section. */
+  private Boolean financesChanged;
+
+  /** Whether the edit form changed the mission link; {@code null} writes the link. */
+  private Boolean missionChanged;
+
   private String source;
 
   /**

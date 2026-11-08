@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -80,6 +82,17 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
         "goods.outputMaterial"
       })
   Optional<RefineryOrder> findById(@NotNull UUID id);
+
+  /**
+   * Loads one refinery order and row-locks it until the transaction ends, so a writer checks and
+   * raises its section counters (REQ-REFINERY-029) on state no concurrent writer can change.
+   *
+   * @param id the order id
+   * @return the locked order, or empty when none exists
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.id = :id")
+  Optional<RefineryOrder> lockById(@Param("id") UUID id);
 
   /**
    * Counts refinery orders in the given lifecycle status, backing the {@code

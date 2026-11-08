@@ -155,6 +155,23 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    */
   @Nullable private Instant storedAt;
 
+  /**
+   * Optimistic-lock counter of the game-data section: location, method, timer, status, goods and
+   * the store marker (REQ-REFINERY-029). A business counter beside the row {@code @Version}, raised
+   * by {@link RefineryOrderSection#advance}; on an update request it carries the caller's echo.
+   */
+  @Column(name = "game_data_version", nullable = false)
+  @Nullable
+  private Long gameDataVersion = 0L;
+
+  /**
+   * Optimistic-lock counter of the finances section: {@link #expenses}, {@link #otherExpenses} and
+   * {@link #oreSales} (REQ-REFINERY-029). Raised and echoed like {@link #gameDataVersion}.
+   */
+  @Column(name = "finances_version", nullable = false)
+  @Nullable
+  private Long financesVersion = 0L;
+
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
   private Set<@Valid RefineryGood> goods = new HashSet<>();

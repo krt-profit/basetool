@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialNameCanonical
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
@@ -278,23 +280,13 @@ public class RefineryImportService implements RefineryDraftBuilder {
     reconcileHeaderTotals(order, sourceGoods, issues);
 
     RefineryOrderDto draftOrder =
-        new RefineryOrderDto(
-            null,
+        draftOrder(
             resolveOwnerReference(callerId),
             location.map(locationMapper::toDto).orElse(null),
-            null,
             deriveStartedAt(order.sourceImages()),
-            order.durationMinutes(),
-            order.expenses(),
-            null,
-            null,
-            null,
+            order,
             method.map(refiningMethodMapper::toDto).orElse(null),
-            RefineryOrderStatus.OPEN.name(),
-            draftGoods,
-            null,
-            null,
-            null);
+            draftGoods);
     log.debug(
         "Built refinery import draft: {} of {} rows matched, {} skipped, {} issues",
         goodsMatched,
@@ -303,6 +295,47 @@ public class RefineryImportService implements RefineryDraftBuilder {
         issues.size());
     return new RefineryImportDraftDto(
         draftOrder, List.copyOf(issues), goodsMatched, sourceGoods.size(), rowsSkipped);
+  }
+
+  /**
+   * Builds the unsaved {@code OPEN} order of an import draft: no id, mission, money besides the
+   * expenses, owning unit, version or section counters.
+   *
+   * @param owner the caller as the order's owner
+   * @param location the matched refinery location, or {@code null}
+   * @param startedAt the start derived from the screenshots, or {@code null}
+   * @param order the extracted order
+   * @param method the matched refining method, or {@code null}
+   * @param goods the draft goods
+   * @return the draft order
+   */
+  @NotNull
+  private static RefineryOrderDto draftOrder(
+      @Nullable UserReferenceDto owner,
+      @Nullable LocationDto location,
+      @Nullable Instant startedAt,
+      @NotNull RefineryExtractOrderDto order,
+      @Nullable RefiningMethodDto method,
+      @NotNull List<RefineryGoodDto> goods) {
+    return new RefineryOrderDto(
+        null,
+        owner,
+        location,
+        null,
+        startedAt,
+        order.durationMinutes(),
+        order.expenses(),
+        null,
+        null,
+        null,
+        method,
+        RefineryOrderStatus.OPEN.name(),
+        goods,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   /**

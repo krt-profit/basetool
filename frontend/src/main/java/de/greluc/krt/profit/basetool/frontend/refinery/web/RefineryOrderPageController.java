@@ -779,7 +779,11 @@ public class RefineryOrderPageController {
         form.setOwnerId(orderDto.owner().id());
       }
       form.setStatus(orderDto.status());
-      form.setVersion(orderDto.version());
+      form.setGameDataVersion(orderDto.gameDataVersion());
+      form.setFinancesVersion(orderDto.financesVersion());
+      form.setGameDataChanged(false);
+      form.setFinancesChanged(false);
+      form.setMissionChanged(false);
 
       if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
         List<RefineryGoodForm> goodsForm = new ArrayList<>();

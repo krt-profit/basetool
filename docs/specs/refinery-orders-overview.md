@@ -384,15 +384,27 @@ neither section, so a mission edit collides with neither. The web's edit form, t
 cancel and every exchange op (REQ-XCH-052) use the same counters, and the read DTO and the
 exchange feed carry both.
 
+On `PUT /api/v1/refinery-orders/{id}` (and the logistician's per-target path) the request names the
+parts it writes in `parts` (`GAME_DATA`, `FINANCES`, `MISSION_LINK`) and echoes `gameDataVersion` /
+`financesVersion` for each section among them; the values of a part it does not name are not
+applied. A request without `parts` writes every part, checks the order `version` when it sends one
+and raises both counters, so a caller that knows no counters keeps its full-replace contract. The
+store and the cancel raise the game-data counter without an echo. Every order write row-locks the
+order first, so the check and the raise of a counter cannot interleave with another writer
+(`RefineryOrderRepository.lockById`). The edit form tracks which of its parts the member changed
+and sends only those; an edit that changed nothing sends no request.
+
 **Acceptance**
 
 - [ ] A finance edit in the web and a concurrent timer update by a client both apply; two
-  concurrent edits of the same section give one `409`.
-- [ ] A mission link change moves neither counter.
-- [ ] The edit form echoes both counters and a stale one of an unchanged section does not refuse
+  concurrent edits of the same section give one `409`. *(The web half holds; the client op comes
+  with REQ-XCH-052.)*
+- [x] A mission link change moves neither counter.
+- [x] The edit form echoes both counters and a stale one of an unchanged section does not refuse
   the save.
 
-**Status:** planned — #3165
+**Status:** implemented for the web and the order API — #3165 (`RefineryOrderSectionCounterTest`,
+`RefineryOrderChangedPartsTest`); the exchange ops follow with REQ-XCH-052.
 
 ## Out of scope
 

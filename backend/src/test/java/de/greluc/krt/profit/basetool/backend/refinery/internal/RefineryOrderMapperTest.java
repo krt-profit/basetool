@@ -240,6 +240,9 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            null,
+            null,
+            null,
             null);
 
     assertEquals(missionId, mapper.toEntity(request).getMissionId());
@@ -249,7 +252,20 @@ class RefineryOrderMapperTest {
   void toEntity_withoutAMissionReference_leavesTheOrderUnlinked() {
     RefineryOrderUpdateRequest request =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            null);
 
     assertNull(mapper.toEntity(request).getMissionId());
   }
@@ -268,10 +284,26 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            null,
+            null,
+            null,
             null);
     RefineryOrderUpdateRequest absent =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            null,
+            null);
     RefineryOrderUpdateRequest withId =
         new RefineryOrderUpdateRequest(
             null,
@@ -284,6 +316,9 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            null,
+            null,
+            null,
             null);
 
     org.junit.jupiter.api.Assertions.assertTrue(
@@ -340,7 +375,20 @@ class RefineryOrderMapperTest {
   void toEntity_fromAnUpdateRequest_carriesStatusAndVersionButNoIdentity() {
     RefineryOrderUpdateRequest request =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, "IN_PROGRESS", java.util.List.of(), 7L);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            "IN_PROGRESS",
+            java.util.List.of(),
+            7L,
+            null,
+            null,
+            null);
 
     RefineryOrder entity = mapper.toEntity(request);
 

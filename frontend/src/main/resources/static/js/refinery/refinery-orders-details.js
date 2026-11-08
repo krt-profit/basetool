@@ -779,6 +779,24 @@ function markRefineryFormDirty(event) {
     if (!target || !target.closest('#refineryOrderMainForm')) return;
     const hint = document.getElementById('rod-unsaved');
     if (hint) hint.hidden = false;
+    markRefinerySectionChanged(target);
+}
+
+/**
+ * Marks the order-form part the element belongs to as changed, so the save writes that part and
+ * echoes its counter (REQ-REFINERY-029); the other parts are left as the server holds them.
+ *
+ * @param {Element} element a control or button inside the order form
+ */
+function markRefinerySectionChanged(element) {
+    const section = element.closest('[data-rod-section]');
+    if (!section) return;
+    const flag = /** @type {HTMLInputElement | null} */ (
+        document.querySelector(
+            `#refineryOrderMainForm [data-rod-changed="${section.getAttribute('data-rod-section')}"]`,
+        )
+    );
+    if (flag) flag.value = 'true';
 }
 
 document.addEventListener('input', markRefineryFormDirty);
@@ -792,10 +810,17 @@ krtEvents.on('focusout', 'rod-update-profit', (el) => {
         updateProfitPreview();
     }
 });
-krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
+krtEvents.on('click', 'rod-set-started-now', (el) => {
+    setStartedAtNow();
+    markRefinerySectionChanged(el);
+});
 krtEvents.on('change', 'rod-update-method', updateMethodRatings);
-krtEvents.on('click', 'rod-add-material', addMaterialRow);
+krtEvents.on('click', 'rod-add-material', (el) => {
+    addMaterialRow();
+    markRefinerySectionChanged(el);
+});
 krtEvents.on('click', 'rod-remove-material', (el) => {
+    markRefinerySectionChanged(el);
     removeMaterialRow(el);
 });
 krtEvents.on('change', 'rod-update-output', (el) => {

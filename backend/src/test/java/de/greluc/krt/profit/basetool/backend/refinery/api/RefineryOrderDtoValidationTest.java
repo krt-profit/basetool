@@ -51,7 +51,7 @@ class RefineryOrderDtoValidationTest {
   private static RefineryOrderDto withExpenses(Double expenses) {
     return new RefineryOrderDto(
         null, null, null, null, null, null, expenses, null, null, null, null, null, null, null,
-        null, null);
+        null, null, null, null);
   }
 
   @Test
@@ -95,6 +95,8 @@ class RefineryOrderDtoValidationTest {
         null,
         null,
         List.of(good),
+        null,
+        null,
         null,
         null,
         null);

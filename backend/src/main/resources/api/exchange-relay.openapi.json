@@ -4525,6 +4525,14 @@
             "maximum" : 1.0E9,
             "minimum" : 0
           },
+          "financesVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "gameDataVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "goods" : {
             "type" : "array",
             "items" : {

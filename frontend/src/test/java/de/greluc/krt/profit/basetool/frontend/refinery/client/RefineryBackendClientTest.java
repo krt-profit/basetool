@@ -140,7 +140,10 @@ class RefineryBackendClientTest {
             null,
             RefineryOrderStatus.OPEN,
             List.of(),
-            3L);
+            3L,
+            null,
+            null,
+            null);
 
     client.create(created);
     client.createFor(USER, created);
@@ -162,7 +165,8 @@ class RefineryBackendClientTest {
     String updatedJson =
         "{\"location\":null,\"mission\":null,\"startedAt\":null,\"durationMinutes\":null,"
             + "\"expenses\":null,\"otherExpenses\":null,\"oreSales\":null,"
-            + "\"refiningMethod\":null,\"status\":\"OPEN\",\"goods\":[],\"version\":3}";
+            + "\"refiningMethod\":null,\"status\":\"OPEN\",\"goods\":[],\"version\":3,"
+            + "\"parts\":null,\"gameDataVersion\":null,\"financesVersion\":null}";
     assertThat(body(backend.expect("POST", "/api/v1/refinery-orders"))).isEqualTo(createdJson);
     assertThat(body(backend.expect("POST", "/api/v1/refinery-orders/users/" + USER)))
         .isEqualTo(createdJson);

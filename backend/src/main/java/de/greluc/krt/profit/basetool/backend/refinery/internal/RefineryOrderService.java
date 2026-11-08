@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Contract;
@@ -124,6 +125,8 @@ public class RefineryOrderService {
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId, boolean onBehalf) {
     order.setId(null);
     order.setVersion(null);
+    order.setGameDataVersion(0L);
+    order.setFinancesVersion(0L);
     order.setStatus(RefineryOrderStatus.OPEN);
     order.setStoredAt(null);
 
@@ -219,8 +222,15 @@ public class RefineryOrderService {
   }
 
   /**
-   * Updates a refinery order, replacing its goods; only the owner or a logistician may do so.
+   * Updates every part of a refinery order, replacing its goods; only the owner or a logistician
+   * may do so. The order version is checked when the caller sends one, and both section counters
+   * are raised (REQ-REFINERY-029).
    *
+   * @param userId the acting member, or the owner when a logistician acts
+   * @param orderId the order
+   * @param details the transient order holding the requested values and the last-seen version
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
    * @throws AccessDeniedException when the caller is neither owner nor logistician
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
    *     stale
@@ -234,18 +244,141 @@ public class RefineryOrderService {
       @NotNull UUID orderId,
       @NotNull RefineryOrder details,
       boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
-
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
     OptimisticLock.checkOptionalClient(
         order.getVersion(), details.getVersion(), RefineryOrder.class, orderId);
+    return update(userId, order, details, RefineryOrderPart.ALL, isLogistician);
+  }
 
+  /**
+   * Updates the named parts of a refinery order and leaves the others as they are
+   * (REQ-REFINERY-029). Each section among the parts is checked against the counter the caller
+   * echoed on {@code details} and raised by one; the mission link is not checked.
+   *
+   * @param userId the acting member, or the owner when a logistician acts
+   * @param orderId the order
+   * @param details the transient order holding the requested values and the echoed counters
+   * @param parts the parts to write; an empty set writes nothing
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
+   * @throws AccessDeniedException when the caller is neither owner nor logistician
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the counter of a
+   *     written section is absent or stale
+   * @throws BadRequestException when the order is already stored and the status would change
+   * @throws MissionParticipantRequiredException when the mission is changed to one the owner does
+   *     not take part in (REQ-SEC-042)
+   */
+  @Transactional
+  public RefineryOrder updateRefineryOrderParts(
+      @NotNull UUID userId,
+      @NotNull UUID orderId,
+      @NotNull RefineryOrder details,
+      @NotNull Set<RefineryOrderPart> parts,
+      boolean isLogistician) {
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
+    for (RefineryOrderPart part : parts) {
+      RefineryOrderSection section = part.section();
+      if (section != null) {
+        section.check(order, section.read(details));
+      }
+    }
+    return update(userId, order, details, parts, isLogistician);
+  }
+
+  /**
+   * Applies the named parts of {@code details} to the locked order and raises the counter of each
+   * section written.
+   *
+   * @param userId the acting member, or the owner when a logistician acts
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested values
+   * @param parts the parts to write
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
+   */
+  private RefineryOrder update(
+      @NotNull UUID userId,
+      @NotNull RefineryOrder order,
+      @NotNull RefineryOrder details,
+      @NotNull Set<RefineryOrderPart> parts,
+      boolean isLogistician) {
     if (!isLogistician
         && (order.getOwner() == null
             || order.getOwner().getId() == null
             || !order.getOwner().getId().equals(userId))) {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
     }
+    if (parts.isEmpty()) {
+      return order;
+    }
 
+    final RefineryOrderStatus previousStatus = order.getStatus();
+    final boolean runTimeChanged =
+        parts.contains(RefineryOrderPart.GAME_DATA) && applyGameData(order, details);
+    if (parts.contains(RefineryOrderPart.MISSION_LINK)) {
+      applyMissionLink(order, details);
+    }
+    if (parts.contains(RefineryOrderPart.FINANCES)) {
+      order.setExpenses(zeroToNull(details.getExpenses()));
+      order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
+      order.setOreSales(zeroToNull(details.getOreSales()));
+    }
+    for (RefineryOrderPart part : parts) {
+      RefineryOrderSection section = part.section();
+      if (section != null) {
+        section.advance(order);
+      }
+    }
+
+    RefineryOrder saved = refineryOrderRepository.save(order);
+    if (runTimeChanged
+        || saved.getStatus() == RefineryOrderStatus.COMPLETED
+        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
+      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+    }
+    announceByOther(
+        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        saved.getOwner() != null ? saved.getOwner().getId() : null,
+        AuditDetails.of("location", RefineryOrders.locationName(saved))
+            .with("method", RefineryOrders.methodName(saved))
+            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
+            .with("status", previousStatus + "->" + saved.getStatus()));
+    return saved;
+  }
+
+  /**
+   * Links, re-links or unlinks the order's mission: a reference with an id links that mission, a
+   * reference without an id leaves the link as it is, no reference unlinks it.
+   *
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested link
+   * @throws MissionParticipantRequiredException when the owner does not take part in the mission
+   */
+  private void applyMissionLink(@NotNull RefineryOrder order, @NotNull RefineryOrder details) {
+    UUID requestedMissionId = details.getMissionId();
+    if (requestedMissionId != null) {
+      if (!requestedMissionId.equals(order.getMissionId())) {
+        order.setMissionId(resolveMissionForOwner(requestedMissionId, order.getOwner()));
+      }
+    } else if (!details.isMissionReferenceWithoutId()) {
+      order.setMissionId(null);
+    }
+  }
+
+  /**
+   * Writes the game-data section: location, method, timer, status and goods. A changed timer clears
+   * the ready marker so the run is announced again (REQ-REFINERY-023).
+   *
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested values
+   * @return {@code true} when the start or the duration changed
+   * @throws BadRequestException when the order is already stored and the status would change
+   */
+  private boolean applyGameData(@NotNull RefineryOrder order, @NotNull RefineryOrder details) {
     if (order.getStoredAt() != null
         && details.getStatus() != null
         && details.getStatus() != order.getStatus()) {
@@ -260,15 +393,6 @@ public class RefineryOrderService {
                   "error.location.not_found"),
               order.getLocation()));
       validateLocationHasRefinery(order.getLocation());
-    }
-
-    UUID requestedMissionId = details.getMissionId();
-    if (requestedMissionId != null) {
-      if (!requestedMissionId.equals(order.getMissionId())) {
-        order.setMissionId(resolveMissionForOwner(requestedMissionId, order.getOwner()));
-      }
-    } else if (!details.isMissionReferenceWithoutId()) {
-      order.setMissionId(null);
     }
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
@@ -290,10 +414,6 @@ public class RefineryOrderService {
     if (runTimeChanged) {
       order.setReadyNotifiedAt(null);
     }
-    order.setExpenses(zeroToNull(details.getExpenses()));
-    order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
-    order.setOreSales(zeroToNull(details.getOreSales()));
-    final RefineryOrderStatus previousStatus = order.getStatus();
     if (details.getStatus() != null) {
       order.setStatus(details.getStatus());
     }
@@ -307,25 +427,7 @@ public class RefineryOrderService {
             order.getGoods().add(good);
           });
     }
-
-    RefineryOrder saved = refineryOrderRepository.save(order);
-    if (runTimeChanged
-        || saved.getStatus() == RefineryOrderStatus.COMPLETED
-        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
-      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
-    }
-    announceByOther(
-        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
-    auditRecorder.record(
-        AuditEventType.REFINERY_ORDER_UPDATED,
-        saved.getId(),
-        RefineryOrders.label(saved),
-        saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", previousStatus + "->" + saved.getStatus()));
-    return saved;
+    return runTimeChanged;
   }
 
   /**
@@ -389,7 +491,7 @@ public class RefineryOrderService {
   @Transactional
   public void deleteRefineryOrder(
       @NotNull UUID userId, @NotNull UUID orderId, boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
 
     if (!isLogistician
         && (order.getOwner() == null
@@ -400,6 +502,7 @@ public class RefineryOrderService {
 
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
+    RefineryOrderSection.GAME_DATA.advance(order);
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceByOther(order, userId, "CANCELED");

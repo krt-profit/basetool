@@ -639,7 +639,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       existing.setVersion(5L);
 
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       RefineryOrder incoming = new RefineryOrder();
       incoming.setVersion(2L);
@@ -654,7 +654,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       existing.setVersion(5L);
 
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
@@ -667,7 +667,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       existing.setStatus(RefineryOrderStatus.COMPLETED);
       existing.setStoredAt(java.time.Instant.now());
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       RefineryOrder incoming = new RefineryOrder();
       incoming.setStatus(RefineryOrderStatus.OPEN);
@@ -686,7 +686,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       existing.setStatus(RefineryOrderStatus.COMPLETED);
       existing.setStoredAt(java.time.Instant.now());
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -700,7 +700,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void throwsAccessDenied_whenNonLogisticianIsNotOwner() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       assertThrows(
           AccessDeniedException.class,
@@ -711,7 +711,7 @@ class RefineryOrderServiceLifecycleTest {
     void throwsAccessDenied_whenOwnerIsNull_andNotLogistician() {
       RefineryOrder existing = newSavedOrder();
       existing.setOwner(null);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       assertThrows(
           AccessDeniedException.class,
@@ -721,7 +721,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void logisticianCanUpdateAnyOrder() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, new RefineryOrder(), true);
@@ -735,7 +735,7 @@ class RefineryOrderServiceLifecycleTest {
       existing.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
       existing.setDurationMinutes(30L);
       existing.setReadyNotifiedAt(Instant.parse("2026-01-01T10:30:00Z"));
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
       when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
       RefineryOrder details = new RefineryOrder();
@@ -759,7 +759,7 @@ class RefineryOrderServiceLifecycleTest {
       existing.setDurationMinutes(30L);
       Instant marker = Instant.parse("2026-01-01T10:30:00Z");
       existing.setReadyNotifiedAt(marker);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
       RefineryOrder details = new RefineryOrder();
       details.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
@@ -774,7 +774,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void anUpdateThatCancelsTheOrderNamesTheCancellation() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
       when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
       RefineryOrder details = new RefineryOrder();
@@ -788,7 +788,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void locationProvided_isLookedUpAndValidated() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(refineryLocation));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
@@ -806,7 +806,7 @@ class RefineryOrderServiceLifecycleTest {
       place.setSpaceStation(refineryLocation.getSpaceStation());
       RefineryOrder existing = newSavedOrder();
       existing.setLocation(place);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
@@ -825,7 +825,7 @@ class RefineryOrderServiceLifecycleTest {
       place.setSpaceStation(refineryLocation.getSpaceStation());
       RefineryOrder existing = newSavedOrder();
       existing.setLocation(refineryLocation);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(locationRepository.findById(place.getId())).thenReturn(Optional.of(place));
 
       RefineryOrder incoming = new RefineryOrder();
@@ -842,7 +842,7 @@ class RefineryOrderServiceLifecycleTest {
     void missionExplicitlySetToNull_clearsExistingMission() {
       RefineryOrder existing = newSavedOrder();
       existing.setMissionId(MISSION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -857,7 +857,7 @@ class RefineryOrderServiceLifecycleTest {
     void missionReferenceWithoutAnId_leavesTheLinkAsItWas() {
       RefineryOrder existing = newSavedOrder();
       existing.setMissionId(MISSION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -874,7 +874,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       Mission mission = new Mission();
       mission.setId(MISSION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
       when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
           .thenReturn(Optional.of(new MissionParticipant()));
@@ -892,7 +892,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       Mission mission = new Mission();
       mission.setId(MISSION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
       when(missionParticipantRepository.findByMissionIdAndUserId(MISSION_ID, OWNER_ID))
           .thenReturn(Optional.empty());
@@ -911,7 +911,7 @@ class RefineryOrderServiceLifecycleTest {
     void missionUnchanged_isNotRechecked() {
       RefineryOrder existing = newSavedOrder();
       existing.setMissionId(MISSION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -928,7 +928,7 @@ class RefineryOrderServiceLifecycleTest {
     void refiningMethodExplicitlySetToNull_clearsExisting() {
       RefineryOrder existing = newSavedOrder();
       existing.setRefiningMethod(new RefiningMethod());
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
@@ -939,7 +939,7 @@ class RefineryOrderServiceLifecycleTest {
     void statusProvided_isApplied() {
       RefineryOrder existing = newSavedOrder();
       existing.setStatus(RefineryOrderStatus.OPEN);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -953,7 +953,7 @@ class RefineryOrderServiceLifecycleTest {
     void statusNullInIncoming_preservesExistingStatus() {
       RefineryOrder existing = newSavedOrder();
       existing.setStatus(RefineryOrderStatus.OPEN);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
@@ -966,7 +966,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void zeroMoneyFields_normalisedToNullOnUpdate() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
       RefineryOrder incoming = new RefineryOrder();
@@ -986,7 +986,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder existing = newSavedOrder();
       existing.setGoods(new HashSet<>(Set.of(preexisting)));
 
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(materialRepository.findById(INPUT_MATERIAL_ID)).thenReturn(Optional.of(rawInput));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
@@ -1006,7 +1006,7 @@ class RefineryOrderServiceLifecycleTest {
 
     @Test
     void throwsNotFound_whenOrderDoesNotExist() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class, () -> service.deleteRefineryOrder(OWNER_ID, ORDER_ID, false));
@@ -1015,7 +1015,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void throwsAccessDenied_whenNonLogisticianIsNotOwner() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       assertThrows(
           AccessDeniedException.class,
@@ -1026,7 +1026,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void ownerCanCancel_orderTransitionsToCanceled() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       service.deleteRefineryOrder(OWNER_ID, ORDER_ID, false);
 
@@ -1037,7 +1037,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void aCancellationByAnotherMemberTellsTheOwnerAndClearsTheReadyNotice() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(userService.currentActor()).thenReturn(new ActorRef(OTHER_USER_ID, "Bob"));
 
       service.deleteRefineryOrder(OTHER_USER_ID, ORDER_ID, true);
@@ -1053,7 +1053,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void aCancellationByTheOwnerOnlyClearsTheReadyNotice() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       service.deleteRefineryOrder(OWNER_ID, ORDER_ID, false);
 
@@ -1063,7 +1063,7 @@ class RefineryOrderServiceLifecycleTest {
     @Test
     void logisticianCanCancelAnyOrder() {
       RefineryOrder existing = newSavedOrder();
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       service.deleteRefineryOrder(OTHER_USER_ID, ORDER_ID, true);
 

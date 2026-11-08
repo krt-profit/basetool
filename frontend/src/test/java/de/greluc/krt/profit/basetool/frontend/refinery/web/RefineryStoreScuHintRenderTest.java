@@ -152,6 +152,8 @@ class RefineryStoreScuHintRenderTest {
             RefineryOrderStatus.OPEN,
             null,
             1L,
+            null,
+            null,
             null);
 
     when(backendApiClient.get(

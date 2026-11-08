@@ -105,7 +105,9 @@ public interface RefineryOrderMapper {
         enriched,
         base.owningSquadron(),
         base.version(),
-        base.owningOrgUnitId());
+        base.owningOrgUnitId(),
+        base.gameDataVersion(),
+        base.financesVersion());
   }
 
   /**
@@ -139,6 +141,8 @@ public interface RefineryOrderMapper {
   @Mapping(target = "readyNotifiedAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "gameDataVersion", ignore = true)
+  @Mapping(target = "financesVersion", ignore = true)
   RefineryOrder toEntity(RefineryOrderCreateRequest request);
 
   /**
@@ -147,7 +151,8 @@ public interface RefineryOrderMapper {
    * or org unit is read from the request.
    *
    * @param request the update request; {@code null} returns {@code null}
-   * @return a transient order holding the requested values and the last-seen version
+   * @return a transient order holding the requested values, the last-seen version and the echoed
+   *     section counters
    */
   @Mapping(target = "id", ignore = true)
   @Mapping(target = "owner", ignore = true)

@@ -41,9 +41,13 @@
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
          th:attr="data-rod-state=${stateName},data-rod-state-class=${stateName != null ? stateClasses.get(stateName) : null},data-rod-state-label=${stateName != null ? #messages.msg(stateKeys.get(stateName)) : null}">
         <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
-            <input type="hidden" th:field="*{version}" />
+            <input type="hidden" th:field="*{gameDataVersion}" />
+            <input type="hidden" th:field="*{financesVersion}" />
+            <input type="hidden" th:field="*{gameDataChanged}" data-rod-changed="gameData" />
+            <input type="hidden" th:field="*{financesChanged}" data-rod-changed="finances" />
+            <input type="hidden" th:field="*{missionChanged}" data-rod-changed="mission" />
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|1 · #{refineryorder.form.location}|">1 · Raffinerie</legend>
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
@@ -63,7 +67,7 @@
                     </div>
                     <div class="form-group">
                         <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
-                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
+                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}" data-rod-section="mission">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="mis : ${missions}" th:value="${mis.id}"
                                     th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
@@ -77,7 +81,7 @@
                 </div>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|2 · #{refineryorder.form.section.time}|">2 · Zeit</legend>
                 <div class="form-grid form-grid--3 rod-time">
                     <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
@@ -107,7 +111,7 @@
                 </div>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</legend>
                 <div class="rod-good rod-good--head" aria-hidden="true">
                     <span class="rod-req" th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
@@ -166,7 +170,7 @@
                 <button th:if="${canEdit}" type="button" class="btn btn-ghost rod-add" data-trigger="rod-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add}">Material hinzufügen</span></button>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="finances">
                 <legend class="form-section__head" th:text="|4 · #{refineryorder.form.section.finance}|">4 · Finanzen</legend>
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
@@ -200,7 +204,7 @@
                     </div>
                     <div class="form-group">
                         <label for="status" th:text="#{refineryorder.form.status}">Status</label>
-                        <select id="status" th:field="*{status}" th:disabled="${!canEdit}">
+                        <select id="status" th:field="*{status}" th:disabled="${!canEdit}" data-rod-section="gameData">
                             <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
                             <option value="IN_PROGRESS" th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</option>
                             <option value="COMPLETED" th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</option>

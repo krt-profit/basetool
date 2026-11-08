@@ -30,6 +30,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Request body of a refinery-order update.
@@ -48,7 +50,14 @@ import java.util.List;
  * @param refiningMethod the refining method, or {@code null} to clear it
  * @param status the new status name, or {@code null} to keep the current one
  * @param goods the goods of the run, replacing the stored ones
- * @param version the last-seen version, or {@code null} to skip the optimistic-lock check
+ * @param version the last-seen order version, read only when {@code parts} is absent; {@code null}
+ *     skips the check
+ * @param parts the parts the request writes (REQ-REFINERY-029); absent writes every part, and the
+ *     values of a part not named are not applied
+ * @param gameDataVersion the last-seen game-data counter, required when {@code parts} names {@code
+ *     GAME_DATA}
+ * @param financesVersion the last-seen finances counter, required when {@code parts} names {@code
+ *     FINANCES}
  */
 public record RefineryOrderUpdateRequest(
     @NotNull LocationDto location,
@@ -61,4 +70,7 @@ public record RefineryOrderUpdateRequest(
     RefiningMethodDto refiningMethod,
     String status,
     @NotEmpty List<@Valid RefineryGoodDto> goods,
-    Long version) {}
+    Long version,
+    @Nullable Set<RefineryOrderPart> parts,
+    @Nullable Long gameDataVersion,
+    @Nullable Long financesVersion) {}

@@ -177,6 +177,8 @@ class RefineryOrderDetailPatternRenderTest {
             status,
             null,
             3L,
+            null,
+            null,
             null);
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(ORDER_ID)))

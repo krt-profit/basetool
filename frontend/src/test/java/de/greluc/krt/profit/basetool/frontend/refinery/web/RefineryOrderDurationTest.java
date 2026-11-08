@@ -122,6 +122,8 @@ class RefineryOrderDurationTest {
             null,
             null,
             1L,
+            null,
+            null,
             null);
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
@@ -200,6 +202,8 @@ class RefineryOrderDurationTest {
             null,
             null,
             1L,
+            null,
+            null,
             null);
 
     java.time.Instant expectedEnd = startedAt.plus(125, java.time.temporal.ChronoUnit.MINUTES);

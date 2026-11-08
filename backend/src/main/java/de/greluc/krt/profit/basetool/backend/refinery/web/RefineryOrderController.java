@@ -178,7 +178,7 @@ public class RefineryOrderController {
    *
    * @param jwt the caller's token
    * @param id the order to update
-   * @param request the new values and the last-seen version
+   * @param request the new values, the parts to write and the last-seen version or counters
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -203,9 +203,7 @@ public class RefineryOrderController {
       }
     }
 
-    RefineryOrder saved =
-        refineryOrderService.updateRefineryOrder(
-            targetUserId, id, mapper.toEntity(request), isLogistician);
+    RefineryOrder saved = update(targetUserId, id, request, isLogistician);
     return mapper.toDto(
         saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -328,7 +326,7 @@ public class RefineryOrderController {
    *
    * @param userId the member whose order is updated
    * @param orderId the order to update
-   * @param request the new values and the last-seen version
+   * @param request the new values, the parts to write and the last-seen version or counters
    * @return the persisted DTO
    */
   @PutMapping("/users/{userId}/{orderId}")
@@ -341,8 +339,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID orderId,
       @RequestBody @Valid @NotNull RefineryOrderUpdateRequest request) {
-    RefineryOrder saved =
-        refineryOrderService.updateRefineryOrder(userId, orderId, mapper.toEntity(request), true);
+    RefineryOrder saved = update(userId, orderId, request, true);
     return mapper.toDto(
         saved, refineryOrderQueryService.getYieldBonusByMaterialForLocation(saved.getLocation()));
   }
@@ -367,5 +364,24 @@ public class RefineryOrderController {
    */
   private RefineryOrderListDto toListDto(RefineryOrder order) {
     return mapper.toListDto(order, refineryAccessPolicy.canEditRefineryOrder(order));
+  }
+
+  /**
+   * Writes an update request: the named parts against their section counters, or every part against
+   * the order version when the request names none (REQ-REFINERY-029).
+   *
+   * @param userId the member acting, or the owner when a logistician acts
+   * @param orderId the order to update
+   * @param request the update request
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
+   */
+  private RefineryOrder update(
+      UUID userId, UUID orderId, RefineryOrderUpdateRequest request, boolean isLogistician) {
+    RefineryOrder details = mapper.toEntity(request);
+    return request.parts() == null
+        ? refineryOrderService.updateRefineryOrder(userId, orderId, details, isLogistician)
+        : refineryOrderService.updateRefineryOrderParts(
+            userId, orderId, details, request.parts(), isLogistician);
   }
 }

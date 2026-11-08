@@ -158,7 +158,7 @@ class RefineryOrderHandoffMvcTest {
     RefineryOrderDto order =
         new RefineryOrderDto(
             null, null, null, null, null, null, null, null, null, null, null, List.of(), null, null,
-            null, null);
+            null, null, null, null);
     RefineryImportDraftDto draft = new RefineryImportDraftDto(order, List.of(), 1, 2, 0);
     when(ingestHandoffService.consume(
             eq(SUB.toString()),

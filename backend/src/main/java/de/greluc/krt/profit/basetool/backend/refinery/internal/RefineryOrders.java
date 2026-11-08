@@ -48,6 +48,19 @@ final class RefineryOrders {
   }
 
   /**
+   * Loads an order for a write, row-locked until the transaction ends (REQ-REFINERY-029), or fails.
+   *
+   * @param repository the order repository
+   * @param id refinery order primary key
+   * @return the locked order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
+   */
+  static RefineryOrder requireLocked(
+      @NotNull RefineryOrderRepository repository, @NotNull UUID id) {
+    return Entities.require(repository.lockById(id), "error.refinery_order.not_found");
+  }
+
+  /**
    * Builds the non-personal audit subject label {@code <method> · <location>} for a refinery order
    * (REQ-AUDIT-001).
    *

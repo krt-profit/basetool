@@ -250,7 +250,10 @@ class RefineryOrderControllerTest {
               "refiningMethod",
               "status",
               "goods",
-              "version"),
+              "version",
+              "parts",
+              "gameDataVersion",
+              "financesVersion"),
           java.util.Arrays.stream(RefineryOrderUpdateRequest.class.getRecordComponents())
               .map(java.lang.reflect.RecordComponent::getName)
               .toList(),
@@ -433,6 +436,8 @@ class RefineryOrderControllerTest {
         java.util.List.of(),
         null,
         1L,
+        null,
+        null,
         null);
   }
 
@@ -452,6 +457,19 @@ class RefineryOrderControllerTest {
 
   private static RefineryOrderUpdateRequest updateRequest() {
     return new RefineryOrderUpdateRequest(
-        null, null, Instant.now(), 10L, null, null, null, null, "OPEN", java.util.List.of(), 1L);
+        null,
+        null,
+        Instant.now(),
+        10L,
+        null,
+        null,
+        null,
+        null,
+        "OPEN",
+        java.util.List.of(),
+        1L,
+        null,
+        null,
+        null);
   }
 }

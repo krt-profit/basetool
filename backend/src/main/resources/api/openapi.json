@@ -92892,6 +92892,14 @@
             "maximum" : 1.0E9,
             "minimum" : 0
           },
+          "financesVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "gameDataVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "goods" : {
             "type" : "array",
             "items" : {
@@ -93091,6 +93099,14 @@
             "maximum" : 1.0E9,
             "minimum" : 0
           },
+          "financesVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "gameDataVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
           "goods" : {
             "type" : "array",
             "items" : {
@@ -93115,6 +93131,14 @@
             "format" : "double",
             "maximum" : 1.0E9,
             "minimum" : 0
+          },
+          "parts" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "GAME_DATA", "FINANCES", "MISSION_LINK" ]
+            },
+            "uniqueItems" : true
           },
           "refiningMethod" : {
             "$ref" : "#/components/schemas/RefiningMethodDto"

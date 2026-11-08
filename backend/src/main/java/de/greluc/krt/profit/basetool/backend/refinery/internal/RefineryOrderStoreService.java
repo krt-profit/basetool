@@ -109,7 +109,7 @@ public class RefineryOrderStoreService {
       @NotNull UUID orderId,
       @NotNull RefineryOrderStoreDto dto,
       boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
 
     if (order.getStoredAt() != null || order.getStatus() == RefineryOrderStatus.COMPLETED) {
       throw new BadRequestException("error.refinery_order.already_stored");
@@ -207,6 +207,7 @@ public class RefineryOrderStoreService {
 
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.setStoredAt(Instant.now());
+    RefineryOrderSection.GAME_DATA.advance(order);
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceStored(order, userId, bookedOnto);

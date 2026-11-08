@@ -39,7 +39,9 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>{@code owningOrgUnitId} is the picker output on create, resolved by {@code
  * OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable} for all four org-unit kinds; an
- * inadmissible pick is rejected with 400 (REQ-ORG-016).
+ * inadmissible pick is rejected with 400 (REQ-ORG-016). {@code gameDataVersion} and {@code
+ * financesVersion} are the order's section counters (REQ-REFINERY-029), which an update echoes for
+ * each section it writes; a create ignores them.
  */
 public record RefineryOrderDto(
     @Nullable UUID id,
@@ -57,4 +59,6 @@ public record RefineryOrderDto(
     @NotEmpty List<@Valid RefineryGoodDto> goods,
     @Nullable SquadronReferenceDto owningSquadron,
     @Nullable Long version,
-    @Nullable UUID owningOrgUnitId) {}
+    @Nullable UUID owningOrgUnitId,
+    @Nullable Long gameDataVersion,
+    @Nullable Long financesVersion) {}
