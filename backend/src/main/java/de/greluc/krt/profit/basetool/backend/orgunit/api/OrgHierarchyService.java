@@ -25,11 +25,13 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,7 +145,8 @@ public class OrgHierarchyService {
    * Sets or clears an org unit's parent after checking the kind pairing and the child's version.
    *
    * <p>A Staffel or SK takes a Bereich, a Bereich takes the Organisationsleitung, the OL takes
-   * none.
+   * none. The write bumps the child's version, so the squadron cache is evicted to keep the
+   * squadron admin list from echoing a stale version.
    *
    * @param orgUnitId the child org unit
    * @param parentOrgUnitId the new parent's id, or {@code null} to detach
@@ -154,6 +157,7 @@ public class OrgHierarchyService {
    * @throws ObjectOptimisticLockingFailureException if the version is stale
    */
   @Transactional
+  @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public OrgUnit setParent(
       @NotNull UUID orgUnitId, @Nullable UUID parentOrgUnitId, @Nullable Long version) {
     OrgUnit child = Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
