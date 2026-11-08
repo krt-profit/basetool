@@ -96,7 +96,10 @@ the caller reaches the queue, and the order has no responsible unit, a Spezialko
 in the caller's read scope). An order outside that scope MUST be refused with the same `404` as
 an unknown id, so the answer does not reveal that it exists. The requirement reads of
 `EarmarkTargets.JobOrders` (implemented by `JobOrderEarmarkTargets`) answer only for such an order,
-which puts the rule on every seam at once.
+which puts the rule on every seam at once. The rule keys on the order, not on the stock: a member
+of two units earmarks stock owned by one of them to an order of the other, and the stock keeps its
+owning unit — that is how a cross-Staffel supply reaches an order („A bestellt, B liefert",
+`InventoryJobOrderScopeIntegrationTest`, e2e UC-08/UC-09).
 
 The lookup projection (`/api/v1/orders/lookup`; with `withNeeds=true` it also carries each order's
 outstanding need per material bucket for the Lager pickers, REQ-INV-039 in
