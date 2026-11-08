@@ -490,10 +490,9 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
    * @throws NotFoundException when the member owns no such order
    */
   private @NotNull RefineryOrder requireOwn(@NotNull UUID owner, @NotNull UUID orderId) {
-    return refineryOrderRepository
-        .lockById(orderId)
-        .filter(order -> owns(order, owner))
-        .orElseThrow(() -> new NotFoundException("error.refinery_order.not_found"));
+    return Entities.require(
+        refineryOrderRepository.lockById(orderId).filter(order -> owns(order, owner)),
+        "error.refinery_order.not_found");
   }
 
   /**
