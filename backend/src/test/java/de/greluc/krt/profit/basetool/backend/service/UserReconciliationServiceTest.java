@@ -54,6 +54,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminGrant;
+import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminProperties;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RoleChangeRecorder;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
 import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
@@ -108,6 +111,10 @@ class UserReconciliationServiceTest {
   @Mock private UserDeletionService userDeletionService;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
   @Mock private OrgUnitSeatNotifier seatNotifier;
+  @Mock private RoleChangeRecorder roleChangeRecorder;
+
+  /** The bootstrap subjects a test may extend; the record reads it by reference. */
+  private final List<UUID> bootstrapSubjects = new ArrayList<>();
 
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
@@ -145,6 +152,11 @@ class UserReconciliationServiceTest {
             userService,
             partialRoleScopeProperties,
             List.of(seatNotifier),
+            new BootstrapAdminGrant(
+                new BootstrapAdminProperties(bootstrapSubjects),
+                userRepository,
+                roleRepository,
+                roleChangeRecorder),
             meterRegistry);
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -1376,6 +1388,58 @@ class UserReconciliationServiceTest {
 
       verify(eventPublisher)
           .publishEvent(new MemberDepartedEvent(gone, MemberDepartedEvent.REASON_REMOVED));
+    }
+  }
+
+  @Nested
+  class BootstrapAdminTests {
+
+    private final Role admin = codeRole("ADMIN", "Admin");
+
+    private User loginOfAnExistingMember() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setApprovalStatus(ApprovalStatus.PENDING);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      lenient().when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+      userReconciliationService.syncUser(
+          newJwt(USER_ID.toString(), Map.of("preferred_username", "alice")));
+      return existing;
+    }
+
+    @Test
+    void aBootstrapSubjectReceivesAdminWhileNoActiveAdminExists() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(0L);
+
+      User member = loginOfAnExistingMember();
+
+      assertTrue(member.getRoles().contains(admin));
+      assertEquals(ApprovalStatus.ACTIVE, member.getApprovalStatus());
+      verify(userRepository).bumpRolesVersion(USER_ID);
+      verify(roleChangeRecorder).bootstrapGranted(member);
+    }
+
+    @Test
+    void aBootstrapSubjectReceivesNothingWhileAnotherActiveAdminExists() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(1L);
+
+      User member = loginOfAnExistingMember();
+
+      assertFalse(member.getRoles().contains(admin));
+      verify(roleChangeRecorder, never()).bootstrapGranted(any());
+    }
+
+    @Test
+    void anUnlistedSubjectReceivesNothing() {
+      User member = loginOfAnExistingMember();
+
+      assertTrue(member.getRoles().isEmpty());
+      verify(roleRepository, never()).lockByCode(any());
+      verify(roleChangeRecorder, never()).bootstrapGranted(any());
     }
   }
 }

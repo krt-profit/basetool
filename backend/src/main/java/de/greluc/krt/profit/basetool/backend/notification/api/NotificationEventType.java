@@ -572,5 +572,11 @@ public enum NotificationEventType {
    * An appointment was revoked (REQ-PUR-024). The default rule notifies the member and clears the
    * appointment notice.
    */
-  PURCHASING_DELEGATE_REVOKED
+  PURCHASING_DELEGATE_REVOKED,
+
+  /**
+   * One of a member's roles was assigned or withdrawn in the Basetool (REQ-SEC-088). The default
+   * rule notifies the member.
+   */
+  USER_ROLE_CHANGED
 }

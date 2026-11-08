@@ -349,6 +349,11 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.PURCHASING_DELEGATE_REVOKED,
             NotificationType.PURCHASING_DELEGATE_REVOKED,
             true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.USER_ROLE_CHANGED,
+            NotificationType.USER_ROLE_CHANGED,
+            true,
             SelectorKind.EVENT_RECIPIENT));
   }
 

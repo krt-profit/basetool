@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
 import de.greluc.krt.profit.basetool.frontend.identity.model.MemberEditForm;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
@@ -204,7 +206,8 @@ public class MemberManagementController {
    *
    * @param id user id
    * @param source optional origin marker ({@code "profile"} returns to the profile after saving)
-   * @param model Thymeleaf model populated with {@code user} and {@code memberEditForm}
+   * @param model Thymeleaf model populated with {@code user}, {@code memberEditForm} and the role
+   *     set {@code memberRoles} ({@code null} when it could not be read)
    * @param redirectAttributes flash attributes carrier for the error redirect
    * @return inline {@code member-edit} view, or redirect to {@code /members} on backend failure
    */
@@ -229,6 +232,10 @@ public class MemberManagementController {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
+      model.addAttribute(
+          "memberRoles",
+          SectionFallback.load(log, "member-edit-roles", () -> identityClient.userRoles(id), null));
+      model.addAttribute("assignableRoles", AssignableRole.values());
 
       try {
         List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -38,12 +39,13 @@ import org.springframework.test.web.servlet.MockMvc;
 class BankGrantsPageControllerReauthMvcTest {
 
   private final BankBackendClient bankClient = mock(BankBackendClient.class);
+  private final IdentityBackendClient identityClient = mock(IdentityBackendClient.class);
 
   private MockMvc mockMvc;
 
   @BeforeEach
   void setUp() {
-    mockMvc = ReauthPageMvc.standalone(new BankGrantsPageController(bankClient));
+    mockMvc = ReauthPageMvc.standalone(new BankGrantsPageController(bankClient, identityClient));
     ReauthPageMvc.signInMember("BANK_MANAGEMENT");
   }
 

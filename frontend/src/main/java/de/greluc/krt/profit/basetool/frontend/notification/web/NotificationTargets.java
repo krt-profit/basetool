@@ -188,7 +188,8 @@ final class NotificationTargets {
           Map.entry(
               "PURCHASING_DELEGATE_APPOINTED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)),
           Map.entry(
-              "PURCHASING_DELEGATE_REVOKED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)));
+              "PURCHASING_DELEGATE_REVOKED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)),
+          Map.entry("USER_ROLE_CHANGED", page("/profile")));
 
   private NotificationTargets() {}
 

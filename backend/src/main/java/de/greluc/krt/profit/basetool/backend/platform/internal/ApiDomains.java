@@ -171,7 +171,8 @@ public final class ApiDomains {
           Map.entry("TermsController", "identity"),
           Map.entry("TermsDocumentController", "identity"),
           Map.entry("UserController", "identity"),
-          Map.entry("UserProfileController", "identity"));
+          Map.entry("UserProfileController", "identity"),
+          Map.entry("UserRoleController", "identity"));
 
   /** Not instantiable. */
   private ApiDomains() {}

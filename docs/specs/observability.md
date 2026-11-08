@@ -1692,6 +1692,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_user_role_changes_total{role,action}` counter (`RoleChangeRecorder`, `role` bounded by the
+  four assignable roles, `action` `assigned` / `withdrawn`) counts every role written in the Basetool,
+  the bootstrap grant included (REQ-SEC-088); who and whom is in the ROLE audit trail. A panel on
+  `07-basetool-operations.json` charts it per role and action.
 - `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
   the notification types) counts the recipients the engine dropped because they muted the type
   (REQ-NOTIF-027); a panel on `07-basetool-operations.json` charts it per type. Added with issue

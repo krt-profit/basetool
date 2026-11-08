@@ -156,7 +156,10 @@ web, naming its client (REQ-AUDIT-005):
   role editor's permission grid, previously the one mutation in this area that left no trace);
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
-  `from=<old|null> to=<new>`, REQ-ROLE-007); and
+  `from=<old|null> to=<new>`, REQ-ROLE-007); the assignment and withdrawal of one of the four
+  application roles in the Basetool (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`, subject and target
+  the member, details the `role` code and, for the login-time bootstrap grant, `source=bootstrap`,
+  REQ-SEC-088); and
   Kommandogruppe create / rename+reorder / delete; and every **org-structure** write on the
   `org_unit` rows themselves — Staffel, SK, Bereich and Organisationsleitung create
   (`ORG_UNIT_CREATED`, details `kind`, `parent` as `kind:id` or `none`, and a Bereich's
