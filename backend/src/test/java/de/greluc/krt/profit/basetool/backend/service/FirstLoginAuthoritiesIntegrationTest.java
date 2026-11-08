@@ -22,11 +22,17 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.internal.AssignableRole;
 import de.greluc.krt.profit.basetool.backend.identity.internal.TermsAcceptanceService;
+import de.greluc.krt.profit.basetool.backend.identity.internal.UserRoleAssignmentService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,26 +41,33 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Integration tests asserting that the first authenticated request of a new account carries the
- * authorities its token claims, against a real database, role catalogue and transaction.
+ * The authorities of an authenticated request come from {@code user_roles} alone (REQ-SEC-088),
+ * against a real database, role catalogue and transaction.
  *
  * <p>Deliberately not {@code @Transactional}: {@code syncUser} must commit before {@code
- * assembleFor} reads the lazily loaded {@code Role.permissions}, exactly as in a real request.
+ * assembleFor} reads the lazily loaded {@code Role.permissions}, and a role change must commit
+ * before the authorities cache is evicted, exactly as in a real request.
  */
 @SpringBootTest
 class FirstLoginAuthoritiesIntegrationTest {
 
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private UserRegistrationService userRegistrationService;
+  @Autowired private UserRoleAssignmentService userRoleAssignmentService;
   @Autowired private TermsAcceptanceService termsAcceptanceService;
-  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   /** Subjects this class created, so the shared container is left as it was found. */
-  private final List<UUID> createdSubjects = new java.util.ArrayList<>();
+  private final List<UUID> createdSubjects = new ArrayList<>();
 
   /**
    * Removes the rows these cases wrote, since the class runs without a rolling-back test
@@ -62,7 +75,11 @@ class FirstLoginAuthoritiesIntegrationTest {
    */
   @AfterEach
   void removeWhatTheseCasesCreated() {
+    SecurityContextHolder.clearContext();
     createdSubjects.forEach(id -> {
+      jdbcTemplate.update("DELETE FROM notification WHERE recipient_user_id = ?", id);
+      jdbcTemplate.update("DELETE FROM audit_event WHERE subject_id = ?", id);
+      jdbcTemplate.update("DELETE FROM user_approval_event WHERE user_id = ?", id);
       jdbcTemplate.update("DELETE FROM terms_acceptance WHERE user_id = ?", id);
       jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", id);
       jdbcTemplate.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", id);
@@ -72,81 +89,141 @@ class FirstLoginAuthoritiesIntegrationTest {
   }
 
   /**
-   * Builds a Keycloak-shaped access token.
+   * Builds a Keycloak-shaped access token of one session that still carries a realm-role claim.
    *
+   * @param subject the {@code sub} claim
    * @param username the {@code preferred_username} claim
-   * @param realmRoles the {@code realm_access.roles} claim, in Keycloak's own casing
+   * @param realmRoles the {@code realm_access.roles} claim, which must grant nothing
    * @return a token the converter can be handed directly
    */
-  private Jwt tokenFor(String username, List<String> realmRoles) {
-    UUID subject = UUID.randomUUID();
-    createdSubjects.add(subject);
+  private static Jwt tokenFor(UUID subject, String username, List<String> realmRoles) {
     return Jwt.withTokenValue("token")
         .header("alg", "RS256")
         .subject(subject.toString())
+        .claim("sid", "session-" + subject)
         .claim("preferred_username", username)
         .claim("email", username + "@example.test")
         .claim("realm_access", Map.of("roles", realmRoles))
         .build();
   }
 
-  @Test
-  @DisplayName("a brand-new admin holds ROLE_ADMIN on the very first request")
-  void firstLoginOfAnAdminCarriesRoleAdmin() {
-    Jwt jwt = tokenFor("first-login-admin", List.of("Admin", "Officer", "KRT Member"));
+  private UUID newSubject() {
+    UUID subject = UUID.randomUUID();
+    createdSubjects.add(subject);
+    return subject;
+  }
 
-    List<String> authorities =
-        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+  /**
+   * Stores an approved member holding exactly the given roles.
+   *
+   * @param username the callsign
+   * @param roleCodes the role codes to store in {@code user_roles}
+   * @return the stored member's id
+   */
+  private UUID storedMember(String username, String... roleCodes) {
+    UUID id = newSubject();
+    User user = new User();
+    user.setId(id);
+    user.setUsername(username);
+    user.setEmail(username + "@example.test");
+    user.setApprovalStatus(ApprovalStatus.ACTIVE);
+    user.setRoles(new HashSet<>());
+    for (String code : roleCodes) {
+      user.getRoles().add(roleRepository.findByCode(code).orElseThrow());
+    }
+    userRepository.saveAndFlush(user);
+    return id;
+  }
 
-    assertThat(authorities)
-        .as(
-            "the seeding step that opens every E2E run is an @PreAuthorize(hasRole('ADMIN'))"
-                + " endpoint called with exactly this token, on exactly this request")
-        .contains(Roles.authority(Roles.ADMIN));
-    assertThat(authorities)
-        .as("and it must not be the role-less refusal (REQ-SEC-053) or the approval gate")
-        .doesNotContain(Roles.NO_ROLE_MARKER, "ROLE_PENDING_APPROVAL");
+  private List<String> authorities(Jwt jwt) {
+    return converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
   }
 
   @Test
-  @DisplayName("a brand-new ordinary member is PENDING, not admitted with its roles")
-  void firstLoginOfAMemberIsPendingApproval() {
-    Jwt jwt = tokenFor("first-login-member", List.of("KRT Member"));
+  @DisplayName("a brand-new account whose token claims Admin is a pending registration")
+  void aTokenClaimingAdminGrantsNothingOnFirstLogin() {
+    Jwt jwt = tokenFor(newSubject(), "first-login-claimant", List.of("Admin", "KRT Member"));
 
-    List<String> authorities =
-        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
-
-    assertThat(authorities)
-        .as("a new registration is a queue entry, not a member yet")
+    assertThat(authorities(jwt))
+        .as("the realm-role claim is ignored, so a new account waits in the approval queue")
         .containsExactly("ROLE_PENDING_APPROVAL");
   }
 
   @Test
-  @DisplayName("an approved member whose realm roles map to nothing is refused with NO_ROLE")
-  void anApprovedMemberWithNoMappableRoleIsRefused() {
-    Jwt jwt = tokenFor("first-login-nobody", List.of("no-such-realm-role"));
-    converter.convert(jwt);
-    User user = userRepository.findById(UUID.fromString(jwt.getSubject())).orElseThrow();
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    userRepository.saveAndFlush(user);
+  @DisplayName("a stored role authorises and the token's realm roles do not")
+  void theStoredRolesAuthoriseAndTheClaimDoesNot() {
+    UUID id = storedMember("stored-member", Roles.KRT_MEMBER);
 
     List<String> authorities =
-        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+        authorities(tokenFor(id, "stored-member", List.of("Admin", "Bank Management")));
 
-    assertThat(authorities).containsExactly(Roles.NO_ROLE_MARKER);
+    assertThat(authorities).contains(Roles.authority(Roles.KRT_MEMBER));
+    assertThat(authorities)
+        .doesNotContain(Roles.authority(Roles.ADMIN), Roles.authority(Roles.BANK_MANAGEMENT));
+    assertThat(userRepository.findById(id).orElseThrow().getRoles())
+        .as("a login writes no role")
+        .hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a login keeps the stored roles of a token that carries none")
+  void aTokenWithoutRolesKeepsTheStoredRoles() {
+    UUID id = storedMember("roleless-token", Roles.KRT_MEMBER, Roles.BANK_EMPLOYEE);
+
+    List<String> authorities = authorities(tokenFor(id, "roleless-token", List.of()));
+
+    assertThat(authorities)
+        .contains(Roles.authority(Roles.KRT_MEMBER), Roles.authority(Roles.BANK_EMPLOYEE));
+  }
+
+  @Test
+  @DisplayName("a role assigned in the Basetool applies on the next request of the same session")
+  void aRoleChangeEvictsTheCachedAuthorities() {
+    UUID id = storedMember("evicted-member", Roles.KRT_MEMBER);
+    Jwt jwt = tokenFor(id, "evicted-member", List.of());
+    assertThat(authorities(jwt)).doesNotContain(Roles.authority(Roles.BANK_EMPLOYEE));
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new TestingAuthenticationToken("admin", "n/a", Roles.authority(Roles.ADMIN)));
+
+    userRoleAssignmentService.change(id, AssignableRole.BANK_EMPLOYEE, true, 0L);
+
+    assertThat(authorities(jwt)).contains(Roles.authority(Roles.BANK_EMPLOYEE));
+  }
+
+  @Test
+  @DisplayName("approving a registration grants KRT Member")
+  void approvingARegistrationGrantsKrtMember() {
+    UUID subject = newSubject();
+    Jwt jwt = tokenFor(subject, "approved-registration", List.of());
+    assertThat(authorities(jwt)).containsExactly("ROLE_PENDING_APPROVAL");
+    UUID adminId = storedMember("approving-admin", Roles.ADMIN);
+    long version = userRepository.findById(subject).orElseThrow().getVersion();
+
+    userRegistrationService.approveUser(subject, version, adminId);
+
+    assertThat(authorities(jwt)).contains(Roles.authority(Roles.KRT_MEMBER));
+  }
+
+  @Test
+  @DisplayName("an approved member holding no role is refused with NO_ROLE")
+  void anApprovedMemberWithoutRolesIsRefused() {
+    UUID id = storedMember("first-login-nobody");
+
+    assertThat(authorities(tokenFor(id, "first-login-nobody", List.of("KRT Member"))))
+        .containsExactly(Roles.NO_ROLE_MARKER);
   }
 
   @Test
   @DisplayName("the first thing every seeded client does - accepting the terms - works")
   void aFreshlyLoggedInAdminCanAcceptTheTerms() {
-    Jwt jwt = tokenFor("first-login-consenter", List.of("Admin", "Officer", "KRT Member"));
-    converter.convert(jwt);
-    UUID userId = UUID.fromString(jwt.getSubject());
+    UUID id = storedMember("first-login-consenter", Roles.ADMIN, Roles.KRT_MEMBER);
+    authorities(tokenFor(id, "first-login-consenter", List.of()));
 
-    assertThat(termsAcceptanceService.acceptCurrentTerms(userId))
+    assertThat(termsAcceptanceService.acceptCurrentTerms(id))
         .as("the first acceptance writes a row")
         .isTrue();
-    assertThat(termsAcceptanceService.hasAcceptedCurrentTerms(userId))
+    assertThat(termsAcceptanceService.hasAcceptedCurrentTerms(id))
         .as("and the gate sees it")
         .isTrue();
   }

@@ -28,12 +28,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -52,16 +49,12 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -217,9 +210,7 @@ public class SecurityConfig {
                     token.accessTokenResponseClient(oauthAuthorizationCodeTokenResponseClient))
                 .authorizationEndpoint(auth ->
                     auth.authorizationRequestResolver(
-                        authorizationRequestResolver(clientRegistrationRepository)))
-                .userInfoEndpoint(
-                    userInfo -> userInfo.userAuthoritiesMapper(userAuthoritiesMapper())))
+                        authorizationRequestResolver(clientRegistrationRepository))))
         .logout(logout ->
             logout
                 .logoutRequestMatcher(request ->
@@ -379,39 +370,6 @@ public class SecurityConfig {
             .additionalParameters(additionalParameters)
             .build();
       }
-    };
-  }
-
-  /**
-   * Maps Keycloak realm roles from the OIDC token's {@code realm_access.roles} claim onto Spring
-   * {@code ROLE_…} authorities (upper-cased, spaces replaced with underscores).
-   */
-  @Bean
-  @SuppressWarnings("unchecked")
-  public GrantedAuthoritiesMapper userAuthoritiesMapper() {
-    return authorities -> {
-      Set<GrantedAuthority> mappedAuthorities = new HashSet<>();
-
-      authorities.forEach(authority -> {
-        mappedAuthorities.add(authority);
-        if (authority instanceof OidcUserAuthority oidcUserAuthority) {
-          log.debug(
-              "OidcUserAuthority attribute keys: {}", oidcUserAuthority.getAttributes().keySet());
-          Map<String, Object> realmAccess =
-              (Map<String, Object>) oidcUserAuthority.getAttributes().get("realm_access");
-          if (realmAccess != null && realmAccess.containsKey("roles")) {
-            Collection<String> roles = (Collection<String>) realmAccess.get("roles");
-            log.info("Mapping realm roles from Keycloak: {}", roles);
-            roles.forEach(role -> {
-              String mappedRole = "ROLE_" + role.toUpperCase().replace(" ", "_");
-              log.debug("Mapped role: {}", mappedRole);
-              mappedAuthorities.add(new SimpleGrantedAuthority(mappedRole));
-            });
-          }
-        }
-      });
-
-      return mappedAuthorities;
     };
   }
 

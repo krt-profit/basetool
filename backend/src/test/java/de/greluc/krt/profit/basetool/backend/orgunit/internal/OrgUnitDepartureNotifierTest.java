@@ -126,7 +126,8 @@ class OrgUnitDepartureNotifierTest {
         .thenReturn(List.of(membership(squadron.getId(), MembershipRole.STAFFELLEITER)));
     when(orgUnitRepository.findAllById(List.of(squadron.getId()))).thenReturn(List.of(squadron));
 
-    notifier.onDeparture(new MemberDepartedEvent(USER, MemberDepartedEvent.REASON_ROLE_LOST));
+    notifier.onDeparture(
+        new MemberDepartedEvent(USER, MemberDepartedEvent.REASON_MEMBER_ROLE_WITHDRAWN));
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).renderParams()).containsEntry("vacancyCode", "YES");

@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
@@ -60,15 +60,18 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Translates a Keycloak JWT into the authorities checked by {@code @PreAuthorize}.
  *
- * <p>Merges realm roles as {@code ROLE_*}, their local permissions, and flat and contextual
- * logistician / mission-manager roles derived from org-unit memberships. Each miss syncs the local
- * user via {@link UserReconciliationService#syncUser(Jwt)}, retrying optimistic-lock conflicts up
- * to {@value #MAX_SYNC_ATTEMPTS} times before rejecting with {@link
- * AuthenticationServiceException}.
+ * <p>Merges the roles stored in {@code user_roles} as {@code ROLE_*}, their local permissions, and
+ * flat and contextual logistician / mission-manager roles derived from org-unit memberships; the
+ * token's {@code realm_access} claim grants nothing (REQ-SEC-088). Each miss syncs the local user
+ * via {@link UserReconciliationService#syncUser(Jwt)}, retrying optimistic-lock conflicts up to
+ * {@value #MAX_SYNC_ATTEMPTS} times before rejecting with {@link AuthenticationServiceException}. A
+ * committed role change evicts the member's cached authorities.
  */
 @Component
 @Slf4j
@@ -189,7 +192,8 @@ public class CustomJwtGrantedAuthoritiesConverter
    *
    * <p>The session is {@code sid}, falling back to {@code issuedAt}; a token with neither, or
    * without {@code sub}, is not cached. {@code azp} is part of the key because the assembly reads
-   * it (REQ-SEC-036). The fingerprint makes a changed role or account miss.
+   * it for the gateway check. The subject is lower-cased, so {@link #onRolesChanged} finds every
+   * entry of one member by its prefix.
    *
    * @param jwt the access token
    * @return the cache key, or {@code null} to bypass caching
@@ -211,7 +215,34 @@ public class CustomJwtGrantedAuthoritiesConverter
       }
       session = "iat:" + issuedAt.toEpochMilli();
     }
-    return sub + '|' + session + '|' + jwt.getClaimAsString("azp") + '|' + claimsFingerprint(jwt);
+    return keyPrefix(sub)
+        + session
+        + '|'
+        + jwt.getClaimAsString("azp")
+        + '|'
+        + claimsFingerprint(jwt);
+  }
+
+  /**
+   * The prefix every cache key of one subject starts with.
+   *
+   * @param subject the token subject, which is the member's id
+   * @return the lower-cased subject followed by the separator
+   */
+  private static String keyPrefix(@NonNull String subject) {
+    return subject.toLowerCase(Locale.ROOT) + '|';
+  }
+
+  /**
+   * Drops every cached authority set of a member whose role set changed, once the change is
+   * committed, so the member's next request is assembled from the new {@code user_roles}.
+   *
+   * @param event the committed role change
+   */
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onRolesChanged(@NonNull UserRolesChangedEvent event) {
+    String prefix = keyPrefix(event.userId().toString());
+    authoritiesCache.asMap().keySet().removeIf(key -> key.startsWith(prefix));
   }
 
   /**
@@ -286,10 +317,7 @@ public class CustomJwtGrantedAuthoritiesConverter
     ObjectOptimisticLockingFailureException lastLockingFailure = null;
     for (int attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
       try {
-        UserReconciliationService.ReconciledUser reconciled =
-            userReconciliationService.syncUser(jwt);
-
-        return assembleFor(reconciled.user(), reconciled.effectiveRoles());
+        return assembleFor(userReconciliationService.syncUser(jwt));
       } catch (ObjectOptimisticLockingFailureException e) {
         lastLockingFailure = e;
         int attemptsLeft = MAX_SYNC_ATTEMPTS - attempt;
@@ -326,31 +354,17 @@ public class CustomJwtGrantedAuthoritiesConverter
    * Assembles a member's authorities from the database alone, shared by the login path and the
    * ingest gateway's acting-member path (ADR-0129).
    *
-   * @param user the member whose authorities to assemble
+   * @param user the member whose stored roles, approval status and memberships to read
    * @return the authorities, or the lone {@code ROLE_PENDING_APPROVAL} for a non-approved
    *     registration
    */
   public Collection<GrantedAuthority> assembleFor(@NonNull User user) {
-    return assembleFor(user, user.getRoles());
-  }
-
-  /**
-   * Assembles a member's authorities from the given role set rather than the one stored on {@code
-   * user}, for partial-scope clients (REQ-SEC-036).
-   *
-   * @param user the member whose approval status and memberships to read
-   * @param roles the roles to authorise with; the stored set for every ordinary client
-   * @return the authorities, or the lone {@code ROLE_PENDING_APPROVAL} for a non-approved
-   *     registration
-   */
-  public Collection<GrantedAuthority> assembleFor(
-      @NonNull User user, @NonNull Collection<Role> roles) {
     if (!user.isApproved()) {
       return List.of(PENDING_APPROVAL_AUTHORITY);
     }
 
     Collection<GrantedAuthority> authorities =
-        roles.stream()
+        user.getRoles().stream()
             .flatMap(role -> {
               Stream<GrantedAuthority> roleAuth =
                   Stream.of(

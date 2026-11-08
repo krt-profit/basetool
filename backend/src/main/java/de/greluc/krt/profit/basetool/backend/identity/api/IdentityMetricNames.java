@@ -35,8 +35,9 @@ public final class IdentityMetricNames {
 
   /**
    * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
-   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because the
-   * subject holds the Keycloak ADMIN realm role (REQ-SEC-017). Normally zero (REQ-OBS-011).
+   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because a
+   * bootstrap subject earned Admin at its first login (REQ-SEC-017, REQ-SEC-088). Normally zero
+   * (REQ-OBS-011).
    */
   public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
       "basetool.admin.registration.auto.activated";

@@ -9,8 +9,8 @@ Members should be able to log in to Basetool with their Discord account, but **o
 verified DAS KARTELL members — present in the `das-kartell` Discord guild **and** holding the
 `KRT-Mitglied` role. Discord login is **additive** to the existing Keycloak credential login. A
 brand-new Discord user lands in a **PENDING** state with no access until an admin approves; admins
-are notified. After approval, Basetool roles and org-unit memberships are assigned **manually** with
-the existing tooling — the automated Discord-role → app-role/unit **sync is a separate, later track**
+are notified. Approval grants `KRT Member` (REQ-SEC-088); further Basetool roles and org-unit
+memberships are assigned **manually** with the existing tooling — the automated Discord-role → app-role/unit **sync is a separate, later track**
 (Track 2) and is out of scope here.
 
 This is epic **#720, Track 1** (issues #721–#725). The federation and the gate are implemented in an
@@ -411,19 +411,19 @@ until an admin approves — independent of whether the login arrived via Discord
 PENDING decision is deliberately **decoupled from Discord detection**: it must not depend on the
 optional `discord_user_id` claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol
 mapper absent) would let a federated login inherit the `ACTIVE` default and silently skip approval.
-For a PENDING (or `REJECTED`) account the entire authority assembly (realm roles + permissions +
+For a PENDING (or `REJECTED`) account the entire authority assembly (stored roles + permissions +
 org-unit membership + cascade) is short-circuited to a single `ROLE_PENDING_APPROVAL`. Neither the
 deleted `ROLE_GUEST` nor the `ROLE_NO_ROLE` marker that replaced it (V239, REQ-SEC-053) is carried:
 the order matters, because a pending registration must be told it is pending rather than that it
 holds no role. Approval moves the user to `ACTIVE`; rejection keeps them denied.
-Keycloak `ADMIN`-realm-role holders are auto-`ACTIVE` (bootstrap safety — the first admin can never be
-locked out). Both creation paths apply the rule — the interactive login (`syncUser(Jwt)`) and the
+An account holding Admin in `user_roles`, a bootstrap subject of `APP_BOOTSTRAP_ADMIN_SUBS` included,
+is auto-`ACTIVE` (bootstrap safety — the first admin can never be locked out, REQ-SEC-088). Both creation paths apply the rule — the interactive login (`syncUser(Jwt)`) and the
 scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — so the scheduler can never
 pre-create an `ACTIVE` row that a later login would inherit. Admins are **notified** for every such
 new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itself and — like the gate
 — independent of the `discord_user_id` claim, from whichever path first materialises the row
-(interactive or scheduled) and exactly once. After approval, roles/units are assigned manually
-(Track 1) — no automated mapping.
+(interactive or scheduled) and exactly once. Approval grants `KRT Member`; further roles and units
+are assigned manually (Track 1) — no automated mapping.
 
 > **Trade-off (owner-approved 2026-06-20).** Making the default fail-safe means a brand-new
 > **credential** account (created directly in Keycloak) now also requires a one-time Basetool
@@ -434,18 +434,20 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
 > The behaviour is gated by `app.registration.require-approval` (default **`true`** = prod). It is set
 > to `false` **only** in the Playwright e2e stack (`APP_REGISTRATION_REQUIRE_APPROVAL=false` in
 > `docker-compose.e2e.yml`), where `BackendSeeder` provisions fixture users on the fly and an
-> interactive approval step would deadlock seeding on an ephemeral DB (no V173 backfill). The approval
+> interactive approval step would deadlock seeding on an ephemeral DB (no V173 backfill). There an
+> account is active but holds no role until `E2eUserRoles` stores its roles at stack start. The approval
 > lifecycle itself stays covered by backend unit tests, not e2e.
 
 **Acceptance**
 
-- [x] PENDING/REJECTED ⇒ only `ROLE_PENDING_APPROVAL`, even if the JWT carries realm roles; membership
+- [x] PENDING/REJECTED ⇒ only `ROLE_PENDING_APPROVAL`, whatever roles are stored; membership
   is never consulted, and neither `ROLE_GUEST` nor the `ROLE_NO_ROLE` marker is carried.
 - [x] Every brand-new non-admin registration ⇒ `PENDING`, whether via Discord **or** credentials, and
   regardless of whether the `discord_user_id` claim is present (mapper-independent fail-safe).
 - [x] The scheduled sync (`syncUser(KeycloakUserDto)`) creates a brand-new non-admin user `PENDING`
   too; it never changes an existing user's approval state.
-- [ ] First admin (Keycloak `ADMIN` realm role) is `ACTIVE` on first login. _(syncUser carve-out; T1.4 e2e.)_
+- [x] A bootstrap subject is `ACTIVE` on first login, with Admin (REQ-SEC-088).
+- [x] Approving a registration grants `KRT Member` (REQ-SEC-088).
 - [x] The backend API is gated independently of the frontend redirect (which is UX, not the
   boundary): `PendingApprovalAccessFilter` refuses a caller whose sole authority is
   `ROLE_PENDING_APPROVAL` with a `403` (`code = PENDING_APPROVAL`) on every `/api/**` endpoint,
@@ -694,9 +696,8 @@ match.
 
 - ~~**Baseline floor on approval** — does approval auto-grant a baseline `KRT_MEMBER`, or does the
   admin seat every role by hand? (epic open decision #1)~~ **Settled by the code and REQ-SEC-053:**
-  approval grants no role (`UserRegistrationService.approveUser`); the roles are the Keycloak realm
-  roles an admin assigns, and an approved account that still maps to no role is refused `403 NO_ROLE`
-  until one is assigned.
+  approval grants `KRT Member` (`UserRegistrationService.approveUser`, REQ-SEC-088, ADR-0355); an
+  admin assigns every further role in the Basetool.
 - **Existing-member migration** — ~~link an existing credential account to a Discord identity, or only
   forward via Discord login? (epic open decision #2)~~ **Resolved (ADR-0036):** an existing account
   may be linked to Discord via the Keycloak Account Console and is recognised exactly like a Discord

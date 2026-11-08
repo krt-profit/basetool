@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.RoleNotices;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import java.util.UUID;
@@ -40,7 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Leaves the traces of one role written in the Basetool, inside the writing transaction
- * (REQ-SEC-088): the observers, the audit row, the counter and the member's notice.
+ * (REQ-SEC-088): the observers, the audit row, the counter, the {@link UserRolesChangedEvent} that
+ * evicts the member's cached authorities and the member's notice.
  */
 @Component
 @RequiredArgsConstructor
@@ -110,6 +112,7 @@ public class RoleChangeRecorder {
             IdentityMetricNames.TAG_ACTION,
             action)
         .increment();
+    eventPublisher.publishEvent(new UserRolesChangedEvent(user.getId()));
     eventPublisher.publishEvent(
         RoleNotices.roleChanged(user.getId(), role.getCode(), assigned, actorId));
     log.info("Role {} {} for user {} by actor {}", role.getCode(), action, user.getId(), actorId);

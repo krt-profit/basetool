@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -78,7 +77,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_fetchesUpsertsReconcilesAndReturnsTheSyncedCount() {
     KeycloakUserDto user1 = user("user1");
     KeycloakUserDto user2 = user("user2");
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1, user2));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user1, user2));
 
     int count = userSyncService.syncFromKeycloak();
 
@@ -91,12 +90,12 @@ class UserSyncServiceTest {
 
   @Test
   void syncFromKeycloak_onEmptyRoster_skipsWithoutTouchingLocalState() {
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(Collections.emptyList());
+    when(keycloakService.fetchUsers(anySet())).thenReturn(Collections.emptyList());
 
     int count = userSyncService.syncFromKeycloak();
 
     assertEquals(0, count);
-    verify(keycloakService).fetchUsers(anyCollection(), anySet());
+    verify(keycloakService).fetchUsers(anySet());
     verify(userReconciliationService, never()).syncUser(any(KeycloakUserDto.class));
     verify(userReconciliationService, never()).markMissingUsers(anySet());
     verifyNoInteractions(userSyncFollowUp);
@@ -106,7 +105,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_continuesAndCountsOnlyTheUsersThatSucceeded() {
     KeycloakUserDto user1 = user("user1");
     KeycloakUserDto user2 = user("user2");
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1, user2));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user1, user2));
     doThrow(new RuntimeException("sync failed")).when(userReconciliationService).syncUser(user1);
 
     int count = userSyncService.syncFromKeycloak();
@@ -126,8 +125,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_aUserWhoseSyncThrew_isStillCountedAsPresentInKeycloak() {
     KeycloakUserDto failing = user("failing");
     KeycloakUserDto healthy = user("healthy");
-    when(keycloakService.fetchUsers(anyCollection(), anySet()))
-        .thenReturn(List.of(failing, healthy));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(failing, healthy));
     doThrow(new RuntimeException("constraint violation"))
         .when(userReconciliationService)
         .syncUser(failing);
@@ -149,7 +147,7 @@ class UserSyncServiceTest {
   @Test
   void syncFromKeycloak_countsEveryPerUserFailure() {
     KeycloakUserDto failing = user("failing");
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(failing));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(failing));
     doThrow(new RuntimeException("boom")).when(userReconciliationService).syncUser(failing);
 
     userSyncService.syncFromKeycloak();
@@ -168,7 +166,7 @@ class UserSyncServiceTest {
   void syncFromKeycloak_aUserAbsentFromTheFetch_isNotInThePresentSet() {
     KeycloakUserDto stillThere = user("stillThere");
     UUID departed = UUID.randomUUID();
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(stillThere));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(stillThere));
 
     userSyncService.syncFromKeycloak();
 
@@ -183,7 +181,7 @@ class UserSyncServiceTest {
   @Test
   void syncFromKeycloak_swallowsABankReconcileFailureAfterASuccessfulRosterSync() {
     KeycloakUserDto user1 = user("user1");
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user1));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user1));
     doThrow(new RuntimeException("bank hiccup")).when(userSyncFollowUp).reconcileAll();
 
     int count = userSyncService.syncFromKeycloak();
@@ -195,8 +193,8 @@ class UserSyncServiceTest {
   }
 
   @Test
-  void syncFromKeycloak_logsTheRoleSummaryAndFlaggedCount_atInfoForAnOrdinaryRun() {
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+  void syncFromKeycloak_logsTheFlaggedCount_atInfoForAnOrdinaryRun() {
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(2);
 
     withAppender(appender -> {
@@ -206,12 +204,11 @@ class UserSyncServiceTest {
       assertEquals(Level.INFO, flagged.getLevel());
       assertTrue(flagged.getFormattedMessage().contains("2 local users"));
     });
-    verify(userReconciliationService).logRoleSyncSummary();
   }
 
   @Test
   void syncFromKeycloak_massSoftDeleteInOneRun_escalatesToWarn() {
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(42);
 
     withAppender(appender -> {
@@ -225,7 +222,7 @@ class UserSyncServiceTest {
 
   @Test
   void syncFromKeycloak_withNoDepartures_saysNothingAboutSoftDeletes() {
-    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(user("user1")));
+    when(keycloakService.fetchUsers(anySet())).thenReturn(List.of(user("user1")));
     when(userReconciliationService.markMissingUsers(anySet())).thenReturn(0);
 
     withAppender(appender -> {
@@ -271,7 +268,6 @@ class UserSyncServiceTest {
   }
 
   private static KeycloakUserDto user(String name) {
-    return new KeycloakUserDto(
-        UUID.randomUUID(), name, name + "@test.com", true, Collections.emptySet(), null);
+    return new KeycloakUserDto(UUID.randomUUID(), name, name + "@test.com", true, null);
   }
 }

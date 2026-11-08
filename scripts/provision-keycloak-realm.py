@@ -33,7 +33,9 @@ def _load_kcadm():
 kcadm = _load_kcadm()
 KcadmError = kcadm.KcadmError
 
-APPLICATION_REALM_ROLES = ["KRT Member", "Bank Employee", "Bank Management", "Admin"]
+RETIRED_APPLICATION_ROLES = ["KRT Member", "Bank Employee", "Bank Management", "Admin"]
+RETIRED_APPLICATION_ROLES_REASON = "held in the Basetool's user_roles, ADR-0355"
+ROLES_SCOPE = "roles"
 
 RETIRED_REALM_ROLE = "Officer"
 RETIRED_ROLE_REASON = "retired with the OFFICER role, ADR-0300"
@@ -186,8 +188,8 @@ class ClientSpec:
 
     `fields` are converged on every run; `create_only` is written only on creation. List fields
     are unions: missing entries are added, extra ones reported, and `withheld_*` entries removed
-    wherever found; `withheld_scope_reason`, when set, names why for the scopes instead of
-    `withheld_reason`. With `exact_mappers`, every client-level protocol mapper not in `mappers` is
+    wherever found; `withheld_scope_reasons` names why for one scope, else `withheld_scope_reason`,
+    when set, for the scopes instead of `withheld_reason`. With `exact_mappers`, every client-level protocol mapper not in `mappers` is
     removed instead of reported. `value_env` names the environment variable that supplies a
     confidential client's credential; only that name is ever printed. `credential_hint`, when set,
     replaces the host-.env instruction for where a generated secret goes.
@@ -207,6 +209,7 @@ class ClientSpec:
     withheld_web_origins: list[str] = field(default_factory=list)
     withheld_reason: str = ""
     withheld_scope_reason: str = ""
+    withheld_scope_reasons: dict[str, str] = field(default_factory=dict)
     mappers: list[dict] = field(default_factory=list)
     exact_mappers: bool = False
     client_roles: list[dict] = field(default_factory=list)
@@ -382,10 +385,14 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             withheld_redirect_uris=["http://frontend:18081/*"],
             withheld_web_origins=["http://frontend:18081"],
             withheld_reason="compose-internal origin retired 2026-09-22",
-            default_scopes=["email", "extractor-ingest", "profile", "roles", "web-origins"],
+            default_scopes=["email", "extractor-ingest", "profile", "web-origins"],
             optional_scopes=["address", "microprofile-jwt", "phone"],
-            withheld_scopes=[OFFLINE_ACCESS],
+            withheld_scopes=[OFFLINE_ACCESS, ROLES_SCOPE],
             withheld_scope_reason=_NO_OFFLINE_SESSION,
+            withheld_scope_reasons={
+                ROLES_SCOPE: "the web login carries no role claim; roles are "
+                             + RETIRED_APPLICATION_ROLES_REASON,
+            },
             mappers=[
                 _user_attribute_mapper("description", "String", introspection=False,
                                        lightweight=False),
@@ -757,13 +764,13 @@ class Planner:
         if self.problems:
             return
         self.plan_realm_settings()
-        self.plan_realm_roles()
         self.plan_offline_access()
         self.plan_scopes()
         for spec in self.specs:
             self.plan_client(spec)
         self.plan_retired()
         self.plan_retired_realm_roles()
+        self.plan_retired_application_roles()
         self.plan_reports()
 
     def preflight_builtin_scopes(self) -> None:
@@ -789,17 +796,6 @@ class Planner:
         if diff:
             changes.append(Change("  (one partial update of the realm)",
                                   lambda d=dict(diff): self.kc.update_realm(d, "token settings")))
-
-    def plan_realm_roles(self) -> None:
-        """The application's realm roles, created when missing."""
-        changes = self.section("application realm roles")
-        present = {role.get("name") for role in (self.kc.get("roles") or [])}
-        for name in APPLICATION_REALM_ROLES:
-            if name not in present:
-                changes.append(Change(
-                    f"+ create realm role '{name}'",
-                    lambda n=name: self.kc.write("create", "roles", {"name": n},
-                                                 f"realm role '{n}' created")))
 
     def default_role_name(self) -> str:
         """The realm's default role, which every account the realm creates holds."""
@@ -1218,11 +1214,12 @@ class Planner:
                     changes.append(Change(f"+ {kind} scope '{name}'",
                                           lambda n=name, k=kind: self._link_scope(uuid, k, n)))
         for name in spec.withheld_scopes:
+            reason = (spec.withheld_scope_reasons.get(name) or spec.withheld_scope_reason
+                      or spec.withheld_reason)
             for kind, have in (("default", default), ("optional", optional)):
                 if name in have:
                     changes.append(Change(
-                        f"- {kind} scope '{name}' withheld "
-                        f"({spec.withheld_scope_reason or spec.withheld_reason})",
+                        f"- {kind} scope '{name}' withheld ({reason})",
                         lambda n=name, k=kind, sid=have[name]: self._unlink_scope(
                             uuid, k, n, sid, "withheld")))
         wanted_all = set(spec.default_scopes) | set(spec.optional_scopes) | set(
@@ -1389,6 +1386,24 @@ class Planner:
                 f"({RETIRED_ROLE_REASON})",
                 lambda: self.kc.delete(f"roles/{RETIRED_REALM_ROLE}",
                                        f"realm role '{RETIRED_REALM_ROLE}' deleted")))
+
+    def plan_retired_application_roles(self) -> None:
+        """Delete the four application realm roles, ADR-0355.
+
+        Keycloak drops each role's user mappings and its place in the default-role composite, so
+        no token carries it and a new account no longer holds KRT Member. The runbook's final
+        roster sync must have run first; the rollback script recreates them from `user_roles`.
+        """
+        changes = self.section("retired — the application realm roles (ADR-0355)")
+        present = {role.get("name"): role for role in (self.kc.get("roles") or [])}
+        default_role = self.default_role_name()
+        for name in RETIRED_APPLICATION_ROLES:
+            if name in present:
+                changes.append(Change(
+                    f"- realm role '{name}' deleted with its user mappings and its place in "
+                    f"'{default_role}' ({RETIRED_APPLICATION_ROLES_REASON})",
+                    lambda n=name, rid=present[name]["id"]: self.kc.delete(
+                        f"roles-by-id/{rid}", f"realm role '{n}' deleted")))
 
     def _remove_named(self, path: str, key: str, name: str) -> None:
         current = kcadm.read_list(self.kc, path, key)

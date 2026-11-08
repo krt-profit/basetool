@@ -9,8 +9,8 @@ Keycloak is the only identity provider; the applications never handle a credenti
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
 invariants that keep it that way. The four application roles are assigned in the Basetool and held
-in `user_roles` with a per-user role-set counter; Keycloak keeps authentication (REQ-SEC-088,
-ADR-0355). Those tests select by role and class literal rather than by
+in `user_roles` with a per-user role-set counter; the backend and the frontend read them from there
+alone, and Keycloak keeps authentication and holds none of them (REQ-SEC-088, ADR-0355). Those tests select by role and class literal rather than by
 package or name, assert a selection floor and are each proven able to fail on a planted fixture,
 so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
 Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
@@ -25,7 +25,7 @@ ADR-0287).
 Beyond roles there are three mechanisms that are easy to miss:
 
 - **Contextual grants** — LOGISTICIAN and MISSION_MANAGER rights, and SK-lead grants, depend on the
-  caller's relationship to the object, not only on a realm role.
+  caller's relationship to the object, not only on an application role.
 - **Per-`sub` isolation** — personal data (inventory, blueprints, hangar) is keyed on the Keycloak
   subject, so it is invisible to everyone else regardless of role.
 - **Field redaction for partial viewers** — some surfaces return a reduced projection rather than

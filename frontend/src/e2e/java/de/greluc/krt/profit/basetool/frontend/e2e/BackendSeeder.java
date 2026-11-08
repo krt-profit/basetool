@@ -46,6 +46,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
@@ -156,6 +157,61 @@ public final class BackendSeeder {
       }
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.seedSql(" + resource + ") failed", e);
+    }
+  }
+
+  /**
+   * Stores a test account's roles in {@code user_roles}, where the backend reads them
+   * (REQ-SEC-088). Signs the account in once first, so its {@code app_user} row exists. Idempotent.
+   *
+   * @param username the Keycloak username of the test account
+   * @param password its throwaway password
+   * @param roleCodes the role codes to hold, e.g. {@code KRT_MEMBER}
+   * @throws IllegalStateException if the sign-in or a statement fails
+   */
+  public void grantStoredRoles(String username, String password, List<String> roleCodes) {
+    try {
+      passwordGrant(username, password);
+      try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+          PreparedStatement grant =
+              connection.prepareStatement(
+                  "INSERT INTO user_roles (user_id, role_id) SELECT u.id, r.id FROM app_user u"
+                      + " JOIN role r ON r.code = ? WHERE u.username = ? ON CONFLICT DO NOTHING")) {
+        for (String code : roleCodes) {
+          grant.setString(1, code);
+          grant.setString(2, username);
+          if (grant.executeUpdate() == 0 && !holdsRole(connection, username, code)) {
+            throw new IllegalStateException(username + " could not be given " + code);
+          }
+        }
+      }
+    } catch (IllegalStateException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.grantStoredRoles(" + username + ") failed", e);
+    }
+  }
+
+  /**
+   * Whether a test account already holds a role in {@code user_roles}.
+   *
+   * @param connection an open connection to the backend database
+   * @param username the account's username
+   * @param code the role code
+   * @return {@code true} when the row exists
+   * @throws java.sql.SQLException on a failed query
+   */
+  private static boolean holdsRole(Connection connection, String username, String code)
+      throws java.sql.SQLException {
+    try (PreparedStatement held =
+        connection.prepareStatement(
+            "SELECT 1 FROM user_roles ur JOIN app_user u ON u.id = ur.user_id"
+                + " JOIN role r ON r.id = ur.role_id WHERE u.username = ? AND r.code = ?")) {
+      held.setString(1, username);
+      held.setString(2, code);
+      try (java.sql.ResultSet rows = held.executeQuery()) {
+        return rows.next();
+      }
     }
   }
 

@@ -234,7 +234,8 @@ public class SecurityConfig {
 
   /**
    * Wires the project's authorities converter into a {@link JwtAuthenticationConverter}, so every
-   * authenticated request carries Keycloak realm roles plus the DB-flag-derived roles.
+   * authenticated request carries the roles stored in {@code user_roles} plus the DB-flag-derived
+   * roles (REQ-SEC-088).
    *
    * @param customConverter the project-specific authorities converter bean
    * @return the wired {@code JwtAuthenticationConverter}

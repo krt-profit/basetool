@@ -101,8 +101,6 @@ app:
       uri: ${KEYCLOAK_BACKCHANNEL_URI:}
     ingest-gateway:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
-    partial-role-scope:
-      client-ids: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:}
     authorities-cache:
       ttl: ${APP_SECURITY_AUTHORITIES_CACHE_TTL:PT5M}
     jwt:

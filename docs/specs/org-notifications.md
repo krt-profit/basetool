@@ -44,8 +44,8 @@ admin is judged like everyone else; the `OFFICER` role plays no part.
 `OrgUnitDepartureNotifier` listens for `MemberDepartedEvent` (REQ-XCH-008) after the commit, in a
 transaction of its own, and publishes `ORG_MEMBER_DEPARTED` once per unit the member belonged to. The
 default rule notifies that unit's leadership (`ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` on `RESPONSIBLE`,
-REQ-NOTIF-024) with the member, the unit, the coded reason (`reasonCode`: `disabled`, `role_lost`,
-`removed`) and whether a seat became vacant (`vacancyCode`). When the member held a seat, the parent
+REQ-NOTIF-024) with the member, the unit, the coded reason (`reasonCode`: `disabled`,
+`removed`, `member_role_withdrawn`; older notices may carry `role_lost`) and whether a seat became vacant (`vacancyCode`). When the member held a seat, the parent
 Bereich's leadership is told as well, once per Bereich. The departed member is never a recipient.
 
 **Acceptance**
