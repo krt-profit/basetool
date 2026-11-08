@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrant;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantId;
@@ -32,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRecipientDirectory;

@@ -26,11 +26,15 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
+import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
@@ -41,11 +45,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
@@ -54,15 +61,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -71,12 +79,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.TestingAuthenticationToken;
-import org.springframework.security.core.Authentication;
 
 /**
  * Unit tests for {@link BankBookingRequestService} (REQ-BANK-022): create, cancel, confirm, reject
- * and close-account orchestration, with the ledger mocked.
+ * and close-account orchestration, with the ledger mocked and a real {@link BankAccessRules}
+ * deciding for the mocked caller's actor.
  */
 @ExtendWith(MockitoExtension.class)
 class BankBookingRequestServiceTest {
@@ -85,37 +92,67 @@ class BankBookingRequestServiceTest {
   @Mock private BankAccountRepository accountRepository;
   @Mock private BankHolderRepository holderRepository;
   @Mock private BankTransactionRepository transactionRepository;
-  @Mock private BankAccountGrantRepository grantRepository;
   @Mock private BankLedgerService bankLedgerService;
-  @Mock private BankSecurityService bankSecurityService;
+  @Mock private BankCaller bankCaller;
+  @Mock private BankAccountViewGrantRepository viewGrantRepository;
+  @Mock private BankAccountApprovalLimitRepository approvalLimitRepository;
+  @Mock private BereichRepository bereichRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BankAuditService bankAuditService;
   @Mock private AuthHelperService authHelperService;
   @Mock private UserRepository userRepository;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
 
-  @InjectMocks private BankBookingRequestService service;
+  private BankAccessRules policy;
+  private BankBookingRequestService service;
+
+  @BeforeEach
+  void wireTheServiceOverTheRealPolicy() {
+    policy =
+        new BankAccessRules(
+            accountRepository,
+            viewGrantRepository,
+            approvalLimitRepository,
+            bereichRepository,
+            orgUnitRepository);
+    service =
+        new BankBookingRequestService(
+            requestRepository,
+            accountRepository,
+            holderRepository,
+            transactionRepository,
+            bankLedgerService,
+            bankCaller,
+            policy,
+            bankAuditService,
+            authHelperService,
+            userRepository,
+            orgUnitMembershipQueryService,
+            eventPublisher,
+            purposeObservers);
+  }
 
   @Test
   void listQueue_emptyStatuses_returnsEmptyWithoutQuerying() {
-    Page<BankBookingRequestDto> result = service.listQueue(Set.of(), PageRequest.of(0, 20), null);
+    Page<BankBookingRequestDto> result = service.listQueue(Set.of(), PageRequest.of(0, 20));
 
     assertThat(result.getTotalElements()).isZero();
     verify(requestRepository, never()).findByStatusIn(any(), any());
     verify(requestRepository, never()).findByStatusInAndAccountIdIn(any(), any(), any());
-    verify(bankSecurityService, never()).confirmCheck(any());
+    verifyNoInteractions(bankCaller);
   }
 
   @Test
   void listQueue_management_delegatesToFindByStatusInAcrossAllAccounts() {
     Set<BankBookingRequestStatus> statuses =
         Set.of(BankBookingRequestStatus.PENDING, BankBookingRequestStatus.CONFIRMED);
-    when(bankSecurityService.isManagement()).thenReturn(true);
-    when(bankSecurityService.confirmCheck(any())).thenReturn((type, accountId) -> true);
+    callerIs(TestBankActor.of(UUID.randomUUID()).bankManagement().build());
     when(requestRepository.findByStatusIn(eq(statuses), any(Pageable.class)))
         .thenReturn(Page.<BankBookingRequest>empty());
 
-    service.listQueue(statuses, PageRequest.of(0, 20), null);
+    service.listQueue(statuses, PageRequest.of(0, 20));
 
     verify(requestRepository).findByStatusIn(eq(statuses), any(Pageable.class));
     verify(requestRepository, never()).findByStatusInAndAccountIdIn(any(), any(), any());
@@ -158,12 +195,9 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             1L);
     decidedDeposit.setStatus(BankBookingRequestStatus.CONFIRMED);
-    Authentication caller = new TestingAuthenticationToken("employee", "n/a");
-    when(bankSecurityService.isManagement()).thenReturn(true);
-    when(bankSecurityService.confirmCheck(caller))
-        .thenReturn((type, accountId) ->
-            type == BankBookingRequestType.DEPOSIT && accountId.equals(grantedAccount));
-    when(requestRepository.findByStatusIn(any(), any(Pageable.class)))
+    callerIs(employeeMayBook(UUID.randomUUID(), grantedAccount, BankBookingRequestType.DEPOSIT));
+    when(requestRepository.findByStatusInAndAccountIdIn(
+            any(), eq(Set.of(grantedAccount)), any(Pageable.class)))
         .thenReturn(
             new PageImpl<>(
                 List.of(depositOnGranted, withdrawalOnGranted, depositOnOther, decidedDeposit)));
@@ -171,13 +205,11 @@ class BankBookingRequestServiceTest {
     Page<BankBookingRequestDto> result =
         service.listQueue(
             Set.of(BankBookingRequestStatus.PENDING, BankBookingRequestStatus.CONFIRMED),
-            PageRequest.of(0, 20),
-            caller);
+            PageRequest.of(0, 20));
 
     assertThat(result.getContent())
         .extracting(BankBookingRequestDto::callerMayConfirm)
         .containsExactly(true, false, false, false);
-    verify(bankSecurityService).confirmCheck(caller);
   }
 
   /** REQ-BANK-022: the caller's page reads strictly the caller's sub, in the given states. */
@@ -265,6 +297,59 @@ class BankBookingRequestServiceTest {
     request.setRequesterHandle("requester");
     request.setVersion(version);
     return request;
+  }
+
+  /**
+   * Makes the actor the caller of every decision in the test.
+   *
+   * @param actor the request's actor
+   */
+  private void callerIs(BankActor actor) {
+    when(bankCaller.actor()).thenReturn(actor);
+  }
+
+  /**
+   * A bank employee (not management) without any grant row.
+   *
+   * @param userId the employee's id
+   * @return the actor
+   */
+  private static BankActor employee(UUID userId) {
+    return TestBankActor.of(userId).roles(Roles.BANK_EMPLOYEE).build();
+  }
+
+  /**
+   * A bank employee (not management) whose grant on the account carries only the flag of the type.
+   *
+   * @param userId the employee's id
+   * @param accountId the granted account
+   * @param type the movement kind the grant allows
+   * @return the actor
+   */
+  private static BankActor employeeMayBook(
+      UUID userId, UUID accountId, BankBookingRequestType type) {
+    return TestBankActor.of(userId)
+        .roles(Roles.BANK_EMPLOYEE)
+        .grant(
+            accountId,
+            type == BankBookingRequestType.DEPOSIT,
+            type == BankBookingRequestType.WITHDRAWAL,
+            type == BankBookingRequestType.TRANSFER)
+        .build();
+  }
+
+  /**
+   * A bank employee (not management) holding a view-only grant row on the account.
+   *
+   * @param userId the employee's id
+   * @param accountId the visible account
+   * @return the actor
+   */
+  private static BankActor employeeSees(UUID userId, UUID accountId) {
+    return TestBankActor.of(userId)
+        .roles(Roles.BANK_EMPLOYEE)
+        .grant(accountId, false, false, false)
+        .build();
   }
 
   /**
@@ -608,7 +693,7 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     BankBookingRequestDto dto = service.cancelOwn(requestId, 0L);
 
@@ -645,7 +730,7 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    callerIs(TestBankActor.of(UUID.randomUUID()).build());
 
     assertThrows(NotFoundException.class, () -> service.cancelOwn(requestId, 0L));
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
@@ -660,7 +745,7 @@ class BankBookingRequestServiceTest {
             requestId, account(UUID.randomUUID()), BankBookingRequestType.DEPOSIT, requester, 1L);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     BankConflictException ex =
         assertThrows(BankConflictException.class, () -> service.cancelOwn(requestId, 1L));
@@ -680,7 +765,7 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     service.updateOwn(
         requestId,
@@ -737,7 +822,7 @@ class BankBookingRequestServiceTest {
     request.setRequiresOwnerApproval(false);
     request.setApplicableLimit(new BigDecimal("1000"));
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     service.updateOwn(
         requestId,
@@ -765,7 +850,7 @@ class BankBookingRequestServiceTest {
     request.setRequiresOwnerApproval(true);
     request.setOwnerApprovalGranted(true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     BankConflictException conflict =
         assertThrows(
@@ -796,7 +881,7 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    callerIs(TestBankActor.of(UUID.randomUUID()).build());
 
     assertThrows(
         NotFoundException.class,
@@ -824,7 +909,7 @@ class BankBookingRequestServiceTest {
             0L);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     BankConflictException conflict =
         assertThrows(
@@ -854,7 +939,7 @@ class BankBookingRequestServiceTest {
             requester,
             3L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -884,7 +969,7 @@ class BankBookingRequestServiceTest {
             requester,
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     assertThrows(
         BankConflictException.class,
@@ -909,8 +994,7 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.DEPOSIT));
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.DEPOSIT, "from sale", Instant.now()));
@@ -927,7 +1011,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
         .thenReturn(Optional.of(requesterOrgUnit));
 
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L, null);
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     assertThat(dto.holderId()).isEqualTo(holderId);
@@ -966,11 +1050,11 @@ class BankBookingRequestServiceTest {
     UUID holderId = UUID.randomUUID();
     UUID txId = UUID.randomUUID();
     UUID requester = UUID.randomUUID();
+    UUID decider = UUID.randomUUID();
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.DEPOSIT));
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.DEPOSIT, "from sale", Instant.now()));
@@ -980,9 +1064,9 @@ class BankBookingRequestServiceTest {
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
 
-    service.confirm(requestId, holderId, null, false, "Bar uebergeben, Zeuge: greluc", 0L, null);
+    service.confirm(requestId, holderId, null, false, "Bar uebergeben, Zeuge: greluc", 0L);
 
     ArgumentCaptor<BankDepositRequest> booked = ArgumentCaptor.forClass(BankDepositRequest.class);
     verify(bankLedgerService).bookDeposit(booked.capture());
@@ -1017,7 +1101,7 @@ class BankBookingRequestServiceTest {
                 new OrgUnitMembershipOptionDto(
                     orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     ArgumentCaptor<BankWithdrawalRequest> booked =
         ArgumentCaptor.forClass(BankWithdrawalRequest.class);
@@ -1052,7 +1136,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(recipientId))
         .thenReturn(Optional.of(primaryUnit));
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     ArgumentCaptor<BankWithdrawalRequest> booked =
         ArgumentCaptor.forClass(BankWithdrawalRequest.class);
@@ -1079,7 +1163,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.findPrimaryDirectMembershipOrgUnitId(requester))
         .thenReturn(Optional.of(primaryUnit));
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     ArgumentCaptor<BankWithdrawalRequest> booked =
         ArgumentCaptor.forClass(BankWithdrawalRequest.class);
@@ -1089,8 +1173,8 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * Shared stubs for confirming a WITHDRAWAL request: the locked row, the employee's capability, an
-   * active holder, the booked transaction and the acting user.
+   * Shared stubs for confirming a WITHDRAWAL request: the locked row, an employee whose grant
+   * carries the withdrawal flag, an active holder, the booked transaction and the acting user.
    *
    * @param requestId the request being confirmed
    * @param accountId the source account
@@ -1100,10 +1184,9 @@ class BankBookingRequestServiceTest {
    */
   private void stubWithdrawalConfirm(
       UUID requestId, UUID accountId, UUID holderId, UUID txId, BankBookingRequest request) {
+    UUID decider = UUID.randomUUID();
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(
-            eq(BankBookingRequestType.WITHDRAWAL), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.WITHDRAWAL));
     when(bankLedgerService.bookWithdrawal(any(BankWithdrawalRequest.class)))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.WITHDRAWAL, "payout", Instant.now()));
@@ -1113,7 +1196,7 @@ class BankBookingRequestServiceTest {
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
   }
 
   @Test
@@ -1130,8 +1213,7 @@ class BankBookingRequestServiceTest {
     request.setSplitEnabled(true);
     request.setSplitPercent(new BigDecimal("30"));
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.DEPOSIT));
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(new BankTransactionDto(txId, BankTransactionType.DEPOSIT, null, Instant.now()));
     BankHolder holder = new BankHolder();
@@ -1143,7 +1225,7 @@ class BankBookingRequestServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     ArgumentCaptor<BankDepositRequest> booked = ArgumentCaptor.forClass(BankDepositRequest.class);
     verify(bankLedgerService).bookDeposit(booked.capture());
@@ -1165,13 +1247,11 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(
-            eq(BankBookingRequestType.WITHDRAWAL), eq(accountId), any()))
-        .thenReturn(false);
+    callerIs(employeeMayBook(UUID.randomUUID(), accountId, BankBookingRequestType.DEPOSIT));
 
     assertThrows(
         AccessDeniedException.class,
-        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
+        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L));
     verify(bankLedgerService, never()).bookWithdrawal(any());
   }
 
@@ -1191,7 +1271,7 @@ class BankBookingRequestServiceTest {
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 2L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 2L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
     verify(bankLedgerService, never()).bookDeposit(any());
   }
@@ -1210,7 +1290,7 @@ class BankBookingRequestServiceTest {
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
-        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 4L, null));
+        () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 4L));
     verify(bankLedgerService, never()).bookDeposit(any());
   }
 
@@ -1223,11 +1303,11 @@ class BankBookingRequestServiceTest {
         pending(
             requestId, account(accountId), BankBookingRequestType.DEPOSIT, UUID.randomUUID(), 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canSee(eq(accountId), any())).thenReturn(true);
+    callerIs(employeeSees(decider, accountId));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
 
-    BankBookingRequestDto dto = service.reject(requestId, "duplicate", 0L, null);
+    BankBookingRequestDto dto = service.reject(requestId, "duplicate", 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
     assertThat(dto.rejectReason()).isEqualTo("duplicate");
@@ -1257,11 +1337,12 @@ class BankBookingRequestServiceTest {
             0L);
     request.setRequiresOwnerApproval(true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    callerIs(employee(UUID.randomUUID()));
 
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED);
     verify(bankLedgerService, never()).bookDeposit(any());
   }
@@ -1279,7 +1360,7 @@ class BankBookingRequestServiceTest {
     stubBookableDeposit(request, accountId, holderId, txId);
 
     BankBookingRequestDto dto =
-        service.confirm(requestId, holderId, null, true, "Freigabe: greluc", 0L, null);
+        service.confirm(requestId, holderId, null, true, "Freigabe: greluc", 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     verify(bankAuditService)
@@ -1302,11 +1383,12 @@ class BankBookingRequestServiceTest {
             requestId, account(accountId), BankBookingRequestType.DEPOSIT, UUID.randomUUID(), 0L);
     request.setRequiresOwnerApproval(true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    callerIs(employee(UUID.randomUUID()));
 
     BankApproverNoteRequiredException ex =
         assertThrows(
             BankApproverNoteRequiredException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, true, staffNote, 0L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, true, staffNote, 0L));
 
     assertThat(ex.code()).isEqualTo("BANK_APPROVER_NOTE_REQUIRED");
     assertThat(ex.status()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -1327,7 +1409,7 @@ class BankBookingRequestServiceTest {
     request.setOwnerApprovalGranted(true);
     stubBookableDeposit(request, accountId, holderId, txId);
 
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, null, 0L, null);
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, true, null, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     assertThat(dto.staffNote()).isNull();
@@ -1344,9 +1426,9 @@ class BankBookingRequestServiceTest {
    */
   private void stubBookableDeposit(
       BankBookingRequest request, UUID accountId, UUID holderId, UUID txId) {
+    UUID decider = UUID.randomUUID();
     when(requestRepository.findByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.DEPOSIT));
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(new BankTransactionDto(txId, BankTransactionType.DEPOSIT, null, Instant.now()));
     BankHolder holder = new BankHolder();
@@ -1355,7 +1437,7 @@ class BankBookingRequestServiceTest {
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
   }
 
@@ -1367,12 +1449,12 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(employeeMayBook(requester, accountId, BankBookingRequestType.DEPOSIT));
 
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
-            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L, null));
+            () -> service.confirm(requestId, UUID.randomUUID(), null, false, null, 0L));
 
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED);
     verify(bankLedgerService, never()).bookDeposit(any());
@@ -1389,10 +1471,8 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    callerIs(TestBankActor.of(requester).admin().build());
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
-    when(authHelperService.isAdmin()).thenReturn(true);
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(new BankTransactionDto(txId, BankTransactionType.DEPOSIT, null, Instant.now()));
     BankHolder holder = new BankHolder();
@@ -1403,7 +1483,7 @@ class BankBookingRequestServiceTest {
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 
-    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L, null);
+    BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
   }
@@ -1416,11 +1496,11 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canSee(eq(accountId), any())).thenReturn(true);
+    callerIs(employeeSees(requester, accountId));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
     when(userRepository.findById(requester)).thenReturn(Optional.of(new User()));
 
-    BankBookingRequestDto dto = service.reject(requestId, "changed my mind", 0L, null);
+    BankBookingRequestDto dto = service.reject(requestId, "changed my mind", 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.REJECTED);
   }
@@ -1436,7 +1516,7 @@ class BankBookingRequestServiceTest {
             requester,
             0L);
     request.setRequiresOwnerApproval(true);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    callerIs(TestBankActor.of(requester).build());
 
     BankConflictException ex =
         assertThrows(
@@ -1459,8 +1539,8 @@ class BankBookingRequestServiceTest {
             requester,
             0L);
     request.setRequiresOwnerApproval(true);
+    callerIs(TestBankActor.of(requester).admin().build());
     when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
-    when(authHelperService.isAdmin()).thenReturn(true);
     when(userRepository.findById(requester)).thenReturn(Optional.of(new User()));
 
     BankBookingRequestDto dto = service.applyOwnerApprovalWithinTransaction(request, true);
@@ -1483,13 +1563,11 @@ class BankBookingRequestServiceTest {
             0L);
     Pageable pageable = PageRequest.of(0, 10);
     Set<BankBookingRequestStatus> statuses = Set.of(BankBookingRequestStatus.PENDING);
-    when(bankSecurityService.confirmCheck(any())).thenReturn((type, id) -> true);
-    when(bankSecurityService.isManagement()).thenReturn(true);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    callerIs(TestBankActor.of(caller).bankManagement().build());
     when(requestRepository.findByStatusIn(statuses, pageable))
         .thenReturn(new PageImpl<>(List.of(own, foreign), pageable, 2));
 
-    Page<BankBookingRequestDto> page = service.listQueue(statuses, pageable, null);
+    Page<BankBookingRequestDto> page = service.listQueue(statuses, pageable);
 
     assertThat(page.getContent())
         .extracting(BankBookingRequestDto::callerMayConfirm)
@@ -1497,7 +1575,7 @@ class BankBookingRequestServiceTest {
   }
 
   @Test
-  void listForAccounts_leavesOutTheCallersOwnRequestsUnlessAdmin() {
+  void listForeign_leavesOutTheCallersOwnRequestsUnlessAdmin() {
     UUID caller = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankBookingRequest own =
@@ -1509,19 +1587,44 @@ class BankBookingRequestServiceTest {
             BankBookingRequestType.DEPOSIT,
             UUID.randomUUID(),
             0L);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
-    when(requestRepository.findByAccountIdInOrderByCreatedAtDesc(List.of(accountId)))
+    when(requestRepository.findByAccountIdInOrderByCreatedAtDesc(Set.of(accountId)))
         .thenReturn(List.of(own, foreign));
 
-    assertThat(service.listForAccounts(List.of(accountId)))
+    assertThat(service.listForeign(holderScope(TestBankActor.of(caller).build(), accountId)))
         .extracting(BankBookingRequestDto::id)
         .containsExactly(foreign.getId());
 
-    when(authHelperService.isAdmin()).thenReturn(true);
-
-    assertThat(service.listForAccounts(List.of(accountId))).hasSize(2);
+    assertThat(
+            service.listForeign(holderScope(TestBankActor.of(caller).admin().build(), accountId)))
+        .hasSize(2);
   }
 
+  @Test
+  void listForeign_withoutCandidateAccounts_isEmptyWithoutQuerying() {
+    BankAccessRules.ForeignRequestScope scope =
+        new BankAccessRules.ForeignRequestScope(
+            policy.staffRights(TestBankActor.of(UUID.randomUUID()).build()), Set.of(), Set.of());
+
+    assertThat(service.listForeign(scope)).isEmpty();
+    verify(requestRepository, never()).findByAccountIdInOrderByCreatedAtDesc(any());
+  }
+
+  /**
+   * The foreign-request scope of an actor who is the responsible holder of exactly one account.
+   *
+   * @param actor the actor
+   * @param accountId the account the actor holds
+   * @return the scope with that account as the only candidate
+   */
+  private BankAccessRules.ForeignRequestScope holderScope(BankActor actor, UUID accountId) {
+    return new BankAccessRules.ForeignRequestScope(
+        policy.staffRights(actor), Set.of(accountId), Set.of(accountId));
+  }
+
+  /**
+   * REQ-BANK-011/-023: confirming a transfer needs the transfer capability on the source account
+   * only; the destination needs no grant.
+   */
   @Test
   void confirm_transfer_bypassesDestinationVisibilityGate() {
     UUID requestId = UUID.randomUUID();
@@ -1530,13 +1633,13 @@ class BankBookingRequestServiceTest {
     UUID sourceHolder = UUID.randomUUID();
     UUID destHolder = UUID.randomUUID();
     UUID txId = UUID.randomUUID();
+    UUID decider = UUID.randomUUID();
     BankBookingRequest request =
         pending(
             requestId, account(accountId), BankBookingRequestType.TRANSFER, UUID.randomUUID(), 0L);
     request.setTargetAccount(account(destId));
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.TRANSFER), eq(accountId), any()))
-        .thenReturn(true);
+    callerIs(employeeMayBook(decider, accountId, BankBookingRequestType.TRANSFER));
     when(bankLedgerService.bookTransfer(any(BankTransferRequest.class), anyBoolean()))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.TRANSFER, null, Instant.now()));
@@ -1546,16 +1649,15 @@ class BankBookingRequestServiceTest {
     holder.setActive(true);
     when(holderRepository.findById(sourceHolder)).thenReturn(Optional.of(holder));
     when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 
     BankBookingRequestDto dto =
-        service.confirm(requestId, sourceHolder, destHolder, false, null, 0L, null);
+        service.confirm(requestId, sourceHolder, destHolder, false, null, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CONFIRMED);
     ArgumentCaptor<BankTransferRequest> booked = ArgumentCaptor.forClass(BankTransferRequest.class);
     verify(bankLedgerService).bookTransfer(booked.capture(), eq(true));
-    verify(bankSecurityService, never()).canSee(any(), any());
     assertThat(booked.getValue().sourceAccountId()).isEqualTo(accountId);
     assertThat(booked.getValue().destinationAccountId()).isEqualTo(destId);
     assertThat(booked.getValue().sourceHolderId()).isEqualTo(sourceHolder);
@@ -1571,6 +1673,7 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     request.setRequiresOwnerApproval(true);
+    callerIs(TestBankActor.of(approver).build());
     when(authHelperService.currentUserId()).thenReturn(Optional.of(approver));
     when(userRepository.findById(approver)).thenReturn(Optional.of(new User()));
 

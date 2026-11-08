@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
@@ -45,7 +47,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,8 +54,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
-import java.util.function.BiPredicate;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -65,7 +64,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,9 +86,9 @@ public class BankBookingRequestService {
   private final BankAccountRepository accountRepository;
   private final BankHolderRepository holderRepository;
   private final BankTransactionRepository transactionRepository;
-  private final BankAccountGrantRepository grantRepository;
   private final BankLedgerService bankLedgerService;
-  private final BankSecurityService bankSecurityService;
+  private final BankCaller bankCaller;
+  private final BankAccessRules policy;
   private final BankAuditService bankAuditService;
   private final AuthHelperService authHelperService;
   private final UserRepository userRepository;
@@ -406,8 +404,7 @@ public class BankBookingRequestService {
       @Nullable BigDecimal applicableLimit,
       @Nullable BankRequestApprover requiredApprover) {
     BankBookingRequest request = lockRequest(requestId);
-    UUID caller = authHelperService.currentUserId().orElse(null);
-    if (caller == null || !caller.equals(request.getRequestedBy())) {
+    if (!policy.ownsRequest(bankCaller.actor(), request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, update.version());
@@ -438,7 +435,7 @@ public class BankBookingRequestService {
         BankAuditEventType.BOOKING_REQUEST_UPDATED,
         request.getAccount().getId(),
         null,
-        caller,
+        request.getRequestedBy(),
         "edited request "
             + shortId(request.getId())
             + " to "
@@ -456,7 +453,7 @@ public class BankBookingRequestService {
             account.getAccountNo(),
             request.getRequesterHandle(),
             orgUnit == null ? null : orgUnit.getShorthand(),
-            caller));
+            request.getRequestedBy()));
     return toDto(request);
   }
 
@@ -500,23 +497,24 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Lists every request on the given accounts, newest first (REQ-BANK-041) — backs the responsible
-   * holder's "Fremde Anträge" tab. Org-unit-blind: the caller ({@link OrgUnitBankRequestService})
-   * supplies the set of accounts the holder is responsible for. The caller's own requests are left
-   * out unless they are an admin, because they may not approve them (REQ-BANK-062).
+   * Lists the foreign requests of a scope, newest first (REQ-BANK-046): the requests on its
+   * candidate accounts that it shows, without those the four-eyes rule bars the caller from
+   * deciding (REQ-BANK-062). Backs the "Fremde Anträge" tab.
    *
-   * @param accountIds the accounts to list requests for
-   * @return the requests on those accounts, newest first; empty when the set is empty
+   * @param scope the caller's foreign-request scope from {@link BankAccessRules}
+   * @return the requests the caller acts on; empty when the scope has no candidate account
    */
   @NotNull
-  public List<BankBookingRequestDto> listForAccounts(@NotNull Collection<UUID> accountIds) {
-    if (accountIds.isEmpty()) {
+  public List<BankBookingRequestDto> listForeign(
+      @NotNull BankAccessRules.ForeignRequestScope scope) {
+    if (scope.candidateAccountIds().isEmpty()) {
       return List.of();
     }
-    UUID callerId = authHelperService.currentUserId().orElse(null);
-    boolean admin = authHelperService.isAdmin();
-    return requestRepository.findByAccountIdInOrderByCreatedAtDesc(accountIds).stream()
-        .filter(request -> !isBoundByFourEyes(request, callerId, admin))
+    return requestRepository
+        .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
+        .stream()
+        .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
+        .filter(request -> scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
         .map(this::toDto)
         .toList();
   }
@@ -539,8 +537,7 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto cancelOwn(@NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
-    UUID caller = authHelperService.currentUserId().orElse(null);
-    if (caller == null || !caller.equals(request.getRequestedBy())) {
+    if (!policy.ownsRequest(bankCaller.actor(), request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);
@@ -551,11 +548,11 @@ public class BankBookingRequestService {
         BankAuditEventType.BOOKING_REQUEST_CANCELLED,
         request.getAccount().getId(),
         null,
-        caller,
+        request.getRequestedBy(),
         "cancelled request " + shortId(request.getId()));
     eventPublisher.publishEvent(
         new BankBookingRequestCancelledEvent(
-            request.getId(), request.getAccount().getId(), caller));
+            request.getId(), request.getAccount().getId(), request.getRequestedBy()));
     notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
     return toDto(request);
   }
@@ -618,45 +615,21 @@ public class BankBookingRequestService {
    * account; an employee sees only requests on accounts they are granted on. This is a pure
    * bank-staff surface — it consults grants, never org-unit scope. An empty status set yields an
    * empty page (the caller deselected every filter). Every row carries {@code callerMayConfirm},
-   * decided by {@link BankSecurityService#confirmCheck} with one grant read for the whole page.
+   * decided by the caller's {@link BankStaffRights} with no read per row.
    *
    * @param statuses the lifecycle states to include (any-of, e.g. {@code PENDING})
    * @param pageable page, size and whitelisted sort
-   * @param authentication the current authentication (per-row confirm capability)
    * @return one page of requests visible to the caller in any of those states
    */
   @NotNull
   public Page<BankBookingRequestDto> listQueue(
-      @NotNull Set<BankBookingRequestStatus> statuses,
-      @NotNull Pageable pageable,
-      Authentication authentication) {
+      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     if (statuses.isEmpty()) {
       return Page.empty(pageable);
     }
-    BiPredicate<BankBookingRequestType, UUID> confirmCheck =
-        bankSecurityService.confirmCheck(authentication);
-    UUID callerId = authHelperService.currentUserId().orElse(null);
-    boolean admin = authHelperService.isAdmin();
-    return pageQueue(statuses, pageable)
-        .map(request ->
-            toDto(
-                request,
-                callerMayConfirm(request, confirmCheck)
-                    && !isBoundByFourEyes(request, callerId, admin)));
-  }
-
-  /**
-   * Whether the four-eyes rule bars the caller from approving or confirming the request: the caller
-   * raised it and is not an admin (REQ-BANK-062).
-   *
-   * @param request the request to judge
-   * @param callerId the caller's user id, or {@code null} when unknown
-   * @param admin whether the caller is an admin, who may decide their own request
-   * @return {@code true} iff the caller must leave the decision to a second person
-   */
-  private static boolean isBoundByFourEyes(
-      @NotNull BankBookingRequest request, @Nullable UUID callerId, boolean admin) {
-    return !admin && callerId != null && callerId.equals(request.getRequestedBy());
+    BankStaffRights rights = staffRights();
+    return pageQueue(statuses, pageable, rights)
+        .map(request -> toDto(request, callerMayConfirm(request, rights)));
   }
 
   /**
@@ -664,11 +637,12 @@ public class BankBookingRequestService {
    * the request (REQ-BANK-062).
    *
    * @param request the request being decided
+   * @param rights the caller's staff rights
    * @throws BankConflictException with {@code BANK_FOUR_EYES_REQUIRED} when the caller raised it
    */
-  private void requireSecondPerson(@NotNull BankBookingRequest request) {
-    if (isBoundByFourEyes(
-        request, authHelperService.currentUserId().orElse(null), authHelperService.isAdmin())) {
+  private static void requireSecondPerson(
+      @NotNull BankBookingRequest request, @NotNull BankStaffRights rights) {
+    if (rights.boundByFourEyes(request.getRequestedBy())) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_FOUR_EYES_REQUIRED,
           "The requester of a booking request cannot approve or confirm it");
@@ -680,42 +654,49 @@ public class BankBookingRequestService {
    *
    * @param statuses the non-empty lifecycle states to include
    * @param pageable page, size and whitelisted sort
+   * @param rights the caller's staff rights
    * @return one page of request entities visible to the caller
    */
   @NotNull
   private Page<BankBookingRequest> pageQueue(
-      @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
-    if (bankSecurityService.isManagement()) {
+      @NotNull Set<BankBookingRequestStatus> statuses,
+      @NotNull Pageable pageable,
+      @NotNull BankStaffRights rights) {
+    if (rights.management()) {
       return requestRepository.findByStatusIn(statuses, pageable);
     }
-    Optional<UUID> caller = authHelperService.currentUserId();
-    if (caller.isEmpty()) {
+    if (rights.grantedAccountIds().isEmpty()) {
       return Page.empty(pageable);
     }
-    Set<UUID> grantedAccountIds =
-        grantRepository.findByUserId(caller.get()).stream()
-            .map(grant -> grant.getId().getAccountId())
-            .collect(Collectors.toSet());
-    if (grantedAccountIds.isEmpty()) {
-      return Page.empty(pageable);
-    }
-    return requestRepository.findByStatusInAndAccountIdIn(statuses, grantedAccountIds, pageable);
+    return requestRepository.findByStatusInAndAccountIdIn(
+        statuses, rights.grantedAccountIds(), pageable);
   }
 
   /**
-   * Whether the caller may confirm the request now: it is still {@code PENDING} and the caller
-   * holds the capability {@link #confirm} requires for it. The over-limit attestation stays a
-   * confirm-time input and is not part of this answer (REQ-BANK-041).
+   * Whether the caller may confirm the request now: it is still {@code PENDING}, the caller holds
+   * the capability {@link #confirm} requires for it, and the four-eyes rule does not bar them. The
+   * over-limit attestation stays a confirm-time input and is not part of this answer
+   * (REQ-BANK-041).
    *
    * @param request the request to judge
-   * @param confirmCheck the caller's confirm capability by request type and account
+   * @param rights the caller's staff rights
    * @return {@code true} iff the confirm action applies to this row for this caller
    */
   private static boolean callerMayConfirm(
-      @NotNull BankBookingRequest request,
-      @NotNull BiPredicate<BankBookingRequestType, UUID> confirmCheck) {
+      @NotNull BankBookingRequest request, @NotNull BankStaffRights rights) {
     return request.getStatus() == BankBookingRequestStatus.PENDING
-        && confirmCheck.test(request.getType(), request.getAccount().getId());
+        && rights.canBook(request.getType(), request.getAccount().getId())
+        && !rights.boundByFourEyes(request.getRequestedBy());
+  }
+
+  /**
+   * The current caller's staff rights.
+   *
+   * @return the rights of {@link BankCaller#actor()}
+   */
+  @NotNull
+  private BankStaffRights staffRights() {
+    return policy.staffRights(bankCaller.actor());
   }
 
   /**
@@ -733,7 +714,6 @@ public class BankBookingRequestService {
    * @param ownerApprovalConfirmed the over-limit "approval by responsible holder obtained"
    *     attestation (REQ-BANK-041); required when the request needs approval
    * @param version the echoed optimistic-locking version
-   * @param authentication the current authentication (capability check)
    * @return the confirmed request
    * @throws NotFoundException when the request does not exist
    * @throws BankApproverNoteRequiredException when the request needs approval, none was recorded in
@@ -755,15 +735,18 @@ public class BankBookingRequestService {
       @Nullable UUID destinationHolderId,
       boolean ownerApprovalConfirmed,
       @Nullable String staffNote,
-      long version,
-      Authentication authentication) {
+      long version) {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
-    requireSecondPerson(request);
+    BankStaffRights rights = staffRights();
+    requireSecondPerson(request, rights);
     BankOverLimitConfirmGate.require(request, ownerApprovalConfirmed, staffNote);
     UUID accountId = request.getAccount().getId();
-    requireConfirmCapability(request.getType(), accountId, authentication);
+    if (!rights.canBook(request.getType(), accountId)) {
+      throw new AccessDeniedException(
+          "The caller lacks the bank capability to confirm this request");
+    }
 
     UUID namedCounterparty = request.getCounterpartyUserId();
     UUID requesterId = namedCounterparty != null ? namedCounterparty : request.getRequestedBy();
@@ -872,7 +855,6 @@ public class BankBookingRequestService {
    * @param requestId the request to reject
    * @param reason the rejection reason
    * @param version the echoed optimistic-locking version
-   * @param authentication the current authentication (visibility check)
    * @return the rejected request
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the employee may not see the account
@@ -882,15 +864,12 @@ public class BankBookingRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto reject(
-      @NotNull UUID requestId,
-      @NotNull String reason,
-      long version,
-      Authentication authentication) {
+      @NotNull UUID requestId, @NotNull String reason, long version) {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
     UUID accountId = request.getAccount().getId();
-    if (!bankSecurityService.canSee(accountId, authentication)) {
+    if (!staffRights().canSee(accountId)) {
       throw new AccessDeniedException("The caller may not see the request's account");
     }
     UUID decider = authHelperService.currentUserId().orElse(null);
@@ -936,7 +915,7 @@ public class BankBookingRequestService {
       @NotNull BankBookingRequest request, boolean granted) {
     requirePending(request);
     if (granted) {
-      requireSecondPerson(request);
+      requireSecondPerson(request, staffRights());
     }
     if (granted && !request.isRequiresOwnerApproval()) {
       throw new BadRequestException(
@@ -989,25 +968,6 @@ public class BankBookingRequestService {
   public boolean hasOpenRequests(@NotNull UUID accountId) {
     return requestRepository.existsByAccountIdAndStatus(
         accountId, BankBookingRequestStatus.PENDING);
-  }
-
-  /**
-   * Enforces that the confirming employee holds the per-account capability matching the request
-   * type, as decided by {@link BankSecurityService#canConfirm} (REQ-BANK-023).
-   *
-   * @param type the request type
-   * @param accountId the target account
-   * @param authentication the current authentication
-   * @throws AccessDeniedException when the capability is missing
-   */
-  private void requireConfirmCapability(
-      @NotNull BankBookingRequestType type,
-      @NotNull UUID accountId,
-      Authentication authentication) {
-    if (!bankSecurityService.canConfirm(type, accountId, authentication)) {
-      throw new AccessDeniedException(
-          "The caller lacks the bank capability to confirm this request");
-    }
   }
 
   /**

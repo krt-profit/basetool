@@ -93,7 +93,7 @@ class OrgUnitBankAreaCascadeDifferentialTest {
             for (UUID target : TARGETS) {
               boolean expected = formerHubVerdict(target, fixture.callerMemberships());
               boolean actual =
-                  OrgUnitBankAccessService.isMemberOfAreaCascade(
+                  BankAccessJudgement.isMemberOfAreaCascade(
                       target,
                       fixture.resolver().currentDirectMembershipOrgUnitIds(),
                       fixture.orgUnits().findChildOrgUnitIds(target));

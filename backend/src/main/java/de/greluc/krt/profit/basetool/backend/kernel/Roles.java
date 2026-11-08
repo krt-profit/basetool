@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -62,6 +63,13 @@ public final class Roles {
 
   public static final String LOGISTICIAN = "LOGISTICIAN";
   public static final String MISSION_MANAGER = "MISSION_MANAGER";
+
+  /**
+   * The role codes that mark an organisation member or above once the hierarchy is applied; the
+   * elevated roles are listed because the hierarchy never implies {@link #KRT_MEMBER}.
+   */
+  public static final Set<String> MEMBER_OR_ABOVE =
+      Set.of(ADMIN, MISSION_MANAGER, LOGISTICIAN, KRT_MEMBER);
 
   /**
    * The only role an acting member holds on the exchange layer, in place of their stored roles

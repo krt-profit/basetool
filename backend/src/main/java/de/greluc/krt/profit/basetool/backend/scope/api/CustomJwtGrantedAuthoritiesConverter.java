@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -368,8 +367,7 @@ public class CustomJwtGrantedAuthoritiesConverter
             .flatMap(role -> {
               Stream<GrantedAuthority> roleAuth =
                   Stream.of(
-                      new SimpleGrantedAuthority(
-                          "ROLE_" + role.getName().toUpperCase(Locale.ROOT).replace(" ", "_")));
+                      new SimpleGrantedAuthority(Roles.authority(MemberRoleCodes.codeOf(role))));
               Stream<GrantedAuthority> permAuth =
                   role.getPermissions().stream().map(SimpleGrantedAuthority::new);
               return Stream.concat(roleAuth, permAuth);
@@ -412,17 +410,8 @@ public class CustomJwtGrantedAuthoritiesConverter
     }
 
     boolean seatsConfer = authorities.contains(KRT_MEMBER_AUTHORITY);
-    boolean anyLogistician =
-        memberships.stream().anyMatch(m -> m.isLogisticianOfOwnUnit(seatsConfer));
-    boolean anyMissionManager =
-        memberships.stream()
-            .anyMatch(m -> m.isMissionManager() || (seatsConfer && confersFlatOfficerRole(m)));
-
-    if (anyLogistician) {
-      authorities.add(new SimpleGrantedAuthority("ROLE_LOGISTICIAN"));
-    }
-    if (anyMissionManager) {
-      authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
+    for (String code : MemberRoleCodes.derivedFromMemberships(memberships, seatsConfer)) {
+      authorities.add(new SimpleGrantedAuthority(Roles.authority(code)));
     }
 
     Set<GrantedAuthority> contextual = new LinkedHashSet<>();
@@ -443,17 +432,5 @@ public class CustomJwtGrantedAuthoritiesConverter
       }
     }
     authorities.addAll(contextual);
-  }
-
-  /**
-   * Whether holding {@code m} confers the flat {@code ROLE_LOGISTICIAN} / {@code
-   * ROLE_MISSION_MANAGER}: true for any functional rank ({@link
-   * MembershipRole#confersOwnLevelOversight()}) (REQ-ROLE-001/002).
-   *
-   * @param m the membership row to classify
-   * @return {@code true} iff {@code m} carries a rank other than {@link MembershipRole#MEMBER}
-   */
-  private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
-    return m.getRole().confersOwnLevelOversight();
   }
 }

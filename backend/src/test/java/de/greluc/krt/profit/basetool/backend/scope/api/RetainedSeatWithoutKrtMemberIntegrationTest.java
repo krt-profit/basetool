@@ -151,13 +151,12 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
 
     authenticate(holder, true);
     assertThat(requestScopeResolver.canAccessBlueprintOverview()).isTrue();
-    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
+    assertThat(requestScopeResolver.currentOversightScope().memberOrgUnitIds())
         .contains(squadron.getId());
 
     authenticate(holder, false);
     assertThat(requestScopeResolver.canAccessBlueprintOverview()).isFalse();
-    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
-        .isEmpty();
+    assertThat(requestScopeResolver.currentOversightScope().memberOrgUnitIds()).isEmpty();
   }
 
   @Test

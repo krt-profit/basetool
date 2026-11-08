@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountAccess;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -90,11 +92,7 @@ public class OrgUnitBankSettingsService {
   @NotNull
   @Transactional(readOnly = true)
   public OrgUnitBankAccountSettingsDto getAccountSettings(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    if (!accessService.canSetTarget(account) && !accessService.canConfigureVisibility(account)) {
-      throw new AccessDeniedException("The caller may not manage this account's settings");
-    }
-    return toSettingsDto(account);
+    return toSettingsDto(accessService.requireSettingsAccount(accountId));
   }
 
   /**
@@ -112,8 +110,7 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setBalanceTarget(
       @NotNull UUID accountId, @Nullable BigDecimal target, long version) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanSetTarget(account);
+    BankAccount account = accessService.requireCanChange(accountId, BankAccountRight.SET_TARGET);
     OptimisticLock.check(account.getVersion(), version, BankAccount.class, account.getId());
     account.setBalanceTarget(target);
     bankAccountRepository.saveAndFlush(account);
@@ -144,8 +141,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto addRoleVisibility(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     requireValidRoleBucket(account, roleCode);
     orgUnitBankVisibilityService.grantRole(
         account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
@@ -166,8 +163,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto removeRoleVisibility(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     requireValidRoleBucket(account, roleCode);
     orgUnitBankVisibilityService.revokeRole(
         account, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, roleCode);
@@ -188,8 +185,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
       @NotNull UUID accountId, boolean enabled) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     if (!allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members visibility bucket");
     }
@@ -211,8 +208,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto addUserVisibility(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     orgUnitBankVisibilityService.grantUser(account, userId);
     return toSettingsDto(account);
   }
@@ -230,8 +227,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto removeUserVisibility(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     orgUnitBankVisibilityService.revokeUser(account, userId);
     return toSettingsDto(account);
   }
@@ -251,8 +248,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
       @NotNull UUID accountId, boolean enabled) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureVisibility(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_VISIBILITY);
     if (!areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members visibility bucket");
     }
@@ -275,8 +272,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
       @NotNull UUID accountId, @NotNull String roleCode, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     requireValidLimitRoleBucket(account, roleCode);
     orgUnitBankApprovalLimitService.setRole(account, roleCode, limit);
     return toSettingsDto(account);
@@ -296,8 +293,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto clearRoleApprovalLimit(
       @NotNull UUID accountId, @NotNull String roleCode) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     requireValidLimitRoleBucket(account, roleCode);
     orgUnitBankApprovalLimitService.clearRole(account, roleCode);
     return toSettingsDto(account);
@@ -317,8 +314,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
       @NotNull UUID accountId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     if (!BankApprovalLimitService.allMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no all-members approval-limit tier");
     }
@@ -337,8 +334,8 @@ public class OrgUnitBankSettingsService {
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto clearAllMembersApprovalLimit(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     orgUnitBankApprovalLimitService.clearAllMembers(account);
     return toSettingsDto(account);
   }
@@ -357,8 +354,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
       @NotNull UUID accountId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     if (!BankApprovalLimitService.areaMembersSupported(account.getType())) {
       throw new BadRequestException("This account type has no area-members approval-limit tier");
     }
@@ -377,8 +374,8 @@ public class OrgUnitBankSettingsService {
   @NotNull
   @Transactional
   public OrgUnitBankAccountSettingsDto clearAreaMembersApprovalLimit(@NotNull UUID accountId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     orgUnitBankApprovalLimitService.clearAreaMembers(account);
     return toSettingsDto(account);
   }
@@ -399,8 +396,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
       @NotNull UUID accountId, @NotNull UUID userId, @NotNull BigDecimal limit) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     orgUnitBankApprovalLimitService.setUser(account, userId, limit);
     return toSettingsDto(account);
   }
@@ -418,8 +415,8 @@ public class OrgUnitBankSettingsService {
   @Transactional
   public OrgUnitBankAccountSettingsDto clearUserApprovalLimit(
       @NotNull UUID accountId, @NotNull UUID userId) {
-    BankAccount account = accessService.requireDisclosedAccount(accountId);
-    accessService.requireCanConfigureApprovalLimits(account);
+    BankAccount account =
+        accessService.requireCanChange(accountId, BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     orgUnitBankApprovalLimitService.clearUser(account, userId);
     return toSettingsDto(account);
   }
@@ -473,7 +470,8 @@ public class OrgUnitBankSettingsService {
             .map(id -> new OrgUnitBankViewUserDto(id, names.getOrDefault(id, "")))
             .toList();
     OrgUnit orgUnit = account.getOrgUnit();
-    boolean canConfigureApprovalLimits = accessService.canConfigureApprovalLimits(account);
+    BankAccountAccess access = accessService.accessTo(account);
+    boolean canConfigureApprovalLimits = access.has(BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     BankApprovalLimitsDto approvalLimits =
         bankApprovalLimitService.assemble(account, canConfigureApprovalLimits);
     return new OrgUnitBankAccountSettingsDto(
@@ -484,9 +482,9 @@ public class OrgUnitBankSettingsService {
         orgUnit == null ? null : orgUnit.getKind(),
         account.getBalanceTarget(),
         account.getVersion(),
-        accessService.canSetTarget(account),
-        accessService.canConfigureVisibility(account),
-        OrgUnitBankAccessService.visibilityConfigurable(account.getType()),
+        access.has(BankAccountRight.SET_TARGET),
+        access.has(BankAccountRight.CONFIGURE_VISIBILITY),
+        BankAccessJudgement.visibilityConfigurable(account.getType()),
         allMembersSupported(account.getType()),
         areaMembersSupported(account.getType()),
         availableRoleCodes(account),
@@ -534,13 +532,13 @@ public class OrgUnitBankSettingsService {
 
   /**
    * {@code true} iff the account type has an all-members visibility bucket (same set as {@link
-   * OrgUnitBankAccessService#visibilityConfigurable}).
+   * BankAccessJudgement#visibilityConfigurable}).
    *
    * @param type the account type
    * @return whether the all-members bucket applies
    */
   private static boolean allMembersSupported(@NotNull BankAccountType type) {
-    return OrgUnitBankAccessService.visibilityConfigurable(type);
+    return BankAccessJudgement.visibilityConfigurable(type);
   }
 
   /**

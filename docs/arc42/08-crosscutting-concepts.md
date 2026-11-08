@@ -21,6 +21,9 @@ module per aggregate (`MissionEditor`, `JobOrderEditor`) loads the aggregate, de
 on it through the module's policy, checks the version, and records the audit event, so a caller
 without an HTTP request meets the same gate; the controller keeps a coarse role gate (REQ-SEC-085,
 ADR-0287).
+The bank goes one step further: every bank access rule sits behind `BankAccessPolicy`, which
+decides for an explicit `BankActor` read from the database and never reads the security context;
+the web beans and the exchange only build the actor and ask (ADR-0352).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
