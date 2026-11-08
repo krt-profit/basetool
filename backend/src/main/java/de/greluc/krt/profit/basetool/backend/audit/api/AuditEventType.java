@@ -368,6 +368,17 @@ public enum AuditEventType {
    * member; the details carry only the {@code from} and {@code to} ranks.
    */
   MEMBER_RANK_CHANGED(AuditDomain.ROLE),
+  /**
+   * One of the four application roles was assigned to a member in the Basetool (REQ-SEC-088). The
+   * subject and the target are the member; the details carry the {@code role} code and, for the
+   * login-time grant, {@code source=bootstrap}.
+   */
+  USER_ROLE_ASSIGNED(AuditDomain.ROLE),
+  /**
+   * One of the four application roles was withdrawn from a member in the Basetool (REQ-SEC-088).
+   * The subject and the target are the member; the details carry the {@code role} code.
+   */
+  USER_ROLE_WITHDRAWN(AuditDomain.ROLE),
   /** A Kommandogruppe was created within a squadron. */
   KOMMANDO_GROUP_CREATED(AuditDomain.ROLE),
   /** A Kommandogruppe was renamed or reordered. */

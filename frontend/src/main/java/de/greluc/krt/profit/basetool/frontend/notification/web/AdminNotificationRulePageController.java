@@ -158,7 +158,8 @@ public class AdminNotificationRulePageController {
           "PURCHASING_PAUSED",
           "PURCHASING_RESUMED",
           "PURCHASING_DELEGATE_APPOINTED",
-          "PURCHASING_DELEGATE_REVOKED");
+          "PURCHASING_DELEGATE_REVOKED",
+          "USER_ROLE_CHANGED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -241,7 +242,8 @@ public class AdminNotificationRulePageController {
           "PURCHASING_PAUSED",
           "PURCHASING_RESUMED",
           "PURCHASING_DELEGATE_APPOINTED",
-          "PURCHASING_DELEGATE_REVOKED");
+          "PURCHASING_DELEGATE_REVOKED",
+          "USER_ROLE_CHANGED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but

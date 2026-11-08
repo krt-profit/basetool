@@ -16,6 +16,23 @@
         text-align: center;
     }
 
+    .bank-grants-results {
+        display: grid;
+        gap: var(--space-4);
+    }
+
+    .bank-employees__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+    }
+
+    .bank-employees__title {
+        margin: 0;
+    }
+
     @media (width <= 768px) {
         .bank-grants-flag-col {
             width: auto;

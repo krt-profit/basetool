@@ -8,7 +8,9 @@ findable from one place, not to restate them.
 Keycloak is the only identity provider; the applications never handle a credential. The backend is
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
-invariants that keep it that way. Those tests select by role and class literal rather than by
+invariants that keep it that way. The four application roles are assigned in the Basetool and held
+in `user_roles` with a per-user role-set counter; Keycloak keeps authentication (REQ-SEC-088,
+ADR-0355). Those tests select by role and class literal rather than by
 package or name, assert a selection floor and are each proven able to fail on a planted fixture,
 so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
 Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller

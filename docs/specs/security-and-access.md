@@ -6385,6 +6385,53 @@ surface.
 
 ---
 
+### REQ-SEC-088 — The four application roles are assigned in the Basetool
+
+The roles Admin, KRT Member, Bank Employee and Bank Management are written to `user_roles` by the
+Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).
+`identity.internal.UserRoleAssignmentService` owns those writes:
+
+- **Who assigns.** An admin assigns and withdraws every role on the member page (tab *Rollen*). The
+  bank management assigns and withdraws Bank Employee in the bank grant management (*Bank-Mitarbeiter*)
+  and sees only that role of a role set; anyone else gets `403`
+  (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
+  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
+- **Its own counter.** `app_user.roles_version` guards a user's role set (V362) and is echoed on every
+  change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
+  role change, so a role change and an edit of the user record never collide. A change that leaves
+  the role set as it is writes nothing.
+- **The last admin.** Withdrawing Admin while no other active account (approved, present and enabled
+  in Keycloak) holds it answers `409 LAST_ADMIN`; the Admin role row is locked first, so two
+  withdrawals are checked one after the other.
+- **The departure.** Withdrawing KRT Member publishes `MemberDepartedEvent` with the reason
+  `member_role_withdrawn`, so the exchange revocations and the unit notices follow (REQ-XCH-008).
+- **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
+  Keycloak subjects, empty by default; a value that is not a UUID fails the start) lists subjects
+  that receive Admin at login while no other active admin exists; the account is approved with it.
+- **Traces.** Every change, the bootstrap grant included, records `USER_ROLE_ASSIGNED` /
+  `USER_ROLE_WITHDRAWN` (subject and target the member, details the `role` code and, for the
+  bootstrap grant, `source=bootstrap`; REQ-AUDIT-001), counts
+  `basetool_user_role_changes_total{role,action}`, tells the member through `USER_ROLE_CHANGED`
+  (not mutable, V363) and calls the `RolesChangedObserver`s.
+
+Until the cutover the login and the daily roster sync still write the roles from the token, and the
+backend reads them from the token; this requirement and the cutover ship in the same release.
+
+**Enforced by:** `UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`
+(`BootstrapAdminTests`), `BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`,
+`BankGrantsPageControllerTest` ·
+**Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
+`RoleChangeRecorder`, `BootstrapAdminGrant`, `identity/web/UserRoleController`
+
+**Acceptance**
+
+- [x] An admin assigns and withdraws each role; the counter moves, the row `@Version` does not.
+- [x] The bank management changes Bank Employee and is refused every other role.
+- [x] The last active admin keeps Admin (`409 LAST_ADMIN`).
+- [x] Withdrawing KRT Member publishes the departure.
+- [x] Each change is audited, counted and announced; an unchanged role set leaves no trace.
+- [x] A bootstrap subject receives Admin at login only while no other active admin exists.
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

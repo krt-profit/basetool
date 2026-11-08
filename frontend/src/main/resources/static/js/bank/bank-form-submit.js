@@ -42,7 +42,7 @@ const NUMBER_FIELDS = [
 ];
 
 /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
-const BOOLEAN_FIELDS = ['active'];
+const BOOLEAN_FIELDS = ['active', 'assigned'];
 
 /**
  * Maps backend bank conflict codes onto the form field whose inline error slot

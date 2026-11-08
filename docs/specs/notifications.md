@@ -133,6 +133,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `PURCHASING_RESUMED` | `PURCHASING_RESUMED` | V289 | as the pause; supersedes `PURCHASING_PAUSED`; not mutable | REQ-PUR-019 |
 | `PURCHASING_DELEGATE_APPOINTED` | `PURCHASING_DELEGATE_APPOINTED` | V289 | `EVENT_RECIPIENT` (the appointed member); not mutable | REQ-PUR-003 |
 | `PURCHASING_DELEGATE_REVOKED` | `PURCHASING_DELEGATE_REVOKED` | V289 | `EVENT_RECIPIENT` (the former HB); supersedes the appointment notice; not mutable | REQ-PUR-003 |
+| `USER_ROLE_CHANGED` | `USER_ROLE_CHANGED` | V363 | `EVENT_RECIPIENT` (the member); coded `roleCode`, `changeCode`; not mutable | REQ-SEC-088 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
@@ -1298,6 +1299,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `PURCHASING_DELIVERY_RECORDED`, `PURCHASING_DELIVERY_DECIDED`, `PURCHASING_SETTLEMENT_OVERDUE` | `/purchasing/deals/{id}` |
 | `PURCHASING_NEED_RELEASED`, `PURCHASING_PAUSED`, `PURCHASING_RESUMED` | `/purchasing/deals` |
 | `PURCHASING_DELEGATE_APPOINTED`, `PURCHASING_DELEGATE_REVOKED` | `/purchasing/delegates?focus={id}` |
+| `USER_ROLE_CHANGED` | `/profile` |
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
 | `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF`, `BANK_EXCHANGE_SWITCHED_ON`, `BANK_EXCHANGE_SWITCHED_OFF` | `/connected-apps` |

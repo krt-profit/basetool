@@ -90,6 +90,7 @@ public class UserReconciliationService {
   private final UserService userService;
   private final PartialRoleScopeProperties partialRoleScopeProperties;
   private final List<RolesChangedObserver> rolesChangedObservers;
+  private final LoginRoleGrant loginRoleGrant;
 
   /** Counts callsign collisions between a new subject and an existing account. */
   private final MeterRegistry meterRegistry;
@@ -188,15 +189,22 @@ public class UserReconciliationService {
       changed = true;
     }
 
+    final boolean bootstrapAdmin = loginRoleGrant.grantIfDue(user);
+    if (bootstrapAdmin) {
+      changed = true;
+    }
+
     String guildNickname = normalizeGuildNickname(jwt.getClaimAsString("discord_guild_nickname"));
     if (!Objects.equals(user.getDiscordGuildNickname(), guildNickname)) {
       user.setDiscordGuildNickname(guildNickname);
       changed = true;
     }
 
-    boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
+    boolean isAdmin =
+        bootstrapAdmin
+            || localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration =
-        userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
+        userRegistrationService.stampNewPendingRegistration(user, created, user.getRoles());
     if (newPendingRegistration) {
       changed = true;
     } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
@@ -210,6 +218,9 @@ public class UserReconciliationService {
 
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
+      if (bootstrapAdmin) {
+        loginRoleGrant.recordGrant(saved);
+      }
       if (created) {
         memberCreatedObserver.afterMemberCreated(user.getId());
       }

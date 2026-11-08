@@ -229,6 +229,15 @@ seeded permissions from
 The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
 
+**The roles are assigned in the Basetool** (REQ-SEC-088, ADR-0355): an admin assigns and withdraws
+every role on the member page (tab *Rollen*), the bank management assigns and withdraws
+`Bank Employee` in the bank grant management (*Bank-Mitarbeiter*). A user's role set has its own
+counter (`roles_version`), separate from the user record's version. The last active admin keeps
+`Admin` (`409 LAST_ADMIN`), withdrawing `KRT Member` is a departure, and the subjects in
+`APP_BOOTSTRAP_ADMIN_SUBS` receive `Admin` at login while no active admin exists. Every change is
+audited (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`) and announced to the member. Until the
+cutover ships with it, a login still writes the token's roles.
+
 ### Role hierarchy (backend + frontend identical)
 
 ```
@@ -738,6 +747,7 @@ OL seat (REQ-ROLE-005) does not count.
 | Read system settings (`GET /settings`, `GET /settings/{key}`, `hasRole('ADMIN')`; members read the typed `GET /orders/settings` and `GET /refinery-orders/settings`)                                                                       |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, Staffel memberships + flags, Keycloak roster sync now (`/api/v1/admin/**`, `/api/v1/users/*/...`, `POST /api/v1/users/sync`, `/members`, `hasRole('ADMIN')`)                          |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Assign or withdraw one of the four roles of a member (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`, member page tab *Rollen*, REQ-SEC-088); the last active admin keeps `Admin` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Discord registration queue — approve / reject / reopen / link / merge (`/api/v1/users/admin/registrations/**`, `/admin/discord-registrations`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Own exchange connections — list them with their installations and recent activity, mark new installations seen, disconnect a client or one installation, undo a client's writes — the org-stock writes one made as a Logistician included, only in pools one is still a Logistician of —, confirm or discard a change set the mass-change guard held back, withhold one's name from connected applications (`/api/v1/connected-apps/**`, REQ-XCH-008/-021/-022/-032/-044/-046); only from the member's own web session, never the app or the gateway; the web pages are *Persönlich → Verbundene Anwendungen* (`/connected-apps`), its confirmation page (`/connected-apps/confirm`) and, for the name withholding, the profile (`/profile`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read the anonymous open demand of one's **own** units through an approved connected application (`GET /exchange/v1/me/org-demand` → `/api/v1/exchange/me/org-demand`, capability `exchange.demand.read`, REQ-XCH-018) — every member who gave that consent and passes `canViewJobOrders` (else empty lists with `reason: NOT_PERMITTED`; an `ADMIN` role does not open it on the exchange); only units the member belongs to, never ones they merely oversee or administer; no requester, assignee, order or free text |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
@@ -780,7 +790,7 @@ data.**
 
 ### 3.11 Kartellbank (epic #556)
 
-The bank hinges on two dedicated Keycloak roles (`Bank Employee` →
+The bank hinges on two dedicated roles (`Bank Employee` →
 `ROLE_BANK_EMPLOYEE`, `Bank Management` → `ROLE_BANK_MANAGEMENT`) plus
 app-managed **grant rows** per (employee, account)
 (`bank_account_grant`: row = read right; flags = deposit / withdraw /
@@ -788,6 +798,9 @@ transfer). **Bank staffing is entirely independent of
 OrgUnit memberships** (REQ-BANK-008): `BankSecurityService` evaluates
 exclusively bank roles + grants — the org-unit scope services, contextual
 roles and the admin pin have no influence whatsoever, in either direction.
+The bank management assigns and withdraws `Bank Employee` itself on the grants page
+(`PUT /api/v1/users/{id}/roles/BANK_EMPLOYEE`, `GET /api/v1/users/role-holders?role=BANK_EMPLOYEE`;
+REQ-SEC-088); every other role stays with the admins.
 Columns here: **Member** = any org role without a bank role · **Bank Empl.** =
 `Bank Employee` (with grants) · **Bank Mgmt.** = `Bank Management`.
 

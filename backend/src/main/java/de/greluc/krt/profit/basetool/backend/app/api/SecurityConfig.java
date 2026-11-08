@@ -387,6 +387,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/users/lookup")
                 .hasAnyRole(
                     Roles.ADMIN, Roles.KRT_MEMBER, Roles.BANK_MANAGEMENT, Roles.BANK_EMPLOYEE)
+                .requestMatchers(
+                    "/api/v1/users/role-holders",
+                    "/api/v1/users/*/roles",
+                    "/api/v1/users/*/roles/*")
+                .hasAnyRole(Roles.ADMIN, Roles.BANK_MANAGEMENT)
                 .requestMatchers("/api/v1/users/me", "/api/v1/users/me/**")
                 .authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/users")

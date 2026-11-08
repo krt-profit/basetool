@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.ConsolidateAccountReque
 import de.greluc.krt.profit.basetool.frontend.bank.model.MergeAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.ApproveRegistrationRequest;
+import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
 import de.greluc.krt.profit.basetool.frontend.identity.model.CreateDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.LinkRegistrationRequest;
@@ -44,6 +45,9 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserAttributesUpdateDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDescriptionRequest;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleChangeRequest;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleHolderDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleSetDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserSyncResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -100,6 +104,9 @@ public class IdentityBackendClient {
 
   private static final ParameterizedTypeReference<PageResponse<TermsAcceptanceStatusDto>>
       TERMS_STATUS_PAGE = new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<UserRoleHolderDto>> ROLE_HOLDER_LIST =
+      new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -339,6 +346,44 @@ public class IdentityBackendClient {
   @Nullable
   public UserRsiHandleResponse userRsiHandle(@NotNull UUID id) {
     return backendApiClient.get("/api/v1/users/{id}/rsi-handle", UserRsiHandleResponse.class, id);
+  }
+
+  /**
+   * Reads a user's role set as far as the caller may assign it (REQ-SEC-088).
+   *
+   * @param id the user
+   * @return the role set, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public UserRoleSetDto userRoles(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/users/{id}/roles", UserRoleSetDto.class, id);
+  }
+
+  /**
+   * Assigns or withdraws one role of a user (REQ-SEC-088).
+   *
+   * @param id the user
+   * @param role the role
+   * @param request whether to assign it and the role-set counter the caller last saw
+   * @return the role set after the change, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public UserRoleSetDto changeUserRole(
+      @NotNull UUID id, @NotNull AssignableRole role, @NotNull UserRoleChangeRequest request) {
+    return backendApiClient.put(
+        "/api/v1/users/{id}/roles/{role}", request, UserRoleSetDto.class, id, role.name());
+  }
+
+  /**
+   * Lists the holders of a role the caller may assign (REQ-SEC-088).
+   *
+   * @param role the role
+   * @return the holders, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<UserRoleHolderDto> roleHolders(@NotNull AssignableRole role) {
+    return backendApiClient.get(
+        "/api/v1/users/role-holders?role={role}", ROLE_HOLDER_LIST, role.name());
   }
 
   /**

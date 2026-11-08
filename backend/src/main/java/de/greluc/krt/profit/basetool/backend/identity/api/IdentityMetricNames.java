@@ -125,5 +125,25 @@ public final class IdentityMetricNames {
    */
   public static final String TAG_TERMS_VERSION = "terms_version";
 
+  /**
+   * Counter {@code basetool_user_role_changes_total} — tags {@link #TAG_ROLE} (one of the four
+   * assignable role codes) and {@link #TAG_ACTION} ({@link #ROLE_ACTION_ASSIGNED} / {@link
+   * #ROLE_ACTION_WITHDRAWN}). Bumped once per role written in the Basetool, the bootstrap grant
+   * included (REQ-SEC-088, REQ-OBS-011).
+   */
+  public static final String USER_ROLE_CHANGES = "basetool.user.role.changes";
+
+  /** Tag: the role code of a role change, bounded by the four assignable roles. */
+  public static final String TAG_ROLE = "role";
+
+  /** Tag: whether a role was assigned or withdrawn. */
+  public static final String TAG_ACTION = "action";
+
+  /** Role-change action: the role was assigned. */
+  public static final String ROLE_ACTION_ASSIGNED = "assigned";
+
+  /** Role-change action: the role was withdrawn. */
+  public static final String ROLE_ACTION_WITHDRAWN = "withdrawn";
+
   private IdentityMetricNames() {}
 }

@@ -37,6 +37,8 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankApprovalLimitsDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankCapabilitiesDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleHolderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -85,7 +87,8 @@ class BankGrantsPageControllerTest {
   void grants_ShouldFilterByAccount_andSeedSelectedAccountForCombobox() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller =
-        new BankGrantsPageController(new BankBackendClient(backendApiClient));
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
@@ -110,7 +113,8 @@ class BankGrantsPageControllerTest {
   void grants_ShouldFilterByUserInEmployeeViewAndCollectGrantees() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller =
-        new BankGrantsPageController(new BankBackendClient(backendApiClient));
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID userId = UUID.randomUUID();
     UUID otherUser = UUID.randomUUID();
@@ -139,7 +143,8 @@ class BankGrantsPageControllerTest {
   void grants_fragmentGrantsMatrix_rendersOnlyMatrixFragment_andSkipsFilterAndModalLookups() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     BankGrantsPageController controller =
-        new BankGrantsPageController(new BankBackendClient(backendApiClient));
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
     Model model = new ConcurrentModel();
     UUID accountId = UUID.randomUUID();
     UUID user = UUID.randomUUID();
@@ -155,5 +160,24 @@ class BankGrantsPageControllerTest {
     verify(backendApiClient, never())
         .get(eq("/api/v1/bank/accounts/{id}"), eq(BankAccountDetailDto.class), eq(accountId));
     verify(backendApiClient, never()).get(eq("/api/v1/bank/grants"), anyTypeRef());
+  }
+
+  @Test
+  void grants_listsTheBankEmployeesForTheRolePanel() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+    UserRoleHolderDto employee = new UserRoleHolderDto(UUID.randomUUID(), "alpha", 3L);
+    when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get(
+            eq("/api/v1/users/role-holders?role={role}"), anyTypeRef(), eq("BANK_EMPLOYEE")))
+        .thenReturn(List.of(employee));
+
+    String view = controller.grants(null, null, null, "grantsMatrix", model);
+
+    assertEquals("bank/bank-grants :: grantsMatrix", view);
+    assertEquals(List.of(employee), model.getAttribute("bankEmployees"));
   }
 }

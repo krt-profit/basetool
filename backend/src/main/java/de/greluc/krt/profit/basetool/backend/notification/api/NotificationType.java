@@ -482,12 +482,18 @@ public enum NotificationType {
   PURCHASING_DELEGATE_APPOINTED,
 
   /** The member's appointment was revoked (REQ-PUR-024). */
-  PURCHASING_DELEGATE_REVOKED;
+  PURCHASING_DELEGATE_REVOKED,
+
+  /**
+   * One of the recipient's roles was assigned or withdrawn (REQ-SEC-088), rendered with the coded
+   * {@code role} and {@code change} words.
+   */
+  USER_ROLE_CHANGED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
-   * deadline and {@link #EXCHANGE_INSTALLATION_CONNECTED} is the phishing signal, so none of them
-   * can be muted.
+   * deadline, {@link #EXCHANGE_INSTALLATION_CONNECTED} is the phishing signal and {@link
+   * #USER_ROLE_CHANGED} reports a change of access, so none of them can be muted.
    *
    * @return {@code false} for the types a member cannot mute, {@code true} for every other
    */
@@ -502,7 +508,8 @@ public enum NotificationType {
           PURCHASING_PAUSED,
           PURCHASING_RESUMED,
           PURCHASING_DELEGATE_APPOINTED,
-          PURCHASING_DELEGATE_REVOKED ->
+          PURCHASING_DELEGATE_REVOKED,
+          USER_ROLE_CHANGED ->
           false;
       case JOB_ORDER_CREATED,
           JOB_ORDER_UPDATED_BY_REQUESTER,

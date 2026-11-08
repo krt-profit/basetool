@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Role. */
@@ -82,4 +85,15 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
    */
   @Query("SELECT r.name FROM Role r")
   Set<String> findAllNames();
+
+  /**
+   * Loads a role under a row lock held to the end of the transaction, so that checks against its
+   * holders run one at a time (the last-admin rule, REQ-SEC-088).
+   *
+   * @param code the stable role code
+   * @return the locked role, or empty when the catalogue knows no such code
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM Role r WHERE r.code = :code")
+  Optional<Role> lockByCode(@Param("code") String code);
 }
