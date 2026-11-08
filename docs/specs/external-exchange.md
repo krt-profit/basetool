@@ -3377,7 +3377,8 @@ commit, into the `refinery` room (section `queue`) and the order's `refinery-ord
 `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
 `ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
 `RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373` · **Status:** implemented for `create`,
-`update` and the goods ops — #3168; `pickup`, `cancel` and `delete` follow with #3169 and #3170
+`update` and the goods ops — #3168, and `pickup` without store lines — #3170; `cancel` and
+`delete` follow with #3169
 
 ### REQ-XCH-053 — A pickup closes an order and books stock only with store lines
 
@@ -3413,16 +3414,23 @@ A `pickup` op reports that the member collected an order's yield in the game. It
 
 **Acceptance**
 
-- [ ] A pickup without lines closes a running order before its end, books nothing and leaves the
+- [x] A pickup without lines closes a running order before its end, books nothing and leaves the
   status editable in the web; the web shows „Abgeholt" with the client.
-- [ ] A pickup of a completed order is `unchanged`; of a cancelled one `ORDER_CANCELED`.
+  *`ExchangeRefineryOrderWriteControllerTest`, `RefineryProgressTest`.*
+- [x] A pickup of a completed order is `unchanged`; of a cancelled one `ORDER_CANCELED`.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
 - [ ] A pickup with lines stores as the web's store does and locks the order through `storedAt`; one
   refused line refuses the op and books nothing.
 - [ ] A line whose material is no output, whose receiver or unit the rule refuses, or whose job
   order is unknown, invisible or does not need the material, is refused with its reason.
 - [ ] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing.
 
-**Status:** planned — #3170 (pickup without store lines), #3171 (store lines)
+Until the store lines are built, the `pickup` op declares no line field: a pickup books nothing,
+and a field it does not declare is ignored with the `UNKNOWN_FIELD` warning of REQ-XCH-026.
+
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest` ·
+**Code:** `ExchangeRefineryOrderWriteService.pickup`, `RefineryExchangeWrites.pickUp`, `V375` ·
+**Status:** partially implemented — #3170 (pickup without store lines); #3171 (store lines)
 
 ### REQ-XCH-054 — A client reads the store choices under its own scope
 
@@ -3494,7 +3502,8 @@ refinery journal state (ADR-0285): the fields a client writes — location, meth
 before and after; the `delete` of #3169 adds the client marker and the mission link. The
 `clientKey` stays in `exchange_refinery_order_link`, which keeps it after the order is gone. The
 journal actions are `REFINERY_CREATE`, `REFINERY_UPDATE`, `REFINERY_GOOD_ADD`,
-`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`). Writes of one change set share their
+`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`), and `REFINERY_PICKUP` (`V375`). Writes
+of one change set share their
 transaction and time, so the undo orders an order's writes by its counters, which every write
 raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as follows:
 
@@ -3523,12 +3532,15 @@ gone, is skipped `GONE`.
 - [x] An undo removes an unchanged create and skips one changed in the web; it brings a removed
   good back under its id and rolls back the finances of the same order.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
-- [ ] An undo of a pickup without lines reopens the order; one with lines is skipped `STOCK_BOOKED`.
+- [x] An undo of a pickup without lines reopens the order and clears `pickedUpAt`.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [ ] An undo of a pickup with lines is skipped `STOCK_BOOKED`.
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`
-· **Code:** `ExchangeRefineryOrderJournal`, `ExchangeUndoService`, `V373` · **Status:** partially
-implemented — #3168 (journal, undo of create, update and goods ops); #3169 (undo of cancel and
-delete), #3170 (undo of a pickup)
+· **Code:** `ExchangeRefineryOrderJournal`, `ExchangeUndoService`, `V373`, `V375` · **Status:**
+partially implemented — #3168 (journal, undo of create, update and goods ops), #3170 (undo of a
+pickup without store lines); #3169 (undo of cancel and delete), #3171 (undo of a pickup with store
+lines)
 
 ## Threat model
 

@@ -249,16 +249,17 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 A **client create** (REQ-XCH-052, `RefineryExchangeWrites`) sets its status, `OPEN` or
 `IN_PROGRESS`, because a client reads running orders from the game. `COMPLETED` comes only from a
 pickup and `CANCELED` only from a cancel or delete; `storedAt`, `id`, the owner and the counters stay
-server-managed, and the web's create is unchanged.
+server-managed, and the web's create is unchanged. A client's **pickup without store lines**
+(REQ-XCH-053, `RefineryExchangeWrites.pickUp`) sets `COMPLETED` without `storedAt`
+(REQ-REFINERY-028): such an order stays editable like one a `PUT` completed, and the member may
+reopen and then store it in the web.
 
 > [!note] Planned — the exchange's pickup (ADR-0351, epic #3163)
 > Two exchange paths join this requirement as they are built, and leave the web's store unchanged:
 >
 > - **A pickup with store lines** (REQ-XCH-053) stores through this same store operation, so it
 >   books exactly once and sets `storedAt`; a refused line refuses the whole pickup and books
->   nothing. A pickup without store lines sets `COMPLETED` without `storedAt`
->   (REQ-REFINERY-028): such an order stays editable like one a `PUT` completed, and the member may
->   reopen and then store it in the web.
+>   nothing.
 > - **A client's hard delete** (REQ-XCH-055) refuses an order with `storedAt` set, so the record
 >   behind booked stock is never deleted; the web keeps cancelling through `DELETE`.
 
@@ -394,10 +395,16 @@ for any `COMPLETED` order.
 
 **Enforced by:** `RefineryProgressTest` (`aPickupWithoutStoreIsItsOwnState`,
 `aPickedUpRowIsClosed`), `RefineryOrdersListPatternRenderTest` (`rendersTheClientChipAndThePickup`),
-`RefineryOrderDetailPatternRenderTest` · **Code:** `RefineryProgress.state`,
-`RefineryOrderProvenanceDto.pickedUpWithoutStore`, `RefineryOrderProvenance.recordPickup`
+`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderWriteControllerTest` (the pickup op
+and its undo) · **Code:** `RefineryProgress.state`,
+`RefineryOrderProvenanceDto.pickedUpWithoutStore`, `RefineryOrderProvenance.recordPickup`,
+`RefineryExchangeWrites.pickUp`
 
-**Status:** marker and labels implemented (#3166); the pickup op that sets it arrives with #3170
+The undo of a client's pickup (REQ-XCH-056) sets the status back and clears the marker
+(`RefineryOrderProvenance.clearPickup`); a web reopen keeps it.
+
+**Status:** marker and labels implemented (#3166); the pickup op without store lines and its undo
+implemented (#3170)
 
 ### REQ-REFINERY-029 — An order is locked per section: game data and finances
 

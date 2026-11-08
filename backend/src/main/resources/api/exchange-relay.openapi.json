@@ -5122,7 +5122,7 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^(create|update|good-add|good-update|good-remove)$"
+            "pattern" : "^(create|update|good-add|good-update|good-remove|pickup)$"
           },
           "opId" : {
             "type" : "string",

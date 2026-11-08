@@ -128,12 +128,14 @@ web, naming its client (REQ-AUDIT-005):
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
   (`REFINERY_ORDERS_REASSIGNED`). An exchange client's refinery-order writes (REQ-XCH-052)
   record the same events under the client's id: a create `REFINERY_ORDER_CREATED`, an update
-  and a goods op `REFINERY_ORDER_UPDATED`. The removal of an order with its goods is
+  and a goods op `REFINERY_ORDER_UPDATED`, and a pickup without store lines (REQ-XCH-053)
+  `REFINERY_ORDER_UPDATED` with the status change and `pickup=true`. The removal of an order with
+  its goods is
   `REFINERY_ORDER_DELETED` (order id, last status, location and the number of goods rows; no free
   text), today written by the undo of a client's create (REQ-XCH-056) beside the undo's own
   `EXCHANGE_CHANGES_UNDONE`; it is in the viewer's Raffinerie event-type filter with its DE/EN
-  labels. *Planned (ADR-0351, epic #3163):* a pickup without store lines records
-  `REFINERY_ORDER_UPDATED`, a cancel `REFINERY_ORDER_CANCELED`, a pickup with store lines
+  labels. *Planned (ADR-0351, epic #3163):* a cancel records `REFINERY_ORDER_CANCELED`, a pickup
+  with store lines
   `REFINERY_ORDER_STORED` with its `INVENTORY_RECEIVED_FROM_REFINERY` rows, the client's hard
   delete `REFINERY_ORDER_DELETED`, and the undo's recreation of a deleted order the new
   `REFINERY_ORDER_RESTORED` (order id and the number of goods rows restored), which joins the

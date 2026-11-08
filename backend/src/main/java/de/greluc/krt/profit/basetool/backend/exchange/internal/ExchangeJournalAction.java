@@ -50,7 +50,8 @@ public enum ExchangeJournalAction {
   REFINERY_UPDATE(ExchangeResource.REFINERY_ORDER),
   REFINERY_GOOD_ADD(ExchangeResource.REFINERY_ORDER),
   REFINERY_GOOD_UPDATE(ExchangeResource.REFINERY_ORDER),
-  REFINERY_GOOD_REMOVE(ExchangeResource.REFINERY_ORDER);
+  REFINERY_GOOD_REMOVE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_PICKUP(ExchangeResource.REFINERY_ORDER);
 
   /** The resource the action belongs to. */
   @NotNull private final ExchangeResource resource;

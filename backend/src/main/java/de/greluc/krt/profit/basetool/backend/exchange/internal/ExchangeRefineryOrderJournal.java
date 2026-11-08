@@ -48,8 +48,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Owns the journal state of a refinery order and sets the order back on an undo (REQ-XCH-056,
- * ADR-0285): a create is removed, an update or goods op restores the sections it touched, each only
- * while that section's counter shows no write but the client's since.
+ * ADR-0285): a create is removed, an update, goods op or pickup restores the sections it touched,
+ * each only while that section's counter shows no write but the client's since; a pickup's marker
+ * is cleared with its status.
  */
 @Component
 @RequiredArgsConstructor
@@ -120,6 +121,10 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
                     base.expenses(), base.otherExpenses(), base.oreSales())
                 : null,
             gameData ? base.goods().stream().map(Good::toEdit).toList() : null));
+    if (group.stream()
+        .anyMatch(entry -> entry.getAction() == ExchangeJournalAction.REFINERY_PICKUP)) {
+      writer.clearPickup(scope.member(), orderId);
+    }
     return null;
   }
 

@@ -186,6 +186,38 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   }
 
   @Override
+  public @NotNull RefineryExchangeOrder pickUp(
+      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    RefineryOrderStatus previousStatus = order.getStatus();
+    if (previousStatus != RefineryOrderStatus.OPEN
+        && previousStatus != RefineryOrderStatus.IN_PROGRESS) {
+      throw new BadRequestException("error.refinery_order.not_running");
+    }
+    order.setStatus(RefineryOrderStatus.COMPLETED);
+    order.getProvenance().recordPickup(clientId, Instant.now());
+    RefineryOrderSection.GAME_DATA.advance(order);
+    RefineryOrder saved = refineryOrderRepository.saveAndFlush(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        owner,
+        AuditDetails.of("location", RefineryOrders.locationName(saved))
+            .with("method", RefineryOrders.methodName(saved))
+            .with("goods", saved.getGoods().size())
+            .with("status", previousStatus + "->" + saved.getStatus())
+            .with("pickup", true));
+    return RefineryExchangeReads.toRow(saved);
+  }
+
+  @Override
+  public void clearPickup(@NotNull UUID owner, @NotNull UUID orderId) {
+    requireOwn(owner, orderId).getProvenance().clearPickup();
+  }
+
+  @Override
   public void delete(@NotNull UUID owner, @NotNull UUID orderId) {
     RefineryOrder order = requireOwn(owner, orderId);
     if (order.getStoredAt() != null) {

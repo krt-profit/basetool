@@ -5,6 +5,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-08
 
+- **New: refinery-order op `pickup`.** It closes an open or running order as collected in the
+  game, also before its end: the order becomes `COMPLETED` with `pickedUpAt`, nothing is booked
+  into stock, and it echoes `gameData`. A completed order is `unchanged`; a cancelled one is
+  refused with the new per-op reason `ORDER_CANCELED`
+  ([refinery orders](resources/refinery-orders.md#fields), [errors](errors.md)).
 - **New: refinery orders.** `GET /exchange/v1/me/refinery-orders` with the scope
   `exchange.refinery.read` serves the member's own refinery orders: a snapshot of the open and
   running ones, and a feed of every change of every own order, completed and cancelled ones
