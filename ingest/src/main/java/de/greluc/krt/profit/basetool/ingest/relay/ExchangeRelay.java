@@ -140,6 +140,8 @@ public class ExchangeRelay {
       Map.of(
           ExchangeRefusals.EXCHANGE_DISABLED,
           HttpStatus.SERVICE_UNAVAILABLE.value(),
+          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+          HttpStatus.SERVICE_UNAVAILABLE.value(),
           ExchangeRefusals.REGISTRY_UNAVAILABLE,
           HttpStatus.SERVICE_UNAVAILABLE.value(),
           ExchangeRefusals.CLIENT_NOT_ALLOWED,
@@ -180,6 +182,9 @@ public class ExchangeRelay {
                   + " confirmation."),
           Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
+          Map.entry(
+              ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+              ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL),
           Map.entry(
               ExchangeRefusals.REGISTRY_UNAVAILABLE,
               ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL),
@@ -460,7 +465,8 @@ public class ExchangeRelay {
 
   /**
    * Returns the {@code Retry-After} a relay result carries: for a relayed refusal the same the
-   * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}.
+   * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}
+   * and for {@code BANK_EXCHANGE_DISABLED} {@value ExchangeGateFilter#BANK_RETRY_AFTER_SECONDS}.
    *
    * @param code a problem code, or {@code null}
    * @return the seconds, or {@code null} when the code carries none
@@ -468,6 +474,9 @@ public class ExchangeRelay {
   public static @Nullable String retryAfterSeconds(@Nullable String code) {
     if (ExchangeRefusals.RELAY_BUSY.equals(code)) {
       return BUSY_RETRY_AFTER_SECONDS;
+    }
+    if (ExchangeRefusals.BANK_EXCHANGE_DISABLED.equals(code)) {
+      return ExchangeGateFilter.BANK_RETRY_AFTER_SECONDS;
     }
     return ExchangeRefusals.EXCHANGE_DISABLED.equals(code)
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)

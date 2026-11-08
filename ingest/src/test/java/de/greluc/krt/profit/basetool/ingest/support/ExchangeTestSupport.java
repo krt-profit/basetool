@@ -229,6 +229,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         enabled,
+        false,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client("VerseKit", active, capabilities, minVersion, null, null)));
@@ -247,6 +248,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         true,
+        false,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(

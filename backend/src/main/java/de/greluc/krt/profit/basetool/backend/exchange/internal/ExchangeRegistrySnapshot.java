@@ -32,19 +32,24 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The registry's content as the gateway sees it: the global switch and every client by client id
- * (REQ-XCH-003). Two snapshots are equal exactly when they grant the same access.
+ * The registry's content as the gateway sees it: the global switch, the bank switch and every
+ * client by client id (REQ-XCH-003, REQ-BXCH-006). Two snapshots are equal exactly when they grant
+ * the same access.
  *
  * @param enabled whether the exchange serves any request
+ * @param bankEnabled whether the bank route family serves requests while the exchange is on
  * @param clients every registry client by its Keycloak client id, sorted
  */
 public record ExchangeRegistrySnapshot(
-    boolean enabled, @NotNull @Unmodifiable SortedMap<String, Client> clients) {
+    boolean enabled,
+    boolean bankEnabled,
+    @NotNull @Unmodifiable SortedMap<String, Client> clients) {
 
   /**
    * Copies the client map so the snapshot cannot change under its reader.
    *
    * @param enabled whether the exchange serves any request
+   * @param bankEnabled whether the bank route family serves requests while the exchange is on
    * @param clients every registry client by its Keycloak client id
    */
   public ExchangeRegistrySnapshot {
@@ -88,12 +93,13 @@ public record ExchangeRegistrySnapshot(
    * Builds a snapshot from the registry rows.
    *
    * @param enabled the global switch
+   * @param bankEnabled the bank switch
    * @param rows the registry clients with their capabilities loaded
    * @return the snapshot
    */
   @NotNull
   public static ExchangeRegistrySnapshot of(
-      boolean enabled, @NotNull Collection<ExchangeClient> rows) {
+      boolean enabled, boolean bankEnabled, @NotNull Collection<ExchangeClient> rows) {
     SortedMap<String, Client> clients = new TreeMap<>();
     for (ExchangeClient row : rows) {
       clients.put(
@@ -106,12 +112,12 @@ public record ExchangeRegistrySnapshot(
               row.getRequestsPerMinute(),
               row.getWritesPerDay()));
     }
-    return new ExchangeRegistrySnapshot(enabled, clients);
+    return new ExchangeRegistrySnapshot(enabled, bankEnabled, clients);
   }
 
   /**
    * Combines the state before a change with the state after it into the state that grants no more
-   * than either: the switch is on only if it is on in both, a client absent from either is left
+   * than either: each switch is on only if it is on in both, a client absent from either is left
    * out, a client suspended in either is suspended and keeps only the capabilities both grant.
    * Every other field keeps its value from {@code before}.
    *
@@ -147,7 +153,8 @@ public record ExchangeRegistrySnapshot(
               then.requestsPerMinute(),
               then.writesPerDay()));
     }
-    return new ExchangeRegistrySnapshot(before.enabled() && after.enabled(), merged);
+    return new ExchangeRegistrySnapshot(
+        before.enabled() && after.enabled(), before.bankEnabled() && after.bankEnabled(), merged);
   }
 
   /**

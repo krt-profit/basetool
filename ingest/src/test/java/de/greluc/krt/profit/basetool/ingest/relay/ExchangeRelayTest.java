@@ -182,14 +182,17 @@ class ExchangeRelayTest {
   @Test
   void theBackendGatesRefusalsPassThroughWithTheGatewayGatesCodeStatusAndDetail() {
     assertGate(503, "EXCHANGE_DISABLED", ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL);
+    assertGate(503, "BANK_EXCHANGE_DISABLED", ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL);
     assertGate(503, "REGISTRY_UNAVAILABLE", ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL);
     assertGate(403, "CLIENT_NOT_ALLOWED", ExchangeGateFilter.CLIENT_NOT_ALLOWED_DETAIL);
     assertGate(403, "CLIENT_SUSPENDED", ExchangeGateFilter.CLIENT_SUSPENDED_DETAIL);
     assertGate(401, "INSTALLATION_REVOKED", ExchangeGateFilter.INSTALLATION_REVOKED_DETAIL);
     assertGate(401, "CLIENT_REVOKED", ExchangeGateFilter.CLIENT_REVOKED_DETAIL);
     assertGate(403, "SCOPE_MISSING", ExchangeGateFilter.SCOPE_MISSING_DETAIL);
-    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(7);
-    assertThat(count("refused")).isEqualTo(7.0d);
+    assertThat(ExchangeRelay.GATE_STATUSES).hasSize(8);
+    assertThat(count("refused")).isEqualTo(8.0d);
+    assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED")).isEqualTo("300");
+    assertThat(ExchangeRelay.retryAfterSeconds("EXCHANGE_DISABLED")).isEqualTo("30");
   }
 
   @Test

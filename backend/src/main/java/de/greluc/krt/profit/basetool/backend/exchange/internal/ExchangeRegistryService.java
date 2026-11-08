@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -51,9 +52,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Manages the exchange client registry and the global switch for {@code ADMIN} (REQ-XCH-003): each
- * change takes the settings row lock, is mirrored by {@link ExchangeRegistryMirrorSync}, audited in
- * „Verbundene Anwendungen" and counted for {@code ExchangeRegistryChanged}.
+ * Manages the exchange client registry, the global switch and the bank switch for {@code ADMIN}
+ * (REQ-XCH-003, REQ-BXCH-006): each change takes the settings row lock, is mirrored by {@link
+ * ExchangeRegistryMirrorSync}, audited in „Verbundene Anwendungen" and counted for {@code
+ * ExchangeRegistryChanged}.
  */
 @Slf4j
 @Service
@@ -79,6 +81,9 @@ public class ExchangeRegistryService {
   private final ApplicationEventPublisher eventPublisher;
 
   private final AuthHelperService authHelperService;
+
+  /** Stamps the bank switch's change time. */
+  private final Clock clock = Clock.systemUTC();
 
   /**
    * Registers {@code basetool_exchange_registry_changes_total} for every action at zero, so the
@@ -301,6 +306,49 @@ public class ExchangeRegistryService {
         enabled ? ExchangeNotices.switchedOn(actor) : ExchangeNotices.switchedOff(actor));
     countAfterCommit(
         enabled ? ExchangeRegistryAction.SWITCH_ON : ExchangeRegistryAction.SWITCH_OFF);
+    return saved;
+  }
+
+  /**
+   * Turns the bank switch on or off (REQ-BXCH-006); switching off reaches the mirror before the
+   * commit. The switch has its own version counter, so this never makes the global switch's version
+   * stale and the other way round.
+   *
+   * @param enabled the new state
+   * @param bankVersion the bank switch's version last seen
+   * @return the saved settings, unchanged when the bank switch already had that state
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
+   *     bankVersion} is stale
+   */
+  @NotNull
+  @Transactional
+  public ExchangeSettings updateBankSwitch(boolean enabled, @NotNull Long bankVersion) {
+    ExchangeSettings settings = mirrorSync.lockSettings();
+    OptimisticLock.check(
+        settings.getBankVersion(),
+        bankVersion,
+        ExchangeSettings.class,
+        ExchangeSettings.SINGLETON_ID);
+    if (settings.isBankEnabled() == enabled) {
+      return settings;
+    }
+    final ExchangeRegistrySnapshot before = mirrorSync.load();
+    settings.setBankEnabled(enabled);
+    settings.setBankVersion(settings.getBankVersion() + 1);
+    settings.setBankUpdatedAt(clock.instant());
+    final ExchangeSettings saved = mirrorSync.saveSettings(settings);
+    mirrorSync.mirrorChange(before, mirrorSync.load());
+    auditRecorder.record(
+        AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED,
+        null,
+        null,
+        null,
+        AuditDetails.of("enabled", enabled));
+    UUID actor = authHelperService.currentUserId().orElse(null);
+    eventPublisher.publishEvent(
+        enabled ? ExchangeNotices.bankSwitchedOn(actor) : ExchangeNotices.bankSwitchedOff(actor));
+    countAfterCommit(
+        enabled ? ExchangeRegistryAction.BANK_SWITCH_ON : ExchangeRegistryAction.BANK_SWITCH_OFF);
     return saved;
   }
 

@@ -489,6 +489,18 @@ public enum NotificationEventType {
   EXCHANGE_SWITCHED_ON,
 
   /**
+   * An admin switched the bank on for connected applications (REQ-BXCH-006). The default rule
+   * notifies the admins and the Bankleitung.
+   */
+  BANK_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched the bank off for connected applications (REQ-BXCH-006). The default rule
+   * notifies the admins and the Bankleitung.
+   */
+  BANK_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit.
    */

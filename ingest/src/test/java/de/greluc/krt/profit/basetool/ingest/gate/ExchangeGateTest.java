@@ -191,6 +191,7 @@ class ExchangeGateTest {
             new ExchangeRegistry(
                 1L,
                 true,
+                false,
                 Map.of(
                     "someone-else",
                     new ExchangeRegistry.Client(
@@ -231,6 +232,51 @@ class ExchangeGateTest {
   }
 
   @Test
+  void theBankRouteFamilyIsRefusedWhileTheBankSwitchIsOff() throws Exception {
+    bankRegistry(true, false);
+    double before = refused("bank_exchange_disabled");
+
+    call(HttpMethod.GET, "/exchange/v1/bank/accounts")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "300"))
+        .andExpect(jsonPath("$.code").value("BANK_EXCHANGE_DISABLED"));
+    call(HttpMethod.POST, "/exchange/v1/bank")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("BANK_EXCHANGE_DISABLED"));
+
+    assertThat(refused("bank_exchange_disabled") - before).isEqualTo(2.0d);
+  }
+
+  @Test
+  void theGlobalSwitchWinsOverTheBankSwitch() throws Exception {
+    bankRegistry(false, false);
+
+    call(HttpMethod.GET, "/exchange/v1/bank/accounts")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "30"))
+        .andExpect(jsonPath("$.code").value("EXCHANGE_DISABLED"));
+  }
+
+  @Test
+  void theBankSwitchLeavesEveryOtherRouteAndLookalikePathAlone() throws Exception {
+    bankRegistry(true, false);
+
+    call(HttpMethod.GET, STOCK).andExpect(status().isOk());
+    call(HttpMethod.GET, "/exchange/v1/bankers")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void aBankPathWithoutARouteIsNotFoundWhileTheBankSwitchIsOn() throws Exception {
+    bankRegistry(true, true);
+
+    call(HttpMethod.GET, "/exchange/v1/bank/accounts")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
   void anUnreadableRegistryFailsClosed() throws Exception {
     when(registryReader.current()).thenThrow(new ExchangeUnavailableException("down", null));
     double before = refused("registry_unavailable");
@@ -260,7 +306,7 @@ class ExchangeGateTest {
 
   @Test
   void aClientOutsideTheRegistryIsNotAllowed() throws Exception {
-    when(registryReader.current()).thenReturn(new ExchangeRegistry(1L, true, Map.of()));
+    when(registryReader.current()).thenReturn(new ExchangeRegistry(1L, true, false, Map.of()));
     double unregistered = refusedBy("client_not_allowed", MetricNames.EXCHANGE_CLIENT_UNREGISTERED);
 
     call(HttpMethod.GET, STOCK)
@@ -582,6 +628,30 @@ class ExchangeGateTest {
       @Nullable String minVersion) {
     when(registryReader.current())
         .thenReturn(ExchangeTestSupport.registry(enabled, active, capabilities, minVersion));
+  }
+
+  /**
+   * Stubs the registry with an active client holding the stock capability.
+   *
+   * @param enabled the global switch
+   * @param bankEnabled the bank switch
+   */
+  private void bankRegistry(boolean enabled, boolean bankEnabled) {
+    when(registryReader.current())
+        .thenReturn(
+            new ExchangeRegistry(
+                1L,
+                enabled,
+                bankEnabled,
+                Map.of(
+                    CLIENT,
+                    new ExchangeRegistry.Client(
+                        "VerseKit",
+                        true,
+                        Set.of("exchange.connect", "exchange.stock.read"),
+                        null,
+                        null,
+                        null))));
   }
 
   /**

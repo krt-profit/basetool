@@ -3,6 +3,13 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-08
+
+- **New: error code `BANK_EXCHANGE_DISABLED`.** The bank area of the exchange, every path below
+  `/exchange/v1/bank`, can be switched off on its own while the exchange stays on. It then answers
+  `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`; pause the bank area only and keep syncing
+  every other area ([errors](errors.md)). No bank route is published yet, and the switch starts off.
+
 ## 2026-11-07
 
 - **New: per-op reason `ITEM_RETIRED`.** An item the game no longer has, or one the Basetool hid,

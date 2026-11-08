@@ -26,14 +26,19 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The exchange registry as the gateway reads it from the backend's Redis mirror (REQ-XCH-003).
+ * The exchange registry as the gateway reads it from the backend's Redis mirror (REQ-XCH-003,
+ * REQ-BXCH-006).
  *
  * @param revision the mirror document's revision
  * @param enabled whether the exchange serves any request
+ * @param bankEnabled whether the bank route family serves requests while the exchange is on
  * @param clients every registry client by its Keycloak client id
  */
 public record ExchangeRegistry(
-    long revision, boolean enabled, @NotNull @Unmodifiable Map<String, Client> clients) {
+    long revision,
+    boolean enabled,
+    boolean bankEnabled,
+    @NotNull @Unmodifiable Map<String, Client> clients) {
 
   /** Copies the clients. */
   public ExchangeRegistry {

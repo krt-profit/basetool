@@ -61,6 +61,9 @@ public class ExchangeRefusals {
   /** The exchange is switched off. */
   public static final String EXCHANGE_DISABLED = "EXCHANGE_DISABLED";
 
+  /** The bank switch is off and the request is for the bank route family. */
+  public static final String BANK_EXCHANGE_DISABLED = "BANK_EXCHANGE_DISABLED";
+
   /** The token's client is not in the registry. */
   public static final String CLIENT_NOT_ALLOWED = "CLIENT_NOT_ALLOWED";
 
@@ -116,6 +119,7 @@ public class ExchangeRefusals {
           NOT_FOUND,
           REGISTRY_UNAVAILABLE,
           EXCHANGE_DISABLED,
+          BANK_EXCHANGE_DISABLED,
           CLIENT_NOT_ALLOWED,
           CLIENT_SUSPENDED,
           ORIGIN_NOT_ALLOWED,

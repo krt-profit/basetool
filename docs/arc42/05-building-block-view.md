@@ -474,7 +474,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | Where | Building block | Responsibility |
 | --- | --- | --- |
 | ingest | `ExchangeTokenGateFilter` | DPoP-bound token with a proof and a server nonce, the `basetool-ingest` audience checked in code |
-| ingest | `ExchangeGateFilter` (`ExchangeRoutes`, `ExchangeRegistryReader`, `ExchangeRevocationReader`) | Deny-by-default route table; global switch, client status, revocations (read uncached), route scope ∩ registry grant, minimum client version; fail-closed on an unreadable mirror |
+| ingest | `ExchangeGateFilter` (`ExchangeRoutes`, `ExchangeRegistryReader`, `ExchangeRevocationReader`) | Deny-by-default route table; global switch, the bank switch for `/exchange/v1/bank/**` (REQ-BXCH-006), client status, revocations (read uncached), route scope ∩ registry grant, minimum client version; fail-closed on an unreadable mirror |
 | ingest | `ExchangeLimitFilter`, `ExchangeQuotas`, `ExchangeBudget` | Per-minute buckets in-process, the daily write quota and the hard byte budget in Redis (`ingest:xch:*`) |
 | ingest | `ExchangeIdempotencyFilter` | `Idempotency-Key` on every write, answers cached per client, member and key |
 | ingest | `web.ExchangeController`, `ExchangeSchemas`, `ExchangeRelay` | Schema check of request and answer, relay under the gateway's service identity naming member, client, capabilities and installation; staging of drafts and of a held mass change (`HandoffKind.MASS_CHANGE`) for the browser |
@@ -487,7 +487,7 @@ decisions in ADR-0216 … ADR-0221 and ADR-0224 … ADR-0228.
 | backend | Bulk undo (`ExchangeBulkUndoService`, `ExchangeBulkUndoRunner`, `ExchangeBulkUndoStep`, `AdminExchangeBulkUndoController`, `V256`) | An admin's undo of one client for every member: suspends the client, then one member per transaction on the single-thread `exchangeBulkUndoExecutor`; runs and skipped entries kept 90 days (ADR-0227) |
 | backend | `ExchangeResolveService`, `ExchangeDemandService`, `ExchangeDraftService` | Catalogue resolve through the web import's matching, the anonymised org demand, review drafts |
 | frontend | „Verbundene Anwendungen" (`/connected-apps`, `/connected-apps/confirm`) | The member's clients, installations and activity; disconnect, undo, confirm a mass change — over `/api/v1/connected-apps`, member session only |
-| frontend | Admin „Verbundene Anwendungen" (`/admin/exchange-clients`) | The registry and the global switch; a client's undo for every member with its runs |
+| frontend | Admin „Verbundene Anwendungen" (`/admin/exchange-clients`) | The registry, the global switch and the bank switch; a client's undo for every member with its runs |
 | keycloak-spi | `ExchangeClientSessionResourceProviderFactory` (`basetool-exchange`) | Ends one client inside a member's shared user sessions when the member disconnects it (ADR-0226, REQ-XCH-008) |
 | keycloak-spi | `DeviceConsentLoginFormsProviderFactory` (`krt-freemarker`) | Hands a device login's user code to the consent page, beside the phishing warning (ADR-0228, REQ-XCH-005) |
 

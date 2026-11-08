@@ -92,6 +92,14 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theBankSwitchGatesTheSeamsBankRouteFamilyWithTheSeamsWait() {
+    assertThat(ExchangeRoutes.BANK_PATH)
+        .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.BANK_PATH);
+    assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.BANK_RETRY_AFTER_SECONDS));
+  }
+
+  @Test
   void theRelayPassesAndTranslatesTheSeamsCodes() {
     assertRelayedCodes(ExchangeSeam.PASSED_THROUGH_CODES, ExchangeSeam.TRANSLATED_CODES);
     Map<String, String> otherTranslation = new HashMap<>(ExchangeSeam.TRANSLATED_CODES);
@@ -144,7 +152,7 @@ class ExchangeRelaySeamParityTest {
       assertReadDiffers(renamed, "clients.versekit." + field);
       read.add(field);
     }
-    assertThat(read).hasSize(10);
+    assertThat(read).hasSize(11);
     assertThat(UNREAD_REGISTRY_FIELDS.keySet()).isSubsetOf(ExchangeSeam.REGISTRY_DOCUMENT_FIELDS);
   }
 
@@ -208,11 +216,12 @@ class ExchangeRelaySeamParityTest {
    */
   private static void assertGateStatuses(@NotNull Map<String, Integer> expected) {
     assertThat(new TreeMap<>(ExchangeRelay.GATE_STATUSES))
-        .hasSize(7)
+        .hasSize(8)
         .isEqualTo(new TreeMap<>(expected));
     Set<String> gateConstants =
         Set.of(
             ExchangeRefusals.EXCHANGE_DISABLED,
+            ExchangeRefusals.BANK_EXCHANGE_DISABLED,
             ExchangeRefusals.REGISTRY_UNAVAILABLE,
             ExchangeRefusals.CLIENT_NOT_ALLOWED,
             ExchangeRefusals.CLIENT_SUSPENDED,
@@ -280,6 +289,7 @@ class ExchangeRelaySeamParityTest {
   private static @NotNull ExchangeRegistry expectedRegistry() {
     return new ExchangeRegistry(
         ExchangeSeam.REGISTRY_SAMPLE_REVISION,
+        true,
         true,
         Map.of(
             "versekit",
