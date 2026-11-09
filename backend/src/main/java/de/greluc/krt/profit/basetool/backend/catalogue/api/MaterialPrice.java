@@ -71,9 +71,9 @@ public class MaterialPrice extends AbstractEntity<UUID> {
   private BigDecimal priceBuy;
   private BigDecimal priceSell;
 
-  private Integer scuBuy;
-  private Integer scuSell;
-  private Integer scuSellStock;
+  private Long scuBuy;
+  private Long scuSell;
+  private Long scuSellStock;
 
   /** UEX's running average of {@link #priceBuy}, in aUEC per SCU. */
   @Nullable private BigDecimal priceBuyAvg;
@@ -81,9 +81,9 @@ public class MaterialPrice extends AbstractEntity<UUID> {
   /** UEX's running average of {@link #priceSell}, in aUEC per SCU. */
   @Nullable private BigDecimal priceSellAvg;
 
-  @Nullable private Integer scuBuyAvg;
-  @Nullable private Integer scuSellAvg;
-  @Nullable private Integer scuSellStockAvg;
+  @Nullable private Long scuBuyAvg;
+  @Nullable private Long scuSellAvg;
+  @Nullable private Long scuSellStockAvg;
 
   /**
    * SCU container sizes the terminal handles for this commodity, in UEX order; {@code null} when

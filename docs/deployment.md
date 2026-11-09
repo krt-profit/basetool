@@ -727,23 +727,31 @@ Within about five minutes the timer fires `deploy.sh`, which:
    bypass it), applies the stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
    about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
    the live tree to `config-previous/`, mirrors the new tree into `/opt/basetool`, **renders
-   `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
+   `env.d/`**, installs changed units and stops-then-removes units the release no longer names. A
+   unit whose rendered `env.d/<svc>.env` differs from the file it replaced counts as **re-defined**,
+   exactly like a changed unit file (`env.d: <svc>.env differs from the one it replaced → <svc> is
+   re-defined …` in the log, and under `unit definitions […]`): a container reads its
+   `EnvironmentFile=` only when it is created;
 5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
    the stateful-infra gate holds back leaves no pin behind — pulls the three app images, swaps a
    moved provider JAR into `keycloak/providers/` (the previous one kept as
    `keycloak-spi-previous.jar`), logs `release parts: …`, and applies the release in **one restart
    window**: one `systemctl --user stop` of every unit it re-defined — re-pinned app services, units
-   the config replaced, keycloak for a moved JAR — which takes what `Requires=` them down with them,
+   the config replaced or whose `env.d` file changed, keycloak for a moved JAR — which takes what
+   `Requires=` them down with them,
    then a `start` of every stack unit in dependency order, each waited for until healthy. Keycloak
    comes up on the new JAR before backend starts, and one health gate covers everything (ADR-0213,
    since 2026-09-25 — until then the JAR was swapped only after this gate, and its keycloak restart
    took the app down a second time; see [Keycloak provider JAR](#keycloak-provider-jar));
-6. on success writes the marker, clears the failure records, reconciles the monitoring units and
-   the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
+6. on success writes the marker, clears the failure records, reconciles the monitoring units —
+   a `restart` of each monitoring unit the release re-defined, its `env.d` file included, and a
+   `start` of the others — and the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
 7. on a health failure logs which units did not come up and what the release changed, restores the
-   previous config tree, the previous units, the previous pin drop-ins **and the previous provider
-   JAR** — together, never one without the other — applies them the same way, records an
+   previous config tree, the previous units, the previous `env.d/` (rendered again from the previous
+   tree's templates), the previous pin drop-ins **and the previous provider JAR** — together, never
+   one without the other — applies them the same way (a monitoring unit was not restarted, so it
+   keeps the previous environment it is running on), records an
    exponential backoff for that target (600 s doubling, capped at 6 h; `--force` bypasses it) and
    exits non-zero — `DeployRolledBack` / `DeployFailed`. Only a new target gets here: a failed
    re-apply logs `health check failed … on a re-apply of the deployed release — not rolling back`,
@@ -1051,8 +1059,14 @@ The GHCR account name is masked in Loki (REQ-OBS-004); only the on-host log file
 A change to either compose file, `docker/edge`, `docker/acme`, the maintenance page, the Keycloak
 theme, `monitoring/` or `quadlet/` rides the same path as an app release: regenerate the units if
 compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next tick stages the
-bundle, installs the changed units and restarts exactly the application services whose definition
-moved. Dependabot's image-pin bumps take this path too.
+bundle, installs the changed units, renders `env.d/` and restarts exactly the services whose
+definition moved — a changed unit file, pin or rendered `env.d/<svc>.env` — the application services
+in the release's gated restart window, the monitoring units in the non-gating monitoring apply after
+it. A change to an `env.d` template alone (`quadlet/env.d/<svc>.env.tmpl`) therefore restarts that
+one service, with no hand restart. Dependabot's image-pin bumps take this path too.
+
+A change to `/etc/basetool/basetool.env` alone is not a release: no tick renders `env.d/` for it.
+Render and restart by hand as in the recipes below.
 
 ### Dependabot image bumps
 

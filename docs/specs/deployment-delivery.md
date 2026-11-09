@@ -330,6 +330,13 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   and what requires them, each once, stops a retired unit
   before removing it, and leaves every `.container.d/` drop-in in place. A changed monitoring or
   `acme` unit is restarted too (since 2026-09-22 — see REQ-OPS-013).
+- [ ] Under Quadlet, a unit whose rendered `env.d/<svc>.env` differs from the file the render
+  replaced is re-defined exactly like a unit whose file changed: `deploy.sh` logs one
+  `env.d: <svc>.env differs …` line naming it, lists it under `unit definitions […]`, recreates an
+  application service in the release's gated restart window and restarts a monitoring unit in the
+  non-gating monitoring apply. An unchanged `env.d` file restarts nothing. A failed gate renders the
+  previous `env.d/` again from the restored previous tree, so the rollback runs on the previous
+  environment.
 - [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
 - [ ] The host environment file lives at `/etc/basetool/basetool.env` (`BASETOOL_CONFIG_DIR`,
   `BASETOOL_ENV_FILE`), **outside the release tree** `/opt/basetool` (`BASETOOL_COMPOSE_DIR`): the
@@ -337,7 +344,8 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   when it is missing after the swap (ADR-0319).
 
 **Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
-`install_quadlet_units`) · `scripts/render-env-d.py` ·
+`install_quadlet_units`, `note_env_d_changes`) · `scripts/render-env-d.py` ·
+`scripts/deploy.test.sh` (`scenario_podman_env_d_*`) ·
 `scripts/generate-quadlet.py` (`repo-lint.yml` → `quadlet-drift`) · `docker/config/Dockerfile` ·
 `.github/workflows/release-images.yml` (`build-config`) · **Runbook:** `docs/deployment.md` →
 *Configuration changes that are not app releases*

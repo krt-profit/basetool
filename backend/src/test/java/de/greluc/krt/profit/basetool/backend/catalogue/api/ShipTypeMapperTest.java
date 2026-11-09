@@ -57,20 +57,20 @@ class ShipTypeMapperTest {
   }
 
   @Test
-  void toDto_sourcesDescriptionFromRichColumns_germanPreferred() {
-    ShipType german = new ShipType();
-    german.setName("Carrack");
-    german.setDescriptionDe("Deutsche Beschreibung");
-    german.setDescriptionEn("English description");
-    assertEquals("Deutsche Beschreibung", mapper.toDto(german).description());
+  void toDto_sourcesDescriptionFromRichColumns_englishPreferred() {
+    ShipType both = new ShipType();
+    both.setName("Carrack");
+    both.setDescriptionDe("Deutsche Beschreibung");
+    both.setDescriptionEn("English description");
+    assertEquals("English description", mapper.toDto(both).description());
   }
 
   @Test
-  void toDto_fallsBackToEnglishDescription_whenGermanNull() {
-    ShipType englishOnly = new ShipType();
-    englishOnly.setName("Gladius");
-    englishOnly.setDescriptionEn("English only");
-    assertEquals("English only", mapper.toDto(englishOnly).description());
+  void toDto_fallsBackToGermanDescription_whenEnglishNull() {
+    ShipType germanOnly = new ShipType();
+    germanOnly.setName("Gladius");
+    germanOnly.setDescriptionDe("Nur Deutsch");
+    assertEquals("Nur Deutsch", mapper.toDto(germanOnly).description());
   }
 
   @Test

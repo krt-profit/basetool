@@ -406,6 +406,29 @@ assert_host_scripts_current_or_die() {
   fail "HOST SCRIPTS: [${apply}] on this host are not the ones this release was built with, and they are what applies it. Nothing was changed. Install that release's scripts first: run the role from its tag with --tags deploy,scripts (docs/deployment.md, Before a promotion: the host scripts); the next tick then applies the release. Break-glass: deploy.sh --force, or BASETOOL_REQUIRE_CURRENT_SCRIPTS=false"
 }
 
+env_d_digests() {
+  local f sum
+  for f in "${ENV_D_DIR}"/*.env; do
+    [[ -f "${f}" ]] || continue
+    sum="$(sha256sum < "${f}")"
+    printf '%s %s\n' "$(basename "${f}" .env)" "${sum%% *}"
+  done
+}
+
+# A unit reads its EnvironmentFile only when its container is created, so a changed
+# <service>.env re-defines that unit exactly like a changed .container file does.
+note_env_d_changes() {
+  local before="$1" units="$2" line svc
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] || continue
+    grep -qxF -- "${line}" <<< "${before}" && continue
+    svc="${line%% *}"
+    [[ -f "${units}/${svc}.container" ]] || continue
+    log "env.d: ${svc}.env differs from the one it replaced → ${svc} is re-defined and restarts with this apply"
+    rt_note_changed "${svc}"
+  done <<< "$(env_d_digests)"
+}
+
 install_quadlet_units() {
   local src="${1}/quadlet" installed=0 removed=0
 
@@ -420,10 +443,13 @@ install_quadlet_units() {
   DEPLOY_STEP="render ${ENV_D_DIR}"
   if [[ -d "${src}/env.d" ]]; then
     if [[ -x "${ENV_RENDERER}" ]]; then
+      local env_before
+      env_before="$(env_d_digests)"
       if ! "${ENV_RENDERER}" --env "${ENV_FILE}"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
         fail "rendering ${ENV_D_DIR} from the bundle's templates failed — a unit whose EnvironmentFile is missing does not start"
       fi
       log "rendered env.d from the bundle's templates"
+      note_env_d_changes "${env_before}" "${src}/systemd"
     else
       fail "the bundle carries env.d templates but ${ENV_RENDERER} is not on this host (ansible role: 25-scripts.yml)"
     fi

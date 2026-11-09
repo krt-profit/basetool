@@ -164,14 +164,14 @@ class ShipDataPageControllerMvcTest {
   }
 
   /**
-   * A German page shows the German names, an English page the names, and a manufacturer without a
-   * Fan Kit logo shows its abbreviation badge (REQ-P4K-022, REQ-P4K-023).
+   * A German and an English page both show the English names, and a manufacturer without a Fan Kit
+   * logo shows its abbreviation badge (REQ-P4K-022, REQ-P4K-023).
    *
    * @throws Exception if a request fails
    */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void germanNamesShowOnAGermanPage_andAManufacturerWithoutALogoShowsItsBadge() throws Exception {
+  void englishNamesShowOnAGermanPage_andAManufacturerWithoutALogoShowsItsBadge() throws Exception {
     stubCatalogue(false, "Aegis Dynamik", "Avenger Titan DE");
 
     String german =
@@ -190,8 +190,9 @@ class ShipDataPageControllerMvcTest {
             .getContentAsString();
 
     assertThat(german)
-        .contains("class=\"cell-title\">Aegis Dynamik</span>")
-        .contains("class=\"cell-title\">Avenger Titan DE</span>")
+        .contains("class=\"cell-title\">Aegis Dynamics</span>")
+        .contains("class=\"cell-title\">Avenger Titan</span>")
+        .doesNotContain("Aegis Dynamik", "Avenger Titan DE")
         .contains("data-testid=\"manufacturer-badge\"")
         .doesNotContain("data-testid=\"manufacturer-logo\"");
     assertThat(english)
