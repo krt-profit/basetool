@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankA
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBookingPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQueueDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
@@ -135,15 +136,17 @@ class ExchangeWireContractTest {
   private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
 
   /**
-   * The bank reads, which answer only for a seeded bank world; {@code ExchangeBankReadsTest} and
-   * {@code ExchangeBankQueueTest} check their answers against the published schemas on one.
+   * The bank reads, which answer only with the bank switched on and a seeded bank world; {@code
+   * ExchangeBankReadsTest}, {@code ExchangeBankRequestsTest} and {@code ExchangeBankQueueTest}
+   * check their answers against the published schemas on one.
    */
   private static final Set<String> BANK_READS =
       Set.of(
           "/bank/accounts",
           "/bank/accounts/{id}/bookings",
           "/bank/accounts/{id}/balance-series",
-          "/bank/queue");
+          "/bank/queue",
+          "/bank/requests");
 
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =
@@ -160,6 +163,7 @@ class ExchangeWireContractTest {
           Map.entry("page--bankBookingPage", ExchangeBankBookingPageDto.class),
           Map.entry("bank-balance-series", ExchangeBankBalanceSeriesDto.class),
           Map.entry("bank-queue", ExchangeBankQueueDto.class),
+          Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),

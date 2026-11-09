@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 23 relay operations on 22 backend paths, each with the gateway route that relays it, the
+   * The 24 relay operations on 23 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -245,7 +245,15 @@ public final class ExchangeSeam {
               "exchange.bank.queue",
               true,
               null,
-              "bank-queue.schema.json"));
+              "bank-queue.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/bank/requests",
+              "/bank/requests",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankRequestPage"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");

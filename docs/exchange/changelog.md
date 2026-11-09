@@ -11,6 +11,11 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   link into the Basetool for each ([bank](resources/bank.md#staff-queue)). New schema
   `bank-queue` and error code `403 NOT_BANK_STAFF` ([errors](errors.md)). The answer is foreign
   bank data: memory only, for at most 7 days.
+- **New: the member's own bank requests.** `GET /exchange/v1/bank/requests` under
+  `exchange.bank.read`: every booking request the member raised, in the Basetool or through any
+  client, as a snapshot and a change feed with tombstones ([bank](resources/bank.md)). New schema
+  `bank-request` and the page definition `bankRequestPage`. The answers are the member's own
+  data: a client may persist them.
 - **New: the bank reads.** `GET /exchange/v1/bank/accounts`, `…/accounts/{id}/bookings` and
   `…/accounts/{id}/balance-series` under the new scope `exchange.bank.read`: the accounts the
   member views with balance, target, 30-day trend, whether they may raise a request and their

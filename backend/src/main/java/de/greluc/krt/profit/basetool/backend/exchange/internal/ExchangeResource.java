@@ -36,20 +36,25 @@ public enum ExchangeResource {
   SHIP,
 
   /** The shared stock of the member's units, keyed by unit and lot; its writes by entry. */
-  ORG_STOCK;
+  ORG_STOCK,
+
+  /** The member's own bank booking requests, keyed by request id; no mass change reaches them. */
+  BANK_REQUEST;
 
   /**
    * The resource's name in a staged mass change ({@code ConnectedAppMassChangeRequestDto}).
    *
-   * @return {@code blueprints}, {@code stock}, {@code ships} or {@code org-stock}
+   * @return {@code blueprints}, {@code stock}, {@code ships} or {@code org-stock}, or {@code null}
+   *     for {@link #BANK_REQUEST}, which no mass change reaches
    */
-  @NotNull
+  @Nullable
   public String massChangeName() {
     return switch (this) {
       case BLUEPRINT -> "blueprints";
       case STOCK -> "stock";
       case SHIP -> "ships";
       case ORG_STOCK -> "org-stock";
+      case BANK_REQUEST -> null;
     };
   }
 
@@ -65,13 +70,15 @@ public enum ExchangeResource {
       case STOCK -> ExchangeCapability.STOCK_WRITE;
       case SHIP -> ExchangeCapability.HANGAR_WRITE;
       case ORG_STOCK -> ExchangeCapability.ORGSTOCK_WRITE;
+      case BANK_REQUEST -> ExchangeCapability.BANK_REQUEST;
     };
   }
 
   /**
    * The value of the {@code resource} tag on the resource's mass-change metric.
    *
-   * @return {@code blueprint}, {@code stock}, {@code ship} or {@code org_stock}
+   * @return {@code blueprint}, {@code stock}, {@code ship}, {@code org_stock} or {@code
+   *     bank_request}
    */
   @NotNull
   public String metricTag() {
@@ -80,6 +87,7 @@ public enum ExchangeResource {
       case STOCK -> "stock";
       case SHIP -> "ship";
       case ORG_STOCK -> "org_stock";
+      case BANK_REQUEST -> "bank_request";
     };
   }
 
@@ -91,6 +99,8 @@ public enum ExchangeResource {
    */
   @NotNull
   public static Optional<ExchangeResource> fromMassChangeName(@Nullable String name) {
-    return Arrays.stream(values()).filter(r -> r.massChangeName().equals(name)).findFirst();
+    return name == null
+        ? Optional.empty()
+        : Arrays.stream(values()).filter(r -> name.equals(r.massChangeName())).findFirst();
   }
 }

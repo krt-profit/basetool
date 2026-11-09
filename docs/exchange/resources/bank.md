@@ -1,9 +1,10 @@
 # Bank
 
 The Kartellbank's accounts, bookings and balance series as the member may see them in the
-Basetool, under scope `exchange.bank.read`. Every route lies below `/exchange/v1/bank`; while the
-bank is switched off for connected applications they all answer `503 BANK_EXCHANGE_DISABLED` with
-`Retry-After: 300`. Pause the bank area only and keep syncing every other area ([errors](../errors.md)).
+Basetool, and the member's own booking requests, under scope `exchange.bank.read`. Every route
+lies below `/exchange/v1/bank`; while the bank is switched off for connected applications they
+all answer `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`. Pause the bank area only and keep
+syncing every other area ([errors](../errors.md)).
 
 No money moves through a client, and nothing a client does here is a bank-staff action. The Basetool
 decides every call anew from the member's bank roles, memberships and grants, so a withdrawn grant
@@ -22,6 +23,7 @@ its routes are not published yet.
 | `GET /exchange/v1/bank/accounts/{id}/bookings` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/accounts/{id}/balance-series` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/queue` | foreign bank data | keep it in memory only, for at most 7 days |
+| `GET /exchange/v1/bank/requests` | the member's own data | persist it |
 
 The retention class is a condition of the approval ([becoming a client](../onboarding.md)).
 
@@ -114,6 +116,60 @@ not lie after `to`, and the period spans at most 365 days; otherwise `400 SCHEMA
 }
 ```
 
+## Own requests
+
+`GET /exchange/v1/bank/requests` — every booking request the member raised, in the Basetool or
+through any client, as a snapshot followed by a change feed, exactly as in the
+[sync guide](../sync-guide.md): page the snapshot with `cursor` and `limit` (1 to 1000, default
+500); its last page hands over a feed cursor. Each feed page answers every request changed since
+the cursor once, with its current state, and a request that no longer exists as a tombstone in
+`removed`. A cursor older than the retained changes answers `410 CURSOR_EXPIRED`: start a new
+snapshot. Raising, correcting or cancelling a request in the Basetool, a bank decision, a renamed
+account or a new org-unit shorthand all reach the feed.
+
+Each item is a [`bank-request`](../schemas/):
+
+```json
+{
+  "id": "7f3e2d1c-0b9a-4876-9543-210fedcba987",
+  "version": 1,
+  "status": "PENDING",
+  "createdAt": "2026-11-08T20:15:00Z",
+  "decidedAt": null,
+  "type": "WITHDRAWAL",
+  "amount": 15000,
+  "note": "Refuel at Port Olisar",
+  "justification": "Fuel for the Friday op",
+  "account": { "id": "5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f", "no": "KB-0042",
+               "name": "Staffel Nord", "orgUnitShorthand": "NORD" },
+  "targetAccount": null,
+  "requiresOwnerApproval": true,
+  "requiredApprover": "RESPONSIBLE_HOLDER",
+  "ownerApprovalGranted": false,
+  "rejectReason": null,
+  "client": null,
+  "splitEnabled": false,
+  "splitPercent": null
+}
+```
+
+- `status` is `PENDING`, `CONFIRMED`, `REJECTED` or `CANCELLED`; `type` is `DEPOSIT`, `WITHDRAWAL`
+  or `TRANSFER`. Treat a value you do not know as unknown ([versioning](../versioning.md)).
+- `account` is the deposit's target or the withdrawal's or transfer's source; `targetAccount` is the
+  destination of a transfer, or `null`.
+- `requiresOwnerApproval` tells whether the amount exceeded the member's limit; `requiredApprover`
+  (`RESPONSIBLE_HOLDER`, `BANK_MANAGEMENT` or `ORGANISATIONSLEITUNG`) is who must sign off before
+  the bank confirms, and `ownerApprovalGranted` whether they did.
+- `rejectReason` is the bank's reason for a rejection; `decidedAt` the time of the decision or the
+  cancellation.
+- `splitEnabled` and `splitPercent` describe a deposit that distributes a whole percent of the
+  amount across the squadron accounts.
+- `client` names the connected application that raised the request; it is `null` for now.
+- `version` is the value a correction or a cancel echoes.
+
+No staff note, no bank-staff identity, no counterparty and no purpose leave the Basetool. These are
+the member's own data: a client may keep them.
+
 ## Staff queue
 
 `GET /exchange/v1/bank/queue` under scope `exchange.bank.queue` — the pending booking requests the
@@ -180,7 +236,7 @@ No staff note, holder, custody balance or handle other than the requester's leav
 | --- | --- |
 | `404 NOT_FOUND` | The account does not exist, is closed, or the member may not view it. All three answer alike. |
 | `400 SCHEMA_INVALID` | The account id is not an id, a bound is malformed, missing or too far apart, or a queue `limit` lies outside 1 to 500. |
-| `410 CURSOR_EXPIRED` | The cursor is not one the server issued, or its account is gone for the member. |
+| `410 CURSOR_EXPIRED` | The cursor is not one the server issued, its account is gone for the member, or a feed cursor is older than the retained changes. |
 | `403 NOT_BANK_STAFF` | The queue was asked for by a member with no bank role, no grant and no request to approve. |
 | `403 SCOPE_MISSING` | The token or the client's approval lacks `exchange.bank.read`, or `exchange.bank.queue` for the queue. |
 | `503 BANK_EXCHANGE_DISABLED` | The bank is switched off for connected applications. |

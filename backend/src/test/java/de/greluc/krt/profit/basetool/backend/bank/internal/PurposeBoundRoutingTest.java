@@ -61,7 +61,8 @@ class PurposeBoundRoutingTest {
   void setUp() {
     accountRepository = mock(BankAccountRepository.class);
     requestService = mock(BankBookingRequestService.class);
-    service = new OrgUnitBankRequestService(null, null, accountRepository, null, requestService);
+    service =
+        new OrgUnitBankRequestService(null, null, accountRepository, null, requestService, null);
   }
 
   private BankAccount account(BankAccountType type, BankAccountStatus status) {

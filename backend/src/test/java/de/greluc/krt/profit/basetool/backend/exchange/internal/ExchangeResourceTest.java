@@ -41,21 +41,29 @@ class ExchangeResourceTest {
             ExchangeResource.BLUEPRINT, ExchangeCapability.BLUEPRINTS_WRITE,
             ExchangeResource.STOCK, ExchangeCapability.STOCK_WRITE,
             ExchangeResource.SHIP, ExchangeCapability.HANGAR_WRITE,
-            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE);
+            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE,
+            ExchangeResource.BANK_REQUEST, ExchangeCapability.BANK_REQUEST);
     Map<ExchangeResource, String> tags =
         Map.of(
             ExchangeResource.BLUEPRINT, "blueprint",
             ExchangeResource.STOCK, "stock",
             ExchangeResource.SHIP, "ship",
-            ExchangeResource.ORG_STOCK, "org_stock");
+            ExchangeResource.ORG_STOCK, "org_stock",
+            ExchangeResource.BANK_REQUEST, "bank_request");
 
-    assertThat(names).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
+    assertThat(capabilities).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
     for (ExchangeResource resource : ExchangeResource.values()) {
       assertThat(resource.massChangeName()).isEqualTo(names.get(resource));
       assertThat(resource.writeCapability()).isEqualTo(capabilities.get(resource));
       assertThat(resource.metricTag()).isEqualTo(tags.get(resource));
-      assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName())).contains(resource);
     }
+    names.forEach((resource, name) ->
+        assertThat(ExchangeResource.fromMassChangeName(name)).contains(resource));
+  }
+
+  @Test
+  void theBankRequestFeedHasNoMassChange() {
+    assertThat(ExchangeResource.BANK_REQUEST.massChangeName()).isNull();
   }
 
   @Test

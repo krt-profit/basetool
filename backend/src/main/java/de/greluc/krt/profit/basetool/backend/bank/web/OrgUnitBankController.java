@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewDto;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
@@ -94,7 +93,6 @@ public class OrgUnitBankController {
   private final OrgUnitBankSettingsService orgUnitBankSettingsService;
   private final OrgUnitBankRequestService orgUnitBankRequestService;
   private final OrgUnitBankVisibleAccountsQuery orgUnitBankVisibleAccountsQuery;
-  private final BankBookingRequestViewService bankBookingRequestViewService;
 
   /**
    * Returns the balance-only view of every org-unit account the caller oversees (REQ-BANK-021); a
@@ -634,7 +632,7 @@ public class OrgUnitBankController {
         @ApiResponse(responseCode = "404", description = "Unknown or not visible to the caller")
       })
   public BankBookingRequestViewDto getRequest(@PathVariable @NotNull UUID id) {
-    return bankBookingRequestViewService.view(id);
+    return orgUnitBankRequestService.viewRequest(id);
   }
 
   /**

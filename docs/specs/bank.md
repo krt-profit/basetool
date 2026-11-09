@@ -3180,7 +3180,8 @@ and the backend decides what it shows.
   its `requestDetail` fragment resolves, and a hidden request shows the empty state
   (`BankRequestPageControllerMvcTest`).
 
-**Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankController#getRequest` (backend) ·
+**Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankRequestService#viewRequest`,
+`OrgUnitBankController#getRequest` (backend) ·
 `BankRequestPageController`, `templates/bank/bank-request.html`, `bank-livesync.js` (frontend) ·
 **Related:** REQ-BANK-023, REQ-BANK-041, REQ-BANK-062, REQ-BXCH-005 · **Issues:** #3120, #3160
 

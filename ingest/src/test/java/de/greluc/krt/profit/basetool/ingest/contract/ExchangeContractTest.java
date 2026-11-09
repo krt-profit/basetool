@@ -91,7 +91,8 @@ class ExchangeContractTest {
           "/exchange/v1/bank/accounts",
           "/exchange/v1/bank/accounts/{id}/bookings",
           "/exchange/v1/bank/accounts/{id}/balance-series",
-          "/exchange/v1/bank/queue");
+          "/exchange/v1/bank/queue",
+          "/exchange/v1/bank/requests");
 
   /**
    * Narrowings within v1 the owner accepted as corrections, each with the reason: the schema now

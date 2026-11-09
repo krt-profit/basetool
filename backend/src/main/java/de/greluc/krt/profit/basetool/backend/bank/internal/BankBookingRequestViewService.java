@@ -38,24 +38,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class BankBookingRequestViewService {
 
   private final BankAccessRules policy;
-  private final BankCaller bankCaller;
   private final BankBookingRequestRepository requestRepository;
 
   /**
-   * Reads a request the caller may see.
+   * Reads a request the actor may see.
    *
+   * @param actor the reading member
    * @param requestId the request
-   * @return the request with the caller's roles on it
-   * @throws NotFoundException when the request is unknown or the caller may not see it
+   * @return the request with the actor's roles on it
+   * @throws NotFoundException when the request is unknown or the actor may not see it
    */
   @NotNull
   @Transactional(readOnly = true)
-  public BankBookingRequestViewDto view(@NotNull UUID requestId) {
+  public BankBookingRequestViewDto view(@NotNull BankActor actor, @NotNull UUID requestId) {
     BankBookingRequest request =
         requestRepository
             .findById(requestId)
             .orElseThrow(() -> new NotFoundException("Booking request not found"));
-    BankActor actor = bankCaller.actor();
     BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
     BankStaffRights rights = scope.rights();
     UUID accountId = request.getAccount().getId();
