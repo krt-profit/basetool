@@ -154,7 +154,7 @@ class UserAccountMergeEndStateTest {
     long sourceRolesVersion = rolesVersion(source);
     long targetRolesVersion = rolesVersion(target);
     long bystanderRolesVersion = rolesVersion(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(29);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -302,7 +302,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=33");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
