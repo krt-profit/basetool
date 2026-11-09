@@ -71,7 +71,9 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "location",
           "city",
           "space_station",
-          "starmap_object");
+          "starmap_object",
+          "bank_booking_request",
+          "bank_account");
 
   @Autowired private JdbcTemplate jdbc;
 
@@ -111,7 +113,7 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .singleElement()
         .satisfies(c -> {
-          assertThat(c.getResource()).isEqualTo(ExchangeResource.BLUEPRINT);
+          assertThat(c.getResource()).isEqualTo(ExchangeFeedResource.BLUEPRINT);
           assertThat(c.getEntityKey()).isEqualTo("laser rifle");
           assertThat(c.getSourceChannel()).isEqualTo("system");
           assertThat(c.getSourceClient()).isNull();
@@ -211,10 +213,10 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot));
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot));
   }
 
   @Test
@@ -309,7 +311,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
-        .containsOnly(org.assertj.core.groups.Tuple.tuple(ExchangeResource.SHIP, ship.toString()))
+        .containsOnly(
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.SHIP, ship.toString()))
         .hasSize(2);
     assertThat(changes(bob)).extracting(ExchangeChange::getEntityKey).contains(ship.toString());
   }
@@ -710,6 +713,140 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     jdbc.update("DELETE FROM app_user WHERE id = ?", alice);
 
     assertThat(changes(alice)).isEmpty();
+  }
+
+  @Test
+  void raisingDecidingAndDeletingARequestIsSequencedUnderItsRequester() {
+    UUID account = bankAccount("feed-bank", null);
+    UUID request = bankRequest(alice, account, null);
+    jdbc.update(
+        "UPDATE bank_booking_request SET status = 'CANCELLED', decided_at = now() WHERE id = ?",
+        request);
+    jdbc.update("DELETE FROM bank_booking_request WHERE id = ?", request);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()),
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()),
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()));
+    assertThat(changes(bob)).isEmpty();
+  }
+
+  @Test
+  void aClientRaisedRequestIsAttributedToItsClient() {
+    UUID account = bankAccount("feed-bank-client", null);
+    source("client|versekit|" + "K".repeat(43));
+
+    bankRequest(alice, account, null);
+
+    assertThat(changes(alice))
+        .singleElement()
+        .satisfies(c -> {
+          assertThat(c.getResource()).isEqualTo(ExchangeFeedResource.BANK_REQUEST);
+          assertThat(c.getSourceChannel()).isEqualTo("client");
+          assertThat(c.getSourceClient()).isEqualTo("versekit");
+        });
+  }
+
+  @Test
+  void renamingAnAccountReannouncesTheRequestsOnItAndToIt() {
+    UUID source = bankAccount("feed-bank-source", null);
+    UUID target = bankAccount("feed-bank-target", null);
+    UUID other = bankAccount("feed-bank-other", null);
+    UUID raised = bankRequest(alice, source, null);
+    UUID transfer = bankRequest(bob, other, target);
+    bankRequest(alice, other, null);
+    int aliceBefore = changes(alice).size();
+    int bobBefore = changes(bob).size();
+
+    jdbc.update("UPDATE bank_account SET name = 'feed-renamed' WHERE id IN (?, ?)", source, target);
+    jdbc.update("UPDATE bank_account SET status = 'ACTIVE' WHERE id = ?", other);
+
+    assertThat(changes(alice).subList(aliceBefore, changes(alice).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(raised.toString());
+    assertThat(changes(bob).subList(bobBefore, changes(bob).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(transfer.toString());
+  }
+
+  @Test
+  void aNewShorthandReannouncesTheRequestsOnTheUnitsAccount() {
+    UUID unit = orgUnit("feed-bank-unit");
+    UUID account = bankAccount("feed-bank-unit-account", unit);
+    UUID request = bankRequest(alice, account, null);
+    int before = changes(alice).size();
+
+    jdbc.update("UPDATE org_unit SET shorthand = 'FBNEW' WHERE id = ?", unit);
+
+    assertThat(changes(alice).subList(before, changes(alice).size()))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(request.toString());
+  }
+
+  @Test
+  void aRequestWhoseRequesterIsGoneIsNotSequenced() {
+    UUID account = bankAccount("feed-bank-orphan", null);
+    UUID request = bankRequest(alice, account, null);
+    jdbc.update("DELETE FROM app_user WHERE id = ?", alice);
+
+    jdbc.update("UPDATE bank_booking_request SET note = 'orphan' WHERE id = ?", request);
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM exchange_change WHERE entity_key = ?",
+                Long.class,
+                request.toString()))
+        .isZero();
+  }
+
+  /**
+   * Inserts an active bank account directly: a Staffel account when a unit is given, a Sonderkonto
+   * otherwise.
+   *
+   * @param name the display name
+   * @param unit the owning org unit, or {@code null}
+   * @return its id
+   */
+  private @NotNull UUID bankAccount(@NotNull String name, @Nullable UUID unit) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO bank_account (id, account_no, name, type, org_unit_id) VALUES (?, ?, ?, ?, ?)",
+        id,
+        "KB-F" + id.toString().substring(0, 8),
+        name,
+        unit == null ? "SPECIAL" : "ORG_UNIT",
+        unit);
+    return id;
+  }
+
+  /**
+   * Inserts a pending booking request directly, as the web's request path writes it.
+   *
+   * @param requester the requesting member
+   * @param account the (source) account
+   * @param target the destination of a transfer, or {@code null} for a deposit
+   * @return its id
+   */
+  private @NotNull UUID bankRequest(
+      @NotNull UUID requester, @NotNull UUID account, @Nullable UUID target) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO bank_booking_request (id, account_id, target_account_id, type, amount,
+                                          requested_by, requester_handle)
+        VALUES (?, ?, ?, ?, 100, ?, 'feed-requester')
+        """,
+        id,
+        account,
+        target,
+        target == null ? "DEPOSIT" : "TRANSFER",
+        requester);
+    return id;
   }
 
   /**

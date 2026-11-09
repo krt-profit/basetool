@@ -42,6 +42,12 @@ public final class ExchangeRoutes {
   /** Stands for "any granted exchange capability". */
   public static final String ANY = "*";
 
+  /**
+   * The root of the bank route family, which the bank switch gates (REQ-BXCH-006): every path at or
+   * below it, whether a route serves it or not.
+   */
+  public static final String BANK_PATH = "/exchange/v1/bank";
+
   /** Every authenticated exchange route. */
   public static final @Unmodifiable List<Route> ROUTES =
       List.of(
@@ -66,7 +72,19 @@ public final class ExchangeRoutes {
           write(
               HttpMethod.POST,
               "/exchange/v1/me/drafts/refinery-orders",
-              "exchange.drafts.refinery"));
+              "exchange.drafts.refinery"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/bookings", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/balance-series", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/queue", "exchange.bank.queue"),
+          route(HttpMethod.GET, BANK_PATH + "/requests", "exchange.bank.read"),
+          write(HttpMethod.POST, BANK_PATH + "/requests", "exchange.bank.request"),
+          write(HttpMethod.POST, BANK_PATH + "/requests/{id}/correction", "exchange.bank.request"),
+          write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"));
+
+  /** The bank route family as a pattern, matched against the decoded path segments. */
+  private static final PathPattern BANK_FAMILY =
+      PathPatternParser.defaultInstance.parse(BANK_PATH + "/**");
 
   /** Not instantiable. */
   private ExchangeRoutes() {}
@@ -83,6 +101,17 @@ public final class ExchangeRoutes {
     return ROUTES.stream()
         .filter(route -> route.method().matches(method) && route.pattern().matches(container))
         .findFirst();
+  }
+
+  /**
+   * Tells whether a request path belongs to the bank route family, judged on the decoded segments
+   * as {@link #find} matches them, so a percent-encoded spelling is in the family too.
+   *
+   * @param path the raw request path
+   * @return {@code true} for {@link #BANK_PATH} and every path below it
+   */
+  public static boolean isBank(@NotNull String path) {
+    return BANK_FAMILY.matches(PathContainer.parsePath(path));
   }
 
   /**

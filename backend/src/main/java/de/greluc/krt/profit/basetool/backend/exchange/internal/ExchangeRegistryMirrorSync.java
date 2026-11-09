@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +51,7 @@ public class ExchangeRegistryMirrorSync {
   private final ExchangeRegistryMirror mirror;
   private final ExchangeClientRepository clientRepository;
   private final ExchangeSettingsRepository settingsRepository;
+  private final EntityManager entityManager;
   private final MeterRegistry meterRegistry;
   private final ExchangeClientGauges clientGauges;
   private final TransactionTemplate requiresNew;
@@ -62,6 +65,7 @@ public class ExchangeRegistryMirrorSync {
    * @param meterRegistry the registry the write counter binds to
    * @param clientGauges the per-status client gauges every read of the registry refreshes
    * @param transactionManager the manager the resync's own transactions run in
+   * @param entityManager reloads the settings row after the bank switch's own write
    */
   public ExchangeRegistryMirrorSync(
       @NotNull ExchangeRegistryMirror mirror,
@@ -69,10 +73,12 @@ public class ExchangeRegistryMirrorSync {
       @NotNull ExchangeSettingsRepository settingsRepository,
       @NotNull MeterRegistry meterRegistry,
       @NotNull ExchangeClientGauges clientGauges,
-      @NotNull PlatformTransactionManager transactionManager) {
+      @NotNull PlatformTransactionManager transactionManager,
+      @NotNull EntityManager entityManager) {
     this.mirror = mirror;
     this.clientRepository = clientRepository;
     this.settingsRepository = settingsRepository;
+    this.entityManager = entityManager;
     this.meterRegistry = meterRegistry;
     this.clientGauges = clientGauges;
     this.requiresNew = new TransactionTemplate(transactionManager);
@@ -140,6 +146,23 @@ public class ExchangeRegistryMirrorSync {
   }
 
   /**
+   * Writes the bank switch onto the locked settings row without touching the row's version or
+   * {@code updatedAt}, which belong to the global switch (REQ-BXCH-006), and reloads the row.
+   *
+   * @param settings the locked settings row
+   * @param enabled the bank switch's new state
+   * @param at the change time
+   * @return the reloaded row, with the bank switch's version bumped
+   */
+  @NotNull
+  public ExchangeSettings saveBankSwitch(
+      @NotNull ExchangeSettings settings, boolean enabled, @NotNull Instant at) {
+    settingsRepository.writeBankSwitch(settings.getId(), enabled, at);
+    entityManager.refresh(settings);
+    return settings;
+  }
+
+  /**
    * Reads the registry as the current transaction sees it, flushing pending changes first.
    *
    * @return the registry content
@@ -147,12 +170,12 @@ public class ExchangeRegistryMirrorSync {
   @NotNull
   public ExchangeRegistrySnapshot load() {
     clientRepository.flush();
-    boolean enabled =
-        settingsRepository
-            .findById(ExchangeSettings.SINGLETON_ID)
-            .map(ExchangeSettings::isEnabled)
-            .orElse(false);
-    return ExchangeRegistrySnapshot.of(enabled, clientRepository.findAllWithCapabilities());
+    Optional<ExchangeSettings> settings =
+        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
+    return ExchangeRegistrySnapshot.of(
+        settings.map(ExchangeSettings::isEnabled).orElse(false),
+        settings.map(ExchangeSettings::isBankEnabled).orElse(false),
+        clientRepository.findAllWithCapabilities());
   }
 
   /**

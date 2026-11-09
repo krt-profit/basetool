@@ -1059,6 +1059,84 @@
           "protocolMapper": "oidc-audience-mapper"
         }
       ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankRead}",
+        "display.on.consent.screen": "true",
+        "gui.order": "16",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.read",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankRequest}",
+        "display.on.consent.screen": "true",
+        "gui.order": "17",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.request",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankQueue}",
+        "display.on.consent.screen": "true",
+        "gui.order": "18",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.queue",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
     }
   ],
   "clientSessionIdleTimeout": 0,
@@ -1071,6 +1149,13 @@
       },
       "clientAuthenticatorType": "client-secret",
       "clientId": "basetool-frontend",
+      "defaultClientScopes": [
+        "acr",
+        "basic",
+        "email",
+        "profile",
+        "web-origins"
+      ],
       "directAccessGrantsEnabled": true,
       "enabled": true,
       "fullScopeAllowed": true,
@@ -1253,6 +1338,9 @@
         "exchange.orgstock.details",
         "exchange.demand.details",
         "exchange.orgstock.write",
+        "exchange.bank.read",
+        "exchange.bank.request",
+        "exchange.bank.queue",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1315,30 +1403,6 @@
   "roles": {
     "realm": [
       {
-        "description": "E2E test role",
-        "name": "Admin"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Logistician"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Mission Manager"
-      },
-      {
-        "description": "E2E test role",
-        "name": "KRT Member"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Bank Employee"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Bank Management"
-      },
-      {
         "clientRole": false,
         "composite": false,
         "containerId": "basetool",
@@ -1356,7 +1420,6 @@
         "composite": true,
         "composites": {
           "realm": [
-            "KRT Member",
             "offline_access",
             "uma_authorization"
           ]
@@ -1393,10 +1456,7 @@
       "email": "test-admin@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "Admin",
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-admin"
     },
     {
@@ -1410,9 +1470,7 @@
       "email": "test-officer@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-officer"
     },
     {
@@ -1426,9 +1484,7 @@
       "email": "test-member@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-member"
     },
     {
@@ -1442,9 +1498,7 @@
       "email": "test-sk@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-sk"
     },
     {
@@ -1458,9 +1512,7 @@
       "email": "test-none@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-none"
     },
     {
@@ -1474,9 +1526,7 @@
       "email": "test-both@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-both"
     },
     {
@@ -1490,9 +1540,7 @@
       "email": "test-bereich@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-bereich"
     },
     {
@@ -1506,10 +1554,7 @@
       "email": "test-bank-employee@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "Bank Employee",
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-bank-employee"
     },
     {
@@ -1523,10 +1568,7 @@
       "email": "test-bank-management@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "Bank Management",
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-bank-management"
     },
     {
@@ -1540,10 +1582,7 @@
       "email": "test-bank-member@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "Bank Employee",
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-bank-member"
     },
     {
@@ -1557,9 +1596,7 @@
       "email": "test-appoint-bl@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-appoint-bl"
     },
     {
@@ -1573,9 +1610,7 @@
       "email": "test-appoint-tgt@example.test",
       "emailVerified": true,
       "enabled": true,
-      "realmRoles": [
-        "KRT Member"
-      ],
+      "realmRoles": [],
       "username": "test-appoint-tgt"
     },
     {
@@ -1605,8 +1640,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "test-exchange"
     },
@@ -1622,8 +1656,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "test-exchange-2"
     },
@@ -1639,8 +1672,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "test-exchange-3"
     },
@@ -1656,8 +1688,7 @@
       "emailVerified": true,
       "enabled": true,
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "test-exchange-departed"
     },
@@ -1665,7 +1696,6 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
-          "view-realm",
           "view-users"
         ]
       },

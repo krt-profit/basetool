@@ -56,12 +56,14 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The registry gate of the exchange routes, after the token gate: the route must exist, the
- * exchange be switched on, the client be active in the registry, a browser origin be one approved
- * for that client, neither the installation key nor the client be revoked for this member, the
- * route's capability be both in the token and granted, and the client's version meet its minimum
- * (REQ-XCH-001, -003, -004, -008, -024, -027). An admitted request carries an {@link
- * ExchangeRequestContext}, and every request past the token gate is tagged in the log with its
- * registry client and route ({@link ExchangeLogContext}).
+ * exchange be switched on and, for the bank route family, the bank switch too (REQ-BXCH-006; while
+ * it is off, a bank path answers {@code 503 BANK_EXCHANGE_DISABLED} whether a route serves it or
+ * not), the client be active in the registry, a browser origin be one approved for that client,
+ * neither the installation key nor the client be revoked for this member, the route's capability be
+ * both in the token and granted, and the client's version meet its minimum (REQ-XCH-001, -003,
+ * -004, -008, -024, -027). An admitted request carries an {@link ExchangeRequestContext}, and every
+ * request past the token gate is tagged in the log with its registry client and route ({@link
+ * ExchangeLogContext}).
  *
  * <p>The registry comes through a five-second cache; the revocations are read on every request.
  * Anything unreadable fails closed with {@code 503 REGISTRY_UNAVAILABLE}.
@@ -72,9 +74,22 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   /** What a client should wait before retrying a {@code 503}. */
   public static final String RETRY_AFTER_SECONDS = "30";
 
+  /**
+   * What a client should wait before retrying a bank route after {@code 503
+   * BANK_EXCHANGE_DISABLED}; the switch is an admin's decision, so the wait is longer.
+   */
+  public static final String BANK_RETRY_AFTER_SECONDS = "300";
+
+  /** The detail of {@code 503 BANK_EXCHANGE_DISABLED}. */
+  public static final String BANK_EXCHANGE_DISABLED_DETAIL =
+      "The bank is switched off for connected applications; every other area keeps working.";
+
   /** The detail of {@code 503 REGISTRY_UNAVAILABLE}. */
   public static final String REGISTRY_UNAVAILABLE_DETAIL =
       "The exchange registry cannot be read; try again later.";
+
+  /** The detail of {@code 404 NOT_FOUND}. */
+  static final String NOT_FOUND_DETAIL = "No such exchange route.";
 
   /** The detail of {@code 503 EXCHANGE_DISABLED}. */
   public static final String EXCHANGE_DISABLED_DETAIL = "The exchange is switched off.";
@@ -140,19 +155,19 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     }
     Optional<ExchangeRoutes.Route> route =
         ExchangeRoutes.find(request.getMethod(), request.getRequestURI());
-    if (route.isEmpty()) {
-      refuse(
-          refusals.clientLabel(jwt.getClaimAsString("azp")),
-          response,
-          HttpStatus.NOT_FOUND,
-          ExchangeRefusals.NOT_FOUND,
-          "No such exchange route.");
+    boolean bank = ExchangeRoutes.isBank(request.getRequestURI());
+    if (route.isEmpty() && !bank) {
+      refuseNotFound(refusals.clientLabel(jwt.getClaimAsString("azp")), response);
       return;
     }
-    ExchangeLogContext.route(route.get());
+    route.ifPresent(ExchangeLogContext::route);
     ExchangeRequestContext context;
     try {
-      context = admit(jwt, route.get(), request, response);
+      if (route.isEmpty()) {
+        refuseRoutelessBankPath(jwt, response);
+        return;
+      }
+      context = admit(jwt, route.get(), bank, request, response);
     } catch (ExchangeUnavailableException _) {
       response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
       refuse(
@@ -176,6 +191,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
    *
    * @param jwt the token
    * @param route the route
+   * @param bank whether the route is a bank route, which the bank switch also gates
    * @param request the request
    * @param response the response a refusal is written to
    * @return the context, or {@code null} when the request was refused
@@ -185,6 +201,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private @Nullable ExchangeRequestContext admit(
       @NotNull Jwt jwt,
       @NotNull ExchangeRoutes.Route route,
+      boolean bank,
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response)
       throws IOException {
@@ -192,14 +209,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     String clientId = jwt.getClaimAsString("azp");
     String label = ExchangeRefusals.clientLabel(clientId, registry);
     ExchangeLogContext.client(label);
-    if (!registry.enabled()) {
-      response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
-      refuse(
-          label,
-          response,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          ExchangeRefusals.EXCHANGE_DISABLED,
-          EXCHANGE_DISABLED_DETAIL);
+    if (refusedBySwitch(registry, label, bank, response)) {
       return null;
     }
     ExchangeRegistry.Client client = clientId == null ? null : registry.clients().get(clientId);
@@ -292,6 +302,77 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
         granted,
         client,
         connectedAt == null ? null : connectedAt.getEpochSecond());
+  }
+
+  /**
+   * Refuses a request one of the switches stops: the global switch for every route, then the bank
+   * switch for the bank route family (REQ-XCH-003, REQ-BXCH-006).
+   *
+   * @param registry the registry
+   * @param label the {@code client_id} label of the request
+   * @param bank whether the request is for the bank route family
+   * @param response the response a refusal is written to
+   * @return {@code true} when the request was refused
+   * @throws IOException if writing the refusal fails
+   */
+  private boolean refusedBySwitch(
+      @NotNull ExchangeRegistry registry,
+      @NotNull String label,
+      boolean bank,
+      @NotNull HttpServletResponse response)
+      throws IOException {
+    if (!registry.enabled()) {
+      response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
+      refuse(
+          label,
+          response,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          ExchangeRefusals.EXCHANGE_DISABLED,
+          EXCHANGE_DISABLED_DETAIL);
+      return true;
+    }
+    if (bank && !registry.bankEnabled()) {
+      response.setHeader(HttpHeaders.RETRY_AFTER, BANK_RETRY_AFTER_SECONDS);
+      refuse(
+          label,
+          response,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+          BANK_EXCHANGE_DISABLED_DETAIL);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Answers a bank path no route serves: the switches refuse it first, so while the bank switch is
+   * off the whole family answers alike; otherwise it is {@code 404 NOT_FOUND}.
+   *
+   * @param jwt the token
+   * @param response the response
+   * @throws IOException if writing the refusal fails
+   * @throws ExchangeUnavailableException if the registry cannot be read
+   */
+  private void refuseRoutelessBankPath(@NotNull Jwt jwt, @NotNull HttpServletResponse response)
+      throws IOException {
+    ExchangeRegistry registry = registryReader.current();
+    String label = ExchangeRefusals.clientLabel(jwt.getClaimAsString("azp"), registry);
+    ExchangeLogContext.client(label);
+    if (!refusedBySwitch(registry, label, true, response)) {
+      refuseNotFound(label, response);
+    }
+  }
+
+  /**
+   * Writes and counts {@code 404 NOT_FOUND} for a path the exchange has no route for.
+   *
+   * @param label the {@code client_id} label of the request
+   * @param response the response
+   * @throws IOException if writing fails
+   */
+  private void refuseNotFound(@NotNull String label, @NotNull HttpServletResponse response)
+      throws IOException {
+    refuse(label, response, HttpStatus.NOT_FOUND, ExchangeRefusals.NOT_FOUND, NOT_FOUND_DETAIL);
   }
 
   /**

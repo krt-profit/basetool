@@ -64,7 +64,7 @@ authorization: Bearer gateway-service-token
 content-length: 608
 content-type: application/json
 x-correlation-id: <correlation-id>
-x-exchange-capabilities: exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.stock.read,exchange.stock.write
+x-exchange-capabilities: exchange.bank.queue,exchange.bank.read,exchange.bank.request,exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.stock.read,exchange.stock.write
 x-exchange-client: versekit
 x-exchange-connected-at: <connected-at>
 x-exchange-installation: <thumbprint>

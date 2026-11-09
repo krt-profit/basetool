@@ -63,7 +63,10 @@ class OrgUnitBankPathCutTest {
    * Operations of the controller that are not in the cut map because they never had an old path.
    */
   private static final Set<String> NOT_IN_THE_CUT_MAP =
-      Set.of("GET " + NEW_PREFIX + "/accounts/visible", "GET " + NEW_PREFIX + "/requests/page");
+      Set.of(
+          "GET " + NEW_PREFIX + "/accounts/visible",
+          "GET " + NEW_PREFIX + "/requests/page",
+          "GET " + NEW_PREFIX + "/requests/{id}");
 
   /** One wave-4 line of the map: verb, old path, new path, whether the operation is frozen. */
   private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
@@ -122,7 +125,8 @@ class OrgUnitBankPathCutTest {
     for (String operation : NOT_IN_THE_CUT_MAP) {
       String[] verbAndPath = operation.split(" ", 2);
       mockMvc
-          .perform(request(HttpMethod.valueOf(verbAndPath[0]), verbAndPath[1]).with(csrf()))
+          .perform(
+              request(HttpMethod.valueOf(verbAndPath[0]), concrete(verbAndPath[1])).with(csrf()))
           .andExpect(status().isUnauthorized());
     }
   }

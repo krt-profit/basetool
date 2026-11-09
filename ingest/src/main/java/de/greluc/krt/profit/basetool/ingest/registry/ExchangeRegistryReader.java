@@ -162,7 +162,6 @@ public class ExchangeRegistryReader {
       throw new ExchangeUnavailableException("The registry mirror has an unknown format.", null);
     }
     JsonNode revision = root.get("revision");
-    JsonNode enabled = root.get("enabled");
     Map<String, ExchangeRegistry.Client> clients = new HashMap<>();
     JsonNode clientNodes = root.get("clients");
     if (clientNodes != null && clientNodes.isObject()) {
@@ -172,8 +171,21 @@ public class ExchangeRegistryReader {
     }
     return new ExchangeRegistry(
         revision != null && revision.isNumber() ? revision.longValue() : 0L,
-        enabled != null && enabled.isBoolean() && enabled.booleanValue(),
+        flag(root, "enabled"),
+        flag(root, "bankEnabled"),
         clients);
+  }
+
+  /**
+   * Reads a switch of the document; an absent or malformed one counts as off.
+   *
+   * @param root the document
+   * @param name the member's name
+   * @return {@code true} only for a JSON {@code true}
+   */
+  private static boolean flag(@NotNull JsonNode root, @NotNull String name) {
+    JsonNode node = root.get(name);
+    return node != null && node.isBoolean() && node.booleanValue();
   }
 
   /**

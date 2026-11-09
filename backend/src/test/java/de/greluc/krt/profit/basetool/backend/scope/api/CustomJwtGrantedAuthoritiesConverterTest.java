@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService.ReconciledUser;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
@@ -148,7 +148,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void leavesANonGatewayCallerOnTheOrdinaryMemberPath() {
     gatewayClientIds.add("test-ingest-gateway");
     when(jwt.getClaimAsString("azp")).thenReturn("basetool-frontend");
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -159,23 +159,21 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verify(userReconciliationService).syncUser(jwt);
   }
 
-  /** The request is authorised by the token's roles, not the stored ones (REQ-SEC-036). */
+  /**
+   * The request is authorised by the stored roles; a realm-role claim grants nothing (REQ-SEC-088).
+   */
   @Test
-  void authorisesWithTheEffectiveRolesRatherThanTheStoredOnes() {
-    User admin = userWithNoRoles();
-    admin.setRoles(Set.of(namedRole("Admin"), namedRole("KRT Member")));
-
-    when(userReconciliationService.syncUser(jwt))
-        .thenReturn(new ReconciledUser(admin, Set.of(namedRole("KRT Member"))));
+  void authorisesWithTheStoredRolesAndIgnoresTheRealmRoleClaim() {
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<String> authorities =
-        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+        converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "Admin")).stream()
+            .map(GrantedAuthority::getAuthority)
+            .toList();
 
-    assertTrue(authorities.contains("ROLE_KRT_MEMBER"), "the token's role must authorise");
-    assertFalse(
-        authorities.contains("ROLE_ADMIN"),
-        "the row still holds Admin because the app path no longer overwrites it - it must not"
-            + " leak into the authorities");
+    assertTrue(authorities.contains("ROLE_KRT_MEMBER"), "the stored role must authorise");
+    assertFalse(authorities.contains("ROLE_ADMIN"), "the token's claim must not");
   }
 
   /**
@@ -185,7 +183,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void assembleForAUserAloneStillReadsTheStoredRoles() {
     User user = userWithNoRoles();
-    user.setRoles(Set.of(namedRole("Admin")));
+    user.setRoles(Set.of(codeRole(Roles.ADMIN)));
 
     Collection<String> authorities =
         converter.assembleFor(user).stream().map(GrantedAuthority::getAuthority).toList();
@@ -194,14 +192,15 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   /**
-   * A role with only a name, which is all the authority mapping reads.
+   * A role with its code, which is all the authority mapping reads.
    *
-   * @param name the role's display name
+   * @param code the role's stable code
    * @return the role, with no permissions attached
    */
-  private static Role namedRole(String name) {
+  private static Role codeRole(String code) {
     Role role = new Role();
-    role.setName(name);
+    role.setCode(code);
+    role.setName(code);
     role.setPermissions(Set.of());
     return role;
   }
@@ -212,8 +211,10 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     return user;
   }
 
-  private ReconciledUser krtMember() {
-    return new ReconciledUser(userWithNoRoles(), Set.of(namedRole("KRT Member")));
+  private User krtMember() {
+    User user = userWithNoRoles();
+    user.setRoles(Set.of(codeRole(Roles.KRT_MEMBER)));
+    return user;
   }
 
   private static OrgUnitMembership membership(UUID orgUnitId, OrgUnitKind kind) {
@@ -227,7 +228,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void convert_sameToken_memoisesAuthorities_assemblesOnce() {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> first = converter.convert(jwt);
@@ -243,7 +244,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
@@ -255,7 +256,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void convert_tokenWithoutIssuedAt_bypassesCache() {
     when(jwt.getSubject()).thenReturn("sub-1");
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(jwt);
@@ -271,8 +272,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void convert_refreshedTokenOfTheSameSession_isServedFromTheCache() {
-    when(userReconciliationService.syncUser(any(Jwt.class)))
-        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
@@ -281,38 +281,69 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verify(userReconciliationService, times(1)).syncUser(any(Jwt.class));
   }
 
-  /**
-   * A refreshed token with changed realm roles misses the cache and its authorities reflect the
-   * change immediately.
-   */
+  /** A role change of the member evicts their cached authorities, so it applies at once. */
   @Test
-  void convert_refreshedTokenWithChangedRoles_missesAndReflectsTheChangeImmediately() {
-    Jwt before = token("session-1", "basetool-frontend", 1_700_000_000L, "Admin", "KRT Member");
-    Jwt after = token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member");
-    when(userReconciliationService.syncUser(before))
-        .thenReturn(
-            new ReconciledUser(
-                userWithNoRoles(), Set.of(namedRole("Admin"), namedRole("KRT Member"))));
-    when(userReconciliationService.syncUser(after))
-        .thenReturn(new ReconciledUser(userWithNoRoles(), Set.of(namedRole("KRT Member"))));
+  void convert_afterTheMembersRolesChanged_reassemblesFromTheStoredRoles() {
+    User admin = userWithNoRoles();
+    admin.setRoles(Set.of(codeRole(Roles.ADMIN), codeRole(Roles.KRT_MEMBER)));
+    Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
+    when(userReconciliationService.syncUser(jwt)).thenReturn(admin, krtMember());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
-    Collection<String> first =
-        converter.convert(before).stream().map(GrantedAuthority::getAuthority).toList();
-    Collection<String> second =
-        converter.convert(after).stream().map(GrantedAuthority::getAuthority).toList();
+    Collection<String> before =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+    converter.onRolesChanged(new UserRolesChangedEvent(USER_ID));
+    Collection<String> after =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
 
-    assertTrue(first.contains("ROLE_ADMIN"));
-    assertFalse(second.contains("ROLE_ADMIN"), "a revoked realm role must bite on the refresh");
-    verify(userReconciliationService).syncUser(before);
-    verify(userReconciliationService).syncUser(after);
+    assertTrue(before.contains("ROLE_ADMIN"));
+    assertFalse(after.contains("ROLE_ADMIN"), "a withdrawn role must bite on the next request");
+    verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
+  /**
+   * An assembly that read the roles before a role change committed does not cache its result, so
+   * the eviction that ran while it was assembling is not undone for the cache's TTL.
+   */
+  @Test
+  void convert_whenTheRolesChangeWhileAssembling_doesNotCacheTheStaleResult() {
+    User admin = userWithNoRoles();
+    admin.setRoles(Set.of(codeRole(Roles.ADMIN), codeRole(Roles.KRT_MEMBER)));
+    Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
+    when(userReconciliationService.syncUser(jwt))
+        .thenAnswer(_ -> {
+          converter.onRolesChanged(new UserRolesChangedEvent(USER_ID));
+          return admin;
+        })
+        .thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(jwt);
+    Collection<String> after =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertFalse(after.contains("ROLE_ADMIN"), "the withdrawn role must not be served from cache");
+    verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
+  /** Another member's role change leaves this member's cached authorities alone. */
+  @Test
+  void convert_afterAnotherMembersRolesChanged_staysServedFromTheCache() {
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
+
+    converter.convert(jwt);
+    converter.onRolesChanged(new UserRolesChangedEvent(UUID.randomUUID()));
+    converter.convert(jwt);
+
+    verify(userReconciliationService, times(1)).syncUser(any(Jwt.class));
   }
 
   /** A new login is a new Keycloak session and therefore a miss, whatever the claims say. */
   @Test
   void convert_newSession_misses() {
-    when(userReconciliationService.syncUser(any(Jwt.class)))
-        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
@@ -322,18 +353,16 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   /**
-   * REQ-SEC-036: two clients of the same person never share an entry, even inside one Keycloak
-   * session and with otherwise identical claims — the partial-scope client must not inherit the web
-   * client's authorities, nor the other way round.
+   * Two clients of the same person never share an entry, even inside one Keycloak session and with
+   * otherwise identical claims, because the assembly reads {@code azp} for the gateway check.
    */
   @Test
   void convert_sameSessionDifferentAzp_neverShareAnEntry() {
-    when(userReconciliationService.syncUser(any(Jwt.class)))
-        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
-    converter.convert(token("session-1", "basetool-android", 1_700_000_000L, "KRT Member"));
+    converter.convert(token("session-1", "another-client", 1_700_000_000L, "KRT Member"));
 
     verify(userReconciliationService, times(2)).syncUser(any(Jwt.class));
   }
@@ -375,8 +404,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void convert_publishesHitsAndMissesUnderTheCacheMeters() {
-    when(userReconciliationService.syncUser(any(Jwt.class)))
-        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
@@ -407,13 +435,13 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    * @param sid the Keycloak session id
    * @param azp the authorized party
    * @param issuedAtEpochSecond the token's {@code iat}
-   * @param realmRoles the realm roles the token carries
+   * @param realmRoles the realm roles the token still carries, which grant nothing
    * @return the token
    */
   private static Jwt token(String sid, String azp, long issuedAtEpochSecond, String... realmRoles) {
     return Jwt.withTokenValue("token-" + sid + '-' + azp + '-' + issuedAtEpochSecond)
         .header("alg", "none")
-        .subject("sub-1")
+        .subject(USER_ID.toString())
         .claim("sid", sid)
         .claim("azp", azp)
         .claim("jti", "jti-" + issuedAtEpochSecond)
@@ -538,7 +566,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void aRetainedSeatWithoutKrtMember_mintsNoRankDerivedAuthorityAndNoCascade() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     OrgUnitMembership staffelleiter = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
@@ -558,7 +586,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void explicitFlagsWithoutKrtMember_stillMintTheirOwnUnitAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership logistician = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     logistician.setLogistician(true);
     OrgUnitMembership missionManager = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
@@ -582,7 +610,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void pendingRegistration_getsOnlyPendingApprovalAndNeverConsultsMembership() {
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(pending));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(pending);
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -597,7 +625,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void rejectedRegistration_getsOnlyPendingApprovalAuthority() {
     User rejected = userWithNoRoles();
     rejected.setApprovalStatus(ApprovalStatus.REJECTED);
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(rejected));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(rejected);
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
@@ -616,11 +644,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(jwt.getClaimAsString("sid")).thenReturn("keycloak-session-1");
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
-    User approved = userWithNoRoles();
-    when(userReconciliationService.syncUser(jwt))
-        .thenReturn(
-            ReconciledUser.of(pending),
-            new ReconciledUser(approved, Set.of(namedRole("KRT Member"))));
+    User approved = krtMember();
+    when(userReconciliationService.syncUser(jwt)).thenReturn(pending, approved);
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> beforeApproval = converter.convert(jwt);
@@ -637,7 +662,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(userWithNoRoles()));
+    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
     lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
@@ -651,7 +676,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void convert_retriesOnOptimisticLockThenSucceeds() {
     when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
-        .thenReturn(ReconciledUser.of(userWithNoRoles()));
+        .thenReturn(userWithNoRoles());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);

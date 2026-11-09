@@ -1283,6 +1283,560 @@
           }
         }
       }
+    },
+    "/exchange/v1/bank/accounts": {
+      "get": {
+        "operationId": "bank_accounts",
+        "summary": "The active Kartellbank accounts the member may view, the KRT account first and the rest by account number: a snapshot.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankAccountPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Each account carries its balance, target and 30-day trend, whether the member may raise a withdrawal or transfer there and the member's own limit. No holders, custody or limit tables. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page of the same snapshot. A cursor the server did not issue, or whose account the member no longer views, answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/bank/accounts/{id}/bookings": {
+      "get": {
+        "operationId": "bank_bookings",
+        "summary": "The bookings of one account the member views, newest first: a snapshot, optionally bounded in time.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankBookingPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Redacted as on the member's account page: no holders and no staff note; the counterparty's handle is null when they withhold their name from connected applications. A hidden, closed or unknown account answers 404 NOT_FOUND. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The account's accountId.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive lower bound on the booking time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive upper bound on the booking time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page. A cursor the server did not issue answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/bank/accounts/{id}/balance-series": {
+      "get": {
+        "operationId": "bank_balance_series",
+        "summary": "The end-of-day balances of one account the member views, one per UTC day of the period.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-balance-series.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "from and to are required and span at most 365 days; otherwise 400 SCHEMA_INVALID. A hidden, closed or unknown account answers 404 NOT_FOUND. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The account's accountId.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive start of the period.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive end of the period, at most 365 days after from.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/bank/requests": {
+      "get": {
+        "operationId": "bank_requests",
+        "summary": "The member's own booking requests, raised in the Basetool or through any client: snapshot or changes since a cursor.",
+        "description": "Each request carries its status, amount, accounts, approval need, rejection reason and split. No staff note, no staff identities, no counterparty and no purpose. Every page carries openRequestCap, the most pending requests the member may hold; once the PENDING items reach it, a raise answers 409 BANK_OPEN_REQUEST_CAP. Retention class: the member's own data. A client may persist it.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankRequestPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "bank_request_raise",
+        "summary": "Raise one of the member's own booking requests: a deposit, withdrawal or transfer.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "The Basetool's own validation and approval routing apply; nothing is booked until the bank confirms the request in the Basetool. A deposit may target any active account; a withdrawal or transfer needs an account the member may view. An unknown, closed or hidden account answers 404 NOT_FOUND. A member who already holds 20 pending requests, from any channel, gets 409 BANK_OPEN_REQUEST_CAP. The answer names only the request's id, status, version and amount. Counts one unit of the daily write quota. There is no undo: cancel the request.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/raise"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/bank/requests/{id}/cancel": {
+      "post": {
+        "operationId": "bank_request_cancel",
+        "summary": "Cancel one of the member's own pending booking requests, raised anywhere.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/cancelled"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Another member's request answers 404 NOT_FOUND; a decided one 409 BANK_REQUEST_NOT_PENDING; a stale version 409 VERSION_CONFLICT. Counts one unit of the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The request's id as the own requests answer it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/cancel"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/bank/requests/{id}/correction": {
+      "post": {
+        "operationId": "bank_request_correct",
+        "summary": "Correct one of the member's own pending booking requests, raised anywhere.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replaces amount, note, justification and destination; the approval need is derived anew. Another member's request answers 404 NOT_FOUND; a decided one 409 BANK_REQUEST_NOT_PENDING; an approved one 409 BANK_REQUEST_ALREADY_APPROVED; a stale version 409 VERSION_CONFLICT. Counts one unit of the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The request's id as the own requests answer it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/correction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/bank/queue": {
+      "get": {
+        "operationId": "bank_queue",
+        "summary": "The read-only bank-staff queue: the pending requests the member's staff queue shows and those waiting for the member's approval, oldest first: a snapshot.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.queue"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-queue.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "open is the Basetool staff queue's set (the granted accounts for a bank employee, the whole bank for the Bankleitung) with mayConfirm; toApprove the requests whose approval-needed notice goes to the member. Decided anew on every call; the Admin role has no effect. A member without a bank role, a grant and a request to approve answers 403 NOT_BANK_STAFF. Each item links to its page in the Basetool; confirming and approving stay there. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position of both sections from a previous page of the same snapshot. A cursor the server did not issue answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "The page size of each section.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 500
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

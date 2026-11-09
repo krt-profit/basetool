@@ -766,7 +766,7 @@
           "required" : false,
           "schema" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ORG_UNIT_CREATED", "ORG_UNIT_UPDATED", "ORG_UNIT_DEACTIVATED", "ORG_UNIT_REACTIVATED", "ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED", "ORG_UNIT_PARENT_CHANGED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "USER_ROLE_ASSIGNED", "USER_ROLE_WITHDRAWN", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ORG_UNIT_CREATED", "ORG_UNIT_UPDATED", "ORG_UNIT_DEACTIVATED", "ORG_UNIT_REACTIVATED", "ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED", "ORG_UNIT_PARENT_CHANGED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "BANK_EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
           }
         }, {
           "in" : "query",
@@ -8382,6 +8382,125 @@
       }
     },
     "/api/v1/bank/org-units/requests/{id}" : {
+      "get" : {
+        "operationId" : "getRequest",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/BankBookingRequestViewDto"
+                }
+              }
+            },
+            "description" : "The request",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read one booking request the caller raised, sees as staff or approves",
+        "tags" : [ "bank" ],
+        "x-domain" : "bank"
+      },
       "put" : {
         "operationId" : "updateOwnBookingRequest",
         "parameters" : [ {
@@ -8750,6 +8869,16 @@
             "format" : "uuid"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrantOwnerApprovalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -16320,6 +16449,241 @@
           }
         },
         "summary" : "Set the global exchange switch",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/connected-apps/admin/settings/bank" : {
+      "get" : {
+        "operationId" : "getBankSwitch",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankSwitchDto"
+                }
+              }
+            },
+            "description" : "The bank switch",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Get the bank switch of the exchange",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      },
+      "put" : {
+        "description" : "While it is off, every bank route answers 503 BANK_EXCHANGE_DISABLED; switching off reaches the gateway's mirror before the commit or not at all.",
+        "operationId" : "updateBankSwitch",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeBankSwitchUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankSwitchDto"
+                }
+              }
+            },
+            "description" : "The saved bank switch"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          },
+          "502" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankSwitchDto"
+                }
+              }
+            },
+            "description" : "The registry mirror could not be written"
+          }
+        },
+        "summary" : "Set the bank switch of the exchange",
         "tags" : [ "exchange" ],
         "x-domain" : "exchange"
       }
@@ -43978,7 +44342,7 @@
           "required" : true,
           "schema" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           }
         } ],
         "requestBody" : {
@@ -78453,6 +78817,130 @@
         "x-domain" : "identity"
       }
     },
+    "/api/v1/users/role-holders" : {
+      "get" : {
+        "operationId" : "holders",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "role",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "KRT_MEMBER", "BANK_EMPLOYEE", "BANK_MANAGEMENT" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserRoleHolderDto"
+                  }
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "List the holders of a role",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
     "/api/v1/users/search" : {
       "get" : {
         "operationId" : "searchUsers",
@@ -79307,6 +79795,260 @@
         "x-domain" : "identity"
       }
     },
+    "/api/v1/users/{id}/roles" : {
+      "get" : {
+        "description" : "The four assignable roles the user holds, limited to those the caller may assign, with the role-set counter a change echoes.",
+        "operationId" : "roleSet",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserRoleSetDto"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read a user's role set",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
+    "/api/v1/users/{id}/roles/{role}" : {
+      "put" : {
+        "description" : "Admins change every role, the bank management Bank Employee only. Guarded by the role-set counter, not by the user record's version.",
+        "operationId" : "changeRole",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "role",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "KRT_MEMBER", "BANK_EMPLOYEE", "BANK_MANAGEMENT" ]
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserRoleChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserRoleSetDto"
+                }
+              }
+            },
+            "description" : "Role set after the change"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Assign or withdraw a role",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
     "/api/v1/users/{id}/rsi-handle" : {
       "get" : {
         "operationId" : "getUserRsiHandle",
@@ -80040,7 +80782,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ORG_UNIT_CREATED", "ORG_UNIT_UPDATED", "ORG_UNIT_DEACTIVATED", "ORG_UNIT_REACTIVATED", "ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED", "ORG_UNIT_PARENT_CHANGED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
+            "enum" : [ "INVENTORY_ITEM_CATALOGUE_REASSIGNED", "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED", "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED", "BLUEPRINT_CATALOGUE_REASSIGNED", "SUPPLY_CATALOGUE_REASSIGNED", "PURCHASING_CATALOGUE_REASSIGNED", "INVENTORY_ITEM_CREATED", "INVENTORY_ITEM_UPDATED", "INVENTORY_ITEM_MERGED", "INVENTORY_ITEM_NOTE_UPDATED", "INVENTORY_ALLOCATION_ADDED", "INVENTORY_ALLOCATION_CHANGED", "INVENTORY_ALLOCATION_REMOVED", "INVENTORY_ITEM_CONSUMED", "INVENTORY_ITEM_TRANSFERRED", "INVENTORY_ITEM_SOLD", "INVENTORY_ITEM_DEPERSONALIZED", "INVENTORY_ITEM_PERSONALIZED", "INVENTORY_ITEM_DELIVERY_TOGGLED", "INVENTORY_BULK_CHECKED_OUT", "INVENTORY_BULK_REBOOKED", "INVENTORY_WIPED", "INVENTORY_RECEIVED_FROM_REFINERY", "INVENTORY_RECEIVED_FROM_PRODUCTION", "INVENTORY_HANDED_OVER", "INVENTORY_CONSUMED_BY_PRODUCTION", "INVENTORY_ORG_RESTAMPED", "INVENTORY_ORG_UNIT_CHANGED", "INVENTORY_BULK_ORG_UNIT_CHANGED", "INVENTORY_POOL_CHANGED", "INVENTORY_STOLEN_MARKED", "INVENTORY_STOLEN_UNMARKED", "INVENTORY_BULK_STOLEN_CHANGED", "INVENTORY_ITEM_RESTORED", "MIN_STOCK_LEVEL_SET", "MIN_STOCK_LEVEL_CHANGED", "MIN_STOCK_LEVEL_REMOVED", "MIN_STOCK_LEVEL_REMOVED_BY_CASCADE", "INVENTORY_OWNER_REASSIGNED", "INVENTORY_PURGED_ON_USER_DELETION", "INVENTORY_AUDIT_EXPORTED", "INVENTORY_AUDIT_PURGED", "JOB_ORDER_CREATED", "JOB_ORDER_ITEM_CREATED", "JOB_ORDER_UPDATED", "JOB_ORDER_ITEM_UPDATED", "JOB_ORDER_STATUS_CHANGED", "JOB_ORDER_PRIORITY_CHANGED", "JOB_ORDER_BLUEPRINT_COUNTING_CHANGED", "JOB_ORDER_DELETED", "JOB_ORDER_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_ASSIGNEE_NOTE_SET", "JOB_ORDER_ASSIGNEE_NOTE_CLEARED", "JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED", "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED", "JOB_ORDER_MATERIAL_UNLINKED", "JOB_ORDER_INVENTORY_UNLINKED", "JOB_ORDER_HANDOVER_CREATED", "JOB_ORDER_ITEM_HANDOVER_CREATED", "JOB_ORDER_PRODUCTION_BOOKED", "JOB_ORDER_CLAIM_UPSERTED", "JOB_ORDER_CLAIM_WITHDRAWN", "QUALITY_TIER_CREATED", "QUALITY_TIER_UPDATED", "QUALITY_TIER_DEACTIVATED", "QUALITY_TIER_DELETED", "JOB_ORDER_AUDIT_EXPORTED", "JOB_ORDER_AUDIT_PURGED", "REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED", "REFINERY_ORDER_CANCELED", "REFINERY_ORDER_STORED", "REFINERY_METHOD_CREATED", "REFINERY_METHOD_UPDATED", "REFINERY_METHOD_DELETED", "REFINERY_METHODS_SYNCED", "REFINERY_YIELDS_SYNCED", "REFINERY_ORDERS_REASSIGNED", "REFINERY_AUDIT_EXPORTED", "REFINERY_AUDIT_PURGED", "PERSONAL_INVENTORY_CREATED", "PERSONAL_INVENTORY_UPDATED", "PERSONAL_INVENTORY_DELETED", "PERSONAL_DATA_PURGED_ON_USER_DELETION", "PERSONAL_INVENTORY_AUDIT_EXPORTED", "PERSONAL_INVENTORY_AUDIT_PURGED", "MISSION_CREATED", "MISSION_UPDATED", "MISSION_DELETED", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_UPDATED", "MISSION_PARTICIPANT_CHECKED_IN", "MISSION_PARTICIPANT_CHECKED_OUT", "MISSION_UNIT_ADDED", "MISSION_UNIT_UPDATED", "MISSION_UNIT_REMOVED", "MISSION_CREW_ADDED", "MISSION_CREW_UPDATED", "MISSION_CREW_REMOVED", "MISSION_FREQUENCY_CHANGED", "MISSION_FREQUENCY_REMOVED", "MISSION_OWNER_CHANGED", "MISSION_OWNING_ORG_UNIT_CHANGED", "MISSION_PARTY_LEAD_CHANGED", "MISSION_MANAGER_ADDED", "MISSION_MANAGER_REMOVED", "MISSION_FINANCE_ENTRY_CREATED", "MISSION_FINANCE_ENTRY_UPDATED", "MISSION_FINANCE_ENTRY_DELETED", "MISSION_STEP_ADDED", "MISSION_STEP_UPDATED", "MISSION_STEP_REMOVED", "MISSION_STEP_REORDERED", "MISSION_STEP_DONE_CHANGED", "MISSION_OBJECTIVE_ADDED", "MISSION_OBJECTIVE_UPDATED", "MISSION_OBJECTIVE_REMOVED", "MISSION_OBJECTIVE_REORDERED", "MISSION_AUDIT_EXPORTED", "MISSION_AUDIT_PURGED", "OPERATION_CREATED", "OPERATION_UPDATED", "OPERATION_DELETED", "OPERATION_PAYOUT_TOGGLED", "OPERATION_AUDIT_EXPORTED", "OPERATION_AUDIT_PURGED", "MEMBERSHIP_GRANTED", "MEMBERSHIP_REVOKED", "ROLE_GRANTED", "ROLE_CHANGED", "ROLE_REVOKED", "CAPABILITY_FLAGS_CHANGED", "ROLE_PERMISSIONS_CHANGED", "MEMBER_RANK_CHANGED", "USER_ROLE_ASSIGNED", "USER_ROLE_WITHDRAWN", "KOMMANDO_GROUP_CREATED", "KOMMANDO_GROUP_UPDATED", "KOMMANDO_GROUP_DELETED", "ORG_UNIT_CREATED", "ORG_UNIT_UPDATED", "ORG_UNIT_DEACTIVATED", "ORG_UNIT_REACTIVATED", "ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED", "ORG_UNIT_PARENT_CHANGED", "USER_DELETED", "USER_MERGED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_WITHDRAWN", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_EXECUTED", "ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED", "HANDLE_SNAPSHOTS_ANONYMISED", "PERSON_SEARCH_PERFORMED", "PERSONAL_DATA_EXPORTED", "ROLE_AUDIT_EXPORTED", "ROLE_AUDIT_PURGED", "MARKET_OFFER_RELEASED", "MARKET_OFFER_DEACTIVATED", "MARKET_OFFER_REDUCED", "MARKET_OFFER_REMOVED", "MARKET_REMARK_UPDATED", "MARKET_INTEREST_REGISTERED", "MARKET_INTEREST_WITHDRAWN", "MARKET_REQUEST_CREATED", "MARKET_REQUEST_UPDATED", "MARKET_REQUEST_DEACTIVATED", "MARKET_REQUEST_INTEREST_SIGNALLED", "MARKET_REQUEST_INTEREST_WITHDRAWN", "MARKET_AUDIT_EXPORTED", "MARKET_AUDIT_PURGED", "HANGAR_SHIP_CREATED", "HANGAR_SHIP_UPDATED", "HANGAR_SHIP_ORG_UNIT_CHANGED", "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED", "HANGAR_SHIP_DELETED", "HANGAR_EMPTIED", "HANGAR_IMPORTED", "HANGAR_FITTED_RESET", "HANGAR_HOME_LOCATION_SET", "HANGAR_AUDIT_EXPORTED", "HANGAR_AUDIT_PURGED", "BLUEPRINT_ADDED", "BLUEPRINT_BATCH_ADDED", "BLUEPRINT_UPDATED", "BLUEPRINT_REMOVED", "BLUEPRINT_ALL_REMOVED", "BLUEPRINT_IMPORTED", "BLUEPRINT_SHARING_CHANGED", "BLUEPRINT_PURGED_ALL_USERS", "BLUEPRINT_DEFAULT_ADDED", "BLUEPRINT_DEFAULT_REMOVED", "BLUEPRINT_DEFAULTS_GRANTED", "BLUEPRINT_AUDIT_EXPORTED", "BLUEPRINT_AUDIT_PURGED", "BLUEPRINT_PRODUCT_KEYS_UPGRADED", "BLUEPRINT_PRODUCT_MERGED", "EXCHANGE_CLIENT_CREATED", "EXCHANGE_CLIENT_UPDATED", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_SWITCH_CHANGED", "BANK_EXCHANGE_SWITCH_CHANGED", "EXCHANGE_CLIENT_DISCONNECTED", "EXCHANGE_INSTALLATION_DISCONNECTED", "EXCHANGE_MEMBER_DEPARTED", "EXCHANGE_CHANGES_UNDONE", "EXCHANGE_MASS_CHANGE_CONFIRMED", "EXCHANGE_BULK_UNDO_STARTED", "EXCHANGE_BULK_UNDO_FINISHED", "EXCHANGE_CONNECTIONS_PURGED", "EXCHANGE_NAME_WITHHOLDING_CHANGED", "CONNECTED_APPS_AUDIT_EXPORTED", "CONNECTED_APPS_AUDIT_PURGED", "NEED_RAISED", "NEED_UPDATED", "NEED_PAUSED", "NEED_RESUMED", "NEED_WITHDRAWN", "NEED_FULFILLED", "DONATION_PLEDGED", "DONATION_RECEIVED", "DONATION_DECLINED", "DONATION_WITHDRAWN", "DONATION_RECORDED", "SUPPLY_UNIT_SETTING_CHANGED", "SUPPLY_SETTINGS_CHANGED", "SUPPLY_AUDIT_EXPORTED", "SUPPLY_AUDIT_PURGED", "DEAL_CREATED", "DEAL_UPDATED", "DEAL_CANCELLED", "DEAL_TRANCHE_REQUESTED", "DEAL_TRANCHE_FUNDED", "DEAL_TRANCHE_REFUSED", "DEAL_DELIVERY_RECORDED", "DEAL_DELIVERY_ACCEPTED", "DEAL_DELIVERY_REJECTED", "DEAL_DELIVERY_CLOSED", "DEAL_SETTLEMENT_RECORDED", "DEAL_SETTLED", "DEAL_FAILED", "PARTNER_CREATED", "PARTNER_UPDATED", "PARTNER_BLOCKED", "PARTNER_UNBLOCKED", "PARTNER_ERASED", "DELEGATE_APPOINTED", "DELEGATE_REVOKED", "DELEGATE_LIMIT_CHANGED", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_SETTINGS_CHANGED", "RISK_CLASSES_CHANGED", "PURCHASING_AUDIT_EXPORTED", "PURCHASING_AUDIT_PURGED", "CATALOGUE_P4K_PREVIEW_ENQUEUED", "CATALOGUE_P4K_APPLIED", "CATALOGUE_P4K_MASS_GUARD_OVERRIDDEN", "CATALOGUE_P4K_REVIEW_KEPT", "CATALOGUE_P4K_REVIEW_HIDDEN", "CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED", "CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED", "CATALOGUE_STARMAP_LINK_SET", "CATALOGUE_STARMAP_LINK_CLEARED", "CATALOGUE_STARMAP_LINK_RELEASED", "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN", "CATALOGUE_SHOP_LINK_SET", "CATALOGUE_SHOP_LINK_CLEARED", "CATALOGUE_SHOP_LINK_RELEASED", "CATALOGUE_STORAGE_PLACE_CREATED", "CATALOGUE_SYNC_REPORTS_DELETED", "CATALOGUE_SYNC_RUN_FINISHED", "CATALOGUE_MATERIAL_CREATED", "CATALOGUE_MATERIAL_UPDATED", "CATALOGUE_MATERIAL_P4K_OVERRIDE_SET", "CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED", "CATALOGUE_MATERIAL_DELETED", "CATALOGUE_MATERIAL_CATEGORY_CREATED", "CATALOGUE_MATERIAL_CATEGORY_UPDATED", "CATALOGUE_MATERIAL_CATEGORY_DELETED", "CATALOGUE_MATERIAL_ALIAS_CREATED", "CATALOGUE_MATERIAL_ALIAS_UPDATED", "CATALOGUE_MATERIAL_ALIAS_DELETED", "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED", "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED", "CATALOGUE_LOCATION_CREATED", "CATALOGUE_LOCATION_UPDATED", "CATALOGUE_LOCATION_DELETED", "CATALOGUE_TERMINAL_VISIBILITY_CHANGED", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_TERMINAL_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDDEN", "CATALOGUE_TERMINAL_AUTO_LOAD_OVERRIDE_CLEARED", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_CITY_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_OUTPOST_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_POI_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_POI_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDDEN", "CATALOGUE_SPACE_STATION_LOADING_DOCK_OVERRIDE_CLEARED", "CATALOGUE_STAR_SYSTEM_CREATED", "CATALOGUE_STAR_SYSTEM_UPDATED", "CATALOGUE_STAR_SYSTEM_DELETED", "CATALOGUE_FREQUENCY_TYPE_CREATED", "CATALOGUE_FREQUENCY_TYPE_UPDATED", "CATALOGUE_FREQUENCY_TYPE_DEACTIVATED", "CATALOGUE_FREQUENCY_TYPE_ACTIVATED", "CATALOGUE_FREQUENCY_TYPES_REORDERED", "CATALOGUE_JOB_TYPE_CREATED", "CATALOGUE_JOB_TYPE_UPDATED", "CATALOGUE_JOB_TYPE_DEACTIVATED", "CATALOGUE_JOB_TYPE_ACTIVATED", "CATALOGUE_AUDIT_EXPORTED", "CATALOGUE_AUDIT_PURGED" ]
           },
           "id" : {
             "type" : "string",
@@ -80405,6 +81147,9 @@
           "callerMayConfirm" : {
             "type" : "boolean"
           },
+          "clientName" : {
+            "type" : "string"
+          },
           "counterpartyHandle" : {
             "type" : "string"
           },
@@ -80514,6 +81259,23 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          }
+        }
+      },
+      "BankBookingRequestViewDto" : {
+        "type" : "object",
+        "properties" : {
+          "approver" : {
+            "type" : "boolean"
+          },
+          "own" : {
+            "type" : "boolean"
+          },
+          "request" : {
+            "$ref" : "#/components/schemas/BankBookingRequestDto"
+          },
+          "staff" : {
+            "type" : "boolean"
           }
         }
       },
@@ -83563,6 +84325,36 @@
           }
         }
       },
+      "ExchangeBankSwitchDto" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ExchangeBankSwitchUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        },
+        "required" : [ "enabled", "version" ]
+      },
       "ExchangeBulkUndoInstallationDto" : {
         "type" : "object",
         "properties" : {
@@ -83713,7 +84505,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             },
             "minItems" : 1,
             "uniqueItems" : true
@@ -83761,7 +84553,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             }
           },
           "clientId" : {
@@ -83824,7 +84616,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             },
             "minItems" : 1,
             "uniqueItems" : true
@@ -84145,6 +84937,16 @@
           }
         },
         "required" : [ "userId" ]
+      },
+      "GrantOwnerApprovalRequest" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
       },
       "GroupedInventoryDto" : {
         "type" : "object",
@@ -88281,7 +89083,7 @@
           },
           "type" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           }
         }
       },
@@ -88310,7 +89112,7 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN", "SUPPLY_NEED_ORDER_COVERED", "SUPPLY_NEED_CLOSED", "PURCHASING_NEED_RELEASED", "PURCHASING_NEED_CLOSED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN", "SUPPLY_NEED_ORDER_COVERED", "SUPPLY_NEED_CLOSED", "PURCHASING_NEED_RELEASED", "PURCHASING_NEED_CLOSED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           },
           "excludeActor" : {
             "type" : "boolean"
@@ -88321,7 +89123,7 @@
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           },
           "selectors" : {
             "type" : "array",
@@ -88352,7 +89154,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS", "REQUIRED_APPROVER", "REQUEST_RESPONSIBLE" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
@@ -88376,7 +89178,7 @@
           },
           "kind" : {
             "type" : "string",
-            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS" ]
+            "enum" : [ "SPECIFIC_USER", "ROLE", "ORG_RELATIVE_ROLE", "ACCOUNT_GRANT", "EVENT_RECIPIENT", "ACCOUNT_RESPONSIBLE", "MISSION_PARTICIPANTS", "MISSION_LEADERSHIP", "EXCHANGE_CLIENT_HOLDERS", "EVENT_RECIPIENTS", "SEAT_HOLDERS", "REQUIRED_APPROVER", "REQUEST_RESPONSIBLE" ]
           },
           "orgRelativeRole" : {
             "type" : "string",
@@ -88405,14 +89207,14 @@
           },
           "eventType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN", "SUPPLY_NEED_ORDER_COVERED", "SUPPLY_NEED_CLOSED", "PURCHASING_NEED_RELEASED", "PURCHASING_NEED_CLOSED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_CANCELLED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "ACCOUNT_DELETION_REQUEST_RESOLVED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "DISCORD_REGISTRATION_DECIDED", "JOB_ORDER_CLOSED", "BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER_DUE", "MISSION_STARTED", "MISSION_CHECKED_IN", "MISSION_PARTICIPANT_ADDED", "MISSION_PARTICIPANT_REMOVED", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_END_RECORDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_MARKED", "OPERATION_PAYOUT_UNMARKED", "OPERATION_COMPLETED", "OPERATION_COMPLETED_UNOWNED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNEE_ADDED", "JOB_ORDER_ASSIGNEE_REMOVED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "REFINERY_ORDER_READY_CLEARED", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_REVOKED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_BOOKED", "BANK_HOLDER_TRANSFER_BOOKED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER_NOTICE_CLEARED", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_LEADERSHIP_ROLE_MISMATCH_CLEARED", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED_TO_UNIT", "HANGAR_SHIP_UNASSIGNED_FROM_UNIT", "HANGAR_SHIP_DELETED_FROM_MISSION", "HANGAR_FITTED_RESET_FOR_OWNER", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_DONATION_WITHDRAWN", "SUPPLY_NEED_ORDER_COVERED", "SUPPLY_NEED_CLOSED", "PURCHASING_NEED_RELEASED", "PURCHASING_NEED_CLOSED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           },
           "excludeActor" : {
             "type" : "boolean"
           },
           "notificationType" : {
             "type" : "string",
-            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED" ]
+            "enum" : [ "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER", "BANK_BOOKING_REQUEST_CREATED", "BANK_BOOKING_REQUEST_CONFIRMED", "BANK_BOOKING_REQUEST_REJECTED", "BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED", "BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED", "DISCORD_REGISTRATION_PENDING", "MATERIAL_EXCHANGE_INTEREST_REGISTERED", "MATERIAL_REQUEST_FULFILLMENT_SIGNALLED", "ACCOUNT_DELETION_REQUESTED", "ACCOUNT_DELETION_REQUEST_DECLINED", "EXCHANGE_INSTALLATION_CONNECTED", "EXCHANGE_BULK_UNDO_APPLIED", "INVENTORY_TRANSFERRED_TO_USER", "INVENTORY_TRANSFERRED_FROM_USER", "BANK_BOOKING_REQUEST_UPDATED", "BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "MISSION_RESCHEDULED", "MISSION_CANCELLED", "MISSION_DELETED", "MISSION_REMINDER", "MISSION_CHECKIN_OPEN", "MISSION_PARTICIPANT_ADDED_BY_OTHER", "MISSION_PARTICIPANT_REMOVED_BY_OTHER", "MISSION_PARTICIPANT_LEFT", "MISSION_NEVER_ENDED", "MISSION_RESPONSIBILITY_ASSIGNED", "OPERATION_PAYOUT_PAID_OUT", "OPERATION_COMPLETED", "JOB_ORDER_REASSIGNED", "JOB_ORDER_FINISHED", "JOB_ORDER_ASSIGNED", "JOB_ORDER_CLAIM_WITHDRAWN", "REFINERY_ORDER_READY", "REFINERY_ORDER_CHANGED_BY_OTHER", "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE", "MATERIAL_REQUEST_UNAVAILABLE", "INVENTORY_BOOKED_OUT_BY_OTHER", "INVENTORY_POOL_CHANGED_BY_OTHER", "INVENTORY_STOCK_LEVEL_LOW", "BANK_BOOKING_REQUEST_APPROVED", "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", "BANK_GRANT_CHANGED", "BANK_GRANT_REVOKED", "BANK_PAYOUT_RECEIVED", "BANK_HOLDER_TRANSFER_RECEIVED", "BANK_ACCOUNT_DEBITED", "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "ORG_LEADERSHIP_ROLE_MISMATCH", "ORG_MEMBER_DEPARTED", "HANGAR_SHIP_ASSIGNED", "HANGAR_SHIP_REMOVED_FROM_UNIT", "HANGAR_FITTED_RESET", "HANGAR_CHANGED_BY_ADMIN", "HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", "BLUEPRINT_CHANGED_BY_ADMIN", "BLUEPRINT_PURGED_BY_ADMIN", "EXCHANGE_CLIENT_SUSPENDED", "EXCHANGE_CLIENT_ACTIVATED", "EXCHANGE_CLIENT_UPDATE_REQUIRED", "EXCHANGE_CLIENT_CAPABILITY_REMOVED", "EXCHANGE_SWITCHED_OFF", "BANK_EXCHANGE_SWITCHED_ON", "BANK_EXCHANGE_SWITCHED_OFF", "SUPPLY_DONATION_PLEDGED", "SUPPLY_DONATION_RECEIVED", "SUPPLY_DONATION_DECLINED", "SUPPLY_NEED_ORDER_COVERED", "PURCHASING_NEED_RELEASED", "PURCHASING_DELIVERY_RECORDED", "PURCHASING_DELIVERY_DECIDED", "PURCHASING_SETTLEMENT_OVERDUE", "PURCHASING_PAUSED", "PURCHASING_RESUMED", "PURCHASING_DELEGATE_APPOINTED", "PURCHASING_DELEGATE_REVOKED", "USER_ROLE_CHANGED" ]
           },
           "selectors" : {
             "type" : "array",
@@ -92133,7 +92935,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CATALOGUE_BLUEPRINT_RETIRED", "CATALOGUE_ITEM_RETIRED", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "LOCATION_NOT_OFFERED", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "P4K_UPLOAD_REJECTED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_APPROVER_NOTE_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OPEN_REQUEST_CAP", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CATALOGUE_BLUEPRINT_RETIRED", "CATALOGUE_ITEM_RETIRED", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LAST_ADMIN", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "LOCATION_NOT_OFFERED", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "P4K_UPLOAD_REJECTED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -95996,6 +96798,62 @@
           },
           "username" : {
             "type" : "string"
+          }
+        }
+      },
+      "UserRoleChangeRequest" : {
+        "type" : "object",
+        "properties" : {
+          "assigned" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "assigned", "version" ]
+      },
+      "UserRoleHolderDto" : {
+        "type" : "object",
+        "properties" : {
+          "handle" : {
+            "type" : "string"
+          },
+          "rolesVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "UserRoleSetDto" : {
+        "type" : "object",
+        "properties" : {
+          "assignable" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "ADMIN", "KRT_MEMBER", "BANK_EMPLOYEE", "BANK_MANAGEMENT" ]
+            }
+          },
+          "roles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "ADMIN", "KRT_MEMBER", "BANK_EMPLOYEE", "BANK_MANAGEMENT" ]
+            }
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

@@ -274,7 +274,7 @@ class BankControllerSecurityTest {
 
   @Test
   void balanceSeries_withoutAccess_isForbidden() throws Exception {
-    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(false);
+    when(bankSecurityService.canSee(any(UUID.class))).thenReturn(false);
     mockMvc
         .perform(
             get("/api/v1/bank/accounts/{id}/balance-series", UUID.randomUUID())
@@ -286,7 +286,7 @@ class BankControllerSecurityTest {
 
   @Test
   void balanceSeries_withAccess_isAllowed() throws Exception {
-    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(true);
+    when(bankSecurityService.canSee(any(UUID.class))).thenReturn(true);
     when(bankAccountService.getBalanceSeries(any(UUID.class), any(), any()))
         .thenReturn(new BankBalanceSeriesDto(List.of(), null));
     mockMvc
@@ -300,7 +300,7 @@ class BankControllerSecurityTest {
 
   @Test
   void deposit_withoutCapability_isForbidden() throws Exception {
-    when(bankSecurityService.canDeposit(any(UUID.class), any())).thenReturn(false);
+    when(bankSecurityService.canDeposit(any(UUID.class))).thenReturn(false);
     mockMvc
         .perform(
             post("/api/v1/bank/deposits")
@@ -312,7 +312,7 @@ class BankControllerSecurityTest {
 
   @Test
   void deposit_withCapability_isAllowed() throws Exception {
-    when(bankSecurityService.canDeposit(any(UUID.class), any())).thenReturn(true);
+    when(bankSecurityService.canDeposit(any(UUID.class))).thenReturn(true);
     mockMvc
         .perform(
             post("/api/v1/bank/deposits")
@@ -324,7 +324,7 @@ class BankControllerSecurityTest {
 
   @Test
   void deposit_fractionalAmount_isRejectedWith400() throws Exception {
-    when(bankSecurityService.canDeposit(any(UUID.class), any())).thenReturn(true);
+    when(bankSecurityService.canDeposit(any(UUID.class))).thenReturn(true);
     String body =
         "{\"accountId\":\""
             + UUID.randomUUID()
@@ -454,7 +454,7 @@ class BankControllerSecurityTest {
 
   @Test
   void statement_withoutVisibility_isForbidden() throws Exception {
-    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(false);
+    when(bankSecurityService.canSee(any(UUID.class))).thenReturn(false);
     mockMvc
         .perform(
             get("/api/v1/bank/accounts/{id}/statement", UUID.randomUUID())
@@ -466,7 +466,7 @@ class BankControllerSecurityTest {
 
   @Test
   void statement_withVisibility_isAllowed() throws Exception {
-    when(bankSecurityService.canSee(any(UUID.class), any())).thenReturn(true);
+    when(bankSecurityService.canSee(any(UUID.class))).thenReturn(true);
     when(bankStatementReportService.generateStatement(any(), any(), any(), any()))
         .thenReturn(new byte[] {1, 2, 3});
     mockMvc
@@ -480,7 +480,7 @@ class BankControllerSecurityTest {
 
   @Test
   void holderHistory_withoutVisibility_isForbidden() throws Exception {
-    when(bankSecurityService.canSeeHolder(any(UUID.class), any())).thenReturn(false);
+    when(bankSecurityService.canSeeHolder(any(UUID.class))).thenReturn(false);
     mockMvc
         .perform(
             get("/api/v1/bank/holders/{id}/transactions", UUID.randomUUID())
@@ -490,7 +490,7 @@ class BankControllerSecurityTest {
 
   @Test
   void holderHistory_withVisibility_isAllowed() throws Exception {
-    when(bankSecurityService.canSeeHolder(any(UUID.class), any())).thenReturn(true);
+    when(bankSecurityService.canSeeHolder(any(UUID.class))).thenReturn(true);
     when(bankHolderService.getHolderBookings(any(), any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
     mockMvc

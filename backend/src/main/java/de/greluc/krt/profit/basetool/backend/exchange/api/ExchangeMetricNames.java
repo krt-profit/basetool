@@ -153,9 +153,25 @@ public final class ExchangeMetricNames {
       "exchange_installation_invalid";
 
   /**
+   * Counter {@code basetool_exchange_bank_reads_total{client_id,route}} — bank reads served through
+   * the exchange, by registered client and bank route (REQ-BXCH-006, REQ-OBS-024).
+   */
+  public static final String EXCHANGE_BANK_READS = "basetool.exchange.bank.reads";
+
+  /**
+   * Counter {@code basetool_exchange_bank_refused_total{reason}} — bank requests the backend
+   * refused, by bounded reason; feeds {@code BankExchangeNotFoundSpike} and {@code
+   * BankExchangeOpenRequestCapHit} (REQ-BXCH-006, REQ-OBS-024).
+   */
+  public static final String EXCHANGE_BANK_REFUSED = "basetool.exchange.bank.refused";
+
+  /** Tag key: the bank route on {@link #EXCHANGE_BANK_READS}. */
+  public static final String TAG_ROUTE = "route";
+
+  /**
    * Counter {@code basetool_exchange_registry_changes_total{action}} — one per committed change of
-   * the exchange client registry or its switch (REQ-XCH-003); feeds {@code
-   * ExchangeRegistryChanged}.
+   * the exchange client registry, its global switch or its bank switch (REQ-XCH-003, REQ-BXCH-006);
+   * feeds {@code ExchangeRegistryChanged} and {@code BankExchangeSwitchChanged}.
    */
   public static final String EXCHANGE_REGISTRY_CHANGES = "basetool.exchange.registry.changes";
 

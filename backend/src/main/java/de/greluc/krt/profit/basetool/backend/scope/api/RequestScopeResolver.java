@@ -405,20 +405,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * The {@link #currentOversightScope()} without the active-org-unit pin: an admin gets {@code
-   * adminAllScope}, everyone else the whole set of org units they oversee (REQ-BANK-064).
-   *
-   * @return a never-null, pin-free cascading oversight scope.
-   */
-  @NotNull
-  public ScopePredicate currentOversightScopeIgnoringPin() {
-    if (authHelper.isAdmin()) {
-      return new ScopePredicate(true, null, Set.of());
-    }
-    return new ScopePredicate(false, null, currentOversightOrgUnitIds());
-  }
-
-  /**
    * The org units a non-admin caller oversees: every unit with an SK lead or functional-rank seat,
    * and the cascaded leadership reach.
    *
@@ -426,7 +412,9 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Set<UUID> currentOversightOrgUnitIds() {
-    return holdsKrtMember() ? seatReach(currentCallerMemberships()) : Set.of();
+    return holdsKrtMember()
+        ? orgUnitCascadeService.officerReach(currentCallerMemberships())
+        : Set.of();
   }
 
   /**
@@ -444,7 +432,8 @@ public class RequestScopeResolver {
         CACHE_KEY_OFFICER_ORG_UNIT_IDS,
         () ->
             holdsKrtMember()
-                ? Collections.unmodifiableSet(seatReach(currentCallerMemberships()))
+                ? Collections.unmodifiableSet(
+                    orgUnitCascadeService.officerReach(currentCallerMemberships()))
                 : Set.of());
   }
 
@@ -578,26 +567,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Collects the org units the given seats reach: each own unit of a seat that {@link
-   * MembershipRole#confersOwnUnitOfficerReach()}, plus {@link
-   * OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
-   *
-   * @param memberships the caller's membership rows; never {@code null}
-   * @return the reached org-unit ids, insertion-ordered
-   */
-  @NotNull
-  private Set<UUID> seatReach(@NotNull List<OrgUnitMembership> memberships) {
-    Set<UUID> reach = new LinkedHashSet<>();
-    for (OrgUnitMembership m : memberships) {
-      if (m.getRole().confersOwnUnitOfficerReach()) {
-        reach.add(m.getId().getOrgUnitId());
-      }
-    }
-    reach.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
-    return reach;
-  }
-
-  /**
    * Whether the membership carries a functional rank ({@link
    * MembershipRole#confersOwnLevelOversight()}) and therefore oversight over its own org unit.
    *
@@ -617,17 +586,6 @@ public class RequestScopeResolver {
   public boolean currentUserIsOlMember() {
     return currentCallerMemberships().stream()
         .anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
-  }
-
-  /**
-   * Whether the caller holds a {@code BEREICHSLEITER} seat on any Bereich. Pure membership check
-   * without an admin short-circuit (REQ-BANK-037).
-   *
-   * @return {@code true} iff the caller has at least one {@code BEREICHSLEITER} membership.
-   */
-  public boolean currentUserIsBereichsleiter() {
-    return currentCallerMemberships().stream()
-        .anyMatch(m -> m.getRole() == MembershipRole.BEREICHSLEITER);
   }
 
   /**

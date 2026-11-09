@@ -229,6 +229,7 @@ public final class ExchangeTestSupport {
     return new ExchangeRegistry(
         1L,
         enabled,
+        false,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client("VerseKit", active, capabilities, minVersion, null, null)));
@@ -244,9 +245,28 @@ public final class ExchangeTestSupport {
    */
   public static @NotNull ExchangeRegistry registryWithLimits(
       @NotNull Set<String> capabilities, @Nullable String minVersion, int requestsPerMinute) {
+    return registryWithLimits(capabilities, minVersion, requestsPerMinute, false);
+  }
+
+  /**
+   * Builds a registry holding the test client, active and switched on, with limit overrides and the
+   * given bank switch.
+   *
+   * @param capabilities the granted capabilities
+   * @param minVersion the minimum client version, or {@code null}
+   * @param requestsPerMinute the per-minute limit override
+   * @param bankEnabled the bank switch
+   * @return the registry
+   */
+  public static @NotNull ExchangeRegistry registryWithLimits(
+      @NotNull Set<String> capabilities,
+      @Nullable String minVersion,
+      int requestsPerMinute,
+      boolean bankEnabled) {
     return new ExchangeRegistry(
         1L,
         true,
+        bankEnabled,
         Map.of(
             CLIENT,
             new ExchangeRegistry.Client(

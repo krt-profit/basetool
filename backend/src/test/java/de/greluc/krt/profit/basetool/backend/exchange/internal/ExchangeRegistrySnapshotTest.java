@@ -69,8 +69,19 @@ class ExchangeRegistrySnapshotTest {
   }
 
   @Test
+  void switchingTheBankOffIsARestrictionAndSwitchingItOnIsNot() {
+    ExchangeRegistrySnapshot bankOn = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
+    ExchangeRegistrySnapshot bankOff = new ExchangeRegistrySnapshot(true, false, new TreeMap<>());
+
+    assertThat(ExchangeRegistrySnapshot.restricts(bankOn, bankOff)).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).bankEnabled()).isFalse();
+    assertThat(ExchangeRegistrySnapshot.restrictiveMerge(bankOn, bankOff).enabled()).isTrue();
+    assertThat(ExchangeRegistrySnapshot.restricts(bankOff, bankOn)).isFalse();
+  }
+
+  @Test
   void aNewClientStaysOutOfTheMergeAndAMissingOneIsARestriction() {
-    ExchangeRegistrySnapshot empty = new ExchangeRegistrySnapshot(true, new TreeMap<>());
+    ExchangeRegistrySnapshot empty = new ExchangeRegistrySnapshot(true, true, new TreeMap<>());
     ExchangeRegistrySnapshot withClient = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
 
     assertThat(ExchangeRegistrySnapshot.restricts(empty, withClient)).isFalse();
@@ -83,6 +94,7 @@ class ExchangeRegistrySnapshotTest {
     ExchangeRegistrySnapshot before = snapshot(true, client(ExchangeClientStatus.ACTIVE, "a"));
     ExchangeRegistrySnapshot after =
         new ExchangeRegistrySnapshot(
+            true,
             true,
             new TreeMap<>(
                 Map.of(
@@ -109,7 +121,7 @@ class ExchangeRegistrySnapshotTest {
    */
   private static @NotNull ExchangeRegistrySnapshot snapshot(
       boolean enabled, @NotNull ExchangeRegistrySnapshot.Client client) {
-    return new ExchangeRegistrySnapshot(enabled, new TreeMap<>(Map.of("app", client)));
+    return new ExchangeRegistrySnapshot(enabled, true, new TreeMap<>(Map.of("app", client)));
   }
 
   /**

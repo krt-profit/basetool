@@ -42,13 +42,13 @@ is the notification-engine view of it; the linked requirement is canonical.
 |---|---|---|---|---|
 | `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` + `ROLE` ADMIN | REQ-NOTIF-008 |
 | `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 | `ORG_RELATIVE_ROLE` OFFICER / LEAD on `RESPONSIBLE` | REQ-NOTIF-017 |
-| `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` | V160 + V194 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `ACCOUNT_RESPONSIBLE` | REQ-NOTIF-011, [REQ-BANK-026](bank.md) |
-| `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
-| `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
-| `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED` and `…_UPDATED` only | REQ-NOTIF-018 |
-| `BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER` | `BANK_BOOKING_REQUEST_UPDATED` | V269 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED` and `…_UPDATED` first, so the new notice replaces the old one | REQ-NOTIF-018, [REQ-BANK-056](bank.md) |
+| `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
+| `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
+| `BANK_BOOKING_REQUEST_CANCELLED` | none (no rule) | — | supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` only | REQ-NOTIF-018 |
+| `BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER` | `BANK_BOOKING_REQUEST_UPDATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V269 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` first, so the new notice replaces the old one | REQ-NOTIF-018/-033, [REQ-BANK-056](bank.md) |
 | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | V269 | `EVENT_RECIPIENT` (each member who became a responsible holder of the account); rendered with `accountNo` and the number of requests `pending` their approval | [REQ-BANK-034](bank.md) |
-| `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` | V160 + V194 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023, [REQ-BANK-034](bank.md) |
+| `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023/-033, [REQ-BANK-034](bank.md) |
 | `DISCORD_REGISTRATION_PENDING` | `DISCORD_REGISTRATION_PENDING` | V174 | `ROLE` ADMIN (`exclude_actor = false`) | REQ-NOTIF-012 ([discord-integration.md](discord-integration.md)) |
 | `DISCORD_REGISTRATION_DECIDED` | none (no rule) | — | supersedes `DISCORD_REGISTRATION_PENDING` only (approve, reject, deletion while pending) | REQ-NOTIF-012, REQ-NOTIF-018 |
 | `JOB_ORDER_CLOSED` | none (no rule) | — | supersedes `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` only (completed, rejected, deleted) | REQ-NOTIF-008, REQ-NOTIF-018 |
@@ -115,6 +115,8 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | V281 | `EXCHANGE_CLIENT_HOLDERS` (the client); the removed scopes | REQ-XCH-040 |
 | `EXCHANGE_SWITCHED_OFF` | `EXCHANGE_SWITCHED_OFF` | V281 | `EXCHANGE_CLIENT_HOLDERS` (any client, `contextAllExchangeClients`) | REQ-XCH-041 |
 | `EXCHANGE_SWITCHED_ON` | none (no rule) | — | supersedes `EXCHANGE_SWITCHED_OFF` | REQ-XCH-041 |
+| `BANK_EXCHANGE_SWITCHED_ON` | `BANK_EXCHANGE_SWITCHED_ON` | V361 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
+| `BANK_EXCHANGE_SWITCHED_OFF` | `BANK_EXCHANGE_SWITCHED_OFF` | V361 | `ROLE` `ADMIN` + `ROLE` `BANK_MANAGEMENT` (the actor excluded); supersedes the other bank switch notice | [REQ-BXCH-006](bank-exchange.md) |
 | `SUPPLY_DONATION_PLEDGED` | `SUPPLY_DONATION_PLEDGED` | V286 | `ORG_RELATIVE_ROLE` leadership and Logisticians of the receiving unit | REQ-SUP-016 |
 | `SUPPLY_DONATION_RECEIVED` | `SUPPLY_DONATION_RECEIVED` | V286 | `EVENT_RECIPIENT` (the donor); supersedes the pledge notices | REQ-SUP-016 |
 | `SUPPLY_DONATION_DECLINED` | `SUPPLY_DONATION_DECLINED` | V286 | `EVENT_RECIPIENT` (the donor); coded `reasonCode`; supersedes the pledge notices | REQ-SUP-016 |
@@ -131,6 +133,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `PURCHASING_RESUMED` | `PURCHASING_RESUMED` | V289 | as the pause; supersedes `PURCHASING_PAUSED`; not mutable | REQ-PUR-019 |
 | `PURCHASING_DELEGATE_APPOINTED` | `PURCHASING_DELEGATE_APPOINTED` | V289 | `EVENT_RECIPIENT` (the appointed member); not mutable | REQ-PUR-003 |
 | `PURCHASING_DELEGATE_REVOKED` | `PURCHASING_DELEGATE_REVOKED` | V289 | `EVENT_RECIPIENT` (the former HB); supersedes the appointment notice; not mutable | REQ-PUR-003 |
+| `USER_ROLE_CHANGED` | `USER_ROLE_CHANGED` | V363 | `EVENT_RECIPIENT` (the member); coded `roleCode`, `changeCode`; not mutable | REQ-SEC-088 |
 
 Every notification type renders through `notifications.type.<TYPE>` in all three frontend bundles.
 The e-mail consumers of REQ-NOTIF-013 (`UserApprovalMailService`, `PendingRegistrationMailService`)
@@ -264,6 +267,9 @@ Four group kinds were added for the wider notifications of issue #2414 and read 
 column either: `MISSION_PARTICIPANTS`, `MISSION_LEADERSHIP`, `EXCHANGE_CLIENT_HOLDERS` and
 `EVENT_RECIPIENTS` (REQ-NOTIF-024), and `ORG_RELATIVE_ROLE` gained the role `UNIT_LEADERSHIP`.
 `SEAT_HOLDERS` (every leadership seat holder, REQ-NOTIF-024) reads no column and no event field.
+`REQUIRED_APPROVER` (the members a booking request's approval waits for, read from the request the
+event carries, `NotificationEvent.contextBankRequestId()`) and `REQUEST_RESPONSIBLE` (the responsible
+holders of the event's account except the KRT account's) read no column either (REQ-NOTIF-033).
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
@@ -963,6 +969,8 @@ the rule editor like the others:
 | `EXCHANGE_CLIENT_HOLDERS` | every member with a non-revoked installation of the client; of any client when the event is exchange-wide | `contextExchangeClientId()` or `contextAllExchangeClients()` |
 | `EVENT_RECIPIENTS` | the set of affected users the event lists (bulk actions) | `contextRecipientUserIds()` |
 | `SEAT_HOLDERS` | every member who holds a leadership seat in any org unit | nothing |
+| `REQUIRED_APPROVER` | the members a pending, flagged, not yet approved booking request waits for, never its requester (REQ-NOTIF-033) | `contextBankRequestId()` |
+| `REQUEST_RESPONSIBLE` | the responsible holders of the account, none on the KRT account (REQ-NOTIF-033) | `contextAccountId()` |
 
 `OrgRelativeRole.UNIT_LEADERSHIP` resolves to the members whose rank confers oversight of the context
 org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …). The seats
@@ -1277,7 +1285,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `BANK_BOOKING_REQUEST_CREATED`, `BANK_BOOKING_REQUEST_UPDATED` | staff: `/bank/requests?focus={id}`; others: `/org-unit-bank?focus={id}#tab=fremde` |
 | `BANK_BOOKING_REQUEST_APPROVED` | staff: `/bank/requests?focus={id}`; others: `/org-unit-bank?focus={id}#tab=antraege` |
 | `BANK_BOOKING_REQUEST_CONFIRMED`, `BANK_BOOKING_REQUEST_REJECTED` | `/org-unit-bank?focus={id}#tab=antraege` |
-| `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED`, `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | `/org-unit-bank?focus={id}#tab=fremde` |
+| `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED`, `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED`, `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | `/org-unit-bank?focus={id}#tab=fremde` |
 | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `/org-unit-bank/accounts/{id}` |
 | `BANK_GRANT_CHANGED` | `/bank/accounts/{id}` |
 | `BANK_ACCOUNT_DEBITED` | `/org-unit-bank` (the notice names the transaction, not the account) |
@@ -1291,9 +1299,10 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `PURCHASING_DELIVERY_RECORDED`, `PURCHASING_DELIVERY_DECIDED`, `PURCHASING_SETTLEMENT_OVERDUE` | `/purchasing/deals/{id}` |
 | `PURCHASING_NEED_RELEASED`, `PURCHASING_PAUSED`, `PURCHASING_RESUMED` | `/purchasing/deals` |
 | `PURCHASING_DELEGATE_APPOINTED`, `PURCHASING_DELEGATE_REVOKED` | `/purchasing/delegates?focus={id}` |
+| `USER_ROLE_CHANGED` | `/profile` |
 | `EXCHANGE_INSTALLATION_CONNECTED` | `/connected-apps?focus={installation id}` |
 | `EXCHANGE_CLIENT_SUSPENDED`, `EXCHANGE_CLIENT_ACTIVATED`, `EXCHANGE_CLIENT_UPDATE_REQUIRED`, `EXCHANGE_CLIENT_CAPABILITY_REMOVED` | `/connected-apps?focus={client id}` |
-| `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
+| `EXCHANGE_BULK_UNDO_APPLIED`, `EXCHANGE_SWITCHED_OFF`, `BANK_EXCHANGE_SWITCHED_ON`, `BANK_EXCHANGE_SWITCHED_OFF` | `/connected-apps` |
 | `INVENTORY_TRANSFERRED_TO_USER`, `INVENTORY_TRANSFERRED_FROM_USER`, `INVENTORY_BOOKED_OUT_BY_OTHER`, `INVENTORY_POOL_CHANGED_BY_OTHER` | `/inventory?storage=my` (the notice names a source row, not the recipient's) |
 | `INVENTORY_STOCK_LEVEL_LOW` | `/inventory/stock-levels` |
 | `HANGAR_SHIP_ASSIGNED`, `HANGAR_FITTED_RESET`, `HANGAR_CHANGED_BY_ADMIN`, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` | `/hangar` |
@@ -1321,6 +1330,51 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 **Code:** `NotificationTargets`, `NotificationPageController`, `static/js/notification/notifications.js`
 (`openNotification`), `static/js/kernel/krt-focus.js` · **Related:** REQ-NOTIF-005, REQ-NOTIF-022,
 REQ-FE-001 · **Decision:** ADR-0321
+
+### REQ-NOTIF-033 — The required approver is told that their approval is needed
+
+A booking request that needs an approval (REQ-BANK-041, REQ-BANK-047) raises the notice
+`BANK_BOOKING_REQUEST_APPROVAL_NEEDED` („Freigabe nötig") for its **required approver** only: the
+account's responsible holders when the request is over their limit, the Bankleitung on the middle
+KRT band (`T1 < amount ≤ T2`), the OL above `T2`. It is a data-driven rule (ADR-0015): the selector
+`REQUIRED_APPROVER` reads the request's `required_approver` (a missing value counts as the
+responsible holders) and never resolves the requester (REQ-BANK-062).
+
+- **One notice per member and request.** For the required approver the approval notice replaces the
+  generic `…_CREATED` / `…_UPDATED` notice: an event may name notice types that outrank others
+  (`NotificationEvent#outrankedNotificationTypes`), and a member resolved for the outranking type
+  gets none of the outranked ones. Bank employees granted on the account and the Bankleitung keep the
+  generic notice on the requests they do not have to approve. After the approval nothing replaces
+  it; confirming belongs to the bank staff.
+- **OL relief.** The generic notices reach the responsible holders through `REQUEST_RESPONSIBLE`,
+  which resolves every account's responsible holders except the KRT account's. The OL hears of a KRT
+  request only as its required approver above `T2`; the other `ACCOUNT_RESPONSIBLE` rules are
+  unchanged.
+- **Lifecycle.** The notice clears on approval (`BANK_BOOKING_REQUEST_APPROVED`), rejection,
+  cancellation and confirmation. A revoked approval raises it again for the required approvers. A
+  correction by the requester (REQ-BANK-056) re-decides it, including a change of approver class. A
+  change of responsible holder moves it like the other open notices (REQ-NOTIF-023).
+- **The same set as the queue.** The requests carrying this notice for a member are the requests
+  waiting for their approval.
+
+Notifications are not audited, so this adds no audit event. Rendered with `type`, `amount`,
+`accountNo` and `requester`; linked to `/org-unit-bank?focus={id}#tab=fremde` (REQ-NOTIF-032).
+
+**Acceptance**
+
+- [x] A middle-band request tells the Bankleitung „Freigabe nötig" and not „Neuer Buchungsantrag";
+  a granted bank employee still gets the generic notice; the requester gets neither.
+- [x] A KRT request at or below `T2` raises no notice for an OL member.
+- [x] Approval, rejection, cancellation and confirmation clear the notice; a revocation raises it again.
+- [x] A correction below the limit replaces the approval notice with the generic one.
+
+**Enforced by:** `ApprovalNeededNoticeIntegrationTest`, `RecipientDirectoriesTest`,
+`SeededNotificationRulesIntegrationTest`, `NotificationRuleEngineIntegrationTest` · **Code:**
+`notification/api/SelectorKind#{REQUIRED_APPROVER,REQUEST_RESPONSIBLE}`,
+`notification/internal/RuleEvaluationService`, `bank/internal/OrgUnitBankRecipientDirectory`,
+`bank/api/events/BankBookingRequestEvent`, `bank/api/events/BankNotices#approvalRevoked`,
+`db/migration/V360` · **Related:** REQ-NOTIF-018, REQ-NOTIF-023, REQ-BANK-026, REQ-BANK-041 ·
+**Decision:** ADR-0353
 
 ## Out of scope (v1)
 

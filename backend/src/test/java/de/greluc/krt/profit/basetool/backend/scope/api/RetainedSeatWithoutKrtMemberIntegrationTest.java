@@ -151,13 +151,12 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
 
     authenticate(holder, true);
     assertThat(requestScopeResolver.canAccessBlueprintOverview()).isTrue();
-    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
+    assertThat(requestScopeResolver.currentOversightScope().memberOrgUnitIds())
         .contains(squadron.getId());
 
     authenticate(holder, false);
     assertThat(requestScopeResolver.canAccessBlueprintOverview()).isFalse();
-    assertThat(requestScopeResolver.currentOversightScopeIgnoringPin().memberOrgUnitIds())
-        .isEmpty();
+    assertThat(requestScopeResolver.currentOversightScope().memberOrgUnitIds()).isEmpty();
   }
 
   @Test
@@ -189,8 +188,11 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
   }
 
   private void authenticate(User holder, boolean krtMember) {
-    Set<Role> roles = krtMember ? Set.of(namedRole("KRT Member")) : Set.of();
-    List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(holder, roles));
+    User view = new User();
+    view.setId(holder.getId());
+    view.setApprovalStatus(holder.getApprovalStatus());
+    view.setRoles(krtMember ? Set.of(codeRole(Roles.KRT_MEMBER)) : Set.of());
+    List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(view));
     SecurityContextHolder.getContext()
         .setAuthentication(
             new JwtAuthenticationToken(
@@ -221,9 +223,10 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     return user;
   }
 
-  private static Role namedRole(String name) {
+  private static Role codeRole(String code) {
     Role role = new Role();
-    role.setName(name);
+    role.setCode(code);
+    role.setName(code);
     role.setPermissions(Set.of());
     return role;
   }

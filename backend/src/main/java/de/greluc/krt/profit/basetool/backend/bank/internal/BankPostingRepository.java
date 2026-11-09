@@ -114,7 +114,7 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
-      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName, t.counterpartyUserId)
       FROM BankPosting p JOIN p.transaction t
       LEFT JOIN t.reversedTransaction rt
       WHERE p.account.id = :accountId
@@ -128,6 +128,40 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       Pageable pageable);
 
   /**
+   * One keyset page of an account's booking history, newest first by booking instant and then by
+   * posting id (REQ-BANK-018, REQ-BXCH-002). Every bound is optional; {@code afterAt} and {@code
+   * afterId} together continue after that booking.
+   *
+   * @param accountId the account
+   * @param from inclusive lower bound on the booking instant, or {@code null}
+   * @param to inclusive upper bound on the booking instant, or {@code null}
+   * @param afterAt the booking instant of the last row delivered, or {@code null} for the start
+   * @param afterId the posting id of the last row delivered; ignored without {@code afterAt}
+   * @param limit the page size, as {@code Pageable.ofSize(n)}
+   * @return the rows of the page
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName, t.counterpartyUserId)
+      FROM BankPosting p JOIN p.transaction t
+      LEFT JOIN t.reversedTransaction rt
+      WHERE p.account.id = :accountId
+      AND (CAST(:from AS timestamp) IS NULL OR p.createdAt >= :from)
+      AND (CAST(:to AS timestamp) IS NULL OR p.createdAt <= :to)
+      AND (CAST(:afterAt AS timestamp) IS NULL OR p.createdAt < :afterAt
+           OR (p.createdAt = :afterAt AND p.id < :afterId))
+      ORDER BY p.createdAt DESC, p.id DESC
+      """)
+  List<BankBookingRow> findBookingsAfter(
+      @Param("accountId") UUID accountId,
+      @Param("from") @Nullable Instant from,
+      @Param("to") @Nullable Instant to,
+      @Param("afterAt") @Nullable Instant afterAt,
+      @Param("afterId") @Nullable UUID afterId,
+      Pageable limit);
+
+  /**
    * An account's booking rows inside a period, oldest first — the statement body (REQ-BANK-014).
    *
    * @param accountId the account
@@ -138,7 +172,7 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRow(p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
-      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName)
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName, t.counterpartyUserId)
       FROM BankPosting p JOIN p.transaction t
       LEFT JOIN t.reversedTransaction rt
       WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to

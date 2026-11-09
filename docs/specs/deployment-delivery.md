@@ -2435,6 +2435,17 @@ there.
   third-party client (2026-09-28, ADR-0202 amendment 4), and `offline_access` on
   `basetool-frontend`, `backend-service`, `basetool-ingest-gateway` and `grafana` (2026-09-28,
   ADR-0202 amendment 5) — and the scope lists of a client the same run created.
+- **Least privilege for the backend's Admin API identity** (owner decision on #3151, ADR-0202
+  amendment 10): `backend-service`'s service account holds `manage-users` and `view-users` of
+  `realm-management`. `view-realm` is taken back wherever it is held — `- service-account roles
+  realm-management:view-realm withdrawn (…)` — because no backend, frontend or ingest call reads
+  the realm. An identity that cannot read or change the account gets the withdrawal under
+  `[manual]`, like a grant it cannot make.
+- **Grafana's admins hold the client role `grafana-admin`** (owner decision on #3151, ADR-0202
+  amendment 10, REQ-OBS-008): with `--grafana-origin` the `grafana` client carries the role and
+  exactly one client-level mapper, `client roles`, which puts the client's roles into the ID token
+  and userinfo as `grafana_roles`; any other client-level mapper on it, the former `realm roles`
+  mapper included, is a planned removal. The role is assigned by hand.
 - **The exchange clients carry no client-level mapper.** A mapper found on `basetool-sc-extractor`
   or on a client of `scripts/keycloak/external-clients.json` is a planned removal, not a report: the
   dry run lists it and exits `2`, the apply deletes it, and the verify pass fails while one is left.
@@ -3305,6 +3316,11 @@ neither tool can reach production (ADR-0279).
   `provision-keycloak-realm.py --seed-client`, which refuses a production origin before it reads the
   realm. The testing backend accepts it through `BASETOOL_BACKEND_ACCEPTED_CLIENT_IDS` in the testing
   `basetool.env` (REQ-SEC-024); the release default stays `basetool-frontend,basetool-ingest-gateway`.
+- **It assigns the roles in the Basetool.** Keycloak holds no Basetool role (ADR-0355): `seed-admin`
+  earns Admin as a subject of `APP_BOOTSTRAP_ADMIN_SUBS` in the testing `basetool.env` (REQ-SEC-088),
+  and the seed then assigns every other planned role through `PUT /api/v1/users/{id}/roles/{role}`
+  as `seed-admin`, after the approvals that grant KRT Member. Without Admin the seed stops at the
+  activation and names the setting with the account's id.
 - **It refuses production.** `seed` and `purge` exit when `--keycloak-url` or `--api-url` names a
   production host, and the client secret is read only from `$SEED_CLIENT_SECRET`.
 - **Its accounts are marked and synthetic.** Every seeded account carries an `@briefing.invalid`
@@ -3340,7 +3356,8 @@ neither tool can reach production (ADR-0279).
 - [x] `seed-briefing.py --selftest` covers the account plan (unique names, every track, the SK lead
   outside every Staffel, the ranked accounts holding the Officer role, no admin among presenters and
   participants), the production refusal, the out-directory refusal, the state round trip and the
-  handout. It runs in `repo-lint.yml`.
+  handout, the role assignment through the role API (each missing role once) and the stop with the
+  bootstrap hint when `seed-admin` is no Admin. It runs in `repo-lint.yml`.
 - [x] `testing-reset.test.sh` covers the usage refusal, the host-marker refusal, the stop–drop–create–
   start order, that only the Basetool database is touched, and both failure paths. It runs in
   `repo-lint.yml`.

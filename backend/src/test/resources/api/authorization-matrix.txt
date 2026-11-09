@@ -10,22 +10,22 @@ GET /api/v1/audit/{domain}/export | AuditAdminController#exportAuditLog | pre=ha
 GET /api/v1/audit/{domain}/export.json | AuditAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/audit/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/accounts | BankAccountController#getAccounts | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/accounts | BankAccountController#createAccount | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
-GET /api/v1/bank/accounts/{id} | BankAccountController#getAccount | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/bank/accounts/{id} | BankAccountController#getAccount | pre=@bankSecurityService.canSee(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/bank/accounts/{id} | BankAccountController#renameAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 PATCH /api/v1/bank/accounts/{id}/approval-tiers | BankAccountController#setCartelApprovalTiers | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
-GET /api/v1/bank/accounts/{id}/balance-series | BankAccountController#getBalanceSeries | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
-PUT /api/v1/bank/accounts/{id}/balance-target | BankAccountController#setBalanceTarget | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/bank/accounts/{id}/balance-series | BankAccountController#getBalanceSeries | pre=@bankSecurityService.canSee(#id) | url=anyRequest -> authenticated
+PUT /api/v1/bank/accounts/{id}/balance-target | BankAccountController#setBalanceTarget | pre=@bankSecurityService.canSee(#id) | url=anyRequest -> authenticated
 POST /api/v1/bank/accounts/{id}/close | BankAccountController#closeAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 POST /api/v1/bank/accounts/{id}/reopen | BankAccountController#reopenAccount | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
-GET /api/v1/bank/accounts/{id}/statement | BankAccountController#downloadStatement | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
-GET /api/v1/bank/accounts/{id}/transactions | BankAccountController#getBookings | pre=@bankSecurityService.canSee(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/bank/accounts/{id}/statement | BankAccountController#downloadStatement | pre=@bankSecurityService.canSee(#id) | url=anyRequest -> authenticated
+GET /api/v1/bank/accounts/{id}/transactions | BankAccountController#getBookings | pre=@bankSecurityService.canSee(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/bank/admin/audit | BankAdminController#purgeAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/admin/audit | BankAdminController#getAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/admin/audit/export | BankAdminController#exportAuditLog | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/admin/audit/export.json | BankAdminController#exportAuditLogJson | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/bank/admin/wipe-reset | BankAdminController#wipeReset | pre=hasRole('ADMIN') | url=/api/v1/bank/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/bank/dashboard | BankDashboardController#getDashboard | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
-POST /api/v1/bank/deposits | BankBookingController#bookDeposit | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#request.accountId, authentication) | url=anyRequest -> authenticated
+POST /api/v1/bank/deposits | BankBookingController#bookDeposit | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canDeposit(#request.accountId) | url=anyRequest -> authenticated
 GET /api/v1/bank/export/three-month-report | BankExportController#downloadThreeMonthReport | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/grants | BankGrantController#getGrants | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 POST /api/v1/bank/grants | BankGrantController#createGrant | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
@@ -34,9 +34,9 @@ PATCH /api/v1/bank/grants/{userId}/{accountId} | BankGrantController#updateGrant
 GET /api/v1/bank/holders | BankHolderController#getHolders | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/holders | BankHolderController#registerHolder | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 POST /api/v1/bank/holders/transfer | BankHolderController#transfer | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
-GET /api/v1/bank/holders/{id} | BankHolderController#getHolder | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/bank/holders/{id} | BankHolderController#getHolder | pre=@bankSecurityService.canSeeHolder(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/bank/holders/{id} | BankHolderController#updateHolder | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
-GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id, authentication) | url=anyRequest -> authenticated
+GET /api/v1/bank/holders/{id}/transactions | BankHolderController#getHolderBookings | pre=@bankSecurityService.canSeeHolder(#id) | url=anyRequest -> authenticated
 GET /api/v1/bank/members/search | BankMemberSearchController#searchUsersForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/members/search/references | BankMemberSearchController#searchUserReferencesForBank | pre=hasAnyRole('ADMIN', 'KRT_MEMBER', 'BANK_EMPLOYEE') | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/accounts/visible | OrgUnitBankController#listVisibleAccounts | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -65,6 +65,7 @@ GET /api/v1/bank/org-units/requests | OrgUnitBankController#listOwnBookingReques
 POST /api/v1/bank/org-units/requests | OrgUnitBankController#createBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/requests/foreign | OrgUnitBankController#listForeignRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/requests/page | OrgUnitBankController#pageOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#getRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#updateOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/org-units/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -75,8 +76,8 @@ POST /api/v1/bank/requests/{id}/confirm | BankRequestController#confirm | pre=ha
 POST /api/v1/bank/requests/{id}/reject | BankRequestController#reject | pre=hasRole('BANK_EMPLOYEE') | url=anyRequest -> authenticated
 POST /api/v1/bank/transactions/{id}/reversal | BankBookingController#reverseTransaction | pre=hasRole('BANK_MANAGEMENT') | url=anyRequest -> authenticated
 GET /api/v1/bank/transfer-fee-rate | BankBookingController#getTransferFeeRate | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/bank/transfers | BankBookingController#bookTransfer | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication) | url=anyRequest -> authenticated
-POST /api/v1/bank/withdrawals | BankBookingController#bookWithdrawal | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canWithdraw(#request.accountId, authentication) | url=anyRequest -> authenticated
+POST /api/v1/bank/transfers | BankBookingController#bookTransfer | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canTransfer(#request.sourceAccountId) | url=anyRequest -> authenticated
+POST /api/v1/bank/withdrawals | BankBookingController#bookWithdrawal | pre=hasRole('BANK_EMPLOYEE') and @bankSecurityService.canWithdraw(#request.accountId) | url=anyRequest -> authenticated
 GET /api/v1/blueprints | BlueprintController#getBlueprints | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/blueprints/admin/defaults | AdminDefaultBlueprintController#list | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/blueprints/admin/defaults | AdminDefaultBlueprintController#add | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -128,6 +129,8 @@ GET /api/v1/connected-apps/admin/clients/{id}/undo/installations | AdminExchange
 POST /api/v1/connected-apps/admin/clients/{id}/undo/preview | AdminExchangeBulkUndoController#preview | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#getSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/connected-apps/admin/settings | AdminExchangeRegistryController#updateSettings | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/connected-apps/admin/settings/bank | AdminExchangeRegistryController#getBankSwitch | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/connected-apps/admin/settings/bank | AdminExchangeRegistryController#updateBankSwitch | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/undo-runs | AdminExchangeBulkUndoController#runs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/connected-apps/admin/undo-runs/{runId} | AdminExchangeBulkUndoController#run | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/connected-apps/installations/{installationId} | ConnectedAppsController#disconnectInstallation | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
@@ -138,6 +141,14 @@ GET /api/v1/connected-apps/name-withholding | ExchangeNameWithholdingController#
 PUT /api/v1/connected-apps/name-withholding | ExchangeNameWithholdingController#updateNameWithholding | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/connected-apps/{clientId} | ConnectedAppsController#disconnectClient | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
 POST /api/v1/connected-apps/{clientId}/undo | ConnectedAppsController#undo | pre=@connectedAppsGate.isMemberSession(authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/accounts | ExchangeBankController#accounts | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/accounts/{id}/balance-series | ExchangeBankController#balanceSeries | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/accounts/{id}/bookings | ExchangeBankController#bookings | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/queue | ExchangeBankQueueController#queue | pre=@exchangeGate.allows('exchange.bank.queue', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/requests | ExchangeBankRequestController#requests | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/bank/requests | ExchangeBankRequestController#raise | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/bank/requests/{id}/cancel | ExchangeBankRequestController#cancel | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/bank/requests/{id}/correction | ExchangeBankRequestController#correct | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/catalog/resolve | ExchangeCatalogController#resolve | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/account-check | ExchangeAccountCheckController#check | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
@@ -643,6 +654,7 @@ GET /api/v1/users/me/export/pdf | DataExportController#exportPdf | pre=isAuthent
 GET /api/v1/users/me/registration-status | MyRegistrationStatusController#myStatus | pre=isAuthenticated() | url=/api/v1/users/me/** -> authenticated
 GET /api/v1/users/me/rsi-handle | UserController#getMyRsiHandle | pre=isAuthenticated() | url=/api/v1/users/me/** -> authenticated
 PUT /api/v1/users/me/rsi-handle | UserController#updateMyRsiHandle | pre=isAuthenticated() | url=/api/v1/users/me/** -> authenticated
+GET /api/v1/users/role-holders | UserRoleController#holders | pre=hasAnyRole('ADMIN', 'BANK_MANAGEMENT') | url=/api/v1/users/role-holders -> hasAnyAuthority(ROLE_ADMIN,ROLE_BANK_MANAGEMENT)
 GET /api/v1/users/search | UserProfileController#searchUsers | pre=hasAnyRole('ADMIN', 'KRT_MEMBER') | url=/api/v1/users/search -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER)
 GET /api/v1/users/search/references | UserController#searchUserReferences | pre=hasAnyRole('ADMIN', 'KRT_MEMBER') | url=/api/v1/users/search/references -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER)
 POST /api/v1/users/sync | UserController#syncUsersNow | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -650,6 +662,8 @@ DELETE /api/v1/users/{id} | AccountRemovalController#deleteUser | pre=hasRole('A
 GET /api/v1/users/{id} | UserProfileController#getUserById | pre=hasAnyRole('ADMIN', 'KRT_MEMBER') | url=GET /api/v1/users/* -> hasAnyAuthority(ROLE_ADMIN,ROLE_KRT_MEMBER)
 PUT /api/v1/users/{id}/attributes | UserProfileController#updateUserAttributes | pre=hasRole('ADMIN') | url=PUT /api/v1/users/*/attributes -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/users/{id}/consolidate | AccountRemovalController#consolidateAccount | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/users/{id}/roles | UserRoleController#roleSet | pre=hasAnyRole('ADMIN', 'BANK_MANAGEMENT') | url=/api/v1/users/*/roles -> hasAnyAuthority(ROLE_ADMIN,ROLE_BANK_MANAGEMENT)
+PUT /api/v1/users/{id}/roles/{role} | UserRoleController#changeRole | pre=hasAnyRole('ADMIN', 'BANK_MANAGEMENT') | url=/api/v1/users/*/roles/* -> hasAnyAuthority(ROLE_ADMIN,ROLE_BANK_MANAGEMENT)
 GET /api/v1/users/{id}/rsi-handle | UserController#getUserRsiHandle | pre=hasRole('ADMIN') | url=/api/v1/users/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll
 GET /error | BasetoolErrorController#handleError | pre=permitAll() | url=/error -> permitAll

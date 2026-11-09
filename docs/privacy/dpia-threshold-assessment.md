@@ -56,6 +56,22 @@ triggers above: no new data categories (the member's own game data, already proc
 profiling or automated decision, no monitoring, the scale unchanged, and the transfer goes to
 software on the member's own device at the member's request. **Still no DPIA required.**
 
+### Re-checked 2026-11-09 — the Kartellbank on connected applications (A11)
+
+The bank reads (REQ-BXCH-002) put other members' bank data on third-party devices: the balances and
+booking history of the accounts the member may view, with the handle of a counterparty. They meet
+none of the triggers above either: no new data category (the bank data of A3, shown to the same
+members as in the Basetool), no profiling or automated decision, no monitoring and no money moved.
+The data stays with the member who may already see it, on a client approved only if it keeps
+other people's bank data in memory for at most 7 days (REQ-BXCH-007), and a member can withhold
+their name. **Still no DPIA required.**
+
+The staff queue (REQ-BXCH-005) adds, for bank staff and approvers only, the pending requests they
+already work on in the Basetool: the requester's handle, the justification and note, and the
+account balance for the Bankleitung and on granted accounts. Still the A3 bank data, to the same
+people as in the Basetool, read-only, under the same 7-day memory-only condition and the same name
+withholding; no new trigger. **Still no DPIA required.**
+
 ---
 
 ## Art. 37 GDPR / § 38 BDSG — Data protection officer: not required

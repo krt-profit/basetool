@@ -43,7 +43,13 @@ public enum ExchangeRegistryAction {
   SWITCH_ON("switch_on"),
 
   /** The global switch was turned off. */
-  SWITCH_OFF("switch_off");
+  SWITCH_OFF("switch_off"),
+
+  /** The bank switch was turned on. */
+  BANK_SWITCH_ON("bank_switch_on"),
+
+  /** The bank switch was turned off. */
+  BANK_SWITCH_OFF("bank_switch_off");
 
   /** The metric label value. */
   @Getter @NotNull private final String tag;

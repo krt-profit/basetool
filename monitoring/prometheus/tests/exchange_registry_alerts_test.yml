@@ -30,6 +30,18 @@ tests:
         alertname: ExchangeRegistryChanged
         exp_alerts: []
 
+  - name: silent - a change of the bank switch is left to BankExchangeSwitchChanged
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="bank_switch_on"}'
+        values: "0x5 1x20"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="bank_switch_off"}'
+        values: "0x5 1x20"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: ExchangeRegistryChanged
+        exp_alerts: []
+
   - name: fires - a failing reconcile
     interval: 1m
     input_series:

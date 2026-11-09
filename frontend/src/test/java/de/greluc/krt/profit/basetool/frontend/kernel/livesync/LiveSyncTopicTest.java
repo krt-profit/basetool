@@ -171,6 +171,21 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsTheMemberRoomOfOneMember_gatedByTheAdminRole() {
+    UUID memberId = UUID.randomUUID();
+    LiveSyncTopic topic = LiveSyncTopic.parse("member:" + memberId);
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.MEMBER);
+    assertThat(topic.resourceId()).isEqualTo(memberId);
+    assertThat(LiveSyncTopic.parse("member")).isNull();
+    assertThat(LiveSyncTopicClass.MEMBER.requiredAnyRole()).containsExactly("ROLE_ADMIN");
+    assertThat(LiveSyncTopicClass.MEMBER.authProbePath()).isNull();
+    assertThat(LiveSyncTopicClass.MEMBER.personal()).isFalse();
+    assertThat(LiveSyncTopicClass.MEMBER.allowedSections()).containsExactly("roles");
+  }
+
+  @Test
   void membersTopic_isTheOnlyNewClassGatedByALocalAdminRoleCheck() {
     assertThat(LiveSyncTopicClass.MEMBERS.requiredAnyRole()).containsExactly("ROLE_ADMIN");
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.requiredAnyRole()).isNull();
@@ -268,9 +283,11 @@ class LiveSyncTopicTest {
   @Test
   void everyScopedClassExposesAnAuthProbePathWithAnIdPlaceholder() {
     for (LiveSyncTopicClass topicClass : LiveSyncTopicClass.values()) {
-      if (topicClass.personal()) {
+      if (topicClass.personal() || topicClass.scoped() && topicClass.requiredAnyRole() != null) {
         assertThat(topicClass.authProbePath())
-            .as("personal class %s is authorized locally, never by a probe", topicClass)
+            .as(
+                "personal or role-gated class %s is authorized locally, never by a probe",
+                topicClass)
             .isNull();
       } else if (topicClass.scoped()) {
         assertThat(topicClass.authProbePath())

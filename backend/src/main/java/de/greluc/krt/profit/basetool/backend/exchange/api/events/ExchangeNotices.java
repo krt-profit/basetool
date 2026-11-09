@@ -44,7 +44,10 @@ public final class ExchangeNotices {
   /** Loose entity-type tag of the notices about the global switch. */
   public static final String SWITCH_ENTITY_TYPE = "EXCHANGE_SWITCH";
 
-  /** The fixed entity id of the global switch. */
+  /** Loose entity-type tag of the notices about the bank switch. */
+  public static final String BANK_SWITCH_ENTITY_TYPE = "EXCHANGE_BANK_SWITCH";
+
+  /** The fixed entity id of the global switch and of the bank switch. */
   public static final UUID SWITCH_ENTITY_ID = new UUID(0L, 1L);
 
   private ExchangeNotices() {}
@@ -181,6 +184,43 @@ public final class ExchangeNotices {
         .entityType(SWITCH_ENTITY_TYPE)
         .entityId(SWITCH_ENTITY_ID)
         .resolvesNotificationTypes(Set.of(NotificationType.EXCHANGE_SWITCHED_OFF))
+        .build();
+  }
+
+  /**
+   * The bank was switched on for connected applications (REQ-BXCH-006); the earlier bank switch
+   * notices go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent bankSwitchedOn(@Nullable UUID actorSub) {
+    return bankSwitch(NotificationEventType.BANK_EXCHANGE_SWITCHED_ON, actorSub);
+  }
+
+  /**
+   * The bank was switched off for connected applications (REQ-BXCH-006); the earlier bank switch
+   * notices go.
+   *
+   * @param actorSub the admin, or {@code null}
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent bankSwitchedOff(@Nullable UUID actorSub) {
+    return bankSwitch(NotificationEventType.BANK_EXCHANGE_SWITCHED_OFF, actorSub);
+  }
+
+  private static NoticeEvent bankSwitch(NotificationEventType type, @Nullable UUID actorSub) {
+    return NoticeEvent.builder()
+        .eventType(type)
+        .actorSub(actorSub)
+        .entityType(BANK_SWITCH_ENTITY_TYPE)
+        .entityId(SWITCH_ENTITY_ID)
+        .resolvesNotificationTypes(
+            Set.of(
+                NotificationType.BANK_EXCHANGE_SWITCHED_ON,
+                NotificationType.BANK_EXCHANGE_SWITCHED_OFF))
         .build();
   }
 }

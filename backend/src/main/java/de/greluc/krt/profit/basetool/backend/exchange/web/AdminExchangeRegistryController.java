@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankSwitchDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientCreateRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientMapper;
@@ -49,7 +51,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The exchange client registry and the global exchange switch, {@code ADMIN} only (REQ-XCH-003).
+ * The exchange client registry, the global exchange switch and the bank switch, {@code ADMIN} only
+ * (REQ-XCH-003, REQ-BXCH-006).
  */
 @RestController
 @RequestMapping("/api/v1/connected-apps/admin")
@@ -216,5 +219,41 @@ public class AdminExchangeRegistryController {
       @RequestBody @Valid @NotNull ExchangeSettingsUpdateRequest request) {
     return ResponseEntity.ok(
         mapper.toDto(registryService.updateSettings(request.enabled(), request.version())));
+  }
+
+  /**
+   * Reads the bank switch of the exchange.
+   *
+   * @return the bank switch with its own version
+   */
+  @NotNull
+  @GetMapping("/settings/bank")
+  @Operation(summary = "Get the bank switch of the exchange")
+  @ApiResponse(responseCode = "200", description = "The bank switch")
+  public ResponseEntity<ExchangeBankSwitchDto> getBankSwitch() {
+    return ResponseEntity.ok(mapper.toBankSwitchDto(registryService.getSettings()));
+  }
+
+  /**
+   * Turns the bank switch of the exchange on or off.
+   *
+   * @param request the new state and the bank switch's version last seen
+   * @return the saved bank switch
+   */
+  @NotNull
+  @PutMapping("/settings/bank")
+  @Operation(
+      summary = "Set the bank switch of the exchange",
+      description =
+          "While it is off, every bank route answers 503 BANK_EXCHANGE_DISABLED; switching off"
+              + " reaches the gateway's mirror before the commit or not at all.")
+  @ApiResponse(responseCode = "200", description = "The saved bank switch")
+  @ApiResponse(responseCode = "409", description = "Stale version")
+  @ApiResponse(responseCode = "502", description = "The registry mirror could not be written")
+  public ResponseEntity<ExchangeBankSwitchDto> updateBankSwitch(
+      @RequestBody @Valid @NotNull ExchangeBankSwitchUpdateRequest request) {
+    return ResponseEntity.ok(
+        mapper.toBankSwitchDto(
+            registryService.updateBankSwitch(request.enabled(), request.version())));
   }
 }

@@ -49,18 +49,35 @@ class ExchangeResourceTest {
             ExchangeResource.SHIP, "ship",
             ExchangeResource.ORG_STOCK, "org_stock");
 
-    assertThat(names).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
+    assertThat(capabilities).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
     for (ExchangeResource resource : ExchangeResource.values()) {
       assertThat(resource.massChangeName()).isEqualTo(names.get(resource));
       assertThat(resource.writeCapability()).isEqualTo(capabilities.get(resource));
       assertThat(resource.metricTag()).isEqualTo(tags.get(resource));
-      assertThat(ExchangeResource.fromMassChangeName(resource.massChangeName())).contains(resource);
+    }
+    names.forEach((resource, name) ->
+        assertThat(ExchangeResource.fromMassChangeName(name)).contains(resource));
+  }
+
+  @Test
+  void everyResourceWritesIntoTheFeedOfItsName() {
+    for (ExchangeResource resource : ExchangeResource.values()) {
+      assertThat(resource.feed().name()).isEqualTo(resource.name());
     }
   }
 
   @Test
+  void theFeedsAreTheValuesTheChangeTableAllows() {
+    assertThat(Arrays.stream(ExchangeFeedResource.values()).map(Enum::name))
+        .containsExactly("BLUEPRINT", "STOCK", "SHIP", "ORG_STOCK", "BANK_REQUEST");
+  }
+
+  @Test
   void anyOtherNameMapsToNoResource() {
-    for (String name : new String[] {null, "", "hangar", "ship", "SHIPS", "blueprint", " stock"}) {
+    for (String name :
+        new String[] {
+          null, "", "hangar", "ship", "SHIPS", "blueprint", " stock", "bank-requests"
+        }) {
       assertThat(ExchangeResource.fromMassChangeName(name)).as(String.valueOf(name)).isEmpty();
     }
   }

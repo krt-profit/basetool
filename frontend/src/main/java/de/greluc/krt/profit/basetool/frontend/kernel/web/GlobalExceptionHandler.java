@@ -645,10 +645,12 @@ public class GlobalExceptionHandler {
     m.put("BANK_REQUEST_NOT_PENDING", "error.bank.requestNotPending");
     m.put("BANK_ACCOUNT_HAS_PENDING_REQUESTS", "error.bank.accountHasPendingRequests");
     m.put("BANK_OWNER_APPROVAL_REQUIRED", "error.bank.ownerApprovalRequired");
+    m.put("BANK_APPROVER_NOTE_REQUIRED", "error.bank.approverNoteRequired");
     m.put("BANK_FOUR_EYES_REQUIRED", "error.bank.fourEyesRequired");
     m.put(
         BackendServiceException.CODE_LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER,
         "error.orgUnit.seatRequiresKrtMember");
+    m.put("LAST_ADMIN", "error.role.lastAdmin");
     m.put("CATALOGUE_ITEM_RETIRED", "error.catalogue.itemRetired");
     m.put("CATALOGUE_BLUEPRINT_RETIRED", "error.catalogue.blueprintRetired");
     m.put("SUPPLY_DISABLED", "error.supply.disabled");

@@ -8,8 +8,9 @@
 """Seed the briefing test data into the testing system through its API, or remove the seed accounts.
 
 `seed` creates the Keycloak accounts (five presenter accounts, a numbered participant pool and two
-service accounts), signs in as each of them through the testing-only `basetool-seed` client and
-builds the org structure and the feature data the briefing walks through, all through the
+service accounts), signs in as each of them through the testing-only `basetool-seed` client,
+assigns their Basetool roles as `seed-admin` (a subject of `APP_BOOTSTRAP_ADMIN_SUBS`, REQ-SEC-088)
+and builds the org structure and the feature data the briefing walks through, all through the
 Basetool's own API so audit, permissions and versioning apply. It writes the participant handout
 and the presenter list as CSV into `--out`. A second run reuses the accounts and their passwords
 and skips the data once the test org structure exists.
@@ -48,9 +49,10 @@ HANDOUT_FILE = "teilnehmer.csv"
 PRESENTER_FILE = "praesentation.csv"
 EXTRACT_FILE = "extractor-beispiel.json"
 
-ROLE_MEMBER = "KRT Member"
-ROLE_ADMIN = "Admin"
-ROLE_BANK_MANAGEMENT = "Bank Management"
+ROLE_MEMBER = "KRT_MEMBER"
+ROLE_ADMIN = "ADMIN"
+ROLE_BANK_MANAGEMENT = "BANK_MANAGEMENT"
+BASETOOL_ROLES = (ROLE_ADMIN, ROLE_MEMBER, "BANK_EMPLOYEE", ROLE_BANK_MANAGEMENT)
 
 STAFFELN = (("Test-Staffel Alpha", "TSA"), ("Test-Staffel Bravo", "TSB"),
             ("Test-Staffel Charlie", "TSC"))
@@ -73,12 +75,12 @@ class SeedError(RuntimeError):
 
 @dataclass
 class Account:
-    """One seeded Keycloak account and its place in the test org structure."""
+    """One seeded Keycloak account, its Basetool roles and its place in the test org structure."""
 
     username: str
     first_name: str
     last_name: str
-    realm_roles: list[str]
+    roles: list[str]
     kind: str
     staffel: str | None = None
     track: str = TRACK_MEMBER
@@ -328,7 +330,11 @@ class Keycloak:
         return users[0] if users else None
 
     def ensure_user(self, account: Account) -> None:
-        """Create the account, or adopt the existing seed account, and set its password and roles."""
+        """Create the account, or adopt the existing seed account, and set its password.
+
+        Keycloak holds no Basetool role (ADR-0355); `Seeder.ensure_roles` assigns them in the
+        Basetool.
+        """
         existing = self.find_user(account.username)
         if existing is None:
             self.admin("POST", "/users", {
@@ -346,10 +352,6 @@ class Keycloak:
         account.keycloak_id = existing["id"]
         self.admin("PUT", f"/users/{account.keycloak_id}/reset-password",
                    {"type": "password", "value": account.password, "temporary": False})
-        roles = [self.admin("GET", f"/roles/{urllib.parse.quote(name)}")
-                 for name in account.realm_roles]
-        self.admin("POST", f"/users/{account.keycloak_id}/role-mappings/realm",
-                   [{"id": r["id"], "name": r["name"]} for r in roles])
 
     def seed_users(self) -> list[dict]:
         """Every Keycloak user whose e-mail address lies in the seed's domain."""
@@ -444,12 +446,14 @@ class Seeder:
             self.failures.append(f"{title}: {error}")
 
     def activate(self) -> None:
-        """Sign every account in once, approve the pending ones and accept the terms."""
+        """Sign every account in once, approve the pending ones, assign the roles and accept the
+        terms. `seed-admin` must be an Admin of the Basetool first, as a bootstrap subject."""
         for account in self.accounts:
             me = self.api.call(account, "GET", "/users/me", ok=(200, 403))
             if isinstance(me, dict) and me.get("id"):
                 account.user_id = me["id"]
         self.api.post(self.admin, "/terms/acceptance")
+        self.require_admin()
         pending = {r["username"]: r for r in content(
             self.api.get(self.admin, "/users/admin/registrations?status=PENDING"))}
         for account in self.accounts:
@@ -458,12 +462,41 @@ class Seeder:
                 self.api.post(self.admin,
                               f"/users/admin/registrations/{registration['id']}/approve",
                               {"version": registration.get("version")})
+                account.user_id = registration["id"]
                 print(f"  approved {account.username}")
+        self.ensure_roles()
         self.api.keycloak.forget_tokens()
         for account in self.accounts:
             self.api.post(account, "/terms/acceptance")
             if not account.user_id:
                 account.user_id = self.api.get(account, "/users/me")["id"]
+
+    def require_admin(self) -> None:
+        """Stop unless `seed-admin` holds Admin in the Basetool, naming the bootstrap setting.
+
+        Keycloak holds no Basetool role (ADR-0355): on an emptied testing database the account
+        earns Admin at its first sign-in only as a subject of `APP_BOOTSTRAP_ADMIN_SUBS`.
+        """
+        admin = self.admin
+        role_set = (self.api.call(admin, "GET", f"/users/{admin.user_id}/roles", ok=(200, 403))
+                    if admin.user_id else None)
+        if not isinstance(role_set, dict) or ROLE_ADMIN not in role_set.get("roles", []):
+            raise SeedError(
+                f"seed-admin is no Admin in the Basetool. Set APP_BOOTSTRAP_ADMIN_SUBS="
+                f"{admin.keycloak_id} on the testing backend (it applies while no other active "
+                f"admin exists, e.g. after testing-reset.sh) or give the account Admin on its "
+                f"member page, then run the seed again")
+
+    def ensure_roles(self) -> None:
+        """Assign every planned role an account lacks through the Basetool's role API."""
+        for account in self.accounts:
+            role_set = self.api.get(self.admin, f"/users/{account.user_id}/roles")
+            for role in account.roles:
+                if role in role_set["roles"]:
+                    continue
+                role_set = self.api.put(self.admin, f"/users/{account.user_id}/roles/{role}",
+                                        {"assigned": True, "version": role_set["version"]})
+                print(f"  {account.username}: {role}")
 
     def domains(self) -> dict:
         """The data domains in seeding order, keyed by the name `--only` accepts."""
@@ -1087,6 +1120,78 @@ def run_purge(args: argparse.Namespace) -> int:
     return 0
 
 
+class FakeRoleApi:
+    """The role endpoints of the Basetool API in memory, for the self-test."""
+
+    def __init__(self, held: dict[str, list[str]], admin_status: int = 200):
+        self.held = {user: list(roles) for user, roles in held.items()}
+        self.versions = {user: 0 for user in held}
+        self.admin_status = admin_status
+        self.writes: list[str] = []
+
+    def call(self, account: Account, method: str, path: str, body: Any = None,
+             ok: tuple[int, ...] = (200, 201, 204)) -> Any:
+        """Answer GET and PUT on `/users/{id}/roles`; refuse a non-admin with `admin_status`."""
+        if self.admin_status not in ok:
+            raise SeedError(f"{account.username}: {method} {path} -> HTTP {self.admin_status}")
+        if self.admin_status != 200:
+            return None
+        parts = path.strip("/").split("/")
+        user = parts[1]
+        if method == "PUT":
+            if body["version"] != self.versions[user]:
+                raise SeedError(f"{path} -> HTTP 409")
+            self.held[user].append(parts[3])
+            self.versions[user] += 1
+            self.writes.append(f"{user}:{parts[3]}")
+        return {"userId": user, "roles": list(self.held[user]), "version": self.versions[user]}
+
+    def get(self, account: Account, path: str) -> Any:
+        """GET `path` as `account`."""
+        return self.call(account, "GET", path)
+
+    def put(self, account: Account, path: str, body: Any = None) -> Any:
+        """PUT `body` to `path` as `account`."""
+        return self.call(account, "PUT", path, body)
+
+
+def roles_selftest() -> bool:
+    """Whether `ensure_roles` writes exactly the planned roles each account lacks."""
+    accounts = plan_accounts(3)
+    for index, account in enumerate(accounts):
+        account.user_id = f"u{index}"
+    admin = next(a for a in accounts if a.username == "seed-admin")
+    bank = next(a for a in accounts if a.username == "seed-bank")
+    held = {a.user_id: [ROLE_MEMBER] for a in accounts}
+    held[admin.user_id] = [ROLE_ADMIN]
+    api = FakeRoleApi(held)
+    seeder = Seeder(api, accounts, Path("."))
+    seeder.ensure_roles()
+    first = sorted(api.writes) == sorted([f"{admin.user_id}:{ROLE_MEMBER}",
+                                          f"{bank.user_id}:{ROLE_BANK_MANAGEMENT}"])
+    seeder.ensure_roles()
+    return first and len(api.writes) == 2
+
+
+def bootstrap_selftest() -> bool:
+    """Whether a seed-admin the Basetool does not hold as Admin stops the seed with the hint."""
+    accounts = plan_accounts(3)
+    admin = next(a for a in accounts if a.username == "seed-admin")
+    admin.keycloak_id = admin.user_id = "kc-seed-admin"
+    for status, held in ((403, []), (200, [ROLE_MEMBER])):
+        try:
+            Seeder(FakeRoleApi({admin.user_id: held}, status), accounts, Path(".")).require_admin()
+            return False
+        except SeedError as error:
+            if f"APP_BOOTSTRAP_ADMIN_SUBS={admin.keycloak_id}" not in str(error):
+                return False
+    try:
+        Seeder(FakeRoleApi({admin.user_id: [ROLE_ADMIN]}), accounts, Path(".")).require_admin()
+    except SeedError:
+        return False
+    return True
+
+
 def selftest() -> int:
     """Check the offline parts: account plan, production guard, handout and extractor sample."""
     failures: list[str] = []
@@ -1113,10 +1218,14 @@ def selftest() -> int:
     check(sum(a.special_command_lead for a in accounts) == 1, "exactly one SK lead")
     check(all(a.staffel is None for a in accounts if a.special_command_lead),
           "the SK lead belongs to no Staffel")
-    check(all(ROLE_MEMBER in a.realm_roles for a in accounts if a.rank),
+    check(all(ROLE_MEMBER in a.roles for a in accounts if a.rank),
           "every ranked account holds the KRT Member role")
-    check(not any(ROLE_ADMIN in a.realm_roles for a in accounts if a.kind != "service"),
+    check(not any(ROLE_ADMIN in a.roles for a in accounts if a.kind != "service"),
           "no presenter or participant is an admin")
+    check(all(set(a.roles) <= set(BASETOOL_ROLES) for a in accounts),
+          "every planned role is a Basetool role code")
+    check(roles_selftest(), "roles are assigned through the Basetool role API, once")
+    check(bootstrap_selftest(), "a seed-admin without Admin stops the seed with the bootstrap hint")
     for url in ("https://profit-base.online", "https://auth.profit-base.online/auth",
                 "https://krt-profit.de"):
         try:

@@ -27,6 +27,16 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.exchange.ExchangeFieldRatchet.FieldClass;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccountCheckDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccountCheckRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankAccountPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBalanceSeriesDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBookingPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQueueDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelledDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCorrectionDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
@@ -97,6 +107,23 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeStockPageDto.class, "page.schema.json#/$defs/stockPage"),
           Map.entry(ExchangeShipPageDto.class, "page.schema.json#/$defs/shipPage"),
           Map.entry(ExchangeOrgStockPageDto.class, "page.schema.json#/$defs/orgStockPage"),
+          Map.entry(ExchangeBankAccountPageDto.class, "page.schema.json#/$defs/bankAccountPage"),
+          Map.entry(ExchangeBankBookingPageDto.class, "page.schema.json#/$defs/bankBookingPage"),
+          Map.entry(ExchangeBankBalanceSeriesDto.class, "bank-balance-series.schema.json"),
+          Map.entry(ExchangeBankQueueDto.class, "bank-queue.schema.json"),
+          Map.entry(ExchangeBankRequestPageDto.class, "page.schema.json#/$defs/bankRequestPage"),
+          Map.entry(
+              ExchangeBankRequestCreateDto.class, "bank-request-write.schema.json#/$defs/raise"),
+          Map.entry(
+              ExchangeBankRequestCorrectionDto.class,
+              "bank-request-write.schema.json#/$defs/correction"),
+          Map.entry(
+              ExchangeBankRequestCancelDto.class, "bank-request-write.schema.json#/$defs/cancel"),
+          Map.entry(
+              ExchangeBankRequestWrittenDto.class, "bank-request-write.schema.json#/$defs/written"),
+          Map.entry(
+              ExchangeBankRequestCancelledDto.class,
+              "bank-request-write.schema.json#/$defs/cancelled"),
           Map.entry(ExchangeChangeResultDto.class, "change-result.schema.json"),
           Map.entry(
               ExchangeBlueprintChangeSet.class, "change-set.schema.json#/$defs/blueprintChangeSet"),

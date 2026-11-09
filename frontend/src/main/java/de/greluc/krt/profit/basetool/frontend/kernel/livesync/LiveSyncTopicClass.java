@@ -256,6 +256,22 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
+   * One member's room for the admin member page {@code /members/{id}/edit}, keyed by the member's
+   * id, with the {@code roles} section (the role tab, REQ-SEC-088); authorized locally by {@code
+   * ROLE_ADMIN} ({@link #requiredAnyRole}) alone, so the member is admitted only as an admin.
+   */
+  MEMBER(
+      "member",
+      true,
+      Set.of("roles"),
+      false,
+      "member",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
    * Global org-structure room of {@code /admin/org-structure}, with sections {@code units} and
    * {@code forms}; authorized by the socket's authentication alone, the admin sections staying
    * protected per fragment.
@@ -590,6 +606,17 @@ public enum LiveSyncTopicClass {
   @Nullable
   public Set<String> requiredAnyRole() {
     return requiredAnyRole;
+  }
+
+  /**
+   * Reports whether a holder of the given authorities passes this class's local role check; a class
+   * without {@link #requiredAnyRole} admits everyone here and leaves the decision to its probes.
+   *
+   * @param authorities the caller's authorities, e.g. {@code ROLE_BANK_EMPLOYEE}
+   * @return {@code true} when the class needs no role or the caller holds one of them
+   */
+  public boolean admitsAnyOf(@NotNull Set<String> authorities) {
+    return requiredAnyRole == null || requiredAnyRole.stream().anyMatch(authorities::contains);
   }
 
   /**

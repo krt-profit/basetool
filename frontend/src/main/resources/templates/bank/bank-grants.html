@@ -48,8 +48,9 @@
         </div>
     </form>
 
-    <div id="bank-grants-results" class="card card--flush" data-testid="bank-grants-panel">
+    <div id="bank-grants-results" class="bank-grants-results" data-testid="bank-grants-panel">
         <th:block th:fragment="grantsMatrix">
+        <div class="card card--flush">
         <div class="table-responsive" th:if="${!#lists.isEmpty(grants)}">
             <table class="data-table data-table--stack">
                 <thead>
@@ -111,17 +112,55 @@
         <th:block th:if="${#lists.isEmpty(grants)}">
             <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.grants.empty.title', textKey='bank.grants.empty', emptyId='bank-grants-empty')}"></th:block>
         </th:block>
+        </div>
+        <section class="card bank-employees" aria-labelledby="bank-employees-head" data-testid="bank-employees-panel">
+            <div class="bank-employees__head">
+                <h2 class="bank-employees__title" id="bank-employees-head" th:text="#{bank.employees.title}">Bank-Mitarbeiter</h2>
+                <button type="button" class="btn btn-ghost btn-xs"
+                        data-trigger="open-modal-display" data-modal-id="bank-employee-assign-modal"
+                        data-testid="bank-employee-assign-open" th:text="#{bank.employees.assign}">+ Rolle vergeben</button>
+            </div>
+            <p class="bank-field-hint" th:text="#{bank.employees.hint}">Bankleitung und Admins brauchen die Rolle nicht.</p>
+            <table class="data-table data-table--stack" th:if="${!#lists.isEmpty(bankEmployees)}">
+                <thead>
+                <tr>
+                    <th th:text="#{bank.grants.col.employee}">Mitarbeiter</th>
+                    <th class="cell-actions"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="employee : ${bankEmployees}" data-testid="bank-employee-row"
+                    th:with="employeeHandle=${@handles.display(employee.handle())}">
+                    <td><span class="cell-title" th:text="${employeeHandle}">greluc</span></td>
+                    <td class="cell-actions">
+                        <button type="button" class="btn btn-quiet-danger btn-xs"
+                                data-trigger="open-modal-display" data-modal-id="bank-employee-withdraw-modal"
+                                th:attr="data-field-_userId=${employee.userId()},data-field-version=${employee.rolesVersion()},data-field-_label=${employeeHandle}"
+                                data-testid="bank-employee-withdraw-open"
+                                th:text="#{bank.employees.withdraw}">Rolle entziehen</button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <div class="alert alert-warning" role="alert" th:if="${bankEmployeesUnavailable}"
+                 data-testid="bank-employees-unavailable">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                <p th:text="#{bank.employees.unavailable}">Die Inhaber der Rolle Bank Employee konnten nicht geladen werden.</p>
+            </div>
+            <th:block th:if="${#lists.isEmpty(bankEmployees) and !bankEmployeesUnavailable}">
+                <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.employees.empty.title', textKey='bank.employees.empty', emptyId='bank-employees-empty')}"></th:block>
+            </th:block>
+        </section>
         </th:block>
     </div>
     </section>
-
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-grant-create-modal', titleKey='bank.modal.grant.title', body=~{::bank-grant-create-modal-body})}">
         <th:block th:ref="bank-grant-create-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
                   data-livesync="bank/grants"
                   data-endpoint="/api/proxy/bank/grants" data-method="POST">
                 <div class="krt-modal-body">
-                    <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Der Nutzer braucht die Keycloak-Rolle &quot;Bank Employee&quot;, damit die Berechtigung wirkt.</p>
+                    <p class="bank-field-hint" th:text="#{bank.modal.grant.hint}">Die Berechtigung wirkt, sobald der Nutzer die Rolle &quot;Bank Employee&quot; hat.</p>
                     <div class="bank-form-row">
                         <label for="bank-grant-user" th:text="#{bank.field.user}">Nutzer</label>
                         <select id="bank-grant-user" name="userId" required data-role="bank-holder-user"
@@ -190,8 +229,58 @@
             </form>
         </th:block>
     </th:block>
-</main>
-</th:block>
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-employee-assign-modal', titleKey='bank.modal.employee.assign.title', body=~{::bank-employee-assign-modal-body})}">
+        <th:block th:ref="bank-employee-assign-modal-body">
+            <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-livesync="bank/grants,manage member:@user/roles"
+                  data-endpoint="/api/proxy/users/{userId}/roles/BANK_EMPLOYEE" data-method="POST">
+                <div class="krt-modal-body">
+                    <p class="bank-field-hint" th:text="#{bank.modal.employee.assign.text}">Der Nutzer erh&auml;lt die Rolle &quot;Bank Employee&quot; und wird benachrichtigt.</p>
+                    <div class="bank-form-row">
+                        <label for="bank-employee-user" th:text="#{bank.field.user}">Nutzer</label>
+                        <select id="bank-employee-user" name="_userId" required
+                                data-krt-combobox="remote-bank-users" data-testid="bank-employee-user">
+                            <option value="" th:text="#{bank.field.user.placeholder}">Nutzer w&auml;hlen &hellip;</option>
+                        </select>
+                        <span class="bank-field-error" data-error-for="_userId"></span>
+                    </div>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-employee-assign-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" data-testid="bank-employee-assign-submit"
+                            th:text="#{bank.modal.employee.assign.submit}">Vergeben</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-employee-withdraw-modal', titleKey='bank.modal.employee.withdraw.title', variant='krt-modal--danger', body=~{::bank-employee-withdraw-modal-body})}">
+        <th:block th:ref="bank-employee-withdraw-modal-body">
+            <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
+                  data-livesync="bank/grants,manage member:@user/roles"
+                  data-endpoint="/api/proxy/users/{userId}/roles/BANK_EMPLOYEE" data-method="PUT">
+                <input type="hidden" name="_userId">
+                <input type="hidden" name="version">
+                <input type="hidden" name="assigned" value="false">
+                <div class="krt-modal-body">
+                    <p>
+                        <span th:text="#{bank.modal.employee.withdraw.text}">Entzieht die Rolle &quot;Bank Employee&quot;; seine Berechtigungen bleiben, wirken aber nicht mehr:</span>
+                        <strong data-bank-label="_label"></strong>
+                    </p>
+                    <span class="bank-field-error" data-error-for="_global"></span>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="bank-employee-withdraw-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" data-testid="bank-employee-withdraw-submit"
+                            th:text="#{bank.employees.withdraw}">Rolle entziehen</button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+</main></th:block>
 <th:block th:fragment="pageTail">
 <script type="module" th:src="@{/js/bank/bank.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/bank/bank-layout-prefs.js}" th:attr="nonce=${cspNonce}"></script>

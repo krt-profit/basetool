@@ -42,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -149,10 +150,52 @@ public class BankAccountService {
       @Nullable Instant to) {
     requireAccount(accountId);
     Page<BankBookingRow> rows = postingRepository.findBookings(accountId, from, to, pageable);
-    List<UUID> txIds =
-        rows.getContent().stream().map(BankBookingRow::transactionId).distinct().toList();
+    return new PageImpl<>(toBookingDtos(rows.getContent()), pageable, rows.getTotalElements());
+  }
+
+  /**
+   * Maps booking rows to their DTOs, with counter-accounts and holder annotations resolved in batch
+   * (REQ-BANK-018, REQ-DATA-003).
+   *
+   * @param rows the projected booking rows
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  List<BankBookingDto> toBookingDtos(@NotNull List<BankBookingRow> rows) {
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
+    return mapBookingRows(
+        rows,
+        holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+            .collect(Collectors.groupingBy(BankHolderLeg::transactionId)));
+  }
+
+  /**
+   * Maps booking rows to their DTOs without reading the holder legs, for a reader that never shows
+   * a holder (REQ-BANK-038): the holder handles stay {@code null}.
+   *
+   * @param rows the projected booking rows
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  List<BankBookingDto> toBookingDtosWithoutHolders(@NotNull List<BankBookingRow> rows) {
+    return rows.isEmpty() ? List.of() : mapBookingRows(rows, Map.of());
+  }
+
+  /**
+   * Maps booking rows to their DTOs with the counter-accounts resolved in batch.
+   *
+   * @param rows the projected booking rows, not empty
+   * @param holderLegsByTx the holder legs to annotate, grouped by transaction
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  private List<BankBookingDto> mapBookingRows(
+      @NotNull List<BankBookingRow> rows, @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
     List<UUID> transferTxIds =
-        rows.getContent().stream()
+        rows.stream()
             .filter(r -> r.type() == BankTransactionType.TRANSFER)
             .map(BankBookingRow::transactionId)
             .distinct()
@@ -162,12 +205,7 @@ public class BankAccountService {
             ? Map.of()
             : postingRepository.findLegsByTransactionIds(transferTxIds).stream()
                 .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
-    Map<UUID, List<BankHolderLeg>> holderLegsByTx =
-        txIds.isEmpty()
-            ? Map.of()
-            : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
-                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    return rows.map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx));
+    return rows.stream().map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx)).toList();
   }
 
   /**

@@ -1,0 +1,120 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fires - bank account ids are probed through 404s
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="not_found"}'
+        values: "0+5x70"
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="not_bank_staff"}'
+        values: "0x70"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: BankExchangeNotFoundSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Bank exchange requests keep hitting unknown accounts"
+              description: "The backend answered more than 50 bank exchange requests in the last hour with 404 because the requested bank account was not found for the member. A client or a member is probing bank account ids. Check the gateway logs per client for the members and account ids behind the refusals, and consider suspending the client under Administration - Verbundene Anwendungen (REQ-BXCH-006, REQ-OBS-024)."
+
+  - name: silent - occasional 404s and other refusals
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="not_found"}'
+        values: "0+0.5x70"
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="not_bank_staff"}'
+        values: "0+5x70"
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: BankExchangeNotFoundSpike
+        exp_alerts: []
+
+  - name: fires - the open-request cap is hit for over 30 minutes
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="open_request_cap"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BankExchangeOpenRequestCapHit
+        exp_alerts: []
+      - eval_time: 60m
+        alertname: BankExchangeOpenRequestCapHit
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Bank exchange requests keep hitting the open-request cap"
+              description: "For 30 minutes more than 10 bank requests an hour were refused with 409 BANK_OPEN_REQUEST_CAP, because the member already had 20 pending bank requests. Either the bank staff falls behind with the approvals (BankBookingApprovalOverdue) or a client keeps filing requests without waiting for the decision. Check the pending queue and the bank request writes per client on the Exchange dashboard, and contact the client's author if one client causes it (REQ-OBS-024)."
+
+  - name: silent - the open-request cap is hit only rarely
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_bank_refused_total{job="basetool-backend", instance="backend:11261", reason="open_request_cap"}'
+        values: "0+0.1x120"
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: BankExchangeOpenRequestCapHit
+        exp_alerts: []
+
+  - name: fires - the bank switch is turned off
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="bank_switch_off"}'
+        values: "0x5 1x20"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: BankExchangeSwitchChanged
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              action: bank_switch_off
+            exp_annotations:
+              summary: "Bank exchange switch changed (bank_switch_off)"
+              description: "An admin switched the bank part of the third-party exchange on or off (bank_switch_off). While it is off the gateway refuses every bank exchange request, the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event BANK_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned (REQ-OBS-024)."
+
+  - name: silent - registry changes that are not the bank switch
+    interval: 1m
+    input_series:
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="bank_switch_on"}'
+        values: "0x30"
+      - series: 'basetool_exchange_registry_changes_total{job="basetool-backend", instance="backend:11261", action="suspended"}'
+        values: "0x5 1x25"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: BankExchangeSwitchChanged
+        exp_alerts: []
+
+  - name: fires - a bank booking request waits for more than 48 hours
+    interval: 1m
+    input_series:
+      - series: 'basetool_bank_booking_request_pending_oldest_age_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "172900+60x20"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: BankBookingApprovalOverdue
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: BankBookingApprovalOverdue
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: basetool-backend
+              instance: backend:11261
+            exp_annotations:
+              summary: "Oldest pending bank booking request >48h"
+              description: "A bank booking request has been awaiting approval for more than 48 hours."
+
+  - name: silent - the oldest bank booking request is younger than 48 hours
+    interval: 1m
+    input_series:
+      - series: 'basetool_bank_booking_request_pending_oldest_age_seconds{job="basetool-backend", instance="backend:11261"}'
+        values: "171000+60x20"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BankBookingApprovalOverdue
+        exp_alerts: []

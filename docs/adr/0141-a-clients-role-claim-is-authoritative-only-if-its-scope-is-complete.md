@@ -1,6 +1,7 @@
 # ADR-0141 — A client's role claim is authoritative only if its scope is complete
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0355](0355-roles-are-held-in-the-basetool-database.md): no token's role claim is read or written,
+  and the guard is deleted
 - **Date:** 2026-08-21
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-036](../specs/security-and-access.md)

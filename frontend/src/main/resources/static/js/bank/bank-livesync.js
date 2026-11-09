@@ -71,8 +71,8 @@ function bankRoom(room) {
 }
 
 /**
- * Opens the live-sync receivers the page's rooms call for: the staff overview, the org-unit bank
- * and the single-account room (REQ-FE-015).
+ * Opens the live-sync receivers the page's rooms call for: the staff overview, the org-unit bank,
+ * the single-request page and the single-account room (REQ-FE-015).
  */
 export function initLiveSyncReceivers() {
     const hasStaffRoom =
@@ -118,6 +118,35 @@ export function initLiveSyncReceivers() {
         });
     }
 
+    // Every request write publishes both bank/requestQueue and orgunit-bank/orgUnitBank, so either
+    // room alone keeps the card current; the server marks the rooms the caller may join.
+    const requestDetail = document.querySelector('#bank-request-detail-results');
+    if (requestDetail && requestDetail.hasAttribute('data-livesync-orgunit-room')) {
+        bankRoom({
+            topicClass: 'ORGUNIT_BANK',
+            topic: 'orgunit-bank',
+            coalesceMs: 1500,
+            sections: {
+                orgUnitBank: {
+                    container: '#bank-request-detail-results',
+                    fragmentValue: 'requestDetail',
+                },
+            },
+        });
+    } else if (requestDetail && requestDetail.hasAttribute('data-livesync-staff-room')) {
+        bankRoom({
+            topicClass: 'BANK_STAFF',
+            topic: 'bank',
+            coalesceMs: 1500,
+            sections: {
+                requestQueue: {
+                    container: '#bank-request-detail-results',
+                    fragmentValue: 'requestDetail',
+                },
+            },
+        });
+    }
+
     const accountId = bankAccountId();
     if (accountId && document.querySelector('#bank-account-results')) {
         bankRoom({
@@ -152,15 +181,20 @@ export function initLiveSyncReceivers() {
 }
 
 /**
- * Resolves a bank live-sync account placeholder to a concrete account id. `account` reads
+ * Resolves a bank live-sync placeholder to a concrete resource id. `account` reads
  * `data-livesync-account`, `data-account-id` or a primed `_livesyncAccount` field; `destination`
- * reads an enabled `destinationAccountId` or a primed `_livesyncDestination` field.
+ * reads an enabled `destinationAccountId` or a primed `_livesyncDestination` field; `user` reads the
+ * member the form named in its `_userId` field.
  *
  * @param {HTMLFormElement} form the form whose write just succeeded
- * @param {string} ref the placeholder name (`account` or `destination`)
- * @returns {string|null} the resolved account id, or null when the form has none
+ * @param {string} ref the placeholder name (`account`, `destination` or `user`)
+ * @returns {string|null} the resolved id, or null when the form has none
  */
-function resolveBankLiveSyncAccount(form, ref) {
+function resolveBankLiveSyncPlaceholder(form, ref) {
+    if (ref === 'user') {
+        const el = /** @type {HTMLInputElement | null} */ (form.querySelector('[name="_userId"]'));
+        return el && el.value ? el.value : null;
+    }
     if (ref === 'account') {
         const primed = /** @type {HTMLInputElement | null} */ (
             form.querySelector('[name="_livesyncAccount"]')
@@ -184,8 +218,8 @@ function resolveBankLiveSyncAccount(form, ref) {
 /**
  * Broadcasts a bank form's live-sync publish matrix after a successful write (REQ-FE-015). The
  * `data-livesync` attribute lists space-separated `topic/section,section` entries; a
- * `bank:@account` / `bank:@destination` topic resolves to the form's account, and entries that
- * are duplicate or unresolvable are skipped.
+ * `bank:@account` / `bank:@destination` topic resolves to the form's account, a `member:@user` topic
+ * to the member the form named, and entries that are duplicate or unresolvable are skipped.
  *
  * @param {HTMLFormElement} form the form whose write just succeeded
  */
@@ -213,7 +247,7 @@ export function publishBankLiveSync(form) {
             }
             const at = topic.indexOf(':@');
             if (at >= 0) {
-                const id = resolveBankLiveSyncAccount(form, topic.slice(at + 2));
+                const id = resolveBankLiveSyncPlaceholder(form, topic.slice(at + 2));
                 if (!id) {
                     return;
                 }

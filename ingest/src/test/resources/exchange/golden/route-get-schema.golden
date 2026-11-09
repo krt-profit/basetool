@@ -3,7 +3,7 @@ GET /exchange/v1/schemas/page.schema.json
 === response
 200
 cache-control: max-age=3600, public
-content-length: 1992
+content-length: 3438
 content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
 content-type: application/schema+json
 vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
@@ -11,4 +11,4 @@ x-content-type-options: nosniff
 x-correlation-id: <correlation-id>
 x-frame-options: DENY
 x-xss-protection: 0
-sha-256 bca78e1d7998b568b178138703df41086974ec7933a5fde91b851ba09c8d3f62
+sha-256 e2828f9568029eb36091928013296483097e1443be2e7368abb3f75dc2b29e5e

@@ -25,14 +25,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import com.networknt.schema.Error;
-import com.networknt.schema.InputFormat;
-import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SchemaRegistry;
-import com.networknt.schema.SpecificationVersion;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintNameNormalizer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.ExchangePublishedSchemas;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -41,6 +37,11 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccountCheckDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankAccountPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBalanceSeriesDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBookingPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQueueDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeInstallationDto;
@@ -108,10 +109,6 @@ import tools.jackson.databind.node.ObjectNode;
 @SpringBootTest
 class ExchangeWireContractTest {
 
-  private static final String BASE = "https://ingest.profit-base.online/exchange/v1/schemas/";
-
-  private static final Path SCHEMAS = Path.of("../ingest/src/main/resources/exchange/v1/schemas");
-
   private static final Path FIXTURES = Path.of("../docs/exchange/examples/v1");
 
   private static final String GATEWAY = "55555555-5555-5555-5555-555555555555";
@@ -138,6 +135,26 @@ class ExchangeWireContractTest {
   /** The paged relay paths that serve a snapshot but answer their feed cursor as expired. */
   private static final Set<String> SNAPSHOT_ONLY = Set.of("/org-stock");
 
+  /**
+   * The bank reads, which answer only with the bank switched on and a seeded bank world; {@code
+   * ExchangeBankReadsTest}, {@code ExchangeBankRequestsTest} and {@code ExchangeBankQueueTest}
+   * check their answers against the published schemas on one.
+   */
+  private static final Set<String> BANK_READS =
+      Set.of(
+          "/bank/accounts",
+          "/bank/accounts/{id}/bookings",
+          "/bank/accounts/{id}/balance-series",
+          "/bank/queue",
+          "/bank/requests");
+
+  /**
+   * The bank request writes, which answer only with the bank switched on and a seeded bank world;
+   * {@code ExchangeBankRequestWritesTest} sends them on one.
+   */
+  private static final Set<String> BANK_WRITES =
+      Set.of("/bank/requests", "/bank/requests/{id}/correction", "/bank/requests/{id}/cancel");
+
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =
       Map.ofEntries(
@@ -149,16 +166,16 @@ class ExchangeWireContractTest {
           Map.entry("page--stockPage", ExchangeStockPageDto.class),
           Map.entry("page--shipPage", ExchangeShipPageDto.class),
           Map.entry("page--orgStockPage", ExchangeOrgStockPageDto.class),
+          Map.entry("page--bankAccountPage", ExchangeBankAccountPageDto.class),
+          Map.entry("page--bankBookingPage", ExchangeBankBookingPageDto.class),
+          Map.entry("bank-balance-series", ExchangeBankBalanceSeriesDto.class),
+          Map.entry("bank-queue", ExchangeBankQueueDto.class),
+          Map.entry("page--bankRequestPage", ExchangeBankRequestPageDto.class),
           Map.entry("change-result", ExchangeChangeResultDto.class),
           Map.entry("org-demand", ExchangeOrgDemandDto.class),
           Map.entry("org-stock-members", ExchangeOrgStockMembersDto.class),
           Map.entry("org-stock-targets", ExchangeOrgStockTargetsDto.class),
           Map.entry("org-unit-list", ExchangeOrgUnitListDto.class));
-
-  private final SchemaRegistry registry =
-      SchemaRegistry.withDefaultDialect(
-          SpecificationVersion.DRAFT_2020_12,
-          builder -> builder.schemas(ExchangeWireContractTest::publishedSchema));
 
   @Autowired private WebApplicationContext context;
   @Autowired private JsonMapper mapper;
@@ -242,7 +259,7 @@ class ExchangeWireContractTest {
   void everyPublishedRequestFixtureIsAcceptedAndEveryAnswerMatchesItsSchema() throws Exception {
     int sent = 0;
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.requestSchema() == null) {
+      if (operation.requestSchema() == null || BANK_WRITES.contains(operation.relayPath())) {
         continue;
       }
       String folder = folderOf(operation.requestSchema());
@@ -290,7 +307,7 @@ class ExchangeWireContractTest {
     seed();
     Map<String, Integer> items = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (!"GET".equals(operation.method())) {
+      if (!"GET".equals(operation.method()) || BANK_READS.contains(operation.relayPath())) {
         continue;
       }
       String path = ExchangeSeam.RELAY_PREFIX + operation.relayPath();
@@ -340,7 +357,7 @@ class ExchangeWireContractTest {
     seed();
     Map<String, String> cursors = new TreeMap<>();
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.paged()) {
+      if (operation.paged() && !BANK_READS.contains(operation.relayPath())) {
         JsonNode snapshot =
             mapper.readTree(read(ExchangeSeam.RELAY_PREFIX + operation.relayPath()));
         assertThat(snapshot.path("hasMore").asBoolean()).isFalse();
@@ -584,29 +601,9 @@ class ExchangeWireContractTest {
    * @param json the document
    * @param what the document's origin, for the message
    */
-  private void assertMatches(@Nullable String schema, @NotNull String json, @NotNull String what) {
-    assertThat(schema).as("schema of " + what).isNotNull();
-    List<Error> errors =
-        registry.getSchema(SchemaLocation.of(BASE + schema)).validate(json, InputFormat.JSON);
-    assertThat(errors).as("%s against %s: %s", what, schema, json).isEmpty();
-  }
-
-  /**
-   * Reads a published schema by its {@code $id}, from the gateway's committed schema folder.
-   *
-   * @param schemaId the schema's {@code $id}
-   * @return its text, or {@code null} for a schema that is not one of the published ones
-   */
-  private static @Nullable String publishedSchema(@NotNull String schemaId) {
-    if (!schemaId.startsWith(BASE)) {
-      return null;
-    }
-    try {
-      return Files.readString(
-          SCHEMAS.resolve(schemaId.substring(BASE.length())), StandardCharsets.UTF_8);
-    } catch (IOException missing) {
-      return null;
-    }
+  private static void assertMatches(
+      @Nullable String schema, @NotNull String json, @NotNull String what) {
+    ExchangePublishedSchemas.assertMatches(schema, json, what);
   }
 
   /**

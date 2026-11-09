@@ -84,11 +84,24 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theRelaySendsTheSeamsIdempotencyKeyHeader() {
+    assertThat(ExchangeRelay.IDEMPOTENCY_KEY_HEADER).isEqualTo(ExchangeSeam.IDEMPOTENCY_KEY_HEADER);
+  }
+
+  @Test
   void theRelayAdmitsTheSeamsGateCodesWithTheirStatuses() {
     assertGateStatuses(ExchangeSeam.GATE_STATUSES);
     Map<String, Integer> otherStatus = new HashMap<>(ExchangeSeam.GATE_STATUSES);
     otherStatus.put("SCOPE_MISSING", 401);
     assertThatThrownBy(() -> assertGateStatuses(otherStatus)).isInstanceOf(AssertionError.class);
+  }
+
+  @Test
+  void theBankSwitchGatesTheSeamsBankRouteFamilyWithTheSeamsWait() {
+    assertThat(ExchangeRoutes.BANK_PATH)
+        .isEqualTo(ExchangeSeam.GATEWAY_PREFIX + ExchangeSeam.BANK_PATH);
+    assertThat(ExchangeRelay.retryAfterSeconds("BANK_EXCHANGE_DISABLED"))
+        .isEqualTo(String.valueOf(ExchangeSeam.BANK_RETRY_AFTER_SECONDS));
   }
 
   @Test
@@ -144,7 +157,7 @@ class ExchangeRelaySeamParityTest {
       assertReadDiffers(renamed, "clients.versekit." + field);
       read.add(field);
     }
-    assertThat(read).hasSize(10);
+    assertThat(read).hasSize(11);
     assertThat(UNREAD_REGISTRY_FIELDS.keySet()).isSubsetOf(ExchangeSeam.REGISTRY_DOCUMENT_FIELDS);
   }
 
@@ -208,11 +221,12 @@ class ExchangeRelaySeamParityTest {
    */
   private static void assertGateStatuses(@NotNull Map<String, Integer> expected) {
     assertThat(new TreeMap<>(ExchangeRelay.GATE_STATUSES))
-        .hasSize(7)
+        .hasSize(8)
         .isEqualTo(new TreeMap<>(expected));
     Set<String> gateConstants =
         Set.of(
             ExchangeRefusals.EXCHANGE_DISABLED,
+            ExchangeRefusals.BANK_EXCHANGE_DISABLED,
             ExchangeRefusals.REGISTRY_UNAVAILABLE,
             ExchangeRefusals.CLIENT_NOT_ALLOWED,
             ExchangeRefusals.CLIENT_SUSPENDED,
@@ -245,13 +259,13 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> routes = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> routes.put(operation.gateway(), operation.capability()));
-    assertThat(routes).as("one gateway route per relay operation").hasSize(19);
+    assertThat(routes).as("one gateway route per relay operation").hasSize(27);
     return routes;
   }
 
   /**
    * Asserts that the gateway's route table holds exactly the given routes with their capabilities
-   * and that every capability scope but the additive ones gates a route.
+   * and that every capability scope but the additive and the unrouted ones gates a route.
    *
    * @param expected {@code METHOD path} to capability, {@link ExchangeSeam#ANY_CAPABILITY} for any
    */
@@ -266,7 +280,7 @@ class ExchangeRelaySeamParityTest {
         scopes.add(route.capability());
       }
     }
-    assertThat(routes).hasSize(19).isEqualTo(new TreeMap<>(expected));
+    assertThat(routes).hasSize(27).isEqualTo(new TreeMap<>(expected));
     assertThat(scopes).doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES);
     scopes.addAll(ExchangeSeam.ADDITIVE_SCOPES);
     assertThat(scopes).isEqualTo(new TreeSet<>(ExchangeSeam.CAPABILITY_SCOPES));
@@ -280,6 +294,7 @@ class ExchangeRelaySeamParityTest {
   private static @NotNull ExchangeRegistry expectedRegistry() {
     return new ExchangeRegistry(
         ExchangeSeam.REGISTRY_SAMPLE_REVISION,
+        true,
         true,
         Map.of(
             "versekit",

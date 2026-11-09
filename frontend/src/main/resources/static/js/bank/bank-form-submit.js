@@ -42,7 +42,7 @@ const NUMBER_FIELDS = [
 ];
 
 /** Form field names serialized as JSON booleans ("true"/"false" hidden inputs). */
-const BOOLEAN_FIELDS = ['active'];
+const BOOLEAN_FIELDS = ['active', 'assigned'];
 
 /**
  * Maps backend bank conflict codes onto the form field whose inline error slot
@@ -61,6 +61,7 @@ const CODE_FIELD = {
     BANK_SPLIT_TOO_SMALL: 'splitPercent',
     BANK_JUSTIFICATION_REQUIRED: 'justification',
     BANK_FEE_EXCEEDS_AMOUNT: 'amount',
+    BANK_APPROVER_NOTE_REQUIRED: 'staffNote',
 };
 
 /**

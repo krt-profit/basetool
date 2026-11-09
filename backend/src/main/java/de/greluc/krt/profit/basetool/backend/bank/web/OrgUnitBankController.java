@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDetailDto;
@@ -616,6 +618,25 @@ public class OrgUnitBankController {
   }
 
   /**
+   * Reads one booking request for its own page (REQ-BANK-068): for its requester, the bank staff
+   * who see its account and its approvers.
+   *
+   * @param id the request
+   * @return the request with the caller's roles on it
+   */
+  @GetMapping("/requests/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Read one booking request the caller raised, sees as staff or approves")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "The request"),
+        @ApiResponse(responseCode = "404", description = "Unknown or not visible to the caller")
+      })
+  public BankBookingRequestViewDto getRequest(@PathVariable @NotNull UUID id) {
+    return orgUnitBankRequestService.viewRequest(id);
+  }
+
+  /**
    * Lists all active accounts as transfer-request destinations (REQ-BANK-040): a requester may
    * transfer from a viewable source account to any active account.
    *
@@ -632,17 +653,20 @@ public class OrgUnitBankController {
   /**
    * Grants the responsible holder's in-app approval for an over-limit request (REQ-BANK-041), which
    * pre-fills the bank employee's confirmation checkbox. The seam authorizes the caller as the
-   * account's responsible holder (or admin).
+   * request's approver; a request that changed since the echoed version answers 409.
    *
    * @param id the request to approve
+   * @param request the version of the request as the approver read it
    * @return the updated request
    */
   @PostMapping("/requests/{id}/owner-approval")
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Grant the responsible holder's in-app approval for a booking request")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval granted")})
-  public BankBookingRequestDto grantOwnerApproval(@PathVariable @NotNull UUID id) {
-    return orgUnitBankRequestService.grantOwnerApproval(id);
+  public BankBookingRequestDto grantOwnerApproval(
+      @PathVariable @NotNull UUID id,
+      @NotNull @Valid @RequestBody GrantOwnerApprovalRequest request) {
+    return orgUnitBankRequestService.grantOwnerApproval(id, request.version());
   }
 
   /**

@@ -18,7 +18,7 @@ tests:
               application: basetool-backend
             exp_annotations:
               summary: "Several accounts hold no role (basetool-backend)"
-              description: "basetool-backend refused 12 distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a realm-side role rename, a hand-edit, or tokens arriving from the wrong realm; check the Keycloak role index line in the sync summary."
+              description: "basetool-backend refused 12 distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a mass withdrawal or lost role rows; check the role audit trail and basetool_user_role_changes_total (REQ-SEC-088)."
 
   - name: NoRoleBlockSpike stays silent for a single waiting account
     interval: 30s

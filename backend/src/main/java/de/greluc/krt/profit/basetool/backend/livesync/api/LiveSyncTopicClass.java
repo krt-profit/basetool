@@ -83,6 +83,18 @@ public enum LiveSyncTopicClass {
   MATERIALBOARD("materialboard", false, "materialboard"),
 
   /**
+   * Global bank-staff room; the backend pokes {@code requestQueue} when a booking request was
+   * raised, corrected or cancelled through the exchange (REQ-XCH-030, REQ-BANK-068).
+   */
+  BANK_STAFF("bank", false, "bank_staff"),
+
+  /**
+   * Global org-unit bank room, which the request page joins too; the backend pokes {@code
+   * orgUnitBank} for the same exchange writes.
+   */
+  ORGUNIT_BANK("orgunit-bank", false, "orgunit_bank"),
+
+  /**
    * Global admin dashboard room: the backend pokes the section of the widget whose state changed;
    * only administrators may listen (REQ-UI-034).
    */
@@ -155,6 +167,8 @@ public enum LiveSyncTopicClass {
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
+      case BANK_STAFF -> Set.of("requestQueue");
+      case ORGUNIT_BANK -> Set.of("orgUnitBank");
       case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;
     };
   }

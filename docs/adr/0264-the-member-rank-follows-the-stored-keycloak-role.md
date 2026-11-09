@@ -1,6 +1,7 @@
 # ADR-0264 — The member rank follows the stored Keycloak role
 
-- **Status:** Superseded by [ADR-0348](0348-the-member-rank-is-set-freely-by-the-admin.md)
+- **Status:** Superseded by [ADR-0348](0348-the-member-rank-is-set-freely-by-the-admin.md);
+  Decision 1's premise, that the tool does not write roles, is superseded by [ADR-0355](0355-roles-are-held-in-the-basetool-database.md)
 - **Date:** 2026-10-17
 - **Deciders:** @greluc
 - **Related:** spec [`role-model.md`](../specs/role-model.md) (REQ-ROLE-007) ·

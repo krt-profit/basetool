@@ -23,6 +23,9 @@ import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
+import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleHolderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
@@ -42,7 +45,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 /**
  * Renders the grants administration page ({@code /bank/grants}, G1 mockup with the G2 grouping
  * toggle): the per-(employee, account) capability flag matrix, grouped per account by default and
- * per employee on demand. Management-only (REQ-BANK-009/-010).
+ * per employee on demand, with the holders of the Bank Employee role the bank management assigns
+ * and withdraws there. Management-only (REQ-BANK-009/-010, REQ-SEC-088).
  */
 @Controller
 @UsesLayoutModel
@@ -53,6 +57,9 @@ public class BankGrantsPageController {
   /** The bank domain's backend calls. */
   private final BankBackendClient bankClient;
 
+  /** Reads and writes the Bank Employee role (REQ-SEC-088). */
+  private final IdentityBackendClient identityClient;
+
   /**
    * Renders the grants matrix, grouped by account (default) or by employee. User and account
    * pickers are server-side search comboboxes, so only the filtered account is resolved.
@@ -62,7 +69,8 @@ public class BankGrantsPageController {
    * @param userId selected grantee in per-employee mode; absent = first employee with grants
    * @param fragment {@code "grantsMatrix"} to re-render only the matrix under the current filter
    *     (REQ-FE-005)
-   * @param model Spring MVC model
+   * @param model Spring MVC model; {@code bankEmployeesUnavailable} marks a failed read of the Bank
+   *     Employee holders, which the page shows as such rather than as an empty list
    * @return the grants template, or its {@code grantsMatrix} fragment
    */
   @NotNull
@@ -79,6 +87,15 @@ public class BankGrantsPageController {
     List<BankGrantDto> grants =
         bankClient.grants(byEmployee ? userId : null, byEmployee ? null : accountId);
     model.addAttribute("grants", grants == null ? List.<BankGrantDto>of() : grants);
+    List<UserRoleHolderDto> employees =
+        SectionFallback.load(
+            log,
+            "bank-grants-employees",
+            () -> identityClient.roleHolders(AssignableRole.BANK_EMPLOYEE),
+            null);
+    model.addAttribute(
+        "bankEmployees", employees == null ? List.<UserRoleHolderDto>of() : employees);
+    model.addAttribute("bankEmployeesUnavailable", employees == null);
     if ("grantsMatrix".equals(fragment)) {
       return "bank/bank-grants :: grantsMatrix";
     }

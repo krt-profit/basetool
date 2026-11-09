@@ -24,7 +24,12 @@ import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** A resource the exchange syncs, each with its own change feed (REQ-XCH-013, REQ-XCH-042). */
+/**
+ * A resource clients write through the exchange: journaled, undoable and guarded against mass
+ * changes (REQ-XCH-015, REQ-XCH-021, REQ-XCH-022, REQ-XCH-042).
+ *
+ * <p>Its constant names are the values of the journal and bulk-undo {@code resource} columns.
+ */
 public enum ExchangeResource {
   /** The member's personal blueprints, keyed by product. */
   BLUEPRINT,
@@ -84,6 +89,21 @@ public enum ExchangeResource {
   }
 
   /**
+   * The change feed that sequences this resource's writes.
+   *
+   * @return the feed of the same name
+   */
+  @NotNull
+  public ExchangeFeedResource feed() {
+    return switch (this) {
+      case BLUEPRINT -> ExchangeFeedResource.BLUEPRINT;
+      case STOCK -> ExchangeFeedResource.STOCK;
+      case SHIP -> ExchangeFeedResource.SHIP;
+      case ORG_STOCK -> ExchangeFeedResource.ORG_STOCK;
+    };
+  }
+
+  /**
    * Maps a staged mass change's resource name to its resource.
    *
    * @param name the name, as {@link #massChangeName()} spells it
@@ -91,6 +111,8 @@ public enum ExchangeResource {
    */
   @NotNull
   public static Optional<ExchangeResource> fromMassChangeName(@Nullable String name) {
-    return Arrays.stream(values()).filter(r -> r.massChangeName().equals(name)).findFirst();
+    return name == null
+        ? Optional.empty()
+        : Arrays.stream(values()).filter(r -> name.equals(r.massChangeName())).findFirst();
   }
 }

@@ -6,7 +6,8 @@
   [ADR-0134](0134-backend-joins-the-management-port-isolation.md) and
   [ADR-0202](0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
   each of which rests on the exposure this ends. Amended 2026-10-17 (*Amendment 1*): the Android
-  client is deleted without a disabled grace period, and the realm provisioner deletes it.
+  client is deleted without a disabled grace period, and the realm provisioner deletes it. The
+  partial-role-scope guard of ADR-0141 it left unarmed is deleted by [ADR-0355](0355-roles-are-held-in-the-basetool-database.md).
 - **Date:** 2026-10-17
 - **Deciders:** @greluc (issue #2638)
 - **Related:** [ADR-0164](0164-an-installable-web-app-without-a-service-worker.md) (the PWA that

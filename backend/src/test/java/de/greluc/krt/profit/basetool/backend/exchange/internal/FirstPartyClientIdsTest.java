@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties;
-import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,7 +36,6 @@ class FirstPartyClientIdsTest {
           new IngestGatewayProperties(List.of("gw-client")),
           new ConnectedAppsProperties(List.of("web-a")),
           new ChangeSourceProperties(List.of("web-b")),
-          new PartialRoleScopeProperties(List.of("app-b", " ")),
           new KeycloakSyncProperties(
               false,
               "0 0 5 * * *",
@@ -49,7 +47,7 @@ class FirstPartyClientIdsTest {
               100));
 
   @ParameterizedTest
-  @ValueSource(strings = {"gw-client", "web-a", "web-b", "app-b", "admin-client"})
+  @ValueSource(strings = {"gw-client", "web-a", "web-b", "admin-client"})
   void everyConfiguredFirstPartyIdIsRecognised(String clientId) {
     assertThat(ids.contains(clientId)).isTrue();
   }

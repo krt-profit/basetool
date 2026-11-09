@@ -44,6 +44,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param entityId the loose entity id stored on the notification
  * @param contextOrgUnits the org units the event exposes by role
  * @param contextAccountId the bank account the event concerns
+ * @param contextBankRequestId the bank booking request the event concerns
  * @param contextRecipientUserId the single member the event is directed at
  * @param contextRecipientUserIds the members the event lists
  * @param contextMissionId the mission the event concerns
@@ -66,6 +67,7 @@ public record NoticeEvent(
     @NotNull UUID entityId,
     Map<NotificationContextRole, OrgUnitRef> contextOrgUnits,
     @Nullable UUID contextAccountId,
+    @Nullable UUID contextBankRequestId,
     @Nullable UUID contextRecipientUserId,
     Set<UUID> contextRecipientUserIds,
     @Nullable UUID contextMissionId,
@@ -88,6 +90,7 @@ public record NoticeEvent(
    * @param entityId the loose entity id
    * @param contextOrgUnits the org units by role
    * @param contextAccountId the bank account
+   * @param contextBankRequestId the bank booking request
    * @param contextRecipientUserId the single directed member
    * @param contextRecipientUserIds the listed members
    * @param contextMissionId the mission

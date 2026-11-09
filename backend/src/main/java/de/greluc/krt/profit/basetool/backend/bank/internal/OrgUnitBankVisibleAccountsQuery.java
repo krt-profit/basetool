@@ -86,13 +86,14 @@ public class OrgUnitBankVisibleAccountsQuery {
   }
 
   /**
-   * The fixed order of REQ-BANK-064.
+   * The fixed order of REQ-BANK-064; an empty active context orders the KRT account first and the
+   * rest by account number.
    *
    * @param activeContext the active-context org-unit ids
    * @return the comparator
    */
   @NotNull
-  private static Comparator<BankAccount> order(@NotNull Set<UUID> activeContext) {
+  static Comparator<BankAccount> order(@NotNull Set<UUID> activeContext) {
     return Comparator.comparingInt((BankAccount account) -> rank(account, activeContext))
         .thenComparing(BankAccount::getAccountNo)
         .thenComparing(BankAccount::getId);

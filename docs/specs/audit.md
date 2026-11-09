@@ -156,7 +156,10 @@ web, naming its client (REQ-AUDIT-005):
   role editor's permission grid, previously the one mutation in this area that left no trace);
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
-  `from=<old|null> to=<new>`, REQ-ROLE-007); and
+  `from=<old|null> to=<new>`, REQ-ROLE-007); the assignment and withdrawal of one of the four
+  application roles in the Basetool (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`, subject and target
+  the member, details the `role` code and, for the login-time bootstrap grant, `source=bootstrap`;
+  the KRT Member an approval grants is recorded as the approving admin's assignment, REQ-SEC-088); and
   Kommandogruppe create / rename+reorder / delete; and every **org-structure** write on the
   `org_unit` rows themselves — Staffel, SK, Bereich and Organisationsleitung create
   (`ORG_UNIT_CREATED`, details `kind`, `parent` as `kind:id` or `none`, and a Bereich's
@@ -259,7 +262,8 @@ web, naming its client (REQ-AUDIT-005):
   scopes), editing it (`EXCHANGE_CLIENT_UPDATED`, only when a field changed; the details name the
   changed fields and the added and removed scopes), suspending and activating it
   (`EXCHANGE_CLIENT_SUSPENDED` / `_ACTIVATED`, only on a change) and the global exchange switch
-  (`EXCHANGE_SWITCH_CHANGED`, the new state), and a member disconnecting a whole client
+  (`EXCHANGE_SWITCH_CHANGED`, the new state), the bank switch of the exchange
+  (`BANK_EXCHANGE_SWITCH_CHANGED`, the new state, REQ-BXCH-006), and a member disconnecting a whole client
   (`EXCHANGE_CLIENT_DISCONNECTED`) or one installation (`EXCHANGE_INSTALLATION_DISCONNECTED`,
   REQ-XCH-008; the installation's label never enters the row), and the system ending a departed
   member's exchange access (`EXCHANGE_MEMBER_DEPARTED`: the reason, the number of clients, and

@@ -495,4 +495,58 @@ public interface UserRepository
           + " :roleCodes")
   boolean hasAnyRoleCode(
       @Param("userId") UUID userId, @Param("roleCodes") java.util.Collection<String> roleCodes);
+
+  /**
+   * Bumps a user's role-set counter in one conditional statement, leaving the row {@code @Version}
+   * untouched (ADR-0355). Zero rows means the counter moved on, a conflict.
+   *
+   * @param userId the user
+   * @param expectedVersion the role-set counter the caller last saw
+   * @return {@code 1} when the counter was bumped, {@code 0} when it did not match
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          "UPDATE app_user SET roles_version = roles_version + 1"
+              + " WHERE id = :userId AND roles_version = :expectedVersion",
+      nativeQuery = true)
+  int bumpRolesVersionIfMatches(
+      @Param("userId") UUID userId, @Param("expectedVersion") long expectedVersion);
+
+  /**
+   * Bumps a user's role-set counter unconditionally, for a role change no caller based on a seen
+   * role set: the bootstrap grant (REQ-SEC-088).
+   *
+   * @param userId the user
+   * @return the number of rows bumped, {@code 0} for an unknown user
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value = "UPDATE app_user SET roles_version = roles_version + 1 WHERE id = :userId",
+      nativeQuery = true)
+  int bumpRolesVersion(@Param("userId") UUID userId);
+
+  /**
+   * Counts the active accounts other than {@code userId} that hold a role: approved, present and
+   * enabled in Keycloak, matching {@link User#isActiveAccount()}.
+   *
+   * @param roleCode the stable role code
+   * @param userId the account left out of the count
+   * @return the number of other active holders
+   */
+  @Query(
+      "SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.code = :roleCode AND u.id <> :userId"
+          + " AND u.approvalStatus ="
+          + " de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE"
+          + " AND u.inKeycloak = TRUE AND u.enabledInKeycloak = TRUE")
+  long countOtherActiveHolders(@Param("roleCode") String roleCode, @Param("userId") UUID userId);
+
+  /**
+   * The holders of a role, ordered by username.
+   *
+   * @param roleCode the stable role code
+   * @return the users holding the role; never {@code null}
+   */
+  @Query("SELECT u FROM User u JOIN u.roles r WHERE r.code = :roleCode ORDER BY u.username")
+  List<User> findAllByRoleCode(@Param("roleCode") String roleCode);
 }

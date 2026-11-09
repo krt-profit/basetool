@@ -222,6 +222,8 @@ def run(stack: Stack, sink: SmtpSink, workdir: Path) -> None:
     admin_pw = "probe-admin-" + secrets.token_hex(4)
     stack.kcadm("create", "clients", "-r", REALM, "-s", f"clientId={CLIENT}", "-s", "publicClient=true",
                 "-s", "standardFlowEnabled=true", "-s", f'redirectUris=["{REDIRECT}"]')
+    # The test realms hold no application role; production keeps Admin by hand as the OTP marker.
+    stack.kcadm("create", "roles", "-r", REALM, "-s", "name=Admin")
     stack.create_user("probe-admin", admin_pw, "Admin")
     stack.create_user("probe-admin-rollback", admin_pw, "Admin")
     stack.create_user("probe-forgetful", admin_pw, None)

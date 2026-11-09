@@ -19,252 +19,115 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import java.util.Map;
-import java.util.Optional;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
+import java.math.BigDecimal;
 import java.util.UUID;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The {@code @PreAuthorize} helper bean for the bank surface (ADR-0011).
- *
- * <p>Decides only from the bank roles ({@code ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE}) and the
- * {@link BankAccountGrant} rows; org-unit membership and scope are never consulted (REQ-BANK-008).
+ * The {@code @PreAuthorize} helper bean of the bank-staff surface (ADR-0011): a thin adapter that
+ * asks {@link BankAccessPolicy} for the request's {@link BankCaller#actor()} and decides nothing
+ * itself (ADR-0352). The gates pass only the id they check; the actor comes from the database.
  */
 @Service("bankSecurityService")
 @RequiredArgsConstructor
-@Slf4j
 @Transactional(readOnly = true)
 public class BankSecurityService {
 
-  private final AuthHelperService authHelperService;
-  private final BankAccountGrantRepository grantRepository;
+  private final BankCaller bankCaller;
+  private final BankAccessRules policy;
   private final BankHolderRepository holderRepository;
 
   /**
-   * Whether the current caller is bank staff at all — holds {@code ROLE_BANK_EMPLOYEE} directly or
-   * reaches it via the hierarchy (management, admin). The coarse gate of every bank surface.
+   * The current caller's bank-staff rights.
    *
-   * @return {@code true} iff the caller reaches the Bank Employee role
+   * @return the rights of {@link BankCaller#actor()}
    */
-  public boolean isBankStaff() {
-    return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE));
+  @NotNull
+  public BankStaffRights staffRights() {
+    return policy.staffRights(bankCaller.actor());
   }
 
   /**
-   * Whether the current caller is Bankleitung or above — sees and manages all accounts, holders and
-   * grants (REQ-BANK-010). Admins reach this via the hierarchy.
+   * Whether the current caller is Bankleitung or above and so sees and manages every account,
+   * holder and grant (REQ-BANK-010).
    *
-   * @return {@code true} iff the caller reaches the Bank Management role
+   * @return {@link BankStaffRights#management()} of the caller
    */
   public boolean isManagement() {
-    return authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT));
+    return staffRights().management();
   }
 
   /**
-   * Checks whether the caller may see the account: bank management, or bank staff with any grant
-   * row on it (REQ-BANK-009). An unknown account is denied.
+   * Whether the caller may see the account on the bank-staff side (REQ-BANK-009).
    *
-   * @param accountId the account to check; never {@code null}
-   * @param authentication the current authentication; may be {@code null}
-   * @return {@code true} iff the caller may read the account
+   * @param accountId the account to check
+   * @return {@link BankStaffRights#canSee(UUID)} of the caller
    */
-  public boolean canSee(@NotNull UUID accountId, Authentication authentication) {
-    return hasCapability(accountId, authentication, _ -> true);
+  public boolean canSee(@NotNull UUID accountId) {
+    return staffRights().canSee(accountId);
   }
 
   /**
-   * Checks whether the caller may see a holder's custody history (REQ-BANK-032): management may see
-   * any holder, a bank employee only their own.
+   * Whether the caller may see a holder's custody history (REQ-BANK-032).
    *
-   * @param holderId the holder whose history is requested; never {@code null}
-   * @param authentication the current authentication; may be {@code null}
-   * @return {@code true} iff the caller may read the holder's history
+   * @param holderId the holder whose history is requested
+   * @return {@link BankStaffRights#maySeeHolder(UUID)} for the member the holder belongs to
    */
-  public boolean canSeeHolder(@NotNull UUID holderId, Authentication authentication) {
-    if (authentication == null || !authentication.isAuthenticated() || !isBankStaff()) {
-      return false;
-    }
-    if (isManagement()) {
-      return true;
-    }
-    return authHelperService
-        .currentUserId()
-        .flatMap(uid ->
+  public boolean canSeeHolder(@NotNull UUID holderId) {
+    return staffRights()
+        .maySeeHolder(
             holderRepository
                 .findById(holderId)
-                .map(holder -> holder.getUser() != null && uid.equals(holder.getUser().getId())))
-        .orElse(false);
+                .map(holder -> holder.getUser() == null ? null : holder.getUser().getId())
+                .orElse(null));
   }
 
   /**
-   * Checks whether the caller may book deposits onto the account: management unrestricted,
-   * employees need {@code can_deposit} (REQ-BANK-009).
+   * Whether the caller may book deposits onto the account (REQ-BANK-009).
    *
-   * @param accountId the receiving account; never {@code null}
-   * @param authentication the current authentication
-   * @return {@code true} iff the caller may deposit
+   * @param accountId the receiving account
+   * @return {@code true} iff the caller holds the deposit capability
    */
-  public boolean canDeposit(@NotNull UUID accountId, Authentication authentication) {
-    return hasCapability(accountId, authentication, BankAccountGrant::isCanDeposit);
+  public boolean canDeposit(@NotNull UUID accountId) {
+    return staffRights().canBook(BankBookingRequestType.DEPOSIT, accountId);
   }
 
   /**
-   * Checks whether the caller may book withdrawals from the account: management unrestricted,
-   * employees need {@code can_withdraw} (REQ-BANK-009).
+   * Whether the caller may book withdrawals from the account (REQ-BANK-009).
    *
-   * @param accountId the paying account; never {@code null}
-   * @param authentication the current authentication
-   * @return {@code true} iff the caller may withdraw
+   * @param accountId the paying account
+   * @return {@code true} iff the caller holds the withdrawal capability
    */
-  public boolean canWithdraw(@NotNull UUID accountId, Authentication authentication) {
-    return hasCapability(accountId, authentication, BankAccountGrant::isCanWithdraw);
+  public boolean canWithdraw(@NotNull UUID accountId) {
+    return staffRights().canBook(BankBookingRequestType.WITHDRAWAL, accountId);
   }
 
   /**
-   * Checks whether the caller may transfer out of the account: management unrestricted, employees
-   * need {@code can_transfer} on the source account (REQ-BANK-011).
+   * Whether the caller may transfer out of the account (REQ-BANK-011).
    *
-   * @param accountId the source account; never {@code null}
-   * @param authentication the current authentication
-   * @return {@code true} iff the caller may transfer
+   * @param accountId the source account
+   * @return {@code true} iff the caller holds the transfer capability
    */
-  public boolean canTransfer(@NotNull UUID accountId, Authentication authentication) {
-    return hasCapability(accountId, authentication, BankAccountGrant::isCanTransfer);
+  public boolean canTransfer(@NotNull UUID accountId) {
+    return staffRights().canBook(BankBookingRequestType.TRANSFER, accountId);
   }
 
   /**
-   * Checks whether the caller may confirm a booking request of the given type on the account: the
-   * capability the matching direct booking needs, {@code can_deposit}, {@code can_withdraw} or
-   * {@code can_transfer} on the request's account; management unrestricted (REQ-BANK-023).
+   * Whether the caller's direct withdrawal or transfer must become an approval request instead
+   * (REQ-BANK-047, ADR-0109).
    *
-   * @param type the request's movement kind
-   * @param accountId the request's (source) account; never {@code null}
-   * @param authentication the current authentication
-   * @return {@code true} iff the caller may confirm such a request
+   * @param accountId the (source) account
+   * @param amount the entered whole-aUEC amount leaving the account
+   * @return {@code true} iff the booking exceeds the KRT ceiling for the caller
    */
-  public boolean canConfirm(
-      @NotNull BankBookingRequestType type,
-      @NotNull UUID accountId,
-      Authentication authentication) {
-    return hasCapability(accountId, authentication, confirmCapability(type), this::findCallerGrant);
-  }
-
-  /**
-   * Answers {@link #canConfirm} for any number of requests with at most one grant read, for a list
-   * that marks every row (REQ-BANK-023).
-   *
-   * @param authentication the current authentication
-   * @return a check taking a request's type and account id, deciding exactly as {@link #canConfirm}
-   */
-  @NotNull
-  public BiPredicate<BankBookingRequestType, UUID> confirmCheck(Authentication authentication) {
-    Map<UUID, BankAccountGrant> callerGrants = isManagement() ? Map.of() : loadCallerGrants();
-    return (type, accountId) ->
-        hasCapability(
-            accountId,
-            authentication,
-            confirmCapability(type),
-            id -> Optional.ofNullable(callerGrants.get(id)));
-  }
-
-  /**
-   * Maps a request type onto the grant flag its confirmation needs.
-   *
-   * @param type the request's movement kind
-   * @return the per-grant check for that kind
-   */
-  @NotNull
-  private static Predicate<BankAccountGrant> confirmCapability(
-      @NotNull BankBookingRequestType type) {
-    return switch (type) {
-      case DEPOSIT -> BankAccountGrant::isCanDeposit;
-      case WITHDRAWAL -> BankAccountGrant::isCanWithdraw;
-      case TRANSFER -> BankAccountGrant::isCanTransfer;
-    };
-  }
-
-  /**
-   * Loads every grant row of the caller, keyed by account id.
-   *
-   * @return the caller's grants; empty when there is no caller
-   */
-  @NotNull
-  private Map<UUID, BankAccountGrant> loadCallerGrants() {
-    return authHelperService
-        .currentUserId()
-        .map(uid ->
-            grantRepository.findByUserId(uid).stream()
-                .collect(
-                    Collectors.toUnmodifiableMap(
-                        grant -> grant.getId().getAccountId(), Function.identity())))
-        .orElseGet(Map::of);
-  }
-
-  /**
-   * Reads the caller's grant row on one account.
-   *
-   * @param accountId the account
-   * @return the caller's grant on it, or empty when there is none or no caller
-   */
-  @NotNull
-  private Optional<BankAccountGrant> findCallerGrant(@NotNull UUID accountId) {
-    return authHelperService
-        .currentUserId()
-        .flatMap(uid -> grantRepository.findById(new BankAccountGrantId(uid, accountId)));
-  }
-
-  /**
-   * Passes authenticated bank staff that hold the management role or a grant row satisfying the
-   * capability predicate.
-   *
-   * @param accountId the account under decision
-   * @param authentication the current authentication, possibly {@code null}
-   * @param capability the per-grant check ({@code g -> true} for plain visibility)
-   * @return {@code true} iff the caller passes
-   */
-  private boolean hasCapability(
-      @NotNull UUID accountId,
-      Authentication authentication,
-      @NotNull Predicate<BankAccountGrant> capability) {
-    return hasCapability(accountId, authentication, capability, this::findCallerGrant);
-  }
-
-  /**
-   * Passes authenticated bank staff that hold the management role or a grant row, found through the
-   * given lookup, satisfying the capability predicate.
-   *
-   * @param accountId the account under decision
-   * @param authentication the current authentication, possibly {@code null}
-   * @param capability the per-grant check
-   * @param callerGrant resolves the caller's grant row on an account
-   * @return {@code true} iff the caller passes
-   */
-  private boolean hasCapability(
-      @NotNull UUID accountId,
-      Authentication authentication,
-      @NotNull Predicate<BankAccountGrant> capability,
-      @NotNull Function<UUID, Optional<BankAccountGrant>> callerGrant) {
-    if (authentication == null || !authentication.isAuthenticated()) {
-      return false;
-    }
-    if (!isBankStaff()) {
-      return false;
-    }
-    if (isManagement()) {
-      return true;
-    }
-    return callerGrant.apply(accountId).filter(capability).isPresent();
+  public boolean exceedsCartelDirectBookingCeiling(
+      @NotNull UUID accountId, @NotNull BigDecimal amount) {
+    return policy.exceedsDirectBookingCeiling(bankCaller.actor(), accountId, amount);
   }
 }

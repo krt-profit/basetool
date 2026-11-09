@@ -125,13 +125,11 @@ public class ExchangeController {
   private static final String BUDGET_EXHAUSTED_DETAIL =
       "The exchange's storage budget is full; try again later.";
 
-  private static final String BACKEND = "/api/v1/exchange";
+  /** The relay prefix of the backend's exchange surface. */
+  static final String BACKEND = "/api/v1/exchange";
 
-  private static final Pattern CURSOR = Pattern.compile("^[A-Za-z0-9._:-]{1,128}$");
-
-  private static final Pattern LIMIT = Pattern.compile("^[0-9]{1,4}$");
-
-  private static final Pattern UUID_SHAPE =
+  /** The shape of an id the gateway relays in a path or query. */
+  static final Pattern UUID_SHAPE =
       Pattern.compile(
           "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$");
 
@@ -157,6 +155,9 @@ public class ExchangeController {
   private final HeldMassChanges heldMassChanges;
   private final ExchangeAnswers answers;
 
+  /** Relays a read and turns the backend's answer or a refusal into the client's. */
+  private final ExchangeRelayResponses responses;
+
   /**
    * Returns the service document: what this token may do and what the server expects.
    *
@@ -173,7 +174,7 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
     ObjectNode document = objectMapper.createObjectNode();
     document.put("apiVersion", API_VERSION);
@@ -182,7 +183,7 @@ public class ExchangeController {
     ExchangeRelay.Result installation =
         relay.forward(HttpMethod.GET, BACKEND + "/me/installation", null, context, acceptLanguage);
     if (ExchangeRelay.isGateCode(installation.code())) {
-      return problem(installation.status(), installation.code(), installation.detail());
+      return responses.problem(installation.status(), installation.code(), installation.detail());
     }
     if (installation.isOk() && installation.body().get("installationId") != null) {
       document.set("installationId", installation.body().get("installationId"));
@@ -203,7 +204,7 @@ public class ExchangeController {
         installation.isOk()
             ? answers.passesRelayed(document, schema, request, context)
             : answers.passes(document, schema, request);
-    return passes ? ok(document) : failed();
+    return passes ? responses.ok(document) : responses.failed();
   }
 
   /**
@@ -221,7 +222,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "installation.schema.json",
         "/me/installation",
@@ -245,7 +247,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "account-check-request.schema.json",
         "/me/account-check",
@@ -269,7 +272,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "resolve-request.schema.json",
         "/catalog/resolve",
@@ -293,9 +297,9 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
-    return relayed(
+    return responses.relayed(
         relay.forward(
             HttpMethod.GET, BACKEND + "/catalog/locations", null, context, acceptLanguage),
         "location-list.schema.json",
@@ -322,7 +326,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return page(
+    return responses.page(
         "/me/blueprints",
         "page.schema.json#/$defs/blueprintPage",
         cursor,
@@ -349,7 +353,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return page(
+    return responses.page(
         "/me/stock", "page.schema.json#/$defs/stockPage", cursor, limit, request, acceptLanguage);
   }
 
@@ -370,7 +374,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return page(
+    return responses.page(
         "/me/ships", "page.schema.json#/$defs/shipPage", cursor, limit, request, acceptLanguage);
   }
 
@@ -389,9 +393,9 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
-    return relayed(
+    return responses.relayed(
         relay.forward(HttpMethod.GET, BACKEND + "/me/org-demand", null, context, acceptLanguage),
         "org-demand.schema.json",
         List.of(),
@@ -414,9 +418,9 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
-    return relayed(
+    return responses.relayed(
         relay.forward(HttpMethod.GET, BACKEND + "/me/org-units", null, context, acceptLanguage),
         "org-unit-list.schema.json",
         List.of(),
@@ -441,7 +445,7 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return page(
+    return responses.page(
         "/org-stock",
         "page.schema.json#/$defs/orgStockPage",
         cursor,
@@ -467,12 +471,13 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
     if (unit == null || !UUID_SHAPE.matcher(unit).matches()) {
-      return schemaInvalid(List.of(new ExchangeSchemas.Violation("/unit", "must be a unit id")));
+      return responses.schemaInvalid(
+          List.of(new ExchangeSchemas.Violation("/unit", "must be a unit id")));
     }
-    return relayed(
+    return responses.relayed(
         relay.forward(
             HttpMethod.GET,
             BACKEND + "/org-stock/members?unit=" + unit.toLowerCase(Locale.ROOT),
@@ -505,7 +510,7 @@ public class ExchangeController {
           String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
     List<ExchangeSchemas.Violation> violations = new ArrayList<>();
     if (unit == null || !UUID_SHAPE.matcher(unit).matches()) {
@@ -515,9 +520,9 @@ public class ExchangeController {
       violations.add(new ExchangeSchemas.Violation("/material", "must be a material or item id"));
     }
     if (!violations.isEmpty()) {
-      return schemaInvalid(violations);
+      return responses.schemaInvalid(violations);
     }
-    return relayed(
+    return responses.relayed(
         relay.forward(
             HttpMethod.GET,
             BACKEND
@@ -682,28 +687,28 @@ public class ExchangeController {
       @Nullable String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
     List<ExchangeSchemas.Violation> violations = schemas.validate(schema, body);
     if (!violations.isEmpty()) {
-      return schemaInvalid(violations);
+      return responses.schemaInvalid(violations);
     }
     ExchangeSchemas.Violation unsupported =
         kind == HandoffKind.BLUEPRINT ? unsupportedFormatMajor(body) : null;
     if (unsupported != null) {
-      return schemaInvalid(List.of(unsupported));
+      return responses.schemaInvalid(List.of(unsupported));
     }
     ExchangeRelay.Result result =
         relay.forward(
             HttpMethod.POST, BACKEND + "/me/drafts/" + resource, body, context, acceptLanguage);
     if (!result.isOk()) {
-      return problem(result.status(), result.code(), result.detail());
+      return responses.problem(result.status(), result.code(), result.detail());
     }
     String json = objectMapper.writeValueAsString(result.body());
     long bytes = stagingService.stagedBytes(kind, json);
     if (json.getBytes(StandardCharsets.UTF_8).length > ingestProperties.maxHandoffBytes()
         || bytes > ingestProperties.maxHandoffBytes()) {
-      return problem(
+      return responses.problem(
           HttpStatus.CONTENT_TOO_LARGE.value(),
           PAYLOAD_TOO_LARGE,
           "The draft is too large to hand off; send fewer entries.");
@@ -742,7 +747,7 @@ public class ExchangeController {
     answer.put("handoffId", staged.handoffId());
     answer.put("kind", kind.name());
     boolean passes = answers.passesRelayed(answer, "draft-result.schema.json", request, context);
-    return passes ? ok(answer) : failed();
+    return passes ? responses.ok(answer) : responses.failed();
   }
 
   /**
@@ -771,10 +776,10 @@ public class ExchangeController {
       @Nullable String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
-      return failed();
+      return responses.failed();
     }
     if (body.get("ops") instanceof ArrayNode ops && ops.size() > BATCH_MAX_OPS) {
-      return problem(
+      return responses.problem(
           HttpStatus.CONTENT_TOO_LARGE.value(),
           BATCH_TOO_LARGE,
           "A change set holds at most " + BATCH_MAX_OPS + " ops.");
@@ -782,10 +787,10 @@ public class ExchangeController {
     String schema = "change-set.schema.json#/$defs/" + definition;
     List<ExchangeSchemas.Violation> violations = schemas.validate(schema, body);
     if (!violations.isEmpty()) {
-      return schemaInvalid(violations);
+      return responses.schemaInvalid(violations);
     }
     List<String> unknown = schemas.unknownFields(schema, body);
-    ResponseEntity<?> unreportable = unreportable(unknown);
+    ResponseEntity<?> unreportable = responses.unreportable(unknown);
     if (unreportable != null) {
       return unreportable;
     }
@@ -814,7 +819,7 @@ public class ExchangeController {
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
       return staged(context, request, resource, body, result, digest);
     }
-    return relayed(result, "change-result.schema.json", unknown, context, request);
+    return responses.relayed(result, "change-result.schema.json", unknown, context, request);
   }
 
   /**
@@ -890,7 +895,7 @@ public class ExchangeController {
     long bytes = stagingService.stagedBytes(HandoffKind.MASS_CHANGE, json);
     if (json.getBytes(StandardCharsets.UTF_8).length > storeProperties.maxMassChangeBytes()
         || bytes > storeProperties.maxMassChangeBytes()) {
-      return problem(
+      return responses.problem(
           HttpStatus.CONTENT_TOO_LARGE.value(),
           BATCH_TOO_LARGE,
           "The change set is too large to hold for confirmation; send smaller batches.");
@@ -1016,164 +1021,6 @@ public class ExchangeController {
   }
 
   /**
-   * Checks the paging parameters, relays a page request and checks the answer.
-   *
-   * @param path the route below {@code /exchange/v1}
-   * @param responseSchema the page's schema
-   * @param cursor the cursor, or {@code null}
-   * @param limit the page size, or {@code null}
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the page or a problem
-   */
-  private @NotNull ResponseEntity<?> page(
-      @NotNull String path,
-      @NotNull String responseSchema,
-      @Nullable String cursor,
-      @Nullable String limit,
-      @NotNull HttpServletRequest request,
-      @Nullable String acceptLanguage) {
-    ExchangeRequestContext context = ExchangeRequestContext.of(request);
-    if (context == null) {
-      return failed();
-    }
-    if (limit != null && !validLimit(limit)) {
-      return schemaInvalid(
-          List.of(
-              new ExchangeSchemas.Violation(
-                  "/limit", "must be an integer from 1 to " + PAGE_MAX_LIMIT)));
-    }
-    if (cursor != null && !CURSOR.matcher(cursor).matches()) {
-      return problem(
-          HttpStatus.GONE.value(), CURSOR_EXPIRED, "The cursor is not one the server issued.");
-    }
-    StringBuilder target = new StringBuilder(BACKEND).append(path);
-    char separator = '?';
-    if (cursor != null) {
-      target.append(separator).append("cursor=").append(cursor);
-      separator = '&';
-    }
-    if (limit != null) {
-      target.append(separator).append("limit=").append(Integer.parseInt(limit));
-    }
-    return relayed(
-        relay.forward(HttpMethod.GET, target.toString(), null, context, acceptLanguage),
-        responseSchema,
-        List.of(),
-        context,
-        request);
-  }
-
-  /**
-   * Whether a page size lies within the contract.
-   *
-   * @param limit the raw value
-   * @return {@code true} for an integer from 1 to {@value #PAGE_MAX_LIMIT}
-   */
-  private static boolean validLimit(@NotNull String limit) {
-    if (!LIMIT.matcher(limit).matches()) {
-      return false;
-    }
-    int value = Integer.parseInt(limit);
-    return value >= 1 && value <= PAGE_MAX_LIMIT;
-  }
-
-  /**
-   * Checks a body, relays it and checks the answer.
-   *
-   * @param body the request body
-   * @param requestSchema the body's schema
-   * @param path the route below {@code /exchange/v1}
-   * @param responseSchema the answer's schema
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the answer or a problem
-   */
-  private @NotNull ResponseEntity<?> relayBody(
-      @NotNull JsonNode body,
-      @NotNull String requestSchema,
-      @NotNull String path,
-      @NotNull String responseSchema,
-      @NotNull HttpServletRequest request,
-      @Nullable String acceptLanguage) {
-    ExchangeRequestContext context = ExchangeRequestContext.of(request);
-    if (context == null) {
-      return failed();
-    }
-    List<ExchangeSchemas.Violation> violations = schemas.validate(requestSchema, body);
-    if (!violations.isEmpty()) {
-      return schemaInvalid(violations);
-    }
-    List<String> unknown = schemas.unknownFields(requestSchema, body);
-    ResponseEntity<?> unreportable = unreportable(unknown);
-    if (unreportable != null) {
-      return unreportable;
-    }
-    return relayed(
-        relay.forward(HttpMethod.POST, BACKEND + path, body, context, acceptLanguage),
-        responseSchema,
-        unknown,
-        context,
-        request);
-  }
-
-  /**
-   * Turns a relay result into the answer: a usable one gains the request's unknown-field warnings
-   * and reaches the client only when it holds its contract.
-   *
-   * @param result the relay result
-   * @param responseSchema the answer's schema
-   * @param unknown the request's undeclared fields
-   * @param context what the gate established
-   * @param request the admitted request
-   * @return the answer or a problem
-   */
-  private @NotNull ResponseEntity<?> relayed(
-      @NotNull ExchangeRelay.Result result,
-      @NotNull String responseSchema,
-      @NotNull List<String> unknown,
-      @NotNull ExchangeRequestContext context,
-      @NotNull HttpServletRequest request) {
-    if (!result.isOk()) {
-      return problem(result.status(), result.code(), result.detail());
-    }
-    JsonNode body = result.body();
-    answers.addUnknownFieldWarnings(body, responseSchema, unknown);
-    return answers.passesRelayed(body, responseSchema, request, context) ? ok(body) : failed();
-  }
-
-  /**
-   * Answers with a JSON document.
-   *
-   * @param body the document
-   * @return {@code 200}
-   */
-  private static @NotNull ResponseEntity<?> ok(@NotNull JsonNode body) {
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
-  }
-
-  /**
-   * Refuses a body whose undeclared field could not be reported as a warning, because its JSON
-   * Pointer exceeds {@link ExchangeSchemas#MAX_POINTER} characters; checked before the relay, so a
-   * write the backend committed always gets an answer that matches its schema.
-   *
-   * @param unknown the request's undeclared fields
-   * @return {@code 400 SCHEMA_INVALID} naming the fields' parents, or {@code null} when every field
-   *     can be reported
-   */
-  private @Nullable ResponseEntity<?> unreportable(@NotNull List<String> unknown) {
-    List<ExchangeSchemas.Violation> violations =
-        unknown.stream()
-            .filter(pointer -> pointer.length() > ExchangeSchemas.MAX_POINTER)
-            .map(pointer ->
-                new ExchangeSchemas.Violation(
-                    ExchangeSchemas.reportable(pointer), "holds a property name too long"))
-            .distinct()
-            .toList();
-    return violations.isEmpty() ? null : schemaInvalid(violations);
-  }
-
-  /**
    * Refuses an envelope whose {@code formatVersion} names a major other than {@value
    * #FORMAT_MAJOR}; every {@code 1.x} passes (REQ-XCH-019).
    *
@@ -1191,69 +1038,5 @@ public class ExchangeController {
     return FORMAT_MAJOR.equals(major)
         ? null
         : new ExchangeSchemas.Violation("/" + FORMAT_VERSION, UNSUPPORTED_MAJOR);
-  }
-
-  /**
-   * Answers a request body that breaks its schema; every pointer is shortened to one the problem
-   * schema can carry.
-   *
-   * @param violations the violations
-   * @return {@code 400 SCHEMA_INVALID} with {@code errors[]}
-   */
-  private @NotNull ResponseEntity<?> schemaInvalid(
-      @NotNull List<ExchangeSchemas.Violation> violations) {
-    ProblemDetail problem =
-        Problems.of(
-            loggingProperties,
-            HttpStatus.BAD_REQUEST,
-            "Bad request",
-            "SCHEMA_INVALID",
-            "The body does not match the v1 schema.");
-    problem.setProperty(
-        "errors",
-        violations.stream()
-            .map(v -> new Problems.FieldError(ExchangeSchemas.reportable(v.pointer()), v.message()))
-            .toList());
-    return ResponseEntity.badRequest()
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(problem);
-  }
-
-  /**
-   * Answers a relay failure.
-   *
-   * @return {@code 502 BACKEND_RELAY_FAILED}
-   */
-  private @NotNull ResponseEntity<?> failed() {
-    ExchangeRelay.Result failed = ExchangeRelay.Result.failed();
-    return problem(failed.status(), failed.code(), failed.detail());
-  }
-
-  /**
-   * Builds a problem answer, with the {@code Retry-After} the gateway's gate sends for a relayed
-   * gate code that carries one.
-   *
-   * @param status the status
-   * @param code the code
-   * @param detail the detail
-   * @return the answer
-   */
-  private @NotNull ResponseEntity<?> problem(
-      int status, @Nullable String code, @Nullable String detail) {
-    HttpStatus httpStatus = HttpStatus.valueOf(status);
-    ProblemDetail problem =
-        Problems.of(
-            loggingProperties,
-            httpStatus,
-            httpStatus.getReasonPhrase(),
-            code == null ? ExchangeRelay.RELAY_FAILED : code,
-            detail);
-    ResponseEntity.BodyBuilder answer =
-        ResponseEntity.status(httpStatus).contentType(MediaType.APPLICATION_PROBLEM_JSON);
-    String retryAfter = ExchangeRelay.retryAfterSeconds(code);
-    if (retryAfter != null) {
-      answer.header(HttpHeaders.RETRY_AFTER, retryAfter);
-    }
-    return answer.body(problem);
   }
 }

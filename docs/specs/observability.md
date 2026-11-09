@@ -962,7 +962,11 @@ not silent — so the only detector was a human reading a log export.
 
 - **Admin-only UIs:** Grafana is the **only** monitoring UI, published via the native edge
   (ADR-0162, `docker/edge/conf.d/40-grafana.conf.template`) and authenticated through Keycloak OIDC
-  restricted to the realm role `Admin` (`ROLES_AND_PERMISSIONS.md`). No other monitoring component
+  restricted to the client role `grafana-admin` of the `grafana` client (`ROLES_AND_PERMISSIONS.md`):
+  the client's `client roles` mapper puts it into the ID token and userinfo as `grafana_roles`, and
+  `GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH` maps it to Grafana's server admin under
+  `ROLE_ATTRIBUTE_STRICT`. The provisioner creates the role; it is assigned by hand to the few
+  Grafana admins and is independent of the Basetool's own roles. No other monitoring component
   (Prometheus, Alertmanager, Loki, Tempo, exporters) has a public route. Inside the host, two ports
   are published on **loopback only** so the host-native Alloy can reach them (`loki` on
   `127.0.0.1:3100`, `tempo`'s OTLP receiver on `127.0.0.1:4327`, `PODMAN_LOOPBACK_PUBLISH` in
@@ -1223,7 +1227,7 @@ Binding conditions on this retention:
   (`tasks/27-observability.yml`); a size cap that binds first deletes sooner, which stays inside the
   approved retention.
 - **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
-  restricted to the realm role `Admin` (REQ-OBS-008).
+  restricted to the client role `grafana-admin` (REQ-OBS-008).
 - **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
   the temporary IP storage. `frontend/src/main/resources/templates/shell/privacy.html` §3.8 plus the
   `privacy.h2_3_8` / `privacy.p_3_8_1` / `privacy.p_3_8_2` keys in the DE/EN bundles document the
@@ -1684,14 +1688,16 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
   the account id the Keycloak console needs (added 2026-09-17).
 - `basetool_admin_registration_auto_activated_total` counter (untagged,
-  `UserReconciliationService`, both creation paths) counts a brand-new row that is `ACTIVE` on
-  arrival because the subject holds the Keycloak ADMIN realm role — the REQ-SEC-017
-  bootstrap carve-out, which is the one way an account gains full authority with no admin
-  decision behind it and which used to leave no trace. Counted on whichever path inserts the
-  row (`created` is true exactly once per account), so the interactive and scheduled paths
-  cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
+  `UserReconciliationService`, the login path) counts every bootstrap Admin grant at login
+  (REQ-SEC-088), to a brand-new row as to an existing account — the REQ-SEC-017 bootstrap
+  carve-out, which is the one way an account gains full authority with no admin decision behind
+  it. The roster sync grants nothing, because it writes no role. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_user_role_changes_total{role,action}` counter (`RoleChangeRecorder`, `role` bounded by the
+  four assignable roles, `action` `assigned` / `withdrawn`) counts every role written in the Basetool,
+  the bootstrap grant and the KRT Member an approval grants included (REQ-SEC-088); who and whom is in the ROLE audit trail. A panel on
+  `07-basetool-operations.json` charts it per role and action.
 - `basetool_notification_muted_total{notification_type}` counter (`NotificationMuteService`, bounded by
   the notification types) counts the recipients the engine dropped because they muted the type
   (REQ-NOTIF-027); a panel on `07-basetool-operations.json` charts it per type. Added with issue
@@ -2314,6 +2320,7 @@ the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-
 counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` labels:
 `mission`, `operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
+the role tab's `member`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
@@ -4192,3 +4199,51 @@ These meters show where that precedence meets values it cannot place:
 **Enforced by:** `P4kItemPrecedenceTest`, `ScWikiItemFieldWriterTest` (unknown class and grade);
 `CatalogueStatBusinessGaugesTest`, `BusinessMetricsCollectorTest`,
 `monitoring/prometheus/tests/scwiki_item_stats_missing_test.yml` (stat sources) · **Related:** REQ-OBS-011, REQ-OBS-022 · **Issues:** #2889, #2927, #3040
+
+### REQ-OBS-024 — The bank on the exchange is measured and alerted
+
+> [!note] Implemented (#3156; ADR-0354). The route slices wire the read and write counters.
+
+The bank route family of the exchange ([`bank-exchange.md`](bank-exchange.md), REQ-BXCH-006) carries
+its own meters. Every label is a registry `client_id` or a fixed enumeration, never an id, a path or
+an amount (REQ-OBS-011).
+
+- **Reads.** `basetool_exchange_bank_reads_total{client_id, route}` counts the bank reads served, with
+  `route` one of `accounts`, `bookings`, `balance_series`, `requests`, `queue`.
+- **Writes.** The existing `basetool_exchange_writes_total{client_id, resource="bank_request",
+  outcome}` counts the request writes.
+- **Refusals.** `basetool_exchange_bank_refused_total{reason}` counts what the backend refused, with
+  `reason` one of `not_found`, `not_bank_staff`, `open_request_cap`, `switched_off`, every reason
+  registered at zero. The gateway's own bank switch refusals count as
+  `basetool_ingest_exchange_refused_total{reason="bank_exchange_disabled"}`.
+- **Switch changes.** `basetool_exchange_registry_changes_total{action}` counts `bank_switch_on` and
+  `bank_switch_off` once per committed change.
+
+Alerts, each with a promtool rule test that fires and stays silent:
+
+- **`BankExchangeNotFoundSpike`**: more than 50 `not_found` refusals in an hour, a client or member
+  probing account ids.
+- **`BankExchangeOpenRequestCapHit`**: more than 10 open-request cap refusals in an hour, sustained
+  for 30 minutes.
+- **`BankExchangeSwitchChanged`**: any bank switch change in ten minutes, informational like
+  `ExchangeRegistryChanged`, which no longer fires for the bank actions.
+- **`BankBookingApprovalOverdue`** (the oldest pending booking request older than 48 hours) gains its
+  missing rule test.
+
+The „Bank" row of the exchange dashboard (`15-exchange.json`) shows the reads by route, the
+refusals by reason, the request writes, the gateway's switch refusals and the switch changes.
+
+**Acceptance**
+
+- [x] The refusal counter exists for every reason at zero, and the backend gate counts
+  `switched_off` (`ExchangeGateTest`).
+- [x] Every alert above has a promtool rule test that fires and stays silent, and
+  `ExchangeRegistryChanged` stays silent on the bank actions.
+- [ ] The read and request-write counters are incremented by the bank routes (REQ-BXCH-002…005).
+
+**Enforced by:** `ExchangeBankMetrics`, `BankExchangeRefusal`, `BankExchangeReadRoute`,
+`ExchangeMetricNames`, `ExchangeRegistryAction` · `monitoring/prometheus/alerts/business.yml`,
+`monitoring/prometheus/tests/bank_exchange_alerts_test.yml`,
+`monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
+`monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
+REQ-BXCH-006 · **Issues:** #3121, #3156

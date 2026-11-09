@@ -7,7 +7,8 @@
 """Build the Keycloak realms of the local exchange sandbox and the E2E stack (REQ-XCH-029, ADR-0225).
 
 Both realms start from the shared test realm base (``scripts/keycloak/test-realm-base.json``: the
-roles, the two first-party clients and the E2E accounts) and add what the production provisioner
+realm roles Keycloak needs, the two first-party clients and the E2E accounts; the application
+roles are held in the Basetool, ADR-0355) and add what the production provisioner
 (``scripts/provision-keycloak-realm.py``) defines: the token and session settings, the login theme,
 the Basetool client scopes, the ingest gateway's service account and the approved third-party
 client template. The sandbox realm replaces the accounts with the sandbox members and instantiates
@@ -101,14 +102,10 @@ SANDBOX = Target(
         },
     ],
     users=[
-        {"id": "5a4d0000-0000-4000-8000-000000000001", "username": "sandbox-member",
-         "roles": ["KRT Member"]},
-        {"id": "5a4d0000-0000-4000-8000-000000000002", "username": "sandbox-member-2",
-         "roles": ["KRT Member"]},
-        {"id": "5a4d0000-0000-4000-8000-000000000003", "username": "sandbox-admin",
-         "roles": ["Admin", "KRT Member"]},
-        *({"id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}", "username": f"sandbox-load-{n:02d}",
-           "roles": ["KRT Member"]} for n in range(1, LOAD_MEMBERS + 1)),
+        {"id": "5a4d0000-0000-4000-8000-000000000001", "username": "sandbox-member"},
+        {"id": "5a4d0000-0000-4000-8000-000000000002", "username": "sandbox-member-2"},
+        {"id": "5a4d0000-0000-4000-8000-000000000003", "username": "sandbox-admin"},
+        *({"id": f"5a4d0000-0000-4000-8000-0000000002{n:02d}", "username": f"sandbox-load-{n:02d}"} for n in range(1, LOAD_MEMBERS + 1)),
     ],
     offline_users=("sandbox-member", "sandbox-member-2", "sandbox-admin",
                    *(f"sandbox-load-{n:02d}" for n in range(1, LOAD_MEMBERS + 1))),
@@ -219,7 +216,7 @@ def user_representation(target: Target, user: dict) -> dict:
         "email": f"{name}@example.invalid",
         "credentials": [{"type": "password", "value": target.password(name),
                          "temporary": False}],
-        "realmRoles": [f"default-roles-{REALM}", *user["roles"]],
+        "realmRoles": [f"default-roles-{REALM}"],
     }
 
 
@@ -393,6 +390,16 @@ def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
     for scope in provisioner.SCOPES:
         if scope.name not in scopes:
             found.append(f"the provisioner scope {scope.name} is missing")
+    realm_roles = {r.get("name") for r in realm.get("roles", {}).get("realm", [])}
+    for name in provisioner.RETIRED_APPLICATION_ROLES:
+        if name in realm_roles:
+            found.append(f"the realm defines the application role {name}, which the Basetool "
+                         f"holds itself")
+    frontend = clients.get("basetool-frontend", {})
+    frontend_scopes = frontend.get("defaultClientScopes",
+                                   realm.get("defaultDefaultClientScopes", []))
+    if provisioner.ROLES_SCOPE in frontend_scopes + frontend.get("optionalClientScopes", []):
+        found.append("basetool-frontend has the roles scope, so the web login carries realm roles")
     offline = provisioner.OFFLINE_ACCESS
     default_role = next((r for r in realm.get("roles", {}).get("realm", [])
                          if r.get("name") == f"default-roles-{REALM}"), {})
@@ -412,6 +419,9 @@ def problems(realm: dict, provisioner: ModuleType, target: Target) -> list[str]:
     for user in realm.get("users", []):
         name = user["username"]
         usernames.add(name)
+        for role in user.get("realmRoles", []):
+            if role not in realm_roles:
+                found.append(f"user {name} holds the undefined realm role {role}")
         if target.fixed_ids and not re.fullmatch(UUID_PATTERN, user.get("id", "")):
             found.append(f"user {name} has no fixed id")
         for credential in user.get("credentials", []):
@@ -503,9 +513,10 @@ def selftest() -> int:
 
         broken = copy.deepcopy(realm)
         offline = next(u for u in broken["users"] if u["username"] == target.offline_users[0])
-        offline["realmRoles"] = ["KRT Member"]
+        offline["realmRoles"] = []
         expect(f"{prefix} a device-grant account without the default roles is caught",
-               caught(broken))
+               problems(broken, provisioner, target)
+               == [f"user {offline['username']} lacks the default roles, so no offline token"])
 
         broken = copy.deepcopy(realm)
         broken["users"] = [u for u in broken["users"]
@@ -522,6 +533,24 @@ def selftest() -> int:
         broken["scopeMappings"] = []
         expect(f"{prefix} an offline_access scope without its role mapping is caught",
                caught(broken))
+
+        broken = copy.deepcopy(realm)
+        broken["roles"]["realm"].append({"name": "KRT Member"})
+        expect(f"{prefix} an application realm role is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        broken["users"][0]["realmRoles"].append("KRT Member")
+        expect(f"{prefix} an account holding an undefined realm role is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        client = next(c for c in broken["clients"] if c["clientId"] == "basetool-frontend")
+        client["defaultClientScopes"].append(provisioner.ROLES_SCOPE)
+        expect(f"{prefix} a web login with the roles scope is caught", caught(broken))
+
+        broken = copy.deepcopy(realm)
+        client = next(c for c in broken["clients"] if c["clientId"] == "basetool-frontend")
+        del client["defaultClientScopes"]
+        expect(f"{prefix} a web login on the realm's default scopes is caught", caught(broken))
 
         broken = copy.deepcopy(realm)
         broken["defaultOptionalClientScopes"].append(provisioner.OFFLINE_ACCESS)

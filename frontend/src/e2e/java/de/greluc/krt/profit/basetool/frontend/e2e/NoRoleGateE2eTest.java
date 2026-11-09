@@ -36,7 +36,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 /**
  * Verifies that an account holding no role is told so and reaches nothing (REQ-SEC-053).
  *
- * <p>Uses the realm fixture {@code test-norole}, an enabled account with no realm role at all.
+ * <p>Uses the realm fixture {@code test-norole}, an enabled account that holds no role in the
+ * Basetool ({@link E2eUserRoles}).
  */
 @Tag("e2e")
 class NoRoleGateE2eTest {

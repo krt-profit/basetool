@@ -60,7 +60,7 @@ probes), plus the app data networks the exporters bridge into. `net-docker-proxy
 compose file.
 
 **Grafana is the only UI**, published by the native edge (`docker/edge/conf.d/40-grafana.conf.template`)
-behind Keycloak OIDC and restricted to the realm role `Admin` (REQ-OBS-008).
+behind Keycloak OIDC and restricted to the client role `grafana-admin` of the `grafana` client (REQ-OBS-008).
 
 | Component | Runs as | Defined in |
 | --- | --- | --- |
@@ -193,7 +193,7 @@ sudo systemctl restart alloy.service            # the host-native shipper
 - **Loki is excluded from backups**, so its retention window cannot be extended by restoring an old
   snapshot.
 - **Traces — 14d.**
-- **Grafana is admin-only** (Keycloak realm role `Admin`).
+- **Grafana is admin-only** (Keycloak client role `grafana-admin` of the `grafana` client).
 
 ## Alert-response runbook (alert → first actions)
 
@@ -265,7 +265,10 @@ section above.
 | **ScheduledJobStale** | A scheduled job has not succeeded in >26h, or has never succeeded since a restart longer ago than that while it is enabled. Check the backend scheduler and the job's logs. |
 | **ScheduledJobFailureStreak** | One scheduled job (`task` label) failed at least three times in an hour. Read its ERROR lines in the backend log; `ScheduledJobStale` follows if it never recovers. |
 | **BusinessMetricsStale** | The 60s business-metrics sampler wedged — the queue-depth gauges are frozen and the `*ApprovalOverdue` alerts read stale values. Check the backend log for the `BusinessMetricsCollector.refresh()` failure. |
-| **ExchangeRegistryChanged** | An admin changed the third-party exchange registry or its global switch (`action` label). Expected to be rare and deliberate — confirm it in the „Verbundene Anwendungen“ audit tab (REQ-XCH-003). |
+| **ExchangeRegistryChanged** | An admin changed the third-party exchange registry or its global switch (`action` label; the bank switch's `bank_switch_on` / `bank_switch_off` fire **BankExchangeSwitchChanged** instead). Expected to be rare and deliberate — confirm it in the „Verbundene Anwendungen“ audit tab (REQ-XCH-003). |
+| **BankExchangeSwitchChanged** | An admin switched the bank part of the exchange on or off (`action` label `bank_switch_on` / `bank_switch_off`); while it is off the gateway refuses every bank request with reason `bank_exchange_disabled`, the rest of the exchange keeps working. Expected to be rare and deliberate — confirm it in the „Verbundene Anwendungen“ audit log (event `BANK_EXCHANGE_SWITCH_CHANGED`) (REQ-OBS-024). |
+| **BankExchangeNotFoundSpike** | More than 50 bank exchange requests in an hour were answered `404` because the requested bank account was not found for the member (`basetool_exchange_bank_refused_total{reason="not_found"}`) — a client or a member probing bank account ids. Check the gateway logs per client and consider suspending the client under *Administration → Verbundene Anwendungen* (REQ-BXCH-006, REQ-OBS-024). |
+| **BankExchangeOpenRequestCapHit** | For 30 minutes more than 10 bank requests an hour were refused `409 BANK_OPEN_REQUEST_CAP` (20 pending requests per member). Either the approvals fall behind (**BankBookingApprovalOverdue**) or a client files requests without waiting for the decision; check the pending queue and the bank request writes per client on the Exchange dashboard's *Bank* row (REQ-OBS-024). |
 | **ExchangeMirrorWriteFailed** | The backend could not write the registry mirror `exchange:registry` to Redis. `phase=pre_commit` means an admin's restriction was refused; any other phase means the mirror lags until the reconcile succeeds. Check Redis and the `basetool-backend` ACL user's `~exchange:*` grant. |
 | **ExchangeRegistryReconcileStale** | The 60s mirror reconcile has not succeeded for 10 minutes, so a lagging mirror is not repaired. Only armed while `APP_EXCHANGE_MIRROR_ENABLED=true` (the job's enabled gauge). |
 | **ExchangeRegistryMirrorStaleAtGateway** | The ingest gateway's last successful read of `exchange:registry` is more than 5 minutes old (or it has not read it once since it started) for 10 minutes, while the backend's mirror is enabled. The gateway reads it every 30 s on its own, so this fires without any exchange traffic; `basetool_exchange_registry_mirror_age_seconds` on the Exchange dashboard shows the age. Same checks as the next row (REQ-XCH-003, REQ-XCH-028). |
@@ -336,7 +339,7 @@ section above.
 | **RateLimitRejectionSpike** | One application rejects more than one request a second through its rate limiter for 10 minutes. Find the source (`{app="edge"}`) and decide whether it is abuse or a limit too tight for a real client; `RateLimitRejectionRatioHigh` gives the ratio. |
 | **RequestBodyRejectedSpike** | The backend refuses oversized JSON bodies (`413`) on a capped import path at an elevated rate — memory-DoS probing of the refinery import, or a client bypassing the frontend's proxy cap. Read the source in `{app="edge"}`. |
 | **PendingApprovalBlockSpike** | Pending-approval 403s at more than 0.2/s for 10 minutes — more than the occasional pending account; likely an authorities-converter or approval-sync regression leaving approved members with only `ROLE_PENDING_APPROVAL`. Check the last deploy and the user sync. |
-| **NoRoleBlockSpike** | More than three distinct accounts refused with `403 NO_ROLE` in 15 minutes (REQ-SEC-053). One or two is an admin who has not assigned a role yet; more is a realm-side role rename, a hand edit or tokens from the wrong realm — check the Keycloak role index line in the sync summary. |
+| **NoRoleBlockSpike** | More than three distinct accounts refused with `403 NO_ROLE` in 15 minutes (REQ-SEC-053). One or two is an admin who has not assigned a role yet; more is a mass withdrawal or lost role rows — check the role audit trail and `basetool_user_role_changes_total` (REQ-SEC-088). |
 | **TermsConsentRolloutStalled** | At least three members have been refused by the consent gate for an hour and nobody accepted in two hours — the consent path is broken and they are locked out of the tool and the extractor. Check `/admin/terms` and the frontend log for failures on `POST /terms/accept`. |
 | **AuditSilenceAnomaly** | An audited area has gone unexpectedly quiet. Verify the audit pipeline is recording; a silent area may mean logging broke, not that activity stopped. Carries `keep_firing_for: 15m` so the nightly 04:15 backup quiesce does not produce a RESOLVED + FIRING pair every night. |
 | **AuditDomainSilenceAnomaly** | One audit domain recorded nothing for 30d while others stay active — it may have lost its audit wiring (REQ-AUDIT-001). Check the domain's `auditRecorder.record` calls. `ROLE`/`PERSONAL_INVENTORY`/`MARKET`/`HANGAR`/`BLUEPRINT`/`CONNECTED_APPS`/`SUPPLY`/`PURCHASING`/`CATALOGUE` are excluded; review their volume on the `07` per-domain tables. Same `keep_firing_for: 15m` hold. |
@@ -344,7 +347,7 @@ section above.
 | **RegistrationApprovalOverdue / BankBookingApprovalOverdue** | An approval queue is aging past SLA. Notify the approvers; clear the backlog. |
 | **DeletionRequestOverdue** | A member's Art. 17 erasure request has been pending more than 14 days. Art. 12(3) gives one month, so this is a warning with headroom: decide it in Administration -> Löschanträge. A refusal needs a written reason (REQ-SEC-061). |
 | **UserDeletionUnfinished** | An account has been gone from Keycloak for more than 7 days while its local row is still there. Finish it in Administration -> Mitglieder (REQ-SEC-059). Service-account rows (`service-account-%`) are excluded. |
-| **AccountErasureKeycloakDeleteFailed / AdminAccountAutoActivated** | An erasure deleted the local data and not the Keycloak account, or a new account arrived already holding `Admin` and skipped the approval queue. The remedy is manual; the paired audit row carries the account id the Keycloak console needs. |
+| **AccountErasureKeycloakDeleteFailed / AdminAccountAutoActivated** | An erasure deleted the local data and not the Keycloak account, or an account earned `Admin` at login as a bootstrap subject, with no admin's decision behind it. The remedy is manual; the paired audit row carries the account id the Keycloak console needs. |
 | **P4kImportStuck / P4kImportRunningStuck / P4kImportFailed** | A P4K import has been PENDING > 6h (the worker is wedged), RUNNING > 3h (the worker is wedged or the job's end could not be recorded; a restart marks it FAILED), or reached FAILED in the last 24h. Check the backend log and the job list. |
 | **JobOrderStale / RefineryOrderStale / OperationStale** | A work-queue item has been open past its baseline (job order > 180d, refinery order / operation > 90d). Close, reassign or cancel it. |
 | **MailDeliveryFailing** | Outgoing SMTP mail is failing (>2/h). Check the relay and the backend log. |
@@ -595,7 +598,7 @@ grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/lib/basetool/textf
 python3 scripts/check-conformance.py --ssh <host>   # from a workstation; covers scrape-targets-up, container-metrics, log-streams
 ```
 
-In Grafana, confirm the Keycloak login lets an `Admin` in and refuses anyone else, and that
+In Grafana, confirm the Keycloak login lets a holder of `grafana-admin` in and refuses anyone else, and that
 Explore shows one trace in Tempo, one `{app="edge"}` line and one `{app="host-auth"}` line in Loki.
 healthchecks.io must go green within minutes (the `Watchdog` heartbeat).
 

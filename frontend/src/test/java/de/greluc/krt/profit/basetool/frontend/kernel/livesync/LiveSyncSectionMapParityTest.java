@@ -397,6 +397,40 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void memberRolesSeamMap_matchesTheMemberTopicWhitelist() throws IOException {
+    String js = readResource("/static/js/identity/member-roles.js");
+    assertThat(js).contains("topicClass: 'MEMBER'", "topic: `member:${userId}`");
+    assertThat(seamMapKeys("/static/js/identity/member-roles.js", "sections"))
+        .as("sections keys in member-roles.js vs LiveSyncTopicClass.MEMBER whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBER.allowedSections());
+  }
+
+  /**
+   * A role change reaches every surface that shows roles, from either side: the member page pokes
+   * the bank staff's grant and manage sections, and the bank grant management's role forms poke the
+   * member's room (REQ-SEC-088).
+   */
+  @Test
+  void roleChanges_reachTheBankStaffRoomAndTheMemberRoomFromEitherSide() throws IOException {
+    assertThat(readResource("/static/js/identity/member-roles.js"))
+        .contains("krtPageSections.publish('bank', ['grants', 'manage'])");
+    assertThat(LiveSyncTopicClass.BANK_STAFF.allowedSections()).contains("grants", "manage");
+
+    String grants = readResource("/templates/bank/bank-grants.html");
+    Matcher roleForms =
+        Pattern.compile(
+                "data-livesync=\"([^\"]*)\"\\s+data-endpoint=\"/api/proxy/users/\\{userId}/roles/")
+            .matcher(grants);
+    int forms = 0;
+    while (roleForms.find()) {
+      forms++;
+      assertThat(roleForms.group(1).split("\\s+"))
+          .containsExactlyInAnyOrder("bank/grants,manage", "member:@user/roles");
+    }
+    assertThat(forms).as("the assign and the withdraw form of Bank Employee").isEqualTo(2);
+  }
+
+  @Test
   void adminCatalogueSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
     Set<String> jsKeys = new LinkedHashSet<>();
     for (String page : List.of("starmap.js", "shops.js", "p4k-report.js")) {
@@ -454,7 +488,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 2);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 4);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -462,7 +496,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 5);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -482,6 +516,29 @@ class LiveSyncSectionMapParityTest {
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.ORGUNIT_BANK" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
+  }
+
+  /** The single-request page listens to the request section of the ORGUNIT_BANK room only. */
+  @Test
+  void bankRequestDetailSeamMap_listensToTheOrgUnitBankRequestSection() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 2);
+    assertThat(jsKeys)
+        .as("sections keys of the request-detail seam in bank-livesync.js vs ORGUNIT_BANK")
+        .containsExactly("orgUnitBank")
+        .isSubsetOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
+  }
+
+  /**
+   * A bank-staff account without a membership role follows the single-request page through the
+   * request-queue section of the BANK_STAFF room.
+   */
+  @Test
+  void bankRequestDetailStaffSeamMap_listensToTheBankStaffRequestQueueSection() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
+    assertThat(jsKeys)
+        .as("sections keys of the request-detail staff seam in bank-livesync.js vs BANK_STAFF")
+        .containsExactly("requestQueue")
+        .isSubsetOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
   }
 
   /**

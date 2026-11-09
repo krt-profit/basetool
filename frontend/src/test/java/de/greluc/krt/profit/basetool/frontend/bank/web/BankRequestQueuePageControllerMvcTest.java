@@ -115,6 +115,7 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             null,
             null,
+            null,
             0L,
             true);
     PageResponse<BankBookingRequestDto> page =
@@ -277,5 +278,20 @@ class BankRequestQueuePageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("bank-confirm-staff-note")))
         .andExpect(content().string(Matchers.containsString("name=\"staffNote\"")));
+  }
+
+  /**
+   * REQ-BANK-041: the confirmation modal carries the hidden "Wer hat freigegeben?" hint that the
+   * script reveals, with the note made mandatory, on an attested over-limit confirm.
+   */
+  @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void bankRequests_confirmModalCarriesTheApproverNoteHint() throws Exception {
+    mockMvc
+        .perform(get("/bank/requests"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content().string(Matchers.containsString("data-testid=\"bank-confirm-approver-hint\"")))
+        .andExpect(content().string(Matchers.containsString("data-approver-note-hint")));
   }
 }

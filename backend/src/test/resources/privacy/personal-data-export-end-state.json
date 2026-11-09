@@ -150,6 +150,12 @@
       "source_channel" : "system",
       "source_client" : null,
       "changed_at" : "<instant>"
+    }, {
+      "resource" : "BANK_REQUEST",
+      "entity_key" : "<uuid>",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
@@ -442,6 +448,7 @@
       "note" : "Einzahlung von #OTHER_MEMBER#",
       "justification" : "Abgesprochen mit #OTHER_MEMBER#",
       "status" : "PENDING",
+      "client_id" : null,
       "created_at" : "<instant>",
       "decided_at" : null
     } ],

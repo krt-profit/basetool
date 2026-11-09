@@ -1,3 +1,4 @@
 # gitleaks fingerprints (commit:file:rule:line) of reviewed false positives; each names one finding only.
 d149011c59605cf1991b10d22cfec41ebe1c74a5:docs/exchange/examples/v1/page--blueprintPage/valid/feed.json:generic-api-key:4
 d149011c59605cf1991b10d22cfec41ebe1c74a5:ingest/src/test/resources/exchange/golden/route-get-blueprints.golden:generic-api-key:29
+66bc323162649839c61f7dcf52e5977d60fb8534:docs/exchange/examples/v1/page--bankRequestPage/valid/feed.json:generic-api-key:31

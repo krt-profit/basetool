@@ -4822,6 +4822,55 @@
           "placement": "bottom"
         }
       }
+    },
+    {
+      "id": 101,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 352
+      },
+      "type": "timeseries",
+      "title": "Role changes/day by role and action",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (role, action) (increase(basetool_user_role_changes_total[1d]))",
+          "refId": "A",
+          "legendFormat": "{{role}} {{action}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Roles assigned and withdrawn in the Basetool, the bootstrap grant included (REQ-SEC-088)."
     }
   ]
 }

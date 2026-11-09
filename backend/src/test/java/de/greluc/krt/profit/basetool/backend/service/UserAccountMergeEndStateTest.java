@@ -36,7 +36,9 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepo
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -52,6 +54,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -60,13 +64,14 @@ import org.springframework.transaction.annotation.Transactional;
  * is dropped, which row of a bystander and which row recording an act stays, and the {@code
  * USER_MERGED} audit row with its exact details and key order.
  *
- * <p>The source account owns rows in every one of the 27 followed columns, the target holds the
+ * <p>The source account owns rows in every one of the 28 followed columns, the target holds the
  * same key in every table with a unique constraint, and a bystander owns a row of each kind. The
  * expectation list is spelled out here, independent of the code under test, so the steps can move
  * into the owning modules.
  */
 @SpringBootTest
 @Transactional
+@RecordApplicationEvents
 class UserAccountMergeEndStateTest {
 
   /** The followed columns in the order the merge reports them, with the rows each moves. */
@@ -100,6 +105,7 @@ class UserAccountMergeEndStateTest {
     EXPECTED_MOVED.put("notification_mute.user_id", 1);
     EXPECTED_MOVED.put("exchange_installation.user_id", 1);
     EXPECTED_MOVED.put("exchange_ship_link.user_id", 1);
+    EXPECTED_MOVED.put("user_roles.user_id", 1);
   }
 
   @Autowired private UserAccountMergeService mergeService;
@@ -113,6 +119,7 @@ class UserAccountMergeEndStateTest {
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private EntityManager entityManager;
+  @Autowired private ApplicationEvents events;
 
   @MockitoBean private KeycloakService keycloakService;
 
@@ -143,7 +150,10 @@ class UserAccountMergeEndStateTest {
 
     Map<String, Integer> targetBefore = counts(target);
     Map<String, Integer> bystanderBefore = counts(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(27);
+    long sourceRolesVersion = rolesVersion(source);
+    long targetRolesVersion = rolesVersion(target);
+    long bystanderRolesVersion = rolesVersion(bystander);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -159,6 +169,16 @@ class UserAccountMergeEndStateTest {
           .isEqualTo(targetBefore.get(column) + moved.getValue());
     }
     assertThat(counts(bystander)).as("the bystander's rows").isEqualTo(bystanderBefore);
+    assertThat(rolesVersion(source))
+        .as("the emptied role set's counter")
+        .isGreaterThan(sourceRolesVersion);
+    assertThat(rolesVersion(target))
+        .as("the joined role set's counter")
+        .isGreaterThan(targetRolesVersion);
+    assertThat(rolesVersion(bystander)).isEqualTo(bystanderRolesVersion);
+    assertThat(events.stream(UserRolesChangedEvent.class).map(UserRolesChangedEvent::userId))
+        .as("both accounts' cached authorities are evicted")
+        .containsExactlyInAnyOrder(source, target);
 
     assertThat(count("audit_event.actor_user_id", source)).isGreaterThanOrEqualTo(1);
     assertThat(text("audit_event", "actor_user_id", stayingAudit)).isEqualTo(source.toString());
@@ -234,7 +254,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=31");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
@@ -391,6 +411,9 @@ class UserAccountMergeEndStateTest {
     installation(source, "b");
     shipLink(source, "ext1", shipOf(source, "S1"));
     shipLink(source, "ext2", shipOf(source, "S2"));
+
+    role(source, Roles.KRT_MEMBER);
+    role(source, Roles.ADMIN);
   }
 
   private void seedTarget(UUID target) {
@@ -398,6 +421,7 @@ class UserAccountMergeEndStateTest {
     membership(target, Squadron.IRIDIUM_ID, "SQUADRON");
     installation(target, "a");
     shipLink(target, "ext1", ship(target, "T1"));
+    role(target, Roles.KRT_MEMBER);
   }
 
   private void seedBystander(UUID by) {
@@ -425,6 +449,20 @@ class UserAccountMergeEndStateTest {
     selector(by);
     mute(by, "TYPE_X");
     installation(by, "a");
+    role(by, Roles.KRT_MEMBER);
+  }
+
+  private void role(UUID user, String code) {
+    jdbc.update(
+        "INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM role WHERE code = ?",
+        user,
+        code);
+  }
+
+  private long rolesVersion(UUID user) {
+    Long version =
+        jdbc.queryForObject("SELECT roles_version FROM app_user WHERE id = ?", Long.class, user);
+    return version == null ? 0L : version;
   }
 
   private void inventoryItem(UUID user) {

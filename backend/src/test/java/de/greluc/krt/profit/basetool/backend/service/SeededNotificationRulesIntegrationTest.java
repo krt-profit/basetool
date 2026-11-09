@@ -173,6 +173,11 @@ class SeededNotificationRulesIntegrationTest {
             SelectorKind.ACCOUNT_GRANT,
             SelectorKind.EVENT_RECIPIENT),
         rule(
+            NotificationEventType.BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
+            NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
+            false,
+            SelectorKind.REQUIRED_APPROVER),
+        rule(
             NotificationEventType.BANK_GRANT_CHANGED,
             NotificationType.BANK_GRANT_CHANGED,
             true,
@@ -274,6 +279,18 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.EXCHANGE_CLIENT_HOLDERS),
         rule(
+            NotificationEventType.BANK_EXCHANGE_SWITCHED_ON,
+            NotificationType.BANK_EXCHANGE_SWITCHED_ON,
+            true,
+            SelectorKind.ROLE,
+            SelectorKind.ROLE),
+        rule(
+            NotificationEventType.BANK_EXCHANGE_SWITCHED_OFF,
+            NotificationType.BANK_EXCHANGE_SWITCHED_OFF,
+            true,
+            SelectorKind.ROLE,
+            SelectorKind.ROLE),
+        rule(
             NotificationEventType.OPERATION_COMPLETED_UNOWNED,
             NotificationType.OPERATION_COMPLETED,
             true,
@@ -348,6 +365,11 @@ class SeededNotificationRulesIntegrationTest {
         rule(
             NotificationEventType.PURCHASING_DELEGATE_REVOKED,
             NotificationType.PURCHASING_DELEGATE_REVOKED,
+            true,
+            SelectorKind.EVENT_RECIPIENT),
+        rule(
+            NotificationEventType.USER_ROLE_CHANGED,
+            NotificationType.USER_ROLE_CHANGED,
             true,
             SelectorKind.EVENT_RECIPIENT));
   }

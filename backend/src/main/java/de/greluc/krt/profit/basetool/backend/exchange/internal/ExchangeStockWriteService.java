@@ -561,7 +561,8 @@ public class ExchangeStockWriteService
    */
   private boolean removedElsewhere(@NotNull ExchangeCaller caller, @NotNull String lotKey) {
     Optional<ExchangeChange> latest =
-        changeRepository.findLatestForKey(caller.member(), ExchangeResource.STOCK.name(), lotKey);
+        changeRepository.findLatestForKey(
+            caller.member(), ExchangeFeedResource.STOCK.name(), lotKey);
     if (latest.isEmpty()) {
       return false;
     }

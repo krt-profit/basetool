@@ -133,7 +133,7 @@ public class ExchangeRegistryMirrorClosure {
     if (revision == null) {
       throw new IllegalStateException("No mirror revision was drawn");
     }
-    document.write(new ExchangeRegistrySnapshot(false, left.get().clients()), revision);
+    document.write(new ExchangeRegistrySnapshot(false, false, left.get().clients()), revision);
     return true;
   }
 

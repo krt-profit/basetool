@@ -261,19 +261,20 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   `AppExceptionKind` codes, the request pipeline's (`TERMS_NOT_ACCEPTED`, `PENDING_APPROVAL`,
   `NO_ROLE`, `SERVICE_UNAVAILABLE`, `RATE_LIMIT_EXCEEDED`, `REQUEST_BODY_TOO_LARGE`) and
   `NOT_ACCEPTABLE` (`406`) — 26 codes.
-- **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 18
-  `BANK_*` codes), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
+- **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 20
+  `BANK_*` codes, among them `BANK_APPROVER_NOTE_REQUIRED`, 400, REQ-BANK-041), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
   module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
   `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
   `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes),
-  `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`) and
+  `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`),
+  `identity.api.IdentityProblemCode` (`LAST_ADMIN`, REQ-SEC-088) and
   `catalogue.api.CatalogueProblemCode` (`P4K_UPLOAD_REJECTED`, REQ-P4K-001;
   `LOCATION_NOT_OFFERED`, REQ-P4K-039; `CATALOGUE_ITEM_RETIRED` and
   `CATALOGUE_BLUEPRINT_RETIRED`, REQ-P4K-013). Names and wire
-  values did not change when they left `CoreProblemCode`; the registry holds 85 codes across the
-  eleven enums. Two are
+  values did not change when they left `CoreProblemCode`; the registry holds 87 codes across the
+  twelve enums. Two are
   **reserved**, registered but not emitted: `BANK_HOLDER_OVERDRAFT` (ADR-0039) and
   `BANK_CARTEL_APPROVAL_REQUIRED` (ADR-0109). `APP_UPDATE_REQUIRED` left the registry with the app
   floor (REQ-API-020, superseded). Every producer references the enum; no code is a literal any
@@ -404,7 +405,7 @@ the `bearer-jwt` scheme and the document-wide requirement on it, exactly the two
 operations (`GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`), one domain tag and
 one contract tier on every operation, a per-domain operation-count floor, no exchange relay path, no
 dangling `$ref`, and unique schema names (REQ-API-018; `OpenApiDocumentAssertions`, `ExposedTypes`);
-of the relay document exactly the 19 relay operations, all `exchange` and `T0` (REQ-XCH-039).
+of the relay document exactly the 27 relay operations, all `exchange` and `T0` (REQ-XCH-039).
 
 > [!note] Corrected 2026-10-03
 > This paragraph described assertions (title, scheme, paths, schemas) that belonged to the removed
@@ -480,7 +481,7 @@ own.
   an entry no controller needs fails. One published document stays — the frontend generates its
   test types from it; per-domain views are filtered from it. The exchange
   relay surface alone is fenced into its own internal document (REQ-XCH-039), so the `exchange`
-  domain's 19 relay operations are counted there and its 21 member and admin operations here.
+  domain's 27 relay operations are counted there and its 21 member and admin operations here.
 - **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
   type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
   handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record
@@ -503,7 +504,7 @@ own.
   is the domains — asserted by the generator before it writes and on the committed document
   (`OpenApiDocumentAssertionsTest`).
 - [x] Each domain's operation count has a floor at today's count (575 operations: 559 in
-  `openapi.json`, the 19 relay operations in the relay document, REQ-XCH-039).
+  `openapi.json`, the 27 relay operations in the relay document, REQ-XCH-039).
 - [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
   table names exactly the 99 controllers (`OpenApiSchemaNamesTest`).
 - [x] Each guard proven able to fail: a planted document with every fault, planted fixture
@@ -726,7 +727,7 @@ constraint for nothing and record a guess about which fields matter.
 | `POST …/bank/org-units/requests`                                                                           | `id`, `status`, `requiresOwnerApproval`, `requiredApprover`, `version` — **request** requires `sourceAccountId`, `type`, `amount`; `type` is `DEPOSIT` / `WITHDRAWAL` / `TRANSFER`                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `PUT …/bank/org-units/requests/{id}`                                                                       | `id`, `amount`, `note`, `targetAccountId`, `version` — **request** requires `amount` only; the account and the kind are not editable                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `POST …/bank/org-units/requests/{id}/cancel`                                                               | `id`, `status`, `version` — **request** requires `version`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `POST`/`DELETE …/requests/{id}/owner-approval`                                                             | `id`, `ownerApprovalGranted`, `version`, plus `ownerApprovalGrantedByHandle` on the `POST` — **no request body on either verb**, so no version is echoed                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `POST`/`DELETE …/requests/{id}/owner-approval`                                                             | `id`, `ownerApprovalGranted`, `version`, plus `ownerApprovalGrantedByHandle` on the `POST` — **request**: the `POST` requires `version`, the request as the approver read it, and answers `409` when it changed since; the `DELETE` has no body                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `GET /api/v1/app/version-policy`                                                                           | `minimumVersionCode`, `latestVersionCode`, `releasesUrl` — **anonymous**, one of the four paths REQ-SEC-052 enumerates; frozen so a shipped app can be told to STOP (REQ-API-010)                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/refinery-orders/my-orders`                                                                    | envelope; row `id`, `status`, `location`, `refiningMethod`, `startedAt`, `durationMinutes`, `endsAt`, `goods`, `oreSales`, `profit`, `version` — `endsAt` is frozen on the LIST only; the detail has none and the app computes it                                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/v1/refinery-orders/{id}`                                                                         | as the list, without `endsAt`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

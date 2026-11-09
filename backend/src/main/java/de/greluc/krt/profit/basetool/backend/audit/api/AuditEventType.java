@@ -368,6 +368,17 @@ public enum AuditEventType {
    * member; the details carry only the {@code from} and {@code to} ranks.
    */
   MEMBER_RANK_CHANGED(AuditDomain.ROLE),
+  /**
+   * One of the four application roles was assigned to a member in the Basetool (REQ-SEC-088). The
+   * subject and the target are the member; the details carry the {@code role} code and, for the
+   * login-time grant, {@code source=bootstrap}.
+   */
+  USER_ROLE_ASSIGNED(AuditDomain.ROLE),
+  /**
+   * One of the four application roles was withdrawn from a member in the Basetool (REQ-SEC-088).
+   * The subject and the target are the member; the details carry the {@code role} code.
+   */
+  USER_ROLE_WITHDRAWN(AuditDomain.ROLE),
   /** A Kommandogruppe was created within a squadron. */
   KOMMANDO_GROUP_CREATED(AuditDomain.ROLE),
   /** A Kommandogruppe was renamed or reordered. */
@@ -544,6 +555,8 @@ public enum AuditEventType {
   EXCHANGE_CLIENT_ACTIVATED(AuditDomain.CONNECTED_APPS),
   /** The global exchange switch was turned on or off. */
   EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
+  /** The bank switch of the exchange was turned on or off; the details carry the new state. */
+  BANK_EXCHANGE_SWITCH_CHANGED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected a whole exchange client from their account (REQ-XCH-008). */
   EXCHANGE_CLIENT_DISCONNECTED(AuditDomain.CONNECTED_APPS),
   /** A member disconnected one installation of an exchange client (REQ-XCH-008). */

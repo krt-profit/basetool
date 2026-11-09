@@ -28,6 +28,7 @@ import static org.mockito.Mockito.reset;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventRepository;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import de.greluc.krt.profit.basetool.testsupport.containers.TestImages;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
@@ -45,6 +46,7 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -106,6 +108,7 @@ class ExchangeRegistryMirrorIntegrationTest {
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(false);
+    settings.setBankEnabled(false);
     settingsRepository.saveAndFlush(settings);
     auditEventRepository.deleteAll(
         auditEventRepository.findAll().stream()
@@ -269,6 +272,79 @@ class ExchangeRegistryMirrorIntegrationTest {
         false);
 
     assertThat(mirrored().enabled()).isFalse();
+  }
+
+  @Test
+  void theBankSwitchAndTheGlobalSwitchNeverStaleEachOthersVersion() {
+    ExchangeSettings start = registryService.getSettings();
+    long globalVersion = start.getVersion();
+
+    ExchangeSettings bankOn = registryService.updateBankSwitch(true, start.getBankVersion());
+
+    assertThat(bankOn.isBankEnabled()).isTrue();
+    assertThat(bankOn.getBankVersion()).isEqualTo(start.getBankVersion() + 1);
+    assertThat(registryService.getSettings().getVersion())
+        .as("the global switch's version is untouched")
+        .isEqualTo(globalVersion);
+
+    ExchangeSettings globalOn = registryService.updateSettings(true, globalVersion);
+    assertThat(globalOn.isEnabled()).isTrue();
+    assertThat(registryService.getSettings().getBankVersion())
+        .as("the bank switch's version is untouched")
+        .isEqualTo(bankOn.getBankVersion());
+    assertThat(registryService.getSettings().isBankEnabled()).isTrue();
+
+    assertThatThrownBy(() -> registryService.updateBankSwitch(false, start.getBankVersion()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  @Test
+  void theBankSwitchKeepsItsOwnTimeAndLeavesTheGlobalSwitchsTimeAlone() {
+    ExchangeSettings start = registryService.getSettings();
+
+    registryService.updateBankSwitch(!start.isBankEnabled(), start.getBankVersion());
+
+    ExchangeSettings after = registryService.getSettings();
+    assertThat(after.getUpdatedAt()).as("the global switch's time").isEqualTo(start.getUpdatedAt());
+    assertThat(after.getBankUpdatedAt()).isNotNull().isNotEqualTo(start.getBankUpdatedAt());
+  }
+
+  @Test
+  void switchingTheBankOffReachesTheMirrorBeforeTheCommitAndIsAudited() {
+    ExchangeSettings on =
+        registryService.updateBankSwitch(true, registryService.getSettings().getBankVersion());
+    assertThat(mirrored().bankEnabled()).isTrue();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateBankSwitch(false, on.getBankVersion());
+          assertThat(mirrored().bankEnabled())
+              .as("written before the outer transaction commits")
+              .isFalse();
+        },
+        false);
+
+    assertThat(mirrored().bankEnabled()).isFalse();
+    assertThat(
+            auditEventRepository.findAll().stream()
+                .filter(
+                    event -> event.getEventType() == AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED)
+                .count())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void switchingTheBankOnReachesTheMirrorOnlyAfterTheCommit() {
+    long bankVersion = registryService.getSettings().getBankVersion();
+
+    inOuterTransaction(
+        () -> {
+          registryService.updateBankSwitch(true, bankVersion);
+          assertThat(mirrored().bankEnabled()).as("not before the commit").isFalse();
+        },
+        false);
+
+    assertThat(mirrored().bankEnabled()).isTrue();
   }
 
   /**

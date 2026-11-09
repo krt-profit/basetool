@@ -66,7 +66,8 @@ class NotificationMuteServiceTest {
             NotificationType.PURCHASING_PAUSED,
             NotificationType.PURCHASING_RESUMED,
             NotificationType.PURCHASING_DELEGATE_APPOINTED,
-            NotificationType.PURCHASING_DELEGATE_REVOKED);
+            NotificationType.PURCHASING_DELEGATE_REVOKED,
+            NotificationType.USER_ROLE_CHANGED);
   }
 
   @Test

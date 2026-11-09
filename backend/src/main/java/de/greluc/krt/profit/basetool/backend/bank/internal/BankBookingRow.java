@@ -45,6 +45,8 @@ import java.util.UUID;
  * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the counterparty's handle
  *     snapshot (REQ-BANK-044), else {@code null}
  * @param counterpartyOrgUnitName the counterparty's org-unit name snapshot, or {@code null}
+ * @param counterpartyUserId the registered counterparty behind {@code counterpartyHandle}, or
+ *     {@code null} when none was recorded or the user was deleted
  */
 public record BankBookingRow(
     UUID postingId,
@@ -58,4 +60,5 @@ public record BankBookingRow(
     UUID reversedTransactionId,
     BigDecimal transferFee,
     String counterpartyHandle,
-    String counterpartyOrgUnitName) {}
+    String counterpartyOrgUnitName,
+    UUID counterpartyUserId) {}

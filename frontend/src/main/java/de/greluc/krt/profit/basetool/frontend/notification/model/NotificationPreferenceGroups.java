@@ -65,6 +65,7 @@ public final class NotificationPreferenceGroups {
     prefixes.put("EXCHANGE_", "connectedApps");
     prefixes.put("DISCORD_", "account");
     prefixes.put("ACCOUNT_DELETION_", "account");
+    prefixes.put("USER_ROLE_", "account");
     return prefixes;
   }
 
