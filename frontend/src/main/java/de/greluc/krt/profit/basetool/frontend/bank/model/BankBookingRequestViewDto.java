@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.model;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -30,5 +31,6 @@ import org.jetbrains.annotations.NotNull;
  * @param staff whether the caller sees it in the bank-staff queue
  * @param approver whether the caller acts on its approval
  */
+@DtoMirror
 public record BankBookingRequestViewDto(
     @NotNull BankBookingRequestDto request, boolean own, boolean staff, boolean approver) {}
