@@ -961,6 +961,11 @@ not silent — so the only detector was a human reading a log export.
   shared `app_json` stage, and holds Logback's **uppercase** level string (`ERROR`, `WARN`, `INFO`, …)
   verbatim. Loki `=` matchers are case-sensitive, so any dashboard/alert selecting by level must use a
   case-insensitive matcher (`{level=~"(?i)error"}`), never `{level="error"}`.
+- A logs panel must load even when its time range holds stack traces and batch SQL of up to
+  `max_line_size`. Loki's query frontend receives each querier result over its own gRPC server, so
+  `grpc_server_max_recv_msg_size` / `grpc_server_max_send_msg_size` in `loki-config.yml` are raised
+  to 64 MiB; the 4 MiB default turns a 1000-line pull of such lines into a 60 s `504` and an empty
+  "App errors & warnings" panel.
 
 ### REQ-OBS-008 — Monitoring plane: admin-only access, isolated cleartext carve-out
 

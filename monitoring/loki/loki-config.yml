@@ -3,6 +3,10 @@ auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
+  # The query frontend receives whole querier results over this server; 64 MiB fits a 1000-line
+  # logs panel of stack traces (REQ-OBS-007).
+  grpc_server_max_recv_msg_size: 67108864
+  grpc_server_max_send_msg_size: 67108864
   log_level: info
 
 common:

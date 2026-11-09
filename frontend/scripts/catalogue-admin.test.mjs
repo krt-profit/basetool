@@ -203,7 +203,7 @@ await test('the storage-place dialog starts with an empty name, never the game-t
     assert.equal(
         elements['starmap-storage-object'].textContent,
         'Seraphim Station',
-        'the dialog still shows which object the place goes on',
+        'the dialog shows the English game name of the object the place goes on',
     );
     assert.deepEqual(page.ui.opened, ['starmap-storage-modal']);
 });

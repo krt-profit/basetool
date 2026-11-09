@@ -119,7 +119,8 @@ deliberately not pins opts out with an `image-pin-gate: ignore-file` marker in i
   `ops-automation.yml`, `meta.yml`.
 - **`prometheus/tests/*_test.yml`** — `promtool test rules` unit tests for the rules above.
 - **`loki/loki-config.yml`** — Loki: 744h (31d) compactor retention for every stream, ingest rate
-  caps, `reject_old_samples_max_age: 168h`.
+  caps, `reject_old_samples_max_age: 168h`, 64 MiB gRPC messages so a logs panel of stack traces
+  loads.
 - **`loki/rules/fake/basetool-log-alerts.yml`** — the LogQL ruler alerts evaluated by Loki.
 - **`tempo/tempo.yaml`** — Tempo 3.x, monolithic, 14d trace retention.
 - **`alloy/config.alloy`** — log shipping (file tails, the journal for container stdout), OTLP →
