@@ -30,8 +30,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * A page of a member's own requests in id order, the exchange snapshot's keyset (REQ-BXCH-003),
- * is read straight from an index in that order, with no sort over the member's whole history.
+ * A page of a member's own requests in id order, the exchange snapshot's keyset (REQ-BXCH-003), is
+ * read straight from an index in that order, with no sort over the member's whole history.
  */
 @SpringBootTest
 @Transactional

@@ -146,8 +146,7 @@ class ExchangeBankReadsTest {
 
   @Test
   void theResponsibleHoldersNullLimitIsToldApartAsAnExemption() throws Exception {
-    JsonNode own =
-        item(ok(accounts(Actor.STAFFELLEITER, Map.of())), Account.OWN_ORG_UNIT);
+    JsonNode own = item(ok(accounts(Actor.STAFFELLEITER, Map.of())), Account.OWN_ORG_UNIT);
 
     assertThat(own.path("requestable").asBoolean()).isTrue();
     assertThat(own.path("ownLimit").isNull()).isTrue();
@@ -471,16 +470,15 @@ class ExchangeBankReadsTest {
    */
   private void deposit(
       @NotNull UUID accountId, @NotNull BigDecimal amount, @Nullable UUID counterparty) {
-    asAdmin(
-        () ->
-            ledgerService.bookDeposit(
-                new BankDepositRequest(
-                    accountId,
-                    world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
-                    amount,
-                    null,
-                    counterparty,
-                    null)));
+    asAdmin(() ->
+        ledgerService.bookDeposit(
+            new BankDepositRequest(
+                accountId,
+                world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+                amount,
+                null,
+                counterparty,
+                null)));
   }
 
   /**
@@ -490,14 +488,13 @@ class ExchangeBankReadsTest {
    * @param amount the amount handed over
    */
   private void holderTransfer(@NotNull BigDecimal amount) {
-    asAdmin(
-        () ->
-            ledgerService.bookHolderTransfer(
-                new BankHolderTransferRequest(
-                    world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
-                    world.holder(Holder.MANAGEMENT_HOLDER),
-                    amount,
-                    "Custody handover")));
+    asAdmin(() ->
+        ledgerService.bookHolderTransfer(
+            new BankHolderTransferRequest(
+                world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+                world.holder(Holder.MANAGEMENT_HOLDER),
+                amount,
+                "Custody handover")));
   }
 
   /**

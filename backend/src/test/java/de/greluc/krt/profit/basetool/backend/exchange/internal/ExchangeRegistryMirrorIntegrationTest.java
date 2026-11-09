@@ -305,9 +305,7 @@ class ExchangeRegistryMirrorIntegrationTest {
     registryService.updateBankSwitch(!start.isBankEnabled(), start.getBankVersion());
 
     ExchangeSettings after = registryService.getSettings();
-    assertThat(after.getUpdatedAt())
-        .as("the global switch's time")
-        .isEqualTo(start.getUpdatedAt());
+    assertThat(after.getUpdatedAt()).as("the global switch's time").isEqualTo(start.getUpdatedAt());
     assertThat(after.getBankUpdatedAt()).isNotNull().isNotEqualTo(start.getBankUpdatedAt());
   }
 
