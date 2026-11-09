@@ -91,6 +91,27 @@ class ExchangeSchemasTest {
   }
 
   @Test
+  void aFieldOnlyAnotherOpKindDeclaresIsUnknownAndLeftOutOfTheRelayedChangeSet() {
+    String schema = "change-set.schema.json#/$defs/refineryOrderChangeSet";
+    JsonNode changeSet =
+        mapper.readTree(
+            "{\"ops\":[{\"op\":\"pickup\",\"id\":\"o-1\",\"versions\":{\"gameData\":3},"
+                + "\"status\":\"COMPLETED\",\"durationMinutes\":90},"
+                + "{\"op\":\"update\",\"id\":\"o-1\",\"versions\":{\"gameData\":4},"
+                + "\"status\":\"OPEN\"}]}");
+
+    List<String> unknown = schemas.unknownFields(schema, changeSet);
+    JsonNode relayed = schemas.withoutFields(changeSet, unknown);
+
+    assertThat(schemas.validate(schema, changeSet)).isEmpty();
+    assertThat(unknown).containsExactlyInAnyOrder("/ops/0/status", "/ops/0/durationMinutes");
+    assertThat(relayed.at("/ops/0").has("status")).isFalse();
+    assertThat(relayed.at("/ops/0").has("durationMinutes")).isFalse();
+    assertThat(relayed.at("/ops/1/status").stringValue()).isEqualTo("OPEN");
+    assertThat(changeSet.at("/ops/0/status").stringValue()).isEqualTo("COMPLETED");
+  }
+
+  @Test
   void anAnswerBreaksItsContractWithAViolationOrAnUndeclaredPropertyButNotWithItsExtensions() {
     JsonNode page =
         mapper.readTree(

@@ -1371,12 +1371,13 @@
             "endsAt": {
               "type": "string",
               "format": "date-time",
-              "description": "When the run ends, RFC 3339 in UTC. The server stores startedAt = endsAt - durationMinutes."
+              "description": "When the run ends, RFC 3339 in UTC, kept to the microsecond. The server stores startedAt = endsAt - durationMinutes."
             },
             "durationMinutes": {
               "type": "integer",
               "minimum": 0,
-              "description": "The run's length; without it the run starts at the time of the write."
+              "maximum": 525600,
+              "description": "The run's length in minutes, at most one year; without it the run starts at the time of the write."
             },
             "expenses": {
               "type": "number",
@@ -1399,6 +1400,7 @@
             "goods": {
               "type": "array",
               "maxItems": 100,
+              "description": "The goods the order starts with; a create without one answers GOODS_REQUIRED, and their new row ids come back in this order.",
               "items": {
                 "$ref": "#/$defs/refineryGood"
               }
@@ -1460,12 +1462,13 @@
             "endsAt": {
               "type": "string",
               "format": "date-time",
-              "description": "When the run ends, RFC 3339 in UTC. The server stores startedAt = endsAt - durationMinutes."
+              "description": "When the run ends, RFC 3339 in UTC, kept to the microsecond. The server stores startedAt = endsAt - durationMinutes."
             },
             "durationMinutes": {
               "type": "integer",
               "minimum": 0,
-              "description": "The run's length; without it the run starts at the time of the write."
+              "maximum": 525600,
+              "description": "The run's length in minutes, at most one year; without it the run starts at the time of the write."
             },
             "expenses": {
               "type": "number",

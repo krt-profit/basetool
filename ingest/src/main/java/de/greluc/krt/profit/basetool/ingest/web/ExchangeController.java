@@ -82,11 +82,10 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The authenticated exchange routes built so far (REQ-XCH-001). Each request has passed both
- * exchange gates; a body is checked against its v1 schema before the relay, undeclared fields are
- * reported as {@code UNKNOWN_FIELD} warnings where the answer carries warnings, and the backend's
- * answer reaches the client only when it matches its schema and carries no property the schema does
- * not declare (REQ-XCH-050). The committed exchange document describes these routes.
+ * The authenticated exchange routes (REQ-XCH-001) the committed document describes, each behind
+ * both exchange gates: a body is checked against its v1 schema before the relay, an undeclared
+ * field is reported as {@code UNKNOWN_FIELD} and left out of a relayed change set, and the answer
+ * reaches the client only when it matches its schema and declares every property (REQ-XCH-050).
  */
 @Slf4j
 @RestController
@@ -836,6 +835,7 @@ public class ExchangeController {
     if (unreportable != null) {
       return unreportable;
     }
+    JsonNode relayed = schemas.withoutFields(body, unknown);
     if (everyOpCounts
         && !body.path("dryRun").asBoolean(false)
         && body.get("ops") instanceof ArrayNode ops
@@ -845,21 +845,21 @@ public class ExchangeController {
         return overQuota;
       }
     }
-    String digest = heldMassChanges.digest(context, resource, body);
+    String digest = heldMassChanges.digest(context, resource, relayed);
     ResponseEntity<?> resent = heldMassChanges.resent(context, digest);
     if (resent != null) {
       return resent;
     }
     String target = BACKEND + (ORG_STOCK.equals(resource) ? "/" : "/me/") + resource + "/changes";
     ExchangeRelay.Result result =
-        body.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
-            ? relay.forwardLarge(HttpMethod.POST, target, body, context, acceptLanguage)
-            : relay.forward(HttpMethod.POST, target, body, context, acceptLanguage);
+        relayed.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
+            ? relay.forwardLarge(HttpMethod.POST, target, relayed, context, acceptLanguage)
+            : relay.forward(HttpMethod.POST, target, relayed, context, acceptLanguage);
     if (ExchangeRefusals.RELAY_BUSY.equals(result.code())) {
       quotas.refundCounted(request);
     }
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
-      return staged(context, request, resource, body, result, digest);
+      return staged(context, request, resource, relayed, result, digest);
     }
     return responses.relayed(result, "change-result.schema.json", unknown, context, request);
   }

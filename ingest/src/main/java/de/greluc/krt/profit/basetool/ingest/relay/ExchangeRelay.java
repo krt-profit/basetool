@@ -183,6 +183,9 @@ public class ExchangeRelay {
           Map.entry(
               "VERSION_CONFLICT", "The entry changed since it was read; pull, merge and retry."),
           Map.entry(
+              "PESSIMISTIC_LOCK",
+              "Another write held an entry the change set needs; nothing was applied, retry it."),
+          Map.entry(
               "CURSOR_EXPIRED",
               "The cursor is older than the retained changes; reconcile against a full snapshot."),
           Map.entry(
