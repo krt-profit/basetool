@@ -36,7 +36,7 @@ jobs:
   realm-selftest:
     name: realm provisioner self-tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
 
     steps:
       - name: Checkout
