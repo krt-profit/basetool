@@ -79,6 +79,8 @@ import org.jetbrains.annotations.Nullable;
  *     {@code null} for a request a member or employee filed
  * @param purposeRef that module's opaque reference, or {@code null} exactly when there is no
  *     purpose
+ * @param clientName the connected application the request was raised through (REQ-BANK-067), or
+ *     {@code null} for a request raised in the Basetool
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
  *     {@code null} on every other read (REQ-BANK-023)
@@ -121,6 +123,7 @@ public record BankBookingRequestDto(
     @Nullable String counterpartyOrgUnitName,
     @BackendEnumAsString @Nullable String purposeKind,
     @Nullable UUID purposeRef,
+    @Nullable String clientName,
     Long version,
     @Nullable Boolean callerMayConfirm) {
 

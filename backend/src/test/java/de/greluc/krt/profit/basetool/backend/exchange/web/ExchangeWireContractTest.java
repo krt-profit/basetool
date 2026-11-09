@@ -148,6 +148,13 @@ class ExchangeWireContractTest {
           "/bank/queue",
           "/bank/requests");
 
+  /**
+   * The bank request writes, which answer only with the bank switched on and a seeded bank world;
+   * {@code ExchangeBankRequestWritesTest} sends them on one.
+   */
+  private static final Set<String> BANK_WRITES =
+      Set.of("/bank/requests", "/bank/requests/{id}/correction", "/bank/requests/{id}/cancel");
+
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =
       Map.ofEntries(
@@ -252,7 +259,7 @@ class ExchangeWireContractTest {
   void everyPublishedRequestFixtureIsAcceptedAndEveryAnswerMatchesItsSchema() throws Exception {
     int sent = 0;
     for (ExchangeSeam.RelayOperation operation : ExchangeSeam.OPERATIONS) {
-      if (operation.requestSchema() == null) {
+      if (operation.requestSchema() == null || BANK_WRITES.contains(operation.relayPath())) {
         continue;
       }
       String folder = folderOf(operation.requestSchema());

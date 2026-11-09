@@ -104,6 +104,8 @@ public interface BankStaffQueueReads {
    *     them
    * @param accountBalance the account's current balance for the Bankleitung and for a granted
    *     employee, otherwise {@code null}
+   * @param client the connected application that raised the request, or {@code null} for one raised
+   *     in the Basetool
    */
   record Item(
       @NotNull UUID requestId,
@@ -120,7 +122,8 @@ public interface BankStaffQueueReads {
       @Nullable BankRequestApprover requiredApprover,
       boolean ownerApprovalGranted,
       boolean mayConfirm,
-      @Nullable BigDecimal accountBalance) {
+      @Nullable BigDecimal accountBalance,
+      @Nullable String client) {
 
     /**
      * The position of this item in its section.

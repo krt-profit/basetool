@@ -3152,6 +3152,33 @@ answers `404` like an unknown id, through the real token chain) ·
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
 REQ-BANK-038, REQ-BANK-056
 
+### REQ-BANK-067 — A request raised through a connected application shows where it came from
+
+A booking request a connected application raised through the exchange (REQ-BXCH-004) records that
+application in `bank_booking_request.client_id`, the registry client id the exchange gate admitted;
+a request raised in the Basetool has none. The column is set once, when the request is raised, and
+a correction through another channel keeps it.
+
+- **The badge.** The staff queue (REQ-BANK-023), the approvers' "Anträge an unsere Konten"
+  (REQ-BANK-046) and the request's own page (REQ-BANK-068) show "über <Anwendung>" next to the
+  requester, with the registry's display name of the application, or its id once the registry no
+  longer holds it (`clientName` on the request DTO).
+- **Plain text.** Reason and note render as text (`th:text`), so a link in them is not clickable;
+  the badge's hint says the text is the requester's.
+- **The exchange.** The own requests (REQ-BXCH-003) and the staff queue (REQ-BXCH-005) answer the
+  same value as `client`.
+
+**Acceptance**
+
+- [x] A request raised through the exchange records the client, which the own requests and the
+  staff queue answer (`ExchangeBankRequestWritesTest`).
+- [x] The staff queue badges a request raised through a connected application and not a web one,
+  and a link in the justification renders as text (`BankRequestsPatternRenderTest`).
+
+**Enforced by:** `BankBookingRequest#clientId`, `BankRequestClientNames`, `BankBookingRequestDtos`
+(backend) · `bank/fragments/bank-request-origin` (frontend) · V366 · **Related:** REQ-BANK-023,
+REQ-BANK-046, REQ-BANK-068, REQ-BXCH-004 · **Issues:** #3113, #3119, #3159
+
 ### REQ-BANK-068 — One booking request has a page of its own
 
 `/bank/requests/{id}` shows one booking request: its type, status, approval state, account and

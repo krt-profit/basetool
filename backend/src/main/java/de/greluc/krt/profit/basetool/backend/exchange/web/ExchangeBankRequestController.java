@@ -20,27 +20,40 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankRequestService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeBankRequestWriteService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeFeedReader;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelledDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCorrectionDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestWrittenDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The member's own bank booking requests for an exchange client, reachable only from the ingest
- * gateway (REQ-BXCH-003). The bank switch gates every route here (REQ-BXCH-006).
+ * gateway: the snapshot and feed (REQ-BXCH-003) and the writes that raise, correct and cancel them
+ * (REQ-BXCH-004). The bank switch gates every route here (REQ-BXCH-006).
  */
 @RestController
 @RequestMapping("/api/v1/exchange/bank/requests")
@@ -50,6 +63,9 @@ public class ExchangeBankRequestController {
 
   /** Serves the snapshot and the feed of the member's own requests. */
   private final ExchangeBankRequestService requestService;
+
+  /** Raises, corrects and cancels the member's own requests. */
+  private final ExchangeBankRequestWriteService writeService;
 
   /**
    * Returns a snapshot page or a feed page of the member's own requests.
@@ -79,5 +95,88 @@ public class ExchangeBankRequestController {
     return ResponseEntity.ok(
         requestService.page(
             ExchangeCaller.of((SubjectAuthentication) authentication), cursor, limit));
+  }
+
+  /**
+   * Raises a booking request for the member.
+   *
+   * @param body the request
+   * @param authentication the relayed acting member the gate admitted
+   * @return {@code 201} with the request's id, status, version and amount
+   */
+  @NotNull
+  @PostMapping
+  @PreAuthorize("@exchangeGate.allows('exchange.bank.request', authentication)")
+  @Operation(
+      summary = "Exchange: raise one of my bank booking requests",
+      description =
+          "Gateway-only. A deposit, withdrawal or transfer with the web's validation and approval"
+              + " routing; a deposit may target any active account. An unknown, closed or hidden"
+              + " account answers 404 NOT_FOUND; 20 pending requests answer 409"
+              + " BANK_OPEN_REQUEST_CAP. Books nothing.")
+  @ApiResponse(responseCode = "201", description = "The pending request")
+  @ApiResponse(responseCode = "404", description = "Unknown, closed or hidden account")
+  @ApiResponse(responseCode = "409", description = "A bank conflict or the open-request cap")
+  public ResponseEntity<ExchangeBankRequestWrittenDto> raise(
+      @NotNull @Valid @RequestBody ExchangeBankRequestCreateDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(writeService.raise(ExchangeCaller.of((SubjectAuthentication) authentication), body));
+  }
+
+  /**
+   * Corrects one of the member's pending requests (REQ-BANK-056).
+   *
+   * @param id the request
+   * @param body the corrected values and the echoed version
+   * @param authentication the relayed acting member the gate admitted
+   * @return the request's id, status, version and amount
+   */
+  @NotNull
+  @PostMapping("/{id}/correction")
+  @PreAuthorize("@exchangeGate.allows('exchange.bank.request', authentication)")
+  @Operation(
+      summary = "Exchange: correct one of my pending bank booking requests",
+      description =
+          "Gateway-only. Replaces amount, note, justification and destination of a pending, not yet"
+              + " approved own request, raised anywhere, and re-routes its approval. Another"
+              + " member's request answers 404 NOT_FOUND.")
+  @ApiResponse(responseCode = "200", description = "The corrected request")
+  @ApiResponse(responseCode = "404", description = "Unknown or foreign request")
+  @ApiResponse(responseCode = "409", description = "Not pending, approved or a stale version")
+  public ResponseEntity<ExchangeBankRequestWrittenDto> correct(
+      @NotNull @PathVariable UUID id,
+      @NotNull @Valid @RequestBody ExchangeBankRequestCorrectionDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        writeService.correct(ExchangeCaller.of((SubjectAuthentication) authentication), id, body));
+  }
+
+  /**
+   * Cancels one of the member's pending requests.
+   *
+   * @param id the request
+   * @param body the echoed version
+   * @param authentication the relayed acting member the gate admitted
+   * @return the request's id, status and version
+   */
+  @NotNull
+  @PostMapping("/{id}/cancel")
+  @PreAuthorize("@exchangeGate.allows('exchange.bank.request', authentication)")
+  @Operation(
+      summary = "Exchange: cancel one of my pending bank booking requests",
+      description =
+          "Gateway-only. Cancels a pending own request, raised anywhere. Another member's request"
+              + " answers 404 NOT_FOUND.")
+  @ApiResponse(responseCode = "200", description = "The cancelled request")
+  @ApiResponse(responseCode = "404", description = "Unknown or foreign request")
+  @ApiResponse(responseCode = "409", description = "Not pending or a stale version")
+  public ResponseEntity<ExchangeBankRequestCancelledDto> cancel(
+      @NotNull @PathVariable UUID id,
+      @NotNull @Valid @RequestBody ExchangeBankRequestCancelDto body,
+      @NotNull Authentication authentication) {
+    return ResponseEntity.ok(
+        writeService.cancel(
+            ExchangeCaller.of((SubjectAuthentication) authentication), id, body.version()));
   }
 }

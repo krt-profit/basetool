@@ -24,6 +24,7 @@ its routes are not published yet.
 | `GET /exchange/v1/bank/accounts/{id}/balance-series` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/queue` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/requests` | the member's own data | persist it |
+| the answers of the request writes | the member's own data | persist it |
 
 The retention class is a condition of the approval ([becoming a client](../onboarding.md)).
 
@@ -164,11 +165,60 @@ Each item is a [`bank-request`](../schemas/):
   cancellation.
 - `splitEnabled` and `splitPercent` describe a deposit that distributes a whole percent of the
   amount across the squadron accounts.
-- `client` names the connected application that raised the request; it is `null` for now.
+- `client` names the connected application that raised the request, by its registry id; it is
+  `null` for a request raised in the Basetool.
 - `version` is the value a correction or a cancel echoes.
 
 No staff note, no bank-staff identity, no counterparty and no purpose leave the Basetool. These are
 the member's own data: a client may keep them.
+
+## Raising, correcting and cancelling a request
+
+Three writes under the scope `exchange.bank.request`. Each needs an `Idempotency-Key` and counts
+one unit of the daily write quota ([limits](../sync-guide.md#rate-limits-quota-and-back-off)). The
+Basetool applies the same validation and approval routing as in its own pages; nothing is booked
+until the bank confirms the request there.
+
+`POST /exchange/v1/bank/requests` raises a request:
+
+```json
+{
+  "type": "WITHDRAWAL",
+  "sourceAccountId": "11111111-2222-4333-8444-555555555555",
+  "amount": 15000,
+  "note": "Refuel at Port Olisar",
+  "justification": "Fuel for the Friday op"
+}
+```
+
+- `type` is `DEPOSIT`, `WITHDRAWAL` or `TRANSFER`; `amount` is whole aUEC, 1 to 10¹².
+- A deposit may go to any active account, also one the member does not view; it carries no
+  justification and may be split with `splitEnabled` and `splitPercent` (1 to 100).
+- A withdrawal or transfer needs an account the member views and a `justification` where the
+  account asks for one. Only a transfer names a `targetAccountId`, any active account but the
+  source.
+- `note` and `justification` are plain text of at most 500 characters. Bank staff see them as text,
+  links are not clickable, and the request carries a badge with your application's name.
+
+The answer is `201` with only the request's id, status, version and amount:
+
+```json
+{ "id": "33333333-4444-4555-8666-777777777777", "status": "PENDING", "version": 0, "amount": 15000 }
+```
+
+Read the rest — the approval need, the accounts — from the [own requests](#own-requests), where the
+new request follows in the feed.
+
+`POST /exchange/v1/bank/requests/{id}/correction` corrects a pending, not yet approved own
+request, raised anywhere: `amount`, `note`, `justification`, `targetAccountId` and the `version`
+last read. Every
+field replaces the stored one; the type and the source account stay. The approval need is derived
+anew. The answer is `200` like the one above.
+
+`POST /exchange/v1/bank/requests/{id}/cancel` with `{ "version": 2 }` cancels a pending own
+request, raised anywhere, and answers `200 { id, status, version }`.
+
+There is no undo: a request books nothing, so cancel it instead.
 
 ## Staff queue
 
@@ -234,11 +284,17 @@ No staff note, holder, custody balance or handle other than the requester's leav
 
 | Answer | When |
 | --- | --- |
-| `404 NOT_FOUND` | The account does not exist, is closed, or the member may not view it. All three answer alike. |
-| `400 SCHEMA_INVALID` | The account id is not an id, a bound is malformed, missing or too far apart, or a queue `limit` lies outside 1 to 500. |
+| `404 NOT_FOUND` | The account does not exist, is closed, or the member may not view it; for a correction or a cancel, the request is not the member's or does not exist. All answer alike. |
+| `409 BANK_OPEN_REQUEST_CAP` | The member already holds 20 pending requests, from any channel. Wait for the bank's decisions or cancel one. |
+| `409 BANK_JUSTIFICATION_REQUIRED` | A withdrawal or transfer from this account needs a justification. |
+| `409 BANK_SELF_TRANSFER` | Source and destination of a transfer are the same account. |
+| `409 BANK_REQUEST_NOT_PENDING` | The request was decided or cancelled already. |
+| `409 BANK_REQUEST_ALREADY_APPROVED` | The request was approved; it can no longer be corrected, only cancelled. |
+| `409 VERSION_CONFLICT` | The request changed since it was read; read it again and retry. |
+| `400 SCHEMA_INVALID` | The account id is not an id, a bound is malformed, missing or too far apart, a queue `limit` lies outside 1 to 500, or a write's body breaks the schema or the Basetool's rules (a destination on a non-transfer, a split on a non-deposit). |
 | `410 CURSOR_EXPIRED` | The cursor is not one the server issued, its account is gone for the member, or a feed cursor is older than the retained changes. |
 | `403 NOT_BANK_STAFF` | The queue was asked for by a member with no bank role, no grant and no request to approve. |
-| `403 SCOPE_MISSING` | The token or the client's approval lacks `exchange.bank.read`, or `exchange.bank.queue` for the queue. |
+| `403 SCOPE_MISSING` | The token or the client's approval lacks `exchange.bank.read`, `exchange.bank.queue` for the queue, or `exchange.bank.request` for the writes. |
 | `503 BANK_EXCHANGE_DISABLED` | The bank is switched off for connected applications. |
 
 The rest of the [error registry](../errors.md) applies as on every route.

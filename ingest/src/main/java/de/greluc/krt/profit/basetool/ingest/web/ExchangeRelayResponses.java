@@ -42,9 +42,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Relays the gateway's reads and shapes every answer a route sends: the checked page request, a
- * usable backend answer that holds its contract, and the problems of a refusal (REQ-XCH-011,
- * REQ-XCH-025).
+ * Relays the gateway's reads and single-body writes and shapes every answer a route sends: the
+ * checked page request or body, a usable backend answer that holds its contract, and the problems
+ * of a refusal (REQ-XCH-011, REQ-XCH-025).
  */
 @Component
 @RequiredArgsConstructor
@@ -56,6 +56,7 @@ class ExchangeRelayResponses {
 
   private final ExchangeRelay relay;
   private final ExchangeAnswers answers;
+  private final ExchangeSchemas schemas;
   private final LoggingProperties loggingProperties;
 
   /**
@@ -140,6 +141,98 @@ class ExchangeRelayResponses {
   }
 
   /**
+   * Checks a body, relays it and checks the answer, which reaches the client with {@code 200}.
+   *
+   * @param method the method on both sides
+   * @param body the request body
+   * @param requestSchema the body's schema
+   * @param path the route below {@code /exchange/v1}
+   * @param responseSchema the answer's schema
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the answer or a problem
+   */
+  @NotNull
+  ResponseEntity<?> body(
+      @NotNull HttpMethod method,
+      @NotNull JsonNode body,
+      @NotNull String requestSchema,
+      @NotNull String path,
+      @NotNull String responseSchema,
+      @NotNull HttpServletRequest request,
+      @Nullable String acceptLanguage) {
+    return body(
+        method, body, requestSchema, path, responseSchema, HttpStatus.OK, request, acceptLanguage);
+  }
+
+  /**
+   * Checks a body, relays it and checks the answer, which reaches the client with the given status.
+   *
+   * @param method the method on both sides
+   * @param body the request body
+   * @param requestSchema the body's schema
+   * @param path the route below {@code /exchange/v1}
+   * @param responseSchema the answer's schema
+   * @param success the status a usable answer reaches the client with
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the answer or a problem
+   */
+  @NotNull
+  ResponseEntity<?> body(
+      @NotNull HttpMethod method,
+      @NotNull JsonNode body,
+      @NotNull String requestSchema,
+      @NotNull String path,
+      @NotNull String responseSchema,
+      @NotNull HttpStatus success,
+      @NotNull HttpServletRequest request,
+      @Nullable String acceptLanguage) {
+    ExchangeRequestContext context = ExchangeRequestContext.of(request);
+    if (context == null) {
+      return failed();
+    }
+    List<ExchangeSchemas.Violation> violations = schemas.validate(requestSchema, body);
+    if (!violations.isEmpty()) {
+      return schemaInvalid(violations);
+    }
+    List<String> unknown = schemas.unknownFields(requestSchema, body);
+    ResponseEntity<?> unreportable = unreportable(unknown);
+    if (unreportable != null) {
+      return unreportable;
+    }
+    return relayed(
+        relay.forward(method, ExchangeController.BACKEND + path, body, context, acceptLanguage),
+        responseSchema,
+        unknown,
+        success,
+        context,
+        request);
+  }
+
+  /**
+   * Refuses a body whose undeclared field could not be reported as a warning, because its JSON
+   * Pointer exceeds {@link ExchangeSchemas#MAX_POINTER} characters; checked before the relay, so a
+   * write the backend committed always gets an answer that matches its schema.
+   *
+   * @param unknown the request's undeclared fields
+   * @return {@code 400 SCHEMA_INVALID} naming the fields' parents, or {@code null} when every field
+   *     can be reported
+   */
+  @Nullable
+  ResponseEntity<?> unreportable(@NotNull List<String> unknown) {
+    List<ExchangeSchemas.Violation> violations =
+        unknown.stream()
+            .filter(pointer -> pointer.length() > ExchangeSchemas.MAX_POINTER)
+            .map(pointer ->
+                new ExchangeSchemas.Violation(
+                    ExchangeSchemas.reportable(pointer), "holds a property name too long"))
+            .distinct()
+            .toList();
+    return violations.isEmpty() ? null : schemaInvalid(violations);
+  }
+
+  /**
    * Whether a page size lies within the contract.
    *
    * @param limit the raw value
@@ -171,12 +264,36 @@ class ExchangeRelayResponses {
       @NotNull List<String> unknown,
       @NotNull ExchangeRequestContext context,
       @NotNull HttpServletRequest request) {
+    return relayed(result, responseSchema, unknown, HttpStatus.OK, context, request);
+  }
+
+  /**
+   * Turns a relay result into the answer with the given success status.
+   *
+   * @param result the relay result
+   * @param responseSchema the answer's schema
+   * @param unknown the request's undeclared fields
+   * @param success the status a usable answer reaches the client with
+   * @param context what the gate established
+   * @param request the admitted request
+   * @return the answer or a problem
+   */
+  @NotNull
+  private ResponseEntity<?> relayed(
+      @NotNull ExchangeRelay.Result result,
+      @NotNull String responseSchema,
+      @NotNull List<String> unknown,
+      @NotNull HttpStatus success,
+      @NotNull ExchangeRequestContext context,
+      @NotNull HttpServletRequest request) {
     if (!result.isOk()) {
       return problem(result.status(), result.code(), result.detail());
     }
     JsonNode body = result.body();
     answers.addUnknownFieldWarnings(body, responseSchema, unknown);
-    return answers.passesRelayed(body, responseSchema, request, context) ? ok(body) : failed();
+    return answers.passesRelayed(body, responseSchema, request, context)
+        ? ResponseEntity.status(success).contentType(MediaType.APPLICATION_JSON).body(body)
+        : failed();
   }
 
   /**

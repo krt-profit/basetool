@@ -79,6 +79,7 @@ class BankPurposeBoundRequestServiceTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  @Mock private BankRequestClientNames clientNames;
   @Mock private BookingRequestPurposeObserver observer;
 
   private BankBookingRequestService service;
@@ -111,7 +112,8 @@ class BankPurposeBoundRequestServiceTest {
             userRepository,
             orgUnitMembershipQueryService,
             eventPublisher,
-            purposeObservers);
+            purposeObservers,
+            clientNames);
   }
 
   @BeforeEach
@@ -173,7 +175,8 @@ class BankPurposeBoundRequestServiceTest {
             null,
             null,
             null,
-            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId));
+            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId),
+            null);
 
     assertThat(dto.purposeKind()).isEqualTo(BankPurposeKind.PURCHASING_DEAL);
     assertThat(dto.purposeRef()).isEqualTo(dealId);
@@ -202,6 +205,8 @@ class BankPurposeBoundRequestServiceTest {
             null,
             null,
             false,
+            null,
+            null,
             null,
             null,
             null);

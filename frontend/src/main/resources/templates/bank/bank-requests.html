@@ -77,6 +77,7 @@
                 <td>
                     <span class="bank-req-requester"
                           th:text="${@handles.display(r.requesterHandle())} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">greluc (ALP)</span>
+                    <th:block th:replace="~{bank/fragments/bank-request-origin :: clientBadge(${r.clientName()})}"></th:block>
                     <span class="cell-sub utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
                 </td>
                 <td class="num">

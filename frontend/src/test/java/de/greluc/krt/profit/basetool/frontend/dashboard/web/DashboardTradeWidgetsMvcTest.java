@@ -239,6 +239,7 @@ class DashboardTradeWidgetsMvcTest {
         null,
         null,
         null,
+        null,
         1L,
         null);
   }

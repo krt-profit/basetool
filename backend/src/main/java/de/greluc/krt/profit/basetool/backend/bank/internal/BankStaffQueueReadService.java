@@ -234,7 +234,8 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
         request.isOwnerApprovalGranted(),
         rights.canBook(request.getType(), account.getId())
             && !rights.boundByFourEyes(request.getRequestedBy()),
-        balances.get(account.getId()));
+        balances.get(account.getId()),
+        request.getClientId());
   }
 
   /**

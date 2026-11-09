@@ -448,6 +448,7 @@
       "note" : "Einzahlung von #OTHER_MEMBER#",
       "justification" : "Abgesprochen mit #OTHER_MEMBER#",
       "status" : "PENDING",
+      "client_id" : null,
       "created_at" : "<instant>",
       "decided_at" : null
     } ],

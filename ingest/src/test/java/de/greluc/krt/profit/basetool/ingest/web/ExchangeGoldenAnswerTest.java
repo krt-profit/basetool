@@ -156,7 +156,7 @@ class ExchangeGoldenAnswerTest {
 
   /** A path segment holding an id, which the seam writes as {@code {id}}. */
   private static final Pattern ID_SEGMENT =
-      Pattern.compile("/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/");
+      Pattern.compile("/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=/|$)");
 
   @Autowired private WebApplicationContext context;
   @Autowired private MeterRegistry meterRegistry;
@@ -505,6 +505,20 @@ class ExchangeGoldenAnswerTest {
                 + "?from=2026-11-06T00:00:00Z&to=2026-11-08T23:59:59Z"));
     routes.put("route-get-bank-queue", get("/bank/queue?limit=2"));
     routes.put("route-get-bank-requests", get("/bank/requests?limit=2"));
+    routes.put(
+        "route-post-bank-request",
+        post("/bank/requests", fixture("bank-request-write--raise/valid/withdrawal.json")));
+    routes.put(
+        "route-post-bank-request-correction",
+        new Call(
+            HttpMethod.POST,
+            "/bank/requests/33333333-4444-4555-8666-777777777777/correction",
+            fixture("bank-request-write--correction/valid/new-amount.json")));
+    routes.put(
+        "route-post-bank-request-cancel",
+        post(
+            "/bank/requests/33333333-4444-4555-8666-777777777777/cancel",
+            fixture("bank-request-write--cancel/valid/cancel.json")));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -553,6 +567,11 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-queue/valid/staff-and-approver.json");
         case "GET /api/v1/exchange/bank/requests" ->
             fixture("page--bankRequestPage/valid/snapshot.json");
+        case "POST /api/v1/exchange/bank/requests",
+            "POST /api/v1/exchange/bank/requests/{id}/correction" ->
+            fixture("bank-request-write--written/valid/pending.json");
+        case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
+            fixture("bank-request-write--cancelled/valid/cancelled.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";
@@ -725,7 +744,7 @@ class ExchangeGoldenAnswerTest {
   private static @NotNull String pathOf(@NotNull RecordedRequest request) {
     String path = request.getPath() == null ? "" : request.getPath();
     int query = path.indexOf('?');
-    return ID_SEGMENT.matcher(query < 0 ? path : path.substring(0, query)).replaceAll("/{id}/");
+    return ID_SEGMENT.matcher(query < 0 ? path : path.substring(0, query)).replaceAll("/{id}");
   }
 
   /**

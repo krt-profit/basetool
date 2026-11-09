@@ -94,7 +94,13 @@ public enum BankProblemCode implements ProblemCode {
   BANK_JUSTIFICATION_REQUIRED(HttpStatus.CONFLICT),
 
   /** The transfer fee exceeds the amount. */
-  BANK_FEE_EXCEEDS_AMOUNT(HttpStatus.CONFLICT);
+  BANK_FEE_EXCEEDS_AMOUNT(HttpStatus.CONFLICT),
+
+  /**
+   * A connected application raised a request for a member who already holds the configured number
+   * of pending requests (REQ-BXCH-004).
+   */
+  BANK_OPEN_REQUEST_CAP(HttpStatus.CONFLICT);
 
   /** The status the code is answered with. */
   private final HttpStatus status;

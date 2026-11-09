@@ -130,7 +130,9 @@ public class ExchangeRelay {
           "BAD_REQUEST",
           "SCHEMA_INVALID",
           "OPTIMISTIC_LOCK",
-          "VERSION_CONFLICT");
+          "VERSION_CONFLICT",
+          "CONSTRAINT_VIOLATION",
+          "SCHEMA_INVALID");
 
   /**
    * The codes of the gateway's registry gate, each with the only status it may arrive with: the
@@ -187,6 +189,18 @@ public class ExchangeRelay {
               "MASS_CHANGE_CONFIRMATION_REQUIRED",
               "The change set removes more than the mass-change guard allows without"
                   + " confirmation."),
+          Map.entry(
+              "BANK_JUSTIFICATION_REQUIRED",
+              "A withdrawal or transfer from this account needs a justification."),
+          Map.entry(
+              "BANK_SELF_TRANSFER", "Source and destination account of a transfer must differ."),
+          Map.entry("BANK_REQUEST_NOT_PENDING", "The booking request is no longer pending."),
+          Map.entry(
+              "BANK_REQUEST_ALREADY_APPROVED",
+              "The booking request was approved already; cancel it and raise a new one."),
+          Map.entry(
+              "BANK_OPEN_REQUEST_CAP",
+              "The member holds the most pending booking requests a client may add to."),
           Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
           Map.entry(

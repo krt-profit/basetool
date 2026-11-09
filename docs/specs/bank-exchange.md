@@ -32,8 +32,8 @@ The guiding rules:
 
 ### REQ-BXCH-001 — The bank scopes, their consent and the one decision point
 
-> [!note] Implemented (#3157; ADR-0354, ADR-0352). The queue route came with REQ-BXCH-005 (#3160);
-> the routes of `exchange.bank.request` come with REQ-BXCH-004.
+> [!note] Implemented (#3157; ADR-0354, ADR-0352). The queue route came with REQ-BXCH-005 (#3160),
+> the routes of `exchange.bank.request` with REQ-BXCH-004 (#3159).
 
 **Three capabilities.** The bank has three scopes of its own (`ExchangeCapability`, the
 `ck_exchange_client_capability` check, the provisioner's `EXCHANGE_SCOPES`, the sandbox and E2E
@@ -46,8 +46,7 @@ realms, the admin client page and the client application form):
 | `exchange.bank.queue` | read, as bank staff, the open requests the member may confirm or approve | „Als Bankmitarbeiter die offenen Buchungsanträge lesen, die du bestätigen oder freigeben darfst, mit dem Handle des Antragstellers" |
 
 The queue has a scope of its own, so a staff member's ordinary login carries no staff view. No
-client is granted a bank scope until its approval amendment (REQ-BXCH-007); until the routes of
-REQ-BXCH-004 exist, `exchange.bank.request` serves no route.
+client is granted a bank scope until its approval amendment (REQ-BXCH-007).
 
 **One decision point.** Every bank decision of the exchange is made by the bank access policy
 (ADR-0352), never by exchange code:
@@ -140,8 +139,8 @@ REQ-BANK-064, REQ-BANK-066, REQ-XCH-013 · **Issues:** #3118, #3157
 
 ### REQ-BXCH-003 — The member's own requests and their change feed
 
-> [!note] Implemented (#3158). `client` stays `null` until the request writes add the origin
-> column (REQ-BXCH-004).
+> [!note] Implemented (#3158). `client` names the connected application that raised the request
+> since the request writes (REQ-BXCH-004, #3159).
 
 `GET /exchange/v1/bank/requests` under `exchange.bank.read`, relayed to
 `/api/v1/exchange/bank/requests`: every booking request the member raised, whichever channel raised
@@ -157,8 +156,9 @@ it — the web's requests too — as a snapshot followed by the change feed of R
   or not issued by the server answers `410 CURSOR_EXPIRED`.
 - **Allow-list.** `id`, `version`, `status`, `createdAt`, `decidedAt`, `type`, `amount`, `note`,
   `justification`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no }`,
-  `requiresOwnerApproval`, `requiredApprover`, `ownerApprovalGranted`, `rejectReason`, `client`,
-  `splitEnabled`, `splitPercent`, each `null` where it does not apply. Money and the split percent
+  `requiresOwnerApproval`, `requiredApprover`, `ownerApprovalGranted`, `rejectReason`, `client`
+  (the registry id of the application that raised it, `null` for the Basetool), `splitEnabled`,
+  `splitPercent`, each `null` where it does not apply. Money and the split percent
   are JSON integers. No staff note, no staff identities (requester, decider or approver handles), no
   counterparty, no purpose and no `callerMayConfirm`.
 - **Retention.** The member's own data: a client may persist it (REQ-BXCH-007).
@@ -183,10 +183,75 @@ it — the web's requests too — as a snapshot followed by the change feed of R
 `BankOwnRequestReadService` (backend) · `ExchangeBankRequestController`, `ExchangeRoutes`
 (gateway) · `bank-request.schema.json`, `page.schema.json#/$defs/bankRequestPage` · V365 ·
 **Related:** REQ-BANK-022, REQ-XCH-013, REQ-BXCH-007 · **Issues:** #3118, #3119, #3158
+
+### REQ-BXCH-004 — Raising, correcting and cancelling the member's own requests
+
+> [!note] Implemented (#3159).
+
+Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/bank/requests…` to
+`/api/v1/exchange/bank/requests…`. Each is a write: the `Idempotency-Key` is mandatory
+(REQ-XCH-020) and each call is one unit of the daily write quota (REQ-XCH-023).
+
+| Route | Body | Answer |
+|---|---|---|
+| `POST /exchange/v1/bank/requests` | `type`, `sourceAccountId`, `targetAccountId` (transfer), `amount`, `note`, `justification`, `splitEnabled` / `splitPercent` (deposit) | `201 { id, status, version, amount }` |
+| `POST /exchange/v1/bank/requests/{id}/correction` | `amount`, `note`, `justification`, `targetAccountId`, `version` | `200 { id, status, version, amount }` |
+| `POST /exchange/v1/bank/requests/{id}/cancel` | `{ version }` | `200 { id, status, version }` |
+
+- **The web's rules, through the bank policy.** `BankOwnRequestWrites` runs the web's bean
+  validation (`CreateBankBookingRequest`, `UpdateBankBookingRequest`) and the web's raise and
+  correction paths of `OrgUnitBankRequestService` for the actor `BankActors.forExchange` without a
+  pin: approval routing (limits, KRT bands, exemption), the justification guard, self-transfer and
+  re-routing on correction. The exchange adds no rule of its own. A deposit may target any active
+  account (REQ-BANK-042); a withdrawal or transfer needs an account the policy admits.
+- **Which requests.** Correction and cancel act on every own pending request, the web's included.
+  A correction keeps the counterparty a web request names. No counterparty, no purpose-bound and no
+  KRT direct-booking request is raised through a client.
+- **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
+  requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise.
+- **Origin.** A raised request records the registry client the exchange gate admitted in
+  `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
+  (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
+- **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
+  trail is `bank_audit_event` with its `client_id` (ADR-0153).
+- **Refusals.** `404 NOT_FOUND` for an unknown, closed or hidden account and for another member's
+  request (the web answers `403` or `409 BANK_ACCOUNT_CLOSED` there); `400 SCHEMA_INVALID` for a
+  body outside the schema or the bean rules (the backend's `CONSTRAINT_VIOLATION`) and for a
+  missing or superfluous destination (`BAD_REQUEST`); `409 BANK_JUSTIFICATION_REQUIRED`,
+  `BANK_SELF_TRANSFER`, `BANK_REQUEST_NOT_PENDING`, `BANK_REQUEST_ALREADY_APPROVED`,
+  `BANK_OPEN_REQUEST_CAP` and `VERSION_CONFLICT` (the backend's `OPTIMISTIC_LOCK`); the gateway's
+  own idempotency and quota codes.
+- **Counted.** Every write counts `basetool_exchange_writes_total{client_id,
+  resource="bank_request", outcome=applied|rejected}`, every shared `404`
+  `basetool_exchange_bank_refused_total{reason="not_found"}` and every cap refusal
+  `{reason="open_request_cap"}` (REQ-OBS-024).
+
+**Acceptance**
+
+- [x] A deposit on an account the member does not view is raised with the terse `201`; a
+  withdrawal is routed as on the web; the request records the client, which the own requests and
+  the staff queue answer (`ExchangeBankRequestWritesTest`).
+- [x] A hidden, a closed and an unknown account, a closed destination and another member's request
+  answer the same counted `404` (`ExchangeBankRequestWritesTest`).
+- [x] The bank's refusals, the bean rules, a stale version and the cap at 20 pending requests answer
+  as listed (`ExchangeBankRequestWritesTest`).
+- [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,
+  with `201` for a raise and the shared `404` for a refusal (`BankExchangeParityTest`).
+- [x] The gateway checks the body and the request id before the relay, answers `201`, passes the
+  bank's codes on and needs the scope; the routes, schema, fixtures and goldens are part of the
+  frozen contract (`ExchangeBankRequestWriteRouteTest`, `ExchangeGoldenAnswerTest`,
+  `ExchangeContractTest`, `ExchangeWireContractTest`).
+
+**Enforced by:** `ExchangeBankRequestController`, `ExchangeBankRequestWriteService`,
+`BankOwnRequestWriteService`, `OrgUnitBankRequestService` (backend) · `ExchangeBankRequestController`,
+`ExchangeRoutes`, `ExchangeRelay` (gateway) ·
+`bank-request-write.schema.json` · V366 · **Related:** REQ-BANK-022, REQ-BANK-039…042,
+REQ-BANK-056, REQ-BANK-067, REQ-XCH-020, REQ-XCH-023 · **Issues:** #3113, #3119, #3121, #3159
+
 ### REQ-BXCH-005 — The read-only bank-staff queue
 
-> [!note] Implemented (#3160). `client` stays `null` until a request records the application that
-> raised it (REQ-BXCH-004).
+> [!note] Implemented (#3160). `client` names the application that raised a request since the
+> request writes (REQ-BXCH-004, #3159).
 
 `GET /exchange/v1/bank/queue` under `exchange.bank.queue`, relayed to `/api/v1/exchange/bank/queue`.
 A snapshot, decided anew on every call by the bank access policy (`BankAccessPolicy#staffRights`,
@@ -244,7 +309,8 @@ refusal `basetool_exchange_bank_refused_total{reason="not_bank_staff"}` (REQ-OBS
   without balances (`ExchangeBankQueueTest`).
 - [x] A member and an administrator without bank roles, grants or approvals get `403 NOT_BANK_STAFF`,
   counted (`ExchangeBankQueueTest`).
-- [x] The item carries exactly the allow-listed fields, the link and `client = null`; a withholding
+- [x] The item carries exactly the allow-listed fields, the link and `client` (`null` for a request
+  raised in the Basetool); a withholding
   requester has no handle; the oldest request is overdue from 48 hours; both sections page with one
   cursor; a foreign cursor is `410` (`ExchangeBankQueueTest`).
 - [x] The gateway checks the limit before the relay and the answer against `bank-queue.schema.json`;
@@ -319,7 +385,8 @@ or closed account answers the same `404`.
   (`ExchangeRegistryNoticeTest`, `SeededNotificationRulesIntegrationTest`).
 - [x] The open-request cap is 20 unless configured and refuses a value outside 1…1000
   (`BankExchangePropertiesTest`).
-- [ ] `409 BANK_OPEN_REQUEST_CAP` is answered by the request writes (REQ-BXCH-004).
+- [x] `409 BANK_OPEN_REQUEST_CAP` is answered by the request writes (REQ-BXCH-004,
+  `ExchangeBankRequestWritesTest`).
 
 **Enforced by:** `ExchangeGate`, `BankExchangeRoutes`, `ExchangeRegistryService#updateBankSwitch`,
 `ExchangeRegistrySnapshot`, `BankExchangeProperties` (backend) · `ExchangeGateFilter`,

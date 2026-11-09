@@ -95,6 +95,7 @@ public class BankBookingRequestService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
   private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  private final BankRequestClientNames clientNames;
 
   /**
    * Persists a new {@code PENDING} booking request, audits it and fires the notification event
@@ -121,6 +122,9 @@ public class BankBookingRequestService {
    * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
    *     {@code null} to derive the requester at confirmation
    * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
+   * @param purpose what another module raised the request for (REQ-BANK-061), or {@code null}
+   * @param clientId the connected application that raised it through the exchange (REQ-BANK-067),
+   *     or {@code null} for a request raised in the Basetool
    * @return the created request
    * @throws NotFoundException when the source or destination account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
@@ -143,63 +147,9 @@ public class BankBookingRequestService {
       boolean splitEnabled,
       @Nullable BigDecimal splitPercent,
       @Nullable UUID counterpartyUserId,
-      @Nullable UUID counterpartyOrgUnitId) {
-    return create(
-        accountId,
-        type,
-        amount,
-        note,
-        justification,
-        targetAccountId,
-        requiresOwnerApproval,
-        applicableLimit,
-        requiredApprover,
-        splitEnabled,
-        splitPercent,
-        counterpartyUserId,
-        counterpartyOrgUnitId,
-        null);
-  }
-
-  /**
-   * Persists a new {@code PENDING} booking request that another module raised for a purpose
-   * (REQ-BANK-061); otherwise exactly {@link #create(UUID, BankBookingRequestType, BigDecimal,
-   * String, String, UUID, boolean, BigDecimal, BankRequestApprover, boolean, BigDecimal, UUID,
-   * UUID)}.
-   *
-   * @param accountId the source account
-   * @param type deposit, withdrawal or transfer
-   * @param amount the requested whole-aUEC amount
-   * @param note the requester's optional note
-   * @param justification the requester's optional Begr&uuml;ndung
-   * @param targetAccountId the transfer destination, or {@code null}
-   * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
-   * @param applicableLimit the requester's resolved approval limit, or {@code null}
-   * @param requiredApprover the approver class a flagged request needs, or {@code null}
-   * @param splitEnabled whether a deposit is split across the squadron accounts
-   * @param splitPercent the whole percent to distribute, or {@code null}
-   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL}, or {@code null}
-   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
-   * @param purpose what the request is for, or {@code null} for a request without a purpose
-   * @return the created request
-   */
-  @NotNull
-  @Transactional
-  public BankBookingRequestDto create(
-      @NotNull UUID accountId,
-      @NotNull BankBookingRequestType type,
-      @NotNull BigDecimal amount,
-      @Nullable String note,
-      @Nullable String justification,
-      @Nullable UUID targetAccountId,
-      boolean requiresOwnerApproval,
-      @Nullable BigDecimal applicableLimit,
-      @Nullable BankRequestApprover requiredApprover,
-      boolean splitEnabled,
-      @Nullable BigDecimal splitPercent,
-      @Nullable UUID counterpartyUserId,
       @Nullable UUID counterpartyOrgUnitId,
-      @Nullable BankPurpose purpose) {
+      @Nullable BankPurpose purpose,
+      @Nullable String clientId) {
     BankAccount account =
         Entities.require(accountRepository.findById(accountId), "Bank account not found");
     requireActiveForRequest(account);
@@ -244,6 +194,7 @@ public class BankBookingRequestService {
     request.setSplitPercent(splitPercent);
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
+    request.setClientId(clientId);
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -631,7 +582,9 @@ public class BankBookingRequestService {
     return pageQueue(statuses, pageable, rights)
         .map(request ->
             BankBookingRequestDtos.of(
-                request, BankBookingRequestDtos.callerMayConfirm(request, rights)));
+                request,
+                clientNames.nameOf(request),
+                BankBookingRequestDtos.callerMayConfirm(request, rights)));
   }
 
   /**
@@ -1035,7 +988,7 @@ public class BankBookingRequestService {
    */
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
-    return BankBookingRequestDtos.of(request, null);
+    return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
   }
 
   /**

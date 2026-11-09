@@ -53,12 +53,15 @@ final class BankBookingRequestDtos {
    * the single-row transactional paths).
    *
    * @param request the request entity
+   * @param clientName the connected application it was raised through, or {@code null}
    * @param callerMayConfirm whether the caller may confirm it, or {@code null} when not judged
    * @return the wire DTO
    */
   @NotNull
   static BankBookingRequestDto of(
-      @NotNull BankBookingRequest request, @Nullable Boolean callerMayConfirm) {
+      @NotNull BankBookingRequest request,
+      @Nullable String clientName,
+      @Nullable Boolean callerMayConfirm) {
     BankAccount account = request.getAccount();
     OrgUnit orgUnit = account.getOrgUnit();
     BankHolder holder = request.getHolder();
@@ -101,6 +104,7 @@ final class BankBookingRequestDtos {
         request.getCounterpartyOrgUnitName(),
         request.getPurposeKind(),
         request.getPurposeRef(),
+        clientName,
         request.getVersion(),
         callerMayConfirm);
   }

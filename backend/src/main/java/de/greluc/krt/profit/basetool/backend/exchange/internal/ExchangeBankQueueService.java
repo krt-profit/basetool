@@ -153,8 +153,8 @@ public class ExchangeBankQueueService {
   }
 
   /**
-   * Shapes one item, without the handle of a requester who withholds their name. The origin client
-   * is not recorded on a request, so {@code client} is {@code null}.
+   * Shapes one item, without the handle of a requester who withholds their name; {@code client}
+   * names the connected application that raised it, or is {@code null} for the Basetool.
    *
    * @param item the queue item
    * @param withheld the requesters of the page who withhold their name
@@ -185,7 +185,7 @@ public class ExchangeBankQueueService {
         item.ownerApprovalGranted(),
         item.mayConfirm(),
         ExchangeBankReadService.wholeOrNull(item.accountBalance()),
-        null,
+        item.client(),
         LINK_PREFIX + item.requestId());
   }
 }

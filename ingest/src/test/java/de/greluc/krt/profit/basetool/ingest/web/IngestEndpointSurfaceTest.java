@@ -73,6 +73,13 @@ class IngestEndpointSurfaceTest {
               "/exchange/v1/bank/accounts/00000000-0000-4000-8000-000000000000/balance-series"),
           new Call(HttpMethod.GET, "/exchange/v1/bank/queue"),
           new Call(HttpMethod.GET, "/exchange/v1/bank/requests"),
+          new Call(HttpMethod.POST, "/exchange/v1/bank/requests"),
+          new Call(
+              HttpMethod.POST,
+              "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000/correction"),
+          new Call(
+              HttpMethod.POST,
+              "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000/cancel"),
           new Call(HttpMethod.POST, "/exchange/v1/org-stock/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/blueprints/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/stock/changes"),

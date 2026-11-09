@@ -23,7 +23,7 @@
       "ownerApprovalGranted": false,
       "mayConfirm": true,
       "accountBalance": 1250000,
-      "client": null,
+      "client": "versekit",
       "link": "https://profit-base.online/bank/requests/7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
     }
   ],

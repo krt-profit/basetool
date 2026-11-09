@@ -45,7 +45,8 @@
                 </div>
                 <div class="bank-detail-item">
                     <span class="bank-detail-label" th:text="#{bank.request.col.requester}">Antragsteller</span>
-                    <span class="bank-detail-value" th:text="${@handles.display(r.requesterHandle())}">greluc</span>
+                    <span class="bank-detail-value"><span th:text="${@handles.display(r.requesterHandle())}">greluc</span>
+                        <th:block th:replace="~{bank/fragments/bank-request-origin :: clientBadge(${r.clientName()})}"></th:block></span>
                 </div>
                 <div class="bank-detail-item">
                     <span class="bank-detail-label" th:text="#{bank.request.page.created}">Gestellt</span>

@@ -31,6 +31,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -84,64 +85,137 @@ public class OrgUnitBankRequestService {
     BankAccount account =
         Entities.require(
             bankAccountRepository.findById(request.sourceAccountId()), "Bank account not found");
+    return raise(
+        account,
+        request,
+        () ->
+            policy.admit(
+                accessService.actor(),
+                account,
+                accessService.pin(),
+                request.type(),
+                request.amount()),
+        () ->
+            new AccessDeniedException("The caller may not raise a booking request on this account"),
+        null);
+  }
 
-    if (request.type() == BankBookingRequestType.DEPOSIT) {
-      if (request.targetAccountId() != null) {
-        throw new BadRequestException("A deposit request must not carry a destination account");
-      }
-      return bankBookingRequestService.create(
-          account.getId(),
-          BankBookingRequestType.DEPOSIT,
-          request.amount(),
-          request.note(),
-          null,
-          null,
-          false,
-          null,
-          null,
-          request.splitEnabled(),
-          request.splitPercent(),
-          null,
-          null);
-    }
+  /**
+   * Raises a booking request through a connected application (REQ-BXCH-004) with the web's rules,
+   * the policy deciding for the given actor without a pin, and records the client (REQ-BANK-067).
+   * The caller has validated the payload and checked that its accounts exist and are active.
+   *
+   * @param actor the requester
+   * @param account the active source account
+   * @param request the validated payload, without a counterparty
+   * @param hidden builds the refusal of a withdrawal or transfer on an account the actor may not
+   *     raise one on
+   * @param clientId the connected application's bounded label
+   * @return the created pending request
+   * @throws BadRequestException when the destination account is missing or superfluous for the
+   *     type, or the account accepts no withdrawals or transfers
+   */
+  @NotNull
+  @Transactional
+  BankBookingRequestDto raiseForClient(
+      @NotNull BankActor actor,
+      @NotNull BankAccount account,
+      @NotNull CreateBankBookingRequest request,
+      @NotNull Supplier<? extends RuntimeException> hidden,
+      @NotNull String clientId) {
+    return raise(
+        account,
+        request,
+        () -> policy.admit(actor, account, null, request.type(), request.amount()),
+        hidden,
+        clientId);
+  }
 
+  /**
+   * Raises a booking request (REQ-BANK-039…042): a deposit needs no admission and carries neither
+   * justification nor counterparty, a withdrawal or transfer is admitted and routed by the policy
+   * and carries no split; only a transfer names a destination.
+   *
+   * @param account the source account
+   * @param request the payload
+   * @param admission asks the policy to admit a withdrawal or transfer; never called for a deposit
+   * @param hidden builds the refusal of an account the policy does not admit the actor to
+   * @param clientId the connected application's bounded label, or {@code null} for the Basetool
+   * @return the created pending request
+   */
+  @NotNull
+  private BankBookingRequestDto raise(
+      @NotNull BankAccount account,
+      @NotNull CreateBankBookingRequest request,
+      @NotNull Supplier<BankAdmission> admission,
+      @NotNull Supplier<? extends RuntimeException> hidden,
+      @Nullable String clientId) {
+    boolean deposit = request.type() == BankBookingRequestType.DEPOSIT;
     BankAdmission.Admitted routing =
-        switch (policy.admit(
-            accessService.actor(),
-            account,
-            accessService.pin(),
-            request.type(),
-            request.amount())) {
-          case BankAdmission.Admitted admitted -> admitted;
-          case BankAdmission.Rejection.NOT_FOUND ->
-              throw new AccessDeniedException(
-                  "The caller may not raise a booking request on this account");
-          case BankAdmission.Rejection.NOT_REQUEST_CAPABLE ->
-              throw new BadRequestException("This account does not accept booking requests");
-        };
-    UUID targetAccountId = null;
-    if (request.type() == BankBookingRequestType.TRANSFER) {
-      if (request.targetAccountId() == null) {
-        throw new BadRequestException("A transfer request requires a destination account");
-      }
-      targetAccountId = request.targetAccountId();
-    } else if (request.targetAccountId() != null) {
-      throw new BadRequestException("A non-transfer request must not carry a destination account");
-    }
+        deposit ? BankAdmission.Admitted.UNROUTED : admitted(admission.get(), hidden);
+    requireTargetShape(request.type(), request.targetAccountId());
     return bankBookingRequestService.create(
         account.getId(),
         request.type(),
         request.amount(),
         request.note(),
-        request.justification(),
-        targetAccountId,
+        deposit ? null : request.justification(),
+        request.targetAccountId(),
         routing.requiresApproval(),
         routing.applicableLimit(),
         routing.requiredApprover(),
-        false,
+        deposit && request.splitEnabled(),
+        deposit ? request.splitPercent() : null,
+        deposit ? null : request.counterpartyUserId(),
+        deposit ? null : request.counterpartyOrgUnitId(),
         null,
-        request.counterpartyUserId(),
-        request.counterpartyOrgUnitId());
+        clientId);
+  }
+
+  /**
+   * Unwraps the policy's admission of a withdrawal or transfer request.
+   *
+   * @param admission the policy's decision
+   * @param hidden builds the refusal of an account the policy does not admit the actor to
+   * @return the approval routing
+   * @throws BadRequestException when the account accepts no withdrawals or transfers
+   */
+  @NotNull
+  private static BankAdmission.Admitted admitted(
+      @NotNull BankAdmission admission, @NotNull Supplier<? extends RuntimeException> hidden) {
+    return switch (admission) {
+      case BankAdmission.Admitted admitted -> admitted;
+      case BankAdmission.Rejection.NOT_FOUND -> throw hidden.get();
+      case BankAdmission.Rejection.NOT_REQUEST_CAPABLE ->
+          throw new BadRequestException("This account does not accept booking requests");
+    };
+  }
+
+  /**
+   * Checks that only a transfer names a destination account, and that it does (REQ-BANK-040).
+   *
+   * @param type the request type
+   * @param targetAccountId the destination, or {@code null}
+   * @throws BadRequestException when the destination is missing on a transfer or present otherwise
+   */
+  private static void requireTargetShape(
+      @NotNull BankBookingRequestType type, @Nullable UUID targetAccountId) {
+    String refusal =
+        switch (type) {
+          case DEPOSIT ->
+              targetAccountId == null
+                  ? null
+                  : "A deposit request must not carry a destination account";
+          case WITHDRAWAL ->
+              targetAccountId == null
+                  ? null
+                  : "A non-transfer request must not carry a destination account";
+          case TRANSFER ->
+              targetAccountId != null ? null : "A transfer request requires a destination account";
+        };
+    if (refusal != null) {
+      throw new BadRequestException(refusal);
+    }
   }
 
   /**
@@ -203,7 +277,8 @@ public class OrgUnitBankRequestService {
         null,
         counterpartyUserId,
         null,
-        purpose);
+        purpose,
+        null);
   }
 
   /**
@@ -248,6 +323,8 @@ public class OrgUnitBankRequestService {
         false,
         null,
         null,
+        null,
+        null,
         null);
   }
 
@@ -267,10 +344,28 @@ public class OrgUnitBankRequestService {
   @Transactional
   public BankBookingRequestDto updateOwnBookingRequest(
       @NotNull UUID requestId, @NotNull UpdateBankBookingRequest request) {
+    return updateOwnBookingRequest(accessService.actor(), requestId, request);
+  }
+
+  /**
+   * Applies a requester's correction to their own pending booking request for the given actor
+   * (REQ-BANK-056, REQ-BXCH-004), re-deriving the approval snapshot through the policy.
+   *
+   * @param actor the requester
+   * @param requestId the request to correct
+   * @param request the corrected values and the echoed version
+   * @return the updated request
+   * @throws NotFoundException when the request does not exist or belongs to another user
+   */
+  @NotNull
+  @Transactional
+  BankBookingRequestDto updateOwnBookingRequest(
+      @NotNull BankActor actor,
+      @NotNull UUID requestId,
+      @NotNull UpdateBankBookingRequest request) {
     BankBookingRequest existing =
         Entities.require(
             bankBookingRequestRepository.findById(requestId), "Booking request not found");
-    BankActor actor = accessService.actor();
     if (!policy.ownsRequest(actor, existing)) {
       throw new NotFoundException("Booking request not found");
     }

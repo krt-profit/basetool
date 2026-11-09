@@ -43,6 +43,7 @@ public class BankBookingRequestViewService {
 
   private final BankAccessRules policy;
   private final BankBookingRequestRepository requestRepository;
+  private final BankRequestClientNames clientNames;
 
   /**
    * Reads a request the actor may see.
@@ -70,7 +71,9 @@ public class BankBookingRequestViewService {
     }
     return new BankBookingRequestViewDto(
         BankBookingRequestDtos.of(
-            request, staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null),
+            request,
+            clientNames.nameOf(request),
+            staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null),
         own,
         staff,
         approver);

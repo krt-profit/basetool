@@ -71,6 +71,7 @@ public class BankMentionSource implements PersonMentionSource {
         "bank_account_view_grant.role_code",
         "bank_audit_event.client_id",
         "bank_audit_event.event_type",
+        "bank_booking_request.client_id",
         "bank_booking_request.counterparty_org_unit_name",
         "bank_booking_request.purpose_kind",
         "bank_booking_request.required_approver",
