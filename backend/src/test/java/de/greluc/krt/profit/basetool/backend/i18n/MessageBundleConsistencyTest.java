@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -50,6 +53,13 @@ class MessageBundleConsistencyTest {
 
   /** Default (no-locale) fallback bundle under the module's main resources. */
   private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
+
+  /** Root of the module's production sources. */
+  private static final Path MAIN_SOURCES = Path.of("src/main/java");
+
+  /** A complete {@code error.*} message key written as a string literal, never a key prefix. */
+  private static final Pattern ERROR_KEY_LITERAL =
+      Pattern.compile("\"(error\\.[a-z0-9_]+(?:\\.[a-z0-9_]+)+)\"");
 
   /**
    * The seven German umlaut characters that AGENTS.md requires to be written as {@code \\uXXXX}
@@ -158,6 +168,31 @@ class MessageBundleConsistencyTest {
     }
     assertThat(mismatches)
         .as("keys whose default-bundle value differs from the German bundle")
+        .isEmpty();
+  }
+
+  /**
+   * Asserts that every {@code error.*} message key written as a string literal in the main sources
+   * is declared in the default bundle, so a refusal never reaches the user as a raw key.
+   *
+   * @throws IOException if a source file or the bundle cannot be read
+   */
+  @Test
+  void everyErrorKeyUsedInTheMainSourcesIsDeclared() throws IOException {
+    Set<String> declared = keysOf(DEFAULT);
+    Set<String> missing = new TreeSet<>();
+    try (Stream<Path> sources = Files.walk(MAIN_SOURCES)) {
+      for (Path source : sources.filter(p -> p.toString().endsWith(".java")).toList()) {
+        Matcher keys = ERROR_KEY_LITERAL.matcher(Files.readString(source, StandardCharsets.UTF_8));
+        while (keys.find()) {
+          if (!declared.contains(keys.group(1))) {
+            missing.add(keys.group(1) + " (" + source.getFileName() + ")");
+          }
+        }
+      }
+    }
+    assertThat(missing)
+        .as("error keys used in code but missing from messages.properties")
         .isEmpty();
   }
 
