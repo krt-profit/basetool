@@ -96792,7 +96792,7 @@
             "format" : "int64"
           }
         },
-        "required" : [ "version" ]
+        "required" : [ "assigned", "version" ]
       },
       "UserRoleHolderDto" : {
         "type" : "object",
