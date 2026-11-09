@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The bank access characterisation matrix: every actor against every account type and state,
- * operation, amount band and active-org-unit pin (#3154).
+ * operation, amount band and active-org-unit pin.
  *
  * <p>The matrix only names the cases; {@link BankAccessWorld} seeds the subjects, a driver such as
  * {@link BankWebAccessDriver} turns one case into an outcome, and {@code bank-access-matrix.tsv}
