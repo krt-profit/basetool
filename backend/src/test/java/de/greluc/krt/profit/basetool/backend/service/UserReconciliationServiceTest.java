@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedE
 import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminGrant;
 import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminProperties;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleChangeRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RoleSetWriter;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -138,6 +139,7 @@ class UserReconciliationServiceTest {
                 new BootstrapAdminProperties(bootstrapSubjects),
                 userRepository,
                 roleRepository,
+                new RoleSetWriter(userRepository, roleRepository, roleChangeRecorder),
                 roleChangeRecorder),
             meterRegistry);
     lenient()

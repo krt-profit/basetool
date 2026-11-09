@@ -49,6 +49,7 @@ public class BootstrapAdminGrant implements LoginRoleGrant {
   private final BootstrapAdminProperties properties;
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
+  private final RoleSetWriter writer;
   private final RoleChangeRecorder recorder;
 
   /**
@@ -76,7 +77,8 @@ public class BootstrapAdminGrant implements LoginRoleGrant {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public boolean grantIfDue(@NotNull User user) {
-    if (!properties.isBootstrapSubject(user.getId()) || holdsAdmin(user)) {
+    if (!properties.isBootstrapSubject(user.getId())
+        || RoleSetWriter.holds(user, AssignableRole.ADMIN)) {
       return false;
     }
     Optional<Role> admin = roleRepository.lockByCode(AssignableRole.ADMIN.getCode());
@@ -99,13 +101,7 @@ public class BootstrapAdminGrant implements LoginRoleGrant {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void recordGrant(@NotNull User user) {
-    userRepository.bumpRolesVersion(user.getId());
-    user.setRolesVersion(user.getRolesVersion() + 1);
+    writer.bumpAfterSave(user);
     recorder.bootstrapGranted(user);
-  }
-
-  private static boolean holdsAdmin(User user) {
-    return user.getRoles().stream()
-        .anyMatch(role -> AssignableRole.ADMIN.getCode().equals(role.getCode()));
   }
 }
