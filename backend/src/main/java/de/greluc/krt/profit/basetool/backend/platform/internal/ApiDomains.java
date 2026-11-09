@@ -80,6 +80,9 @@ public final class ApiDomains {
           Map.entry("DiscordRegistrationAdminController", "identity"),
           Map.entry("DiscordRegistrationMergeController", "identity"),
           Map.entry("ExchangeAccountCheckController", "exchange"),
+          Map.entry("ExchangeBankController", "exchange"),
+          Map.entry("ExchangeBankQueueController", "exchange"),
+          Map.entry("ExchangeBankRequestController", "exchange"),
           Map.entry("ExchangeBlueprintController", "exchange"),
           Map.entry("ExchangeCatalogController", "exchange"),
           Map.entry("ExchangeDemandController", "exchange"),
@@ -173,7 +176,8 @@ public final class ApiDomains {
           Map.entry("TermsController", "identity"),
           Map.entry("TermsDocumentController", "identity"),
           Map.entry("UserController", "identity"),
-          Map.entry("UserProfileController", "identity"));
+          Map.entry("UserProfileController", "identity"),
+          Map.entry("UserRoleController", "identity"));
 
   /** Not instantiable. */
   private ApiDomains() {}

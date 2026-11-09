@@ -10,7 +10,9 @@
 - **Deciders:** @greluc
 - **Amended:** 2026-09-28 (twice, see below); 2026-10-02 — the relay surface is the exchange's
   internal published API, with its own internal OpenAPI document (see the last Amendment section;
-  all three points of it implemented by 2026-10-03, the document as REQ-XCH-039)
+  all three points of it implemented by 2026-10-03, the document as REQ-XCH-039); 2026-11-08 — the
+  Kartellbank joins the exchange's resources as its own route family behind a bank switch
+  ([ADR-0354](0354-bank-resources-on-the-exchange.md))
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) (`REQ-XCH-001`…) ·
   [`desktop-ingest.md`](../specs/desktop-ingest.md) (`REQ-INGEST-001`, `-010`, `-011`, `-012`) ·
   [ADR-0217](0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md) ·

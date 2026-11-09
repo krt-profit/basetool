@@ -60,6 +60,13 @@ class FilterExemptionSetsTest {
   /** The endpoints the ingest gateway may act on for a member. */
   private static final List<String> ACTING_PATHS =
       List.of(
+          "/api/v1/exchange/bank/accounts",
+          "/api/v1/exchange/bank/accounts/{id}/balance-series",
+          "/api/v1/exchange/bank/accounts/{id}/bookings",
+          "/api/v1/exchange/bank/queue",
+          "/api/v1/exchange/bank/requests",
+          "/api/v1/exchange/bank/requests/{id}/cancel",
+          "/api/v1/exchange/bank/requests/{id}/correction",
           "/api/v1/exchange/catalog/locations",
           "/api/v1/exchange/catalog/resolve",
           "/api/v1/exchange/me/account-check",
@@ -102,18 +109,19 @@ class FilterExemptionSetsTest {
   }
 
   @Test
-  @DisplayName("the acting-member filter acts on exactly its seventeen paths")
+  @DisplayName("the acting-member filter acts on exactly its twenty-five paths")
   void actingPathsAreExact() {
     assertThat(ActingMemberFilter.ACTING_PATHS).containsExactlyInAnyOrderElementsOf(ACTING_PATHS);
   }
 
   @Test
-  @DisplayName("every exempt path is a literal that names a real mapping")
+  @DisplayName("every exempt path is a literal or an {id} segment that names a real mapping")
   void everyExemptPathIsALiteralRealMapping() {
     List<String> all =
         Stream.of(PENDING_EXEMPT, TERMS_EXEMPT, ACTING_PATHS).flatMap(List::stream).toList();
 
-    assertThat(all).noneMatch(path -> path.contains("*") || path.contains("{"));
+    assertThat(all)
+        .noneMatch(path -> path.contains("*") || path.replace("/{id}/", "/").contains("{"));
     assertThat(PathControlInventory.unmappedPaths(all, PathControlInventory.dispatcher(context)))
         .isEmpty();
   }

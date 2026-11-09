@@ -69,7 +69,7 @@ Everything else requires authentication **and** a method gate. Both backend read
 so a `HEAD` on either answers `401`.
 
 **And there is nothing below member.** An approved account whose assembled authority set is empty —
-no realm role the application knows and no Logistician / Mission-Manager / leadership flag on any
+no stored application role and no Logistician / Mission-Manager / leadership flag on any
 membership — is refused with `403 NO_ROLE` (REQ-SEC-053); the `GUEST` role was deleted by
 migration `V239`. A person without an account can still take part in an Einsatz — the leadership
 records them as an **external participant** — but they do not hold an account and they cannot sign
@@ -219,15 +219,23 @@ just joined.
 
 ## 2. Roles & base permissions
 
-The four application roles are the Keycloak realm roles `Admin`, `KRT Member`,
-`Bank Employee` and `Bank Management` (reference export:
-[`docs/keycloak/realm-config.reference.json`](docs/keycloak/realm-config.reference.json)). Each login
-syncs the token's realm roles by name onto the `app_user` row; the authority is the role name
-upper-cased with spaces turned into underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's
-seeded permissions from
+The four application roles are `Admin`, `KRT Member`, `Bank Employee` and `Bank Management`.
+They are held in the Basetool's `user_roles` alone; Keycloak holds none of them and no token carries
+them (REQ-SEC-088, ADR-0355). The authority is the role name upper-cased with spaces turned into
+underscores (`KRT Member` → `ROLE_KRT_MEMBER`), plus the role's seeded permissions from
 [`DataInitializer`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/app/internal/DataInitializer.java).
 The constants live in `kernel.Roles` (backend) and `support.Roles` (frontend). In addition, a **role hierarchy**
 applies.
+
+**The roles are assigned in the Basetool** (REQ-SEC-088, ADR-0355): an admin assigns and withdraws
+every role on the member page (tab *Rollen*), the bank management assigns and withdraws
+`Bank Employee` in the bank grant management (*Bank-Mitarbeiter*). A user's role set has its own
+counter (`roles_version`), separate from the user record's version. The last active admin keeps
+`Admin` (`409 LAST_ADMIN`), withdrawing `KRT Member` is a departure, and the subjects in
+`APP_BOOTSTRAP_ADMIN_SUBS` receive `Admin` at login while no active admin exists. Every change is
+audited (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`) and announced to the member. Approving a
+registration grants `KRT Member`. A change applies in the backend on the member's next request and
+in the web UI within a minute; neither the login nor the roster sync writes a role.
 
 ### Role hierarchy (backend + frontend identical)
 
@@ -259,16 +267,17 @@ like `ROLE_MISSION_MANAGER`, still scope-checked). `MISSION_READ`, `MISSION_WRIT
 and `ROLE_MANAGE` are seeded but checked by no endpoint — every member- and role-management
 endpoint has been `hasRole('ADMIN')` since the Phase-4 lockdown.
 
-### Monitoring UI (Grafana) — realm role `Admin` only
+### Monitoring UI (Grafana) — client role `grafana-admin` only
 
 The operations-monitoring UI (epic [#936](https://github.com/krt-profit/basetool/issues/936),
 ADR-0072) is a **separate, admin-only surface** — the only monitoring component with a public route.
 It is published through the native nginx edge (`docker/edge/conf.d/40-grafana.conf.template`) and
 authenticated through **Keycloak OIDC**, and login is granted **only** to
-holders of the realm role `Admin`: Grafana's `role_attribute_path` maps that realm role to Grafana's
-server-admin and `role_attribute_strict` denies everyone else (an Officer or KRT Member cannot reach
-it). The app-authority table above does **not** apply to Grafana — access is purely the realm-role
-gate. All other monitoring components (Prometheus, Alertmanager, Loki, Tempo, exporters) have no
+holders of the Keycloak client role `grafana-admin` on the `grafana` client: Grafana's
+`role_attribute_path` maps it to Grafana's server-admin and `role_attribute_strict` denies everyone
+else. The owner assigns the role in Keycloak to the few Grafana admins; the Basetool's own `Admin`
+role does not grant it. The app-authority table above does **not** apply to Grafana — access is
+purely the client-role gate. All other monitoring components (Prometheus, Alertmanager, Loki, Tempo, exporters) have no
 public route at all. See [`docs/specs/observability.md`](docs/specs/observability.md) REQ-OBS-008.
 
 ### Contextual roles from OrgUnit memberships
@@ -561,7 +570,7 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 
 **The `Anonymous` column is gone, not empty.** Every row of it was a `❌` except two, and those two
 — reading a non-internal mission and signing up to it — are what ADR-0159 closed. There is no
-caller below `Member` on this surface: an account whose realm roles map to nothing is refused with
+caller below `Member` on this surface: an account holding no role is refused with
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
@@ -738,6 +747,7 @@ OL seat (REQ-ROLE-005) does not count.
 | Read system settings (`GET /settings`, `GET /settings/{key}`, `hasRole('ADMIN')`; members read the typed `GET /orders/settings` and `GET /refinery-orders/settings`)                                                                       |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, Staffel memberships + flags, Keycloak roster sync now (`/api/v1/admin/**`, `/api/v1/users/*/...`, `POST /api/v1/users/sync`, `/members`, `hasRole('ADMIN')`)                          |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Assign or withdraw one of the four roles of a member (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`, member page tab *Rollen*, REQ-SEC-088); the last active admin keeps `Admin` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Discord registration queue — approve / reject / reopen / link / merge (`/api/v1/users/admin/registrations/**`, `/admin/discord-registrations`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Own exchange connections — list them with their installations and recent activity, mark new installations seen, disconnect a client or one installation, undo a client's writes — the org-stock writes one made as a Logistician included, only in pools one is still a Logistician of —, confirm or discard a change set the mass-change guard held back, withhold one's name from connected applications (`/api/v1/connected-apps/**`, REQ-XCH-008/-021/-022/-032/-044/-046); only from the member's own web session, never the app or the gateway; the web pages are *Persönlich → Verbundene Anwendungen* (`/connected-apps`), its confirmation page (`/connected-apps/confirm`) and, for the name withholding, the profile (`/profile`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read the anonymous open demand of one's **own** units through an approved connected application (`GET /exchange/v1/me/org-demand` → `/api/v1/exchange/me/org-demand`, capability `exchange.demand.read`, REQ-XCH-018) — every member who gave that consent and passes `canViewJobOrders` (else empty lists with `reason: NOT_PERMITTED`; an `ADMIN` role does not open it on the exchange); only units the member belongs to, never ones they merely oversee or administer; no requester, assignee, order or free text |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
@@ -751,7 +761,10 @@ OL seat (REQ-ROLE-005) does not count.
 | Read the shared Lager stock of the units one is a **direct** member of through an approved connected application (`GET /exchange/v1/org-stock` → `/api/v1/exchange/org-stock`, capability `exchange.orgstock.read`, REQ-XCH-042) — every member who gave that consent; one pool per unit, each lot summed over every holder's shared rows with the amounts earmarked to job orders and missions, no holder named; never a unit one only oversees, never personal or ownerless rows; an `ADMIN` role or pin does not widen it |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read the single named entries of the org stock through an approved connected application (capability `exchange.orgstock.details` with `.read`, REQ-XCH-043) — only in the pool of a unit whose membership makes one a **Logistician of that unit** (`is_logistician` or any leadership rank in exactly that unit; no cascade from a Bereich or OL seat, the `OFFICER` and `ADMIN` roles add nothing); each entry with holder name, a per-client pseudonym, amount, note and earmarks; a holder who withholds their name appears without name, pseudonym or note (REQ-XCH-044) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Book stock into and out of the org stock through an approved connected application (`POST /exchange/v1/org-stock/changes` → `/api/v1/exchange/org-stock/changes`, roster `GET /exchange/v1/org-stock/members` → `/api/v1/exchange/org-stock/members`, earmark targets `GET /exchange/v1/org-stock/targets` → `/api/v1/exchange/org-stock/targets`, capability `exchange.orgstock.write`, REQ-XCH-045) — only in the pool of a unit one is a **Logistician of** (as for the entries above, no cascade, `OFFICER` and `ADMIN` add nothing): `book-in` a shared entry for any direct member of the unit who does not withhold their name, `book-out`, `sell`, `move-location` and `note`/`stolen` any shared entry of that pool and `move-holder` it to a member of another unit one is a Logistician of who does not withhold their name, and `move-pool` it into the pool of another unit its holder belongs to and one is a Logistician of (REQ-INV-059), and add, change and remove its job-order and mission earmarks (REQ-INV-027), with the web's rules (reservations protected, Materialbörse offers lowered, mission proceeds split, the holders notified); personal entries and other pools are refused; audited in the Lager naming the writer and the client, journaled under the writer and undoable by the writer from *Verbundene Anwendungen*, never by the holders (REQ-XCH-046); a change set that takes too much out of one pool waits for the writer's confirmation in the browser; each op counts toward the client's writes per day |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Exchange client registry and the global exchange switch (`/api/v1/connected-apps/admin/clients/**`, `/api/v1/connected-apps/admin/settings`, REQ-XCH-003) — register, edit, suspend and activate approved clients (third-party programs and the SC Extractor), see each client's connected members and last activity (`…/exchange-clients/usage`); audited as „Verbundene Anwendungen“; the web page is *Administration → Verbundene Anwendungen* (`/admin/exchange-clients`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Read the Kartellbank accounts one may view, their bookings and a daily balance series through an approved connected application (`GET /exchange/v1/bank/accounts`, `…/accounts/{id}/bookings`, `…/accounts/{id}/balance-series` → `/api/v1/exchange/bank/…`, capability `exchange.bank.read`, REQ-BXCH-001/-002) — every member who gave that consent, while the bank switch is on; exactly the active accounts the org-unit bank page shows without a pin, decided by the bank access policy with the `ADMIN` role dropped (an administrator sees only what their bank roles, grants and memberships give them; the whole bank needs Bank Management); each account with balance, target, trend, whether one may raise a request and one's own limit; the bookings without holders or staff note, a counterparty who withholds their name without handle; a hidden, closed or unknown account answers `404 NOT_FOUND`. `exchange.bank.request` exists and serves no route yet; no client is granted a bank scope |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read the bank-staff queue through an approved connected application (`GET /exchange/v1/bank/queue` → `/api/v1/exchange/bank/queue`, capability `exchange.bank.queue`, REQ-BXCH-005) — every member who gave that consent, while the bank switch is on, decided by the bank access policy with the `ADMIN` role dropped: `open` holds the pending requests of the web staff queue (granted accounts for a bank employee, the whole bank for Bank Management) with `mayConfirm`, `toApprove` the requests waiting for the member's approval (responsible holder, Bankleitung on the middle KRT band, OL above `T2`); read-only, each item links to its Basetool page; a member without a bank role, a grant and a request to approve gets `403 NOT_BANK_STAFF` |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Open one booking request's page (`/bank/requests/{id}`, `GET /api/v1/bank/org-units/requests/{id}`, REQ-BANK-068) — its requester, the bank staff who see its account and its approvers; anyone else gets `404` |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Exchange client registry, the global exchange switch and the bank switch (`/api/v1/connected-apps/admin/clients/**`, `/api/v1/connected-apps/admin/settings`, `…/settings/bank`, REQ-XCH-003, REQ-BXCH-006) — register, edit, suspend and activate approved clients (third-party programs and the SC Extractor), see each client's connected members and last activity (`…/exchange-clients/usage`); audited as „Verbundene Anwendungen“; the web page is *Administration → Verbundene Anwendungen* (`/admin/exchange-clients`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Undo one exchange client's writes for **every** member since a chosen time — after a malicious or faulty release (`/api/v1/connected-apps/admin/clients/{id}/undo`, `…/undo/preview`, `…/undo/installations`, `/api/v1/connected-apps/admin/undo-runs/**`, REQ-XCH-034): suspends the client through the registry first, then undoes member by member in the background with the member's undo semantics, the org-stock writes of every writer included (REQ-XCH-046), optionally limited to one installation or resource; lists the runs and what they left alone, notifies each affected member; audited as „Verbundene Anwendungen“; on the same web page (*Administration → Verbundene Anwendungen*) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Terms-of-Use acceptance overview (`/api/v1/terms/admin/**`, `/admin/terms`), notification rules (`/api/v1/notifications/admin/rules/**`), default blueprints (`/api/v1/blueprints/admin/defaults/**`), quality tiers (`/api/v1/catalog/admin/quality-tiers/**`, `/admin/quality-tiers`, REQ-ORDERS-036), P4K game-data import (`/api/v1/catalog/admin/import/p4k/**`), UEX data (`/admin/uex-data`) — all `hasRole('ADMIN')` |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Hard-delete a user account** (`DELETE /api/v1/users/{id}`, `hasRole('ADMIN')`) — irreversible, and only for an account already gone from Keycloak                                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -783,7 +796,7 @@ data.**
 
 ### 3.11 Kartellbank (epic #556)
 
-The bank hinges on two dedicated Keycloak roles (`Bank Employee` →
+The bank hinges on two dedicated roles (`Bank Employee` →
 `ROLE_BANK_EMPLOYEE`, `Bank Management` → `ROLE_BANK_MANAGEMENT`) plus
 app-managed **grant rows** per (employee, account)
 (`bank_account_grant`: row = read right; flags = deposit / withdraw /
@@ -791,6 +804,9 @@ transfer). **Bank staffing is entirely independent of
 OrgUnit memberships** (REQ-BANK-008): `BankSecurityService` evaluates
 exclusively bank roles + grants — the org-unit scope services, contextual
 roles and the admin pin have no influence whatsoever, in either direction.
+The bank management assigns and withdraws `Bank Employee` itself on the grants page
+(`PUT /api/v1/users/{id}/roles/BANK_EMPLOYEE`, `GET /api/v1/users/role-holders?role=BANK_EMPLOYEE`;
+REQ-SEC-088); every other role stays with the admins.
 Columns here: **Member** = any org role without a bank role · **Bank Empl.** =
 `Bank Employee` (with grants) · **Bank Mgmt.** = `Bank Management`.
 
@@ -933,7 +949,7 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 | Submit a **withdrawal / transfer** request on a **visible** requestable account (`OrgUnitBankRequestService#createBookingRequest`, `OrgUnitBankAccessService#canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
 | Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
 | **Approve/revoke** an over-limit request („Anträge an unsere Konten" tab, account in one's own responsibility)                                |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
-| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`)                                         |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
+| **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`; without an in-app approval the staff note must name the approver, otherwise 400 `BANK_APPROVER_NOTE_REQUIRED`) |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
@@ -1138,17 +1154,14 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
 
 ## 5. Implementation specifics
 
-1. **Keycloak sync, no fallback:** every login runs `UserReconciliationService.syncUser(Jwt)`,
-   which maps the token's `realm_access.roles` by name onto the local role catalogue (unknown names
-   are dropped) and persists them; `CustomJwtGrantedAuthoritiesConverter.assembleFor` then builds the
-   authorities from those roles, their permissions and the membership flags/ranks, cached per token
-   for the configured TTL (REQ-SEC-056). A client configured as partial-scope — none since the
-   mobile app's client was deleted — would be authorised with the narrower role list its token
-   presents and never rewrite the stored set (REQ-SEC-036, superseded). If the
-   sync keeps failing on optimistic locking, the authentication is **denied** — there is no
-   fallback to raw token role names.
-2. **No matching role:** If the token carries no role the application knows and no membership
-   mints one, the account is refused with `403 NO_ROLE` (REQ-SEC-053). It used to be
+1. **Database roles, no fallback:** every login runs `UserReconciliationService.syncUser(Jwt)`,
+   which keeps the account's names, e-mail and Discord link and writes no role;
+   `CustomJwtGrantedAuthoritiesConverter.assembleFor` then builds the authorities from the roles in
+   `user_roles`, their permissions and the membership flags/ranks, cached per session for the
+   configured TTL (REQ-SEC-056) and evicted for a member whose roles change (REQ-SEC-088). The
+   token's `realm_access` claim is ignored. If the sync keeps failing on optimistic locking, the
+   authentication is **denied**.
+2. **No role:** If the account holds no stored role and no membership mints one, the account is refused with `403 NO_ROLE` (REQ-SEC-053). It used to be
    given the authority-less **Guest** role, which `V239` deleted.
 3. **Ranks:** An admin sets the numeric member rank (1–20) freely: any account may hold any rank,
    independent of its roles and leadership seats (REQ-ROLE-007, ADR-0348). The rank grants no

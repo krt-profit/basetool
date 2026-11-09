@@ -1667,6 +1667,72 @@ release is rolled back past the cut, create the role again (`kcadm.sh create rol
 name=Officer`) and grant it to the accounts the report listed under `officer_without_seat` and to
 the seat holders; the application mirror (`user_roles`) refreshes at the next login or user sync.
 
+### Roles in the Basetool: the switch and its rollback
+
+The release that carries ADR-0355 (REQ-SEC-088) stops reading the four roles — `Admin`,
+`KRT Member`, `Bank Employee`, `Bank Management` — from Keycloak: the backend reads `user_roles`
+only, and neither the login nor the roster sync writes a role. `user_roles` already mirrors every
+account through the daily sync, so no data migration runs; the mirror only has to be fresh at the
+switch. Every write below needs @greluc's explicit approval for this host.
+
+1. **Final roster sync, on the previous release.** Right before the promotion, run the Keycloak
+   user sync once more (`POST /api/v1/users/sync` as an admin, or wait for `UserSyncTask` at 05:00
+   Europe/Berlin), so a role changed in Keycloak since the last run reaches `user_roles`. From the
+   promotion on, roles are changed only in the Basetool.
+2. **Check that an admin exists.** A read-only count of active holders of `ADMIN` in `user_roles`
+   must be at least one, or `APP_BOOTSTRAP_ADMIN_SUBS` in `basetool.env` names a subject that gets
+   Admin at its next login (REQ-SEC-088).
+3. **Export the assignments** for the rollback with the read-only
+   `scripts/role-assignments-export.sql`, fed on stdin as the report above, and keep the file off
+   the repository:
+
+   ```sh
+   ssh <host> 'cd / && sudo -n -u basetool podman exec -i db-backend sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15432 -f -"' \
+       < scripts/role-assignments-export.sql > roles.tsv
+   ```
+
+4. **Assign `grafana-admin` to the Grafana admins before the provisioner deletes the realm roles.**
+   Grafana's login reads the client role `grafana-admin` of the `grafana` client from the release
+   on (REQ-OBS-008), no longer the realm role `Admin`. In the Admin Console, create the role if the
+   realm lacks it (*Clients → `grafana` → Roles → Create role*, name `grafana-admin`; the
+   provisioner creates the same role on any realm without it), then give it to each Grafana admin
+   (*Users → <user> → Role mapping → Assign role → Filter by clients → `grafana-admin`*). Until
+   step 6 adds the client's `client roles` mapper, a new Grafana login is denied; an open Grafana
+   session is not affected, so run step 6 right after the promotion.
+5. **Promote the release.**
+6. **Bring the realm to the new shape** with the provisioner (ADR-0202 amendments 9 and 10), dry
+   run first:
+
+   ```sh
+   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --grafana-origin <grafana-origin> --frontend-client confidential            # dry run
+   python3 scripts/provision-keycloak-realm.py --realm basetool --public-origin <origin> --grafana-origin <grafana-origin> --frontend-client confidential --apply
+   ```
+
+   The dry run lists `- default scope 'roles' withheld (…)` for `basetool-frontend`,
+   `- realm role '<name>' deleted with its user mappings and its place in 'default-roles-basetool'
+   (…)` for each of the four roles, for `grafana` `+ mapper 'client roles' -> …` and
+   `- grafana: mapper 'realm roles' (…) removed (…)`, and for `backend-service`
+   `- service-account roles realm-management:view-realm withdrawn (…)`, and exits `2`. When the
+   provisioning identity cannot read or change that service account (it holds no `manage-users`),
+   the withdrawal is printed under `[manual]` instead: unassign `view-realm` under *Clients →
+   `backend-service` → Service account roles* by hand. Then sign in to Grafana as one of its admins
+   to confirm the gate. The rollback's previous provisioner grants `view-realm` again and restores
+   Grafana's realm-role mapper.
+
+**Rollback.** Redeploy the previous release, run **its** provisioner (it creates the four realm
+roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back
+from the export, dry run first:
+
+```sh
+python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-command '<kcadm invocation>'            # dry run
+python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-command '<kcadm invocation>' --apply
+```
+
+It maps each account to the roles the export lists, puts `KRT Member` back into
+`default-roles-basetool`, adds and never removes, reports accounts Keycloak no longer has, and
+refuses to run while a realm role is missing. A role assigned in the Basetool after the export is
+not in it: export again right before the rollback if the release ran for a while.
+
 ### Updating the operational scripts and units
 
 `deploy.sh`, the other scripts and the `basetool-*` units are **not** in the config bundle — a deployer

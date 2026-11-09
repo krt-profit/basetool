@@ -130,7 +130,9 @@ public class ExchangeRelay {
           "BAD_REQUEST",
           "SCHEMA_INVALID",
           "OPTIMISTIC_LOCK",
-          "VERSION_CONFLICT");
+          "VERSION_CONFLICT",
+          "CONSTRAINT_VIOLATION",
+          "SCHEMA_INVALID");
 
   /**
    * The codes of the gateway's registry gate, each with the only status it may arrive with: the
@@ -139,6 +141,8 @@ public class ExchangeRelay {
   static final Map<String, Integer> GATE_STATUSES =
       Map.of(
           ExchangeRefusals.EXCHANGE_DISABLED,
+          HttpStatus.SERVICE_UNAVAILABLE.value(),
+          ExchangeRefusals.BANK_EXCHANGE_DISABLED,
           HttpStatus.SERVICE_UNAVAILABLE.value(),
           ExchangeRefusals.REGISTRY_UNAVAILABLE,
           HttpStatus.SERVICE_UNAVAILABLE.value(),
@@ -168,6 +172,13 @@ public class ExchangeRelay {
           Map.entry(
               "ACTING_MEMBER_REFUSED", "The Basetool refused the member this request acts for."),
           Map.entry("NOT_PERMITTED", "The member may not do this."),
+          Map.entry(
+              ExchangeRefusals.NOT_FOUND,
+              "No such resource, or the member may not see it; both answer alike."),
+          Map.entry(
+              "NOT_BANK_STAFF",
+              "The member holds no bank role and no grant, and no request waits for their"
+                  + " approval."),
           Map.entry("SCHEMA_INVALID", "The Basetool refused the request's content as malformed."),
           Map.entry(
               "VERSION_CONFLICT", "The entry changed since it was read; pull, merge and retry."),
@@ -179,7 +190,22 @@ public class ExchangeRelay {
               "The change set removes more than the mass-change guard allows without"
                   + " confirmation."),
           Map.entry(
+              "BANK_JUSTIFICATION_REQUIRED",
+              "A withdrawal or transfer from this account needs a justification."),
+          Map.entry(
+              "BANK_SELF_TRANSFER", "Source and destination account of a transfer must differ."),
+          Map.entry("BANK_REQUEST_NOT_PENDING", "The booking request is no longer pending."),
+          Map.entry(
+              "BANK_REQUEST_ALREADY_APPROVED",
+              "The booking request was approved already; cancel it and raise a new one."),
+          Map.entry(
+              "BANK_OPEN_REQUEST_CAP",
+              "The member holds the most pending booking requests a client may add to."),
+          Map.entry(
               ExchangeRefusals.EXCHANGE_DISABLED, ExchangeGateFilter.EXCHANGE_DISABLED_DETAIL),
+          Map.entry(
+              ExchangeRefusals.BANK_EXCHANGE_DISABLED,
+              ExchangeGateFilter.BANK_EXCHANGE_DISABLED_DETAIL),
           Map.entry(
               ExchangeRefusals.REGISTRY_UNAVAILABLE,
               ExchangeGateFilter.REGISTRY_UNAVAILABLE_DETAIL),
@@ -460,7 +486,8 @@ public class ExchangeRelay {
 
   /**
    * Returns the {@code Retry-After} a relay result carries: for a relayed refusal the same the
-   * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}.
+   * gateway's gate sends with that code, for {@code RELAY_BUSY} {@value #BUSY_RETRY_AFTER_SECONDS}
+   * and for {@code BANK_EXCHANGE_DISABLED} {@value ExchangeGateFilter#BANK_RETRY_AFTER_SECONDS}.
    *
    * @param code a problem code, or {@code null}
    * @return the seconds, or {@code null} when the code carries none
@@ -468,6 +495,9 @@ public class ExchangeRelay {
   public static @Nullable String retryAfterSeconds(@Nullable String code) {
     if (ExchangeRefusals.RELAY_BUSY.equals(code)) {
       return BUSY_RETRY_AFTER_SECONDS;
+    }
+    if (ExchangeRefusals.BANK_EXCHANGE_DISABLED.equals(code)) {
+      return ExchangeGateFilter.BANK_RETRY_AFTER_SECONDS;
     }
     return ExchangeRefusals.EXCHANGE_DISABLED.equals(code)
             || ExchangeRefusals.REGISTRY_UNAVAILABLE.equals(code)

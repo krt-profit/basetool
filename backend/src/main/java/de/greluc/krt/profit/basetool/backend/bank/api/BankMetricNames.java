@@ -37,7 +37,9 @@ public final class BankMetricNames {
   public static final String BANK_LEDGER_INTEGRITY_VIOLATIONS =
       "basetool.bank.ledger.integrity.violations";
 
-  /** Gauge {@code basetool_bank_booking_request_pending_count} — tag {@code required_approver}. */
+  /**
+   * Gauge {@code basetool_bank_booking_request_pending_count} — untagged, every pending request.
+   */
   public static final String BANK_BOOKING_REQUEST_PENDING =
       "basetool.bank.booking.request.pending.count";
 

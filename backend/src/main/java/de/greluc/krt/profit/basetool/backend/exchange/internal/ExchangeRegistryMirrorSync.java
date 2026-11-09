@@ -147,12 +147,12 @@ public class ExchangeRegistryMirrorSync {
   @NotNull
   public ExchangeRegistrySnapshot load() {
     clientRepository.flush();
-    boolean enabled =
-        settingsRepository
-            .findById(ExchangeSettings.SINGLETON_ID)
-            .map(ExchangeSettings::isEnabled)
-            .orElse(false);
-    return ExchangeRegistrySnapshot.of(enabled, clientRepository.findAllWithCapabilities());
+    Optional<ExchangeSettings> settings =
+        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
+    return ExchangeRegistrySnapshot.of(
+        settings.map(ExchangeSettings::isEnabled).orElse(false),
+        settings.map(ExchangeSettings::isBankEnabled).orElse(false),
+        clientRepository.findAllWithCapabilities());
   }
 
   /**

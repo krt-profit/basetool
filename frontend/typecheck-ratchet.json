@@ -83,6 +83,7 @@
       "identity/admin-terms.js",
       "identity/discord-registrations.js",
       "identity/member-edit.js",
+      "identity/member-roles.js",
       "identity/members.js",
       "identity/pending-approval.js",
       "identity/profile-notification-prefs.js",

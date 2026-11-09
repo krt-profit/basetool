@@ -9,6 +9,8 @@
 > [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
 > tests; subsequent behaviour changes keep this spec in sync in the same PR.
+> **On the exchange:** the bank's route family for connected applications, its switch, limits and
+> refusal codes live in [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, ADR-0354).
 
 # Kartell bank — accounts, ledger, grants, audit, exports
 
@@ -956,10 +958,10 @@ dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
 > **Amended 2026-10-04 — the confirm action follows the caller's capability:** every row of
 > `GET /api/v1/bank/requests` carries **`callerMayConfirm`** (`BankBookingRequestDto`, `null` on every
 > other read of that DTO): `true` exactly when the request is `PENDING` and the caller passes the same
-> capability check the confirm endpoint enforces — `BankSecurityService#canConfirm`, i.e. management,
+> capability check the confirm endpoint enforces — `BankStaffRights#canBook`, i.e. management,
 > or a grant on the request's account with `can_deposit` / `can_withdraw` / `can_transfer` matching
-> its type. The queue evaluates it through `BankSecurityService#confirmCheck`, one read of the
-> caller's grants per page, so the read stays statement-bounded (REQ-DATA-003). The over-limit
+> its type. The queue evaluates it on the caller's `BankStaffRights`, read once with the actor,
+> not per row, so the read stays statement-bounded (REQ-DATA-003). The over-limit
 > attestation stays a confirm-time input and is not part of the flag. The page offers „Bestätigen"
 > (and the attested „Bestätigen, Freigabe liegt vor …") **only where `callerMayConfirm` is true**; a
 > ready row the caller may not confirm says **„wartet auf berechtigte Bankmitarbeiter"** and keeps
@@ -1249,9 +1251,11 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 Every user holding `ROLE_BANK_EMPLOYEE` or `ROLE_BANK_MANAGEMENT` is automatically present as
 an **active** `bank_holder` row, reconciled idempotently at the end of every Keycloak user
 reconciliation (`UserSyncService#syncFromKeycloak` — the daily `UserSyncTask` and the admin's
-manual sync) over `UserRepository.findUserIdsByRoleCode` (ADR-0040). It deliberately does **not**
-run on login, so a freshly granted bank role becomes a holder on the next sync, not the next
-request. A `bank_holder.role_managed` flag marks
+manual sync) over `UserRepository.findUserIdsByRoleCode` (ADR-0040), and for the one member after
+every committed role change (`UserRolesChangedEvent` → `BankHolderRoleChangeListener` →
+`BankHolderReconciliationService#reconcileUser`, in a transaction of its own), so a bank role
+granted or withdrawn in the Basetool reaches the holder registry at once. A failed per-member
+reconcile is logged and left to the next sweep. A `bank_holder.role_managed` flag marks
 role-derived holders. When a user loses **all** bank roles, their `role_managed` holder is
 **auto-deactivated** — it accepts no new incoming money, but its (possibly negative, ADR-0039)
 balance survives and must be reconciled to zero by a holder→holder Umbuchung (REQ-BANK-031).
@@ -1266,6 +1270,9 @@ reconcile; management may still register any tool user as a custodian.
   balance and ledger history; a manually-registered holder is unaffected.
 - [x] The reconcile never hard-deletes a holder and never alters a manual holder's
   `role_managed = false`.
+- [x] A committed bank-role assignment makes the member an active holder without waiting for the
+  sync, its withdrawal deactivates the holder, and a rolled-back change leaves the registry alone
+  (`BankHolderRoleChangeIntegrationTest`).
 
 **Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `bank/internal/BankHolderReconciliationService`, `identity/api/UserSyncService` (sync hook), `identity/internal/UserSyncTask`, `identity/api/UserRepository#findUserIdsByRoleCode`, `bank/internal/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
@@ -1619,7 +1626,7 @@ Two account groups have **fixed** (non-holder-configurable) visibility on the or
   **tightens** the prior REQ-BANK-028 rule (which granted SPECIAL to all Bereich oversight ranks):
   Bereichskoordinatoren/-operatoren and officers no longer auto-see Sonderkonten.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/OrgUnitBankAccessService#canView`, `scope/api/RequestScopeResolver#currentUserIsOlMember` / `#currentUserIsBereichsleiter` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (CARTEL all-members; CARTEL_BANK holder-only; SPECIAL OL + Bereichsleiter auto, BK/BO not) · **Code:** `bank/internal/BankAccessJudgement#canView` (ADR-0352) · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 #### The Sonderkonto role audiences are retired (ADR-0300)
 
@@ -1743,7 +1750,7 @@ at all. The bank stays org-unit-blind: eligibility is decided in the `OrgUnitBan
 **Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate replaces own-level on create; a
 view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsultOrgUnitScope`) ·
 **Code:** `bank/internal/OrgUnitBankRequestService#createBookingRequest` /
-`OrgUnitBankAccessService#isRequestCapable` ·
+`BankAccessJudgement#isRequestCapable` ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-040 — User-initiated transfer requests
@@ -1774,6 +1781,16 @@ confirmable even when the employee cannot see the destination; capability gate o
 
 ### REQ-BANK-041 — Per-account approval limits & two-step owner approval
 
+> **Amended (owner-approved, ADR-0353):** the confirm of a flagged request **stays an attestation**:
+> it does not need an approval recorded in the app. But when the request needs approval
+> (`requires_owner_approval`), none was recorded (`owner_approval_granted = false`) and the employee
+> confirms on the checkbox alone, the bank-internal note (`staffNote`, REQ-BANK-054) **must name the
+> approver** — it must be non-blank after trimming, otherwise the confirm answers
+> `BANK_APPROVER_NOTE_REQUIRED` (400) and books nothing. With a recorded approval the note stays
+> optional. In the confirm dialog the note becomes mandatory on that path and shows the hint
+> „Wer hat freigegeben?". `BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED` is unchanged and carries no
+> free text (REQ-AUDIT-001); the note never leaves through the exchange.
+>
 > **Amended by REQ-BANK-042:** approval limits — and the two-step owner approval below — apply to
 > **withdrawal and transfer** requests only (money *leaving* an account). A **deposit** is never
 > subject to an approval limit: `requires_owner_approval` is always `false` and `applicable_limit`
@@ -1879,6 +1896,8 @@ sees an explicit warning in the confirmation dialog and must tick a mandatory
 **"Freigabe durch Kontoverantwortlichen erfolgt"** checkbox (pre-filled when (1) happened) before the
 request can be confirmed; ticking it is audited (`BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED`). A
 flagged request cannot be confirmed without the checkbox (`BANK_OWNER_APPROVAL_REQUIRED`, 409).
+Without step (1) the Notiz Bankmitarbeiter must name who approved (`BANK_APPROVER_NOTE_REQUIRED`,
+400; ADR-0353).
 
 **Queue markers (`/bank/requests`).** A flagged request carries a second chip next to its status: a
 success chip **"Freigegeben"** once the holder granted approval in-app, otherwise the status-neutral
@@ -1920,6 +1939,15 @@ approval completes the approver step, so the bank's confirmation becomes current
 derived in the frontend from the request's `requiresOwnerApproval` / `requiredApprover` /
 `ownerApprovalGranted` / `status` (`BankRequestSteps`); no new endpoint, field or audit event.
 
+**„Freigabe nötig" — the approver is told (REQ-NOTIF-033, ADR-0353).** A flagged request tells its
+required approver, and only them, that their approval is needed: the responsible holders over the
+limit, the Bankleitung on the middle KRT band, the OL above `T2` — never the requester. For them this
+notice replaces the generic „Neuer Buchungsantrag"; it clears on the approval, the rejection, the
+cancellation and the confirmation, comes back when the approval is revoked, is re-decided by a
+correction (REQ-BANK-056) and moves with a change of responsible holder (REQ-NOTIF-023). The KRT
+account's responsible holders, the OL, get no generic notice for its requests. The requests carrying
+the notice for a member are exactly those waiting for that member's approval.
+
 The two approval acts (holder in-app grant, employee checkbox) are on **different surfaces seen by
 different users**, so they are outside the same-surface peer-sync scope (REQ-FE-010 live multi-user
 is Mission-only). An out-of-band grant/revoke bumps the request's `@Version`; an already-open
@@ -1936,7 +1964,13 @@ is exempt** — `createBookingRequest_byResponsibleHolder_needsNoApproval` (no l
 all), `createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval` and
 `createBookingRequest_krtByOlMember_bypassesAmountLadder`),
 `BankBookingRequestServiceTest` (snapshot at create;
-confirm gate 409 + audit; pre-fill is UI-only), `OrgUnitBankControllerTest`,
+confirm gate 409 + audit; pre-fill is UI-only; the attested confirm without an approver note is
+400 and books nothing, `confirm_attestedOverLimitWithoutApproverNote_isRefusedAndBooksNothing`, a
+recorded approval keeps the note optional,
+`confirm_overLimitWithRecordedApproval_booksWithoutApproverNote`), `DomainProblemContractTest`
+(`BANK_APPROVER_NOTE_REQUIRED` wire contract), `GlobalExceptionHandlerTest` and
+`BankRequestQueuePageControllerMvcTest` (frontend message and the „Wer hat freigegeben?" hint),
+`OrgUnitBankControllerTest`,
 `BankAccountServiceTest` (the bank-staff detail surface assembles limits read-only — `canEdit`
 forced `false` even for management,
 `getAccountDetail_assemblesApprovalLimitsReadOnlyEvenForManagement`),
@@ -1946,11 +1980,15 @@ swap) · **Code:**
 `bank/internal/BankAccountApprovalLimit`,
 `bank/internal/BankAccountApprovalLimitRepository`, `bank/internal/BankApprovalLimitService`,
 `bank/internal/OrgUnitBankAccessService` (resolution + authorization), `bank/internal/OrgUnitBankApprovalLimitService`
-(upsert/clear + audit), `bank/internal/BankBookingRequestService`, `db/migration/V193`, frontend
+(upsert/clear + audit), `bank/internal/BankBookingRequestService`,
+`bank/internal/BankOverLimitConfirmGate` (the confirm gate: checkbox and approver note),
+`db/migration/V193`, frontend
 `templates/bank/fragments/bank-approval-limits.html` + `bank/org-unit-bank.html` + `bank/bank-requests.html` +
 `static/js/bank/bank.js` (the `data-exempt` short-circuit in the live warning) ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
-[ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md) · **Issues:** —
+[ADR-0123](../adr/0123-responsible-holder-exempt-from-approval-limits.md),
+[ADR-0353](../adr/0353-an-over-limit-confirm-stays-an-attestation-that-names-the-approver.md) ·
+**Issues:** #3115, #3152
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
@@ -2371,7 +2409,7 @@ button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anleg
 **Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Anträge
 an unsere Konten"** („Fremde Anträge" until 2026-10-03), band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
 `ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
-`canSeeForeignRequest` short-circuit on `isAdmin()` before the band check); their in-app grant records
+`BankStaffRights#mayApprove` short-circuit for an administrator before the band check); their in-app grant records
 `owner_approval_granted`
 and reuses the existing two-step machinery (`BOOKING_REQUEST_OWNER_APPROVAL_GRANTED/REVOKED`). A bank
 employee then confirms with the mandatory `BANK_OWNER_APPROVAL_REQUIRED` checkbox exactly as
@@ -2420,7 +2458,7 @@ membership-based notification seam; the Bankleitung instead picks the request up
 (`createBookingRequest` KRT branch, `resolveCartelApprovalRouting`, `raiseCartelDirectBookingRequest`,
 `canApprove`, `listRequestsForResponsibleAccounts`),
 `bank/internal/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds` (CARTEL OL set),
-`bank/internal/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
+`bank/internal/BankAccessRules#exceedsDirectBookingCeiling`,
 `bank/web/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
 `bank/internal/BankBookingOutcomeDto`, `bank/web/BankAccountController#setCartelApprovalTiers`,
 `db/migration/V203` + `V222` (approver rename), frontend `templates/bank/bank-manage.html` +
@@ -2440,9 +2478,9 @@ Spezialkommandos — via a new **`AREA_MEMBERS`** value of the shared `BankAccou
 (so it extends **both** `bank_account_view_grant` and `bank_account_approval_limit` one-for-one, V202).
 It sits alongside the existing Bereich audiences (`BEREICHSKOORDINATOR` / `BEREICHSOPERATOR` each
 separately, all-Bereichsleitung via `ALL_MEMBERS`, individual users) and is offered **only for AREA
-accounts**. The cascade membership is resolved inside the `OrgUnitBankAccessService` seam
-(`OrgUnitBankAccessService#callerIsMemberOfAreaCascade(bereichId)`, since 2026-10-10 in the seam itself,
-built on the scope kernel's direct memberships = the caller has any membership on the
+accounts**. The cascade membership is resolved by the bank access policy
+(`BankAccessJudgement#isMemberOfAreaCascade(bereichId)`, ADR-0352,
+built on the actor's direct memberships = the actor has any membership on the
 Bereich or one of its `findChildOrgUnitIds` children — the 3-level hierarchy makes the direct children
 the whole subtree), so the bank stays org-unit-blind. Toggling the grant/limit is an idempotent
 insert/delete audited `BALANCE_VISIBILITY_GRANTED/REVOKED` / `APPROVAL_LIMIT_SET/CLEARED` (tier code
@@ -2465,9 +2503,9 @@ all-member **visibility** (every Kartellmitglied, REQ-BANK-037) is **unchanged**
 **Enforced by:** `OrgUnitBankAccessServiceTest` (AREA_MEMBERS canView + limit tier; cascade vs direct
 members), `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest`,
 `DatabaseIndexMigrationTest` (V202 CHECK + partial unique indexes) · **Code:**
-`bank/internal/BankAccountViewGranteeKind#AREA_MEMBERS`, `bank/internal/OrgUnitBankAccessService#callerIsMemberOfAreaCascade`,
-`bank/internal/OrgUnitBankAccessService` (`matchesOrgUnitGrant`, `resolveApplicableLimit`,
-`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `bank/internal/BankApprovalLimitService#areaMembersSupported`,
+`bank/internal/BankAccountViewGranteeKind#AREA_MEMBERS`, `bank/internal/BankAccessJudgement#isMemberOfAreaCascade`,
+`bank/internal/BankAccessJudgement` (`matchesOrgUnitGrant`, `applicableLimit`), `bank/internal/OrgUnitBankSettingsService`
+(`setAreaMembersVisibility`, `setAreaMembersApprovalLimit`), `bank/internal/BankApprovalLimitService#areaMembersSupported`,
 `bank/internal/BankApprovalLimitsDto`, `bank/internal/OrgUnitBankAccountSettingsDto`,
 `bank/web/OrgUnitBankController`, `db/migration/V202`, frontend
 `templates/bank/fragments/bank-approval-limits.html` + `bank/org-unit-bank-account-detail.html` ·
@@ -2748,7 +2786,9 @@ movements, not a new audited activity. It adds no metric, endpoint or scheduled 
   transaction; a deposit accepts one although it accepts no Begründung.
 - [x] Confirming a booking request writes the employee's note onto **both** the request and the
   booked transaction.
-- [x] The note is optional everywhere: omitting it books normally and stores `null`.
+- [x] The note is optional everywhere: omitting it books normally and stores `null` — except on the
+  attested confirm of a flagged request without an in-app approval, where it must name the approver
+  (REQ-BANK-041, ADR-0353).
 - [x] An org-unit member's redacted booking row carries `note` and `justification` but **never**
   `staffNote`; the Halter-redacted statement PDF likewise omits it.
 - [x] A request row whose *only* detail is a staff note still renders as expandable.
@@ -2997,11 +3037,11 @@ may view on the **org-unit bank page** (`/org-unit-bank`), with what the home da
 widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal accounts
 (REQ-BANK-001).
 
-- **Who sees what.** The same rule as the org-unit bank page: `OrgUnitBankAccessService#canView`
+- **Who sees what.** The same rule as the org-unit bank page: `BankAccessJudgement#canView`
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
 - **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin (`RequestScopeResolver#currentOversightScopeIgnoringPin`; an admin sees every
+  active org-unit pin (`BankAccessPolicy#viewableAccounts` without a pin; an admin sees every
   active account); only the order below uses the active context.
 - **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
   `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
@@ -3086,7 +3126,7 @@ caller with the **same `404` and the same problem detail** as an id that does no
 ids cannot be probed by comparing the two answers.
 
 - **Read routes** — the drill-in, `/transactions`, `/balance-series`, `/statement`: hidden means
-  `OrgUnitBankAccessService#canView` is false (REQ-BANK-021, -035, -037).
+  `BankAccessJudgement#canView` is false (REQ-BANK-021, -035, -037).
 - **Settings routes** — `/settings`, `/balance-target`, `/visibility/…`, `/approval-limit/…`: hidden
   means the caller may neither view the account nor set its target, configure its visibility or
   configure its approval limits. A disclosed account whose control the caller lacks still answers
@@ -3111,6 +3151,100 @@ answers `404` like an unknown id, through the real token chain) ·
 `bank/internal/OrgUnitBankAccessService#requireDisclosedAccount`,
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
 REQ-BANK-038, REQ-BANK-056
+
+### REQ-BANK-067 — A request raised through a connected application shows where it came from
+
+A booking request a connected application raised through the exchange (REQ-BXCH-004) records that
+application in `bank_booking_request.client_id`, the registry client id the exchange gate admitted;
+a request raised in the Basetool has none. The column is set once, when the request is raised, and
+a correction through another channel keeps it.
+
+- **The badge.** The staff queue (REQ-BANK-023), the approvers' "Anträge an unsere Konten"
+  (REQ-BANK-046) and the request's own page (REQ-BANK-068) show "über <Anwendung>" next to the
+  requester, with the registry's display name of the application, or its id once the registry no
+  longer holds it (`clientName` on the request DTO).
+- **Plain text.** Reason and note render as text (`th:text`), so a link in them is not clickable;
+  the badge's hint says the text is the requester's.
+- **The exchange.** The own requests (REQ-BXCH-003) and the staff queue (REQ-BXCH-005) answer the
+  same value as `client`.
+
+**Acceptance**
+
+- [x] A request raised through the exchange records the client, which the own requests and the
+  staff queue answer (`ExchangeBankRequestWritesTest`).
+- [x] The staff queue badges a request raised through a connected application and not a web one,
+  and a link in the justification renders as text (`BankRequestsPatternRenderTest`).
+
+**Enforced by:** `BankBookingRequest#clientId`, `BankRequestClientNames`, `BankBookingRequestDtos`
+(backend) · `bank/fragments/bank-request-origin` (frontend) · V366 · **Related:** REQ-BANK-023,
+REQ-BANK-046, REQ-BANK-068, REQ-BXCH-004 · **Issues:** #3113, #3119, #3159
+
+### REQ-BANK-068 — One booking request has a page of its own
+
+`/bank/requests/{id}` shows one booking request: its type, status, approval state, account and
+target, amount, requester, justification and note, and once decided when, by whom and why. It is the
+page the exchange staff queue's `link` opens (REQ-BXCH-005), so it is open to every signed-in member
+and the backend decides what it shows.
+
+- **Who sees it.** `GET /api/v1/bank/org-units/requests/{id}` answers for the requester
+  (REQ-BANK-022), the bank staff who see the request's account (REQ-BANK-009, REQ-BANK-023) and its
+  approvers (REQ-BANK-041, REQ-BANK-046); four-eyes keeps the requester out of the approvers
+  (REQ-BANK-062). Anyone else and an unknown id get the same `404`, and the page shows "Antrag nicht
+  gefunden".
+- **Where to act.** The page decides nothing itself. While the request is pending it leads bank staff
+  into the staff queue (`/bank/requests?focus={id}`), an approver to "Anträge an unsere Konten"
+  (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
+  button is the action the caller can take now.
+- **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
+  card in place through the org-unit bank room (REQ-FE-015).
+
+**Acceptance**
+
+- [x] The requester, a granted employee (with `callerMayConfirm`) and an approver read the request;
+  a foreign member, an employee without a grant on the account and an unknown id get `404`
+  (`BankRequestViewTest`).
+- [x] The page renders the details and the right way to act for staff, approvers and the requester,
+  its `requestDetail` fragment resolves, and a hidden request shows the empty state
+  (`BankRequestPageControllerMvcTest`).
+
+**Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankRequestService#viewRequest`,
+`OrgUnitBankController#getRequest` (backend) ·
+`BankRequestPageController`, `templates/bank/bank-request.html`, `bank-livesync.js` (frontend) ·
+**Related:** REQ-BANK-023, REQ-BANK-041, REQ-BANK-062, REQ-BXCH-005 · **Issues:** #3120, #3160
+
+## Tests
+
+### Bank access characterisation matrix
+
+`BankAccessCharacterisationTest` (backend, `bank/web`) pins the web outcome of every bank access
+rule against Postgres, through the real endpoints and the real token chain, with roles seeded in
+`user_roles`. It is the baseline the move of the rules behind one bank access policy must keep
+(#3154, #3155), and the exchange routes answer the same rows (`REQ-BXCH-*`).
+
+- **Matrix** (`BankAccessMatrix`): 14 actors (member, Staffelleiter, SK lead, Bereichsleiter,
+  Profit-Bereichsleiter, OL member, bank employee without a grant, with a flagless grant and with
+  each grant flag, Bankleitung, admin, pending registration) × 9 accounts (own, Spezialkommando's
+  and foreign `ORG_UNIT`, `AREA`, `CARTEL`, `CARTEL_BANK`, `SPECIAL` with and without a view grant,
+  a closed account) × 28 operations (views, lists, settings, holder view, foreign requests and
+  staff queue; raising each type, correcting, cancelling, confirming by type, rejecting, approving,
+  four-eyes; configuring visibility, target, limits and the KRT tiers; staff direct bookings) ×
+  3 amount bands (below `T1`, between `T1` and `T2` and over the member limits, above `T2`) ×
+  3 active-org-unit pins (none, own Staffel, own Bereich) where they matter: 4,354 cases.
+- **Expected outcomes:** `src/test/resources/bank/bank-access-matrix.tsv`, one line per case with
+  the status and the problem code or the access-relevant fields of the answer. A run writes what
+  it observed to `backend/build/bank-access-matrix/bank-access-matrix.tsv`; an intended change of
+  an outcome replaces the recorded file in the same PR, and the reviewer reads the diff.
+- **Reuse:** the seeded world (`BankAccessSeeder`, `BankAccessWorld`) and the case list are
+  independent of the web driver (`BankWebAccessDriver`), so another path runs the same rows with a
+  driver of its own.
+
+### Bank access policy
+
+Every bank access rule is decided by `BankAccessPolicy` for an explicit `BankActor` read from the
+database (ADR-0352). `BankAccessRulesTest` drives its four queries for explicit actors,
+`DatabaseBankActorsTest` the actor read (the exchange actor holds no Admin), and
+`BankAccessPolicyRulesTest` keeps the security context out of the policy and every role or seat
+read out of the rest of the bank.
 
 ## Out of scope
 

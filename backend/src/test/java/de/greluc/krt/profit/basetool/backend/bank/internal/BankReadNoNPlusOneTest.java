@@ -23,8 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -68,6 +71,7 @@ class BankReadNoNPlusOneTest {
   @Autowired private BankAccountGrantRepository grantRepository;
   @Autowired private BankBookingRequestRepository requestRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private BankDashboardService bankDashboardService;
   @Autowired private BankAccountService bankAccountService;
   @Autowired private BankLedgerService bankLedgerService;
@@ -122,6 +126,9 @@ class BankReadNoNPlusOneTest {
   @Test
   void requestQueueMarksConfirmCapabilityStatementBounded_independentOfRowCount() {
     User employee = newUser("queue-emp-" + UUID.randomUUID());
+    employee.setApprovalStatus(ApprovalStatus.ACTIVE);
+    employee.getRoles().add(roleRepository.findByCode(Roles.BANK_EMPLOYEE).orElseThrow());
+    userRepository.save(employee);
     List<BankAccount> depositOnly = new ArrayList<>();
     for (int i = 0; i < QUEUE_ACCOUNTS; i++) {
       BankAccount account = newAccount("Queue Konto " + i + " " + UUID.randomUUID());
@@ -146,9 +153,7 @@ class BankReadNoNPlusOneTest {
       stats.clear();
       Page<BankBookingRequestDto> queue =
           bankBookingRequestService.listQueue(
-              Set.of(BankBookingRequestStatus.PENDING),
-              PageRequest.of(0, QUEUE_ACCOUNTS),
-              authentication);
+              Set.of(BankBookingRequestStatus.PENDING), PageRequest.of(0, QUEUE_ACCOUNTS));
       long queueStatements = stats.getPrepareStatementCount();
 
       assertEquals(QUEUE_ACCOUNTS, queue.getContent().size());

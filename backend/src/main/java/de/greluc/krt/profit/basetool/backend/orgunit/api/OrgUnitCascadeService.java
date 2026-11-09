@@ -92,6 +92,27 @@ public class OrgUnitCascadeService {
   }
 
   /**
+   * Resolves the org units the holder of {@code memberships} oversees as an officer (REQ-SEC-015,
+   * ADR-0300): the own unit of every seat that {@link MembershipRole#confersOwnUnitOfficerReach()},
+   * plus the {@linkplain #cascadedOfficerReach(Collection) cascaded leadership reach}. Whether a
+   * seat confers anything at all (the {@code KRT Member} gate) is the caller's decision.
+   *
+   * @param memberships the member's membership rows; never {@code null}
+   * @return the reached org-unit ids; never {@code null}, insertion-ordered
+   */
+  @NotNull
+  public Set<UUID> officerReach(@NotNull Collection<OrgUnitMembership> memberships) {
+    Set<UUID> reach = new LinkedHashSet<>();
+    for (OrgUnitMembership m : memberships) {
+      if (m.getRole().confersOwnUnitOfficerReach()) {
+        reach.add(m.getId().getOrgUnitId());
+      }
+    }
+    reach.addAll(cascadedOfficerReach(memberships));
+    return reach;
+  }
+
+  /**
    * Resolves the org units the caller reaches through a Bereich or OL leadership membership, for
    * which the JWT converter mints contextual {@code LOGISTICIAN@<id>} / {@code
    * MISSION_MANAGER@<id>} authorities.

@@ -91,7 +91,7 @@ class ExchangeDepartureIntegrationTest {
   @Test
   void aMemberDisabledAtTheRosterSyncLosesExchangeAccessAtOnce() {
     reconciliationService.syncUser(
-        new KeycloakUserDto(MEMBER, "departing-member", null, false, Set.of(), null));
+        new KeycloakUserDto(MEMBER, "departing-member", null, false, null));
 
     assertThat(
             revocationRepository.findById(new ExchangeClientRevocation.Key(client.getId(), MEMBER)))
@@ -106,13 +106,7 @@ class ExchangeDepartureIntegrationTest {
   @Test
   void aMemberWhoStaysActiveKeepsExchangeAccess() {
     reconciliationService.syncUser(
-        new KeycloakUserDto(
-            MEMBER,
-            "departing-member",
-            null,
-            true,
-            Set.of(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow().getName()),
-            null));
+        new KeycloakUserDto(MEMBER, "departing-member", null, true, null));
 
     verify(keycloakService, never()).logoutUser(MEMBER);
   }

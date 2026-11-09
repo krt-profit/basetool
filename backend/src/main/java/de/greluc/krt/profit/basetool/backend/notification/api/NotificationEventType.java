@@ -337,8 +337,9 @@ public enum NotificationEventType {
   BANK_BOOKING_REQUEST_APPROVED,
 
   /**
-   * The approval of a booking request was revoked (REQ-BANK-057). Creates no notification; clears
-   * the request's ready-to-confirm notices.
+   * The approval of a booking request was revoked (REQ-BANK-057). Clears the request's
+   * ready-to-confirm notices; the default rule tells the required approver again that their
+   * approval is needed (REQ-NOTIF-033).
    */
   BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
 
@@ -488,6 +489,18 @@ public enum NotificationEventType {
   EXCHANGE_SWITCHED_ON,
 
   /**
+   * An admin switched the bank on for connected applications (REQ-BXCH-006). The default rule
+   * notifies the admins and the Bankleitung.
+   */
+  BANK_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched the bank off for connected applications (REQ-BXCH-006). The default rule
+   * notifies the admins and the Bankleitung.
+   */
+  BANK_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit.
    */
@@ -572,5 +585,11 @@ public enum NotificationEventType {
    * An appointment was revoked (REQ-PUR-024). The default rule notifies the member and clears the
    * appointment notice.
    */
-  PURCHASING_DELEGATE_REVOKED
+  PURCHASING_DELEGATE_REVOKED,
+
+  /**
+   * One of a member's roles was assigned or withdrawn in the Basetool (REQ-SEC-088). The default
+   * rule notifies the member.
+   */
+  USER_ROLE_CHANGED
 }

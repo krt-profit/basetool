@@ -44,7 +44,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * </ul>
  *
  * <p>The Officer holds the Logistician grant of IRIDIUM, the unit owning the order: the controls
- * follow that grant, not the realm role. Each role logs in within its own browser context. Relies
+ * follow that grant, not the stored role. Each role logs in within its own browser context. Relies
  * on JUnit running test classes sequentially, so the IRIDIUM home assigned here is not clobbered.
  */
 @Tag("e2e")

@@ -130,6 +130,32 @@ class BankRequestsPatternRenderTest {
       @Nullable String approver,
       @Nullable String justification,
       boolean callerMayConfirm) {
+    return request(
+        id, type, requiresApproval, granted, approver, justification, callerMayConfirm, null);
+  }
+
+  /**
+   * A pending booking request with the backend's per-row confirm answer and its origin.
+   *
+   * @param id the request id
+   * @param type the movement type
+   * @param requiresApproval whether the amount exceeds the requester's limit
+   * @param granted whether the owner approval was granted in-app
+   * @param approver the approver class, or {@code null}
+   * @param justification the requester's justification, or {@code null}
+   * @param callerMayConfirm whether the caller may confirm it
+   * @param clientName the connected application it came through, or {@code null}
+   * @return the request
+   */
+  private static @NotNull BankBookingRequestDto request(
+      @NotNull UUID id,
+      @NotNull String type,
+      boolean requiresApproval,
+      boolean granted,
+      @Nullable String approver,
+      @Nullable String justification,
+      boolean callerMayConfirm,
+      @Nullable String clientName) {
     return new BankBookingRequestDto(
         id,
         UUID.randomUUID(),
@@ -167,6 +193,7 @@ class BankRequestsPatternRenderTest {
         null,
         null,
         null,
+        clientName,
         3L,
         callerMayConfirm);
   }
@@ -205,6 +232,44 @@ class BankRequestsPatternRenderTest {
         .contains("id=\"bank-req-more-" + readyId + "\"")
         .contains("id=\"bank-req-more-" + approvalId + "\"");
     assertThat(html.split("data-testid=\"bank-request-reject-btn\"", -1)).hasSize(3);
+  }
+
+  /**
+   * REQ-BANK-067: a request raised through a connected application carries "über &lt;client&gt;" in
+   * its row, one raised in the Basetool carries none, and the requester's text renders as plain
+   * text, so a link in it is not clickable.
+   */
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void badgesARequestRaisedThroughAConnectedApplication() throws Exception {
+    UUID viaClient = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
+    UUID viaWeb = UUID.fromString("00000000-0000-0000-0000-0000000000c2");
+    PageResponse<BankBookingRequestDto> page =
+        new PageResponse<>(
+            List.of(
+                request(
+                    viaClient,
+                    "WITHDRAWAL",
+                    false,
+                    false,
+                    null,
+                    "<a href=\"https://evil.example\">Beleg</a>",
+                    true,
+                    "VerseKit"),
+                request(viaWeb, "WITHDRAWAL", false, false, null, null, true, null)),
+            0,
+            200,
+            2L,
+            1,
+            List.of());
+
+    String html = render(page, "");
+
+    assertThat(html.split("data-testid=\"bank-request-client\"", -1)).hasSize(2);
+    assertThat(html).containsPattern("data-testid=\"bank-request-client\"[^>]*>über VerseKit<");
+    assertThat(html)
+        .doesNotContain("<a href=\"https://evil.example\"")
+        .contains("&lt;a href=&quot;https://evil.example&quot;&gt;Beleg&lt;/a&gt;");
   }
 
   /** The queue renders head, segment, counter and the per-row decision state. */

@@ -39,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRunDetailDto;
@@ -115,6 +117,9 @@ class AdminExchangeClientsPageControllerMvcTest {
         .thenReturn(List.of(client));
     when(backendApiClient.get("/api/v1/connected-apps/admin/settings", ExchangeSettingsDto.class))
         .thenReturn(new ExchangeSettingsDto(true, null, 5L));
+    when(backendApiClient.get(
+            "/api/v1/connected-apps/admin/settings/bank", ExchangeBankSwitchDto.class))
+        .thenReturn(new ExchangeBankSwitchDto(false, null, 2L));
   }
 
   @Test
@@ -401,6 +406,68 @@ class AdminExchangeClientsPageControllerMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"enabled\":false,\"version\":5}"))
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theRegistryFragmentRendersTheBankSwitchWithItsOwnVersion() throws Exception {
+    stubRegistry();
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/exchange-clients").param("fragment", "registry").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .containsPattern("id=\"xc-bank-switch\"[^>]*data-enabled=\"false\"[^>]*data-version=\"2\"")
+        .containsPattern("id=\"xc-switch\"[^>]*data-version=\"5\"")
+        .contains("Kartellbank im Datenaustausch")
+        .containsPattern("data-xc-bank-switch[^>]*>Einschalten<");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theBankSwitchIsRelayedWithItsOwnVersionAndAConflictComesBackAsAConflict() throws Exception {
+    when(backendApiClient.put(
+            eq("/api/v1/connected-apps/admin/settings/bank"),
+            eq(new ExchangeBankSwitchUpdateRequest(true, 2L)),
+            eq(ExchangeBankSwitchDto.class)))
+        .thenReturn(new ExchangeBankSwitchDto(true, Instant.parse("2026-11-08T12:00:00Z"), 3L))
+        .thenThrow(new BackendServiceException("stale", null, 409));
+
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/bank")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":2}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(true))
+        .andExpect(jsonPath("$.version").value(3));
+    mockMvc
+        .perform(
+            put("/admin/exchange-clients/settings/bank")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":2}"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theBankSwitchConfirmationsAreTranslated() throws Exception {
+    stubRegistry();
+
+    assertThat(messageHolders(Locale.GERMAN))
+        .contains("data-confirm-bank-off-title=\"Kartellbank im Datenaustausch ausschalten?\"");
+    assertThat(messageHolders(Locale.ENGLISH))
+        .contains("data-confirm-bank-on-title=\"Switch the Kartellbank on in the data exchange?\"");
   }
 
   @Test

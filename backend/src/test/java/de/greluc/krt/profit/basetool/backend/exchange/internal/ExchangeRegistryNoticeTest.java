@@ -21,14 +21,19 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -50,7 +55,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * The registry notices (REQ-XCH-040, -041): a suspension, an activation, a raised version floor, a
  * removed capability and the global switch tell the holders of the installations, naming the
- * registry's display name, and changes that need no action tell nobody.
+ * registry's display name; the bank switch tells the admins and the Bankleitung (REQ-BXCH-006);
+ * changes that need no action tell nobody.
  */
 @ExtendWith(MockitoExtension.class)
 class ExchangeRegistryNoticeTest {
@@ -204,6 +210,38 @@ class ExchangeRegistryNoticeTest {
     assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.EXCHANGE_SWITCHED_OFF);
     assertThat(sent.get(0).contextAllExchangeClients()).isTrue();
     assertThat(sent.get(1).eventType()).isEqualTo(NotificationEventType.EXCHANGE_SWITCHED_ON);
+  }
+
+  @Test
+  void flippingTheBankSwitchTellsTheAdminsAndTheBankleitungAndSupersedesTheLastNotice() {
+    ExchangeSettings settings = new ExchangeSettings();
+    settings.setEnabled(true);
+    when(mirrorSync.lockSettings()).thenReturn(settings);
+    when(mirrorSync.saveSettings(any(ExchangeSettings.class))).thenAnswer(i -> i.getArgument(0));
+
+    service.updateBankSwitch(true, 0L);
+    service.updateBankSwitch(false, 1L);
+    service.updateBankSwitch(false, 2L);
+
+    List<NoticeEvent> sent = published(2);
+    assertThat(sent.get(0).eventType()).isEqualTo(NotificationEventType.BANK_EXCHANGE_SWITCHED_ON);
+    assertThat(sent.get(1).eventType()).isEqualTo(NotificationEventType.BANK_EXCHANGE_SWITCHED_OFF);
+    assertThat(sent.get(1).actorSub()).isEqualTo(ADMIN);
+    assertThat(sent.get(1).contextAllExchangeClients())
+        .as("the bank notice goes to roles, not to installation holders")
+        .isFalse();
+    assertThat(sent.get(1).resolvesNotificationTypes())
+        .containsExactlyInAnyOrder(
+            NotificationType.BANK_EXCHANGE_SWITCHED_ON,
+            NotificationType.BANK_EXCHANGE_SWITCHED_OFF);
+    assertThat(settings.getBankVersion()).isEqualTo(2L);
+    verify(auditRecorder, times(2))
+        .record(
+            eq(AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED),
+            isNull(),
+            isNull(),
+            isNull(),
+            any(AuditDetails.class));
   }
 
   @Test

@@ -35,8 +35,9 @@ public final class IdentityMetricNames {
 
   /**
    * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
-   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because the
-   * subject holds the Keycloak ADMIN realm role (REQ-SEC-017). Normally zero (REQ-OBS-011).
+   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because a
+   * bootstrap subject earned Admin at its first login (REQ-SEC-017, REQ-SEC-088). Normally zero
+   * (REQ-OBS-011).
    */
   public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
       "basetool.admin.registration.auto.activated";
@@ -124,6 +125,26 @@ public final class IdentityMetricNames {
    * serves exactly one version, because the value is a build artifact (REQ-OBS-011).
    */
   public static final String TAG_TERMS_VERSION = "terms_version";
+
+  /**
+   * Counter {@code basetool_user_role_changes_total} — tags {@link #TAG_ROLE} (one of the four
+   * assignable role codes) and {@link #TAG_ACTION} ({@link #ROLE_ACTION_ASSIGNED} / {@link
+   * #ROLE_ACTION_WITHDRAWN}). Bumped once per role written in the Basetool, the bootstrap grant
+   * included (REQ-SEC-088, REQ-OBS-011).
+   */
+  public static final String USER_ROLE_CHANGES = "basetool.user.role.changes";
+
+  /** Tag: the role code of a role change, bounded by the four assignable roles. */
+  public static final String TAG_ROLE = "role";
+
+  /** Tag: whether a role was assigned or withdrawn. */
+  public static final String TAG_ACTION = "action";
+
+  /** Role-change action: the role was assigned. */
+  public static final String ROLE_ACTION_ASSIGNED = "assigned";
+
+  /** Role-change action: the role was withdrawn. */
+  public static final String ROLE_ACTION_WITHDRAWN = "withdrawn";
 
   private IdentityMetricNames() {}
 }

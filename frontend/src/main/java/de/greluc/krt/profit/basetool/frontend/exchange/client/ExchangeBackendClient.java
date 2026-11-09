@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.exchange.client;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ConnectedAppMassChangeResultDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchDto;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoInstallationDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoPreviewDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
@@ -62,6 +64,8 @@ public class ExchangeBackendClient {
 
   /** The backend's global switch endpoint. */
   private static final String SETTINGS = "/api/v1/connected-apps/admin/settings";
+
+  private static final String BANK_SWITCH = SETTINGS + "/bank";
 
   /** The backend's bulk undo runs. */
   private static final String UNDO_RUNS = "/api/v1/connected-apps/admin/undo-runs";
@@ -215,6 +219,27 @@ public class ExchangeBackendClient {
   @Nullable
   public ExchangeSettingsDto updateSettings(@NotNull ExchangeSettingsUpdateRequest request) {
     return backendApiClient.put(SETTINGS, request, ExchangeSettingsDto.class);
+  }
+
+  /**
+   * Reads the bank switch of the exchange (REQ-BXCH-006).
+   *
+   * @return the bank switch, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ExchangeBankSwitchDto bankSwitch() {
+    return backendApiClient.get(BANK_SWITCH, ExchangeBankSwitchDto.class);
+  }
+
+  /**
+   * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+   *
+   * @param request the new state and the bank switch's version the admin last saw
+   * @return the bank switch
+   */
+  @Nullable
+  public ExchangeBankSwitchDto updateBankSwitch(@NotNull ExchangeBankSwitchUpdateRequest request) {
+    return backendApiClient.put(BANK_SWITCH, request, ExchangeBankSwitchDto.class);
   }
 
   /**

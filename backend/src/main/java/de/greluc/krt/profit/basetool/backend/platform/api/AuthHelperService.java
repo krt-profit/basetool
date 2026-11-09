@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -45,17 +46,9 @@ public class AuthHelperService {
 
   private final RoleHierarchy roleHierarchy;
 
-  /**
-   * The authorities that mark a caller as an organisation member or above, used by {@link
-   * #isMemberOrAbove()}; elevated roles are listed because the hierarchy never implies {@code
-   * KRT_MEMBER}.
-   */
+  /** The authorities of {@link Roles#MEMBER_OR_ABOVE}, used by {@link #isMemberOrAbove()}. */
   private static final Set<String> MEMBER_OR_ABOVE_ROLES =
-      Set.of(
-          Roles.authority(Roles.ADMIN),
-          Roles.authority(Roles.MISSION_MANAGER),
-          Roles.authority(Roles.LOGISTICIAN),
-          Roles.authority(Roles.KRT_MEMBER));
+      Roles.MEMBER_OR_ABOVE.stream().map(Roles::authority).collect(Collectors.toUnmodifiableSet());
 
   /**
    * Returns the current {@link Authentication}, or empty if no security context is bound, the

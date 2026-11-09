@@ -7,6 +7,7 @@ on:
       - "scripts/keycloak_kcadm.py"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/restore-keycloak-realm-roles.py"
       - "scripts/harden-keycloak-realm.py"
       - "scripts/harden-keycloak-realm.integration.py"
       - "scripts/keycloak/**"
@@ -17,6 +18,7 @@ on:
       - "scripts/keycloak_kcadm.py"
       - "scripts/provision-keycloak-realm.py"
       - "scripts/provision-keycloak-realm.test.sh"
+      - "scripts/restore-keycloak-realm-roles.py"
       - "scripts/harden-keycloak-realm.py"
       - "scripts/harden-keycloak-realm.integration.py"
       - "scripts/keycloak/**"
@@ -34,7 +36,7 @@ jobs:
   realm-selftest:
     name: realm provisioner self-tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
 
     steps:
       - name: Checkout
@@ -47,7 +49,11 @@ jobs:
         run: |
           python3 -m py_compile scripts/keycloak_kcadm.py scripts/provision-keycloak-realm.py
           python3 -m py_compile scripts/harden-keycloak-realm.py scripts/harden-keycloak-realm.integration.py
-          python3 -m py_compile scripts/keycloak/hardening_probe.py
+          python3 -m py_compile scripts/keycloak/hardening_probe.py scripts/restore-keycloak-realm-roles.py
+
+      - name: Run the realm-role rollback self-test
+        shell: bash
+        run: python3 scripts/restore-keycloak-realm-roles.py --selftest
 
       - name: Run the realm hardening self-test
         shell: bash

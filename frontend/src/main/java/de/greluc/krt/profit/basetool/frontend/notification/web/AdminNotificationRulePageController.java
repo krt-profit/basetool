@@ -142,6 +142,8 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
           "EXCHANGE_SWITCHED_OFF",
           "EXCHANGE_SWITCHED_ON",
+          "BANK_EXCHANGE_SWITCHED_ON",
+          "BANK_EXCHANGE_SWITCHED_OFF",
           "SUPPLY_DONATION_PLEDGED",
           "SUPPLY_DONATION_RECEIVED",
           "SUPPLY_DONATION_DECLINED",
@@ -156,7 +158,8 @@ public class AdminNotificationRulePageController {
           "PURCHASING_PAUSED",
           "PURCHASING_RESUMED",
           "PURCHASING_DELEGATE_APPOINTED",
-          "PURCHASING_DELEGATE_REVOKED");
+          "PURCHASING_DELEGATE_REVOKED",
+          "USER_ROLE_CHANGED");
 
   /**
    * {@code NotificationType} codes, labelled via {@code admin.notificationRules.notificationType}.
@@ -205,6 +208,7 @@ public class AdminNotificationRulePageController {
           "INVENTORY_POOL_CHANGED_BY_OTHER",
           "INVENTORY_STOCK_LEVEL_LOW",
           "BANK_BOOKING_REQUEST_APPROVED",
+          "BANK_BOOKING_REQUEST_APPROVAL_NEEDED",
           "BANK_GRANT_CHANGED",
           "BANK_GRANT_REVOKED",
           "BANK_PAYOUT_RECEIVED",
@@ -225,6 +229,8 @@ public class AdminNotificationRulePageController {
           "EXCHANGE_CLIENT_UPDATE_REQUIRED",
           "EXCHANGE_CLIENT_CAPABILITY_REMOVED",
           "EXCHANGE_SWITCHED_OFF",
+          "BANK_EXCHANGE_SWITCHED_ON",
+          "BANK_EXCHANGE_SWITCHED_OFF",
           "SUPPLY_DONATION_PLEDGED",
           "SUPPLY_DONATION_RECEIVED",
           "SUPPLY_DONATION_DECLINED",
@@ -236,7 +242,8 @@ public class AdminNotificationRulePageController {
           "PURCHASING_PAUSED",
           "PURCHASING_RESUMED",
           "PURCHASING_DELEGATE_APPOINTED",
-          "PURCHASING_DELEGATE_REVOKED");
+          "PURCHASING_DELEGATE_REVOKED",
+          "USER_ROLE_CHANGED");
 
   /**
    * {@code SelectorKind} codes, labelled via {@code admin.notificationRules.selector.kind}. All but
@@ -254,7 +261,9 @@ public class AdminNotificationRulePageController {
           "MISSION_LEADERSHIP",
           "EXCHANGE_CLIENT_HOLDERS",
           "EVENT_RECIPIENTS",
-          "SEAT_HOLDERS");
+          "SEAT_HOLDERS",
+          "REQUIRED_APPROVER",
+          "REQUEST_RESPONSIBLE");
 
   /**
    * {@code OrgRelativeRole} codes, labelled via {@code

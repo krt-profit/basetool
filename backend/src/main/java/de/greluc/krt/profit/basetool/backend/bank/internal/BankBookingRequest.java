@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -319,4 +320,13 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "purpose_ref", updatable = false)
   private UUID purposeRef;
+
+  /**
+   * The connected application that raised the request through the exchange, as the registry client
+   * id the exchange gate admitted (REQ-BANK-067); {@code null} for a request raised in the
+   * Basetool. Immutable.
+   */
+  @Nullable
+  @Column(name = "client_id", length = 60, updatable = false)
+  private String clientId;
 }

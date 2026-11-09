@@ -47,6 +47,7 @@ import org.springframework.web.context.WebApplicationContext;
 class AdminExchangeRegistryControllerTest {
 
   private static final String CLIENTS = "/api/v1/connected-apps/admin/clients";
+  private static final String BANK_SWITCH = "/api/v1/connected-apps/admin/settings/bank";
 
   private static final String VALID =
       """
@@ -286,6 +287,53 @@ class AdminExchangeRegistryControllerTest {
                 .content("{\"enabled\":true,\"version\":" + version + "}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.enabled").value(true));
+  }
+
+  @Test
+  void theBankSwitchStartsOffAndIsSetWithItsOwnVersion() throws Exception {
+    String bank =
+        mockMvc
+            .perform(get(BANK_SWITCH).with(admin()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    Number version = JsonPath.read(bank, "$.version");
+
+    mockMvc
+        .perform(
+            put(BANK_SWITCH)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true,\"version\":" + version + "}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enabled").value(true))
+        .andExpect(jsonPath("$.version").value(version.longValue() + 1))
+        .andExpect(jsonPath("$.updatedAt").isNotEmpty());
+    mockMvc
+        .perform(
+            put(BANK_SWITCH)
+                .with(admin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":false,\"version\":" + version + "}"))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void onlyAnAdminReadsOrSetsTheBankSwitch() throws Exception {
+    for (String role : new String[] {"ROLE_OFFICER", "ROLE_BANK_MANAGEMENT"}) {
+      mockMvc
+          .perform(get(BANK_SWITCH).with(jwt().authorities(new SimpleGrantedAuthority(role))))
+          .andExpect(status().isForbidden());
+      mockMvc
+          .perform(
+              put(BANK_SWITCH)
+                  .with(jwt().authorities(new SimpleGrantedAuthority(role)))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"enabled\":true,\"version\":0}"))
+          .andExpect(status().isForbidden());
+    }
   }
 
   /**

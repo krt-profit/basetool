@@ -393,7 +393,8 @@
                                               class="cell-sub" data-testid="org-unit-bank-request-gross"
                                               th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                                     </td>
-                                    <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
+                                    <td><span th:text="${@handles.display(r.requesterHandle())}">greluc</span>
+                                        <th:block th:replace="~{bank/fragments/bank-request-origin :: clientBadge(${r.clientName()})}"></th:block></td>
                                     <td>
                                         <span class="chip"
                                               th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"

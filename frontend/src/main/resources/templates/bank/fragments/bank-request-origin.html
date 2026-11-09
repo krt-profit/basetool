@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The connected application a booking request was raised through (REQ-BANK-067); nothing for one raised in the Basetool. */-->
+<span th:fragment="clientBadge(clientName)" th:if="${clientName != null}"
+      class="chip chip--info" data-testid="bank-request-client"
+      th:title="#{bank.request.client.hint}"
+      th:text="#{bank.request.client(${clientName})}">&uuml;ber VerseKit</span>
+</body>
+</html>

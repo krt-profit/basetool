@@ -44,11 +44,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The backend's own check of an exchange request, used as {@code @exchangeGate} in {@code
  * PreAuthorize} on every exchange controller method (REQ-XCH-004): the caller is an acting member
- * relayed for a registry client, the global switch is on, the client is active, the member has not
- * disconnected the installation or, after the connection was made, the client (REQ-XCH-008), and
- * the needed capability was both relayed and granted in the registry. Every refusal is counted; a
- * relayed request is refused with the code and status the gateway's own gate answers for the same
- * situation (REQ-XCH-025), so a client sees one code whichever side refuses it.
+ * relayed for a registry client, the global switch is on, the bank switch is on for a request of
+ * the bank route family (REQ-BXCH-006, {@link BankExchangeRoutes}), the client is active, the
+ * member has not disconnected the installation or, after the connection was made, the client
+ * (REQ-XCH-008), and the needed capability was both relayed and granted in the registry. Every
+ * refusal is counted; a relayed request is refused with the code and status the gateway's own gate
+ * answers for the same situation (REQ-XCH-025), so a client sees one code whichever side refuses
+ * it.
  */
 @Slf4j
 @Component("exchangeGate")
@@ -60,6 +62,9 @@ public class ExchangeGate {
 
   /** Refusal reason: the global exchange switch is off. */
   static final String REASON_SWITCH_OFF = "switch_off";
+
+  /** Refusal reason: the bank switch is off and the request is for the bank route family. */
+  static final String REASON_BANK_SWITCH_OFF = "bank_switch_off";
 
   /** Refusal reason: the relayed client is not in the registry. */
   static final String REASON_CLIENT_UNKNOWN = "client_unknown";
@@ -86,6 +91,9 @@ public class ExchangeGate {
   private final ExchangeRevocationMirror revocationMirror;
   private final MeterRegistry meterRegistry;
 
+  /** Counts a bank route refused while the bank switch is off. */
+  private final ExchangeBankMetrics bankMetrics;
+
   /** Registers the refusal counter for every reason at zero, so a first refusal is an increase. */
   @PostConstruct
   void registerRefusalCounters() {
@@ -93,6 +101,7 @@ public class ExchangeGate {
         new String[] {
           REASON_NOT_RELAYED,
           REASON_SWITCH_OFF,
+          REASON_BANK_SWITCH_OFF,
           REASON_CLIENT_UNKNOWN,
           REASON_CLIENT_SUSPENDED,
           REASON_SCOPE_MISSING,
@@ -189,13 +198,15 @@ public class ExchangeGate {
       count(REASON_NOT_RELAYED);
       return Optional.empty();
     }
-    boolean enabled =
-        settingsRepository
-            .findById(ExchangeSettings.SINGLETON_ID)
-            .map(ExchangeSettings::isEnabled)
-            .orElse(false);
-    if (!enabled) {
+    Optional<ExchangeSettings> settings =
+        settingsRepository.findById(ExchangeSettings.SINGLETON_ID);
+    if (!settings.map(ExchangeSettings::isEnabled).orElse(false)) {
       throw refuse(REASON_SWITCH_OFF, ExchangeProblemException.exchangeDisabled());
+    }
+    if (BankExchangeRoutes.isCurrentRequestBank()
+        && !settings.map(ExchangeSettings::isBankEnabled).orElse(false)) {
+      bankMetrics.countRefused(BankExchangeRefusal.SWITCHED_OFF);
+      throw refuse(REASON_BANK_SWITCH_OFF, ExchangeProblemException.bankExchangeDisabled());
     }
     ExchangeClient client =
         clientRepository

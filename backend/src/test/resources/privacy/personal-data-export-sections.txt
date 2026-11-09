@@ -37,7 +37,7 @@
 37|bankAccountBookingGrants|ART_15|04e82c954c253fe0|account|
 38|bankApprovalLimits|ART_15|5c8aa53e2d76708d|account|
 39|bankBookingsAsCounterparty|ART_15|9967d5123b726a3f|justification,note|
-40|bankRequestsRaised|ART_15_20|41a38726b7834a7b|justification,note|
+40|bankRequestsRaised|ART_15_20|92e8c356ab113e7b|justification,note|
 41|bankRequestsAsCounterparty|ART_15|3c2882a72dd1ed81|justification,note|
 42|auditActionsByMember|ART_15|6eb20fb4257b79e2||
 43|auditActionsOnMember|ART_15|7135dd606c8f87a1||

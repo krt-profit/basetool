@@ -46,6 +46,17 @@ public interface ExchangeClientMapper {
   ExchangeSettingsDto toDto(ExchangeSettings settings);
 
   /**
+   * Maps the bank switch of the settings row, with its own version.
+   *
+   * @param settings the entity
+   * @return the bank switch DTO
+   */
+  default @NotNull ExchangeBankSwitchDto toBankSwitchDto(@NotNull ExchangeSettings settings) {
+    return new ExchangeBankSwitchDto(
+        settings.isBankEnabled(), settings.getBankUpdatedAt(), settings.getBankVersion());
+  }
+
+  /**
    * Orders capabilities by declaration, so the response is stable.
    *
    * @param capabilities the granted capabilities

@@ -7,6 +7,10 @@
   they remain, the one exception to decision 4 (*Amendment 7*, #2674); converging the remaining
   shape is unchanged. Amended again by [ADR-0300](0300-officer-reach-is-derived-per-org-unit-and-the-keycloak-officer-role-is-retired.md)
   (2026-10-31): the provisioner also deletes the retired `Officer` realm role (*Amendment 8*).
+  Amended by [ADR-0355](0355-roles-are-held-in-the-basetool-database.md): it deletes the four application realm roles and withholds the
+  `roles` scope from the web login (*Amendment 9*); it takes `view-realm` back from
+  `backend-service` and gives `grafana` the client role `grafana-admin` and its own mapper only
+  (*Amendment 10*).
 - **Date:** 2026-09-22
 - **Deciders:** @greluc (requested 2026-09-22: "the testing host must mirror production")
 - **Related:** [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) (the DPoP policy and its
@@ -289,3 +293,39 @@ constant, and every other role only the target realm has is still left alone. Re
 `REQ-SEC-004`; pinned by case 4b of `scripts/provision-keycloak-realm.test.sh`. Production gets the
 deletion with a separate owner-approved dry run and apply, after the release that carries the
 migration.
+
+## Amendment 9 — the application realm roles leave the production shape
+
+- **Deciders:** @greluc (ADR-0355, #3151)
+
+The four application roles are held in the Basetool's `user_roles` (ADR-0355), so `Admin`,
+`KRT Member`, `Bank Employee` and `Bank Management` leave the production shape. The provisioner no
+longer creates them; `plan_retired_application_roles` deletes each one wherever it remains (by id,
+`roles-by-id/<id>`), and Keycloak drops its user mappings and KRT Member's place in
+`default-roles-<realm>` with it. `basetool-frontend` withholds the `roles` client scope, so the web
+login's token carries no `realm_access` claim. Like *Amendment 8* these are named constants, not a
+permission to delete. Pinned by case 4c of `scripts/provision-keycloak-realm.test.sh`. Production
+runs it after the final roster sync (`docs/deployment.md`, *Roles in the Basetool*); the rollback
+recreates the roles with the previous release's provisioner and maps them back with
+`scripts/restore-keycloak-realm-roles.py`.
+
+## Amendment 10 — Grafana's own admin role, and `view-realm` taken back
+
+- **Deciders:** @greluc (#3151, follow-up decisions)
+
+With the application roles gone from the realm, nothing in it says who administers Grafana, and
+`backend-service` no longer needs to read the realm.
+
+- **`grafana` carries the client role `grafana-admin`** and exactly one client-level mapper,
+  `client roles` (`oidc-usermodel-client-role-mapper` for the client itself, claim `grafana_roles`
+  in the ID token and userinfo, where Grafana's `role_attribute_path` looks). Its mappers are
+  exact, so the former `realm roles` mapper is a planned removal. The provisioner creates the role
+  and never assigns it; the owner gives it to the few Grafana admins by hand.
+- **A spec may name service-account roles to withhold.** `backend-service` withholds
+  `realm-management`'s `view-realm`: a planned `- service-account roles … withdrawn (…)` line
+  wherever the account holds it, one role-mapping delete on apply. Like a grant, a withdrawal the
+  provisioning identity cannot read or make is printed under `[manual]`. It is a named constant,
+  not a permission to take any other role back.
+
+Pinned by cases 2, 7, 24 and 25 of `scripts/provision-keycloak-realm.test.sh`; production order in
+`docs/deployment.md`, *Roles in the Basetool*.

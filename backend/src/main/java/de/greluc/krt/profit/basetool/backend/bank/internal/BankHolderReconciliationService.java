@@ -29,13 +29,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,8 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
  * with {@code ROLE_BANK_EMPLOYEE} or {@code ROLE_BANK_MANAGEMENT} is an active holder, and a
  * role-managed holder whose user lost all bank roles is deactivated.
  *
- * <p>Runs on the {@code UserSyncTask} schedule, is idempotent, and never touches manually
- * registered holders.
+ * <p>Sweeps the whole roster on the {@code UserSyncTask} schedule and reconciles one member after
+ * each committed role change ({@link BankHolderRoleChangeListener}); both are idempotent and never
+ * touch manually registered holders.
  */
 @Service
 @RequiredArgsConstructor
@@ -97,14 +102,7 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
         if (user == null) {
           continue;
         }
-        BankHolder holder = new BankHolder();
-        holder.setUser(user);
-        holder.setHandle(user.getEffectiveName());
-        holder.setActive(true);
-        holder.setRoleManaged(true);
-        BankHolder saved = holderRepository.save(holder);
-        bankAuditService.record(
-            BankAuditEventType.HOLDER_REGISTERED, null, null, user.getId(), saved.getHandle());
+        register(user);
         created++;
       }
     }
@@ -112,33 +110,16 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
     int reactivated = 0;
     for (BankHolder holder : staffHolders) {
       if (holder.isRoleManaged() && !holder.isActive()) {
-        holder.setActive(true);
-        holderRepository.save(holder);
-        bankAuditService.record(
-            BankAuditEventType.HOLDER_REACTIVATED,
-            null,
-            null,
-            holder.getUser() == null ? null : holder.getUser().getId(),
-            holder.getHandle());
-        eventPublisher.publishEvent(BankNotices.holderNoticeCleared(holder.getId()));
+        reactivate(holder);
         reactivated++;
       }
     }
 
     int deactivated = 0;
     for (BankHolder holder : holderRepository.findByRoleManagedTrueAndActiveTrue()) {
-      UUID userId = holder.getUser() == null ? null : holder.getUser().getId();
+      UUID userId = userIdOf(holder);
       if (userId == null || !staff.contains(userId)) {
-        holder.setActive(false);
-        holderRepository.save(holder);
-        bankAuditService.record(
-            BankAuditEventType.HOLDER_DEACTIVATED, null, null, userId, holder.getHandle());
-        BigDecimal balance = holderPostingRepository.holderTotal(holder.getId());
-        if (balance.signum() != 0) {
-          eventPublisher.publishEvent(
-              BankNotices.holderDeactivatedWithBalance(
-                  holder.getId(), holder.getHandle(), balance));
-        }
+        deactivate(holder);
         deactivated++;
       }
     }
@@ -151,5 +132,69 @@ public class BankHolderReconciliationService implements UserSyncFollowUp {
           deactivated,
           staff.size());
     }
+  }
+
+  /**
+   * Reconciles one member's holder against the member's committed role set, in a transaction of its
+   * own: registers or reactivates a role-managed holder for bank staff, deactivates one whose
+   * member holds no bank role any more, and leaves a manually registered holder alone.
+   *
+   * @param userId the member whose roles changed
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void reconcileUser(@NotNull UUID userId) {
+    boolean staff = userRepository.hasAnyRoleCode(userId, BANK_ROLE_CODES);
+    Optional<BankHolder> existing = holderRepository.findByUserId(userId);
+    if (existing.isEmpty()) {
+      if (staff) {
+        userRepository.findPlainById(userId).ifPresent(this::register);
+      }
+      return;
+    }
+    BankHolder holder = existing.get();
+    if (!holder.isRoleManaged() || holder.isActive() == staff) {
+      return;
+    }
+    if (staff) {
+      reactivate(holder);
+    } else {
+      deactivate(holder);
+    }
+  }
+
+  private void register(User user) {
+    BankHolder holder = new BankHolder();
+    holder.setUser(user);
+    holder.setHandle(user.getEffectiveName());
+    holder.setActive(true);
+    holder.setRoleManaged(true);
+    BankHolder saved = holderRepository.save(holder);
+    bankAuditService.record(
+        BankAuditEventType.HOLDER_REGISTERED, null, null, user.getId(), saved.getHandle());
+  }
+
+  private void reactivate(BankHolder holder) {
+    holder.setActive(true);
+    holderRepository.save(holder);
+    bankAuditService.record(
+        BankAuditEventType.HOLDER_REACTIVATED, null, null, userIdOf(holder), holder.getHandle());
+    eventPublisher.publishEvent(BankNotices.holderNoticeCleared(holder.getId()));
+  }
+
+  private void deactivate(BankHolder holder) {
+    holder.setActive(false);
+    holderRepository.save(holder);
+    bankAuditService.record(
+        BankAuditEventType.HOLDER_DEACTIVATED, null, null, userIdOf(holder), holder.getHandle());
+    BigDecimal balance = holderPostingRepository.holderTotal(holder.getId());
+    if (balance.signum() != 0) {
+      eventPublisher.publishEvent(
+          BankNotices.holderDeactivatedWithBalance(holder.getId(), holder.getHandle(), balance));
+    }
+  }
+
+  private static @Nullable UUID userIdOf(BankHolder holder) {
+    User user = holder.getUser();
+    return user == null ? null : user.getId();
   }
 }

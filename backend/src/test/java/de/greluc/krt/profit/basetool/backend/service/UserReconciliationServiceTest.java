@@ -35,10 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
@@ -54,8 +51,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
+import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminGrant;
+import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminProperties;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RoleChangeRecorder;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
-import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -67,7 +66,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -75,7 +73,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -84,10 +81,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * Unit tests for {@link UserReconciliationService}, the Keycloak-to-local sync: {@link
  * UserReconciliationService#syncUser(Jwt)}, {@link
  * UserReconciliationService#syncUser(KeycloakUserDto)}, {@link
- * UserReconciliationService#markMissingUsers}, the role mapping ({@link
- * UserReconciliationService#extractRolesFromJwt}) and the sync-input catalogs ({@link
- * UserReconciliationService#getMappableRoleNames} / {@link
- * UserReconciliationService#getKnownDiscordLinkedUserIds}).
+ * UserReconciliationService#markMissingUsers} and {@link
+ * UserReconciliationService#getKnownDiscordLinkedUserIds}. Neither sync path writes a role
+ * (REQ-SEC-088).
  *
  * <p>Uses a real {@link UserRegistrationService} and a mock {@link UserService} whose {@code
  * getUserIdFromJwt} parses the token subject.
@@ -108,19 +104,14 @@ class UserReconciliationServiceTest {
   @Mock private UserDeletionService userDeletionService;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
   @Mock private OrgUnitSeatNotifier seatNotifier;
+  @Mock private RoleChangeRecorder roleChangeRecorder;
+  @Mock private ApprovalRoleGrant approvalRoleGrant;
+
+  /** The bootstrap subjects a test may extend; the record reads it by reference. */
+  private final List<UUID> bootstrapSubjects = new ArrayList<>();
 
   private UserRegistrationService userRegistrationService;
   private UserReconciliationService userReconciliationService;
-
-  /** The partial-scope allowlist a test may extend; the record reads it by reference. */
-  private final List<String> partialScopeClientIds = new ArrayList<>();
-
-  /**
-   * A real instance, empty by default so tests see complete-claim behaviour; the REQ-SEC-036 cases
-   * populate it.
-   */
-  private final PartialRoleScopeProperties partialRoleScopeProperties =
-      new PartialRoleScopeProperties(partialScopeClientIds);
 
   private static final UUID USER_ID = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
@@ -133,18 +124,21 @@ class UserReconciliationServiceTest {
             eventPublisher,
             keycloakService,
             userDeletionService,
+            approvalRoleGrant,
             selfProvider);
     setField(userRegistrationService, "requireApproval", true);
     userReconciliationService =
         new UserReconciliationService(
             userRepository,
-            roleRepository,
             memberCreatedObserver,
             eventPublisher,
             userRegistrationService,
             userService,
-            partialRoleScopeProperties,
-            List.of(seatNotifier),
+            new BootstrapAdminGrant(
+                new BootstrapAdminProperties(bootstrapSubjects),
+                userRepository,
+                roleRepository,
+                roleChangeRecorder),
             meterRegistry);
     lenient()
         .when(userService.getUserIdFromJwt(any(Jwt.class)))
@@ -163,7 +157,7 @@ class UserReconciliationServiceTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
     userReconciliationService.syncUser(
-        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, Set.of(), null));
+        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, null));
 
     assertFalse(existing.isEnabledInKeycloak());
   }
@@ -183,27 +177,27 @@ class UserReconciliationServiceTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
     userReconciliationService.syncUser(
-        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", null, Set.of(), null));
+        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", null, null));
 
     assertTrue(existing.isEnabledInKeycloak());
   }
 
-  /** The retired {@code Officer} realm role has no catalogue entry, so it is never mirrored. */
+  /** The roster sync leaves the stored roles as they are. */
   @Test
-  void doesNotMirrorTheRetiredOfficerRealmRole() {
+  void theRosterSyncKeepsTheStoredRoles() {
     Role krtMember = codeRole("KRT_MEMBER", "KRT Member");
-    when(roleRepository.findAllWithPermissions()).thenReturn(List.of(krtMember));
     User existing = new User();
     existing.setId(USER_ID);
     existing.setApprovalStatus(ApprovalStatus.ACTIVE);
-    existing.setRoles(new HashSet<>());
+    existing.setRoles(new HashSet<>(Set.of(krtMember)));
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
     userReconciliationService.syncUser(
-        new KeycloakUserDto(
-            USER_ID, "alice", "alice@example.com", true, Set.of("Officer", "KRT Member"), null));
+        new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
     assertEquals(Set.of(krtMember), existing.getRoles());
+    verify(roleRepository, never()).findAllWithPermissions();
+    verify(seatNotifier, never()).onRolesChanged(any(), any());
   }
 
   @Nested
@@ -222,7 +216,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt).user();
+      User result = userReconciliationService.syncUser(jwt);
 
       assertEquals(USER_ID, result.getId());
       assertEquals("alice", result.getUsername());
@@ -245,7 +239,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of(otherAccountId));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt).user();
+      User result = userReconciliationService.syncUser(jwt);
 
       assertEquals(
           USER_ID,
@@ -273,24 +267,17 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * Verifies that a new row which is ACTIVE on arrival, an ADMIN realm-role holder carved out of
-     * the approval gate (REQ-SEC-017), is counted.
+     * Verifies that a new row which is ACTIVE on arrival, a bootstrap subject earning Admin at its
+     * first login and so carved out of the approval gate (REQ-SEC-017), is counted.
      */
     @Test
     void countsTheAutoActivatedAdmin_soTheCarveOutIsNotSilent() {
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username",
-                  "alice",
-                  "realm_access",
-                  Map.of("roles", List.of("ADMIN"))));
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
+      Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(codeRole("ADMIN", "ADMIN")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(jwt);
@@ -301,9 +288,9 @@ class UserReconciliationServiceTest {
           "an account that arrives already holding ADMIN must be counted");
     }
 
-    /** A new ordinary member lands PENDING, which is the approval queue's own signal, not this. */
+    /** A token claiming Admin does not make a new account an admin; it lands PENDING. */
     @Test
-    void doesNotCountANewOrdinaryMemberAsAnAutoActivatedAdmin() {
+    void doesNotCountANewAccountWhoseTokenClaimsAdmin() {
       Jwt jwt =
           newJwt(
               USER_ID.toString(),
@@ -311,16 +298,16 @@ class UserReconciliationServiceTest {
                   "preferred_username",
                   "alice",
                   "realm_access",
-                  Map.of("roles", List.of("MEMBER"))));
+                  Map.of("roles", List.of("Admin"))));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(codeRole("MEMBER", "MEMBER")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt);
 
+      assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
+      assertTrue(result.getRoles().isEmpty());
       assertEquals(
           0.0,
           meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count());
@@ -357,7 +344,7 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
-      User result = userReconciliationService.syncUser(jwt).user();
+      User result = userReconciliationService.syncUser(jwt);
 
       assertSame(existing, result);
       verify(userRepository, never()).save(any(User.class));
@@ -375,8 +362,9 @@ class UserReconciliationServiceTest {
       assertSavedOnFieldChange("email", "new@example.com", User::setEmail, "old@example.com");
     }
 
+    /** A realm-role claim neither changes the stored roles nor counts as a change. */
     @Test
-    void detectsChange_whenRolesDiffer() {
+    void aRealmRoleClaimLeavesTheStoredRolesAndSavesNothing() {
       Jwt jwt =
           newJwt(
               USER_ID.toString(),
@@ -384,22 +372,21 @@ class UserReconciliationServiceTest {
                   "preferred_username",
                   "alice",
                   "realm_access",
-                  Map.of("roles", List.of("ADMIN"))));
-
+                  Map.of("roles", List.of("Admin", "Bank Management"))));
+      Role krtMember = codeRole("KRT_MEMBER", "KRT Member");
       User existing = newUser(USER_ID, "alice");
       existing.setVersion(1L);
-      existing.setRoles(new HashSet<>());
+      existing.setApprovalStatus(ApprovalStatus.ACTIVE);
+      existing.setRoles(new HashSet<>(Set.of(krtMember)));
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(1L, "ADMIN")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      userReconciliationService.syncUser(jwt);
+      User result = userReconciliationService.syncUser(jwt);
 
-      verify(userRepository, times(1)).save(any(User.class));
-      assertEquals(1, existing.getRoles().size());
-      assertEquals("ADMIN", existing.getRoles().iterator().next().getName());
+      assertEquals(Set.of(krtMember), result.getRoles());
+      verify(userRepository, never()).save(any(User.class));
+      verify(roleRepository, never()).findAllWithPermissions();
+      verify(seatNotifier, never()).onRolesChanged(any(), any());
     }
 
     @Test
@@ -409,7 +396,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(jwt).user();
+      User result = userReconciliationService.syncUser(jwt);
 
       verify(userRepository, times(1)).save(result);
     }
@@ -456,7 +443,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
+      User result = userReconciliationService.syncUser(discordJwt(true));
 
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
       assertEquals(DISCORD_ID, result.getDiscordUserId());
@@ -464,13 +451,13 @@ class UserReconciliationServiceTest {
     }
 
     @Test
-    void newDiscordAdmin_landsActive_noNotification() {
+    void newDiscordBootstrapAdmin_landsActive_noNotification() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(codeRole("ADMIN", "Admin")));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of("Admin"))).user();
+      User result = userReconciliationService.syncUser(discordJwt(true));
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -486,7 +473,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
+      User result = userReconciliationService.syncUser(discordJwt(true));
 
       assertEquals(USER_ID, result.getId());
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
@@ -501,25 +488,11 @@ class UserReconciliationServiceTest {
       when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
+      User result = userReconciliationService.syncUser(discordJwt(false));
 
       assertEquals(ApprovalStatus.PENDING, result.getApprovalStatus());
       org.junit.jupiter.api.Assertions.assertNull(result.getDiscordUserId());
       verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
-    }
-
-    @Test
-    void newCredentialAdmin_landsActive_noNotification() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
-
-      assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
-      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -529,12 +502,11 @@ class UserReconciliationServiceTest {
       existing.setUsername("discorduser");
       existing.setApprovalStatus(ApprovalStatus.PENDING);
       existing.setVersion(1L);
+      existing.setRoles(new HashSet<>(Set.of(codeRole("ADMIN", "Admin"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(codeRole("ADMIN", "Admin")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of("Admin"))).user();
+      User result = userReconciliationService.syncUser(discordJwt(false));
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -547,7 +519,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
+      User result = userReconciliationService.syncUser(discordJwt(false));
 
       assertEquals(ApprovalStatus.ACTIVE, result.getApprovalStatus());
       verify(eventPublisher, never()).publishEvent(any());
@@ -563,12 +535,11 @@ class UserReconciliationServiceTest {
               .header("alg", "none")
               .subject(USER_ID.toString())
               .claim("preferred_username", "discorduser")
-              .claim("realm_access", Map.of("roles", List.of()))
               .claim("discord_user_id", DISCORD_ID)
               .claim("discord_guild_nickname", "  Vanguard Pilot  ")
               .build();
 
-      User result = userReconciliationService.syncUser(jwt).user();
+      User result = userReconciliationService.syncUser(jwt);
 
       assertEquals("Vanguard Pilot", result.getDiscordGuildNickname());
     }
@@ -578,7 +549,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
+      User result = userReconciliationService.syncUser(discordJwt(true));
 
       org.junit.jupiter.api.Assertions.assertNull(result.getDiscordGuildNickname());
     }
@@ -597,7 +568,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
       when(userRepository.findIdByDiscordUserId(DISCORD_ID)).thenReturn(Optional.of(otherAccount));
 
-      userReconciliationService.syncUser(discordJwt(true, List.of()));
+      userReconciliationService.syncUser(discordJwt(true));
 
       org.junit.jupiter.api.Assertions.assertNull(
           existing.getDiscordUserId(),
@@ -619,201 +590,23 @@ class UserReconciliationServiceTest {
       when(userRepository.findIdByDiscordUserId(DISCORD_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-      userReconciliationService.syncUser(discordJwt(true, List.of()));
+      userReconciliationService.syncUser(discordJwt(true));
 
       assertEquals(DISCORD_ID, existing.getDiscordUserId());
       assertEquals(
           0.0, meterRegistry.counter(IdentityMetricNames.USER_DISCORD_LINK_COLLISIONS).count());
     }
 
-    private Jwt discordJwt(boolean withDiscord, List<String> realmRoles) {
+    private Jwt discordJwt(boolean withDiscord) {
       Jwt.Builder builder =
           Jwt.withTokenValue("t")
               .header("alg", "none")
               .subject(USER_ID.toString())
-              .claim("preferred_username", "discorduser")
-              .claim("realm_access", Map.of("roles", realmRoles));
+              .claim("preferred_username", "discorduser");
       if (withDiscord) {
         builder.claim("discord_user_id", DISCORD_ID);
       }
       return builder.build();
-    }
-  }
-
-  /**
-   * Tests for tokens from a partial-scope client such as the mobile app (REQ-SEC-035), whose role
-   * claim omits roles the member holds.
-   *
-   * <p>The stored role set must survive such a claim, and the request must still be authorised by
-   * it. The fixtures use {@code Admin} as the omitted role.
-   */
-  @Nested
-  class PartialRoleScopeTests {
-
-    private static final String MOBILE_CLIENT = "basetool-android";
-
-    /** Lists the mobile client, which every case in this class assumes is configured as partial. */
-    @BeforeEach
-    void listTheMobileClient() {
-      partialScopeClientIds.add(MOBILE_CLIENT);
-    }
-
-    /**
-     * Builds a token for {@code azp} carrying exactly {@code realmRoles}.
-     *
-     * @param azp the authorized-party claim naming the client that requested the token
-     * @param realmRoles the realm-role names the client's scope let through
-     * @return the token
-     */
-    private Jwt tokenFrom(String azp, List<String> realmRoles) {
-      return newJwt(
-          USER_ID.toString(),
-          Map.of(
-              "preferred_username",
-              "alice",
-              "azp",
-              azp,
-              "realm_access",
-              Map.of("roles", realmRoles)));
-    }
-
-    /**
-     * Verifies that a partial-scope claim does not overwrite the stored roles, so an administrator
-     * logging in through the app keeps {@code Admin}.
-     */
-    @Test
-    void doesNotOverwriteTheStoredRoles_whenTheClaimComesFromAPartialScopeClient() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setVersion(1L);
-      Role admin = role(1L, "Admin");
-      Role member = role(2L, "KRT Member");
-      existing.setRoles(new HashSet<>(Set.of(admin, member)));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(member));
-
-      userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
-
-      assertEquals(
-          Set.of("Admin", "KRT Member"),
-          roleNames(existing.getRoles()),
-          "the stored role set must survive a claim that could not have carried Admin");
-    }
-
-    /**
-     * The request is nevertheless authorised with the token's roles, not the row's.
-     *
-     * <p>Without this the guard would be worse than the defect: the row keeps {@code Admin}
-     * precisely because the app path stopped overwriting it, so authorising from the row would hand
-     * the app the very authority its client scope withholds.
-     */
-    @Test
-    void returnsTheTokensRolesAsEffective_whenTheClaimIsPartial() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setVersion(1L);
-      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
-
-      UserReconciliationService.ReconciledUser reconciled =
-          userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
-
-      assertEquals(
-          Set.of("KRT Member"),
-          roleNames(reconciled.effectiveRoles()),
-          "the request must carry only what the token presented");
-    }
-
-    /**
-     * A client that is NOT listed still replaces the stored set - including shrinking it.
-     *
-     * <p>The complement that keeps the guard honest: one that stopped every role removal would mean
-     * a demotion in Keycloak never reached the database, which is its own privilege defect.
-     */
-    @Test
-    void stillReplacesTheStoredRoles_whenTheClaimComesFromAnOrdinaryClient() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setVersion(1L);
-      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"), role(2L, "KRT Member"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userReconciliationService.syncUser(tokenFrom("basetool-frontend", List.of("KRT Member")));
-
-      assertEquals(
-          Set.of("KRT Member"),
-          roleNames(existing.getRoles()),
-          "a complete claim must still be able to remove a role");
-      verify(seatNotifier).onRolesChanged(USER_ID, existing.getRoles());
-    }
-
-    /**
-     * Verifies that a partial-scope claim does persist its roles when it creates the row, since
-     * there is no stored set to protect and an empty one would refuse the account (REQ-SEC-053).
-     */
-    @Test
-    void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      UserReconciliationService.ReconciledUser reconciled =
-          userReconciliationService.syncUser(tokenFrom(MOBILE_CLIENT, List.of("KRT Member")));
-
-      assertEquals(
-          Set.of("KRT Member"),
-          roleNames(reconciled.user().getRoles()),
-          "a new row must not be created role-less");
-    }
-
-    /**
-     * A token with no {@code azp} is never treated as partial.
-     *
-     * <p>An absent claim must fail towards the established behaviour, not towards the exception:
-     * treating "unknown client" as partial would quietly stop every role change from any issuer
-     * that omits the claim.
-     */
-    @Test
-    void treatsAMissingAzpAsAnOrdinaryClient() {
-      User existing = newUser(USER_ID, "alice");
-      existing.setVersion(1L);
-      existing.setRoles(new HashSet<>(Set.of(role(1L, "Admin"))));
-
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      Jwt noAzp =
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username",
-                  "alice",
-                  "realm_access",
-                  Map.of("roles", List.of("KRT Member"))));
-
-      userReconciliationService.syncUser(noAzp);
-
-      assertEquals(Set.of("KRT Member"), roleNames(existing.getRoles()));
-    }
-
-    /**
-     * Collapses a role set to its names, so a failure message names the roles rather than printing
-     * entity identity hashes.
-     *
-     * @param roles the roles to name
-     * @return their names
-     */
-    private Set<String> roleNames(java.util.Collection<Role> roles) {
-      return roles.stream().map(Role::getName).collect(java.util.stream.Collectors.toSet());
     }
   }
 
@@ -831,8 +624,7 @@ class UserReconciliationServiceTest {
       existing.setVersion(1L);
       existing.setRoles(new HashSet<>());
       KeycloakUserDto dto =
-          new KeycloakUserDto(
-              USER_ID, "alice", "alice@example.com", true, Set.of(), "123456789012345678");
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, "123456789012345678");
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
       when(userRepository.findIdByDiscordUserId("123456789012345678"))
@@ -847,8 +639,7 @@ class UserReconciliationServiceTest {
 
     @Test
     void returnsEarly_whenDtoIdIsNull() {
-      KeycloakUserDto dto =
-          new KeycloakUserDto(null, "alice", "alice@example.com", true, Set.of(), null);
+      KeycloakUserDto dto = new KeycloakUserDto(null, "alice", "alice@example.com", true, null);
 
       userReconciliationService.syncUser(dto);
 
@@ -863,8 +654,7 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
-      userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", null, true, Set.of(), null));
+      userReconciliationService.syncUser(new KeycloakUserDto(USER_ID, "alice", null, true, null));
 
       assertTrue(existing.isInKeycloak(), "must flip back to true once seen again");
       verify(userRepository, times(1)).save(existing);
@@ -875,7 +665,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
       verify(userRepository, times(1)).save(any(User.class));
     }
@@ -886,23 +676,9 @@ class UserReconciliationServiceTest {
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
       verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.PENDING));
-    }
-
-    @Test
-    void createsNewAdminUser_landsActive() {
-      Role adminRole = role(1L, "ADMIN");
-      adminRole.setCode("ADMIN");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(adminRole));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
-
-      verify(userRepository).save(argThat(u -> u.getApprovalStatus() == ApprovalStatus.ACTIVE));
     }
 
     @Test
@@ -911,23 +687,9 @@ class UserReconciliationServiceTest {
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
       verify(eventPublisher).publishEvent(any(DiscordRegistrationPendingEvent.class));
-    }
-
-    @Test
-    void createsNewAdminUser_doesNotNotify() {
-      Role adminRole = role(1L, "ADMIN");
-      adminRole.setCode("ADMIN");
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findAllWithPermissions()).thenReturn(java.util.List.of(adminRole));
-      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-      userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "root", null, true, Set.of("ADMIN"), null));
-
-      verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -942,7 +704,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
       verify(eventPublisher, never()).publishEvent(any());
     }
@@ -958,7 +720,7 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
       verify(userRepository, never()).save(any());
     }
@@ -976,8 +738,7 @@ class UserReconciliationServiceTest {
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(
-              USER_ID, "linkedlater", "l@example.com", true, Set.of(), "123456789012345678"));
+          new KeycloakUserDto(USER_ID, "linkedlater", "l@example.com", true, "123456789012345678"));
 
       assertEquals("123456789012345678", existing.getDiscordUserId());
       verify(userRepository, times(1)).save(existing);
@@ -995,81 +756,11 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "linked", "l@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "linked", "l@example.com", true, null));
 
       assertEquals("123456789012345678", existing.getDiscordUserId());
       verify(userRepository, never()).save(any());
     }
-  }
-
-  @Nested
-  class ExtractRolesFromJwtTests {
-
-    @Test
-    void returnsRoles_whenRealmAccessHasRolesKey() {
-      Jwt jwt =
-          newJwt(
-              USER_ID.toString(),
-              Map.of("realm_access", Map.of("roles", List.of("ADMIN", "KRT_MEMBER"))));
-
-      Set<String> roles = userReconciliationService.extractRolesFromJwt(jwt);
-
-      assertEquals(Set.of("ADMIN", "KRT_MEMBER"), roles);
-    }
-
-    @Test
-    void returnsEmpty_whenRealmAccessClaimMissing() {
-      Jwt jwt = newJwt(USER_ID.toString(), Map.of());
-
-      assertTrue(userReconciliationService.extractRolesFromJwt(jwt).isEmpty());
-    }
-
-    @Test
-    void returnsEmpty_whenRealmAccessLacksRolesKey() {
-      Jwt jwt =
-          newJwt(USER_ID.toString(), Map.of("realm_access", Map.of("something_else", "value")));
-
-      assertTrue(userReconciliationService.extractRolesFromJwt(jwt).isEmpty());
-    }
-  }
-
-  /**
-   * Verifies that a token whose realm roles map to nothing yields an account with no roles, which
-   * is then refused as {@code NO_ROLE} (REQ-SEC-053, ADR-0159).
-   */
-  @Test
-  void mapRoles_writesNoRole_whenNoKeycloakRoleMatchesLocal() {
-    Jwt jwt =
-        newJwt(
-            USER_ID.toString(),
-            Map.of(
-                "preferred_username",
-                "alice",
-                "realm_access",
-                Map.of("roles", List.of("UNKNOWN_ROLE_FROM_OTHER_REALM"))));
-
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-    when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    User result = userReconciliationService.syncUser(jwt).user();
-
-    assertTrue(result.getRoles().isEmpty(), "an unmatched realm role grants nothing");
-  }
-
-  @Test
-  void mapRoles_nullRoleNames_alsoWriteNoRole() {
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-    userReconciliationService.syncUser(
-        new KeycloakUserDto(USER_ID, "alice", null, true, null, null));
-
-    org.mockito.ArgumentCaptor<User> saved = org.mockito.ArgumentCaptor.forClass(User.class);
-    verify(userRepository).save(saved.capture());
-    assertTrue(saved.getValue().getRoles().isEmpty(), "a null role list grants nothing");
-    verify(roleRepository, never()).findAllWithPermissions();
   }
 
   @Nested
@@ -1119,141 +810,7 @@ class UserReconciliationServiceTest {
   }
 
   @Nested
-  class RoleSyncSummaryTests {
-
-    private ListAppender<ILoggingEvent> appender;
-    private Logger logger;
-
-    @BeforeEach
-    void attachAppender() {
-      logger = (Logger) LoggerFactory.getLogger(UserReconciliationService.class);
-      appender = new ListAppender<>();
-      appender.start();
-      logger.addAppender(appender);
-    }
-
-    @AfterEach
-    void detachAppender() {
-      logger.detachAppender(appender);
-    }
-
-    @Test
-    void quietRun_logsTheAggregateAtInfo() {
-      userReconciliationService.logRoleSyncSummary();
-
-      ILoggingEvent event = onlyEvent();
-      assertEquals(Level.INFO, event.getLevel());
-      assertTrue(event.getFormattedMessage().contains("0 accounts changed roles"));
-    }
-
-    @Test
-    void aMassRoleStrip_escalatesToWarn_withCountsOnly() {
-      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
-      for (int i = 0; i < 4; i++) {
-        syncDemotedAccount();
-      }
-
-      userReconciliationService.logRoleSyncSummary();
-
-      ILoggingEvent event = lastEvent();
-      assertEquals(Level.WARN, event.getLevel());
-      String message = event.getFormattedMessage();
-      assertTrue(message.contains("4 accounts changed roles"), message);
-      assertTrue(
-          message.contains("4 accounts resolve to NO role at all and are refused with NO_ROLE"),
-          message);
-      assertFalse(message.contains("demoted-callsign"), message);
-    }
-
-    @Test
-    void aSingleRoleStrip_staysAtInfo_andTheTalliesResetForTheNextRun() {
-      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
-      syncDemotedAccount();
-
-      userReconciliationService.logRoleSyncSummary();
-      assertEquals(Level.INFO, lastEvent().getLevel());
-      assertTrue(lastEvent().getFormattedMessage().contains("1 accounts changed roles"));
-
-      userReconciliationService.logRoleSyncSummary();
-      assertEquals(Level.INFO, lastEvent().getLevel());
-      assertTrue(lastEvent().getFormattedMessage().contains("0 accounts changed roles"));
-    }
-
-    @Test
-    void anAlreadyRoleLessAccountStillCounts_becauseTheTallyIsACensusNotADelta() {
-      when(roleRepository.findAllWithPermissions()).thenReturn(List.of());
-      for (int i = 0; i < 4; i++) {
-        UUID id = UUID.randomUUID();
-        User existing = newUser(id, "already-role-less");
-        existing.setInKeycloak(true);
-        existing.setApprovalStatus(ApprovalStatus.ACTIVE);
-        existing.setRoles(new HashSet<>());
-        when(userRepository.findById(id)).thenReturn(Optional.of(existing));
-        userReconciliationService.syncUser(
-            new KeycloakUserDto(id, "already-role-less", null, true, Set.of("Officer"), null));
-      }
-
-      userReconciliationService.logRoleSyncSummary();
-
-      ILoggingEvent event = lastEvent();
-      assertEquals(Level.WARN, event.getLevel());
-      assertTrue(
-          event.getFormattedMessage().contains("4 accounts resolve to NO role at all"),
-          event.getFormattedMessage());
-      assertTrue(
-          event.getFormattedMessage().contains("0 accounts changed roles"),
-          "nothing changed on this run — that is the whole point of the case");
-    }
-
-    /**
-     * Runs one Admin-API sync of an account that holds {@code Officer} locally while Keycloak's
-     * {@code Officer} no longer resolves — the shape a renamed realm role produces.
-     */
-    private void syncDemotedAccount() {
-      UUID id = UUID.randomUUID();
-      User existing = newUser(id, "demoted-callsign");
-      existing.setInKeycloak(true);
-      existing.setApprovalStatus(ApprovalStatus.ACTIVE);
-      existing.setRoles(new HashSet<>(Set.of(codeRole("OFFICER", "Officer"))));
-      when(userRepository.findById(id)).thenReturn(Optional.of(existing));
-
-      userReconciliationService.syncUser(
-          new KeycloakUserDto(id, "demoted-callsign", null, true, Set.of("Officer"), null));
-    }
-
-    /**
-     * The single log event the appender captured.
-     *
-     * @return that event
-     */
-    private ILoggingEvent onlyEvent() {
-      assertEquals(1, appender.list.size());
-      return appender.list.getFirst();
-    }
-
-    /**
-     * The most recent log event the appender captured.
-     *
-     * @return that event
-     */
-    private ILoggingEvent lastEvent() {
-      assertFalse(appender.list.isEmpty());
-      return appender.list.getLast();
-    }
-  }
-
-  @Nested
   class SyncInputCatalogTests {
-
-    @Test
-    void getMappableRoleNames_returnsTheLocalRoleCatalogNames() {
-      when(roleRepository.findAllNames()).thenReturn(Set.of("ADMIN", "OFFICER", "Bereichsleitung"));
-
-      assertEquals(
-          Set.of("ADMIN", "OFFICER", "Bereichsleitung"),
-          userReconciliationService.getMappableRoleNames());
-      verify(roleRepository).findAllNames();
-    }
 
     @Test
     void getKnownDiscordLinkedUserIds_returnsAlreadyLinkedIds() {
@@ -1310,24 +867,23 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, null));
 
       verify(eventPublisher)
           .publishEvent(new MemberDepartedEvent(USER_ID, MemberDepartedEvent.REASON_DISABLED));
     }
 
     @Test
-    void anActiveMemberLosingEveryRoleDeparts() {
+    void anActiveMemberSeenByTheRosterSyncDoesNotDepart() {
       User existing = newUser(USER_ID, "alice");
       existing.setEnabledInKeycloak(true);
       existing.setRoles(new HashSet<>(Set.of(role(2L, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
-      verify(eventPublisher)
-          .publishEvent(new MemberDepartedEvent(USER_ID, MemberDepartedEvent.REASON_ROLE_LOST));
+      verify(eventPublisher, never()).publishEvent(any(MemberDepartedEvent.class));
     }
 
     @Test
@@ -1337,33 +893,23 @@ class UserReconciliationServiceTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
       userReconciliationService.syncUser(
-          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, Set.of(), null));
+          new KeycloakUserDto(USER_ID, "alice", "alice@example.com", false, null));
 
       verify(eventPublisher, never()).publishEvent(any(MemberDepartedEvent.class));
     }
 
     @Test
-    void aMemberLoggingInWithoutAnyRoleDeparts() {
+    void aMemberLoggingInWithoutARoleClaimKeepsTheRolesAndDoesNotDepart() {
       User existing = newUser(USER_ID, "alice");
       existing.setVersion(1L);
       existing.setRoles(new HashSet<>(Set.of(role(2L, "KRT Member"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findAllWithPermissions())
-          .thenReturn(java.util.List.of(role(2L, "KRT Member")));
 
       userReconciliationService.syncUser(
-          newJwt(
-              USER_ID.toString(),
-              Map.of(
-                  "preferred_username",
-                  "alice",
-                  "azp",
-                  "basetool-frontend",
-                  "realm_access",
-                  Map.of("roles", List.of()))));
+          newJwt(USER_ID.toString(), Map.of("preferred_username", "alice")));
 
-      verify(eventPublisher)
-          .publishEvent(new MemberDepartedEvent(USER_ID, MemberDepartedEvent.REASON_ROLE_LOST));
+      assertEquals(1, existing.getRoles().size());
+      verify(eventPublisher, never()).publishEvent(any(MemberDepartedEvent.class));
     }
 
     @Test
@@ -1376,6 +922,58 @@ class UserReconciliationServiceTest {
 
       verify(eventPublisher)
           .publishEvent(new MemberDepartedEvent(gone, MemberDepartedEvent.REASON_REMOVED));
+    }
+  }
+
+  @Nested
+  class BootstrapAdminTests {
+
+    private final Role admin = codeRole("ADMIN", "Admin");
+
+    private User loginOfAnExistingMember() {
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setApprovalStatus(ApprovalStatus.PENDING);
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      lenient().when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+      userReconciliationService.syncUser(
+          newJwt(USER_ID.toString(), Map.of("preferred_username", "alice")));
+      return existing;
+    }
+
+    @Test
+    void aBootstrapSubjectReceivesAdminWhileNoActiveAdminExists() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(0L);
+
+      User member = loginOfAnExistingMember();
+
+      assertTrue(member.getRoles().contains(admin));
+      assertEquals(ApprovalStatus.ACTIVE, member.getApprovalStatus());
+      verify(userRepository).bumpRolesVersion(USER_ID);
+      verify(roleChangeRecorder).bootstrapGranted(member);
+    }
+
+    @Test
+    void aBootstrapSubjectReceivesNothingWhileAnotherActiveAdminExists() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(1L);
+
+      User member = loginOfAnExistingMember();
+
+      assertFalse(member.getRoles().contains(admin));
+      verify(roleChangeRecorder, never()).bootstrapGranted(any());
+    }
+
+    @Test
+    void anUnlistedSubjectReceivesNothing() {
+      User member = loginOfAnExistingMember();
+
+      assertTrue(member.getRoles().isEmpty());
+      verify(roleRepository, never()).lockByCode(any());
+      verify(roleChangeRecorder, never()).bootstrapGranted(any());
     }
   }
 }

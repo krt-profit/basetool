@@ -43,6 +43,12 @@ public final class ExchangeSeam {
   /** The path prefix of the backend surface the gateway relays to. */
   public static final String RELAY_PREFIX = "/api/v1/exchange";
 
+  /** The root of the bank route family below either prefix, which the bank switch gates. */
+  public static final String BANK_PATH = "/bank";
+
+  /** The seconds a client waits after {@code 503 BANK_EXCHANGE_DISABLED}. */
+  public static final int BANK_RETRY_AFTER_SECONDS = 300;
+
   /** Stands for a route any granted exchange capability admits. */
   public static final String ANY_CAPABILITY = "*";
 
@@ -50,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 22 relay operations on 21 backend paths, each with the gateway route that relays it, the
+   * The 31 relay operations on 29 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -239,7 +245,71 @@ public final class ExchangeSeam {
               "exchange.drafts.refinery",
               false,
               "refinery-draft.schema.json",
-              null));
+              null),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts",
+              "/bank/accounts",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankAccountPage"),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts/{id}/bookings",
+              "/bank/accounts/{id}/bookings",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankBookingPage"),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts/{id}/balance-series",
+              "/bank/accounts/{id}/balance-series",
+              "exchange.bank.read",
+              false,
+              null,
+              "bank-balance-series.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/bank/queue",
+              "/bank/queue",
+              "exchange.bank.queue",
+              true,
+              null,
+              "bank-queue.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/bank/requests",
+              "/bank/requests",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankRequestPage"),
+          new RelayOperation(
+              "POST",
+              "/bank/requests",
+              "/bank/requests",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/raise",
+              "bank-request-write.schema.json#/$defs/written"),
+          new RelayOperation(
+              "POST",
+              "/bank/requests/{id}/correction",
+              "/bank/requests/{id}/correction",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/correction",
+              "bank-request-write.schema.json#/$defs/written"),
+          new RelayOperation(
+              "POST",
+              "/bank/requests/{id}/cancel",
+              "/bank/requests/{id}/cancel",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/cancel",
+              "bank-request-write.schema.json#/$defs/cancelled"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -288,7 +358,10 @@ public final class ExchangeSeam {
           "exchange.refinery.write",
           "exchange.refinery.store",
           "exchange.drafts.blueprints",
-          "exchange.drafts.refinery");
+          "exchange.drafts.refinery",
+          "exchange.bank.read",
+          "exchange.bank.request",
+          "exchange.bank.queue");
 
   /**
    * The capability scopes that gate no route of their own and add to the answer of another route's
@@ -303,6 +376,7 @@ public final class ExchangeSeam {
   public static final @Unmodifiable Map<String, Integer> GATE_STATUSES =
       Map.of(
           "EXCHANGE_DISABLED", 503,
+          "BANK_EXCHANGE_DISABLED", 503,
           "REGISTRY_UNAVAILABLE", 503,
           "CLIENT_NOT_ALLOWED", 403,
           "CLIENT_SUSPENDED", 403,
@@ -318,10 +392,17 @@ public final class ExchangeSeam {
           "NO_ROLE",
           "ACTING_MEMBER_REFUSED",
           "NOT_PERMITTED",
+          "NOT_FOUND",
+          "NOT_BANK_STAFF",
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
           "CURSOR_EXPIRED",
-          "MASS_CHANGE_CONFIRMATION_REQUIRED");
+          "MASS_CHANGE_CONFIRMATION_REQUIRED",
+          "BANK_JUSTIFICATION_REQUIRED",
+          "BANK_SELF_TRANSFER",
+          "BANK_REQUEST_NOT_PENDING",
+          "BANK_REQUEST_ALREADY_APPROVED",
+          "BANK_OPEN_REQUEST_CAP");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =
@@ -329,7 +410,8 @@ public final class ExchangeSeam {
           "ACCESS_DENIED", "NOT_PERMITTED",
           "VALIDATION_FAILED", "SCHEMA_INVALID",
           "BAD_REQUEST", "SCHEMA_INVALID",
-          "OPTIMISTIC_LOCK", "VERSION_CONFLICT");
+          "OPTIMISTIC_LOCK", "VERSION_CONFLICT",
+          "CONSTRAINT_VIOLATION", "SCHEMA_INVALID");
 
   /** The Redis key the backend writes the registry mirror under by default. */
   public static final String REGISTRY_KEY = "exchange:registry";
@@ -342,7 +424,7 @@ public final class ExchangeSeam {
 
   /** The registry mirror document's top-level members. */
   public static final @Unmodifiable List<String> REGISTRY_DOCUMENT_FIELDS =
-      List.of("schemaVersion", "revision", "writtenAt", "enabled", "clients");
+      List.of("schemaVersion", "revision", "writtenAt", "enabled", "bankEnabled", "clients");
 
   /** The members of one client in the registry mirror document. */
   public static final @Unmodifiable List<String> REGISTRY_CLIENT_FIELDS =
@@ -356,12 +438,13 @@ public final class ExchangeSeam {
 
   /**
    * The registry mirror document the backend writes for {@link #REGISTRY_SAMPLE_REVISION}, {@link
-   * #REGISTRY_SAMPLE_WRITTEN_AT}, the switch on and the two clients it lists, and the gateway reads
-   * in full.
+   * #REGISTRY_SAMPLE_WRITTEN_AT}, both switches on and the two clients it lists, and the gateway
+   * reads in full.
    */
   public static final String REGISTRY_SAMPLE =
       """
       {"schemaVersion":1,"revision":42,"writtenAt":"2026-10-01T12:00:00Z","enabled":true,\
+      "bankEnabled":true,\
       "clients":{\
       "sx-tool":{"displayName":"SC Extractor","status":"SUSPENDED",\
       "capabilities":["exchange.connect"],"minClientVersion":null,\

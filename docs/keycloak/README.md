@@ -193,12 +193,14 @@ sandbox/E2E realms carry the same scope and built-in mapper. Existing realms nee
 reviewed provisioner dry run and apply; shipping application images does not assign the scope.
 [Upstream upgrade contract](https://github.com/keycloak/keycloak/blob/26.8.2/docs/documentation/upgrading/topics/changes/changes-26_8_2.adoc#admin-rest-api-now-enforces-an-audience-check).
 
-The service account MUST hold **all three** `realm-management` client roles:
+The service account MUST hold `view-users` and `manage-users` of `realm-management`, and nothing
+else of it: no backend, frontend or ingest call reads the realm, so the provisioner takes
+`view-realm` back wherever the account still holds it (roles are held in the Basetool,
+REQ-SEC-088):
 
 |     Role     |                                                                                                 Why                                                                                                 |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `view-users` | list users (`GET /users`) and read a user's federated identity (Discord back-fill).                                                                                                                 |
-| `view-realm` | list realm roles (`GET /admin/realms/{realm}/roles`) and read their members (`GET /roles/{name}/users`) — the role-indexed resolution added by the 5000-account hardening (ADR-0085 / REQ-SEC-043). |
 | `manage-users` | the admin-side account writes: moving a Discord link during an account merge (`POST`/`DELETE /users/{id}/federated-identity/discord`) and removing the merged-away account (REQ-SEC-026); the exchange disconnect's consent removal, session deletion and the `basetool-exchange` extension below (REQ-XCH-008). |
 
 **The `basetool-exchange` admin extension** comes with the `keycloak-spi` jar
@@ -214,24 +216,8 @@ the backend then logs a warning and leaves the shared sessions to the gateway's 
 > **Corrected 2026-09-22.** This table listed only the two `view-` roles. `KeycloakService` names
 > `manage-users` for the merge writes, and production's service account holds it (configuration
 > snapshot of 2026-09-22); the testing realm's did not. `scripts/provision-keycloak-realm.py` grants
-> all three — or, when its identity lacks `manage-users`, prints them for the Admin Console.
-
-**`view-realm` is easy to miss:** before role-indexing the sync read roles per user and needed only
-`view-users`, so an older deployment's service account may carry `view-users` alone. With only
-`view-users` the nightly sync fails closed every run — a `403` on the `GET /roles` listing, which
-`KeycloakService` skips (never a wipe) but which means roles/departures stop reconciling until the
-next interactive login. The backend logs this as an explicit "missing `view-realm`" ERROR.
-
-Grant it once, via the Admin Console (**Clients → `backend-service` → Service account roles → Assign
-role → filter by `realm-management` → `view-realm`**) or with `kcadm.sh`:
-
-```bash
-# Authenticate kcadm against the running Keycloak first (adjust server/admin creds), then:
-kcadm.sh add-roles -r basetool \
-  --uusername service-account-backend-service \
-  --cclientid realm-management \
-  --rolename view-realm
-```
+> the two roles of the table — or, when its identity lacks `manage-users`, prints them for the
+> Admin Console.
 
 ## Token & session settings (source of truth for session behaviour)
 
@@ -391,8 +377,9 @@ script needs a session.
 
 ## Open findings (hardening, tracked separately)
 
-- **`fullScopeAllowed: true` on `basetool-frontend`** grants the member's full realm role set into
-  the web client's tokens. Deliberately not a hardening step: narrowing it belongs to ADR-0001's
+- **`fullScopeAllowed: true` on `basetool-frontend`** would grant the member's realm roles into the
+  web client's tokens; the client withholds the `roles` scope, and no application role is a realm
+  role any more (ADR-0355). Deliberately not a hardening step: narrowing it belongs to ADR-0001's
   confidential-client migration.
 - **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
   true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The

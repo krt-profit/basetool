@@ -8,7 +8,9 @@ findable from one place, not to restate them.
 Keycloak is the only identity provider; the applications never handle a credential. The backend is
 an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
 `@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
-invariants that keep it that way. Those tests select by role and class literal rather than by
+invariants that keep it that way. The four application roles are assigned in the Basetool and held
+in `user_roles` with a per-user role-set counter; the backend and the frontend read them from there
+alone, and Keycloak keeps authentication and holds none of them (REQ-SEC-088, ADR-0355). Those tests select by role and class literal rather than by
 package or name, assert a selection floor and are each proven able to fail on a planted fixture,
 so moving or renaming a class fails the build instead of quietly leaving a gate (REQ-SEC-073).
 Where a gate can still live in more than one place — a `SecurityConfig` URL rule, a controller
@@ -19,11 +21,14 @@ module per aggregate (`MissionEditor`, `JobOrderEditor`) loads the aggregate, de
 on it through the module's policy, checks the version, and records the audit event, so a caller
 without an HTTP request meets the same gate; the controller keeps a coarse role gate (REQ-SEC-085,
 ADR-0287).
+The bank goes one step further: every bank access rule sits behind `BankAccessPolicy`, which
+decides for an explicit `BankActor` read from the database and never reads the security context;
+the web beans and the exchange only build the actor and ask (ADR-0352).
 
 Beyond roles there are three mechanisms that are easy to miss:
 
 - **Contextual grants** — LOGISTICIAN and MISSION_MANAGER rights, and SK-lead grants, depend on the
-  caller's relationship to the object, not only on a realm role.
+  caller's relationship to the object, not only on an application role.
 - **Per-`sub` isolation** — personal data (inventory, blueprints, hangar) is keyed on the Keycloak
   subject, so it is invisible to everyone else regardless of role.
 - **Field redaction for partial viewers** — some surfaces return a reduced projection rather than

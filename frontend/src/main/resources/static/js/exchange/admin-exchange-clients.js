@@ -143,6 +143,11 @@ function initAdminExchangeClients() {
                 confirmOnTitle: text('confirmOnTitle'),
                 confirmOnBody: text('confirmOnBody'),
                 confirmOnOk: text('confirmOnOk'),
+                bankSwitched: text('bankSwitched'),
+                confirmBankOffTitle: text('confirmBankOffTitle'),
+                confirmBankOffBody: text('confirmBankOffBody'),
+                confirmBankOnTitle: text('confirmBankOnTitle'),
+                confirmBankOnBody: text('confirmBankOnBody'),
                 formCreate: text('formCreate'),
                 formEdit: text('formEdit'),
             };
@@ -337,27 +342,41 @@ function initAdminExchangeClients() {
             }
         }
 
-        /** @param {Element} submitter */
-        function toggleSwitch(submitter) {
-            const box = document.getElementById('xc-switch');
+        /**
+         * @typedef {object} SwitchSpec
+         * @property {string} boxId the card carrying `data-enabled` and `data-version`
+         * @property {string} url the relay endpoint the new state is PUT to
+         * @property {string} switched the success message
+         * @property {{title: string, body: string}} off the confirmation for switching off
+         * @property {{title: string, body: string}} on the confirmation for switching on
+         */
+
+        /**
+         * Flips one switch after a confirmation; each switch echoes its own version.
+         * @param {SwitchSpec} spec
+         * @param {Element} submitter
+         */
+        function toggle(spec, submitter) {
+            const box = document.getElementById(spec.boxId);
             if (!box) {
                 return;
             }
             const enabled = box.getAttribute('data-enabled') === 'true';
             const boxVersion = box.getAttribute('data-version');
+            const confirmation = enabled ? spec.off : spec.on;
             confirmThen(
-                enabled ? i18n.confirmOffTitle : i18n.confirmOnTitle,
-                enabled ? i18n.confirmOffBody : i18n.confirmOnBody,
+                confirmation.title,
+                confirmation.body,
                 enabled ? i18n.confirmOffOk : i18n.confirmOnOk,
                 () => {
                     clients.write({
                         method: 'PUT',
-                        url: `${BASE}/settings`,
+                        url: spec.url,
                         payload: {
                             enabled: !enabled,
                             version: boxVersion == null ? null : Number(boxVersion),
                         },
-                        successMessage: i18n.switched,
+                        successMessage: spec.switched,
                         errorMessage: i18n.error,
                         submitter,
                         refresh: ['registry'],
@@ -365,6 +384,24 @@ function initAdminExchangeClients() {
                 },
             );
         }
+
+        /** @type {SwitchSpec} */
+        const globalSwitch = {
+            boxId: 'xc-switch',
+            url: `${BASE}/settings`,
+            switched: i18n.switched,
+            off: { title: i18n.confirmOffTitle, body: i18n.confirmOffBody },
+            on: { title: i18n.confirmOnTitle, body: i18n.confirmOnBody },
+        };
+
+        /** @type {SwitchSpec} */
+        const bankSwitch = {
+            boxId: 'xc-bank-switch',
+            url: `${BASE}/settings/bank`,
+            switched: i18n.bankSwitched,
+            off: { title: i18n.confirmBankOffTitle, body: i18n.confirmBankOffBody },
+            on: { title: i18n.confirmBankOnTitle, body: i18n.confirmBankOnBody },
+        };
 
         el.form.addEventListener('submit', onSubmit);
         const cancel = document.getElementById('xc-cancel');
@@ -379,7 +416,12 @@ function initAdminExchangeClients() {
             }
             const switchBtn = target.closest('[data-xc-switch]');
             if (switchBtn) {
-                toggleSwitch(switchBtn);
+                toggle(globalSwitch, switchBtn);
+                return;
+            }
+            const bankSwitchBtn = target.closest('[data-xc-bank-switch]');
+            if (bankSwitchBtn) {
+                toggle(bankSwitch, bankSwitchBtn);
                 return;
             }
             if (target.closest('[data-xc-new]')) {

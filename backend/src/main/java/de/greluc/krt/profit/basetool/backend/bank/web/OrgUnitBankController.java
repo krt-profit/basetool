@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
@@ -613,6 +614,25 @@ public class OrgUnitBankController {
       value = {@ApiResponse(responseCode = "200", description = "Requests on own accounts")})
   public List<BankBookingRequestDto> listForeignRequests() {
     return orgUnitBankRequestService.listRequestsForResponsibleAccounts();
+  }
+
+  /**
+   * Reads one booking request for its own page (REQ-BANK-068): for its requester, the bank staff
+   * who see its account and its approvers.
+   *
+   * @param id the request
+   * @return the request with the caller's roles on it
+   */
+  @GetMapping("/requests/{id}")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(summary = "Read one booking request the caller raised, sees as staff or approves")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "The request"),
+        @ApiResponse(responseCode = "404", description = "Unknown or not visible to the caller")
+      })
+  public BankBookingRequestViewDto getRequest(@PathVariable @NotNull UUID id) {
+    return orgUnitBankRequestService.viewRequest(id);
   }
 
   /**

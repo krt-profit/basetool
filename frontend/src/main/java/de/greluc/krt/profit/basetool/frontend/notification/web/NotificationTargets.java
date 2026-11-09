@@ -96,6 +96,8 @@ final class NotificationTargets {
           Map.entry("BANK_BOOKING_REQUEST_CREATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_UPDATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", bankRequest(TAB_OWN_REQUESTS)),
+          Map.entry(
+              "BANK_BOOKING_REQUEST_APPROVAL_NEEDED", orgUnitBankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_CONFIRMED", orgUnitBankRequest(TAB_OWN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_REJECTED", orgUnitBankRequest(TAB_OWN_REQUESTS)),
           Map.entry(
@@ -143,6 +145,8 @@ final class NotificationTargets {
           Map.entry("EXCHANGE_CLIENT_UPDATE_REQUIRED", focus(EXCHANGE_CLIENT, CONNECTED_APPS)),
           Map.entry("EXCHANGE_CLIENT_CAPABILITY_REMOVED", focus(EXCHANGE_CLIENT, CONNECTED_APPS)),
           Map.entry("EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
+          Map.entry("BANK_EXCHANGE_SWITCHED_ON", page(CONNECTED_APPS)),
+          Map.entry("BANK_EXCHANGE_SWITCHED_OFF", page(CONNECTED_APPS)),
           Map.entry("INVENTORY_TRANSFERRED_TO_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_TRANSFERRED_FROM_USER", page(MY_LAGER)),
           Map.entry("INVENTORY_BOOKED_OUT_BY_OTHER", page(MY_LAGER)),
@@ -188,7 +192,8 @@ final class NotificationTargets {
           Map.entry(
               "PURCHASING_DELEGATE_APPOINTED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)),
           Map.entry(
-              "PURCHASING_DELEGATE_REVOKED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)));
+              "PURCHASING_DELEGATE_REVOKED", focus(PURCHASING_DELEGATE, PURCHASING_DELEGATES)),
+          Map.entry("USER_ROLE_CHANGED", page("/profile")));
 
   private NotificationTargets() {}
 

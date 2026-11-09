@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{bank.request.page.heading} + ' - ' + ${appTitle}">Antrag - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/bank/bank.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main th:attr="data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.request.page.heading})}"></th:block>
+
+    <div id="bank-request-detail-results">
+        <th:block th:fragment="requestDetail">
+        <section class="card" data-testid="bank-request-page" th:if="${view != null}"
+                 th:with="r=${view.request()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}}">
+            <div class="cluster">
+                <span class="chip"
+                      th:classappend="${r.type() == 'DEPOSIT'} ? ' chip--success' : (${r.type() == 'WITHDRAWAL'} ? ' chip--danger' : ' chip--info')"
+                      th:text="#{'bank.request.type.' + ${r.type()}}">Auszahlung</span>
+                <span class="chip" data-testid="bank-request-page-status"
+                      th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : '')"
+                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}" class="chip chip--success"
+                      th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
+                <span th:if="${pending and approvalOpen}" class="chip chip--warning" data-testid="bank-request-page-waiting"
+                      th:text="#{bank.request.waitingFor(${approverLabel})}">wartet auf Bankleitung</span>
+            </div>
+
+            <div class="bank-booking-detail-body">
+                <div class="bank-detail-item">
+                    <span class="bank-detail-label" th:text="#{bank.request.col.account}">Konto</span>
+                    <span class="bank-detail-value" data-testid="bank-request-page-account"
+                          th:text="${r.accountNo()} + ' &middot; ' + ${r.accountName()} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">KB-0001 &middot; Staffel ALPHA (ALP)</span>
+                </div>
+                <div class="bank-detail-item" th:if="${r.targetAccountNo() != null}">
+                    <span class="bank-detail-label" th:text="#{bank.request.page.target}">Zielkonto</span>
+                    <span class="bank-detail-value" th:text="${r.targetAccountNo()}">KB-0002</span>
+                </div>
+                <div class="bank-detail-item">
+                    <span class="bank-detail-label" th:text="#{bank.request.col.amount}">Betrag</span>
+                    <span class="bank-detail-value data-value" data-testid="bank-request-page-amount"
+                          th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
+                </div>
+                <div class="bank-detail-item">
+                    <span class="bank-detail-label" th:text="#{bank.request.col.requester}">Antragsteller</span>
+                    <span class="bank-detail-value"><span th:text="${@handles.display(r.requesterHandle())}">greluc</span>
+                        <th:block th:replace="~{bank/fragments/bank-request-origin :: clientBadge(${r.clientName()})}"></th:block></span>
+                </div>
+                <div class="bank-detail-item">
+                    <span class="bank-detail-label" th:text="#{bank.request.page.created}">Gestellt</span>
+                    <span class="bank-detail-value utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
+                </div>
+                <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
+                    <span class="bank-detail-label" th:text="#{bank.field.justification}">Begr&uuml;ndung</span>
+                    <span class="bank-detail-value" th:text="${r.justification()}">Missionsfreigabe</span>
+                </div>
+                <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.note())}">
+                    <span class="bank-detail-label" th:text="#{bank.booking.note}">Notiz</span>
+                    <span class="bank-detail-value" th:text="${r.note()}">Missionsertrag</span>
+                </div>
+                <div class="bank-detail-item" th:if="${!pending and r.decidedAt() != null}">
+                    <span class="bank-detail-label" th:text="#{bank.request.page.decided}">Entschieden</span>
+                    <span class="bank-detail-value">
+                        <span class="utc-time" th:text="${r.decidedAt()}">2026-06-18T09:00:00Z</span>
+                        <th:block th:if="${r.deciderHandle() != null}" th:text="' &middot; ' + ${@handles.display(r.deciderHandle())}"> &middot; bankerin</th:block>
+                    </span>
+                </div>
+                <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.rejectReason())}">
+                    <span class="bank-detail-label" th:text="#{bank.request.field.reason}">Grund</span>
+                    <span class="bank-detail-value" th:text="${r.rejectReason()}">Falscher Betrag</span>
+                </div>
+            </div>
+
+            <div class="cluster" th:if="${pending}">
+                <a class="btn" data-testid="bank-request-page-open-queue" th:if="${view.staff()}"
+                   th:classappend="${r.mayConfirm() and !approvalOpen} ? ' btn--cta' : ' btn-outline'"
+                   th:href="@{/bank/requests(focus=${r.id()})}"
+                   th:text="#{bank.request.page.openQueue}">Im Antragseingang bearbeiten</a>
+                <a class="btn" data-testid="bank-request-page-open-approval" th:if="${view.approver() and approvalOpen}"
+                   th:classappend="${view.staff() and r.mayConfirm()} ? ' btn-outline' : ' btn--cta'"
+                   th:href="@{/org-unit-bank(focus=${r.id()})} + '#tab=fremde'"
+                   th:text="#{bank.request.page.openApproval}">Zur Freigabe &ouml;ffnen</a>
+                <a class="btn btn-outline" data-testid="bank-request-page-open-own" th:if="${view.own()}"
+                   th:href="@{/org-unit-bank(focus=${r.id()})} + '#tab=antraege'"
+                   th:text="#{bank.request.page.openOwn}">In meinen Antr&auml;gen &ouml;ffnen</a>
+            </div>
+        </section>
+        <th:block th:if="${view == null}">
+            <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.request.page.missing.title', textKey='bank.request.page.missing', emptyId='bank-request-page-missing')}"></th:block>
+        </th:block>
+        </th:block>
+    </div>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script type="module" th:src="@{/js/bank/bank.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

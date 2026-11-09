@@ -18,13 +18,16 @@ ALTER TABLE exchange_client_capability ADD CONSTRAINT ck_exchange_client_capabil
     'exchange.refinery.write',
     'exchange.refinery.store',
     'exchange.drafts.blueprints',
-    'exchange.drafts.refinery'));
+    'exchange.drafts.refinery',
+    'exchange.bank.read',
+    'exchange.bank.request',
+    'exchange.bank.queue'));
 
 ALTER TABLE exchange_change DROP CONSTRAINT ck_exchange_change_resource;
 
 ALTER TABLE exchange_change
     ADD CONSTRAINT ck_exchange_change_resource
-        CHECK (resource IN ('BLUEPRINT', 'STOCK', 'SHIP', 'ORG_STOCK', 'REFINERY_ORDER'));
+        CHECK (resource IN ('BLUEPRINT', 'STOCK', 'SHIP', 'ORG_STOCK', 'BANK_REQUEST', 'REFINERY_ORDER'));
 
 CREATE OR REPLACE FUNCTION exchange_record_refinery_order(p_user UUID, p_order UUID)
 RETURNS VOID AS $$

@@ -42,6 +42,47 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   [refinery draft](resources/drafts.md#refinery-draft--post-exchangev1medraftsrefinery-orders)
   stays for an order the member reviews in the browser; to write orders directly, send a change set
   to `POST /exchange/v1/me/refinery-orders/changes`. The draft itself is unchanged.
+- **Approved: the bank scopes for VerseKit.** `exchange.bank.read`, `exchange.bank.request` and
+  `exchange.bank.queue` join VerseKit's row in the [approved-clients list][approved], under the
+  bank-scope [criterion](onboarding.md#criteria). An administrator grants them in the registry
+  with the first VerseKit release that uses them; the bank switch stays off until then.
+- **New: raising, correcting and cancelling bank requests.** `POST /exchange/v1/bank/requests`,
+  `POST …/requests/{id}/correction` and `POST …/requests/{id}/cancel` under the scope
+  `exchange.bank.request`, each a write with a mandatory `Idempotency-Key`
+  ([bank](resources/bank.md#raising-correcting-and-cancelling-a-request)). A raise answers
+  `201 { id, status, version, amount }`. New schema `bank-request-write` and error codes
+  `409 BANK_OPEN_REQUEST_CAP`, `BANK_JUSTIFICATION_REQUIRED`, `BANK_SELF_TRANSFER`,
+  `BANK_REQUEST_NOT_PENDING` and `BANK_REQUEST_ALREADY_APPROVED` ([errors](errors.md)). The own
+  requests and the staff queue now fill `client`.
+- **New: the bank-staff queue.** `GET /exchange/v1/bank/queue` under the scope
+  `exchange.bank.queue`: the pending requests of the member's staff queue (`open`, with
+  `mayConfirm`) and those waiting for the member's approval (`toApprove`), oldest first, with a
+  link into the Basetool for each ([bank](resources/bank.md#staff-queue)). New schema
+  `bank-queue` and error code `403 NOT_BANK_STAFF` ([errors](errors.md)). The answer is foreign
+  bank data: memory only, for at most 7 days.
+- **New: the member's own bank requests.** `GET /exchange/v1/bank/requests` under
+  `exchange.bank.read`: every booking request the member raised, in the Basetool or through any
+  client, as a snapshot and a change feed with tombstones ([bank](resources/bank.md)). New schema
+  `bank-request` and the page definition `bankRequestPage`. The answers are the member's own
+  data: a client may persist them.
+- **New: the bank reads.** `GET /exchange/v1/bank/accounts`, `…/accounts/{id}/bookings` and
+  `…/accounts/{id}/balance-series` under the new scope `exchange.bank.read`: the accounts the
+  member views with balance, target, 30-day trend, whether they may raise a request and their
+  own limit, the redacted bookings newest first, and a daily balance series of at most 365
+  days ([bank](resources/bank.md)). New schemas `bank-account`, `bank-booking` and
+  `bank-balance-series`, and the page definitions `bankAccountPage` and `bankBookingPage`.
+  The answers are foreign bank data: memory only, for at most 7 days.
+- **New: scopes `exchange.bank.request` and `exchange.bank.queue`.** They exist in the
+  registry and on the consent screen; their routes follow.
+- **Changed: `NOT_FOUND` comes from the backend too.** A bank account that does not exist, is
+  closed or is hidden from the member answers `404 NOT_FOUND` ([errors](errors.md)).
+
+## 2026-11-08
+
+- **New: error code `BANK_EXCHANGE_DISABLED`.** The bank area of the exchange, every path below
+  `/exchange/v1/bank`, can be switched off on its own while the exchange stays on. It then answers
+  `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`; pause the bank area only and keep syncing
+  every other area ([errors](errors.md)). No bank route is published yet, and the switch starts off.
 
 ## 2026-11-07
 
@@ -448,3 +489,5 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   fixtures.
 - **`installationId`** in the installation response and the service document — the value a
   tombstone's `removedBy.installationId` carries.
+
+[approved]: https://github.com/krt-profit/basetool/blob/main/docs/legal/approved-clients.md

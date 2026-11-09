@@ -27,9 +27,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
@@ -41,8 +43,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,6 +65,8 @@ class LogisticianRoleTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private RoleRepository roleRepository;
 
   @Autowired private SquadronRepository squadronRepository;
 
@@ -172,6 +174,7 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("sk_lead_user");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
     UUID skId = saveSkLeadMembership(userId, user);
@@ -181,7 +184,6 @@ class LogisticianRoleTest {
             .header("alg", "none")
             .claim("sub", userId.toString())
             .claim("preferred_username", "sk_lead_user")
-            .claim("realm_access", Map.of("roles", List.of("KRT Member")))
             .build();
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);

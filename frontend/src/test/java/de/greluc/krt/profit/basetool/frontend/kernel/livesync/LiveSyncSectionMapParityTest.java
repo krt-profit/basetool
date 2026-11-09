@@ -454,7 +454,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 2);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -462,7 +462,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 4);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -482,6 +482,16 @@ class LiveSyncSectionMapParityTest {
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.ORGUNIT_BANK" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
+  }
+
+  /** The single-request page listens to the request section of the ORGUNIT_BANK room only. */
+  @Test
+  void bankRequestDetailSeamMap_listensToTheOrgUnitBankRequestSection() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 2);
+    assertThat(jsKeys)
+        .as("sections keys of the request-detail seam in bank-livesync.js vs ORGUNIT_BANK")
+        .containsExactly("orgUnitBank")
+        .isSubsetOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
   }
 
   /**

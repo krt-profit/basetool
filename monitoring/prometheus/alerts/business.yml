@@ -192,7 +192,7 @@ groups:
           description: "The hourly job-order integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and JobOrderItemBlueprintDrift cannot fire — a blueprint re-point would go undetected. Restore the sweep before trusting a 'no drift' reading."
 
       - alert: ExchangeRegistryChanged
-        expr: sum by (action) (increase(basetool_exchange_registry_changes_total[10m])) > 0
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action!~"bank_switch_on|bank_switch_off"}[10m])) > 0
         labels:
           severity: warning
         annotations:
@@ -357,6 +357,31 @@ groups:
           summary: "Exchange tokens of a client outside the registry"
           description: "The ingest gateway refused more than 10 exchange requests in 15 minutes that carried a valid token of a Keycloak client the registry does not list. Either a client was provisioned in Keycloak but not registered yet, or a client id is being used that should not be. Register the client deliberately or remove it from Keycloak (REQ-XCH-003, REQ-XCH-028)."
 
+      - alert: BankExchangeNotFoundSpike
+        expr: sum(increase(basetool_exchange_bank_refused_total{reason="not_found"}[1h])) > 50
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bank exchange requests keep hitting unknown accounts"
+          description: "The backend answered more than 50 bank exchange requests in the last hour with 404 because the requested bank account was not found for the member. A client or a member is probing bank account ids. Check the gateway logs per client for the members and account ids behind the refusals, and consider suspending the client under Administration - Verbundene Anwendungen (REQ-BXCH-006, REQ-OBS-024)."
+
+      - alert: BankExchangeOpenRequestCapHit
+        expr: sum(increase(basetool_exchange_bank_refused_total{reason="open_request_cap"}[1h])) > 10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bank exchange requests keep hitting the open-request cap"
+          description: "For 30 minutes more than 10 bank requests an hour were refused with 409 BANK_OPEN_REQUEST_CAP, because the member already had 20 pending bank requests. Either the bank staff falls behind with the approvals (BankBookingApprovalOverdue) or a client keeps filing requests without waiting for the decision. Check the pending queue and the bank request writes per client on the Exchange dashboard, and contact the client's author if one client causes it (REQ-OBS-024)."
+
+      - alert: BankExchangeSwitchChanged
+        expr: sum by (action) (increase(basetool_exchange_registry_changes_total{action=~"bank_switch_on|bank_switch_off"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Bank exchange switch changed ({{ $labels.action }})"
+          description: "An admin switched the bank part of the third-party exchange on or off ({{ $labels.action }}). While it is off the gateway refuses every bank exchange request, the rest of the exchange keeps working. Every change is expected to be deliberate: check the „Verbundene Anwendungen“ audit log (event BANK_EXCHANGE_SWITCH_CHANGED) for who did it and whether it was planned (REQ-OBS-024)."
+
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m
@@ -473,7 +498,7 @@ groups:
           severity: warning
         annotations:
           summary: "Several accounts hold no role ({{ $labels.application }})"
-          description: "{{ $labels.application }} refused {{ $value }} distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a realm-side role rename, a hand-edit, or tokens arriving from the wrong realm; check the Keycloak role index line in the sync summary."
+          description: "{{ $labels.application }} refused {{ $value }} distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a mass withdrawal or lost role rows; check the role audit trail and basetool_user_role_changes_total (REQ-SEC-088)."
 
       - alert: RateLimitRejectionSpike
         expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1
@@ -526,11 +551,11 @@ groups:
         annotations:
           summary: "A new account was activated as admin without an approval"
           description: >-
-            A brand-new account arrived already holding the Keycloak ADMIN realm role and was
-            activated without passing the approval queue (REQ-SEC-017 bootstrap carve-out). Expected
-            for the first admin and for a deliberate re-provisioning; otherwise confirm who was
-            granted the ADMIN realm role in Keycloak, and check Administration -> Protokoll (Rollen
-            tab) for the account's arrival.
+            A brand-new account earned Admin at its first login as a bootstrap subject of
+            APP_BOOTSTRAP_ADMIN_SUBS and was activated without passing the approval queue
+            (REQ-SEC-017, REQ-SEC-088). Expected for the first admin and for a deliberate emergency
+            access; otherwise remove the subject from APP_BOOTSTRAP_ADMIN_SUBS and check
+            Administration -> Protokoll (Rollen tab) for the bootstrap grant.
 
       - alert: AccountErasureKeycloakDeleteFailed
         expr: sum(increase(basetool_account_deletion_keycloak_failures_total[24h])) > 0

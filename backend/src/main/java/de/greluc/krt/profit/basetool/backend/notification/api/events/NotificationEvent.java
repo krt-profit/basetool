@@ -76,6 +76,29 @@ public interface NotificationEvent {
   }
 
   /**
+   * The bank booking request this event concerns, for {@code REQUIRED_APPROVER} selector
+   * resolution. {@code null} for events that concern no booking request — the default.
+   *
+   * @return the context booking request id, or {@code null}
+   */
+  @Nullable
+  default UUID contextBankRequestId() {
+    return null;
+  }
+
+  /**
+   * Which notice outranks which for one member on this event: a member resolved for a key type gets
+   * none of its value types, so they hold one notice per entity (REQ-NOTIF-033). Default: none.
+   *
+   * @return the outranked types by outranking type; never {@code null}, possibly empty
+   */
+  @NotNull
+  @Unmodifiable
+  default Map<NotificationType, Set<NotificationType>> outrankedNotificationTypes() {
+    return Map.of();
+  }
+
+  /**
    * The single user this event is directed at, for {@code EVENT_RECIPIENT} selector resolution —
    * for example the officer/lead who raised a booking request, notified when it is decided.
    * Distinct from {@link #actorSub()} (who caused the event). {@code null} for events with no

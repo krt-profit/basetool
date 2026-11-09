@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.math.BigDecimal;
@@ -60,7 +62,8 @@ class PurposeBoundRoutingTest {
   void setUp() {
     accountRepository = mock(BankAccountRepository.class);
     requestService = mock(BankBookingRequestService.class);
-    service = new OrgUnitBankRequestService(null, null, accountRepository, null, requestService);
+    service =
+        new OrgUnitBankRequestService(null, null, accountRepository, null, requestService, null);
   }
 
   private BankAccount account(BankAccountType type, BankAccountStatus status) {
@@ -100,7 +103,8 @@ class PurposeBoundRoutingTest {
             eq(null),
             eq(recipient),
             eq(null),
-            eq(purpose));
+            eq(purpose),
+            isNull());
   }
 
   @Test
@@ -162,7 +166,7 @@ class PurposeBoundRoutingTest {
     verify(requestService, never())
         .create(
             any(), any(), any(), any(), any(), any(), eq(false), any(), any(), eq(false), any(),
-            any(), any(), any());
+            any(), any(), any(), any());
   }
 
   @Test

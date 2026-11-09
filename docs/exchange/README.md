@@ -76,6 +76,8 @@ the registry grants it to the client.
 - [Store choices](resources/store-choices.md) — the receivers and job orders a pickup's store
   lines name.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
+- [Bank](resources/bank.md) — the Kartellbank accounts the member views, their bookings and
+  balance series.
 
 ## Support
 

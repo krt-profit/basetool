@@ -19,11 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Central constants for the bare role codes, identical to {@code Role.code} and to the Keycloak
- * realm role names without the {@code ROLE_} prefix; changing a value is a breaking change.
+ * Central constants for the bare role codes, identical to {@code Role.code} and to the Spring
+ * authority names without the {@code ROLE_} prefix; changing a value is a breaking change.
  *
  * <p>{@link #authority(String)} derives the prefixed Spring-authority form. {@code LOGISTICIAN} and
  * {@code MISSION_MANAGER} are not seeded roles but derived from user flags. Lives in the
@@ -62,6 +63,13 @@ public final class Roles {
 
   public static final String LOGISTICIAN = "LOGISTICIAN";
   public static final String MISSION_MANAGER = "MISSION_MANAGER";
+
+  /**
+   * The role codes that mark an organisation member or above once the hierarchy is applied; the
+   * elevated roles are listed because the hierarchy never implies {@link #KRT_MEMBER}.
+   */
+  public static final Set<String> MEMBER_OR_ABOVE =
+      Set.of(ADMIN, MISSION_MANAGER, LOGISTICIAN, KRT_MEMBER);
 
   /**
    * The only role an acting member holds on the exchange layer, in place of their stored roles

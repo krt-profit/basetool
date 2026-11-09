@@ -22,20 +22,14 @@ package de.greluc.krt.profit.basetool.backend.identity.api;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
@@ -47,7 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reconciles the local {@code app_user} mirror with Keycloak.
+ * Reconciles the local {@code app_user} mirror with Keycloak: names, e-mail, Discord link, enabled
+ * state and existence. Roles are held in {@code user_roles} alone and are never written from a
+ * token or the roster (REQ-SEC-088, ADR-0355).
  *
  * <p>{@link #syncUser(Jwt)} runs on every authentication via {@code
  * CustomJwtGrantedAuthoritiesConverter}; {@link #syncUser(KeycloakUserDto)} and {@link
@@ -60,55 +56,34 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UserReconciliationService {
 
-  /**
-   * Number of role-less accounts at the end of one sync run above which the run summary escalates
-   * from INFO to WARN; many at once indicate a realm-side role rename, which locks the affected
-   * members out with {@code 403 NO_ROLE} (REQ-SEC-053).
-   */
-  private static final int ROLE_LESS_WARN_THRESHOLD = 3;
-
-  /** Accounts whose persisted role set actually changed in the current Admin-API sync run. */
-  private final AtomicInteger roleChangedAccounts = new AtomicInteger();
-
-  /**
-   * Accounts whose role change in the current run left them with NO local role — i.e. none of their
-   * Keycloak role names resolved.
-   */
-  private final AtomicInteger roleLessAccounts = new AtomicInteger();
-
-  /**
-   * Keycloak role names seen in the current run that matched no local role and were dropped
-   * (counted across accounts, so a renamed role contributes one per holder).
-   */
-  private final AtomicInteger droppedRoleNames = new AtomicInteger();
+  /** Width of the {@code discord_guild_nickname} column. */
+  private static final int GUILD_NICKNAME_MAX_LENGTH = 255;
 
   private final UserRepository userRepository;
-  private final RoleRepository roleRepository;
   private final MemberCreatedObserver memberCreatedObserver;
   private final ApplicationEventPublisher eventPublisher;
   private final UserRegistrationService userRegistrationService;
   private final UserService userService;
-  private final PartialRoleScopeProperties partialRoleScopeProperties;
-  private final List<RolesChangedObserver> rolesChangedObservers;
+  private final LoginRoleGrant loginRoleGrant;
 
-  /** Counts callsign collisions between a new subject and an existing account. */
+  /** Counts callsign collisions and auto-activated admin registrations. */
   private final MeterRegistry meterRegistry;
 
   /**
    * Reconciles the local user record with the supplied JWT on every authentication: creates the row
-   * on first login and updates username, e-mail, display name and roles when they changed.
+   * on first login and updates username, e-mail, Discord link and guild nickname when they changed.
+   * The token's {@code realm_access} claim is ignored.
    *
    * <p>The lookup is by id only; a row holding the same username under another id is logged and
-   * counted as a collision (ADR-0142). A token of a partial-scope client (REQ-SEC-036) leaves the
-   * stored roles untouched, and {@link ReconciledUser#effectiveRoles()} then carries the token's
-   * roles.
+   * counted as a collision (ADR-0142). A bootstrap subject may earn Admin through {@link
+   * LoginRoleGrant}; an Admin among the stored roles activates a pending registration.
    *
    * @param jwt validated JWT from the resource server
-   * @return the managed (created or updated) user together with the roles authorising this request
+   * @return the managed (created or updated) user, whose stored roles authorise the request
    */
   @Transactional
   @NotNull
-  public ReconciledUser syncUser(@NotNull Jwt jwt) {
+  public User syncUser(@NotNull Jwt jwt) {
     final UUID finalUserId = userService.getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
@@ -156,35 +131,14 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    Set<String> keycloakRoles = extractRolesFromJwt(jwt);
-    Set<Role> localRoles = mapRoles(keycloakRoles);
-    final boolean roleClaimIsPartial =
-        partialRoleScopeProperties.isPartialRoleScopeClient(jwt.getClaimAsString("azp"));
-
-    final boolean mayPersistRoles = !roleClaimIsPartial || created;
-
-    if (mayPersistRoles) {
-      if (!user.getRoles().equals(localRoles)) {
-        if (!created && !user.getRoles().isEmpty() && localRoles.isEmpty()) {
-          eventPublisher.publishEvent(
-              new MemberDepartedEvent(user.getId(), MemberDepartedEvent.REASON_ROLE_LOST));
-        }
-        user.setRoles(localRoles);
-        notifyRolesChanged(user, localRoles);
-        changed = true;
-      }
-    } else if (!user.getRoles().equals(localRoles)) {
-      log.debug(
-          "Role claim from partial-scope client not persisted for user {} (stored {} roles, token"
-              + " carried {})",
-          user.getId(),
-          user.getRoles().size(),
-          localRoles.size());
-    }
-
     if (discordUserId != null
         && !discordUserId.isBlank()
         && applyDiscordLink(user, discordUserId)) {
+      changed = true;
+    }
+
+    final boolean bootstrapAdmin = loginRoleGrant.grantIfDue(user);
+    if (bootstrapAdmin) {
       changed = true;
     }
 
@@ -194,9 +148,9 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
+    boolean isAdmin = holdsAdmin(user.getRoles());
     boolean newPendingRegistration =
-        userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
+        userRegistrationService.stampNewPendingRegistration(user, created);
     if (newPendingRegistration) {
       changed = true;
     } else if (!created && isAdmin && user.getApprovalStatus() != ApprovalStatus.ACTIVE) {
@@ -210,6 +164,9 @@ public class UserReconciliationService {
 
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
+      if (bootstrapAdmin) {
+        loginRoleGrant.recordGrant(saved);
+      }
       if (created) {
         memberCreatedObserver.afterMemberCreated(user.getId());
       }
@@ -217,16 +174,17 @@ public class UserReconciliationService {
         eventPublisher.publishEvent(
             new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
       }
-      return new ReconciledUser(saved, localRoles);
+      return saved;
     }
 
-    return new ReconciledUser(user, localRoles);
+    return user;
   }
 
   /**
-   * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path).
-   * Mirrors {@link #syncUser(Jwt)} but reads the data from a {@code KeycloakUserDto} instead of a
-   * decoded JWT. Used by {@code UserSyncTask}.
+   * Reconciles the local user record from a Keycloak Admin API response (scheduled sync path):
+   * existence, enabled state, username, e-mail and the Discord link. Used by {@code UserSyncTask}.
+   *
+   * <p>An active member disabled in Keycloak departs ({@link MemberDepartedEvent#REASON_DISABLED}).
    *
    * @param dto Keycloak admin DTO
    */
@@ -271,24 +229,6 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    RoleMapping mapping = mapRolesTracked(dto.roles());
-    droppedRoleNames.addAndGet(mapping.droppedNames());
-    Set<Role> localRoles = mapping.roles();
-    if (mapping.roleLess()) {
-      roleLessAccounts.incrementAndGet();
-    }
-    if (!user.getRoles().equals(localRoles)) {
-      user.setRoles(localRoles);
-      notifyRolesChanged(user, localRoles);
-      changed = true;
-      roleChangedAccounts.incrementAndGet();
-      log.debug(
-          "Role set changed for user {} (roleLess={}, unmatchedKeycloakRoleNames={})",
-          user.getId(),
-          mapping.roleLess(),
-          mapping.droppedNames());
-    }
-
     String discordUserId = dto.discordUserId();
     if (discordUserId != null
         && !discordUserId.isBlank()
@@ -297,20 +237,14 @@ public class UserReconciliationService {
     }
 
     boolean newPendingRegistration =
-        userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
+        userRegistrationService.stampNewPendingRegistration(user, created);
     if (newPendingRegistration) {
       changed = true;
-    } else if (created
-        && localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
-      meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (wasActive && !enabled) {
       eventPublisher.publishEvent(
           new MemberDepartedEvent(user.getId(), MemberDepartedEvent.REASON_DISABLED));
-    } else if (wasActive && localRoles.isEmpty()) {
-      eventPublisher.publishEvent(
-          new MemberDepartedEvent(user.getId(), MemberDepartedEvent.REASON_ROLE_LOST));
     }
 
     if (changed || user.isNew()) {
@@ -371,33 +305,12 @@ public class UserReconciliationService {
     if (currentIds.isEmpty()) {
       return 0;
     }
-    java.util.List<UUID> departing = userRepository.findIdsMissingFrom(currentIds);
+    List<UUID> departing = userRepository.findIdsMissingFrom(currentIds);
     int flagged = userRepository.markMissingUsers(currentIds, Instant.now());
     departing.forEach(id ->
         eventPublisher.publishEvent(
             new MemberDepartedEvent(id, MemberDepartedEvent.REASON_REMOVED)));
     return flagged;
-  }
-
-  /**
-   * Tells the observers that a member's roles were replaced.
-   *
-   * @param user the member
-   * @param roles the roles the member holds now
-   */
-  private void notifyRolesChanged(@NotNull User user, @NotNull Set<Role> roles) {
-    rolesChangedObservers.forEach(observer -> observer.onRolesChanged(user.getId(), roles));
-  }
-
-  /**
-   * Returns the display names of every local role, which the scheduled Keycloak sync matches
-   * case-insensitively against the realm's roles to fetch memberships.
-   *
-   * @return the mappable realm role names; never {@code null}, possibly empty
-   */
-  @NotNull
-  public Set<String> getMappableRoleNames() {
-    return roleRepository.findAllNames();
   }
 
   /**
@@ -411,134 +324,15 @@ public class UserReconciliationService {
     return userRepository.findIdsWithDiscordLink();
   }
 
-  /**
-   * Logs the per-run role-mapping summary and resets the tallies for the next run.
-   *
-   * <p>Counts only, never handles (REQ-OBS-004). INFO for an ordinary run, WARN once more than
-   * {@link #ROLE_LESS_WARN_THRESHOLD} accounts ended role-less. Only the Admin-API path feeds the
-   * tallies, so logins do not inflate them.
-   */
-  public void logRoleSyncSummary() {
-    int changed = roleChangedAccounts.getAndSet(0);
-    int roleLess = roleLessAccounts.getAndSet(0);
-    int dropped = droppedRoleNames.getAndSet(0);
-    if (roleLess > ROLE_LESS_WARN_THRESHOLD) {
-      log.warn(
-          "User sync role mapping: {} accounts changed roles; {} accounts resolve to NO role at all"
-              + " and are refused with NO_ROLE; {} Keycloak role names matched no local role —"
-              + " check for a renamed or deleted realm role.",
-          changed,
-          roleLess,
-          dropped);
-      return;
-    }
-    log.info(
-        "User sync role mapping: {} accounts changed roles; {} accounts resolve to no role; {}"
-            + " Keycloak role names matched no local role.",
-        changed,
-        roleLess,
-        dropped);
-  }
-
-  /**
-   * Maps Keycloak realm-role names to the local {@link Role} catalog, case-insensitively; unmatched
-   * names are dropped and nothing is substituted when none match. Thin wrapper over {@link
-   * #mapRolesTracked(Collection)} for the per-login JWT path, which deliberately does not feed the
-   * sync-run tallies.
-   *
-   * @param roleNames the Keycloak role names to map, possibly {@code null}
-   * @return the matched local roles, possibly empty; never {@code null}
-   */
-  private Set<Role> mapRoles(Collection<String> roleNames) {
-    return mapRolesTracked(roleNames).roles();
-  }
-
-  /**
-   * The role catalogue keyed by lower-cased name, read once per account with the permissions
-   * fetched.
-   *
-   * <p>Deliberately not cached across calls: {@link Role} entities from an earlier transaction
-   * would be detached in the caller's persistence context and fail the flush.
-   *
-   * @return role by lower-cased name, managed by the caller's persistence context; never {@code
-   *     null}
-   */
-  @NotNull
-  private Map<String, Role> roleCatalogue() {
-    return roleRepository.findAllWithPermissions().stream()
-        .collect(
-            Collectors.toUnmodifiableMap(
-                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, _) -> a));
-  }
-
-  /**
-   * Maps Keycloak realm-role names onto the local catalog exactly like {@link #mapRoles} but also
-   * reports HOW the mapping went, so the caller can tell a legitimate role change apart from a
-   * total failure to resolve: a name that matches nothing is dropped, and an account for which
-   * nothing matched at all comes back with an empty set rather than a substitute role.
-   *
-   * @param roleNames the Keycloak role names to map, possibly {@code null}
-   * @return the mapped roles plus the role-less flag and the number of dropped names
-   */
-  @NotNull
-  private RoleMapping mapRolesTracked(@Nullable Collection<String> roleNames) {
-    Set<Role> localRoles = new HashSet<>();
-    int dropped = 0;
-    if (roleNames != null) {
-      Map<String, Role> catalogue = roleCatalogue();
-      for (String roleName : roleNames) {
-        Role match = catalogue.get(roleName.toLowerCase(Locale.ROOT));
-        if (match != null) {
-          localRoles.add(match);
-        } else {
-          dropped++;
-        }
-      }
-    }
-
-    return new RoleMapping(localRoles, localRoles.isEmpty(), dropped);
-  }
-
-  /**
-   * Outcome of one role-name mapping: the resolved local roles plus the two facts the raw set
-   * cannot express — whether nothing matched at all and how many supplied names were dropped.
-   *
-   * @param roles the resolved local roles, possibly empty
-   * @param roleLess {@code true} when no supplied name resolved to a local role
-   * @param droppedNames how many supplied Keycloak role names matched no local role
-   */
-  private record RoleMapping(@NotNull Set<Role> roles, boolean roleLess, int droppedNames) {}
-
-  /**
-   * What one authentication reconciled: the managed row, and the roles that authorise this request.
-   *
-   * <p>The two differ for a partial-scope client (REQ-SEC-036): the row keeps its roles and {@link
-   * #effectiveRoles()} carries only what the token presented.
-   *
-   * @param user the created or updated {@code app_user} row; never {@code null}
-   * @param effectiveRoles the token's roles mapped onto the local catalogue; possibly empty, which
-   *     {@code assembleFor} refuses (REQ-SEC-053); never {@code null}
-   */
-  public record ReconciledUser(@NotNull User user, @NotNull Set<Role> effectiveRoles) {
-
-    /**
-     * A reconciliation whose effective roles are simply the stored ones -- the shape every
-     * complete-claim client produces.
-     *
-     * @param user the row whose stored roles are also the effective ones
-     * @return the pair, with {@code effectiveRoles} taken from {@code user}
-     */
-    @NotNull
-    public static ReconciledUser of(@NotNull User user) {
-      return new ReconciledUser(user, user.getRoles());
-    }
+  private static boolean holdsAdmin(@NotNull Set<Role> roles) {
+    return roles.stream().anyMatch(role -> Roles.ADMIN.equalsIgnoreCase(role.getCode()));
   }
 
   /**
    * Normalises a raw Discord guild-nickname claim for storage: trims it, maps blank/empty to {@code
-   * null}, and bounds it to the {@code discord_guild_nickname} column width (255 chars) so a
-   * pathologically long attribute can never fail the login save. The Keycloak SPI already caps the
-   * captured value, so this length bound is only a defensive backstop (REQ-DATA-018).
+   * null}, and bounds it to the {@code discord_guild_nickname} column width so a pathologically
+   * long attribute can never fail the login save. The Keycloak SPI already caps the captured value,
+   * so this length bound is only a defensive backstop (REQ-DATA-018).
    *
    * @param raw the raw {@code discord_guild_nickname} claim value, possibly {@code null}
    * @return the trimmed, length-bounded nickname, or {@code null} when the claim is absent or blank
@@ -553,25 +347,8 @@ public class UserReconciliationService {
     if (trimmed.isEmpty()) {
       return null;
     }
-    return trimmed.length() > 255 ? trimmed.substring(0, 255) : trimmed;
-  }
-
-  /**
-   * Extracts the set of realm-role names from a JWT. Reads the {@code realm_access.roles} claim —
-   * Keycloak's standard location. Resource-access roles are intentionally NOT included because this
-   * project's authorization model is realm-scoped.
-   *
-   * @param jwt validated JWT
-   * @return realm role names, possibly empty
-   */
-  @SuppressWarnings("unchecked")
-  @NotNull
-  public Set<String> extractRolesFromJwt(@NotNull Jwt jwt) {
-    Set<String> roles = new HashSet<>();
-    Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-    if (realmAccess != null && realmAccess.containsKey("roles")) {
-      roles.addAll((List<String>) realmAccess.get("roles"));
-    }
-    return roles;
+    return trimmed.length() > GUILD_NICKNAME_MAX_LENGTH
+        ? trimmed.substring(0, GUILD_NICKNAME_MAX_LENGTH)
+        : trimmed;
   }
 }

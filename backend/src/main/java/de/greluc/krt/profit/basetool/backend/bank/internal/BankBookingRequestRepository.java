@@ -53,6 +53,16 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   long countByStatus(BankBookingRequestStatus status);
 
   /**
+   * Counts one requester's requests in the given status, whichever channel raised them; the
+   * open-request cap of the exchange counts the {@code PENDING} ones (REQ-BXCH-004).
+   *
+   * @param requestedBy the requesting user's id
+   * @param status the lifecycle state to count
+   * @return the number of the requester's requests in that status
+   */
+  long countByRequestedByAndStatus(UUID requestedBy, BankBookingRequestStatus status);
+
+  /**
    * Finds the creation timestamp of the oldest booking request in the given status, for the "oldest
    * pending booking request age" gauge (REQ-OBS-011).
    *
@@ -94,6 +104,42 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       })
   Page<BankBookingRequest> findByRequestedByAndStatusIn(
       UUID requestedBy, Collection<BankBookingRequestStatus> statuses, Pageable pageable);
+
+  /**
+   * Returns the first requests of a requester in id order, the start of the exchange snapshot of
+   * the member's own requests (REQ-BXCH-003).
+   *
+   * @param requestedBy the requesting user's id
+   * @param pageable the page size; its sort is ignored
+   * @return the requests with their accounts and the source account's org unit loaded
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
+  List<BankBookingRequest> findByRequestedByOrderByIdAsc(UUID requestedBy, Pageable pageable);
+
+  /**
+   * Returns the requests of a requester after an id in id order, a later page of the exchange
+   * snapshot of the member's own requests (REQ-BXCH-003).
+   *
+   * @param requestedBy the requesting user's id
+   * @param afterId the last request of the previous page
+   * @param pageable the page size; its sort is ignored
+   * @return the requests with their accounts and the source account's org unit loaded
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
+  List<BankBookingRequest> findByRequestedByAndIdGreaterThanOrderByIdAsc(
+      UUID requestedBy, UUID afterId, Pageable pageable);
+
+  /**
+   * Returns those of the given requests a requester raised, the current state of the keys the
+   * exchange feed of the member's own requests names (REQ-BXCH-003). An empty id collection yields
+   * an empty list.
+   *
+   * @param requestedBy the requesting user's id
+   * @param ids the request ids
+   * @return the requester's requests among them with their accounts loaded
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
+  List<BankBookingRequest> findByRequestedByAndIdIn(UUID requestedBy, Collection<UUID> ids);
 
   /**
    * Returns one page of requests in the given state across all accounts, the management/admin
@@ -195,6 +241,16 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "resultingTransaction"
       })
   List<BankBookingRequest> findByAccountIdInOrderByCreatedAtDesc(Collection<UUID> accountIds);
+
+  /**
+   * Lists every request in one lifecycle state, unordered, for the exchange's staff queue snapshot
+   * (REQ-BXCH-005).
+   *
+   * @param status the lifecycle state (the queue passes {@code PENDING})
+   * @return the requests with their accounts and org unit loaded
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
+  List<BankBookingRequest> findAllByStatus(BankBookingRequestStatus status);
 
   /**
    * Existence probe backing the close-account guard (REQ-BANK-025): an account with an open request

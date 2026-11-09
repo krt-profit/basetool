@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakPresence;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
@@ -80,6 +81,7 @@ class UserRegistrationServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private KeycloakService keycloakService;
   @Mock private AccountErasure accountErasure;
+  @Mock private ApprovalRoleGrant approvalRoleGrant;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
 
   @InjectMocks private UserRegistrationService userRegistrationService;
@@ -142,6 +144,32 @@ class UserRegistrationServiceTest {
     verify(eventPublisher).publishEvent(new DiscordRegistrationDecidedEvent(USER_ID, ADMIN_ID));
   }
 
+  /**
+   * Approving a registration grants KRT Member, recorded as the approving admin's (REQ-SEC-088).
+   */
+  @Test
+  void approveUser_grantsKrtMemberAsTheApprovingAdmin() {
+    User user = pendingUser(3L);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+    userRegistrationService.approveUser(USER_ID, 3L, ADMIN_ID);
+
+    verify(approvalRoleGrant).grantOnApproval(user, ADMIN_ID);
+  }
+
+  /** Rejecting a registration grants no role. */
+  @Test
+  void rejectUser_grantsNoRole() {
+    User user = pendingUser(0L);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+    userRegistrationService.rejectUser(USER_ID, null, 0L, ADMIN_ID);
+
+    verifyNoInteractions(approvalRoleGrant);
+  }
+
   @Test
   void rejectUser_setsRejected_andAuditsReason() {
     User user = pendingUser(0L);
@@ -177,6 +205,7 @@ class UserRegistrationServiceTest {
 
     verify(userApprovalEventRepository, never()).save(any());
     verify(eventPublisher, never()).publishEvent(any());
+    verifyNoInteractions(approvalRoleGrant);
     assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
   }
 
@@ -206,9 +235,7 @@ class UserRegistrationServiceTest {
     void stampsPending_andReturnsTrue_forBrandNewNonAdmin() {
       User user = new User();
 
-      boolean stamped =
-          userRegistrationService.stampNewPendingRegistration(
-              user, true, Set.of(roleWithCode("Guest")));
+      boolean stamped = userRegistrationService.stampNewPendingRegistration(user, true);
 
       assertTrue(stamped);
       assertEquals(ApprovalStatus.PENDING, user.getApprovalStatus());
@@ -217,11 +244,10 @@ class UserRegistrationServiceTest {
     @Test
     void doesNotStamp_forBrandNewAdmin() {
       User user = new User();
+      user.setRoles(new java.util.HashSet<>(Set.of(roleWithCode("ADMIN"))));
       ApprovalStatus before = user.getApprovalStatus();
 
-      boolean stamped =
-          userRegistrationService.stampNewPendingRegistration(
-              user, true, Set.of(roleWithCode("ADMIN")));
+      boolean stamped = userRegistrationService.stampNewPendingRegistration(user, true);
 
       assertFalse(stamped);
       assertEquals(before, user.getApprovalStatus(), "an admin keeps the entity-default status");
@@ -232,9 +258,7 @@ class UserRegistrationServiceTest {
       User user = new User();
       ApprovalStatus before = user.getApprovalStatus();
 
-      boolean stamped =
-          userRegistrationService.stampNewPendingRegistration(
-              user, false, Set.of(roleWithCode("Guest")));
+      boolean stamped = userRegistrationService.stampNewPendingRegistration(user, false);
 
       assertFalse(stamped);
       assertEquals(before, user.getApprovalStatus());
@@ -246,9 +270,7 @@ class UserRegistrationServiceTest {
       User user = new User();
       ApprovalStatus before = user.getApprovalStatus();
 
-      boolean stamped =
-          userRegistrationService.stampNewPendingRegistration(
-              user, true, Set.of(roleWithCode("Guest")));
+      boolean stamped = userRegistrationService.stampNewPendingRegistration(user, true);
 
       assertFalse(stamped);
       assertEquals(before, user.getApprovalStatus());

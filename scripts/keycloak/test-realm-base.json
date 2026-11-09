@@ -28,30 +28,6 @@
   "roles": {
     "realm": [
       {
-        "name": "Admin",
-        "description": "E2E test role"
-      },
-      {
-        "name": "Logistician",
-        "description": "E2E test role"
-      },
-      {
-        "name": "Mission Manager",
-        "description": "E2E test role"
-      },
-      {
-        "name": "KRT Member",
-        "description": "E2E test role"
-      },
-      {
-        "name": "Bank Employee",
-        "description": "E2E test role"
-      },
-      {
-        "name": "Bank Management",
-        "description": "E2E test role"
-      },
-      {
         "name": "offline_access",
         "description": "${role_offline-access}",
         "composite": false,
@@ -71,7 +47,6 @@
         "composite": true,
         "composites": {
           "realm": [
-            "KRT Member",
             "offline_access",
             "uma_authorization"
           ]
@@ -145,6 +120,13 @@
             "lightweight.claim": "false"
           }
         }
+      ],
+      "defaultClientScopes": [
+        "acr",
+        "basic",
+        "email",
+        "profile",
+        "web-origins"
       ]
     },
     {
@@ -173,10 +155,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "Admin",
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-officer",
@@ -190,9 +169,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-member",
@@ -206,9 +183,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-sk",
@@ -222,9 +197,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-none",
@@ -238,9 +211,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-both",
@@ -254,9 +225,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-bereich",
@@ -270,9 +239,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-bank-employee",
@@ -286,10 +253,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "Bank Employee",
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-bank-management",
@@ -303,10 +267,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "Bank Management",
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-bank-member",
@@ -320,10 +281,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "Bank Employee",
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-appoint-bl",
@@ -337,9 +295,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-appoint-tgt",
@@ -353,9 +309,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "KRT Member"
-      ]
+      "realmRoles": []
     },
     {
       "username": "test-norole",
@@ -385,8 +339,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ]
     },
     {
@@ -402,8 +355,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ]
     },
     {
@@ -419,8 +371,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ]
     },
     {
@@ -436,8 +387,7 @@
         }
       ],
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ]
     }
   ],

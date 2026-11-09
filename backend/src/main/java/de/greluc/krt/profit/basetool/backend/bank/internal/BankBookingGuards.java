@@ -22,11 +22,8 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,8 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Pre-persist validation guards a booking must pass before {@link BankPostingWriter} writes any
  * ledger row: account and holder status, the conditional Begr&uuml;ndung, the account-level
- * no-overdraft rule (REQ-BANK-006), the fee-inclusive {@code amount > fee} rule and the KRT-account
- * direct-booking cap (REQ-BANK-047).
+ * no-overdraft rule (REQ-BANK-006) and the fee-inclusive {@code amount > fee} rule.
  *
  * <p>Each guard throws a {@link BankConflictException} (or {@link
  * de.greluc.krt.profit.basetool.backend.kernel.BadRequestException}) with a stable code and never
@@ -48,9 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class BankBookingGuards {
 
-  private final BankAccountRepository accountRepository;
   private final BankPostingRepository postingRepository;
-  private final AuthHelperService authHelperService;
 
   /**
    * Rejects bookings on closed accounts (REQ-BANK-002).
@@ -156,36 +150,5 @@ public class BankBookingGuards {
               + " arrive; raise the amount",
           Map.of("fee", plain(fee)));
     }
-  }
-
-  /**
-   * Reports whether a plain bank employee's direct withdrawal or transfer from the KRT ({@code
-   * CARTEL}) account exceeds the approval ceiling {@link BankAccount#getEmployeeApprovalCeiling()}
-   * (unset counts as {@code 0}) and must become an approval request instead (REQ-BANK-047,
-   * ADR-0109).
-   *
-   * <p>Management and admins are uncapped, and non-CARTEL accounts always return {@code false}.
-   * Used only by the direct-booking controller, not by request confirmation.
-   *
-   * @param accountId the (source) account the direct booking debits
-   * @param amount the entered whole-aUEC amount leaving the account
-   * @return {@code true} when the attempt must become an approval request; {@code false} when it
-   *     may book directly
-   */
-  @Transactional(readOnly = true)
-  public boolean exceedsCartelDirectBookingCeiling(
-      @NotNull UUID accountId, @NotNull BigDecimal amount) {
-    if (authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT))) {
-      return false;
-    }
-    BankAccount account = accountRepository.findById(accountId).orElse(null);
-    if (account == null || account.getType() != BankAccountType.CARTEL) {
-      return false;
-    }
-    BigDecimal ceiling =
-        account.getEmployeeApprovalCeiling() == null
-            ? BigDecimal.ZERO
-            : account.getEmployeeApprovalCeiling();
-    return amount.compareTo(ceiling) > 0;
   }
 }

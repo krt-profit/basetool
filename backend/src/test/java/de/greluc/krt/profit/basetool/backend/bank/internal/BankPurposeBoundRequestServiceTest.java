@@ -37,7 +37,10 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObser
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -48,7 +51,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -65,23 +67,54 @@ class BankPurposeBoundRequestServiceTest {
   @Mock private BankAccountRepository accountRepository;
   @Mock private BankHolderRepository holderRepository;
   @Mock private BankTransactionRepository transactionRepository;
-  @Mock private BankAccountGrantRepository grantRepository;
   @Mock private BankLedgerService bankLedgerService;
-  @Mock private BankSecurityService bankSecurityService;
+  @Mock private BankCaller bankCaller;
+  @Mock private BankAccountViewGrantRepository viewGrantRepository;
+  @Mock private BankAccountApprovalLimitRepository approvalLimitRepository;
+  @Mock private BereichRepository bereichRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BankAuditService bankAuditService;
   @Mock private AuthHelperService authHelperService;
   @Mock private UserRepository userRepository;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  @Mock private BankRequestClientNames clientNames;
   @Mock private BookingRequestPurposeObserver observer;
 
-  @InjectMocks private BankBookingRequestService service;
+  private BankBookingRequestService service;
 
   private final UUID requestId = UUID.randomUUID();
   private final UUID accountId = UUID.randomUUID();
   private final UUID dealId = UUID.randomUUID();
   private final UUID requester = UUID.randomUUID();
+
+  @BeforeEach
+  void wireTheServiceOverTheRealPolicy() {
+    BankAccessRules policy =
+        new BankAccessRules(
+            accountRepository,
+            viewGrantRepository,
+            approvalLimitRepository,
+            bereichRepository,
+            orgUnitRepository);
+    service =
+        new BankBookingRequestService(
+            requestRepository,
+            accountRepository,
+            holderRepository,
+            transactionRepository,
+            bankLedgerService,
+            bankCaller,
+            policy,
+            bankAuditService,
+            authHelperService,
+            userRepository,
+            orgUnitMembershipQueryService,
+            eventPublisher,
+            purposeObservers,
+            clientNames);
+  }
 
   @BeforeEach
   void observerOfThePurposeKind() {
@@ -142,7 +175,8 @@ class BankPurposeBoundRequestServiceTest {
             null,
             null,
             null,
-            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId));
+            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId),
+            null);
 
     assertThat(dto.purposeKind()).isEqualTo(BankPurposeKind.PURCHASING_DEAL);
     assertThat(dto.purposeRef()).isEqualTo(dealId);
@@ -173,6 +207,8 @@ class BankPurposeBoundRequestServiceTest {
             false,
             null,
             null,
+            null,
+            null,
             null);
 
     assertThat(dto.purposeKind()).isNull();
@@ -182,8 +218,12 @@ class BankPurposeBoundRequestServiceTest {
   private UUID confirmSetup(BankBookingRequest request, UUID decider, UUID txId) {
     UUID holderId = UUID.randomUUID();
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canConfirm(eq(BankBookingRequestType.DEPOSIT), eq(accountId), any()))
-        .thenReturn(true);
+    when(bankCaller.actor())
+        .thenReturn(
+            TestBankActor.of(decider)
+                .roles(Roles.BANK_EMPLOYEE)
+                .grant(accountId, true, false, false)
+                .build());
     when(bankLedgerService.bookDeposit(any(BankDepositRequest.class)))
         .thenReturn(
             new BankTransactionDto(txId, BankTransactionType.DEPOSIT, "from sale", Instant.now()));
@@ -205,7 +245,7 @@ class BankPurposeBoundRequestServiceTest {
     UUID txId = UUID.randomUUID();
     UUID holderId = confirmSetup(request, UUID.randomUUID(), txId);
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     verify(observer).onConfirmed(requestId, dealId, txId);
   }
@@ -215,7 +255,7 @@ class BankPurposeBoundRequestServiceTest {
     BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, false);
     UUID holderId = confirmSetup(request, UUID.randomUUID(), UUID.randomUUID());
 
-    service.confirm(requestId, holderId, null, false, null, 0L, null);
+    service.confirm(requestId, holderId, null, false, null, 0L);
 
     verify(purposeObservers, never()).orderedStream();
     verify(observer, never()).onConfirmed(any(), any(), any());
@@ -231,17 +271,23 @@ class BankPurposeBoundRequestServiceTest {
 
     assertThrows(
         IllegalStateException.class,
-        () -> service.confirm(requestId, holderId, null, false, null, 0L, null));
+        () -> service.confirm(requestId, holderId, null, false, null, 0L));
   }
 
   @Test
   void aRejectedPurposeBoundRequestIsReportedToItsObserver() {
     BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
+    UUID decider = UUID.randomUUID();
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(bankSecurityService.canSee(eq(accountId), any())).thenReturn(true);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
+    when(bankCaller.actor())
+        .thenReturn(
+            TestBankActor.of(decider)
+                .roles(Roles.BANK_EMPLOYEE)
+                .grant(accountId, false, false, false)
+                .build());
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
 
-    service.reject(requestId, "duplicate", 0L, null);
+    service.reject(requestId, "duplicate", 0L);
 
     verify(observer).onRejected(requestId, dealId);
   }
@@ -250,7 +296,7 @@ class BankPurposeBoundRequestServiceTest {
   void aCancelledPurposeBoundRequestIsReportedToItsObserver() {
     BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
+    when(bankCaller.actor()).thenReturn(TestBankActor.of(requester).build());
 
     service.cancelOwn(requestId, 0L);
 

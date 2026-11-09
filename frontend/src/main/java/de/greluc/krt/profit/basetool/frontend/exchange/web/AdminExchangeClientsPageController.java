@@ -83,7 +83,10 @@ public class AdminExchangeClientsPageController {
           "exchange.refinery.write",
           "exchange.refinery.store",
           "exchange.drafts.blueprints",
-          "exchange.drafts.refinery");
+          "exchange.drafts.refinery",
+          "exchange.bank.read",
+          "exchange.bank.request",
+          "exchange.bank.queue");
 
   /** Talks to the backend. */
   private final ExchangeBackendClient exchangeClient;
@@ -94,13 +97,13 @@ public class AdminExchangeClientsPageController {
   /**
    * Renders the registry page, or with {@code fragment=registry} only its registry section and with
    * {@code fragment=undoRuns} only the bulk undo runs. A failed load renders an empty list with
-   * {@code error} set and no switch.
+   * {@code error} set and no switches.
    *
    * @param fragment {@code registry} or {@code undoRuns} for a section fragment; anything else
    *     renders the page
-   * @param model receives {@code clients}, {@code settings}, {@code usage} by client id, {@code
-   *     capabilities}, {@code grafanaUrl}, {@code undoRuns}, {@code undoRunning} and, on a failed
-   *     load, {@code error}
+   * @param model receives {@code clients}, {@code settings}, {@code bankSwitch}, {@code usage} by
+   *     client id, {@code capabilities}, {@code grafanaUrl}, {@code undoRuns}, {@code undoRunning}
+   *     and, on a failed load, {@code error}
    * @return {@code admin/exchange-clients}, or one of its fragments
    */
   @NotNull
@@ -113,9 +116,11 @@ public class AdminExchangeClientsPageController {
           List<ExchangeClientDto> clients = exchangeClient.clients();
           model.addAttribute("clients", clients == null ? List.of() : clients);
           model.addAttribute("settings", exchangeClient.settings());
+          model.addAttribute("bankSwitch", exchangeClient.bankSwitch());
         })) {
       model.addAttribute("clients", List.of());
       model.addAttribute("settings", null);
+      model.addAttribute("bankSwitch", null);
       model.addAttribute("error", "admin.exchangeClients.error.load");
     }
     model.addAttribute("usage", usage());

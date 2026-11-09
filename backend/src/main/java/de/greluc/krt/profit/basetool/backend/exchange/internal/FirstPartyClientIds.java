@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakSyncProperties;
-import de.greluc.krt.profit.basetool.backend.platform.api.PartialRoleScopeProperties;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,9 +31,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * The Keycloak client ids of the Basetool's own software as the backend is configured with them:
- * the web login, the app, the ingest gateway and the backend's admin client. None of them may be
- * registered as an exchange client (REQ-XCH-003); the SC Extractor is not among them, because it
- * takes part in the exchange as a registered client itself.
+ * the web login, the ingest gateway and the backend's admin client. None of them may be registered
+ * as an exchange client (REQ-XCH-003); the SC Extractor is not among them, because it takes part in
+ * the exchange as a registered client itself.
  */
 @Component
 @RequiredArgsConstructor
@@ -48,9 +47,6 @@ public class FirstPartyClientIds {
 
   /** The web and app client ids, as the change feed knows them. */
   private final @NotNull ChangeSourceProperties changeSourceProperties;
-
-  /** The app's client ids, as the partial-role guard knows them. */
-  private final @NotNull PartialRoleScopeProperties partialRoleScopeProperties;
 
   /** The backend's own Keycloak admin client. */
   private final @NotNull KeycloakSyncProperties keycloakSyncProperties;
@@ -75,7 +71,6 @@ public class FirstPartyClientIds {
     addAll(ids, ingestGatewayProperties.clientIds());
     addAll(ids, connectedAppsProperties.webClientIds());
     addAll(ids, changeSourceProperties.webClientIds());
-    addAll(ids, partialRoleScopeProperties.clientIds());
     if (keycloakSyncProperties.clientId() != null && !keycloakSyncProperties.clientId().isBlank()) {
       ids.add(keycloakSyncProperties.clientId());
     }

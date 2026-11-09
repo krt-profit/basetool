@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.BankExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
 import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
@@ -138,6 +139,12 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theBankSwitchGatesTheSeamsBankRouteFamily() {
+    assertThat(BankExchangeRoutes.PATH)
+        .isEqualTo(ExchangeSeam.RELAY_PREFIX + ExchangeSeam.BANK_PATH);
+  }
+
+  @Test
   void everyCodeTheBackendRelaysIsOneTheGatewayPassesOrTranslates() throws Exception {
     assertRelayedCodes(ExchangeSeam.PASSED_THROUGH_CODES, ExchangeSeam.TRANSLATED_CODES.keySet());
     Set<String> withoutTerms = new HashSet<>(ExchangeSeam.PASSED_THROUGH_CODES);
@@ -156,7 +163,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> expected = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> expected.put(operation.relayed(), operation.capability()));
-    assertThat(expected).as("the seam lists 23 relay operations").hasSize(23);
+    assertThat(expected).as("the seam lists 31 relay operations").hasSize(31);
     return expected;
   }
 
@@ -199,7 +206,7 @@ class ExchangeRelaySeamParityTest {
         }
       }
     }
-    assertThat(owners).as("the exchange controllers").hasSize(12);
+    assertThat(owners).as("the exchange controllers").hasSize(15);
     assertThat(served).isEqualTo(expected);
   }
 
@@ -243,15 +250,16 @@ class ExchangeRelaySeamParityTest {
 
   /**
    * Asserts that {@code ActingMemberFilter} admits an acting member on exactly the given paths,
-   * each listed once and as an exact path, never a wildcard.
+   * each listed once, never a wildcard; a variable is only ever the whole {@code {id}} segment.
    *
    * @param expected the backend paths
    */
   private static void assertActingMemberPaths(@NotNull Set<String> expected) {
     List<?> patterns = (List<?>) staticField(ActingMemberFilter.class, "EXCHANGE_PATHS");
     List<String> listed = patterns.stream().map(p -> ((PathPattern) p).getPatternString()).toList();
-    assertThat(listed).as("22 exact paths").hasSize(22).doesNotHaveDuplicates();
-    assertThat(listed).allSatisfy(path -> assertThat(path).doesNotContain("*", "{"));
+    assertThat(listed).as("29 paths").hasSize(29).doesNotHaveDuplicates();
+    assertThat(listed)
+        .allSatisfy(path -> assertThat(path.replace("/{id}/", "/")).doesNotContain("*", "{"));
     assertThat(new TreeSet<>(listed)).isEqualTo(new TreeSet<>(expected));
   }
 
@@ -293,6 +301,7 @@ class ExchangeRelaySeamParityTest {
     List<Supplier<ExchangeProblemException>> refusals =
         List.of(
             ExchangeProblemException::exchangeDisabled,
+            ExchangeProblemException::bankExchangeDisabled,
             ExchangeProblemException::clientNotAllowed,
             ExchangeProblemException::clientSuspended,
             ExchangeProblemException::installationRevoked,
@@ -304,7 +313,7 @@ class ExchangeRelaySeamParityTest {
       ExchangeProblemException problem = refusal.get();
       answered.put(problem.code(), problem.status().value());
     }
-    assertThat(answered).hasSize(7).isEqualTo(new TreeMap<>(expected));
+    assertThat(answered).hasSize(8).isEqualTo(new TreeMap<>(expected));
   }
 
   /**
@@ -331,6 +340,7 @@ class ExchangeRelaySeamParityTest {
                 GlobalExceptionHandler.CODE_ACCESS_DENIED,
                 GlobalExceptionHandler.CODE_VALIDATION_FAILED,
                 GlobalExceptionHandler.CODE_BAD_REQUEST,
+                GlobalExceptionHandler.CODE_CONSTRAINT_VIOLATION,
                 GlobalExceptionHandler.CODE_OPTIMISTIC_LOCK))
         .isEqualTo(translated);
   }

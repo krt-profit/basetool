@@ -213,6 +213,16 @@ public interface OrgUnitMembershipRepository
       @Param("orgUnitIds") Collection<UUID> orgUnitIds, @Param("role") MembershipRole role);
 
   /**
+   * Returns the users holding the given {@link MembershipRole} on any org unit — for {@code
+   * OL_MEMBER}, every member of the Organisationsleitung, the top-band KRT approver (REQ-BANK-047).
+   *
+   * @param role the membership role to match; never {@code null}
+   * @return the matching user ids, each once; never {@code null}, possibly empty
+   */
+  @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.role = :role")
+  Set<UUID> findUserIdsByRole(@Param("role") MembershipRole role);
+
+  /**
    * Returns the members who hold a leadership seat in the given org unit, that is every member
    * whose rank is not plain {@code MEMBER} ({@link MembershipRole#confersOwnLevelOversight()}).
    * Backs {@code UNIT_LEADERSHIP}.

@@ -24,8 +24,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Resolves the recipients tied to one bank account: the {@code ACCOUNT_GRANT} and {@code
- * ACCOUNT_RESPONSIBLE} selectors.
+ * Resolves the recipients tied to one bank account or one of its booking requests: the {@code
+ * ACCOUNT_GRANT}, {@code ACCOUNT_RESPONSIBLE}, {@code REQUEST_RESPONSIBLE} and {@code
+ * REQUIRED_APPROVER} selectors.
  *
  * <p>Owned by the notification module and implemented by the bank module.
  */
@@ -48,4 +49,24 @@ public interface AccountRecipientDirectory {
    */
   @NotNull
   Set<UUID> responsibleHoldersOf(@NotNull UUID accountId);
+
+  /**
+   * The responsible holders who are told of every request on an account: those of {@link
+   * #responsibleHoldersOf(UUID)}, except on the KRT account (REQ-NOTIF-033).
+   *
+   * @param accountId the bank account
+   * @return their user subs; never {@code null}, empty on the KRT account
+   */
+  @NotNull
+  Set<UUID> requestResponsibleHoldersOf(@NotNull UUID accountId);
+
+  /**
+   * The members whose approval a booking request still waits for (REQ-NOTIF-033, REQ-BANK-041).
+   *
+   * @param requestId the booking request
+   * @return their user subs, never the requester; empty when the request is missing, no longer
+   *     pending, needs no approval or is already approved
+   */
+  @NotNull
+  Set<UUID> requiredApproversOf(@NotNull UUID requestId);
 }

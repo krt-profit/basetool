@@ -30,6 +30,7 @@ import org.jetbrains.annotations.NotNull;
  * @param revision grows with every write, across restarts
  * @param writtenAt when the backend wrote the document
  * @param enabled whether the exchange serves any request
+ * @param bankEnabled whether the bank route family serves requests while the exchange is on
  * @param clients every registry client by its Keycloak client id
  */
 public record ExchangeRegistryMirrorDocument(
@@ -37,6 +38,7 @@ public record ExchangeRegistryMirrorDocument(
     long revision,
     @NotNull Instant writtenAt,
     boolean enabled,
+    boolean bankEnabled,
     @NotNull SortedMap<String, ExchangeRegistrySnapshot.Client> clients) {
 
   /** The current document format. */
@@ -49,6 +51,6 @@ public record ExchangeRegistryMirrorDocument(
    */
   @NotNull
   public ExchangeRegistrySnapshot snapshot() {
-    return new ExchangeRegistrySnapshot(enabled, clients);
+    return new ExchangeRegistrySnapshot(enabled, bankEnabled, clients);
   }
 }

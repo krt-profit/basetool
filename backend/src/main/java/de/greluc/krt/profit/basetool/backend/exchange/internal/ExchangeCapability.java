@@ -87,7 +87,16 @@ public enum ExchangeCapability {
   DRAFTS_BLUEPRINTS("exchange.drafts.blueprints"),
 
   /** Submitting refinery drafts for review in the browser. */
-  DRAFTS_REFINERY("exchange.drafts.refinery");
+  DRAFTS_REFINERY("exchange.drafts.refinery"),
+
+  /** Reading the bank accounts the member may view, their history and the own requests. */
+  BANK_READ("exchange.bank.read"),
+
+  /** Raising, correcting and cancelling the member's own booking requests. */
+  BANK_REQUEST("exchange.bank.request"),
+
+  /** Reading, as bank staff, the open requests the member may confirm or approve. */
+  BANK_QUEUE("exchange.bank.queue");
 
   /** The OAuth scope that carries this capability. */
   @Getter(onMethod_ = @__(@JsonValue))

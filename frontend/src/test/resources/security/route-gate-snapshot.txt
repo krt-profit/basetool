@@ -29,6 +29,7 @@
 /admin/exchange-clients GET -> AdminExchangeClientsPageController#page gate=class:hasRole('ADMIN') layout=yes
 /admin/exchange-clients POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#create gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/settings PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#updateSettings gate=class:hasRole('ADMIN') layout=no
+/admin/exchange-clients/settings/bank PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#updateBankSwitch gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/undo-runs/{runId} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoRun gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id} GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#get gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id} PUT headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#update gate=class:hasRole('ADMIN') layout=no
@@ -261,6 +262,8 @@
 /api/proxy/supply/needs/{id}/resume POST -> SupplyProxyController#resumeNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/needs/{id}/withdraw POST -> SupplyProxyController#withdrawNeed gate=class:isAuthenticated() layout=no
 /api/proxy/supply/units GET -> SupplyProxyController#units gate=class:isAuthenticated() layout=no
+/api/proxy/users/{id}/roles/{role} POST -> UserRoleProxyController#assignRole gate=class:isAuthenticated() layout=no
+/api/proxy/users/{id}/roles/{role} PUT -> UserRoleProxyController#changeRole gate=class:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/report/preview POST -> JobOrderHandoverReportProxyController#previewHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadHandoverReport gate=method:isAuthenticated() layout=no
 /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report GET -> JobOrderHandoverReportProxyController#downloadItemHandoverReport gate=method:isAuthenticated() layout=no
@@ -270,6 +273,7 @@
 /bank/holders/{id} GET -> BankPageController#holderDetail gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/manage GET -> BankManagePageController#manage gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/requests GET -> BankRequestQueuePageController#queue gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/requests/{id} GET -> BankRequestPageController#request gate=method:isAuthenticated() layout=yes
 /blueprint-overview GET -> BlueprintOverviewPageController#view gate=class:isAuthenticated() layout=yes
 /blueprint-overview/owners GET -> BlueprintOverviewPageController#owners gate=class:isAuthenticated() layout=yes
 /catalog/location-search GET -> CatalogSearchController#locationSearch gate=class:isAuthenticated() layout=no

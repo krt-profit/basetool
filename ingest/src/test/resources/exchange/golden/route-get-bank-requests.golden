@@ -1,0 +1,29 @@
+=== request
+GET /exchange/v1/bank/requests?limit=2
+=== relayed
+GET /api/v1/exchange/bank/requests?limit=2
+accept: application/json, application/problem+json
+accept-encoding: gzip, deflate
+authorization: Bearer gateway-service-token
+x-correlation-id: <correlation-id>
+x-exchange-capabilities: exchange.bank.queue,exchange.bank.read,exchange.bank.request,exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.refinery.read,exchange.refinery.store,exchange.refinery.write,exchange.stock.read,exchange.stock.write
+x-exchange-client: versekit
+x-exchange-connected-at: <connected-at>
+x-exchange-installation: <thumbprint>
+x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
+=== response
+200
+cache-control: no-cache, no-store, max-age=0, must-revalidate
+content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+content-type: application/json
+dpop-nonce: <dpop-nonce>
+expires: 0
+pragma: no-cache
+ratelimit: limit=1000, remaining=<remaining>, reset=<reset>
+ratelimit-policy: 1000;w=60
+vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+x-content-type-options: nosniff
+x-correlation-id: <correlation-id>
+x-frame-options: DENY
+x-xss-protection: 0
+{"items":[{"id":"7f3e2d1c-0b9a-4876-9543-210fedcba987","version":1,"status":"PENDING","createdAt":"2026-11-08T20:15:00Z","decidedAt":null,"type":"WITHDRAWAL","amount":15000,"note":"Refuel at Port Olisar","justification":"Fuel for the Friday op","account":{"id":"5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f","no":"KB-0042","name":"Staffel Nord","orgUnitShorthand":"NORD"},"targetAccount":null,"requiresOwnerApproval":true,"requiredApprover":"RESPONSIBLE_HOLDER","ownerApprovalGranted":false,"rejectReason":null,"client":null,"splitEnabled":false,"splitPercent":null},{"id":"9c8b7a6f-5e4d-4c3b-8a29-1f0e9d8c7b6a","version":3,"status":"REJECTED","createdAt":"2026-11-05T12:00:00Z","decidedAt":"2026-11-05T16:45:00Z","type":"TRANSFER","amount":75000,"note":"Shared mining run","justification":"Split the haul","account":{"id":"5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f","no":"KB-0042","name":"Staffel Nord","orgUnitShorthand":"NORD"},"targetAccount":{"id":"0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","no":"KB-0001"},"requiresOwnerApproval":false,"requiredApprover":null,"ownerApprovalGranted":false,"rejectReason":"No receipt attached","client":null,"splitEnabled":false,"splitPercent":null}],"removed":[],"nextCursor":"s1.2245871.0.9c8b7a6f-5e4d-4c3b-8a29-1f0e9d8c7b6a","hasMore":true}

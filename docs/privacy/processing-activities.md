@@ -248,8 +248,24 @@ requires it and duplicating it into further files spreads personal data for no g
   note — for the 90-day undo window; the writer's data export shows those rows without the holder's
   id. The privacy notice („Verbundene Anwendungen") names this and the setting; the legal basis
   is Art. 6(1)(f), coordinating the shared stock, and the setting is the member's objection.
+  The second exception is the Kartellbank (ADR-0354, REQ-BXCH-001…007): a client approved for
+  `exchange.bank.read` (REQ-BXCH-002, built) receives the balances, targets, 30-day trends and
+  booking history of the bank accounts the member may view in the Basetool — redacted as on the
+  member's account page, so no holder and no staff note, but with the handle of the member who
+  handed money in or received it, unless that member withholds their name (REQ-BXCH-007). A
+  client approved for `exchange.bank.queue` (REQ-BXCH-005, built) receives, for a member who is
+  bank staff or an approver, the pending booking requests they work on: amount, accounts,
+  justification and note, the requester's handle (again unless withheld) and, for the Bankleitung
+  and on granted accounts, the account balance; no staff note, holder or custody balance. The
+  client keeps other people's bank data in memory only, for at most 7 days, as its approval
+  requires. The same scope gives the client the member's own booking requests (REQ-BXCH-003, built)
+  without any staff note, staff identity, counterparty or purpose; being the member's own data,
+  the client may keep them. Reads are not journalled; they are counted per client and route
+  without any id.
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
-  Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it). The
+  Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it), and for
+  other people's bank data on a client (coordinating the bank's work; the name withholding is
+  the objection), while the member's own requests and own data stay under Art. 6(1)(b). The
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner
   decision 2026-09-28).
 - **Where:** `exchange_installation`, `exchange_client_revocation`, `exchange_change`,

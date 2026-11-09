@@ -280,6 +280,14 @@ public enum NotificationType {
   BANK_BOOKING_REQUEST_APPROVED,
 
   /**
+   * An over-limit booking request waits for the recipient's approval (REQ-NOTIF-033), rendered with
+   * {@code type}, {@code amount}, {@code accountNo} and {@code requester}. Resolved via the {@code
+   * REQUIRED_APPROVER} selector; replaces the recipient's generic new-request notice on that
+   * request and is cleared by its approval, decision or cancellation.
+   */
+  BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
+
+  /**
    * The recipient's bank access to an account was granted or changed (REQ-BANK-058), rendered with
    * {@code accountNo}, the {@code grantChange} word and the three rights words.
    */
@@ -400,6 +408,18 @@ public enum NotificationType {
   EXCHANGE_SWITCHED_OFF,
 
   /**
+   * An admin switched the bank on for connected applications (REQ-BXCH-006); notifies the admins
+   * and the Bankleitung and supersedes the other bank switch notice.
+   */
+  BANK_EXCHANGE_SWITCHED_ON,
+
+  /**
+   * An admin switched the bank off for connected applications (REQ-BXCH-006); notifies the admins
+   * and the Bankleitung and supersedes the other bank switch notice.
+   */
+  BANK_EXCHANGE_SWITCHED_OFF,
+
+  /**
    * A member pledged a material donation (REQ-SUP-016). The default rule notifies the lead and the
    * Logisticians of the receiving unit, excluding the actor; superseded when the pledge is
    * received, declined or withdrawn.
@@ -462,12 +482,18 @@ public enum NotificationType {
   PURCHASING_DELEGATE_APPOINTED,
 
   /** The member's appointment was revoked (REQ-PUR-024). */
-  PURCHASING_DELEGATE_REVOKED;
+  PURCHASING_DELEGATE_REVOKED,
+
+  /**
+   * One of the recipient's roles was assigned or withdrawn (REQ-SEC-088), rendered with the coded
+   * {@code role} and {@code change} words.
+   */
+  USER_ROLE_CHANGED;
 
   /**
    * Whether a member may mute this type (REQ-NOTIF-027). The account-deletion types serve a legal
-   * deadline and {@link #EXCHANGE_INSTALLATION_CONNECTED} is the phishing signal, so none of them
-   * can be muted.
+   * deadline, {@link #EXCHANGE_INSTALLATION_CONNECTED} is the phishing signal and {@link
+   * #USER_ROLE_CHANGED} reports a change of access, so none of them can be muted.
    *
    * @return {@code false} for the types a member cannot mute, {@code true} for every other
    */
@@ -482,7 +508,8 @@ public enum NotificationType {
           PURCHASING_PAUSED,
           PURCHASING_RESUMED,
           PURCHASING_DELEGATE_APPOINTED,
-          PURCHASING_DELEGATE_REVOKED ->
+          PURCHASING_DELEGATE_REVOKED,
+          USER_ROLE_CHANGED ->
           false;
       case JOB_ORDER_CREATED,
           JOB_ORDER_UPDATED_BY_REQUESTER,
@@ -523,6 +550,7 @@ public enum NotificationType {
           INVENTORY_POOL_CHANGED_BY_OTHER,
           INVENTORY_STOCK_LEVEL_LOW,
           BANK_BOOKING_REQUEST_APPROVED,
+          BANK_BOOKING_REQUEST_APPROVAL_NEEDED,
           BANK_GRANT_CHANGED,
           BANK_GRANT_REVOKED,
           BANK_PAYOUT_RECEIVED,
@@ -543,6 +571,8 @@ public enum NotificationType {
           EXCHANGE_CLIENT_UPDATE_REQUIRED,
           EXCHANGE_CLIENT_CAPABILITY_REMOVED,
           EXCHANGE_SWITCHED_OFF,
+          BANK_EXCHANGE_SWITCHED_ON,
+          BANK_EXCHANGE_SWITCHED_OFF,
           SUPPLY_DONATION_PLEDGED,
           SUPPLY_DONATION_RECEIVED,
           SUPPLY_DONATION_DECLINED,

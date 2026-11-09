@@ -36,13 +36,17 @@ import java.util.Optional;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class ExchangeGateTest {
 
@@ -69,7 +73,8 @@ class ExchangeGateTest {
           installationRepository,
           clientRevocationRepository,
           revocationMirror,
-          meterRegistry);
+          meterRegistry,
+          new ExchangeBankMetrics(meterRegistry));
 
   private ExchangeClient client;
   private ExchangeSettings settings;
@@ -137,6 +142,59 @@ class ExchangeGateTest {
         HttpStatus.SERVICE_UNAVAILABLE,
         "EXCHANGE_DISABLED");
     assertThat(refused(ExchangeGate.REASON_SWITCH_OFF)).isEqualTo(1);
+  }
+
+  @Test
+  void refusesTheBankRouteFamilyWhileTheBankSwitchIsOffAsTheGatewayDoes() {
+    onPath("/api/v1/exchange/bank/accounts");
+
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "BANK_EXCHANGE_DISABLED");
+    onPath("/api/v1/exchange/bank");
+    assertRefused(
+        () -> gate.allows("exchange.stock.read", acting("versekit", "exchange.stock.read")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "BANK_EXCHANGE_DISABLED");
+    assertThat(refused(ExchangeGate.REASON_BANK_SWITCH_OFF)).isEqualTo(2);
+    assertThat(
+            meterRegistry
+                .counter(
+                    ExchangeMetricNames.EXCHANGE_BANK_REFUSED,
+                    MetricNames.TAG_REASON,
+                    "switched_off")
+                .count())
+        .isEqualTo(2);
+  }
+
+  @Test
+  void theGlobalSwitchWinsOverTheBankSwitch() {
+    settings.setEnabled(false);
+    onPath("/api/v1/exchange/bank/accounts");
+
+    assertRefused(
+        () -> gate.allowsAny(acting("versekit", "exchange.connect")),
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "EXCHANGE_DISABLED");
+    assertThat(refused(ExchangeGate.REASON_BANK_SWITCH_OFF)).isZero();
+  }
+
+  @Test
+  void admitsTheBankRouteFamilyWhileTheBankSwitchIsOn() {
+    settings.setBankEnabled(true);
+    onPath("/api/v1/exchange/bank/accounts");
+
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
+  }
+
+  @Test
+  void theBankSwitchLeavesEveryOtherRouteAlone() {
+    onPath("/api/v1/exchange/me/stock");
+    assertThat(gate.allows("exchange.stock.read", acting("versekit", "exchange.stock.read")))
+        .isTrue();
+    onPath("/api/v1/exchange/bankers");
+    assertThat(gate.allowsAny(acting("versekit", "exchange.connect"))).isTrue();
   }
 
   @Test
@@ -256,6 +314,21 @@ class ExchangeGateTest {
         HttpStatus.SERVICE_UNAVAILABLE,
         "REGISTRY_UNAVAILABLE");
     assertThat(refused(ExchangeGate.REASON_REVOCATIONS_UNREADABLE)).isEqualTo(1);
+  }
+
+  @AfterEach
+  void tearDown() {
+    RequestContextHolder.resetRequestAttributes();
+  }
+
+  /**
+   * Binds a request for a backend path to the current thread, as the dispatcher does.
+   *
+   * @param path the request URI
+   */
+  private static void onPath(@NotNull String path) {
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest("GET", path)));
   }
 
   /**

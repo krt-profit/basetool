@@ -251,6 +251,7 @@ public class ExchangeMassChangeService {
             ? refineryOrderWriteService.apply(caller, changeSet)
             : refineryOrderWriteService.applyConfirmed(caller, changeSet);
       }
+      case BANK_REQUEST -> throw new BadRequestException("The staged change set names no resource");
     };
   }
 

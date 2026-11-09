@@ -93,23 +93,54 @@ public final class BankNotices {
         .contextAccountId(accountId)
         .contextRecipientUserId(requesterId)
         .renderParams(params)
-        .resolvesNotificationTypes(Set.of(NotificationType.BANK_BOOKING_REQUEST_APPROVED))
+        .resolvesNotificationTypes(
+            Set.of(
+                NotificationType.BANK_BOOKING_REQUEST_APPROVED,
+                NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED))
         .build();
   }
 
   /**
-   * The approval of a booking request was revoked; its ready-to-confirm notices go.
+   * The approval of a booking request was revoked: its ready-to-confirm notices go and its required
+   * approvers are told again that their approval is needed (REQ-NOTIF-033).
    *
-   * @param requestId the request
+   * @param requestId the request, the {@code REQUIRED_APPROVER} selector input
+   * @param accountId the request's account
+   * @param type deposit, withdrawal or transfer
+   * @param amount the requested whole-aUEC amount
+   * @param accountNo the account's number
+   * @param requesterHandle the requester's effective-name snapshot
+   * @param actorSub the revoking member
    * @return the event
    */
   @NotNull
-  public static NoticeEvent approvalRevoked(@NotNull UUID requestId) {
+  public static NoticeEvent approvalRevoked(
+      @NotNull UUID requestId,
+      @NotNull UUID accountId,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount,
+      @NotNull String accountNo,
+      @Nullable String requesterHandle,
+      @Nullable UUID actorSub) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("type", type.name());
+    params.put("amount", BankAmounts.plain(amount));
+    params.put("accountNo", accountNo);
+    if (requesterHandle != null && !requesterHandle.isBlank()) {
+      params.put("requester", requesterHandle);
+    }
     return NoticeEvent.builder()
         .eventType(NotificationEventType.BANK_BOOKING_REQUEST_APPROVAL_REVOKED)
+        .actorSub(actorSub)
         .entityType(BankBookingRequestEvent.ENTITY_TYPE)
         .entityId(requestId)
-        .resolvesNotificationTypes(Set.of(NotificationType.BANK_BOOKING_REQUEST_APPROVED))
+        .contextAccountId(accountId)
+        .contextBankRequestId(requestId)
+        .renderParams(params)
+        .resolvesNotificationTypes(
+            Set.of(
+                NotificationType.BANK_BOOKING_REQUEST_APPROVED,
+                NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED))
         .build();
   }
 

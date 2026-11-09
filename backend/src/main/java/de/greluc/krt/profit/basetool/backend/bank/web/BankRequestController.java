@@ -36,7 +36,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -71,7 +70,6 @@ public class BankRequestController {
    * @param page zero-based page index
    * @param size page size
    * @param sort whitelisted sort spec
-   * @param authentication the current authentication (per-row confirm capability)
    * @return one page of requests visible to the caller in any of those states
    */
   @Operation(summary = "List booking requests for the bank-staff confirmation queue (paged)")
@@ -80,43 +78,38 @@ public class BankRequestController {
       @RequestParam(required = false) Set<BankBookingRequestStatus> status,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort,
-      Authentication authentication) {
+      @RequestParam(required = false) String sort) {
     Set<BankBookingRequestStatus> effectiveStatuses =
         status == null || status.isEmpty() ? Set.of(BankBookingRequestStatus.PENDING) : status;
     String effectiveSort = sort == null || sort.isBlank() ? "createdAt,desc" : sort;
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, effectiveSort, QUEUE_SORT_FIELDS, "createdAt");
     Page<BankBookingRequestDto> result =
-        bankBookingRequestService.listQueue(effectiveStatuses, pageable, authentication);
+        bankBookingRequestService.listQueue(effectiveStatuses, pageable);
     return PageResponse.of(result);
   }
 
   /**
    * Confirms a pending request: records the holder(s) and books the deposit / withdrawal / transfer
    * onto the ledger (REQ-BANK-023/-040/-041). Requires the per-account capability matching the
-   * request type and, for an over-limit request, the responsible-holder approval attestation — both
-   * enforced in the service.
+   * request type and, for an over-limit request, the responsible-holder approval attestation plus,
+   * without an in-app approval, a staff note naming the approver — all enforced in the service.
    *
    * @param id the request to confirm
    * @param request the holder(s), the over-limit approval attestation and the echoed version
-   * @param authentication the current authentication (capability check)
    * @return the confirmed request
    */
   @Operation(summary = "Confirm a pending booking request and book it onto the ledger")
   @PostMapping("/{id}/confirm")
   public BankBookingRequestDto confirm(
-      @PathVariable UUID id,
-      @NotNull @Valid @RequestBody ConfirmBankBookingRequest request,
-      Authentication authentication) {
+      @PathVariable UUID id, @NotNull @Valid @RequestBody ConfirmBankBookingRequest request) {
     return bankBookingRequestService.confirm(
         id,
         request.holderId(),
         request.destinationHolderId(),
         request.ownerApprovalConfirmed(),
         request.staffNote(),
-        request.version(),
-        authentication);
+        request.version());
   }
 
   /**
@@ -125,16 +118,12 @@ public class BankRequestController {
    *
    * @param id the request to reject
    * @param request the rejection reason and the echoed version
-   * @param authentication the current authentication (visibility check)
    * @return the rejected request
    */
   @Operation(summary = "Reject a pending booking request with a reason")
   @PostMapping("/{id}/reject")
   public BankBookingRequestDto reject(
-      @PathVariable UUID id,
-      @NotNull @Valid @RequestBody RejectBankBookingRequest request,
-      Authentication authentication) {
-    return bankBookingRequestService.reject(
-        id, request.reason(), request.version(), authentication);
+      @PathVariable UUID id, @NotNull @Valid @RequestBody RejectBankBookingRequest request) {
+    return bankBookingRequestService.reject(id, request.reason(), request.version());
   }
 }

@@ -1137,6 +1137,84 @@
           "protocolMapper": "oidc-audience-mapper"
         }
       ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankRead}",
+        "display.on.consent.screen": "true",
+        "gui.order": "19",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.read",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankRequest}",
+        "display.on.consent.screen": "true",
+        "gui.order": "20",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.request",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankQueue}",
+        "display.on.consent.screen": "true",
+        "gui.order": "21",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.bank.queue",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
     }
   ],
   "clientSessionIdleTimeout": 0,
@@ -1149,6 +1227,13 @@
       },
       "clientAuthenticatorType": "client-secret",
       "clientId": "basetool-frontend",
+      "defaultClientScopes": [
+        "acr",
+        "basic",
+        "email",
+        "profile",
+        "web-origins"
+      ],
       "directAccessGrantsEnabled": true,
       "enabled": true,
       "fullScopeAllowed": true,
@@ -1334,6 +1419,9 @@
         "exchange.refinery.read",
         "exchange.refinery.write",
         "exchange.refinery.store",
+        "exchange.bank.read",
+        "exchange.bank.request",
+        "exchange.bank.queue",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1397,6 +1485,9 @@
         "exchange.refinery.read",
         "exchange.refinery.write",
         "exchange.refinery.store",
+        "exchange.bank.read",
+        "exchange.bank.request",
+        "exchange.bank.queue",
         "offline_access"
       ],
       "protocol": "openid-connect",
@@ -1459,30 +1550,6 @@
   "roles": {
     "realm": [
       {
-        "description": "E2E test role",
-        "name": "Admin"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Logistician"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Mission Manager"
-      },
-      {
-        "description": "E2E test role",
-        "name": "KRT Member"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Bank Employee"
-      },
-      {
-        "description": "E2E test role",
-        "name": "Bank Management"
-      },
-      {
         "clientRole": false,
         "composite": false,
         "containerId": "basetool",
@@ -1500,7 +1567,6 @@
         "composite": true,
         "composites": {
           "realm": [
-            "KRT Member",
             "offline_access",
             "uma_authorization"
           ]
@@ -1539,8 +1605,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000001",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-member"
     },
@@ -1557,8 +1622,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000002",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-member-2"
     },
@@ -1575,9 +1639,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000003",
       "realmRoles": [
-        "default-roles-basetool",
-        "Admin",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-admin"
     },
@@ -1594,8 +1656,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000201",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-01"
     },
@@ -1612,8 +1673,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000202",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-02"
     },
@@ -1630,8 +1690,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000203",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-03"
     },
@@ -1648,8 +1707,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000204",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-04"
     },
@@ -1666,8 +1724,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000205",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-05"
     },
@@ -1684,8 +1741,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000206",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-06"
     },
@@ -1702,8 +1758,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000207",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-07"
     },
@@ -1720,8 +1775,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000208",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-08"
     },
@@ -1738,8 +1792,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000209",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-09"
     },
@@ -1756,8 +1809,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000210",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-10"
     },
@@ -1774,8 +1826,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000211",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-11"
     },
@@ -1792,8 +1843,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000212",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-12"
     },
@@ -1810,8 +1860,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000213",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-13"
     },
@@ -1828,8 +1877,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000214",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-14"
     },
@@ -1846,8 +1894,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000215",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-15"
     },
@@ -1864,8 +1911,7 @@
       "enabled": true,
       "id": "5a4d0000-0000-4000-8000-000000000216",
       "realmRoles": [
-        "default-roles-basetool",
-        "KRT Member"
+        "default-roles-basetool"
       ],
       "username": "sandbox-load-16"
     },
@@ -1873,7 +1919,6 @@
       "clientRoles": {
         "realm-management": [
           "manage-users",
-          "view-realm",
           "view-users"
         ]
       },

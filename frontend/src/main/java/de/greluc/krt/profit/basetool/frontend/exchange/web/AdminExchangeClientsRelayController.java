@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.exchange.web;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBankSwitchUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeBulkUndoRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientStatusRequest;
@@ -147,6 +148,21 @@ public class AdminExchangeClientsRelayController {
         log,
         "switch the exchange (ajax)",
         () -> ResponseEntity.ok(exchangeClient.updateSettings(request)));
+  }
+
+  /**
+   * Turns the bank switch of the exchange on or off (REQ-BXCH-006).
+   *
+   * @param request the new state and the bank switch's version the admin last saw
+   * @return the bank switch, or the relayed backend error
+   */
+  @PutMapping(value = "/settings/bank", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> updateBankSwitch(
+      @RequestBody @NotNull ExchangeBankSwitchUpdateRequest request) {
+    return relay(
+        log,
+        "switch the bank on the exchange (ajax)",
+        () -> ResponseEntity.ok(exchangeClient.updateBankSwitch(request)));
   }
 
   /**

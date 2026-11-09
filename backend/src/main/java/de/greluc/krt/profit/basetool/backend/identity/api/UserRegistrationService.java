@@ -64,6 +64,9 @@ public class UserRegistrationService {
   private final KeycloakService keycloakService;
   private final AccountErasure accountErasure;
 
+  /** Grants KRT Member to an approved registration. */
+  private final ApprovalRoleGrant approvalRoleGrant;
+
   /**
    * Lazy self-reference so {@link #linkRegistrationToExistingAccount} can call {@link
    * #completeLinkTransactionally} through the Spring proxy.
@@ -86,18 +89,16 @@ public class UserRegistrationService {
    * The caller marks its change flag and publishes the admin notification (REQ-NOTIF-012) when this
    * returns {@code true}.
    *
-   * @param user the managed user being reconciled; never {@code null}
+   * @param user the managed user being reconciled, an Admin among its stored roles suppresses the
+   *     gate; never {@code null}
    * @param created whether this reconciliation just created the row (only new rows are gated)
-   * @param localRoles the mapped local roles; an ADMIN among them suppresses the gate; never {@code
-   *     null}
    * @return {@code true} when this call stamped a new PENDING registration
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public boolean stampNewPendingRegistration(
-      @NotNull User user, boolean created, @NotNull Set<Role> localRoles) {
+  public boolean stampNewPendingRegistration(@NotNull User user, boolean created) {
     if (created
         && requireApproval
-        && localRoles.stream().noneMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
+        && user.getRoles().stream().noneMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
       user.setApprovalStatus(ApprovalStatus.PENDING);
       return true;
     }
@@ -191,7 +192,8 @@ public class UserRegistrationService {
 
   /**
    * Approves a pending registration: moves it to {@link ApprovalStatus#ACTIVE}, stamps the
-   * approving admin and time, and writes an audit row. Grants no roles by itself.
+   * approving admin and time, writes an audit row and grants KRT Member through {@link
+   * ApprovalRoleGrant} (REQ-SEC-088).
    *
    * @param userId the registration to approve
    * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
@@ -205,6 +207,7 @@ public class UserRegistrationService {
   @NotNull
   public User approveUser(@NotNull UUID userId, @Nullable Long version, @NotNull UUID adminId) {
     User user = decide(userId, version, ApprovalStatus.ACTIVE, adminId);
+    approvalRoleGrant.grantOnApproval(user, adminId);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.APPROVED, null, adminId));
     eventPublisher.publishEvent(

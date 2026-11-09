@@ -195,7 +195,7 @@ class ExchangeRegistryMirrorClosureTest {
             null,
             null));
     new RedisExchangeRegistryMirror(admin, KEY, Clock.systemUTC())
-        .write(new ExchangeRegistrySnapshot(enabled, clients), revision);
+        .write(new ExchangeRegistrySnapshot(enabled, enabled, clients), revision);
   }
 
   /**

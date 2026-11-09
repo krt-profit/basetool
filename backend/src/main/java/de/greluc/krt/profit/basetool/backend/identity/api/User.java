@@ -42,6 +42,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
 /** User JPA entity. */
@@ -180,11 +181,26 @@ public class User extends AbstractEntity<UUID> {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }
 
+  /**
+   * The user's stored roles. A change bumps {@link #rolesVersion}, never the row {@code @Version},
+   * so a role change and an edit of the user record do not collide (REQ-SEC-088, ADR-0355).
+   */
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "user_roles",
       joinColumns = @JoinColumn(name = "user_id"),
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   @ToString.Exclude
+  @OptimisticLock(excluded = true)
   private Set<Role> roles = new HashSet<>();
+
+  /**
+   * Optimistic counter of {@link #roles}, independent of the row {@code @Version}. Written only by
+   * the conditional updates of {@link UserRepository#bumpRolesVersionIfMatches} and {@link
+   * UserRepository#bumpRolesVersion}, so an entity save never overwrites it; the writer mirrors the
+   * bumped value into the loaded entity (ADR-0355).
+   */
+  @Column(name = "roles_version", nullable = false, insertable = false, updatable = false)
+  @OptimisticLock(excluded = true)
+  private long rolesVersion;
 }

@@ -101,10 +101,11 @@ public class BankExportSections implements PersonalDataExportSection {
                 400,
                 "bankRequestsRaised",
                 ART_15_20,
-                "Raised by the member, including their own justification and note. The deciding"
-                    + " bank employee is not named.",
+                "Raised by the member, including their own justification and note and the connected"
+                    + " application they raised it through. The deciding bank employee is not"
+                    + " named.",
                 """
-                SELECT type, amount, note, justification, status, created_at, decided_at
+                SELECT type, amount, note, justification, status, client_id, created_at, decided_at
                 FROM bank_booking_request WHERE requested_by = :userId ORDER BY created_at
                 """)
             .scrubbing("note", "justification"),

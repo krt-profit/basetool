@@ -110,7 +110,7 @@ class NotificationRuleEngineIntegrationTest {
     assertThat(update.getSelectors())
         .extracting(NotificationRuleSelector::getKind)
         .containsExactlyInAnyOrder(
-            SelectorKind.ROLE, SelectorKind.ACCOUNT_GRANT, SelectorKind.ACCOUNT_RESPONSIBLE);
+            SelectorKind.ROLE, SelectorKind.ACCOUNT_GRANT, SelectorKind.REQUEST_RESPONSIBLE);
     assertThat(assigned.getEventType())
         .isEqualTo(NotificationEventType.BANK_ACCOUNT_RESPONSIBLE_ASSIGNED);
     assertThat(assigned.getNotificationType())

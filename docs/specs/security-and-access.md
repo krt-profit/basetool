@@ -54,7 +54,7 @@ bank's admin surface stays URL-gated if the generic rule changes (`BankControlle
 
 ### REQ-SEC-002a — Central role/permission constants (backend)
 
-Role codes (`Role.code`, matching the Keycloak realm role names minus their `ROLE_` prefix) and
+Role codes (`Role.code`, the Spring authority names minus their `ROLE_` prefix, REQ-SEC-088) and
 the fine-grained permission strings a role's `permissions` collection carries are centralised in
 `kernel.Roles` / `kernel.Permissions` (S3, #909) rather than repeated as raw string literals.
 `SecurityConfig` (the `roleHierarchy()` chain and every `hasRole`/`hasAnyRole`/`hasAuthority`/
@@ -519,14 +519,13 @@ dialog (REQ-INV-035) and is unaffected.
 
 **Authority resolution is memoised per token, not per request (#1141).** `CustomJwtGrantedAuthoritiesConverter`
 runs on *every* authenticated API call, and each miss pays `UserService.syncUser` (a write-capable
-transaction) plus ~5–8 SELECTs (user load, `user_roles`, one role lookup per realm role, and the
-membership read). The memoisation key MUST include the token's `azp` alongside `(sub, iat)`. Since REQ-SEC-036 the
-assembly branches on the authorized party twice — the ingest-gateway short-circuit and the
-partial-role-scope client list — so the set is no longer a pure function of `(sub, iat)`, and `iat`
-is a NumericDate in **seconds**: two tokens for the same person minted by different clients inside
-one wall-clock second collided on the key and the first arrival decided the authorities for both.
-That is exactly the admin demotion (and, mirrored, elevation) REQ-SEC-036 exists to prevent. A
-memoisation key must be a superset of the inputs the memoised computation reads.
+transaction) plus ~5–8 SELECTs (user load, `user_roles`, the role permissions, and the
+membership read). The memoisation key MUST include the token's `azp` alongside `(sub, iat)`: the
+assembly branches on the authorized party for the ingest-gateway short-circuit, so the set is not a
+pure function of `(sub, iat)`, and `iat` is a NumericDate in **seconds**, so two tokens for the
+same person minted by different clients inside one wall-clock second would otherwise collide. A
+memoisation key must be a superset of the inputs the memoised computation reads. A committed role
+change evicts every entry of the member (REQ-SEC-088).
 
 The assembled authority collection is memoised in-process keyed on `(sub, token
 issuedAt)` for a short window (~30&nbsp;s), so that work is paid once per token issuance instead of on
@@ -967,10 +966,10 @@ ingest-rollout regression, #1137 · **ADR:** ADR-0019, ADR-0115
 Frontend membership/role predicates (e.g. the member-only mission finance/refinery gate) MUST read
 the request `Authentication`'s authorities — the same source `sec:authorize` and `@PreAuthorize`
 consult — via `FrontendAuthHelperService`, never the `@AuthenticationPrincipal OidcUser`'s own
-`getAuthorities()`. Spring's `userAuthoritiesMapper` maps the Keycloak `realm_access.roles` onto the
-`OAuth2AuthenticationToken`, not onto the `OidcUser` principal object, so a check that reads the
-principal sees none of the mapped `ROLE_*` unless `BackendRoleSyncFilter` happened to rebuild the
-principal that session. The mission-detail finance gate (`MissionPageController.isMemberOrAbove`)
+`getAuthorities()`. The login maps no role from the OIDC token (REQ-SEC-088);
+`BackendRoleSyncFilter` puts the backend's `ROLE_*` onto the `OAuth2AuthenticationToken`, and only
+rebuilds the `OidcUser` principal when the set changed, so a check that reads the principal can
+miss them. The mission-detail finance gate (`MissionPageController.isMemberOrAbove`)
 regressed exactly this way: it read the principal, so the "Finanzen" panel silently collapsed
 (database rows intact, backend returning `200`) for any session whose one-shot role sync had been
 skipped, while the panel chrome still rendered because the template's `sec:authorize` correctly read
@@ -993,10 +992,8 @@ decision:
   after 15 s, so an approval reaches a live session without a re-login (REQ-SEC-017).
 - The **role sync** repeats every 60 s, and immediately when the filter observes the
   `PENDING → ACTIVE` transition, so a role, permission or org-unit membership granted after login
-  reaches the principal without a new session. It reads `/api/v1/users/me`, i.e. the backend's local
-  mirror: an org-unit membership (written locally) therefore lands within the interval, while a
-  **Keycloak realm role** first has to reach that mirror through the next access-token refresh
-  (`accessTokenLifespan` 300 s), so it takes up to ~5 min longer.
+  reaches the principal without a new session. It reads `/api/v1/users/me`, where roles,
+  permissions and org-unit memberships are all written locally, so each lands within the interval.
 - **Static assets skip the filter body**, so the two refreshes cost roughly one backend read per
   interval per session rather than one per page asset.
 - A backend read that fails MUST leave the cached verdict and its stamp untouched (retry on the next
@@ -1007,9 +1004,8 @@ no longer reports — so the frontend principal converges on the backend's autho
 drifting from it. The removal rule is asymmetric by ownership (ADR-0122):
 
 - **`ROLE_*`** — the backend response is authoritative for the whole vocabulary; a role it no longer
-  reports is dropped. Its local `role` catalog is where realm roles are mirrored and is what its own
-  `@PreAuthorize` gates read, so keeping such a role only renders UI that 403s. Technical realm roles
-  with no catalog entry (`offline_access`, `default-roles-*`) are dropped with it.
+  reports is dropped. Its `user_roles` are what its own `@PreAuthorize` gates read, so keeping such
+  a role only renders UI that 403s.
 - **Every other authority** — revocable only when a *previous* sync asserted it, tracked in
   `BACKEND_SYNCED_AUTHORITIES`. Permission strings carry no prefix and are indistinguishable from the
   login-owned `OIDC_USER` / `SCOPE_*` authorities, so this rule makes stripping one of those
@@ -1017,10 +1013,10 @@ drifting from it. The removal rule is asymmetric by ownership (ADR-0122):
 - A response carrying no role (or no permission) list asserts nothing and MUST revoke nothing —
   silence is never "everything withdrawn". Likewise a failed read changes no authority at all.
 
-Revocation is **not** immediate and is not the access boundary: an org-unit membership leaves within
-the re-sync interval, a Keycloak realm role only after it has left the backend's mirror via the next
-access-token refresh. The boundary remains the backend, which re-derives authorities per token under
-its own 30 s memoisation; anything that must revoke instantly needs the session terminated.
+Revocation is **not** immediate in the frontend and the frontend is not the access boundary: a
+role or an org-unit membership leaves the principal within the re-sync interval. The boundary
+remains the backend, which evicts a member's cached authorities on a role change (REQ-SEC-088);
+anything else that must revoke instantly needs the session terminated.
 
 **Acceptance**
 
@@ -1123,7 +1119,7 @@ after syncing every fetched user it calls `UserReconciliationService.markMissing
 which flags every local user whose Keycloak id did **not**
 appear in the run as no-longer-in-Keycloak. That reconciliation is only safe if the fetched set is the
 **complete** Keycloak user list. The Admin API `GET /users` endpoint caps each response at a server-side
-maximum (~100 by default), so `KeycloakService.fetchUsers(appRoleNames, knownDiscordLinkedIds)` MUST
+maximum (~100 by default), so `KeycloakService.fetchUsers(knownDiscordLinkedIds)` MUST
 page through `first`/`max` (`app.keycloak.sync.page-size`, default 100, bounded 1–1000) until a
 short/empty page signals the end.
 
@@ -1131,60 +1127,20 @@ A single unpaged call returns only the first page, so every user beyond the cap 
 missing — a silent soft-delete of real members. Fetching the page is a prerequisite of the
 reconciliation, not an optimisation; the two must never diverge.
 
-**Role resolution is role-indexed, not per-user (5000-account scaling, ADR-0085).** The sync resolves
-roles by listing the members of each app-relevant realm role once (`GET /roles/{name}/users`, paged),
-driven by the local role catalog (`getMappableRoleNames`), rather than reading each user's role mapping
-individually. Both views report directly-assigned realm roles, so the reconstructed sets are equivalent
-to the old per-user path — but the Admin-API call count is bounded by the (small) number of mappable
-roles instead of the user count. The completeness invariant above is unchanged: the roster still comes
-from the paged `GET /users`; role-indexing only changes how the roster is *annotated* with roles, never
-which users are considered present.
+**The sync reads no role (REQ-SEC-088).** Roles are held in `user_roles` and written by the
+Basetool, so the roster annotates each account with its enabled state, names, e-mail and Discord
+link only. The roster page and the per-user reads need `view-users`; a `401`/`403` is logged with
+that hint (naming the service account) rather than the generic fetch-failure message, so the daily
+failure is diagnosable from one log line. See [`docs/keycloak/README.md`](../keycloak/README.md) for
+the grant command.
 
-**The local catalog is matched case-insensitively against the realm's actual role names.** Keycloak's
-`GET /roles/{name}/users` lookup is case-sensitive, so the sync first lists the realm's real role names
-(paged `GET /roles`) and matches the local mappable names against them ignoring case (mirroring the
-interactive JWT path's `findByNameIgnoreCase`), then queries members under Keycloak's own casing. This
-removes a scheduled-vs-interactive casing asymmetry: a role whose Keycloak name differs only in case
-from the local name is still resolved, not silently dropped.
-
-**The realm's default-role composite is folded in (REQ-SEC-053).** `default-roles-<realm>` grants
-`KRT Member` to every account Keycloak creates, and `GET /roles/{name}/users` does not list members
-who hold a role only through that composite. `fetchDefaultRoleGrants` therefore resolves what the
-composite grants and credits it to every member of the default role, or a default-only member would
-come back with no role at all. And **a run in which none of the mappable app roles matches a realm
-role is aborted**, not written: that is a realm-side rename or a broken query, and persisting it would
-strip every account of every role and refuse the whole organisation with `NO_ROLE` at once. A single
-account resolving to no role is legitimate and is written through.
-
-**The service account needs `view-realm` on top of `view-users`.** The roster page (`GET /users`) and
-its per-user reads need only `view-users`, but the role-indexed resolution lists realm roles (`GET
-/admin/realms/{realm}/roles`) and reads their members (`GET /roles/{name}/users`), both of which the
-Keycloak Admin API gates behind the `view-realm` realm-management role. The `backend-service` service
-account MUST therefore hold **both** `view-users` and `view-realm`. A service account carrying only
-`view-users` (the pre-role-indexing requirement) fails closed on the `GET /roles` listing with a `403`
-every run: the run skips (no wipe), but the sync never reconciles — departed members keep their local
-roles and role changes propagate only via interactive login. `KeycloakService.fetchUsers` logs the
-401/403 case with an explicit "missing `view-realm`" hint (naming the offending service account) rather
-than the generic fetch-failure message, so the daily failure is diagnosable from one log line. See
-[`docs/keycloak/README.md`](../keycloak/README.md) for the exact grant command.
-
-**Admin API audience and scope are required alongside roles.** The `backend-service` client has
+**Admin API audience and scope are required alongside the realm-management roles.** The `backend-service` client has
 `kc-admin-api` as a default client scope, so its client-credentials access tokens carry the realm's
 Admin REST API audience and the `kc-admin-api` scope claim. Keycloak 26.8.2 requires both for custom
 Admin API clients. REQ-OPS-033's provisioner assigns the existing built-in scope; it does not disable
 Keycloak's audience check or grant that scope to browser, gateway or exchange clients. The generated
 sandbox/E2E realms enforce the same assignment and mapper, and the disconnect E2Es exercise the
 real protected Admin API.
-
-**A role-membership read failure is fail-safe: it skips the run, never degrades the write.** Because a
-role-stripped set would misclassify holders — creating a brand-new admin `PENDING` instead of
-`ACTIVE` (and, before REQ-SEC-053, mapping it to the since-removed `Guest` fallback), or
-mass-downgrading existing admins — a transient failure of
-any role read (5xx, 401/403, timeout, malformed body) propagates to `fetchUsers`' top-level catch and
-skips the whole run (empty roster → "skip", never a wipe, never a degraded persist), exactly like a
-roster-page failure. Only a clean `404` on a single role's member read (a benign TOCTOU: the role
-vanished after the `GET /roles` listing named it) is swallowed — that role contributes no members and
-the run continues.
 
 **The reconciled set is what the fetch reported, never what reconciled successfully.** The run
 swallows a per-user `syncUser` failure so one bad row cannot abort the roster -- correct, and it must
@@ -1200,12 +1156,9 @@ fail-closed probe, so the cost was misdirection rather than data loss). Every su
 
 **Acceptance** (`KeycloakServiceTest`): with a page size of 2 and three users across two pages,
 `fetchUsers` returns all three, the first request binds `first=0&max=2`, and the second advances to
-`first=2`; with realm role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
-`/roles/ADMIN/users`; a realm role spelled `admin` still resolves the app's `ADMIN` (case-insensitive);
-a 5xx on a role's member read yields an empty result (run skipped, no degraded roles); a clean 404
-on a role's member read keeps the roster with that role simply absent; and a `403` on the realm-role
-listing (a service account missing `view-realm`) yields an empty result and increments the
-`basetool_keycloak_sync_fetch_failures_total` counter.
+`first=2`; the Discord link is read only for users not yet linked locally; and a failed token or
+roster read yields an empty result and increments the `basetool_keycloak_sync_fetch_failures_total`
+counter.
 
 **Acceptance** (`UserSyncServiceTest`): a user whose `syncUser` throws is still carried in the set
 handed to `markMissingUsers`; a user the fetch never reported is not; the returned count stays the
@@ -2815,104 +2768,13 @@ rather than scoped · **Code:** `scripts/provision-keycloak-realm.py`
 **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
-### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete *(superseded)*
+### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete *(removed)*
 
-> **Superseded 2026-10-17 (ADR-0268, #2673).** The one partial-scope client in the realm was the
-> Android app's, and it is retired with the app: `app.security.partial-role-scope.client-ids`
-> defaults to empty, so no client is treated as partial-scope and `UserReconciliationService`
-> mirrors every token's roles again. `PartialRoleScopeProperties` and the guard stay in place
-> unarmed, because the trap they close is a property of Keycloak's `fullScopeAllowed`, not of that
-> client: the next narrowed client is a one-line configuration change away, and the gate is cheaper
-> to keep than to rediscover from a corrupted `app_user.roles`.
->
-> **The finding is the durable part.** *A token describes the member as the client that minted it
-> was allowed to see them.* Persisting that description lets whichever client a member used last
-> decide what the database says they are — and because the mirror is a replacement, not a merge, one
-> login through a narrowed client silently demotes an account.
-
-
-`UserReconciliationService#syncUser(Jwt)` mirrors a member's realm roles into `app_user` on **every**
-authentication, and it does so by **replacement**: `user.setRoles(mapRoles(realm_access.roles))`.
-That is correct only while every client's token carries the member's whole role list. It stopped
-being correct the moment one client was deliberately given less.
-
-A client whose Keycloak scope is narrowed — `fullScopeAllowed: false` plus a partial scope mapping,
-which the mobile client of REQ-SEC-035 still is (its scope names five of the realm's seven
-application roles) —
-mints a token describing a **smaller member than the real one**. Persisting that description lets whichever client a member happened to use last
-decide what the database says they are.
-
-**The rule.** A token from a configured *partial-scope client* MUST NOT write the account's role set.
-The stored set is left exactly as it was, and the request is authorised from the **token's** roles
-rather than from the row.
-
-Both halves are load-bearing and each is a defect without the other:
-
-- Persisting the partial claim is the data loss this requirement exists to stop.
-- Authorising from the row instead of the token would be **worse than the original defect**, and
-  the 2026-09-02 reversal of REQ-SEC-035 did not soften that — it inverted which way the damage
-  runs. While `Admin` was withheld, reading roles off the row would have handed the app an authority
-  its token deliberately lacked. Now that the scope carries `Admin`, reading off the row is what
-  would make the scope mapping stop deciding anything at all: `Logistician` and `Mission Manager`
-  are still absent from it, so the row and the token still describe different members, and
-  the token is the one the client was actually issued.
-
-**Matched on `azp`**, a claim inside a Keycloak-signed token that a client cannot set — the same
-handle `IngestGatewayProperties` already uses for the far more dangerous on-behalf-of decision, so
-this adds no new trust. Configured under `app.security.partial-role-scope.client-ids`.
-
-**Empty is the unsafe end here**, the reverse of the ingest gateway's list. There, empty means
-"nobody may act for another member". Here, empty resumes overwriting stored roles from partial
-tokens. The default therefore names the client known to be partial rather than shipping blank.
-
-**A brand-new row is the one exception**, in the safe direction: there is no stored set to protect,
-and the alternative is persisting a member with no roles at all, which REQ-SEC-053 would then refuse
-with `NO_ROLE` (before ADR-0159 the `Guest` fallback stood in for it).
-
-**The stored set still converges.** It is maintained by every client whose claim is complete and by
-the daily Admin-API pass (`syncUser(KeycloakUserDto)`), which reads the realm directly and is
-unaffected by any client's scope — so even a member who only ever uses the app has their row
-corrected within a day.
-
-**Monitoring.** Deliberately no new metric. The only quantity that varies is how much the
-partial-scope client is used, and `basetool_api_client_requests_total{client_id="basetool-android"}`
-already carries it (REQ-OBS-018); the guard itself is a pure function of static configuration, so a
-counter would restate the config rather than observe anything. The non-persisted claim is logged at
-DEBUG with the account's UUID and the two set sizes — never the username (REQ-OBS-004).
-
-**The narrowing extends to the exchange.** On `/api/v1/exchange/**` the acting member a connected
-application works for holds `ROLE_EXCHANGE_MEMBER` and one `XCH_CAPABILITY:<scope>` per relayed
-capability, never their stored roles, permissions or contextual grants; a member the approval or
-role gate refuses keeps only that gate's marker (`DatabaseActingMemberAuthorities`, REQ-XCH-009,
-ADR-0217). Nothing on that path writes the stored role set. *Corrected 2026-09-27: the planned
-amendment also listed "the memberships the demand feed needs" among these authorities. No
-membership authority is minted; the demand feed reads the member's memberships itself
-(REQ-XCH-018).*
-
-**Acceptance**
-
-- [x] A partial-scope client's token leaves the stored role set untouched, `Admin` included
-  (`UserReconciliationServiceTest.PartialRoleScopeTests`).
-- [x] The same request is authorised with the token's roles, not the row's — a row holding `Admin`
-  plus a token carrying only `KRT Member` yields no `ROLE_ADMIN`
-  (`CustomJwtGrantedAuthoritiesConverterTest`).
-- [x] An ordinary client still **replaces** the set, shrinking included: a guard that blocked every
-  role removal would mean a Keycloak demotion never reached the database, which is its own privilege
-  defect.
-- [x] A first login through a partial-scope client persists its roles rather than creating a
-  role-less row.
-- [x] A token with no `azp` is treated as an ordinary client — an absent claim fails towards the
-  established behaviour, not towards the exception.
-- [x] The database-only `assembleFor(User)` keeps its contract for the ingest gateway's
-  acting-member path (ADR-0129), which has no token to read.
-- [x] Each half was verified by removing it: the persistence guard and the authorisation source each
-  have a test that fails without them.
-
-**Enforced by:** `UserReconciliationServiceTest.PartialRoleScopeTests`,
-`CustomJwtGrantedAuthoritiesConverterTest` · **Code:** `PartialRoleScopeProperties`,
-`UserReconciliationService#syncUser(Jwt)` (`ReconciledUser`),
-`CustomJwtGrantedAuthoritiesConverter#assembleFor(User, Collection)` · **Configuration:**
-`app.security.partial-role-scope.client-ids`
+> **Removed with [ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md) (#3151).** No
+> token's role claim is read or written any more: roles are held in `user_roles` and assembled from
+> there for every client (REQ-SEC-088), so a narrowed client cannot demote an account. The guard
+> (`PartialRoleScopeProperties`, `app.security.partial-role-scope.client-ids`) is deleted. What an
+> exchange client's acting member holds is REQ-XCH-009's.
 
 ### REQ-SEC-038 — The Android App Link is verifiable, or the login is broken *(superseded)*
 
@@ -3660,7 +3522,7 @@ would not repair an identity, it would falsify history.
 | Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
 | Org-unit memberships and the Grand-Admiral office                                                   | Who granted, requested, decided, initiated, executed, paid out                                                        |
 | Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
-| Materialbörse offers, requests and interest                                                         | `user_roles` — re-derived from the token and the roster sync, not owned (REQ-SEC-013, REQ-SEC-036)                    |
+| Materialbörse offers, requests and interest                                                         | `user_roles` — assigned in the Basetool, guarded by `roles_version` (REQ-SEC-088)                                  |
 | Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
 | Notifications, rule selectors                                                                       | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
 | Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
@@ -4551,8 +4413,8 @@ the nightly `edge-deny-probe.yml` (the same statuses from outside the host) · *
 There is no role below member. The seeded `GUEST` role is gone (`V239`), and with it the state it
 represented — an authenticated caller with an **empty authority set**.
 
-**The rule:** an authenticated token whose realm roles map to no application role is refused with
-`403 NO_ROLE` on every `/api/**` path, before a handler runs. Two paths are exempt, for the same
+**The rule:** an approved account that holds no application role in `user_roles` (REQ-SEC-088) is
+refused with `403 NO_ROLE` on every `/api/**` path, before a handler runs. Two paths are exempt, for the same
 reasons they are exempt from the pending gate: `/api/v1/users/me/registration-status` (or the
 refusal has no way to explain itself), and the anonymous terms read of REQ-SEC-052,
 `GET /api/v1/terms/document` (a caller that sends a bearer along must still reach the text it has to
@@ -4565,20 +4427,17 @@ empty set was worse than that: it was mapped onto `GUEST`, which the URL matrix'
 let through, so "we could not resolve this account's roles" silently meant "give them the guest
 surface".
 
-**The refusal lives in `assembleFor(User, Collection<Role>)`**, not on the JWT path, so both callers
+**The refusal lives in `assembleFor(User)`**, not on the JWT path, so both callers
 inherit it: the resource-server conversion and `DatabaseActingMemberAuthorities` on the ingest
 gateway's acting-member path (ADR-0129), which installs an authentication without inspecting it.
 `Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
 `PendingApprovalAccessFilter` is the only reader.
 
-**`default-roles-basetool` carries `KRT Member`**, so every account Keycloak creates is a member at the
-IdP. **There is therefore no account holding only a bank role, or only any other role** (confirmed
-by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a gate on
-the member surface. The E2E realm contradicted this until then: `test-bank-employee` and
-`test-bank-management` carried their bank role alone, so those two accounts, and no real one, met a
-refusal on the mission list. A fixture that models an impossible account shape produces findings
-about a cohort that does not exist. That is the structural half of this requirement, and it is why
-the roster sync had to be fixed in the same change:
+**Approving a registration grants `KRT Member`** (REQ-SEC-088), so every approved account is a
+member. **There is therefore no account holding only a bank role, or only any other role**
+(confirmed by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a
+gate on the member surface. An account whose KRT Member an admin withdraws has departed
+(`MemberDepartedEvent`) and is refused `NO_ROLE` unless it still holds another role.
 
 **The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
@@ -4593,41 +4452,20 @@ The game-item catalogue read, formerly the thirteenth (`GET /api/v1/inventory/it
 lets any login through only for `orderable=true`, the subset the job-order create form read before. No `SecurityConfig` rule
 covers the path, so the annotation is the only gate; `GameItemControllerTest` evaluates both branches.
 
-> [!warning] The composite-blind sync was the precondition, not a detail
-> `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
-> holding `KRT Member` only through the composite came back with an empty set on every nightly run.
-> While that mapped to the authority-less `GUEST` it was invisible and healed at the next web login;
-> with this requirement live it would be an overnight lockout of everyone who never had the role
-> assigned directly. The sync now folds in what the realm's default-role composite grants.
->
-> A run in which the realm matches **none** of the app's roles aborts rather than writing, because
-> that is a rename or a broken query and never a legitimate state. A **single** account resolving to
-> no role is still written through.
->
-> [!bug] Corrected 2026-09-07 — stripping roles is not how a member is offboarded
-> The callout above used to end "removing someone's roles in Keycloak still removes their access".
-> It does not, and the refutation is the fold-in it names two sentences earlier:
-> `default-roles-<realm>` is assigned to every account Keycloak creates and is **not** removed when
-> an admin clears the user's other role mappings, so the composite credits `KRT Member` back on the
-> next nightly run. The two statements cannot both hold, and the fold-in is the one this
-> requirement needs.
->
-> **Offboarding is disabling or deleting the account in Keycloak** (owner decision, 2026-09-07), and
-> the enforcement is the IdP's own: neither account is issued a token, so no request reaches this
-> requirement. The local row mirrors both facts anyway — `in_keycloak` for presence,
-> `enabled_in_keycloak` for the `enabled` flag (V230) — because the ingest gateway's acting-member
-> path (ADR-0129) installs an authentication with no token to refuse, and its liveness guard is the
-> only reader of either. An account that reaches the sync with no role is therefore one the realm
-> never granted anything, not one somebody meant to remove; the `basetool_norole_refused_subjects`
-> gauge and `NoRoleBlockSpike` are what make that population visible.
+> [!note] Offboarding
+> Offboarding is withdrawing KRT Member in the Basetool, or disabling or deleting the account in
+> Keycloak (owner decision, 2026-09-07). The local row mirrors Keycloak's presence and `enabled`
+> flag — `in_keycloak`, `enabled_in_keycloak` (V230) — because the ingest gateway's acting-member path
+> (ADR-0129) installs an authentication with no token to refuse, and its liveness guard is the only
+> reader of either. The `basetool_norole_refused_subjects` gauge and `NoRoleBlockSpike` make the
+> role-less population visible.
 
 **Acceptance**
 
-- [x] A token carrying no known realm role is refused `403 NO_ROLE` on `/api/v1/users/me`, on the
-  JWT path and through `ActingMemberFilter`.
+- [x] An approved account holding no stored role is refused `403 NO_ROLE` on `/api/v1/users/me`,
+  on the JWT path and through `ActingMemberFilter`.
 - [x] The three exempt paths still answer such a token.
-- [x] A member holding `KRT Member` only through `default-roles-basetool` keeps the role after a sync run.
-- [x] A sync run that resolves no app role at all writes nothing and logs it.
+- [x] A sync run writes no role, so a member keeps every stored role (REQ-SEC-088).
 - [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
   before deleting — identifiers, not identities.
 - [x] A `ROLE` notification selector naming a code the catalogue does not know is rejected, so a
@@ -4746,7 +4584,7 @@ token issuedAt, azp)`, so every five-minute token refresh was a miss and a TTL a
 access-token lifespan bought nothing). That memoisation is the single control on how much load the authorization path puts
 on [`PostgreSQL`](data-persistence.md): the converter runs on **every** authenticated call, and a
 **miss** costs a write-capable `syncUser` transaction plus five to eight SELECTs — user load,
-`user_roles`, **one role lookup per realm role**, and the membership read.
+`user_roles`, the role permissions, and the membership read.
 
 Measured on production 2026-09-13, at the original hard-coded 30-second window that miss traffic
 came to **84.1 million sequential scans** across `role`, `org_unit`, `role_permissions`,
@@ -4754,7 +4592,7 @@ came to **84.1 million sequential scans** across `role`, `org_unit`, `role_permi
 was the dominant driver of CFS throttling on `db-backend` (161 s in 29 h, a 229 ms average stall per
 event, at 1.6 % of that container's own CPU quota). The ratios identify the source rather than
 merely correlating with it: `role`/`user_roles` at **3.6** is the per-realm-role N+1 the Javadoc
-describes, `app_user`/`user_roles` at **1.1** is one load per miss, and
+described then, `app_user`/`user_roles` at **1.1** is one load per miss, and
 `org_unit`/`org_unit_membership` at **2.0** is the cascade walk.
 
 The TTL is therefore configuration — `app.security.authorities-cache.ttl`, reaching the container as
@@ -4765,10 +4603,10 @@ would disable the cache and silently restore the storm. Above `PT15M` widens som
 is also **the window in which a revoked role, a withdrawn permission, a reversed approval or a
 removed org-unit membership stays effective within one Keycloak session**. A fresh login always
 misses, because it opens a new session, so re-authentication picks up new authorities at once. A
-refreshed token whose **claims** changed — a realm role granted or revoked in Keycloak, a renamed
-account, a new e-mail address — also misses: every claim except `iat`, `exp`, `nbf` and `jti` is
-hashed into the key, so a Keycloak-side role change bites on the next refresh, as it did while
-`issuedAt` was in the key. An approval does not wait for the TTL either: the pending-approval verdict
+role assigned or withdrawn in the Basetool evicts every entry of the member once it commits, so it
+bites on the member's next request (REQ-SEC-088). A refreshed token whose **claims** changed — a
+renamed account, a new e-mail address — also misses: every claim except `iat`, `exp`, `nbf` and
+`jti` is hashed into the key. An approval does not wait for the TTL either: the pending-approval verdict
 (`ROLE_PENDING_APPROVAL`) is **never cached**, so the first request after an admin approves a
 registration assembles the member's real authorities — a member who was signed in while pending
 reaches the consent page and the dashboard at once, within the same Keycloak session. What the TTL
@@ -4790,8 +4628,9 @@ and siblings, so the Spring-apps dashboard's cache panels and the `CacheHitRatio
 - [x] A fresh login misses the cache regardless of the configured TTL, so re-authentication applies
   new authorities immediately.
 - [x] A refreshed token of the same session and with unchanged claims is a hit; one with changed
-  claims (e.g. a revoked realm role) is a miss and carries the change; two clients (`azp`) of one
-  session never share an entry; a token without `sid` falls back to the `issuedAt` key.
+  claims is a miss; a role change of the member evicts their entries and another member's does not;
+  two clients (`azp`) of one session never share an entry; a token without `sid` falls back to the
+  `issuedAt` key.
 - [x] A pending-approval verdict is not cached: after an approval, the next request of the same
   Keycloak session carries the member's real authorities.
 - [x] Hits and misses are published under `cache="jwt-authorities"`.
@@ -6410,6 +6249,79 @@ surface.
 `KeycloakHealthIndicator`s · **Related:** REQ-SEC-014, REQ-SEC-024, REQ-SEC-069, REQ-OPS-022
 
 ---
+
+### REQ-SEC-088 — The four application roles are assigned in the Basetool
+
+The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
+written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).
+Keycloak holds none of them and no token carries them.
+
+- **Read from the database only.** `CustomJwtGrantedAuthoritiesConverter` assembles the
+  authorities from the stored roles and ignores a `realm_access` claim. A committed role change
+  publishes `UserRolesChangedEvent`, which evicts every cached authority set of the member, so the
+  backend applies it on the member's next request. The frontend maps no role from the OIDC token;
+  `BackendRoleSyncFilter` takes the roles from `/api/v1/users/me` on the first request of a
+  session and every 60 seconds after (ADR-0122).
+- **Never written by login or sync.** The login (`UserReconciliationService#syncUser(Jwt)`) and the
+  daily roster sync keep names, e-mail, the Discord link, the enabled state and existence, and
+  write no role. An account disabled in Keycloak still departs at the sync.
+- **Approval grants KRT Member.** Approving a registration gives the account KRT Member, recorded
+  as an assignment by the approving admin. A new account holds no role until then.
+
+`identity.internal.UserRoleAssignmentService` owns the assignments:
+
+- **Who assigns.** An admin assigns and withdraws every role on the member page (tab *Rollen*). The
+  bank management assigns and withdraws Bank Employee in the bank grant management (*Bank-Mitarbeiter*)
+  and sees only that role of a role set; anyone else gets `403`
+  (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
+  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
+- **Its own counter.** `app_user.roles_version` guards a user's role set (V362) and is echoed on every
+  change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
+  role change, so a role change and an edit of the user record never collide. A change that leaves
+  the role set as it is writes nothing.
+- **The last admin.** Withdrawing Admin while no other active account (approved, present and enabled
+  in Keycloak) holds it answers `409 LAST_ADMIN`; the Admin role row is locked first, so two
+  withdrawals are checked one after the other.
+- **The departure.** Withdrawing KRT Member publishes `MemberDepartedEvent` with the reason
+  `member_role_withdrawn`, so the exchange revocations and the unit notices follow (REQ-XCH-008).
+- **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
+  Keycloak subjects, empty by default; a value that is not a UUID fails the start) lists subjects
+  that receive Admin at login while no other active admin exists; the account is approved with it
+  and the same request is authorised as Admin.
+- **Traces.** Every change, the bootstrap grant included, records `USER_ROLE_ASSIGNED` /
+  `USER_ROLE_WITHDRAWN` (subject and target the member, details the `role` code and, for the
+  bootstrap grant, `source=bootstrap`; REQ-AUDIT-001), counts
+  `basetool_user_role_changes_total{role,action}`, tells the member through `USER_ROLE_CHANGED`
+  (not mutable, V363) and calls the `RolesChangedObserver`s.
+
+The provisioner deletes the four realm roles (with KRT Member's place in `default-roles-<realm>`)
+and withholds the `roles` client scope from `basetool-frontend`; the e2e and sandbox realms carry
+neither. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
+final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
+
+**Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
+`UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`, `UserRegistrationServiceTest`,
+`BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`, `BankGrantsPageControllerTest`,
+`SecurityConfigTest` (frontend), `provision-keycloak-realm.test.sh` (section 4c),
+`build-sandbox-realm.py --selftest`, `restore-keycloak-realm-roles.py --selftest` ·
+**Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
+`RoleChangeRecorder`, `BootstrapAdminGrant`, `ApprovalMemberGrant`, `identity/web/UserRoleController`,
+`scope/api/CustomJwtGrantedAuthoritiesConverter`
+
+**Acceptance**
+
+- [x] An admin assigns and withdraws each role; the counter moves, the row `@Version` does not.
+- [x] The bank management changes Bank Employee and is refused every other role.
+- [x] The last active admin keeps Admin (`409 LAST_ADMIN`).
+- [x] Withdrawing KRT Member publishes the departure.
+- [x] Each change is audited, counted and announced; an unchanged role set leaves no trace.
+- [x] A bootstrap subject receives Admin at login only while no other active admin exists.
+- [x] A token's realm roles grant nothing; the stored roles authorise, and a login writes none.
+- [x] A role assigned in the Basetool applies on the member's next request of the same session.
+- [x] Approving a registration grants KRT Member.
+- [x] The roster sync writes no role.
+- [x] The frontend maps no role from the OIDC token.
+- [x] The provisioner deletes the four realm roles and the web login's role claim.
 
 ## Out of scope
 
