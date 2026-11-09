@@ -3498,10 +3498,11 @@ would not repair an identity, it would falsify history.
 | Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
 | Org-unit memberships and the Grand-Admiral office                                                   | Who granted, requested, decided, initiated, executed, paid out                                                        |
 | Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
-| Materialbörse offers, requests and interest                                                         | `user_roles` — assigned in the Basetool, guarded by `roles_version` (REQ-SEC-088)                                  |
-| Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
-| Notifications, rule selectors                                                                       | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
-| Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
+| Materialbörse offers, requests and interest                                                         | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
+| Bank grants, view grants, approval limits, the holder row                                           | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
+| Notifications, rule selectors                                                                       | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
+| Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 |                                                                                                                       |
+| Roles (`user_roles`), joined with the target's; both role-set counters move (REQ-SEC-088)           |                                                                                                                       |
 
 **The merge is an orchestrator over participants** (plan §7.6, `platform.api`). Each module that
 holds member columns declares them in its `UserReassignmentParticipant` — the columns that follow
@@ -6266,6 +6267,9 @@ condition of the admin OTP (REQ-SEC-082); the Basetool never reads it.
 - **The last admin.** Withdrawing Admin while no other active account (approved, present and enabled
   in Keycloak) holds it answers `409 LAST_ADMIN`; the Admin role row is locked first, so two
   withdrawals are checked one after the other.
+- **The account merge.** Merging two accounts of one member (REQ-SEC-046) joins the source's roles
+  to the target's, bumps both counters and evicts both accounts' cached authorities, so the
+  emptied account holds no role and no longer counts for the last-admin rule.
 - **The departure.** Withdrawing KRT Member publishes `MemberDepartedEvent` with the reason
   `member_role_withdrawn`, so the exchange revocations and the unit notices follow (REQ-XCH-008).
 - **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
@@ -6310,6 +6314,8 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] A token's realm roles grant nothing; the stored roles authorise, and a login writes none.
 - [x] A role assigned in the Basetool applies on the member's next request of the same session.
 - [x] Approving a registration grants KRT Member.
+- [x] An account merge moves the source's roles onto the target and bumps both role-set counters
+  (`UserAccountMergeEndStateTest`).
 - [x] The roster sync writes no role.
 - [x] The frontend maps no role from the OIDC token.
 - [x] The provisioner deletes the three retired realm roles and the web login's role claim, and

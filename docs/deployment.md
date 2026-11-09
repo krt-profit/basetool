@@ -1681,7 +1681,19 @@ switch. Every write below needs @greluc's explicit approval for this host.
    promotion on, roles are changed only in the Basetool.
 2. **Check that an admin exists.** A read-only count of active holders of `ADMIN` in `user_roles`
    must be at least one, or `APP_BOOTSTRAP_ADMIN_SUBS` in `basetool.env` names a subject that gets
-   Admin at its next login (REQ-SEC-088).
+   Admin at its next login (REQ-SEC-088). From the release on, an account merge moves the roles to
+   the surviving account; an account emptied by an earlier merge may still hold some. List them
+   read-only and withdraw them on the member page after the promotion, so an unreachable account
+   does not count for the last-admin rule:
+
+   ```sql
+   SELECT ur.user_id, r.code
+     FROM user_roles ur
+     JOIN role r ON r.id = ur.role_id
+    WHERE ur.user_id::text IN (SELECT substring(details FROM 'fromUser=([0-9a-f-]{36})')
+                                 FROM audit_event
+                                WHERE event_type = 'USER_MERGED');
+   ```
 3. **Export the assignments** for the rollback with the read-only
    `scripts/role-assignments-export.sql`, fed on stdin as the report above, and keep the file off
    the repository:
