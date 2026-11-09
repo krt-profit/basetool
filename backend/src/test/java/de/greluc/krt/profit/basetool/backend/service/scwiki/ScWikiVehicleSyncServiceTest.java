@@ -391,6 +391,110 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
+  void aVariantWhoseSharedNameASiblingHoldsIsCoveredAndTheSweepRuns() {
+    UUID baseUuid = UUID.randomUUID();
+    UUID variantUuid = UUID.randomUUID();
+    ShipType base = new ShipType();
+    base.setName("Hammerhead");
+    base.setExternalUuid(baseUuid);
+    var baseDto =
+        ScWikiVehicleDto.builder()
+            .uuid(baseUuid)
+            .name("Hammerhead")
+            .className("AEGS_Hammerhead")
+            .build();
+    var variantDto =
+        ScWikiVehicleDto.builder()
+            .uuid(variantUuid)
+            .name("Hammerhead")
+            .className("AEGS_Hammerhead_GS")
+            .build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(baseDto, variantDto)));
+    when(shipTypeRepository.findByExternalUuid(baseUuid)).thenReturn(Optional.of(base));
+    when(shipTypeRepository.findByExternalUuid(variantUuid)).thenReturn(Optional.empty());
+    when(shipTypeRepository.findByNameIgnoreCase("Hammerhead")).thenReturn(Optional.of(base));
+    when(shipTypeRepository.save(any(ShipType.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, times(1)).save(base);
+    assertEquals(baseUuid, base.getExternalUuid());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(variantUuid),
+            eq("Hammerhead"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(baseUuid, variantUuid)), any());
+  }
+
+  @Test
+  void aSharedNameHeldByARowOutsideTheCensusStaysAConflictAndBlocksTheSweep() {
+    UUID foreignUuid = UUID.randomUUID();
+    UUID firstUuid = UUID.randomUUID();
+    UUID secondUuid = UUID.randomUUID();
+    ShipType holder = new ShipType();
+    holder.setName("Polaris");
+    holder.setExternalUuid(foreignUuid);
+    var firstDto = ScWikiVehicleDto.builder().uuid(firstUuid).name("Polaris").build();
+    var secondDto = ScWikiVehicleDto.builder().uuid(secondUuid).name("Polaris").build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(firstDto, secondDto)));
+    when(shipTypeRepository.findByNameIgnoreCase("Polaris")).thenReturn(Optional.of(holder));
+
+    assertEquals(0, service.syncVehicles());
+
+    verify(shipTypeRepository, never()).save(any());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            any(),
+            eq("Polaris"),
+            eq("Name is shared by several Wiki vehicles."));
+    verify(syncReportService, times(2)).recordIncomplete();
+    verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
+  }
+
+  @Test
+  void ofTwoUnstoredVariantsSharingANameOnlyTheFirstIsCreated() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    var firstDto = ScWikiVehicleDto.builder().uuid(first).name("Skylark").build();
+    var secondDto = ScWikiVehicleDto.builder().uuid(second).name("Skylark").build();
+    ShipType[] stored = new ShipType[1];
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(firstDto, secondDto)));
+    when(shipTypeRepository.findByNameIgnoreCase("Skylark"))
+        .thenAnswer(inv -> Optional.ofNullable(stored[0]));
+    when(shipTypeRepository.save(any(ShipType.class)))
+        .thenAnswer(inv -> {
+          stored[0] = inv.getArgument(0);
+          return stored[0];
+        });
+
+    assertEquals(1, service.syncVehicles());
+
+    verify(shipTypeRepository, times(1)).save(any(ShipType.class));
+    assertEquals(first, stored[0].getExternalUuid());
+    assertEquals(GameItemSourceSystem.WIKI_ONLY, stored[0].getSourceSystems());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            eq(second),
+            eq("Skylark"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(first, second)), any());
+  }
+
+  @Test
   void syncVehicles_rejectsAliasedRowWithDifferentUuid() {
     ShipType existing = new ShipType();
     UUID original = UUID.randomUUID();
