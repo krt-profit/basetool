@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — hierarchy foundation implemented; remaining workflows accepted/planned. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec — hierarchy and MATERIAL/ITEM workspace implemented; remaining workflows accepted/planned. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0356, ADR-0359, ADR-0360
 
 # Shared JobOrder model
@@ -99,6 +99,16 @@ CANCELLED end open promises; reopening does not revive them. Empty promises do n
 
 ### REQ-ORDERS-052 — Permitted readers see the complete order
 
+**Implemented MATERIAL/ITEM workspace:** queue/count, number search, detail, linked reads,
+material demand and persisted handover reports use the same complete permitted audience.
+Requester reduction and its DTO flag are removed; processing and requester capabilities remain
+separate. Current contextual writers receive the concrete workspace capability even without a
+direct membership. Independent producer, mission, unrelated Inventory, Bank and reduced Exchange
+gates remain. V378 retains only observed order/unit relationships: current parties and retained
+claim facts migrate; authorised creates and edits retain their observed before/after parties.
+Current unit reach is required, and a former individual's lost membership grants nothing.
+The participation extension and money-linked readers follow their owning implementation slices.
+
 The full order is readable by members of the requesting, responsible and active supporting units,
 leadership with existing reach over those units, personal Bearbeiter, members of actual
 eligible Profit units, and administrators. aUEC additionally admits explicitly account-linked
@@ -121,13 +131,26 @@ reduced, capability-based surface.
 - [ ] Linked holders retain personal order/history read after disposal of their balance.
 - [ ] Common read does not expose an independently private blueprint, mission or Bank account.
 
-**Enforced by:** Pending implementation · **Issues:** #3197, #3200, #3201
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
+`V378JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
+`JobOrderScopeQueryIntegrationTest`, `JobOrderLinkedStockReadNoNPlusOneTest` and the frontend
+order render tests cover the implemented workspace; linked money readers remain pending.
+**Issues:** #3197, #3200, #3201
 
 ### REQ-ORDERS-053 — Writing uses current contextual and personal authority
 
 A unit writer is authorized unit leadership or a contextual Logistician under the existing
 unit-specific grants and leadership reach rules, or an administrator. Mere membership is read authority. Either a writer of the requesting unit
 or a writer of the proposed responsible unit may create an order on behalf of those units.
+
+The MATERIAL/ITEM creation affordance and form use the current backend `canCreateJobOrders` and
+`GET /api/v1/orders/create-options` projection. Options carry per-unit writer flags and one
+currently permitted proposed pair; the frontend does not reconstruct authority or enumerate all
+pairs. The backend revalidates the selected pair when creating. All create transports consume the
+returned order identity and open its central detail page. A reader without a permitted pair gets
+no create action and cannot open the form. Workspace and unit-work view capabilities remain
+independent of creation and individual action rights.
+
 
 | Actor | Order write scope |
 | --- | --- |
@@ -150,7 +173,9 @@ within existing booked-production/delivery lower bounds; recorded facts are not 
 - [ ] External assignees can maintain their own note without arbitrary money rights.
 - [ ] Requester edits after partial work preserve production, delivery and historical facts.
 
-**Enforced by:** Pending implementation · **Issues:** #3197, #3200
+**Enforced by:** `JobOrderCreateOptionsIntegrationTest`, `JobOrderCreationWorkspaceMvcTest` and
+`JobOrderAssigneeGrantIntegrationTest` cover current creation and personal-entry capabilities.
+Post-partial requester and money workflows remain pending. **Issues:** #3197, #3200
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 
@@ -213,6 +238,11 @@ and money mutations must apply the same prerequisite.
 **Issues:** #3193, #3197, #3200
 
 ### REQ-ORDERS-056 — One shared overview leads to a central detail
+
+**Implemented overview:** MATERIAL and ITEM share a server-side kind filter in every scope and
+its database page count. The browser remembers kind, scope, status and unit selections; an unset
+scope defaults to ALL for every permitted reader. The filter offers only implemented kinds.
+Creation and later money-specific operation recovery remain governed by the clauses below.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under

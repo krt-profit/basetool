@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeParityCallers;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -77,18 +76,24 @@ class JobOrderScopeParityTest {
         callerId,
         true,
         rows,
-        wired ->
-            wired.resolver().canViewJobOrders()
-                ? jobOrderRepository
-                    .findScopedOrdersWithMaterialRequirements(
-                        List.of(JobOrderStatus.OPEN),
-                        wired.predicate().adminAllScope(),
-                        wired.predicate().activeOrgUnitId(),
-                        wired.predicate().memberOrgUnitIds())
-                    .stream()
-                    .map(JobOrder::getId)
-                    .collect(Collectors.toSet())
-                : Collections.<UUID>emptySet(),
+        wired -> {
+          var scope =
+              wired
+                  .resolver()
+                  .currentScopePredicateGranting(
+                      de.greluc.krt.profit.basetool.backend.kernel.Roles.LOGISTICIAN);
+          return jobOrderRepository
+              .findScopedOrdersWithMaterialRequirements(
+                  List.of(JobOrderStatus.OPEN),
+                  scope.adminAllScope()
+                      || (!wired.authHelper().isAdmin() && wired.resolver().canViewJobOrders()),
+                  scope.activeOrgUnitId(),
+                  scope.memberOrgUnitIds(),
+                  callerId)
+              .stream()
+              .map(JobOrder::getId)
+              .collect(Collectors.toSet());
+        },
         (wired, id) ->
             new JobOrderAccessPolicy(
                     wired.resolver(),
@@ -97,7 +102,10 @@ class JobOrderScopeParityTest {
                     jobOrderRepository,
                     org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
                     jobOrderHandoverRepository,
-                    jobOrderItemHandoverRepository)
+                    jobOrderItemHandoverRepository,
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.joborder.internal
+                            .JobOrderUnitReadHistoryRepository.class))
                 .canSeeJobOrder(id));
   }
 

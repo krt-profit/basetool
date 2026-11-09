@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeCandidateDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
@@ -130,6 +131,15 @@ public class JobOrderBackendClient {
   private final BackendApiClient backendApiClient;
 
   /**
+   * Reads current creation capability and the permitted choices of both unit sides.
+   *
+   * @return the backend projection, absent when its body is empty
+   */
+  public @Nullable JobOrderCreateOptionsDto createOptions() {
+    return backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class);
+  }
+
+  /**
    * Transfers responsibility to a currently eligible unit, including invalid-order recovery.
    *
    * @param id the order
@@ -151,6 +161,7 @@ public class JobOrderBackendClient {
    * @param size the page size
    * @param statuses the status filter, never empty
    * @param squadronIds the squadron filter, empty for all squadrons
+   * @param types implemented kinds, empty for all
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -159,8 +170,9 @@ public class JobOrderBackendClient {
       int page,
       int size,
       @NotNull List<String> statuses,
-      @NotNull List<UUID> squadronIds) {
-    return readOrders(scope, page, size, statuses, squadronIds, null);
+      @NotNull List<UUID> squadronIds,
+      @NotNull List<String> types) {
+    return readOrders(scope, page, size, statuses, squadronIds, null, types);
   }
 
   /**
@@ -174,7 +186,8 @@ public class JobOrderBackendClient {
   @Nullable
   public PageResponse<JobOrderDto> ordersToProcess(
       @Nullable UUID orgUnitId, int size, @NotNull List<String> statuses) {
-    return readOrders(OrderListScope.TO_PROCESS, 0, size, statuses, List.of(), orgUnitId);
+    return readOrders(
+        OrderListScope.TO_PROCESS, 0, size, statuses, List.of(), orgUnitId, List.of());
   }
 
   @Nullable
@@ -184,7 +197,8 @@ public class JobOrderBackendClient {
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds,
-      @Nullable UUID orgUnitId) {
+      @Nullable UUID orgUnitId,
+      @NotNull List<String> types) {
     StringBuilder uri =
         new StringBuilder(
                 scope == OrderListScope.MINE ? "/api/v1/orders/requested" : "/api/v1/orders")
@@ -211,6 +225,10 @@ public class JobOrderBackendClient {
         uriVariables.add(sid);
       }
     }
+    for (String kind : types) {
+      uri.append("&type={type}");
+      uriVariables.add(kind);
+    }
     if (orgUnitId != null) {
       uri.append("&orgUnitId={orgUnitId}");
       uriVariables.add(orgUnitId);
@@ -229,7 +247,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads one job order, redacted by the backend for a requester-only caller.
+   * Reads one complete permitted job order.
    *
    * @param id the order
    * @return the order, or {@code null} when the backend sent no body
@@ -545,7 +563,7 @@ public class JobOrderBackendClient {
    *
    * @param id the order
    * @param dto the comment, materials and the version it replaces
-   * @return the updated redacted order, or {@code null} when the backend sent no body
+   * @return the complete updated order, or {@code null} when the backend sent no body
    */
   @Nullable
   public JobOrderDto updateOrderAsRequester(@NotNull UUID id, @NotNull CreateJobOrderDto dto) {

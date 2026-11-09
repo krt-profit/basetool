@@ -923,3 +923,9 @@ New creation records the verified root too; an unknown legacy original is never 
 Initial reconciliation uses a system actor through the same ending/audit path.
 `ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED` and its labels
 remain readable for historical audit rows; no runtime mutation emits that retired switch event.
+
+Observed JobOrder unit-read relationships are retained in the same authorised create/edit
+transaction as its existing order audit event. They preserve the concrete requesting/responsible
+unit facts already observed by that command; they are not reconstructed from audit text and create
+no separate user action, financial movement or broadcast. A failed or refused edit retains no new
+relationship.

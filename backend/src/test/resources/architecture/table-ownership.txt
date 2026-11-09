@@ -58,6 +58,7 @@ job_order_item_handover joborder
 job_order_item_handover_entry joborder
 job_order_item_material joborder
 job_order_material joborder
+job_order_unit_read_history joborder
 job_type catalogue
 jurisdiction catalogue
 kommando_group orgunit

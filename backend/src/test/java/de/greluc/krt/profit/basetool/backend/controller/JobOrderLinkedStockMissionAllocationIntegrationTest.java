@@ -21,13 +21,18 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
@@ -53,8 +58,10 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -96,10 +103,14 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
   @Autowired private LocationRepository locationRepository;
   @Autowired private MissionRepository missionRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
+  @Autowired private BankAccountRepository bankAccounts;
+  @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private MockMvc mockMvc;
   private UUID orderId;
+  private UUID requesterUnitId;
+  private UUID linkedInventoryId;
   private UUID materialId;
   private UUID missionId;
   private UUID assigneeId;
@@ -115,6 +126,7 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
       tag = UUID.randomUUID().toString().substring(0, 8);
       Squadron unitA = newSquadron("Alloc-A-" + tag, "AA" + tag);
       Squadron unitB = newSquadron("Alloc-B-" + tag, "AB" + tag);
+      requesterUnitId = unitB.getId();
       User assignee = newUser("alloc-assignee-" + tag, UUID.randomUUID());
       assigneeId = assignee.getId();
       joinUnit(assignee, unitB);
@@ -159,7 +171,7 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
       row.setStolen(false);
       InventoryAllocations.addJobOrder(row, orderId, ALLOCATED, false);
       InventoryAllocations.addMission(row, missionId, ALLOCATED);
-      inventoryItemRepository.save(row);
+      linkedInventoryId = inventoryItemRepository.save(row).getId();
     });
     as(post(ORDERS + orderId + "/assignees/" + assigneeId), adminId, "ROLE_ADMIN")
         .andExpect(status().isOk());
@@ -180,6 +192,109 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
         .andExpect(jsonPath("$[0].missionAllocations[0].missionPlannedStartTime").doesNotExist());
     as(get("/api/v1/missions/" + missionId), assigneeId, "ROLE_KRT_MEMBER")
         .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void aConcreteRequesterReadKeepsMissionInventoryAndBankAuthorityIndependent() throws Exception {
+    UUID[] privateIds = new UUID[2];
+    transactionTemplate.executeWithoutResult(_ -> {
+      Squadron requesterUnit = squadronRepository.findById(requesterUnitId).orElseThrow();
+      requesterUnit.setParent(null);
+      squadronRepository.saveAndFlush(requesterUnit);
+      JobOrder order = jobOrderRepository.findById(orderId).orElseThrow();
+      order.setRequestingOrgUnit(requesterUnit);
+      jobOrderRepository.saveAndFlush(order);
+      InventoryItem linked = inventoryItemRepository.findById(linkedInventoryId).orElseThrow();
+      InventoryItem unrelated = new InventoryItem();
+      unrelated.setUser(linked.getUser());
+      unrelated.setMaterial(linked.getMaterial());
+      unrelated.setLocation(linked.getLocation());
+      unrelated.setOwningOrgUnit(order.getResponsibleOrgUnit());
+      unrelated.setQuality(501);
+      unrelated.setAmount(1.0);
+      privateIds[0] = inventoryItemRepository.saveAndFlush(unrelated).getId();
+      BankAccount account = new BankAccount();
+      account.setAccountNo("KB-" + tag);
+      account.setName("Private account " + tag);
+      account.setType(BankAccountType.ORG_UNIT);
+      account.setOrgUnit(order.getResponsibleOrgUnit());
+      privateIds[1] = bankAccounts.saveAndFlush(account).getId();
+    });
+    as(delete(ORDERS + orderId + "/assignees/" + assigneeId), adminId, "ROLE_ADMIN")
+        .andExpect(status().isOk());
+
+    as(get("/api/v1/me/capabilities"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewJobOrders").value(false))
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewBankStaff").value(false));
+    as(get(ORDERS + orderId), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.assignees.length()").value(0))
+        .andExpect(jsonPath("$.canEdit").value(false));
+    as(
+            get(ORDERS + orderId + "/materials/" + materialId + "/inventory"),
+            assigneeId,
+            "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].missionAllocations[0].amount").value(ALLOCATED))
+        .andExpect(jsonPath("$[0].missionAllocations[0].missionName").doesNotExist());
+    as(get("/api/v1/missions/" + missionId), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isForbidden());
+    as(get("/api/v1/inventory/" + privateIds[0] + "/pool-targets"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isForbidden());
+    as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].ownerName").exists())
+        .andExpect(jsonPath("$[0].canEdit").value(false));
+    as(get("/api/v1/bank/accounts/" + privateIds[1]), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void collectionRowCapabilitiesRemainStatementBoundedForARealReader() throws Exception {
+    appendCollectionRows(1, 2);
+    var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    statistics.setStatisticsEnabled(true);
+    statistics.clear();
+    as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(3))
+        .andExpect(jsonPath("$[0].canEdit").value(false));
+    long few = statistics.getPrepareStatementCount();
+
+    appendCollectionRows(3, 24);
+    statistics.clear();
+    as(get(ORDERS + orderId + "/material-collection"), assigneeId, "ROLE_KRT_MEMBER")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(25))
+        .andExpect(jsonPath("$[0].canEdit").value(false));
+    assertThat(statistics.getPrepareStatementCount()).isEqualTo(few);
+    as(get(ORDERS + orderId + "/material-collection"), adminId, "ROLE_ADMIN")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].canEdit").value(true));
+  }
+
+  /**
+   * Adds distinct foreign stock rows to the collection without assigning the reader stock rights.
+   */
+  private void appendCollectionRows(int first, int last) {
+    transactionTemplate.executeWithoutResult(_ -> {
+      JobOrder order = jobOrderRepository.findById(orderId).orElseThrow();
+      InventoryItem source = inventoryItemRepository.findById(linkedInventoryId).orElseThrow();
+      for (int index = first; index <= last; index++) {
+        InventoryItem row = new InventoryItem();
+        row.setUser(source.getUser());
+        row.setMaterial(source.getMaterial());
+        row.setLocation(source.getLocation());
+        row.setOwningOrgUnit(order.getResponsibleOrgUnit());
+        row.setQuality(500 + index);
+        row.setAmount(1.0);
+        InventoryAllocations.addJobOrder(row, orderId, 1.0, false);
+        inventoryItemRepository.save(row);
+      }
+    });
   }
 
   @Test

@@ -110,10 +110,18 @@ class JobOrderBackendClientTest {
     backend.answerJson(EMPTY_PAGE);
 
     client.orders(
-        OrderListScope.ALL, 2, 100, List.of("OPEN", "IN_PROGRESS"), List.of(SQUADRON, OTHER));
-    client.orders(OrderListScope.MINE, 0, 50, List.of("COMPLETED"), List.of(SQUADRON));
-    client.orders(OrderListScope.TO_PROCESS, 1, 200, List.of("OPEN"), List.of(SQUADRON));
-    client.orders(OrderListScope.ASSIGNED, 0, 100, List.of("OPEN"), List.of(SQUADRON));
+        OrderListScope.ALL,
+        2,
+        100,
+        List.of("OPEN", "IN_PROGRESS"),
+        List.of(SQUADRON, OTHER),
+        java.util.List.of());
+    client.orders(
+        OrderListScope.MINE, 0, 50, List.of("COMPLETED"), List.of(SQUADRON), java.util.List.of());
+    client.orders(
+        OrderListScope.TO_PROCESS, 1, 200, List.of("OPEN"), List.of(SQUADRON), java.util.List.of());
+    client.orders(
+        OrderListScope.ASSIGNED, 0, 100, List.of("OPEN"), List.of(SQUADRON), java.util.List.of());
 
     backend.expect(
         "GET",
@@ -156,6 +164,32 @@ class JobOrderBackendClientTest {
 
     backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=5");
     backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=10&orgUnitId=" + SQUADRON);
+  }
+
+  @Test
+  void creationOptionsPreserveTheBackendCapabilityAndPerSideWriterFlags() {
+    backend.answerJson(
+        """
+        {"canCreate":true,
+         "responsibleOptions":[{"orgUnitId":"00000000-0000-0000-0000-000000000185",
+           "orgUnitName":"Profit unit","shorthand":"P","kind":"BEREICH","canWrite":false}],
+         "requestingOptions":[{"orgUnitId":"00000000-0000-0000-0000-000000000186",
+           "orgUnitName":"Requesting unit","shorthand":"Q","kind":"SQUADRON","canWrite":true}],
+         "suggestedResponsibleOrgUnitId":"00000000-0000-0000-0000-000000000185",
+         "suggestedRequestingOrgUnitId":"00000000-0000-0000-0000-000000000186"}
+        """);
+
+    var options = client.createOptions();
+
+    assertThat(options).isNotNull();
+    assertThat(options.canCreate()).isTrue();
+    assertThat(options.responsibleOptions())
+        .singleElement()
+        .satisfies(option -> assertThat(option.canWrite()).isFalse());
+    assertThat(options.requestingOptions())
+        .singleElement()
+        .satisfies(option -> assertThat(option.canWrite()).isTrue());
+    backend.expect("GET", "/api/v1/orders/create-options");
   }
 
   @Test

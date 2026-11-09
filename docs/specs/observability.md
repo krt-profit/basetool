@@ -4274,3 +4274,8 @@ Initial promise reconciliation runs before application readiness and uses the sa
 transition and live notifications. A failed reconciliation rolls back and prevents readiness; the
 existing backend availability/readiness probes expose that failure. It has no schedule, feature
 switch, user labels or separate external surface.
+
+The complete MATERIAL/ITEM workspace, kind narrowing and retained concrete unit reads reuse the
+existing templated HTTP spans, order audit events, `order_detail` / `orders_queue` live-sync classes
+and authenticated `/orders` probe. No public gateway, scheduled job, status or metric label is added;
+reader/unit/order identities and retained relationship timestamps remain outside metric labels.

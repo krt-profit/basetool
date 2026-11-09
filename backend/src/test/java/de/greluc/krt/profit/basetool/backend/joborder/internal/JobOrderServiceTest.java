@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -65,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -164,7 +166,13 @@ class JobOrderServiceTest {
             responsibilityGuard,
             jobOrderAccessPolicy,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     inventoryItemRepository,
@@ -196,16 +204,26 @@ class JobOrderServiceTest {
                 jobOrderAccessPolicy,
                 auditService,
                 eventPublisher,
-                jobOrderStockProjectionService),
-            liveSyncPublisher);
+                jobOrderStockProjectionService,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
+                        .class)),
+            liveSyncPublisher,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     jobOrderQueryService =
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
             requestScopeResolver,
-            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
@@ -307,7 +325,6 @@ class JobOrderServiceTest {
             null,
             false,
             false,
-            false,
             null,
             false);
   }
@@ -398,27 +415,42 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void getAllJobOrders_nonViewer_returnsEmptyPageWithoutQuerying() {
+  void getAllJobOrdersWithoutConcreteReadReturnsAnEmptyScopedPage() {
     when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    var request = org.springframework.data.domain.PageRequest.of(0, 20);
+    when(jobOrderRepository.findScopedJobOrders(
+            List.of(JobOrderStatus.values()),
+            true,
+            Set.of(new UUID(0L, 0L)),
+            false,
+            Set.of(new UUID(0L, 0L)),
+            false,
+            null,
+            Set.of(),
+            new UUID(0L, 0L),
+            List.of(JobOrderType.values()),
+            request))
+        .thenReturn(org.springframework.data.domain.Page.empty(request));
 
     org.springframework.data.domain.Page<JobOrderDto> result =
-        jobOrderQueryService.getAllJobOrders(
-            null, null, org.springframework.data.domain.PageRequest.of(0, 20));
+        jobOrderQueryService.getAllJobOrders(null, null, request);
 
     assertTrue(result.isEmpty());
-    verify(jobOrderRepository, never())
+    verify(jobOrderRepository)
         .findScopedJobOrders(
-            any(),
-            anyBoolean(),
-            any(),
-            anyBoolean(),
-            any(),
-            anyBoolean(),
-            any(),
-            any(),
-            any(),
-            any());
-    verify(requestScopeResolver, never()).currentScopePredicate();
+            List.of(JobOrderStatus.values()),
+            true,
+            Set.of(new UUID(0L, 0L)),
+            false,
+            Set.of(new UUID(0L, 0L)),
+            false,
+            null,
+            Set.of(),
+            new UUID(0L, 0L),
+            List.of(JobOrderType.values()),
+            request);
   }
 
   @Test
@@ -899,23 +931,28 @@ class JobOrderServiceTest {
 
   @Test
   void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     org.springframework.data.domain.Page<JobOrderDto> page =
         jobOrderQueryService.getRequestedJobOrders(
             null, org.springframework.data.domain.PageRequest.of(0, 20));
 
     assertTrue(page.isEmpty(), "no memberships -> empty page");
-    verify(jobOrderRepository, never()).findRequestedOrders(any(), any(), any());
+    verify(jobOrderRepository, never())
+        .findRequestedOrders(any(), any(), org.mockito.ArgumentMatchers.any(), any());
   }
 
   @Test
-  void getRequestedJobOrders_nullStatuses_defaultsToAllStatuses_scopedToDirectMembership() {
+  void getRequestedJobOrdersNullStatusesUseEveryStatusInCurrentUnitReach() {
     UUID requestingUnitId = UUID.randomUUID();
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds())
-        .thenReturn(java.util.Set.of(requestingUnitId));
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of(requestingUnitId)));
     when(jobOrderRepository.findRequestedOrders(
-            any(), eq(java.util.Set.of(requestingUnitId)), any()))
+            any(),
+            eq(java.util.Set.of(requestingUnitId)),
+            org.mockito.ArgumentMatchers.any(),
+            any()))
         .thenReturn(org.springframework.data.domain.Page.empty());
 
     jobOrderQueryService.getRequestedJobOrders(
@@ -925,7 +962,10 @@ class JobOrderServiceTest {
         org.mockito.ArgumentCaptor.captor();
     verify(jobOrderRepository)
         .findRequestedOrders(
-            statusesCaptor.capture(), eq(java.util.Set.of(requestingUnitId)), any());
+            statusesCaptor.capture(),
+            eq(java.util.Set.of(requestingUnitId)),
+            org.mockito.ArgumentMatchers.any(),
+            any());
     assertEquals(
         JobOrderStatus.values().length,
         statusesCaptor.getValue().size(),
@@ -1926,7 +1966,6 @@ class JobOrderServiceTest {
               null,
               false,
               false,
-              false,
               null,
               false);
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
@@ -2001,7 +2040,6 @@ class JobOrderServiceTest {
                 o.getVersion(),
                 null,
                 null,
-                false,
                 false,
                 false,
                 null,

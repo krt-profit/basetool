@@ -78,13 +78,15 @@ public enum OrderListScope {
    * @param canViewQueue whether the caller may enter the Job-Order area
    * @param canViewOwn whether the caller may view the orders their own units requested
    * @param canViewAssigned whether the caller holds an assignee entry
+   * @param canViewUnitWork whether current responsible or supporting units may be viewed
    * @return the offered segments; empty when there is nothing to choose
    */
   @NotNull
   public static List<OrderListScope> offered(
-      boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned) {
+      boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned, boolean canViewUnitWork) {
     return Arrays.stream(values())
-        .filter(scope -> scope.isOffered(canViewQueue, canViewOwn, canViewAssigned))
+        .filter(
+            scope -> scope.isOffered(canViewQueue, canViewOwn, canViewAssigned, canViewUnitWork))
         .toList();
   }
 
@@ -97,6 +99,7 @@ public enum OrderListScope {
    * @param canViewQueue whether the caller may enter the Job-Order area
    * @param canViewOwn whether the caller may view the orders their own units requested
    * @param canViewAssigned whether the caller holds an assignee entry
+   * @param canViewUnitWork whether current responsible or supporting units may be viewed
    * @return the scope to read; the caller has at least one capability
    */
   @NotNull
@@ -104,22 +107,22 @@ public enum OrderListScope {
       @Nullable OrderListScope requested,
       boolean canViewQueue,
       boolean canViewOwn,
-      boolean canViewAssigned) {
-    if (requested != null && requested.isOffered(canViewQueue, canViewOwn, canViewAssigned)) {
+      boolean canViewAssigned,
+      boolean canViewUnitWork) {
+    if (requested != null
+        && requested.isOffered(canViewQueue, canViewOwn, canViewAssigned, canViewUnitWork)) {
       return requested;
     }
-    if (canViewQueue) {
-      return ALL;
-    }
-    return canViewOwn ? MINE : ASSIGNED;
+    return ALL;
   }
 
-  private boolean isOffered(boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned) {
+  private boolean isOffered(
+      boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned, boolean canViewUnitWork) {
     return switch (this) {
       case MINE -> canViewOwn;
       case ASSIGNED -> canViewQueue || canViewAssigned;
-      case TO_PROCESS -> canViewQueue;
-      case ALL -> canViewQueue || canViewOwn || canViewAssigned;
+      case TO_PROCESS -> canViewUnitWork;
+      case ALL -> canViewQueue || canViewOwn || canViewAssigned || canViewUnitWork;
     };
   }
 }

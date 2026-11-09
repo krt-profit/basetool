@@ -28,8 +28,14 @@ public enum NavigationFlag {
   /** The caller may open the org-unit blueprint availability overview. */
   BLUEPRINT_OVERVIEW,
 
-  /** The caller may enter the Job-Order area. */
-  JOB_ORDERS,
+  /** The shared permitted-order workspace is offered in the current context. */
+  ORDER_WORKSPACE,
+
+  /** The current units have a responsible or supporting order-work view. */
+  ORDER_UNIT_WORK,
+
+  /** At least one current unit pair permits order creation. */
+  CREATE_JOB_ORDERS,
 
   /** The caller may view the orders their own org unit requested (REQ-ORDERS-023). */
   OWN_JOB_ORDERS,
@@ -85,13 +91,19 @@ public enum NavigationFlag {
    */
   public boolean holdsUserWide(@NotNull Set<NavigationFlag> flags) {
     return switch (this) {
-      case BLUEPRINT_OVERVIEW, JOB_ORDERS, OWN_JOB_ORDERS, ASSIGNED_JOB_ORDERS, OFFICER_ANYWHERE ->
+      case BLUEPRINT_OVERVIEW,
+          ORDER_WORKSPACE,
+          OWN_JOB_ORDERS,
+          ASSIGNED_JOB_ORDERS,
+          OFFICER_ANYWHERE ->
           flags.contains(this);
       case OPEN_LEITUNG -> flags.contains(OFFICER_ANYWHERE);
       case SUPPLY_INCOMING, SUPPLY_STATS -> !flags.contains(SUPPLY) || flags.contains(this);
       case PURCHASING_PARTNERS, PURCHASING_DELEGATES, PURCHASING_REPORT ->
           !flags.contains(PURCHASING) || flags.contains(this);
-      case LOGISTICIAN_HERE, SUPPLY, PURCHASING, LANGUAGE_DE, LANGUAGE_EN -> true;
+      case ORDER_UNIT_WORK -> flags.contains(ORDER_WORKSPACE);
+      case LOGISTICIAN_HERE, CREATE_JOB_ORDERS, SUPPLY, PURCHASING, LANGUAGE_DE, LANGUAGE_EN ->
+          true;
     };
   }
 }

@@ -93,7 +93,6 @@ class OrderHierarchyVisibilityTest {
             null,
             false,
             false,
-            false,
             true,
             false);
 

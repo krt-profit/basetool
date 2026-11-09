@@ -88,8 +88,8 @@ in the controller, not the service, so business logic stays free of `SecurityCon
 > The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 An assignee entry (`JobOrderAssignee`) is the only meaning of „assigned to me"; there is no separate
-responsible person. Profit members still sign themselves up and off, and a Logistician of the order
-still adds and removes anyone (REQ-ORDERS-014). The entry additionally grants its holder **read
+responsible person. Current responsible-unit writers enroll accounts. Existing assignees remove themselves and
+maintain their own notes; membership or Profit reading alone grants no enrollment (REQ-ORDERS-014). The entry additionally grants its holder **read
 visibility of that one order**, an exception to org-unit tenancy (REQ-ORG-003, ADR-0301).
 
 - **Who may be assigned.** A Logistician of the order may assign **any active account** (approved,

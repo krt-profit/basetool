@@ -29,9 +29,9 @@ required products and its responsible org unit.
 
 ### REQ-ORDERS-015 — Blueprint-coverage view for item orders
 
-> **Approved planned producer population (not implemented):** With the Profit Bereich directly responsible, include its own members and the members of its subordinate Staffeln/SK, together with already globally shared blueprint data. With a responsible Staffel/SK, retain its own members plus the existing global sharers. REQ-ORDERS-016 remains the independent viewer gate; mere support participation does not expose additional private blueprint data.
+> **Implemented ITEM producer population:** With the Profit Bereich directly responsible, include its own members and the members of its subordinate Staffeln/SK, including inactive child units, together with already globally shared blueprint data. With a responsible Staffel/SK, retain its own members plus the existing global sharers. REQ-ORDERS-016 remains the independent viewer gate; mere support participation does not expose additional private blueprint data.
 
-> **Approved shared-order target - not implemented:** the responsible unit may also be the Profit
+> **Implemented ITEM producer projection:** the responsible unit may also be the Profit
 > Bereich. Apply the existing responsible-unit producer scope and explicit global-sharing opt-in
 > through the authoritative unit projection. Do not infer producer ownership from shared queue
 > visibility, supporting participation or a matching name. Family/exact matching and unrelated
@@ -91,7 +91,7 @@ data exposed.
 - [ ] The coverage panel renders inside a collapsible container that starts expanded; toggling it
   open/closed changes only visibility, never the data shown.
 
-**Enforced by:** `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest`,
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`, `JobOrderItemBlueprintOwnersServiceTest`, `BlueprintVariantFamilyResolverTest`,
 `JobOrderItemDetailRenderTest` ·
 **Code:** `JobOrderItemBlueprintOwnersService`, `BlueprintVariantFamilyResolver`,
 `JobOrderController.getItemBlueprintOwners` (`GET /api/v1/orders/{id}/item-blueprint-owners`) ·

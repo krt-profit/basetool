@@ -63,7 +63,13 @@ class JobOrderStockReadServiceTest {
   void setUp() {
     service =
         new JobOrderStockReadService(
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
             jobOrderRepository);
   }
 

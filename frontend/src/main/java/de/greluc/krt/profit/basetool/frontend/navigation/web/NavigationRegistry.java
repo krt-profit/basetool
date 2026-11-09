@@ -22,11 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.navigation.web;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationEntry.of;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.ASSIGNED_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.BLUEPRINT_OVERVIEW;
-import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.JOB_ORDERS;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.CREATE_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LOGISTICIAN_HERE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.ORDER_WORKSPACE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.PURCHASING_DELEGATES;
@@ -110,6 +111,7 @@ public class NavigationRegistry {
       Map.of(
           "hangar.overview", List.of("hangar.unit"),
           "storage.overview", List.of("storage.my", "storage.all"),
+          "orders.list", List.of("orders.own", "orders.assigned"),
           "admin.dataimports", List.of("admin.syncreports.uex", "admin.syncreports.scwiki"));
 
   private static final NavigationGate LEITUNG_GATE = NavigationGate.requires(OPEN_LEITUNG);
@@ -484,26 +486,25 @@ public class NavigationRegistry {
             .testId("nav-refinery"),
         of("orders.list", "/orders", "nav.page.orders")
             .keywords("palette.keywords.orders")
-            .gate(NavigationGate.requires(JOB_ORDERS))
+            .gate(NavigationGate.requires(ORDER_WORKSPACE))
             .testId("nav-orders"),
-        of("orders.own", "/orders", "nav.page.orders")
-            .tab("nav.orders.own")
+        of("orders.own", "/orders?scope=MINE", "nav.orders.own")
             .keywords("palette.keywords.orders")
-            .gate(NavigationGate.requires(OWN_JOB_ORDERS).andExcludes(JOB_ORDERS))
+            .gate(NavigationGate.requires(ORDER_WORKSPACE, OWN_JOB_ORDERS))
+            .with(PALETTE_ONLY)
             .testId("nav-orders-own"),
-        of("orders.assigned", "/orders", "nav.page.orders")
-            .tab("nav.orders.assigned")
+        of("orders.assigned", "/orders?scope=ASSIGNED", "nav.orders.assigned")
             .keywords("palette.keywords.orders")
-            .gate(
-                NavigationGate.requires(ASSIGNED_JOB_ORDERS)
-                    .andExcludes(JOB_ORDERS, OWN_JOB_ORDERS))
+            .gate(NavigationGate.requires(ORDER_WORKSPACE, ASSIGNED_JOB_ORDERS))
+            .with(PALETTE_ONLY)
             .testId("nav-orders-assigned"),
         of("orders.create", "/orders/create", "orders.create.link")
-            .gate(NavigationGate.excludes(JOB_ORDERS, OWN_JOB_ORDERS))
+            .with(PALETTE_ONLY, NOT_INDEXED)
+            .gate(NavigationGate.requires(CREATE_JOB_ORDERS))
             .testId("nav-orders-create"),
         of("orders.demand", "/orders/material-demand", "nav.orders.materialDemand")
-            .keywords("palette.keywords.materialDemand")
-            .gate(NavigationGate.requires(JOB_ORDERS))
+            .tab("nav.orders.materialDemand")
+            .gate(NavigationGate.requires(ORDER_WORKSPACE))
             .testId("nav-orders-material-demand")
             .with(PALETTE_ONLY),
         of("blueprints.availability", "/blueprint-overview", "nav.blueprint_overview")
@@ -789,12 +790,7 @@ public class NavigationRegistry {
         NavigationPageTabs.of("missions.list", "operations.list"),
         NavigationPageTabs.of("hangar.overview", "hangar.catalog"),
         NavigationPageTabs.of("storage.overview", "storage.levels"),
-        NavigationPageTabs.of(
-            "orders.list",
-            "orders.own",
-            "orders.assigned",
-            "orders.demand",
-            "blueprints.availability"),
+        NavigationPageTabs.of("orders.list", "orders.demand", "blueprints.availability"),
         NavigationPageTabs.of("materials.list", "materials.overview", "materials.profit"),
         NavigationPageTabs.of(
             "supply.needs",
@@ -866,6 +862,7 @@ public class NavigationRegistry {
         "palette.actions",
         ICON_PLUS,
         of("action.order.create", "/orders/create", "palette.action.createOrder")
+            .gate(NavigationGate.requires(CREATE_JOB_ORDERS))
             .keywords("palette.keywords.create")
             .icon(ICON_PLUS)
             .testId("palette-action-create-order"),
@@ -919,8 +916,7 @@ public class NavigationRegistry {
     return List.of(
         new NavigationTab(List.of("missions.list")),
         new NavigationTab(List.of("storage.overview")),
-        new NavigationTab(
-            List.of("orders.list", "orders.own", "orders.assigned", "orders.create")));
+        new NavigationTab(List.of("orders.list")));
   }
 
   @NotNull

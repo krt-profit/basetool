@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -34,9 +37,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Creates a job order through the UI and verifies it appears in the order list. IRIDIUM is made
- * profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the membership and a
- * job-order material in {@link #setUp()}.
+ * Creates a job order through the UI, enters its returned detail and finds it in the shared list.
+ * IRIDIUM is made profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the
+ * membership and a job-order material in {@link #setUp()}.
  */
 @Tag("e2e")
 class JobOrderCreateE2eTest {
@@ -79,7 +82,8 @@ class JobOrderCreateE2eTest {
 
   /**
    * Fills and submits the job-order create form (responsible org-unit, requesting org-unit, contact
-   * handle, one material row) and asserts an order then appears in the order list.
+   * handle and one material row), enters its returned identity and finds that exact order in the
+   * list.
    */
   @Test
   void createsAJobOrderThroughTheUi() {
@@ -98,10 +102,22 @@ class JobOrderCreateE2eTest {
         page.locator("#handle").fill("E2E Contact");
         E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-submit").click());
+        var created =
+            page.waitForResponse(
+                response ->
+                    response.url().endsWith("/orders/create")
+                        && "POST".equals(response.request().method()),
+                () -> page.getByTestId("order-submit").click());
+        assertEquals(200, created.status());
+        String target =
+            JsonParser.parseString(created.text()).getAsJsonObject().get("targetUrl").getAsString();
+        assertTrue(target.matches("/orders/[0-9a-f-]{36}"));
+        page.waitForURL(baseUrl + target);
+        assertThat(page.locator("#order-header-results")).containsText("E2E Contact");
 
         E2eSupport.navigate(page, baseUrl + "/orders");
-        assertThat(page.getByTestId("order-row").first())
+        String createdId = target.substring("/orders/".length());
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + createdId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-create");

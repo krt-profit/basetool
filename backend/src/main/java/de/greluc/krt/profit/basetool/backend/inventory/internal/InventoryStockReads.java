@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -66,6 +67,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryStockSplitRepository splitRepository;
   private final InventoryDonationSourceRepository donationSourceRepository;
+  private final StockViewerAccess stockViewerAccess;
 
   @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
@@ -283,7 +285,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
    * @param gameItem the row's game-item reference, or {@code null} for a material row
    * @return the stock-view row
    */
-  private static @NotNull LinkedStockRow linkedRow(
+  private @NotNull LinkedStockRow linkedRow(
       @NotNull InventoryItem item,
       @NotNull UUID jobOrderId,
       @Nullable InventoryGameItemReferenceDto gameItem) {
@@ -304,6 +306,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
         gameItem,
         item.getAmount(),
         sliceAmount != null ? sliceAmount : item.getAmount(),
-        slice != null && Boolean.TRUE.equals(slice.getDelivered()));
+        slice != null && Boolean.TRUE.equals(slice.getDelivered()),
+        stockViewerAccess.mayEditInventoryItem(item.getId(), owner.getId()));
   }
 }

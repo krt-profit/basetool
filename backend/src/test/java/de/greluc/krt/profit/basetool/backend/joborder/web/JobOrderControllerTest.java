@@ -91,7 +91,6 @@ class JobOrderControllerTest {
         null,
         false,
         false,
-        false,
         null,
         false);
   }
@@ -117,18 +116,28 @@ class JobOrderControllerTest {
             PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("priority")),
             1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(false), eq(null), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)),
+            eq(null),
+            eq(false),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), null, false, false, null, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), null, false, false, null, 0, 20, "priority,asc", null);
 
     assertThat(result.content()).containsExactly(dto);
     assertThat(result.sort()).isNotEmpty();
     verify(jobOrderQueryService)
         .getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(false), eq(null), any(Pageable.class));
+            eq(List.of(JobOrderStatus.OPEN)),
+            eq(null),
+            eq(false),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
   }
 
   @Test
@@ -136,15 +145,26 @@ class JobOrderControllerTest {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(null), eq(null), eq(false), eq(null), any(Pageable.class)))
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(null, null, false, false, null, 0, 20, "priority,asc");
+        controller.getAllJobOrders(null, null, false, false, null, 0, 20, "priority,asc", null);
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
-        .getAllJobOrders(eq(null), eq(null), eq(false), eq(null), any(Pageable.class));
+        .getAllJobOrders(
+            eq(null),
+            eq(null),
+            eq(false),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
   }
 
   @Test
@@ -157,12 +177,21 @@ class JobOrderControllerTest {
             eq(squadronIds),
             eq(false),
             eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), squadronIds, false, false, null, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN),
+            squadronIds,
+            false,
+            false,
+            null,
+            0,
+            20,
+            "priority,asc",
+            null);
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
@@ -171,6 +200,7 @@ class JobOrderControllerTest {
             eq(squadronIds),
             eq(false),
             eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class));
   }
 
@@ -179,17 +209,27 @@ class JobOrderControllerTest {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(true), eq(null), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)),
+            eq(null),
+            eq(true),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), null, true, false, null, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), null, true, false, null, 0, 20, "priority,asc", null);
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
         .getAllJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), eq(null), eq(true), eq(null), any(Pageable.class));
+            eq(List.of(JobOrderStatus.OPEN)),
+            eq(null),
+            eq(true),
+            eq(null),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
   }
 
   @Test
@@ -198,11 +238,16 @@ class JobOrderControllerTest {
     UUID unit = UUID.randomUUID();
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAllJobOrders(
-            eq(null), eq(null), eq(true), eq(unit), any(Pageable.class)))
+            eq(null),
+            eq(null),
+            eq(true),
+            eq(unit),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
-        controller.getAllJobOrders(null, null, true, false, unit, 0, 20, "priority,asc");
+        controller.getAllJobOrders(null, null, true, false, unit, 0, 20, "priority,asc", null);
 
     assertThat(result.content()).containsExactly(dto);
   }
@@ -212,24 +257,35 @@ class JobOrderControllerTest {
     JobOrderDto dto = jobOrderDto(UUID.randomUUID());
     Page<JobOrderDto> page = new PageImpl<>(List.of(dto), PageRequest.of(0, 20), 1);
     when(jobOrderQueryService.getAssignedJobOrders(
-            eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class)))
+            eq(List.of(JobOrderStatus.OPEN)),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class)))
         .thenReturn(page);
 
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(
-            List.of(JobOrderStatus.OPEN), null, false, true, null, 0, 20, "priority,asc");
+            List.of(JobOrderStatus.OPEN), null, false, true, null, 0, 20, "priority,asc", null);
 
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
-        .getAssignedJobOrders(eq(List.of(JobOrderStatus.OPEN)), any(Pageable.class));
+        .getAssignedJobOrders(
+            eq(List.of(JobOrderStatus.OPEN)),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
     verify(jobOrderQueryService, never())
-        .getAllJobOrders(any(), any(), anyBoolean(), any(), any(Pageable.class));
+        .getAllJobOrders(
+            any(),
+            any(),
+            anyBoolean(),
+            any(),
+            org.mockito.ArgumentMatchers.isNull(),
+            any(Pageable.class));
   }
 
   @Test
   void getAllJobOrders_assignedToMeWithToProcess_isRejected() {
-    assertThatThrownBy(
-            () -> controller.getAllJobOrders(null, null, true, true, null, 0, 20, "priority,asc"))
+    assertThatThrownBy(() ->
+            controller.getAllJobOrders(null, null, true, true, null, 0, 20, "priority,asc", null))
         .isInstanceOf(BadRequestException.class);
 
     verifyNoInteractions(jobOrderQueryService);
@@ -240,7 +296,8 @@ class JobOrderControllerTest {
     List<UUID> squadronIds = List.of(UUID.randomUUID());
 
     assertThatThrownBy(() ->
-            controller.getAllJobOrders(null, squadronIds, false, true, null, 0, 20, "priority,asc"))
+            controller.getAllJobOrders(
+                null, squadronIds, false, true, null, 0, 20, "priority,asc", null))
         .isInstanceOf(BadRequestException.class);
 
     verifyNoInteractions(jobOrderQueryService);
@@ -296,73 +353,16 @@ class JobOrderControllerTest {
   }
 
   @Test
-  void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
+  void getJobOrderById_preservesTheSameCompleteFactsForRequesterReaders() {
     UUID id = UUID.randomUUID();
-    UUID matLineId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto matLine =
-        new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto(
-            matLineId,
-            null,
-            650,
-            de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures.goodDto(),
-            50.0,
-            999.0,
-            java.util.Collections.singletonList(null),
-            12.0,
-            7L);
-    JobOrderDto full =
-        new JobOrderDto(
-            id,
-            42,
-            null,
-            null,
-            "alice",
-            "deliver to ArcCorp",
-            1,
-            JobOrderStatus.OPEN,
-            JobOrderType.MATERIAL,
-            true,
-            List.of(matLine),
-            java.util.Collections.singletonList(null),
-            java.util.Collections.singletonList(null),
-            java.util.Collections.singletonList(null),
-            java.util.Collections.singletonList(null),
-            java.util.Collections.singletonList(null),
-            Instant.parse("2026-01-01T00:00:00Z"),
-            9L,
-            null,
-            null,
-            true,
-            false,
-            false,
-            null,
-            false);
+    JobOrderDto full = jobOrderDto(id);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
-    assertThat(result.assignees()).isEmpty();
-    assertThat(result.aggregatedMaterials()).isEmpty();
-    assertThat(result.handovers()).isEmpty();
-    assertThat(result.itemHandovers()).isEmpty();
-    assertThat(result.materials()).hasSize(1);
-    de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto redacted =
-        result.materials().get(0);
-    assertThat(redacted.id()).isEqualTo(matLineId);
-    assertThat(redacted.minQuality()).isEqualTo(650);
-    assertThat(redacted.amount()).isEqualTo(50.0);
-    assertThat(redacted.version()).isEqualTo(7L);
-    assertThat(redacted.currentStock()).isNull();
-    assertThat(redacted.openAmount()).isNull();
-    assertThat(redacted.claims()).isEmpty();
-    assertThat(result.items()).hasSize(1);
-    assertThat(result.id()).isEqualTo(id);
-    assertThat(result.displayId()).isEqualTo(42);
-    assertThat(result.handle()).isEqualTo("alice");
-    assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
-    assertThat(result.version()).isEqualTo(9L);
-    assertThat(result.redacted()).isTrue();
-    verify(jobOrderAccessPolicy, never()).canSeeJobOrder(any(UUID.class));
+    assertThat(result.withCanManageAssignees(full.canManageAssignees())).isEqualTo(full);
+    assertThat(result.materials()).isEqualTo(full.materials());
+    assertThat(result.handovers()).isEqualTo(full.handovers());
   }
 
   @Test

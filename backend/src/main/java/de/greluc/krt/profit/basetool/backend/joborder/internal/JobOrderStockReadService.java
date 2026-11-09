@@ -76,7 +76,8 @@ public class JobOrderStockReadService {
                 row.amount(),
                 row.allocatedAmount(),
                 row.delivered(),
-                row.materialNameDe()))
+                row.materialNameDe(),
+                row.canEdit()))
         .toList();
   }
 
@@ -130,7 +131,8 @@ public class JobOrderStockReadService {
                 row.locationId(),
                 Math.round(row.amount()),
                 allocatedQuantity,
-                row.delivered()));
+                row.delivered(),
+                row.canEdit()));
       }
       int[] totals = lineTotals.getOrDefault(gameItemId, new int[2]);
       groups.add(

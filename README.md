@@ -94,6 +94,12 @@ responsible-unit writers can transfer it immediately. An invalid responsible uni
 readable and recoverable by transfer, while processing and coupled stock changes wait. Legacy
 original boundaries remain explicitly unknown when no reliable provenance exists.
 
+MATERIAL/ITEM readers now share complete queue/count, number lookup, detail and linked order
+representations, with remembered scopes and an existing-kind filter defaulting to All. Observed
+former unit relationships retain concrete reading through current unit reach; they grant no
+processing or enrollment. The named producer panel, unreadable missions, unrelated stock, Bank
+and reduced Exchange keep their independent gates.
+
 > **Remaining approved design, implementation pending:** [Shared JobOrder behavior](docs/specs/orders-core.md), [aUEC procurement](docs/specs/orders-auec.md) and [optional bank coupling](docs/specs/orders-auec-bank.md) specify the next JobOrder contract. These documents are not a release announcement; the application overview and operating instructions describe the currently implemented system. The hierarchy foundation above is implemented; runtime acceptance of the remaining planned workflows stays unchecked.
 
 The README is the overview; everything else lives in dedicated, versioned docs:

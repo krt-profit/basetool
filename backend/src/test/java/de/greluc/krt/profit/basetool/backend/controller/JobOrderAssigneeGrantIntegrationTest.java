@@ -154,7 +154,7 @@ class JobOrderAssigneeGrantIntegrationTest {
 
     as(get(ORDERS + orderId), assigneeId, "ROLE_KRT_MEMBER")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.redacted").value(false))
+        .andExpect(jsonPath("$.redacted").doesNotExist())
         .andExpect(jsonPath("$.canEdit").value(false));
     as(get(ORDERS + orderId), unitMateId, "ROLE_KRT_MEMBER").andExpect(status().isForbidden());
     assertThat(lastAuditEventType()).isEqualTo(AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED);
@@ -335,7 +335,7 @@ class JobOrderAssigneeGrantIntegrationTest {
   }
 
   @Test
-  void aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNotAssignOthers() throws Exception {
+  void aLogisticianOfAnotherUnitCannotEnrollAnyoneIncludingThemselves() throws Exception {
     GrantedAuthority logisticianOfB = new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitBId);
 
     as(post(ORDERS + orderId + "/assignees/" + unitMateId), unitAMemberId, logisticianOfB)
@@ -343,7 +343,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(get(ORDERS + orderId + "/assignee-candidates"), unitAMemberId, logisticianOfB)
         .andExpect(status().isForbidden());
     as(post(ORDERS + orderId + "/assignees/" + unitAMemberId), unitAMemberId, logisticianOfB)
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
   }
 
   @Test

@@ -33,16 +33,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-/**
- * E2E multi-tenancy visibility flow for Job Orders (REQ-ORG-003).
- *
- * <ul>
- *   <li>An order with an SK as responsible unit is visible to every profit-eligible member.
- *   <li>An order with a squadron as responsible unit is visible only to that squadron's members and
- *       admins.
- *   <li>A member of a non-profit squadron sees only orders their unit requested (REQ-ORDERS-023).
- * </ul>
- */
+/** Verifies common Profit readership and concrete non-Profit requester isolation in the browser. */
 @Tag("e2e")
 class JobOrderTenancyE2eTest {
 
@@ -60,10 +51,10 @@ class JobOrderTenancyE2eTest {
   private static Playwright playwright;
   private static Browser browser;
 
-  /** An order whose responsible unit is a profit-eligible SK — the SK-public-queue case. */
+  /** A readable order of a current Profit Spezialkommando. */
   private static String skOrderId;
 
-  /** An order whose responsible unit is the IRIDIUM squadron — the squadron-private case. */
+  /** A readable order of a foreign current Profit Staffel. */
   private static String iridiumOrderId;
 
   /**
@@ -144,12 +135,9 @@ class JobOrderTenancyE2eTest {
     }
   }
 
-  /**
-   * An officer of squadron B sees the SK-responsible order (SK-public queue) but not the
-   * IRIDIUM-responsible order (squadron-private to a squadron B is not a member of).
-   */
+  /** A current Profit member reads both Staffel and Spezialkommando orders across units. */
   @Test
-  void officerSeesSkPublicOrderButNotForeignSquadronPrivateOrder() {
+  void profitMemberReadsForeignStaffelAndSpecialCommandOrders() {
     assumeTrue(STACK.managesStack(), "needs the ephemeral-seeded SK / squadrons / orders");
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
@@ -164,7 +152,7 @@ class JobOrderTenancyE2eTest {
         assertThat(page.locator("[data-testid='order-row'][data-id='" + skOrderId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-testid='order-row'][data-id='" + iridiumOrderId + "']"))
-            .hasCount(0);
+            .isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "tenancy-officer-list");
         throw failure;
@@ -173,11 +161,7 @@ class JobOrderTenancyE2eTest {
   }
 
   /**
-   * A member whose only membership is a non-profit squadron does not browse the general queue, but
-   * sees the orders their own unit <em>requested</em> under "Meine Aufträge" (REQ-ORDERS-023): the
-   * C-requested order surfaces, the foreign SK-public order does not, and they are not bounced to
-   * the create form. A direct link to a foreign order they did not request is denied (403 at the
-   * backend requester gate) and bounced back to their own-orders list.
+   * A non-Profit requester reads their complete order and cannot open unrelated order identities.
    */
   @Test
   void nonProfitMemberSeesOwnRequestedOrdersNotTheForeignQueue() {

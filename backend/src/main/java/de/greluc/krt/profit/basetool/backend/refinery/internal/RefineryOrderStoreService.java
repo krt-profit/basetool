@@ -181,7 +181,7 @@ public class RefineryOrderStoreService {
           Entities.require(
               jobOrderRepository
                   .findById(itemDto.jobOrderId())
-                  .filter(jobOrderVisibility::canSeeJobOrderInScope),
+                  .filter(jobOrderVisibility::canSeeJobOrder),
               () -> "JobOrder not found: " + itemDto.jobOrderId());
       assertMaterialRequiredByJobOrder(mat, jobOrder);
     }

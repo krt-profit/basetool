@@ -56,6 +56,7 @@ class MaterialCollectionControllerTest {
         800.0,
         5.0,
         3.0,
+        false,
         false);
   }
 

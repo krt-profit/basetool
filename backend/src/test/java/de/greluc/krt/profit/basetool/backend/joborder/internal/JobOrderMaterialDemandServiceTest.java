@@ -27,7 +27,6 @@ import static org.mockito.Mockito.RETURNS_DEFAULTS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -84,6 +83,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class JobOrderMaterialDemandServiceTest {
 
+  @Mock private de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService authHelper;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private JobOrderStockProjectionService jobOrderStockProjectionService;
@@ -120,7 +120,8 @@ class JobOrderMaterialDemandServiceTest {
             materialRequirementResolver,
             jobOrderStockProjectionService,
             materialClaimService,
-            squadronMapper);
+            squadronMapper,
+            authHelper);
     stockIndex =
         mock(
             OrderLinkedStockIndex.class,
@@ -142,11 +143,10 @@ class JobOrderMaterialDemandServiceTest {
    * @param orders the orders the scoped query returns.
    */
   private void givenVisibleOrders(List<JobOrder> orders) {
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(true), eq(null), any()))
+            any(), eq(true), eq(null), any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(orders);
     when(jobOrderStockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(stockIndex);
     when(materialClaimService.getClaimBucketsForOrders(anyList())).thenReturn(Map.of());
@@ -314,11 +314,15 @@ class JobOrderMaterialDemandServiceTest {
   void queriesOnlyNonTerminalOrdersWithinTheCallersScope() {
     UUID activeOrgUnit = UUID.randomUUID();
     Set<UUID> memberships = Set.of(UUID.randomUUID());
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, activeOrgUnit, memberships));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(false), eq(activeOrgUnit), eq(memberships)))
+            any(),
+            eq(false),
+            eq(activeOrgUnit),
+            eq(memberships),
+            org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of());
 
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
@@ -329,20 +333,39 @@ class JobOrderMaterialDemandServiceTest {
         ArgumentCaptor.forClass(java.util.Collection.class);
     verify(jobOrderRepository)
         .findScopedOrdersWithMaterialRequirements(
-            statuses.capture(), eq(false), eq(activeOrgUnit), eq(memberships));
+            statuses.capture(),
+            eq(false),
+            eq(activeOrgUnit),
+            eq(memberships),
+            org.mockito.ArgumentMatchers.any());
     assertThat(statuses.getValue())
         .containsExactlyInAnyOrder(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS);
   }
 
   @Test
-  @DisplayName("A caller outside the order workflow gets an empty overview and no query")
-  void nonProfitCallerGetsEmptyOverview() {
+  @DisplayName("An empty concrete read scope produces no material-demand rows")
+  void aCallerWithoutAnyUnitOrPersonalReadGetsAnEmptyOverview() {
     when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
+            List.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS),
+            false,
+            null,
+            Set.of(),
+            new UUID(0L, 0L)))
+        .thenReturn(List.of());
 
     MaterialDemandOverviewDto overview = service.getMaterialDemandOverview();
 
     assertThat(overview.groups()).isEmpty();
-    verifyNoInteractions(jobOrderRepository);
+    verify(jobOrderRepository)
+        .findScopedOrdersWithMaterialRequirements(
+            List.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS),
+            false,
+            null,
+            Set.of(),
+            new UUID(0L, 0L));
     verify(jobOrderStockProjectionService, never()).loadOrderLinkedStockIndex(any());
   }
 
@@ -355,11 +378,10 @@ class JobOrderMaterialDemandServiceTest {
     skCommand.setShorthand("SKL");
     JobOrder order = materialOrder(skCommand, 5, titanium, QualityTierFixtures.none(), 500.0);
 
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(true), eq(null), any()))
+            any(), eq(true), eq(null), any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(order));
     when(jobOrderStockProjectionService.loadOrderLinkedStockIndex(any())).thenReturn(stockIndex);
     when(materialClaimService.getClaimBucketsForOrders(anyList()))
@@ -433,11 +455,10 @@ class JobOrderMaterialDemandServiceTest {
     MaterialDto stileronDto = materialDto(stileron);
     JobOrder order = materialOrder(alpha, 7, stileron, QualityTierFixtures.good(), 0.1);
     order.getMaterials().add(line(stileron, QualityTierFixtures.none(), 2.64));
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(true), eq(null), any()))
+            any(), eq(true), eq(null), any(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(List.of(order));
     when(orderLinkedStockRows.materialStockOfOrders(List.of(order.getId())))
         .thenReturn(
