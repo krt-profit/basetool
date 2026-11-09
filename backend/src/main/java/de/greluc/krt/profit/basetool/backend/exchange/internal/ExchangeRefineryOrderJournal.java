@@ -46,17 +46,19 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Sets a refinery order back on an undo (REQ-XCH-056, ADR-0285): a create is removed, an update,
- * goods op, cancel or pickup restores the sections it touched, each only while that section's
- * counter shows no write but the client's since, a pickup's marker is cleared with its status, a
- * pickup that booked stock is left to the member, and a delete recreates the order under its former
- * ids. The journaled state is {@link ExchangeRefineryOrderState}.
+ * Sets a refinery order back on an undo (REQ-XCH-056, ADR-0285): a create is removed and frees its
+ * key, an update, goods op, cancel or pickup restores the sections it touched, each only while that
+ * section's counter shows no write but the client's from the client's first write to it on, a
+ * pickup's marker is cleared with its status, a pickup that booked stock is left to the member, and
+ * a delete recreates the order under its former ids and key. The journaled state is {@link
+ * ExchangeRefineryOrderState}.
  */
 @Component
 @RequiredArgsConstructor
 public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
 
   private final RefineryExchangeWriter writer;
+  private final ExchangeRefineryOrderKeys keys;
   private final RefineryExchangeReader reader;
   private final LocationRepository locationRepository;
   private final RefiningMethodRepository refiningMethodRepository;
@@ -70,9 +72,10 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   }
 
   /**
-   * Sets the order back to its state before the client's first write in the group, section by
-   * section: only the sections the client's writes touched, and only while no other write touched
-   * them in between or since.
+   * Sets the order back section by section: each section the client's writes touched goes back to
+   * its state before the client's first write to it, and only while no other write touched it from
+   * the client's first write on. A delete in the group is the order's last write, wherever the
+   * journal lists it.
    *
    * @param scope the member and the client
    * @param group the client's writes to the order, newest first
@@ -84,10 +87,13 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   @Override
   public @Nullable String restore(
       @NotNull UndoScope scope, @NotNull List<ExchangeJournalEntry> group) {
-    ExchangeJournalEntry newest = group.getFirst();
-    UUID orderId = ExchangeIds.parse(newest.getEntityKey());
-    boolean deleted = newest.getAction() == ExchangeJournalAction.REFINERY_DELETE;
-    List<Step> steps = steps(deleted ? group.subList(1, group.size()) : group);
+    UUID orderId = ExchangeIds.parse(group.getFirst().getEntityKey());
+    ExchangeJournalEntry removal =
+        group.stream()
+            .filter(entry -> entry.getAction() == ExchangeJournalAction.REFINERY_DELETE)
+            .findFirst()
+            .orElse(null);
+    List<Step> steps = steps(group.stream().filter(entry -> entry != removal).toList());
     if (orderId == null || steps == null) {
       return ExchangeUndoService.GONE;
     }
@@ -97,8 +103,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
     boolean pickedUp =
         group.stream()
             .anyMatch(entry -> entry.getAction() == ExchangeJournalAction.REFINERY_PICKUP);
-    if (deleted) {
-      return recreate(scope, orderId, read(newest.getBeforeState()), steps, pickedUp);
+    if (removal != null) {
+      return recreate(scope, orderId, read(removal.getBeforeState()), steps, pickedUp);
     }
     Optional<RefineryExchangeOrder> current = writer.lockOwn(scope.member(), orderId);
     if (current.isEmpty()) {
@@ -110,13 +116,15 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
         || (touched.finances() != null && touched.finances() != current.get().financesVersion())) {
       return ExchangeUndoService.CHANGED_AFTERWARDS;
     }
-    ExchangeRefineryOrderState base = steps.getFirst().before();
-    if (base == null) {
+    if (steps.getFirst().before() == null) {
       writer.delete(scope.member(), orderId);
+      keys.removed(orderId);
       return null;
     }
-    boolean gameData = touched.gameData() != null;
-    if (gameData && !restorable(base, current.get().location().id())) {
+    ExchangeRefineryOrderState gameData = touched.gameDataBase();
+    ExchangeRefineryOrderState finances = touched.financesBase();
+    UUID location = current.get().location().id();
+    if (gameData != null && !restorable(gameData, location)) {
       return ExchangeUndoService.GONE;
     }
     writer.edit(
@@ -124,17 +132,17 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
         null,
         orderId,
         new RefineryExchangeEdit(
-            gameData ? base.location() : null,
-            gameData ? new RefineryExchangeEdit.Method(base.method()) : null,
-            gameData
-                ? new RefineryExchangeEdit.Timer(base.startedAt(), base.durationMinutes())
-                : null,
-            gameData ? base.status() : null,
-            touched.finances() != null
-                ? new RefineryExchangeEdit.Finances(
-                    base.expenses(), base.otherExpenses(), base.oreSales())
-                : null,
-            gameData ? base.editGoods() : null));
+            gameData == null || gameData.location().equals(location) ? null : gameData.location(),
+            gameData == null ? null : new RefineryExchangeEdit.Method(gameData.method()),
+            gameData == null
+                ? null
+                : new RefineryExchangeEdit.Timer(gameData.startedAt(), gameData.durationMinutes()),
+            gameData == null ? null : gameData.status(),
+            finances == null
+                ? null
+                : new RefineryExchangeEdit.Finances(
+                    finances.expenses(), finances.otherExpenses(), finances.oreSales()),
+            gameData == null ? null : gameData.editGoods()));
     if (pickedUp) {
       writer.clearPickup(scope.member(), orderId);
     }
@@ -161,10 +169,11 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   }
 
   /**
-   * Recreates an order the client deleted under its former ids: the sections the client's earlier
-   * writes touched as they were before the first of them, every other part as it was when deleted,
-   * with its client marker, the unit while the member still belongs to it directly and the mission
-   * while it exists, and without the pickup marker when the client's writes include its pickup. An
+   * Recreates an order the client deleted under its former ids and key: each section the client's
+   * earlier writes touched as it was before the client's first write to it, every other part as it
+   * was when deleted, with its client marker, the unit while the member still belongs to it
+   * directly and the mission while it exists, without the pickup marker when the client's writes
+   * include its pickup, and without the ready marker when the run differs from the deleted one. An
    * order the client also created stays gone.
    *
    * @param scope the member and the client
@@ -195,13 +204,16 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
         || (touched.finances() != null && touched.finances() != removed.finances())) {
       return ExchangeUndoService.CHANGED_AFTERWARDS;
     }
-    ExchangeRefineryOrderState base =
-        steps.isEmpty() ? removed : Objects.requireNonNull(steps.getFirst().before());
-    ExchangeRefineryOrderState gameData = touched.gameData() != null ? base : removed;
-    ExchangeRefineryOrderState finances = touched.finances() != null ? base : removed;
+    ExchangeRefineryOrderState gameData =
+        Objects.requireNonNullElse(touched.gameDataBase(), removed);
+    ExchangeRefineryOrderState finances =
+        Objects.requireNonNullElse(touched.financesBase(), removed);
     if (!restorable(gameData, removed.location())) {
       return ExchangeUndoService.GONE;
     }
+    boolean sameRun =
+        Objects.equals(gameData.startedAt(), removed.startedAt())
+            && Objects.equals(gameData.durationMinutes(), removed.durationMinutes());
     UUID unit = origin.orgUnitId();
     writer.restore(
         scope.member(),
@@ -224,7 +236,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
                 origin.missionId(),
                 pickedUp ? null : origin.pickedUpAt(),
                 pickedUp ? null : origin.pickedUpClient(),
-                origin.readyNotifiedAt())));
+                sameRun ? origin.readyNotifiedAt() : null)));
+    keys.restored(orderId);
     return null;
   }
 
@@ -252,32 +265,44 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   }
 
   /**
-   * Follows each section's counter through the client's writes, oldest first.
+   * Follows each section's counter through the client's writes, oldest first. From the client's
+   * first write to a section on, every later write of the client must find that section as the
+   * client's previous write left it.
    *
    * @param steps the client's writes, oldest first
-   * @return the counter each touched section must still show, {@code null} for an untouched one; or
-   *     {@code null} when another write moved a touched section between two of the client's
+   * @return the counter each touched section must still show and the state it goes back to, both
+   *     {@code null} for an untouched section; or {@code null} when another write moved a touched
+   *     section between two of the client's writes
    */
   private static @Nullable Touched touched(@NotNull List<Step> steps) {
     Long gameData = null;
     Long finances = null;
+    ExchangeRefineryOrderState gameDataBase = null;
+    ExchangeRefineryOrderState financesBase = null;
+    ExchangeRefineryOrderState previous = null;
     for (Step step : steps) {
       ExchangeRefineryOrderState before = step.before();
       ExchangeRefineryOrderState after = step.after();
-      if (before == null || before.gameData() != after.gameData()) {
-        if (before != null && gameData != null && before.gameData() != gameData) {
-          return null;
-        }
+      boolean writesGameData = before == null || before.gameData() != after.gameData();
+      boolean writesFinances = before == null || before.finances() != after.finances();
+      if (previous != null
+          && before != null
+          && (((writesGameData || gameData != null) && before.gameData() != previous.gameData())
+              || ((writesFinances || finances != null)
+                  && before.finances() != previous.finances()))) {
+        return null;
+      }
+      if (writesGameData) {
+        gameDataBase = gameData == null ? before : gameDataBase;
         gameData = after.gameData();
       }
-      if (before == null || before.finances() != after.finances()) {
-        if (before != null && finances != null && before.finances() != finances) {
-          return null;
-        }
+      if (writesFinances) {
+        financesBase = finances == null ? before : financesBase;
         finances = after.finances();
       }
+      previous = after;
     }
-    return new Touched(gameData, finances);
+    return new Touched(gameData, finances, gameDataBase, financesBase);
   }
 
   /**
@@ -339,10 +364,19 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   }
 
   /**
-   * The counters the client's last writes left on the sections they touched.
+   * The counters the client's last writes left on the sections they touched, and the state each
+   * section goes back to.
    *
    * @param gameData the game-data counter, or {@code null} when no write touched game data
    * @param finances the finances counter, or {@code null} when no write touched the finances
+   * @param gameDataBase the order before the client's first game-data write, or {@code null} when
+   *     no write touched game data or that write created the order
+   * @param financesBase the order before the client's first finances write, or {@code null} when no
+   *     write touched the finances or that write created the order
    */
-  private record Touched(@Nullable Long gameData, @Nullable Long finances) {}
+  private record Touched(
+      @Nullable Long gameData,
+      @Nullable Long finances,
+      @Nullable ExchangeRefineryOrderState gameDataBase,
+      @Nullable ExchangeRefineryOrderState financesBase) {}
 }
