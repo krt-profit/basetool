@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipDeltaRequest;
@@ -60,6 +61,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -209,28 +212,35 @@ public class MemberManagementController {
    * section of the member's live-sync room (REQ-SEC-088, REQ-FE-015).
    *
    * @param id the member
+   * @param principal the signed-in admin, who is asked to confirm withdrawing their own Admin role
    * @param model Thymeleaf model populated with the role set {@code memberRoles} ({@code null} when
-   *     it could not be read) and {@code assignableRoles}
+   *     it could not be read), {@code assignableRoles} and {@code ownRoles}
    * @return the {@code memberRoles} fragment of {@code member-edit}
    */
   @NotNull
   @GetMapping(value = "/{id}/edit", params = "fragment=" + MEMBER_ROLES_FRAGMENT)
-  public String memberRolesFragment(@PathVariable @NotNull UUID id, @NotNull Model model) {
-    addRoleSet(id, model);
+  public String memberRolesFragment(
+      @PathVariable @NotNull UUID id,
+      @AuthenticationPrincipal @Nullable OidcUser principal,
+      @NotNull Model model) {
+    addRoleSet(id, principal, model);
     return "identity/member-edit :: " + MEMBER_ROLES_FRAGMENT;
   }
 
   /**
-   * Puts the member's role set and the assignable roles into the model the role tab renders from.
+   * Puts the member's role set, the assignable roles and whether the page is the signed-in admin's
+   * own ({@code ownRoles}) into the model the role tab renders from.
    *
    * @param id the member
+   * @param principal the signed-in admin, or {@code null} for a non-OIDC principal
    * @param model the model to fill; {@code memberRoles} is {@code null} when the read failed
    */
-  private void addRoleSet(@NotNull UUID id, @NotNull Model model) {
+  private void addRoleSet(@NotNull UUID id, @Nullable OidcUser principal, @NotNull Model model) {
     model.addAttribute(
         "memberRoles",
         SectionFallback.load(log, "member-edit-roles", () -> identityClient.userRoles(id), null));
     model.addAttribute("assignableRoles", AssignableRole.values());
+    model.addAttribute("ownRoles", id.equals(CurrentUser.userId(principal)));
   }
 
   /**
@@ -238,6 +248,7 @@ public class MemberManagementController {
    *
    * @param id user id
    * @param source optional origin marker ({@code "profile"} returns to the profile after saving)
+   * @param principal the signed-in admin, or {@code null} for a non-OIDC principal
    * @param model Thymeleaf model populated with {@code user}, {@code memberEditForm} and the role
    *     set {@code memberRoles} ({@code null} when it could not be read)
    * @param redirectAttributes flash attributes carrier for the error redirect
@@ -248,6 +259,7 @@ public class MemberManagementController {
   public String editMember(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) String source,
+      @AuthenticationPrincipal @Nullable OidcUser principal,
       Model model,
       RedirectAttributes redirectAttributes) {
     try {
@@ -264,7 +276,7 @@ public class MemberManagementController {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
-      addRoleSet(id, model);
+      addRoleSet(id, principal, model);
 
       try {
         List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);
@@ -347,6 +359,7 @@ public class MemberManagementController {
    * @param id user id
    * @param form member edit form
    * @param bindingResult validation errors carrier
+   * @param principal the signed-in admin, or {@code null} for a non-OIDC principal
    * @param model Thymeleaf model used for inline re-rendering
    * @param redirectAttributes flash attributes carrier
    * @return redirect target depending on source and outcome
@@ -357,10 +370,11 @@ public class MemberManagementController {
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("memberEditForm") MemberEditForm form,
       BindingResult bindingResult,
+      @AuthenticationPrincipal @Nullable OidcUser principal,
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      return editMember(id, form.source(), model, redirectAttributes);
+      return editMember(id, form.source(), principal, model, redirectAttributes);
     }
     try {
       applyMemberUpdate(id, form);

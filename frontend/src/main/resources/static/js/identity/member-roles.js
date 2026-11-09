@@ -18,6 +18,7 @@
  */
 
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+import { showKrtConfirm } from '/js/kernel/toast.js';
 
 /**
  * The role set the backend answers a role change with.
@@ -119,10 +120,32 @@ function bindRoleToggles() {
         });
     }
 
+    /**
+     * Writes a toggle's change, first asking in the danger dialog when the toggle names the
+     * consequences of its withdrawal (`data-withdraw-confirm`); a declined withdrawal is undone.
+     *
+     * @param {HTMLInputElement} toggle the toggle the admin changed
+     */
+    async function confirmAndWrite(toggle) {
+        const consequences = toggle.getAttribute('data-withdraw-confirm');
+        if (!toggle.checked && consequences) {
+            const confirmed = await showKrtConfirm(
+                panel.getAttribute('data-confirm-title'),
+                consequences,
+                panel.getAttribute('data-confirm-label') || undefined,
+            );
+            if (!confirmed) {
+                toggle.checked = true;
+                return;
+            }
+        }
+        write(toggle);
+    }
+
     panel.addEventListener('change', (event) => {
         const target = event.target;
         if (target instanceof HTMLInputElement && target.hasAttribute('data-role-toggle')) {
-            write(target);
+            confirmAndWrite(target);
         }
     });
 }

@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -244,6 +246,53 @@ class MemberEditPageRenderTest {
         .doesNotContain("member-edit-form")
         .doesNotContain("member-roles-results")
         .doesNotContain("<html");
+  }
+
+  /**
+   * Withdrawing KRT Member always asks first, naming the revoked connections and the logout;
+   * withdrawing Admin asks only on the admin's own page.
+   */
+  @Test
+  void withdrawingKrtMemberOrOnesOwnAdminRoleIsConfirmedFirst() throws Exception {
+    UUID id = stubMember();
+    stubRoles(id, List.of(AssignableRole.ADMIN, AssignableRole.KRT_MEMBER), 3L);
+
+    String own = renderRolesAs(id, id);
+    assertThat(own)
+        .containsPattern(
+            "data-withdraw-confirm=\"[^\"]*Verbundenen"
+                + " Anwendungen[^\"]*\"[^>]*value=\"KRT_MEMBER\"")
+        .containsPattern("data-withdraw-confirm=\"[^\"]*dir selbst[^\"]*\"[^>]*value=\"ADMIN\"")
+        .doesNotContainPattern("data-withdraw-confirm=[^>]*value=\"BANK_EMPLOYEE\"");
+
+    String other = renderRolesAs(id, UUID.randomUUID());
+    assertThat(other)
+        .containsPattern("data-withdraw-confirm=[^>]*value=\"KRT_MEMBER\"")
+        .doesNotContainPattern("data-withdraw-confirm=[^>]*value=\"ADMIN\"");
+  }
+
+  /**
+   * Renders the role fragment of a member's page in German for a signed-in admin.
+   *
+   * @param id the member whose page it is
+   * @param viewer the admin's own user id
+   * @return the rendered fragment
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderRolesAs(@NotNull UUID id, @NotNull UUID viewer) throws Exception {
+    return mockMvc
+        .perform(
+            get("/members/{id}/edit", id)
+                .param("fragment", "memberRoles")
+                .locale(Locale.GERMAN)
+                .with(
+                    oidcLogin()
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                        .idToken(token -> token.subject(viewer.toString()))))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
   }
 
   /**
