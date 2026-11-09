@@ -210,7 +210,8 @@ requires it and duplicating it into further files spreads personal data for no g
   [`external-exchange.md`](../specs/external-exchange.md)).
 - **Data held by the tool:** per installation the client, the DPoP key thumbprint, the
   client-supplied label (at most 40 characters, never logged or audited), first and last seen, and
-  the ship links; per disconnected client the revocation time; the change sequence of the member's
+  the ship links; per refinery order a client created, the client's own key of it (client, key,
+  order id, created and retired time); per disconnected client the revocation time; the change sequence of the member's
   synced data (resource, key, channel, client, installation) with its tombstones; the write journal
   (client, installation, resource, key, action and the entry before and after — which can carry a
   blueprint note or a ship name); the entries an admin bulk undo left alone; audit rows in the
@@ -269,17 +270,20 @@ requires it and duplicating it into further files spreads personal data for no g
   Keycloak consent is an OAuth authorisation of the client, not a consent under Art. 6(1)(a) (owner
   decision 2026-09-28).
 - **Where:** `exchange_installation`, `exchange_client_revocation`, `exchange_change`,
-  `exchange_journal`, `exchange_ship_link`, `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`,
-  `exchange_name_withholding`;
+  `exchange_journal`, `exchange_ship_link`, `exchange_refinery_order_link`,
+  `exchange_bulk_undo_run` / `exchange_bulk_undo_skip`, `exchange_name_withholding`;
   Redis `exchange:*` and `ingest:xch:*`; the Keycloak realm.
 - **Retention:** a connected installation for as long as it stays connected; a **disconnected
   installation with its label 90 days after the disconnection**, and a **client revocation 90 days
   after the revocation** (owner decision 2026-09-28, `ExchangeConnectionRetentionTask`, REQ-XCH-035;
   each run is audited in „Verbundene Anwendungen" as counts only); a ship link until its
   ship is deleted, at the latest with the account; the change sequence, the journal and the
-  bulk-undo runs 90 days. Every member row goes with the account (`ON DELETE CASCADE`,
-  REQ-DATA-008); a bulk-undo run keeps its counts with `requested_by` nulled. The name withholding
-  is kept for as long as the account exists. All seven are in the Art. 15 export (REQ-SEC-058).
+  bulk-undo runs 90 days; a refinery-order key while its order exists, then until no journal or
+  change-sequence entry refers to the order any more, so at most those 90 days longer (owner
+  decision 2026-11-09, the nightly `exchange_change_retention` run, REQ-XCH-056). Every member row
+  goes with the account (`ON DELETE CASCADE`, REQ-DATA-008); a bulk-undo run keeps its counts with
+  `requested_by` nulled. The name withholding is kept for as long as the account exists. All eight
+  are in the Art. 15 export (REQ-SEC-058).
 - **After the transfer:** the client runs on the member's device and is not operated by the
   controller; what it does with the data is governed by its provider's privacy statement, which the
   approval requires (REQ-XCH-002). See [Recipients](#recipients).
@@ -331,6 +335,7 @@ The single table every other statement about retention must agree with.
 | Exchange: client revocation | **90 days** after the revocation | `ExchangeConnectionRetentionTask` (REQ-XCH-035) | `app.exchange.connection-retention.max-age` |
 | Exchange: connected installation, ship links | While connected; a ship link until its ship is deleted, at the latest with the account | Disconnection, then the sweep above; `ON DELETE CASCADE` (REQ-DATA-008) | — |
 | Exchange change sequence, write journal, bulk-undo runs | **90 days** | `ExchangeChangeRetentionTask` (REQ-XCH-013/-022/-034) | `app.exchange.change-retention.max-age` |
+| Exchange refinery-order keys | While the order exists, then until no journal or change-sequence entry refers to it | `ExchangeChangeRetentionTask` (REQ-XCH-056); `ON DELETE CASCADE` with the account (REQ-DATA-008) | `app.exchange.change-retention.max-age` |
 | Exchange revocation and deny-list mirror (Redis) | **90 days** after the revocation | Redis key expiry (REQ-XCH-008) | `ExchangeRevocationMirror.RETENTION` |
 | Exchange idempotency results (Redis) | **1 hour** | Redis key expiry (REQ-XCH-020) | `app.exchange.store.idempotency-ttl` (ingest) |
 | Exchange staged mass change | **30 minutes** | Expiry of the staged change (REQ-XCH-021) | `ExchangeMassChangeService.STAGING_REACH` |
