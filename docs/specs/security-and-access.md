@@ -4410,11 +4410,16 @@ gateway's acting-member path (ADR-0129), which installs an authentication withou
 `Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
 `PendingApprovalAccessFilter` is the only reader.
 
-**Approving a registration grants `KRT Member`** (REQ-SEC-088), so every approved account is a
-member. **There is therefore no account holding only a bank role, or only any other role**
-(confirmed by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a
-gate on the member surface. An account whose KRT Member an admin withdraws has departed
-(`MemberDepartedEvent`) and is refused `NO_ROLE` unless it still holds another role.
+**Approving a registration grants `KRT Member`** (REQ-SEC-088), so every approved account starts as
+a member. Two shapes hold a role without `KRT Member`, and `isMemberOrAbove()` stays a safe gate on
+the member surface for both:
+
+- **A bootstrap subject's account holds `Admin` alone** (REQ-SEC-088). `Admin` is one of
+  `Roles.MEMBER_OR_ABOVE`, so it passes the member gates as every admin does.
+- **A departed member who keeps a bank role**: an admin withdrew KRT Member, which is a departure
+  (`MemberDepartedEvent`). Neither bank role is in `Roles.MEMBER_OR_ABOVE` nor reaches one through
+  the role hierarchy, so the member gates refuse that account; it keeps only what the bank role
+  grants. An account left with no role is refused `NO_ROLE`.
 
 **The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
