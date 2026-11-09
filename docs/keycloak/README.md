@@ -361,6 +361,9 @@ Create a short-lived provisioning identity in the Admin Console instead — **Cl
   direct access grants. It is not a login client.
 - Then **Service accounts roles → Assign role → Filter by clients → `realm-management`** and assign
   **`manage-clients`** and **`manage-realm`**.
+- Then **Client scopes → Add client scope → `kc-admin-api` → Default**. Keycloak 26.8.2 checks the
+  Admin API audience: without this scope `config credentials` still logs in, but the first Admin
+  API read answers **`HTTP 401 Unauthorized`** whatever roles the service account holds.
 
 Both roles are required and neither is surplus, verified against Keycloak 26.7 in both directions:
 with `manage-clients` alone the client-policy endpoints answer **403**, with `manage-realm` alone the

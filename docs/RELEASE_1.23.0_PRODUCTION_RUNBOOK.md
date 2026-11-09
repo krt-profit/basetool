@@ -108,7 +108,9 @@ From this moment until §3.2, a new Grafana login is denied; open Grafana sessio
 
 The kcadm session of [`keycloak/README.md` → Runbook](keycloak/README.md#runbook--a-kcadm-session-on-the-production-container),
 with the provisioner of the tag `v1.23.0` (copy `provision-keycloak-realm.py`, `keycloak_kcadm.py` and
-`scripts/keycloak/` to the host), dry run first:
+`scripts/keycloak/` to the host), dry run first. The `basetool-provisioner` client needs the
+`kc-admin-api` default scope besides its two roles: without it the login succeeds and the first
+read answers `HTTP 401 Unauthorized`.
 
 ```sh
 python3 provision-keycloak-realm.py --realm basetool --public-origin https://profit-base.online --grafana-origin https://grafana.profit-base.online --kcadm-command "$KCADM" --frontend-client confidential
@@ -119,8 +121,9 @@ The dry run exits `2` and lists, besides what
 [`deployment.md` step 6](deployment.md#roles-in-the-basetool-the-switch-and-its-rollback) names
 (the three realm roles deleted, `roles` withheld from `basetool-frontend`, Grafana's `client roles`
 mapper added and `realm roles` mapper removed, `view-realm` withdrawn from `backend-service` — under
-`[manual]` without `manage-users`): the three `exchange.refinery.*` client scopes with their consent
-texts, and the `grafana-admin` client role where the realm lacks it. `kc-admin-api` on
+`[manual]` when the withdrawal is refused): the three `exchange.refinery.*` and the three
+`exchange.bank.*` client scopes with their audience mappers, all six as optional scopes of every
+approved external client, and the `grafana-admin` client role where the realm lacks it. `kc-admin-api` on
 `backend-service` is already in place from §1.2. Anything else in the plan: stop and compare.
 
 Afterwards delete `basetool-provisioner` and the session file (README step 4).
@@ -128,7 +131,17 @@ Afterwards delete `basetool-provisioner` and the session file (README step 4).
 ### 3.2 Grafana admins
 
 Admin Console → *Users* → each Grafana admin → *Role mapping* → *Assign role* → *Filter by clients*
-→ `grafana-admin`. Then sign in to Grafana as one of them.
+→ `grafana-admin`.
+
+The deploy renders `env.d/grafana.env` but does not restart Grafana for it, so the container keeps
+the old role path until it is restarted. Check the rendered file, then restart (root, from `/`):
+
+```sh
+grep '^GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=' /etc/basetool/env.d/grafana.env
+sudo -u basetool XDG_RUNTIME_DIR=/run/user/994 systemctl --user restart grafana.service
+```
+
+The first line must name `grafana_roles`. Then sign in to Grafana as one of the admins.
 
 ### 3.3 Roster sync on the new release
 
@@ -166,3 +179,19 @@ Prefer a fix forward: there is no rollback that keeps the data written after the
    [`deployment.md` → Rollback](deployment.md#roles-in-the-basetool-the-switch-and-its-rollback).
    v1.22.3's provisioner does not know `kc-admin-api`; keep the §1.2 assignment.
 4. Start the deploy timer.
+
+## 6. As run on 2026-11-09
+
+| Step | Result |
+|---|---|
+| §1.2 | `kc-admin-api` assigned to `backend-service`; sync at 11:31 UTC: `Synced 104 users` |
+| §1.3 | backup complete 12:03 UTC; `flyway_head 337`, two admins (one assigned by mistake, withdrawn and synced at 12:08, its line removed from the export), no merged-away account with a role, no `DEPARTED` account |
+| §2 | promotion approved about 12:21 UTC; `deploy successful` at 12:28:44; 37 migrations in 1.3 s, now at `v374`; one restart window incl. both databases |
+| §3.1 | 32 changes applied, re-plan clean; `view-realm` withdrawn without `manage-users`; the provisioner client needed `kc-admin-api` first |
+| §3.2 | Grafana restarted by hand after the apply; login works with `grafana-admin` |
+| §3.3 | sync at 12:52 UTC: `Synced 104 users` |
+| §4.2 | VerseKit's refinery scopes and quota set in the registry |
+| Open | §4.1, the first P4K import of catalogue version 2 |
+
+Unrelated to the release: the UEX commodity price fetch has failed to parse since 2026-11-08; with
+1.23.0 the incomplete slice marks `uex_sync` as failed.
