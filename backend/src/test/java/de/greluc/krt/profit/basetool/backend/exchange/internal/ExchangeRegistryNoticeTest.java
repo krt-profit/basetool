@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -217,7 +219,13 @@ class ExchangeRegistryNoticeTest {
     ExchangeSettings settings = new ExchangeSettings();
     settings.setEnabled(true);
     when(mirrorSync.lockSettings()).thenReturn(settings);
-    when(mirrorSync.saveSettings(any(ExchangeSettings.class))).thenAnswer(i -> i.getArgument(0));
+    when(mirrorSync.saveBankSwitch(any(ExchangeSettings.class), anyBoolean(), any(Instant.class)))
+        .thenAnswer(i -> {
+          ExchangeSettings row = i.getArgument(0);
+          row.setBankEnabled(i.getArgument(1));
+          row.setBankVersion(row.getBankVersion() + 1);
+          return row;
+        });
 
     service.updateBankSwitch(true, 0L);
     service.updateBankSwitch(false, 1L);

@@ -29,11 +29,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestWrittenDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -46,6 +48,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,6 +63,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Exchange — bank", description = "The bank accounts the member views")
 public class ExchangeBankRequestController {
+
+  /** The shape of an idempotency key, as the gateway admits it (REQ-XCH-020). */
+  private static final String IDEMPOTENCY_KEY = "[A-Za-z0-9._~-]{8,128}";
 
   /** Serves the snapshot and the feed of the member's own requests. */
   private final ExchangeBankRequestService requestService;
@@ -102,6 +108,7 @@ public class ExchangeBankRequestController {
    * Raises a booking request for the member.
    *
    * @param body the request
+   * @param idempotencyKey the client's key of the raise as the gateway relayed it, or absent
    * @param authentication the relayed acting member the gate admitted
    * @return {@code 201} with the request's id, status, version and amount
    */
@@ -114,15 +121,24 @@ public class ExchangeBankRequestController {
           "Gateway-only. A deposit, withdrawal or transfer with the web's validation and approval"
               + " routing; a deposit may target any active account. An unknown, closed or hidden"
               + " account answers 404 NOT_FOUND; 20 pending requests answer 409"
-              + " BANK_OPEN_REQUEST_CAP. Books nothing.")
+              + " BANK_OPEN_REQUEST_CAP. A raise under an idempotency key the client already"
+              + " raised a request of the member with answers that request. Books nothing.")
   @ApiResponse(responseCode = "201", description = "The pending request")
   @ApiResponse(responseCode = "404", description = "Unknown, closed or hidden account")
   @ApiResponse(responseCode = "409", description = "A bank conflict or the open-request cap")
   public ResponseEntity<ExchangeBankRequestWrittenDto> raise(
       @NotNull @Valid @RequestBody ExchangeBankRequestCreateDto body,
+      @Nullable
+          @Pattern(regexp = IDEMPOTENCY_KEY)
+          @RequestHeader(
+              value = ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER,
+              required = false)
+          String idempotencyKey,
       @NotNull Authentication authentication) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(writeService.raise(ExchangeCaller.of((SubjectAuthentication) authentication), body));
+        .body(
+            writeService.raise(
+                ExchangeCaller.of((SubjectAuthentication) authentication), body, idempotencyKey));
   }
 
   /**

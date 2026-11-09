@@ -21,9 +21,12 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.server.PathContainer;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.util.pattern.PathPattern;
+import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * The bank route family of the backend's exchange surface (REQ-BXCH-006): every path at or below
@@ -34,18 +37,22 @@ public final class BankExchangeRoutes {
   /** The root of the bank route family below the relay prefix. */
   public static final String PATH = "/api/v1/exchange/bank";
 
+  /** The bank route family as a pattern, matched against the decoded path segments. */
+  private static final PathPattern FAMILY = PathPatternParser.defaultInstance.parse(PATH + "/**");
+
   /** Not instantiable. */
   private BankExchangeRoutes() {}
 
   /**
-   * Tells whether a path belongs to the bank route family.
+   * Tells whether a path belongs to the bank route family, judged on the decoded segments as
+   * request mapping matches them, so a percent-encoded spelling is in the family too.
    *
-   * @param path a request URI, or {@code null}
+   * @param path a raw request URI, or {@code null}
    * @return {@code true} for {@value #PATH} and every path below it
    */
   @Contract(value = "null -> false", pure = true)
   public static boolean isBank(@Nullable String path) {
-    return path != null && (path.equals(PATH) || path.startsWith(PATH + "/"));
+    return path != null && FAMILY.matches(PathContainer.parsePath(path));
   }
 
   /**

@@ -194,12 +194,7 @@ class ExchangeBankRequestWritesTest {
   @Test
   void refusesTheRequestOverTheOpenRequestCapAndCountsIt() throws Exception {
     UUID own = world.account(Account.OWN_ORG_UNIT);
-    long pending =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM bank_booking_request WHERE requested_by = ? AND status ="
-                + " 'PENDING'",
-            Long.class,
-            world.user(Actor.STAFFELLEITER));
+    long pending = pendingOf(world.user(Actor.STAFFELLEITER));
     for (long held = pending; held < 20; held++) {
       body(raise(Actor.STAFFELLEITER, deposit(own, 500)), 201);
     }
@@ -224,6 +219,84 @@ class ExchangeBankRequestWritesTest {
     assertThat(own.path("amount").asLong()).isEqualTo(5000);
     assertThat(own.path("requiredApprover").asString()).isEqualTo("RESPONSIBLE_HOLDER");
     assertThat(own.path("version").asLong()).isEqualTo(corrected.path("version").asLong());
+  }
+
+  @Test
+  void aRetriedRaiseWithTheSameKeyAnswersTheRequestItRaisedFirst() throws Exception {
+    UUID member = world.user(Actor.STAFFELLEITER);
+    Map<String, Object> body = deposit(world.account(Account.OWN_ORG_UNIT), 500);
+    long before = requestsOf(member);
+
+    JsonNode first =
+        body(relay.write(HttpMethod.POST, member, REQUESTS, body, "retry-key-0001"), 201);
+    entityManager.flush();
+    JsonNode retried =
+        body(relay.write(HttpMethod.POST, member, REQUESTS, body, "retry-key-0001"), 201);
+    entityManager.flush();
+    JsonNode other =
+        body(relay.write(HttpMethod.POST, member, REQUESTS, body, "retry-key-0002"), 201);
+    entityManager.flush();
+
+    assertThat(retried.path("id").asString()).isEqualTo(first.path("id").asString());
+    assertThat(retried.path("version").asLong()).isEqualTo(first.path("version").asLong());
+    assertThat(other.path("id").asString()).isNotEqualTo(first.path("id").asString());
+    assertThat(requestsOf(member)).isEqualTo(before + 2);
+  }
+
+  @Test
+  void aRetriedRaiseAtTheCapStillAnswersTheRequestItRaisedFirst() throws Exception {
+    UUID member = world.user(Actor.STAFFELLEITER);
+    UUID own = world.account(Account.OWN_ORG_UNIT);
+    long pending = pendingOf(member);
+    for (long held = pending; held < 19; held++) {
+      body(raise(Actor.STAFFELLEITER, deposit(own, 500)), 201);
+    }
+    JsonNode last =
+        body(
+            relay.write(HttpMethod.POST, member, REQUESTS, deposit(own, 500), "cap-key-0001"), 201);
+    entityManager.flush();
+
+    JsonNode retried =
+        body(
+            relay.write(HttpMethod.POST, member, REQUESTS, deposit(own, 500), "cap-key-0001"), 201);
+
+    assertThat(retried.path("id").asString()).isEqualTo(last.path("id").asString());
+  }
+
+  @Test
+  void aCorrectionKeepsTheStoredRecipientAfterTheyLeftTheirUnit() throws Exception {
+    UUID id = world.request(Request.CORRECT_OWN);
+    UUID recipient = world.user(Actor.STAFFELLEITER);
+    UUID formerUnit =
+        jdbc.queryForObject(
+            "SELECT org_unit_id FROM bank_account WHERE id = ?",
+            UUID.class,
+            world.account(Account.FOREIGN_ORG_UNIT));
+    entityManager.flush();
+    jdbc.update(
+        "UPDATE bank_booking_request SET counterparty_user_id = ?, counterparty_handle = ?,"
+            + " counterparty_org_unit_id = ?, counterparty_org_unit_name = ? WHERE id = ?",
+        recipient,
+        "Stored Handle",
+        formerUnit,
+        "Former Unit",
+        id);
+    entityManager.clear();
+
+    body(correct(Actor.MEMBER, id, 700, version(id)), 200);
+    entityManager.flush();
+
+    Map<String, Object> stored =
+        jdbc.queryForMap(
+            "SELECT counterparty_user_id, counterparty_handle, counterparty_org_unit_id,"
+                + " counterparty_org_unit_name, amount FROM bank_booking_request WHERE id = ?",
+            id);
+    assertThat(stored)
+        .containsEntry("counterparty_user_id", recipient)
+        .containsEntry("counterparty_handle", "Stored Handle")
+        .containsEntry("counterparty_org_unit_id", formerUnit)
+        .containsEntry("counterparty_org_unit_name", "Former Unit");
+    assertThat(((Number) stored.get("amount")).longValue()).isEqualTo(700L);
   }
 
   @Test
@@ -266,6 +339,30 @@ class ExchangeBankRequestWritesTest {
     body(raise(Actor.STAFFELLEITER, deposit(world.account(Account.OWN_ORG_UNIT), 500)), 201);
 
     assertThat(writes("applied")).isEqualTo(before + 1);
+  }
+
+  /**
+   * Counts a member's requests in every state.
+   *
+   * @param member the requester
+   * @return the number of their requests
+   */
+  private long requestsOf(@NotNull UUID member) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM bank_booking_request WHERE requested_by = ?", Long.class, member);
+  }
+
+  /**
+   * Counts a member's pending requests.
+   *
+   * @param member the requester
+   * @return the number of their pending requests
+   */
+  private long pendingOf(@NotNull UUID member) {
+    return jdbc.queryForObject(
+        "SELECT count(*) FROM bank_booking_request WHERE requested_by = ? AND status = 'PENDING'",
+        Long.class,
+        member);
   }
 
   /**

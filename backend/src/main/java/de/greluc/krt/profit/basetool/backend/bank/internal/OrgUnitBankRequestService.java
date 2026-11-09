@@ -108,7 +108,7 @@ public class OrgUnitBankRequestService {
    * @param request the validated payload, without a counterparty
    * @param hidden builds the refusal of a withdrawal or transfer on an account the actor may not
    *     raise one on
-   * @param clientId the connected application's bounded label
+   * @param origin the connected application the gate admitted and the client's idempotency key
    * @return the created pending request
    * @throws BadRequestException when the destination account is missing or superfluous for the
    *     type, or the account accepts no withdrawals or transfers
@@ -120,14 +120,14 @@ public class OrgUnitBankRequestService {
       @NotNull BankAccount account,
       @NotNull CreateBankBookingRequest request,
       @NotNull Supplier<? extends RuntimeException> hidden,
-      @NotNull String clientId) {
+      @NotNull BankRequestOrigin origin) {
     return raise(
         actor,
         account,
         request,
         () -> policy.admit(actor, account, null, request.type(), request.amount()),
         hidden,
-        clientId);
+        origin);
   }
 
   /**
@@ -140,7 +140,8 @@ public class OrgUnitBankRequestService {
    * @param request the payload
    * @param admission asks the policy to admit the request
    * @param hidden builds the refusal of an account the policy does not admit the actor to
-   * @param clientId the connected application's bounded label, or {@code null} for the Basetool
+   * @param origin the connected application and its idempotency key, or {@code null} for the
+   *     Basetool
    * @return the created pending request
    */
   @NotNull
@@ -150,7 +151,7 @@ public class OrgUnitBankRequestService {
       @NotNull CreateBankBookingRequest request,
       @NotNull Supplier<BankAdmission> admission,
       @NotNull Supplier<? extends RuntimeException> hidden,
-      @Nullable String clientId) {
+      @Nullable BankRequestOrigin origin) {
     boolean deposit = request.type() == BankBookingRequestType.DEPOSIT;
     BankAdmission.Admitted routing = admitted(admission.get(), hidden);
     requireTargetShape(request.type(), request.targetAccountId());
@@ -169,7 +170,7 @@ public class OrgUnitBankRequestService {
             deposit ? null : request.counterpartyUserId(),
             deposit ? null : request.counterpartyOrgUnitId(),
             null,
-            clientId));
+            origin));
   }
 
   /**

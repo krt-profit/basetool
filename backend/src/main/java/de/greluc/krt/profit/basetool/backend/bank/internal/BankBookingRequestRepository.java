@@ -127,6 +127,18 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
       UUID requestedBy, Collection<BankBookingRequestStatus> statuses, Pageable pageable);
 
   /**
+   * Finds the request a connected application raised for a requester under an idempotency key
+   * (REQ-BXCH-004).
+   *
+   * @param clientId the registry client id
+   * @param requestedBy the requesting user's id
+   * @param idempotencyKey the client's key of the raise
+   * @return the request, or empty when none was raised under that key
+   */
+  Optional<BankBookingRequest> findByClientIdAndRequestedByAndIdempotencyKey(
+      String clientId, UUID requestedBy, String idempotencyKey);
+
+  /**
    * Returns the first requests of a requester in id order, the start of the exchange snapshot of
    * the member's own requests (REQ-BXCH-003).
    *

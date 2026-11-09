@@ -88,7 +88,7 @@ public interface BankAccountReads {
       @NotNull Instant to);
 
   /**
-   * A viewable account with its figures and the two facts about the actor.
+   * A viewable account with its figures and the three facts about the actor.
    *
    * @param accountId the account
    * @param accountNo the {@code KB-<n>} account number
@@ -101,7 +101,9 @@ public interface BankAccountReads {
    * @param sparkline the 30 end-of-day balances, oldest first, ending with the current balance
    * @param requestable whether the actor may raise a withdrawal or transfer here
    * @param ownLimit the actor's applicable limit above which a request needs an approval, or {@code
-   *     null}
+   *     null} when the actor is exempt or every request needs one
+   * @param approvalExempt whether the actor raises requests here without any approver's sign-off,
+   *     the responsible holder; tells the two meanings of a {@code null} {@code ownLimit} apart
    */
   record Account(
       @NotNull UUID accountId,
@@ -114,7 +116,8 @@ public interface BankAccountReads {
       @NotNull BigDecimal delta30d,
       @NotNull @Unmodifiable List<BigDecimal> sparkline,
       boolean requestable,
-      @Nullable BigDecimal ownLimit) {}
+      @Nullable BigDecimal ownLimit,
+      boolean approvalExempt) {}
 
   /**
    * The org unit that owns an account.

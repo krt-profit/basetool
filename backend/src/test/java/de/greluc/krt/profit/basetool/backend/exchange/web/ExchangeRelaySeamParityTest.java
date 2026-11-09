@@ -108,6 +108,12 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theIdempotencyKeyHeaderIsTheSeamsHeader() {
+    assertThat(ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER)
+        .isEqualTo(ExchangeSeam.IDEMPOTENCY_KEY_HEADER);
+  }
+
+  @Test
   void theRelayHeadersAreTheSeamsHeaders() {
     assertRelayHeaders(ExchangeSeam.RELAY_HEADERS);
     assertThatThrownBy(() ->

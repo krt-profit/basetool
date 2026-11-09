@@ -51,7 +51,8 @@ Each item is a [`bank-account`](../schemas/) (the `sparkline` shortened here):
   "delta30d": 250000,
   "sparkline": [1000000, 1000000, 1250000],
   "requestable": true,
-  "ownLimit": 1000
+  "ownLimit": 1000,
+  "approvalExempt": false
 }
 ```
 
@@ -62,8 +63,10 @@ Each item is a [`bank-account`](../schemas/) (the `sparkline` shortened here):
 - `sparkline` holds the 30 end-of-day balances of the last 30 days, oldest first, ending with the
   current balance; `delta30d` is the net change over them.
 - `requestable` tells whether the member may raise a withdrawal or transfer from the account;
-  `ownLimit` is the member's own limit above which such a request needs an approval, or `null` when
-  none applies.
+  `ownLimit` is the member's own limit above which such a request needs an approval, or `null`.
+- `approvalExempt` tells the two meanings of a `null` `ownLimit` apart: `true` when the member is
+  the account's responsible holder and never needs an approval, `false` when every request needs
+  one. The field is additive; the server always sends it.
 
 No holders, custody, approval-limit tables or ceilings leave the Basetool.
 
@@ -71,7 +74,8 @@ No holders, custody, approval-limit tables or ceilings leave the Basetool.
 
 `GET /exchange/v1/bank/accounts/{id}/bookings` — the bookings of one account the member views,
 newest first, paged with `cursor` and `limit`. `from` and `to` (both optional, inclusive,
-`date-time`) bound the booking time; they are a query bound, not a feed.
+`date-time`) bound the booking time; they are a query bound, not a feed. A bound is an RFC 3339
+date-time whose UTC instant lies in the years 0000 to 9999; anything else is `400 SCHEMA_INVALID`.
 
 Each item is a [`bank-booking`](../schemas/), redacted as on the member's account page in the
 Basetool: no holder and no staff note.
@@ -94,6 +98,10 @@ Basetool: no holder and no staff note.
 }
 ```
 
+- `type` is `DEPOSIT`, `WITHDRAWAL`, `TRANSFER`, `HOLDER_TRANSFER`, `WIPE_RESET` or `REVERSAL`.
+  `HOLDER_TRANSFER` appears on the KRT account only: it is the fee leg of a custody handover between
+  two holders, with the fee as a negative `amount` and as `transferFee`. Treat a value you do not
+  know as a booking of an unknown type ([versioning](../versioning.md)).
 - `amount` is this account's signed leg: negative for money leaving the account.
 - `counterAccount { no, name }` names the other account of a transfer; `transferFee` is the fee the
   debited account bore, or `null`.
@@ -183,6 +191,9 @@ Three writes under the scope `exchange.bank.request`. Each needs an `Idempotency
 one unit of the daily write quota ([limits](../sync-guide.md#rate-limits-quota-and-back-off)). The
 Basetool applies the same validation and approval routing as in its own pages; nothing is booked
 until the bank confirms the request there.
+
+A raise keeps its `Idempotency-Key`: when its answer was lost, retry with the same key and the same
+body, and you get the request it raised, with `201` and its current state, never a second one.
 
 `POST /exchange/v1/bank/requests` raises a request:
 

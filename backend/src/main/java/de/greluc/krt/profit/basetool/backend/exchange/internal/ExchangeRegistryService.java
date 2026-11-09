@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -285,34 +286,20 @@ public class ExchangeRegistryService {
   @NotNull
   @Transactional
   public ExchangeSettings updateSettings(boolean enabled, @NotNull Long version) {
-    ExchangeSettings settings = mirrorSync.lockSettings();
-    OptimisticLock.check(
-        settings.getVersion(), version, ExchangeSettings.class, ExchangeSettings.SINGLETON_ID);
-    if (settings.isEnabled() == enabled) {
-      return settings;
-    }
-    ExchangeRegistrySnapshot before = mirrorSync.load();
-    settings.setEnabled(enabled);
-    final ExchangeSettings saved = mirrorSync.saveSettings(settings);
-    mirrorSync.mirrorChange(before, mirrorSync.load());
-    auditRecorder.record(
-        AuditEventType.EXCHANGE_SWITCH_CHANGED,
-        null,
-        null,
-        null,
-        AuditDetails.of("enabled", enabled));
-    UUID actor = authHelperService.currentUserId().orElse(null);
-    eventPublisher.publishEvent(
-        enabled ? ExchangeNotices.switchedOn(actor) : ExchangeNotices.switchedOff(actor));
-    countAfterCommit(
-        enabled ? ExchangeRegistryAction.SWITCH_ON : ExchangeRegistryAction.SWITCH_OFF);
-    return saved;
+    return flip(
+        ExchangeSwitch.GLOBAL,
+        enabled,
+        version,
+        settings -> {
+          settings.setEnabled(enabled);
+          return mirrorSync.saveSettings(settings);
+        });
   }
 
   /**
    * Turns the bank switch on or off (REQ-BXCH-006); switching off reaches the mirror before the
-   * commit. The switch has its own version counter, so this never makes the global switch's version
-   * stale and the other way round.
+   * commit. The switch has its own version counter and change time, so this never makes the global
+   * switch's version stale nor moves its {@code updatedAt}, and the other way round.
    *
    * @param enabled the new state
    * @param bankVersion the bank switch's version last seen
@@ -323,32 +310,43 @@ public class ExchangeRegistryService {
   @NotNull
   @Transactional
   public ExchangeSettings updateBankSwitch(boolean enabled, @NotNull Long bankVersion) {
+    return flip(
+        ExchangeSwitch.BANK,
+        enabled,
+        bankVersion,
+        settings -> mirrorSync.saveBankSwitch(settings, enabled, clock.instant()));
+  }
+
+  /**
+   * Flips one switch under the settings row lock: checks its version, writes it, mirrors the
+   * change, audits it with {@code {enabled}}, announces it and counts it after the commit.
+   *
+   * @param target the switch
+   * @param enabled the new state
+   * @param version the switch's version last seen
+   * @param write writes the new state onto the locked row and returns the saved row
+   * @return the saved settings, unchanged when the switch already had that state
+   */
+  @NotNull
+  private ExchangeSettings flip(
+      @NotNull ExchangeSwitch target,
+      boolean enabled,
+      @NotNull Long version,
+      @NotNull UnaryOperator<ExchangeSettings> write) {
     ExchangeSettings settings = mirrorSync.lockSettings();
     OptimisticLock.check(
-        settings.getBankVersion(),
-        bankVersion,
-        ExchangeSettings.class,
-        ExchangeSettings.SINGLETON_ID);
-    if (settings.isBankEnabled() == enabled) {
+        target.versionOf(settings), version, ExchangeSettings.class, ExchangeSettings.SINGLETON_ID);
+    if (target.isOn(settings) == enabled) {
       return settings;
     }
-    final ExchangeRegistrySnapshot before = mirrorSync.load();
-    settings.setBankEnabled(enabled);
-    settings.setBankVersion(settings.getBankVersion() + 1);
-    settings.setBankUpdatedAt(clock.instant());
-    final ExchangeSettings saved = mirrorSync.saveSettings(settings);
+    ExchangeRegistrySnapshot before = mirrorSync.load();
+    final ExchangeSettings saved = write.apply(settings);
     mirrorSync.mirrorChange(before, mirrorSync.load());
     auditRecorder.record(
-        AuditEventType.BANK_EXCHANGE_SWITCH_CHANGED,
-        null,
-        null,
-        null,
-        AuditDetails.of("enabled", enabled));
+        target.getAuditType(), null, null, null, AuditDetails.of("enabled", enabled));
     UUID actor = authHelperService.currentUserId().orElse(null);
-    eventPublisher.publishEvent(
-        enabled ? ExchangeNotices.bankSwitchedOn(actor) : ExchangeNotices.bankSwitchedOff(actor));
-    countAfterCommit(
-        enabled ? ExchangeRegistryAction.BANK_SWITCH_ON : ExchangeRegistryAction.BANK_SWITCH_OFF);
+    eventPublisher.publishEvent(target.notice(enabled, actor));
+    countAfterCommit(target.action(enabled));
     return saved;
   }
 

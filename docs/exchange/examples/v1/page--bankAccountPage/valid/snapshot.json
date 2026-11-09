@@ -47,7 +47,8 @@
         1250000
       ],
       "requestable": true,
-      "ownLimit": 1000
+      "ownLimit": 1000,
+      "approvalExempt": false
     },
     {
       "accountId": "7a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d",
@@ -91,7 +92,8 @@
         0
       ],
       "requestable": false,
-      "ownLimit": null
+      "ownLimit": null,
+      "approvalExempt": false
     }
   ],
   "removed": [],

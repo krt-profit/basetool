@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -73,16 +72,7 @@ public class ExchangeBankMetrics {
    * @param outcome {@code applied} or {@code rejected}
    */
   public void countWrite(@NotNull String clientId, @NotNull String outcome) {
-    meterRegistry
-        .counter(
-            ExchangeMetricNames.EXCHANGE_WRITES,
-            MetricNames.TAG_CLIENT_ID,
-            clientId,
-            ExchangeMetricNames.TAG_RESOURCE,
-            ExchangeFeedResource.BANK_REQUEST.name().toLowerCase(Locale.ROOT),
-            MetricNames.TAG_OUTCOME,
-            outcome)
-        .increment();
+    ExchangeWrites.count(meterRegistry, clientId, ExchangeFeedResource.BANK_REQUEST, outcome);
   }
 
   /**

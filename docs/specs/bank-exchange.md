@@ -95,21 +95,28 @@ so a withdrawn grant hides everything at once.
 **The accounts** are the active accounts the member views (REQ-BANK-064), each with `accountId`,
 `accountNo`, `name`, `type`, `orgUnit { id, name, shorthand, kind }` or `null`, `balance`,
 `balanceTarget` or `null`, `delta30d`, `sparkline` (30 end-of-day balances, oldest first, ending with
-the current balance) and two facts about the member from the policy: `requestable` (may raise a
-withdrawal or transfer here) and `ownLimit` (the applicable limit above which an approval is needed)
-or `null`. No holders, custody, limit tables, ceilings, `version` or staff capabilities.
+the current balance) and three facts about the member from the policy: `requestable` (may raise a
+withdrawal or transfer here), `ownLimit` (the applicable limit above which an approval is needed)
+or `null`, and `approvalExempt`, which tells a `null` limit of the responsible holder, who never
+needs an approval, from one where every request needs it. `approvalExempt` is additive and not
+required by the schema; the server always sends it. No holders, custody, limit tables, ceilings,
+`version` or staff capabilities.
 
 **The bookings** carry the member detail page's redaction (REQ-BANK-038): `postingId`,
 `transactionId`, `type`, `amount` (this account's signed leg), `createdAt`, `note`, `justification`,
 `reversedTransactionId`, `counterAccount { no, name }`, `intraAccount`, `transferFee`,
 `counterpartyHandle` and `counterpartyOrgUnitName`, each `null` where it does not apply. No holder
-handles and no staff note.
+handles and no staff note. `type` is any ledger type, `HOLDER_TRANSFER` included: the KRT account
+carries the fee leg of every custody handover that bears a fee.
 
 **The balance series** is `points [{ date, balance }]` and `balanceTarget` or `null`.
 
 Money is a JSON integer of whole aUEC; the enumerations are UPPER_SNAKE. A page carries `removed: []`.
 A cursor the server did not issue, or an account cursor whose account the member no longer views,
 answers `410 CURSOR_EXPIRED`.
+
+A `from` or `to` is an RFC 3339 `date-time` whose UTC instant lies in the years 0000 to 9999; any
+other value, a signed or five-digit year included, answers `400 SCHEMA_INVALID` at the gateway.
 
 **The shared `404`.** An unknown account, an account the member may not view and a closed account
 answer the same `404 NOT_FOUND`, on the bookings and the balance series alike; the gateway passes
@@ -120,12 +127,17 @@ it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` a
 
 **Acceptance**
 
-- [x] The accounts come KRT first, carry exactly the allow-listed fields with the two facts about the
-  member, and page with an opaque cursor; a foreign cursor is `410` (`ExchangeBankReadsTest`).
+- [x] The accounts come KRT first, carry exactly the allow-listed fields with the three facts about
+  the member, and page with an opaque cursor; a foreign cursor is `410`; the responsible holder's
+  `null` limit comes with `approvalExempt = true` (`ExchangeBankReadsTest`).
 - [x] The bookings come newest first with the redaction, page and are bounded by `from` / `to`
   (`ExchangeBankReadsTest`).
+- [x] The KRT account's holder-transfer fee leg is served as `HOLDER_TRANSFER` within the published
+  schema and relayed by the gateway (`ExchangeBankReadsTest`, `ExchangeGoldenAnswerTest`).
 - [x] The balance series has one point per day and refuses a missing bound, an inverted period and
   more than 365 days (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
+- [x] A bound outside the four-digit years is refused before the relay (`BankQueryTest`,
+  `ExchangeBankRouteTest`).
 - [x] A hidden, a closed and an unknown account answer the same `404 NOT_FOUND`, counted
   (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
 - [x] Every answer validates against its published schema; the routes, schemas, fixtures and goldens
@@ -148,7 +160,8 @@ REQ-BANK-064, REQ-BANK-066, REQ-XCH-013 · **Issues:** #3118, #3157
 it — the web's requests too — as a snapshot followed by the change feed of REQ-XCH-013.
 
 - **Snapshot.** `cursor` + `limit` (1…1000, default 500), in request-id order; the last page hands
-  over a feed cursor at the position the snapshot was taken.
+  over a feed cursor at the position the snapshot was taken. The index
+  `(requested_by, id)` (V366) serves every page in that order without a sort.
 - **Feed.** A new `ExchangeResource` `BANK_REQUEST`, keyed by the requester, with the request id as
   its key. The `bank_booking_request` trigger sequences every insert, update and delete; a change
   of an account's number, name or owning unit, and of the owning unit's shorthand, re-announces the
@@ -175,6 +188,8 @@ it — the web's requests too — as a snapshot followed by the change feed of R
 - [x] The snapshot lists every own request, the web-raised ones too, with exactly the allow-listed
   fields, and no other member's; it pages with an opaque cursor that ends at the feed; a foreign
   cursor is `410` (`ExchangeBankRequestsTest`).
+- [x] A snapshot page is read in index order without a sort
+  (`BankOwnRequestKeysetPlanIntegrationTest`).
 - [x] A request raised, decided or removed after the snapshot follows in the feed, a removal as a
   tombstone; another member's request never does; a cursor past the horizon is `410`
   (`ExchangeBankRequestFeedTest`).
@@ -212,7 +227,8 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   re-routing on correction. The exchange adds no rule of its own. A deposit may target any active
   account (REQ-BANK-042); a withdrawal or transfer needs an account the policy admits.
 - **Which requests.** Correction and cancel act on every own pending request, the web's included.
-  A correction keeps the counterparty a web request names. A purpose-bound request keeps its
+  A correction keeps the counterparty a web request names, with its stored org unit, even after the
+  counterparty left that unit. A purpose-bound request keeps its
   amount and destination too: a correction that changes them answers `400 SCHEMA_INVALID`
   (REQ-BANK-056). A correction is routed as its raise was: a deposit never needs an approval. No
   counterparty, no purpose-bound and no KRT direct-booking request is raised through a client.
@@ -227,7 +243,17 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   (`BankAccessPolicyRulesTest.theExchangeOwnRequestWritesDecideForTheExplicitActor`).
 - **Origin.** A raised request records the registry client the exchange gate admitted in
   `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
-  (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
+  (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067). The column, the
+  trail's `bank_audit_event.client_id` and both schemas' `client` hold up to 63 characters, the
+  longest id the registry admits.
+- **A retried raise raises nothing twice.** The gateway relays a raise's `Idempotency-Key` as
+  `X-Exchange-Idempotency-Key`, and the request keeps it in `bank_booking_request.idempotency_key`
+  (V366), unique per client, member and key. A raise under a key the client already raised a
+  request of this member with answers that request with `201` and its current state, even when the
+  gateway's answer cache missed it (a `5xx` after the commit is never cached) and even at the cap.
+  The lookup runs under the member's open-request lock, so two retries never both insert.
+- **Live.** Every applied raise, correction and cancel refreshes the staff queue, the org-unit bank
+  and the request page in place, as the web's request forms do (REQ-XCH-030, REQ-BANK-068).
 - **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
   trail is `bank_audit_event` with its `client_id` (ADR-0153).
 - **Refusals.** `404 NOT_FOUND` for an unknown, closed or hidden account and for another member's
@@ -251,8 +277,13 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   answer the same counted `404` (`ExchangeBankRequestWritesTest`).
 - [x] The bank's refusals, the bean rules, a stale version and the cap at 20 pending requests answer
   as listed (`ExchangeBankRequestWritesTest`).
+- [x] A correction keeps the stored counterparty and its org unit after the counterparty left the
+  unit (`ExchangeBankRequestWritesTest`).
 - [x] A raise racing the member's last free slot waits for the other raise and is refused with the
   cap (`BankOpenRequestCapConcurrencyTest`).
+- [x] A raise retried under the same idempotency key answers the request raised first, also at the
+  cap, and a new key raises a new request (`ExchangeBankRequestWritesTest`); the gateway relays the
+  key on the raise only (`ExchangeBankRequestWriteRouteTest`, `ExchangeGoldenAnswerTest`).
 - [x] A raise, correction or cancel path that reaches the security context fails the build
   (`BankAccessPolicyRulesTest`).
 - [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,
@@ -352,7 +383,9 @@ switch (REQ-XCH-003), with its own version counter `bank_version`, independent o
 - It is **off by default**; the bank family goes live only when an admin switches it on.
 - **Admins only** flip it, on the „Verbundene Apps" admin page, through
   `PUT /api/v1/connected-apps/admin/settings/bank {enabled, version}`; `GET` on the same path reads
-  it. A stale `version` answers `409`. Flipping either switch never makes the other's version stale.
+  it. A stale `version` answers `409`. Flipping either switch never makes the other's version stale,
+  and each keeps its own change time: the bank switch's in `bank_updated_at`, the global switch's in
+  the row's `updated_at`, which a bank flip leaves alone.
 - Switching off reaches the gateway's registry mirror **before** the commit or not at all, as the
   global switch does; switching on reaches it after the commit. The gateway reads the mirror through
   its five-second cache. A mirror document without the bank switch reads as off.
@@ -360,6 +393,12 @@ switch (REQ-XCH-003), with its own version counter `bank_version`, independent o
 **The answer while it is off.** Every path at or below `/exchange/v1/bank` answers
 `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`, whether a route serves it or not; with the
 switch on, a bank path no route serves is `404 NOT_FOUND`.
+
+- Membership is judged on the **decoded** path segments, as routing matches them, so a
+  percent-encoded spelling such as `/exchange/v1/b%61nk/accounts` is a bank path too; gateway and
+  backend judge it alike.
+- Both answers come before the daily write quota: a bank write the switch refuses, and a bank path
+  no route serves, count no write.
 
 - The global switch wins: while the exchange is off, a bank path answers `503 EXCHANGE_DISABLED`
   with `Retry-After: 30`.
@@ -394,13 +433,15 @@ or closed account answers the same `404`.
 **Acceptance**
 
 - [x] The switch starts off, is set by an admin only and has its own version; a stale version is
-  `409`, and neither switch stales the other (`AdminExchangeRegistryControllerTest`,
-  `ExchangeRegistryMirrorIntegrationTest`).
+  `409`, and neither switch stales the other nor moves its change time
+  (`AdminExchangeRegistryControllerTest`, `ExchangeRegistryMirrorIntegrationTest`).
 - [x] Switching the bank off reaches the mirror before the commit, switching on only after it
   (`ExchangeRegistryMirrorIntegrationTest`, `ExchangeRegistrySnapshotTest`).
 - [x] While it is off, every bank path answers `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`
   on the gateway and in the backend gate; the global switch wins; other routes and look-alike paths
   are untouched (ingest and backend `ExchangeGateTest`, `ExchangeRelayTest`).
+- [x] A percent-encoded bank path is a bank path on both sides, and neither it nor a bank path no
+  route serves counts a write (ingest `ExchangeGateTest`, `BankExchangeRoutesTest`).
 - [x] Every change is audited and notifies the admins and the Bankleitung
   (`ExchangeRegistryNoticeTest`, `SeededNotificationRulesIntegrationTest`).
 - [x] The open-request cap is 20 unless configured and refuses a value outside 1…1000

@@ -205,7 +205,8 @@ public class BankAccountReadService implements BankAccountReads {
         delta,
         List.copyOf(BankTrendCalculator.sparkline(balance, delta, slices)),
         access.has(BankAccountRight.REQUEST),
-        access.approvalLimit());
+        access.approvalLimit(),
+        access.approvalExempt());
   }
 
   /**

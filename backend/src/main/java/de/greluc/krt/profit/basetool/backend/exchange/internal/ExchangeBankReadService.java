@@ -217,7 +217,8 @@ public class ExchangeBankReadService {
         ExchangeAmounts.whole(account.delta30d()),
         account.sparkline().stream().map(ExchangeAmounts::whole).toList(),
         account.requestable(),
-        ExchangeAmounts.wholeOrNull(account.ownLimit()));
+        ExchangeAmounts.wholeOrNull(account.ownLimit()),
+        account.approvalExempt());
   }
 
   /**

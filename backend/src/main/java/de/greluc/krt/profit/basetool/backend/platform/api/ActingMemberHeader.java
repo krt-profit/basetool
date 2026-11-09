@@ -56,6 +56,13 @@ public final class ActingMemberHeader {
    */
   public static final String EXCHANGE_CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
+  /**
+   * Carries the client's {@code Idempotency-Key} of a bank raise, which the gateway checked
+   * (REQ-XCH-020), so a retry after a lost answer finds the request it raised (REQ-BXCH-004); read
+   * only by the exchange's raise route.
+   */
+  public static final String EXCHANGE_IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
+
   /** Not instantiable: a constant holder, not a component. */
   private ActingMemberHeader() {}
 }

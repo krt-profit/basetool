@@ -84,6 +84,11 @@ class ExchangeRelaySeamParityTest {
   }
 
   @Test
+  void theRelaySendsTheSeamsIdempotencyKeyHeader() {
+    assertThat(ExchangeRelay.IDEMPOTENCY_KEY_HEADER).isEqualTo(ExchangeSeam.IDEMPOTENCY_KEY_HEADER);
+  }
+
+  @Test
   void theRelayAdmitsTheSeamsGateCodesWithTheirStatuses() {
     assertGateStatuses(ExchangeSeam.GATE_STATUSES);
     Map<String, Integer> otherStatus = new HashMap<>(ExchangeSeam.GATE_STATUSES);

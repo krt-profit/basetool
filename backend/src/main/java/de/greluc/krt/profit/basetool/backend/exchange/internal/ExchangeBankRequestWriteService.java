@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,7 +41,9 @@ import org.springframework.stereotype.Service;
  *
  * <p>Every write counts on {@code basetool_exchange_writes_total{resource="bank_request"}}, a
  * shared {@code 404} and a cap refusal also on {@code basetool_exchange_bank_refused_total}
- * (REQ-OBS-024). There is no exchange journal and no undo: a request books nothing.
+ * (REQ-OBS-024), and every applied write refreshes the bank pages that show the request, as the
+ * web's request forms do (REQ-XCH-030, REQ-BANK-068). There is no exchange journal and no undo: a
+ * request books nothing.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,12 +53,17 @@ public class ExchangeBankRequestWriteService {
   private final BankOwnRequestWrites requestWrites;
   private final ExchangeBankMetrics metrics;
 
+  /** Refreshes the open bank pages after an applied write. */
+  private final ExchangeLiveSync liveSync;
+
   /**
    * Raises a deposit, withdrawal or transfer request for the member with the web's validation and
    * the policy's approval routing, and records the calling client on it (REQ-BANK-067).
    *
    * @param caller the acting member and the client the request is recorded for
    * @param body the type, accounts, amount, texts and the split of a deposit
+   * @param idempotencyKey the client's key of the raise the gateway relayed, or {@code null}; a
+   *     retry under the same key answers the request raised first
    * @return the new request's id, {@code PENDING} status, version and amount
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException for an unknown, closed
    *     or hidden account
@@ -63,7 +71,9 @@ public class ExchangeBankRequestWriteService {
    */
   @NotNull
   public ExchangeBankRequestWrittenDto raise(
-      @NotNull ExchangeCaller caller, @NotNull ExchangeBankRequestCreateDto body) {
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeBankRequestCreateDto body,
+      @Nullable String idempotencyKey) {
     return counted(
         caller,
         () ->
@@ -79,7 +89,8 @@ public class ExchangeBankRequestWriteService {
                         body.justification(),
                         body.splitEnabled(),
                         body.splitPercent()),
-                    caller.clientId())));
+                    caller.clientId(),
+                    idempotencyKey)));
   }
 
   /**
@@ -138,7 +149,7 @@ public class ExchangeBankRequestWriteService {
 
   /**
    * Runs one write and counts its outcome, and the refusal reason of a shared {@code 404} or a cap
-   * refusal.
+   * refusal; an applied write refreshes the open bank pages (REQ-XCH-030).
    *
    * @param caller the acting member and the client the outcome is counted for
    * @param write the bank write to run
@@ -150,6 +161,7 @@ public class ExchangeBankRequestWriteService {
     try {
       T answer = write.get();
       metrics.countWrite(caller.clientId(), ExchangeOps.APPLIED);
+      liveSync.bankRequestsChanged();
       return answer;
     } catch (NotFoundException e) {
       metrics.countRefused(BankExchangeRefusal.NOT_FOUND);

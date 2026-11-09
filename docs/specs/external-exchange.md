@@ -2197,6 +2197,14 @@ After each committed exchange write the backend publishes live-sync frames on th
 sections the web pages and the app listen on (Lager, Blueprints, Hangar, and the Materialbörse when
 offers changed) — `ExchangeLiveSync`, see REQ-XCH-013.
 
+The bank family takes part too (REQ-BXCH-004): every applied raise, correction and cancel of a
+booking request announces `bank/requestQueue` and `orgunit-bank/orgUnitBank`, exactly what the
+web's request forms announce, so the staff queue, „Anträge an unsere Konten" and the request page
+(REQ-BANK-068) update in place; a refused write announces nothing.
+
+- [x] An applied bank write announces both rooms, a refused one neither (`ExchangeLiveSyncTest`,
+  `ExchangeBankRequestWriteLiveSyncTest`, `LiveSyncTopicRegistryParityTest`).
+
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086)
 

@@ -101,6 +101,12 @@ public class ExchangeRelay {
    */
   public static final String CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
+  /**
+   * The header carrying the client's {@code Idempotency-Key} of a bank raise, which the idempotency
+   * filter admitted, so the backend can answer a retry with the request it raised (REQ-BXCH-004).
+   */
+  public static final String IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
+
   /** The code of a relay failure. */
   public static final String RELAY_FAILED = "BACKEND_RELAY_FAILED";
 
@@ -308,9 +314,31 @@ public class ExchangeRelay {
       @Nullable JsonNode body,
       @NotNull ExchangeRequestContext context,
       @Nullable String acceptLanguage) {
+    return forward(method, backendPath, body, context, acceptLanguage, null);
+  }
+
+  /**
+   * Relays one write together with the client's {@code Idempotency-Key}, which the backend keeps
+   * with what the write created, so a retry after a lost answer finds it (REQ-BXCH-004).
+   *
+   * @param method the method
+   * @param backendPath the backend path
+   * @param body the JSON body, or {@code null} for none
+   * @param context what the gate established
+   * @param acceptLanguage the caller's {@code Accept-Language}, or {@code null}
+   * @param idempotencyKey the key the idempotency filter admitted, or {@code null} to relay none
+   * @return the backend's answer as the exchange contract allows it
+   */
+  public @NotNull Result forward(
+      @NotNull HttpMethod method,
+      @NotNull String backendPath,
+      @Nullable JsonNode body,
+      @NotNull ExchangeRequestContext context,
+      @Nullable String acceptLanguage,
+      @Nullable String idempotencyKey) {
     Raw raw;
     try {
-      raw = call(method, backendPath, body, context, acceptLanguage);
+      raw = call(method, backendPath, body, context, acceptLanguage, idempotencyKey);
     } catch (RestClientException
         | CallNotPermittedException
         | ServiceAccountTokenProvider.ServiceAccountTokenException e) {
@@ -360,6 +388,7 @@ public class ExchangeRelay {
    * @param body the JSON body, or {@code null} for none
    * @param context what the gate established
    * @param acceptLanguage the caller's {@code Accept-Language}, or {@code null}
+   * @param idempotencyKey the client's key of the write, or {@code null} to relay none
    * @return the backend's raw answer
    * @throws RestClientException if the backend cannot be reached or its answer read
    * @throws CallNotPermittedException if the circuit breaker is open
@@ -370,7 +399,8 @@ public class ExchangeRelay {
       @NotNull String backendPath,
       @Nullable JsonNode body,
       @NotNull ExchangeRequestContext context,
-      @Nullable String acceptLanguage) {
+      @Nullable String acceptLanguage,
+      @Nullable String idempotencyKey) {
     String token = tokenProvider.currentToken();
     String correlationId = MDC.get(loggingProperties.correlationIdMdcKey());
     String language = sanitizedAcceptLanguage(acceptLanguage);
@@ -388,6 +418,9 @@ public class ExchangeRelay {
                 headers.set(INSTALLATION_HEADER, context.keyThumbprint());
                 if (context.connectedAt() != null) {
                   headers.set(CONNECTED_AT_HEADER, Long.toString(context.connectedAt()));
+                }
+                if (idempotencyKey != null) {
+                  headers.set(IDEMPOTENCY_KEY_HEADER, idempotencyKey);
                 }
                 headers.setAccept(
                     List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_PROBLEM_JSON));

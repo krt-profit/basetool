@@ -27,6 +27,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -58,6 +59,15 @@ record BankQuery(
 
   /** The longest period a balance series covers, {@value #MAX_SERIES_DAYS} days. */
   static final Duration MAX_SERIES_SPAN = Duration.ofDays(MAX_SERIES_DAYS);
+
+  /** An unsigned four-digit year at the start of a bound. */
+  private static final Pattern FOUR_DIGIT_YEAR = Pattern.compile("\\d{4}-");
+
+  /** The earliest UTC instant whose ISO-8601 form has a four-digit year. */
+  private static final Instant EARLIEST = Instant.parse("0000-01-01T00:00:00Z");
+
+  /** The latest UTC instant whose ISO-8601 form has a four-digit year. */
+  private static final Instant LATEST = Instant.parse("9999-12-31T23:59:59.999999999Z");
 
   /**
    * Checks the parameters of a bank read.
@@ -111,10 +121,28 @@ record BankQuery(
       }
       return null;
     }
-    try {
-      return OffsetDateTime.parse(raw).toInstant();
-    } catch (DateTimeParseException _) {
+    Instant instant = rfc3339(raw);
+    if (instant == null) {
       violations.add(new ExchangeSchemas.Violation("/" + name, "must be a date-time"));
+    }
+    return instant;
+  }
+
+  /**
+   * Parses an RFC 3339 date-time whose UTC instant still has a four-digit year, so the relayed
+   * ISO-8601 instant carries no sign (RFC 3339 §5.6 allows no other year).
+   *
+   * @param raw the raw value
+   * @return the instant, or {@code null} when it is malformed or outside the years 0000 to 9999
+   */
+  private static @Nullable Instant rfc3339(@NotNull String raw) {
+    if (!FOUR_DIGIT_YEAR.matcher(raw).lookingAt()) {
+      return null;
+    }
+    try {
+      Instant instant = OffsetDateTime.parse(raw).toInstant();
+      return instant.isBefore(EARLIEST) || instant.isAfter(LATEST) ? null : instant;
+    } catch (DateTimeParseException _) {
       return null;
     }
   }

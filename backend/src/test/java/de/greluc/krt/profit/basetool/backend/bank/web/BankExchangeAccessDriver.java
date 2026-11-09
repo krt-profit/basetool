@@ -116,7 +116,36 @@ final class BankExchangeAccessDriver {
     UUID member = world.user(c.actor());
     return render(
         relay.write(HttpMethod.POST, member, "/requests", body),
-        answer -> routing(member, answer.path("id").asString()));
+        answer -> {
+          String routing = routing(member, answer.path("id").asString());
+          withdraw(member, answer);
+          return routing;
+        });
+  }
+
+  /**
+   * Cancels a request a raise case just wrote, so the member's pending requests stay below the
+   * open-request cap however many raise cases run in one world.
+   *
+   * @param member the requester
+   * @param written the raise's answer, with the request's id and version
+   * @throws IllegalStateException when the cancel is refused
+   */
+  private void withdraw(@NotNull UUID member, @NotNull JsonNode written) {
+    MockHttpServletResponse cancelled;
+    try {
+      cancelled =
+          relay.write(
+              HttpMethod.POST,
+              member,
+              "/requests/" + written.path("id").asString() + "/cancel",
+              Map.of("version", written.path("version").asLong()));
+    } catch (Exception e) {
+      throw new IllegalStateException("The raised request could not be cancelled", e);
+    }
+    if (cancelled.getStatus() != 200) {
+      throw new IllegalStateException("The raise's cancel answered " + cancelled.getStatus());
+    }
   }
 
   /**

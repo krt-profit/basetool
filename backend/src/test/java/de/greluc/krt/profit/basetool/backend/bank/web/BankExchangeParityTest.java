@@ -44,13 +44,14 @@ import org.springframework.web.context.WebApplicationContext;
  * its read-only drill-in, reduced to the status.
  *
  * <p>The own-request writes answer every raise, correction and cancel case as the web recorded it
- * (REQ-BXCH-004), with the cap lifted so the member's seeded requests do not hit it.
+ * (REQ-BXCH-004); the driver cancels each raised request again, so the member stays below the
+ * open-request cap and the test runs in the shared Spring context.
  *
  * <p>Two deviations are expected and pinned: an administrator acts on the exchange only through
  * their bank roles, grants and memberships (REQ-XCH-009), so the matrix's administrator without
  * memberships sees nothing; and a closed account is hidden on the exchange like an unknown one.
  */
-@SpringBootTest(properties = "app.bank.exchange.open-request-cap=1000")
+@SpringBootTest
 @Transactional
 class BankExchangeParityTest {
 

@@ -148,8 +148,7 @@ public class BankBookingRequestService {
     request.setAmount(draft.amount());
     request.setNote(draft.note());
     request.setJustification(draft.justification());
-    applyCounterparty(
-        request,
+    request.applyCounterparty(
         resolveRequestCounterparty(
             type, draft.counterpartyUserId(), draft.counterpartyOrgUnitId()));
     request.setStatus(BankBookingRequestStatus.PENDING);
@@ -167,7 +166,9 @@ public class BankBookingRequestService {
     BankPurpose purpose = draft.purpose();
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
-    request.setClientId(draft.clientId());
+    BankRequestOrigin origin = draft.origin();
+    request.setClientId(origin == null ? null : origin.clientId());
+    request.setIdempotencyKey(origin == null ? null : origin.idempotencyKey());
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -265,21 +266,6 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Writes a resolved counterparty snapshot onto the request, clearing all four counterparty
-   * columns when it is {@code null}.
-   *
-   * @param request the request to stamp
-   * @param counterparty the resolved snapshot, or {@code null} to clear
-   */
-  private static void applyCounterparty(
-      @NotNull BankBookingRequest request, @Nullable CounterpartySnapshot counterparty) {
-    request.setCounterpartyUserId(counterparty == null ? null : counterparty.userId());
-    request.setCounterpartyHandle(counterparty == null ? null : counterparty.handle());
-    request.setCounterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId());
-    request.setCounterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName());
-  }
-
-  /**
    * Pages the current caller's own booking requests in the given states (REQ-BANK-022). Per-user
    * isolation: it reads strictly the caller's {@code sub}, never a foreign request.
    *
@@ -343,10 +329,11 @@ public class BankBookingRequestService {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
     }
     applyTargetAccount(request, type, update.targetAccountId());
-    applyCounterparty(
-        request,
-        resolveRequestCounterparty(
-            type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    UUID counterpartyId = update.counterpartyUserId();
+    UUID counterpartyUnit = update.counterpartyOrgUnitId();
+    if (!request.namesCounterparty(counterpartyId, counterpartyUnit)) {
+      request.applyCounterparty(resolveRequestCounterparty(type, counterpartyId, counterpartyUnit));
+    }
     request.setAmount(update.amount());
     request.setNote(update.note());
     request.setJustification(update.justification());

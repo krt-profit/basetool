@@ -3224,7 +3224,8 @@ and the backend decides what it shows.
 - **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
   card in place (REQ-FE-015): a member listens in the org-unit bank room, a bank-staff account
   without a membership role in the bank-staff room, since every request write publishes to both
-  (`BankRequestPageControllerMvcTest`).
+  (`BankRequestPageControllerMvcTest`), a write through a connected application included: the
+  backend announces those itself (REQ-XCH-030).
 
 **Acceptance**
 

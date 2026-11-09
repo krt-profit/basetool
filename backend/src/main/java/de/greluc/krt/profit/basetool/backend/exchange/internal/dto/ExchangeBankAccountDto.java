@@ -40,7 +40,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param sparkline the 30 end-of-day balances, oldest first, ending with the current balance
  * @param requestable whether the member may raise a withdrawal or transfer here
  * @param ownLimit the member's applicable limit above which a request needs an approval, or {@code
- *     null}
+ *     null} when the member is exempt or every request needs one
+ * @param approvalExempt whether the member raises requests here without any approver's sign-off
  */
 public record ExchangeBankAccountDto(
     @NotNull UUID accountId,
@@ -53,4 +54,5 @@ public record ExchangeBankAccountDto(
     long delta30d,
     @NotNull @Unmodifiable List<Long> sparkline,
     boolean requestable,
-    @Nullable Long ownLimit) {}
+    @Nullable Long ownLimit,
+    boolean approvalExempt) {}
