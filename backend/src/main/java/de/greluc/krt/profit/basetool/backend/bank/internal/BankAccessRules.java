@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountAccess;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
@@ -91,6 +92,21 @@ public class BankAccessRules implements BankAccessPolicy {
             account,
             () -> viewGrantRepository.findByAccountId(account.getId()),
             () -> approvalLimitRepository.findByAccountId(account.getId()));
+  }
+
+  /**
+   * Whether the actor views the account on the org-unit side, the {@link
+   * BankAccountRight#VIEW} of {@link #accessTo(BankActor, BankAccount, UUID)} without deciding the
+   * other rights.
+   *
+   * @param actor the actor
+   * @param account the account
+   * @param pin the active org unit, or {@code null}
+   * @return {@code true} iff the actor views the account
+   */
+  boolean canView(@NotNull BankActor actor, @NotNull BankAccount account, @Nullable UUID pin) {
+    return judgement(actor, pin)
+        .canView(account, () -> viewGrantRepository.findByAccountId(account.getId()));
   }
 
   @Override
@@ -263,7 +279,7 @@ public class BankAccessRules implements BankAccessPolicy {
     }
     BigDecimal limit =
         judgement.applicableLimit(
-            account, approvalLimitRepository.findByAccountId(account.getId()));
+            account, () -> approvalLimitRepository.findByAccountId(account.getId()));
     return limit == null || amount.compareTo(limit) > 0
         ? BankAdmission.Admitted.approvedBy(limit, BankRequestApprover.RESPONSIBLE_HOLDER)
         : BankAdmission.Admitted.withoutApproval(limit);

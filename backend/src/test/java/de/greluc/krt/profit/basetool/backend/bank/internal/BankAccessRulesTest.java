@@ -227,6 +227,30 @@ class BankAccessRulesTest {
   }
 
   @Test
+  void accessTo_krtAccount_readsNoApprovalLimitRows() {
+    stubFind(cartelAccount);
+
+    policy.accessTo(TestBankActor.member(UUID.randomUUID()).build(), cartelAccount.getId(), null);
+
+    verify(approvalLimitRepository, never()).findByAccountId(any());
+  }
+
+  @Test
+  void canView_readsTheViewRuleOnlyAndNoApprovalLimitRows() {
+    BankActor member =
+        TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.MEMBER).build();
+    BankAccountViewGrant allMembers = new BankAccountViewGrant();
+    allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    when(viewGrantRepository.findByAccountId(staffelAccount.getId()))
+        .thenReturn(List.of(allMembers));
+
+    assertThat(policy.canView(member, staffelAccount, null)).isTrue();
+    assertThat(policy.canView(TestBankActor.member(UUID.randomUUID()).build(), staffelAccount, null))
+        .isFalse();
+    verify(approvalLimitRepository, never()).findByAccountId(any());
+  }
+
+  @Test
   void accessTo_grantedEmployee_seesOnTheStaffSideOnly() {
     stubFind(staffelAccount);
     BankActor employee =

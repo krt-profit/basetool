@@ -155,7 +155,7 @@ final class BankAccessJudgement {
     if (rights.isEmpty()) {
       return BankAccountAccess.Hidden.INSTANCE;
     }
-    BigDecimal approvalLimit = request && !holder ? applicableLimit(account, limits.get()) : null;
+    BigDecimal approvalLimit = request && !holder ? applicableLimit(account, limits) : null;
     return new BankAccountAccess.Visible(accountId, rights, approvalLimit);
   }
 
@@ -235,15 +235,17 @@ final class BankAccessJudgement {
    * tier, where the all-members tier matches only members of the owning unit.
    *
    * @param account the account
-   * @param limits the account's approval-limit rows
+   * @param limitRows the account's approval-limit rows, read only off the KRT account
    * @return the limit, or {@code null} when no tier matches
    */
   @Nullable
   BigDecimal applicableLimit(
-      @NotNull BankAccount account, @NotNull List<BankAccountApprovalLimit> limits) {
+      @NotNull BankAccount account,
+      @NotNull Supplier<List<BankAccountApprovalLimit>> limitRows) {
     if (account.getType() == BankAccountType.CARTEL) {
       return account.getEmployeeApprovalCeiling();
     }
+    List<BankAccountApprovalLimit> limits = limitRows.get();
     for (BankAccountApprovalLimit limit : limits) {
       if (limit.getGranteeKind() == BankAccountViewGranteeKind.USER
           && actor.is(limit.getGranteeUserId())) {
