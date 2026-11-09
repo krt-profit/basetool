@@ -32,8 +32,15 @@ public interface TerminalRepository extends JpaRepository<Terminal, UUID> {
   /** Derived Spring-Data query - returns entities matching {@code IdTerminal}. */
   Optional<Terminal> findByIdTerminal(Integer id);
 
-  /** Derived Spring-Data query - returns entities matching {@code Name}. */
-  Optional<Terminal> findByName(String name);
+  /**
+   * Returns the oldest-id terminal of this name that no UEX terminal claims yet. UEX gives an item
+   * and a commodity terminal of one location the same name, so a row linked to one UEX id is never
+   * offered to another.
+   *
+   * @param name exact terminal name
+   * @return an unlinked terminal of that name, or empty
+   */
+  Optional<Terminal> findFirstByNameAndIdTerminalIsNullOrderByIdAsc(String name);
 
   /**
    * Returns every currently reachable terminal of the given UEX kind. Called once per sweep with

@@ -788,7 +788,7 @@ public class UexUniverseSyncService {
                     .findByIdTerminal(dto.id())
                     .orElseGet(() ->
                         terminalRepository
-                            .findByName(dto.name())
+                            .findFirstByNameAndIdTerminalIsNullOrderByIdAsc(dto.name())
                             .map(e -> {
                               e.setIdTerminal(dto.id());
                               return terminalRepository.save(e);
