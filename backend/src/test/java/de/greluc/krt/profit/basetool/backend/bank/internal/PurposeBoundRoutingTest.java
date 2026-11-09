@@ -22,12 +22,13 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
@@ -53,6 +54,7 @@ class PurposeBoundRoutingTest {
   private BankBookingRequestService requestService;
   private OrgUnitBankRequestService service;
 
+  private final BankActor requester = TestBankActor.of(UUID.randomUUID()).build();
   private final UUID accountId = UUID.randomUUID();
   private final UUID recipient = UUID.randomUUID();
   private final BankPurpose purpose =
@@ -62,8 +64,11 @@ class PurposeBoundRoutingTest {
   void setUp() {
     accountRepository = mock(BankAccountRepository.class);
     requestService = mock(BankBookingRequestService.class);
+    OrgUnitBankAccessService accessService = mock(OrgUnitBankAccessService.class);
+    when(accessService.actor()).thenReturn(requester);
     service =
-        new OrgUnitBankRequestService(null, null, accountRepository, null, requestService, null);
+        new OrgUnitBankRequestService(
+            accessService, null, accountRepository, null, requestService, null);
   }
 
   private BankAccount account(BankAccountType type, BankAccountStatus status) {
@@ -90,21 +95,22 @@ class PurposeBoundRoutingTest {
       BankRequestApprover approver) {
     verify(requestService)
         .create(
-            eq(accountId),
-            eq(type),
-            eq(new BigDecimal(amount)),
-            eq(null),
-            eq("Ankauf 12 Quantainium"),
-            eq(null),
-            eq(ownerApproval),
-            eq(limit),
-            eq(approver),
-            eq(false),
-            eq(null),
-            eq(recipient),
-            eq(null),
-            eq(purpose),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    requester,
+                    accountId,
+                    type,
+                    new BigDecimal(amount),
+                    null,
+                    "Ankauf 12 Quantainium",
+                    null,
+                    new BankAdmission.Admitted(ownerApproval, limit, approver),
+                    false,
+                    null,
+                    recipient,
+                    null,
+                    purpose,
+                    null)));
   }
 
   @Test
@@ -163,10 +169,7 @@ class PurposeBoundRoutingTest {
     account(BankAccountType.ORG_UNIT, BankAccountStatus.ACTIVE);
 
     assertThrows(BadRequestException.class, () -> raise(BankBookingRequestType.WITHDRAWAL, "80"));
-    verify(requestService, never())
-        .create(
-            any(), any(), any(), any(), any(), any(), eq(false), any(), any(), eq(false), any(),
-            any(), any(), any(), any());
+    verify(requestService, never()).create(any());
   }
 
   @Test
