@@ -6251,7 +6251,11 @@ Keycloak holds none of them and no token carries them.
   bank management assigns and withdraws Bank Employee in the bank grant management (*Bank-Mitarbeiter*)
   and sees only that role of a role set; anyone else gets `403`
   (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
-  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
+  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place. The role tab is the
+  `roles` section of the member's live-sync room `member:{userId}` (REQ-FE-015), so another admin's
+  open tab follows a change with the new counter. Either surface's change also refreshes the other
+  one: the role tab pokes the bank staff's `grants` and `manage` sections, and the
+  *Bank-Mitarbeiter* forms poke the member's room.
 - **Its own counter.** `app_user.roles_version` guards a user's role set (V362) and is echoed on every
   change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
   role change, so a role change and an edit of the user record never collide. A change that leaves
@@ -6261,6 +6265,9 @@ Keycloak holds none of them and no token carries them.
   withdrawals are checked one after the other.
 - **The departure.** Withdrawing KRT Member publishes `MemberDepartedEvent` with the reason
   `member_role_withdrawn`, so the exchange revocations and the unit notices follow (REQ-XCH-008).
+  On the role tab this withdrawal, and an admin's withdrawal of their own Admin role, goes through
+  the danger confirm (`showKrtConfirm`, `ui-design-system.md` rule 3) that names the consequences; a declined confirm
+  leaves the toggle and the role set as they were.
 - **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
   Keycloak subjects, empty by default; a value that is not a UUID fails the start) lists subjects
   that receive Admin at login while no other active admin exists; the account is approved with it
@@ -6279,6 +6286,7 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 **Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
 `UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`, `UserRegistrationServiceTest`,
 `BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`, `BankGrantsPageControllerTest`,
+`MemberEditPageRenderTest`, `member-roles.test.mjs` (`testMemberRolesJs`),
 `SecurityConfigTest` (frontend), `provision-keycloak-realm.test.sh` (section 4c),
 `build-sandbox-realm.py --selftest`, `restore-keycloak-realm-roles.py --selftest` ·
 **Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
@@ -6291,6 +6299,8 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] The bank management changes Bank Employee and is refused every other role.
 - [x] The last active admin keeps Admin (`409 LAST_ADMIN`).
 - [x] Withdrawing KRT Member publishes the departure.
+- [x] The role tab confirms withdrawing KRT Member, and an admin's own Admin role, naming the
+  consequences.
 - [x] Each change is audited, counted and announced; an unchanged role set leaves no trace.
 - [x] A bootstrap subject receives Admin at login only while no other active admin exists.
 - [x] A token's realm roles grant nothing; the stored roles authorise, and a login writes none.

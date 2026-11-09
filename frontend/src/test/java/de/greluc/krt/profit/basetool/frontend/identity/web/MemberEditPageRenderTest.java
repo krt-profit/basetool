@@ -23,11 +23,14 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleSetDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
@@ -39,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -209,6 +213,98 @@ class MemberEditPageRenderTest {
         .contains("data-testid=\"empty-state\"")
         .contains("Keine OrgUnit-Mitgliedschaften.")
         .doesNotContain("member-memberships-table");
+  }
+
+  /**
+   * The roles tab is a live-synced section: the page joins the member's room, and its {@code
+   * memberRoles} fragment re-renders the toggles with the current counter alone.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rolesTab_isALiveSyncedSectionWithItsOwnFragment() throws Exception {
+    UUID id = stubMember();
+    stubRoles(id, List.of(AssignableRole.KRT_MEMBER), 7L);
+
+    assertThat(render(id, "members"))
+        .contains("id=\"member-roles-results\"")
+        .contains("data-roles-version=\"7\"");
+
+    String fragment =
+        mockMvc
+            .perform(
+                get("/members/{id}/edit", id)
+                    .param("fragment", "memberRoles")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(fragment)
+        .contains("data-roles-version=\"7\"")
+        .containsPattern("data-role-toggle=\"true\"[^>]*value=\"KRT_MEMBER\"[^>]*checked")
+        .doesNotContain("member-edit-form")
+        .doesNotContain("member-roles-results")
+        .doesNotContain("<html");
+  }
+
+  /**
+   * Withdrawing KRT Member always asks first, naming the revoked connections and the logout;
+   * withdrawing Admin asks only on the admin's own page.
+   */
+  @Test
+  void withdrawingKrtMemberOrOnesOwnAdminRoleIsConfirmedFirst() throws Exception {
+    UUID id = stubMember();
+    stubRoles(id, List.of(AssignableRole.ADMIN, AssignableRole.KRT_MEMBER), 3L);
+
+    String own = renderRolesAs(id, id);
+    assertThat(own)
+        .containsPattern(
+            "data-withdraw-confirm=\"[^\"]*Verbundenen"
+                + " Anwendungen[^\"]*\"[^>]*value=\"KRT_MEMBER\"")
+        .containsPattern("data-withdraw-confirm=\"[^\"]*dir selbst[^\"]*\"[^>]*value=\"ADMIN\"")
+        .doesNotContainPattern("data-withdraw-confirm=[^>]*value=\"BANK_EMPLOYEE\"");
+
+    String other = renderRolesAs(id, UUID.randomUUID());
+    assertThat(other)
+        .containsPattern("data-withdraw-confirm=[^>]*value=\"KRT_MEMBER\"")
+        .doesNotContainPattern("data-withdraw-confirm=[^>]*value=\"ADMIN\"");
+  }
+
+  /**
+   * Renders the role fragment of a member's page in German for a signed-in admin.
+   *
+   * @param id the member whose page it is
+   * @param viewer the admin's own user id
+   * @return the rendered fragment
+   * @throws Exception if the request fails
+   */
+  private @NotNull String renderRolesAs(@NotNull UUID id, @NotNull UUID viewer) throws Exception {
+    return mockMvc
+        .perform(
+            get("/members/{id}/edit", id)
+                .param("fragment", "memberRoles")
+                .locale(Locale.GERMAN)
+                .with(
+                    oidcLogin()
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))
+                        .idToken(token -> token.subject(viewer.toString()))))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * Stubs the member's role set.
+   *
+   * @param id the member
+   * @param held the roles the member holds
+   * @param version the role-set counter
+   */
+  private void stubRoles(@NotNull UUID id, @NotNull List<AssignableRole> held, long version) {
+    when(backendApiClient.get(eq("/api/v1/users/{id}/roles"), eq(UserRoleSetDto.class), eq(id)))
+        .thenReturn(new UserRoleSetDto(id, held, List.of(AssignableRole.values()), version));
   }
 
   /** Coming from the profile, the eyebrow leads back to the profile. */

@@ -232,7 +232,7 @@
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-employee-assign-modal', titleKey='bank.modal.employee.assign.title', body=~{::bank-employee-assign-modal-body})}">
         <th:block th:ref="bank-employee-assign-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
-                  data-livesync="bank/grants"
+                  data-livesync="bank/grants,manage member:@user/roles"
                   data-endpoint="/api/proxy/users/{userId}/roles/BANK_EMPLOYEE" data-method="POST">
                 <div class="krt-modal-body">
                     <p class="bank-field-hint" th:text="#{bank.modal.employee.assign.text}">Der Nutzer erh&auml;lt die Rolle &quot;Bank Employee&quot; und wird benachrichtigt.</p>
@@ -259,7 +259,7 @@
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bank-employee-withdraw-modal', titleKey='bank.modal.employee.withdraw.title', variant='krt-modal--danger', body=~{::bank-employee-withdraw-modal-body})}">
         <th:block th:ref="bank-employee-withdraw-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="grantsMatrix"
-                  data-livesync="bank/grants"
+                  data-livesync="bank/grants,manage member:@user/roles"
                   data-endpoint="/api/proxy/users/{userId}/roles/BANK_EMPLOYEE" data-method="PUT">
                 <input type="hidden" name="_userId">
                 <input type="hidden" name="version">

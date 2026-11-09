@@ -1277,6 +1277,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `missions` (global list) | list                                                                                                                          | no            | authenticated (the `/missions` list gate; each viewer re-pulls its own scoped, peer-redacted page)    |
 | `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
+| `member:{userId}`        | roles (the role tab of `/members/{id}/edit`, REQ-SEC-088)                                                                     | no            | `ROLE_ADMIN` (local check, no probe; the member is admitted only as an admin)                         |
 | `exchange-clients` (global) | registry, undoRuns (the admin bulk undo runs, REQ-XCH-034)                                                                    | no            | `ROLE_ADMIN` (local check — the `/admin/exchange-clients` class-level page gate)                      |
 | `admin-dashboard` (global) | deletion-requests, discord-registrations, terms, sync-status (the admin dashboard widgets, REQ-UI-034, ADR-0328)               | no            | `ROLE_ADMIN` (local check; the backend publishes it after the commit)                                 |
 | `org-structure` (global) | units, forms | no | authenticated (the admin sections stay protected per fragment) |
@@ -1359,6 +1360,13 @@ whose receivers re-fetch the viewer's *own* filter and page:
   opaque `roster` key covering a member edit (rank, display name, Staffel membership and its
   LOGISTICIAN / MISSION_MANAGER flags), a delete and the manual Keycloak sync. It is the only
   Phase-3 room with a role gate, matching the page's own ADMIN restriction.
+- **`member:{userId}`** — the role tab of one member's page (`/members/{id}/edit`). Its `roles`
+  section re-renders the toggles and the role-set counter through `?fragment=memberRoles`. Each
+  toggle writes in place and then sends `changed`, so another admin's open tab shows the new role set
+  and echoes the new counter instead of answering `409`. A role change reaches the other surface
+  that shows roles in both directions: the role tab also pokes `bank` / `grants`, `manage` (the
+  *Bank-Mitarbeiter* list, the „Rolle fehlt" chips and the holder registry), and the Bank Employee
+  forms of `/bank/grants` poke `member:@user` / `roles`, resolved from the member the form names.
 - **`exchange-clients`** — the admin page *Verbundene Anwendungen* (`/admin/exchange-clients`):
   `registry` is the global switch and the client table, `undoRuns` the admin bulk undo runs
   (REQ-XCH-034). Every write of the page broadcasts from the client — a registration, edit,
