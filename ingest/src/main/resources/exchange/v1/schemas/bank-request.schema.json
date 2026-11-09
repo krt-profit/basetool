@@ -160,8 +160,8 @@
         "string",
         "null"
       ],
-      "maxLength": 64,
-      "description": "The connected application that raised the request; null for one raised in the Basetool."
+      "maxLength": 63,
+      "description": "The registry id of the connected application that raised the request; null for one raised in the Basetool."
     },
     "splitEnabled": {
       "type": "boolean",

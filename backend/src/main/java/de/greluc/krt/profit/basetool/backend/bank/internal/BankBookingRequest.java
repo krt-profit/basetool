@@ -327,6 +327,6 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    * Basetool. Immutable.
    */
   @Nullable
-  @Column(name = "client_id", length = 60, updatable = false)
+  @Column(name = "client_id", length = 63, updatable = false)
   private String clientId;
 }

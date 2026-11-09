@@ -63,7 +63,9 @@ final class BankExchangeRelay {
 
   private final MockMvc mockMvc;
   private final JsonMapper json = JsonMapper.builder().build();
-  private final String client = "bank-" + UUID.randomUUID().toString().substring(0, 8);
+  /** A registry client id of the longest length the registry admits, 63 characters. */
+  private final String client =
+      "bank-" + UUID.randomUUID().toString().substring(0, 8) + "-" + "c".repeat(49);
 
   /**
    * Registers the client and switches the exchange and the bank on.

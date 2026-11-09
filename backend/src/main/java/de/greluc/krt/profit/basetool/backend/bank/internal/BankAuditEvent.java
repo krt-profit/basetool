@@ -111,6 +111,6 @@ public class BankAuditEvent {
    * the web frontend.
    */
   @Nullable
-  @Column(name = "client_id", length = 60)
+  @Column(name = "client_id", length = 63)
   private String clientId;
 }

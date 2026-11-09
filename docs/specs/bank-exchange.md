@@ -233,7 +233,9 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   (`BankAccessPolicyRulesTest.theExchangeOwnRequestWritesDecideForTheExplicitActor`).
 - **Origin.** A raised request records the registry client the exchange gate admitted in
   `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
-  (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
+  (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067). The column, the
+  trail's `bank_audit_event.client_id` and both schemas' `client` hold up to 63 characters, the
+  longest id the registry admits.
 - **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
   trail is `bank_audit_event` with its `client_id` (ADR-0153).
 - **Refusals.** `404 NOT_FOUND` for an unknown, closed or hidden account and for another member's
