@@ -388,8 +388,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Copies the synthetic e2e realm to {@code <repoRoot>/realm-export.json} for Keycloak's {@code
-   * --import-realm}.
+   * Copies the synthetic realm to the configured test-only path for Keycloak's import.
    *
    * @param root the repository root containing the compose files
    * @throws IOException if the realm resource is missing or cannot be written
@@ -401,8 +400,23 @@ public final class E2eStackExtension implements BeforeAllCallback {
             "realm-export.e2e.json not found on the e2e classpath; expected under"
                 + " frontend/src/e2e/resources");
       }
-      Files.copy(in, root.resolve("realm-export.json"), StandardCopyOption.REPLACE_EXISTING);
+      Path target = realmPath(root);
+      Files.createDirectories(target.getParent());
+      Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
     }
+  }
+
+  /**
+   * Resolves the synthetic realm output shared by the harness and test Compose override.
+   *
+   * @param root the repository root
+   * @return the absolute test realm path
+   */
+  private static Path realmPath(Path root) {
+    String configured = System.getenv("E2E_REALM_PATH");
+    return configured == null || configured.isBlank()
+        ? root.resolve("realm-export.json")
+        : Path.of(configured).toAbsolutePath().normalize();
   }
 
   /**
@@ -599,6 +613,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
     env.put("BASETOOL_VERSION", imageTag());
     env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
+    env.put("E2E_REALM_PATH", realmPath(repoRoot()).toString());
     env.put("BASETOOL_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
     env.put("BASETOOL_INGEST_EXPECTED_AUDIENCES", INGEST_AUDIENCE);
     env.put("BASETOOL_INGEST_SERVICE_ACCOUNT_TOKEN_URI", GATEWAY_TOKEN_URI);

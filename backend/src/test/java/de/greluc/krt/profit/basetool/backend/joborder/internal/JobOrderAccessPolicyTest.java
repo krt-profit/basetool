@@ -92,7 +92,10 @@ class JobOrderAccessPolicyTest {
             mock(JobOrderItemHandoverRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
-                    .JobOrderUnitReadHistoryRepository.class));
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
 
     Squadron foreign = new Squadron();
     foreign.setId(foreignUnitId);

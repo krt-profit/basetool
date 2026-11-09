@@ -233,7 +233,10 @@ class ScopeKernelTest {
             jobOrderItemHandoverRepository,
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
-                    .JobOrderUnitReadHistoryRepository.class));
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */

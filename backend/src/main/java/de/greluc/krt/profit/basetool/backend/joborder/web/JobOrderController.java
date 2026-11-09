@@ -69,11 +69,9 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface over the job-order aggregate (the request-and-fulfill queue): create, list, read,
  * update and delete.
  *
- * <p>Reads and mutations are limited to the caller's visibility scope via {@code
- * @accessGateService}: SK-responsible orders are public, squadron-responsible orders private to
- * that squadron and admins. Creation needs a login only (ADR-0149); other mutations require
- * LOGISTICIAN or above, delete requires ADMIN. Handovers live in {@link
- * JobOrderHandoverController}, materials and linked stock in {@link JobOrderMaterialController}.
+ * <p>Reads use the shared permitted order set; each command checks its current contextual or
+ * personal authority independently. Handovers live in {@link JobOrderHandoverController}, materials
+ * and linked stock in {@link JobOrderMaterialController}.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -143,8 +141,8 @@ public class JobOrderController {
   @Operation(
       summary = "Get all job orders",
       description =
-          "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
-              + " active Profit-hierarchy responsible unit is one of the caller's own units;"
+          "Returns a paginated list of permitted job orders. toProcess=true keeps orders of"
+              + " current responsible or active supporting units in the caller's context and reach;"
               + " orgUnitId narrows that to one of them. assignedToMe=true lists the orders the"
               + " caller is an assignee of; it combines with neither toProcess nor squadronId.")
   @PreAuthorize("isAuthenticated()")

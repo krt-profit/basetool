@@ -170,6 +170,8 @@ class JobOrderSharedWorkspaceE2eTest {
         assertEquals(Boolean.TRUE, queue.evaluate("window.__workspaceNoReload === true"));
 
         rememberNarrowing(queue, requester, base);
+        E2eSupport.capture(queue, "shared-workspace-queue");
+        E2eSupport.capture(detail, "shared-workspace-requester");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(queue, "shared-workspace-queue");
         E2eSupport.dump(detail, "shared-workspace-requester");

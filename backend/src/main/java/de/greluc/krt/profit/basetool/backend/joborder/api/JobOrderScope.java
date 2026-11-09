@@ -37,6 +37,9 @@ public final class JobOrderScope {
         OR EXISTS (SELECT h.id FROM JobOrderUnitReadHistory h WHERE h.jobOrder = o
           AND ((:activeOrgUnitId IS NOT NULL AND h.orgUnit.id = :activeOrgUnitId)
             OR (:activeOrgUnitId IS NULL AND h.orgUnit.id IN :memberOrgUnitIds)))
+        OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o
+          AND ((:activeOrgUnitId IS NOT NULL AND p.claimingOrgUnit.id = :activeOrgUnitId)
+            OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
         OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
           AND a.user.id = :callerId)
       )

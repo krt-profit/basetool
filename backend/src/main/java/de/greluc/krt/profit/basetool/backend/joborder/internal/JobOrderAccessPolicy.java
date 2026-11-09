@@ -63,6 +63,7 @@ public class JobOrderAccessPolicy
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderUnitReadHistoryRepository unitReadHistory;
+  private final JobOrderParticipationRepository participations;
 
   /**
    * Checks complete current order reading, including personal and observed unit relationships
@@ -264,7 +265,8 @@ public class JobOrderAccessPolicy
             ? scope.memberOrgUnitIds()
             : Set.of(scope.activeOrgUnitId());
     return !units.isEmpty()
-        && unitReadHistory.existsByJobOrderIdAndOrgUnitIdIn(order.getId(), units);
+        && (unitReadHistory.existsByJobOrderIdAndOrgUnitIdIn(order.getId(), units)
+            || participations.existsByJobOrderIdAndClaimingOrgUnitIdIn(order.getId(), units));
   }
 
   private boolean isAssigneeRow(@NotNull JobOrder order) {

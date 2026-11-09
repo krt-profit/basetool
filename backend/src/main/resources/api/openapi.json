@@ -46777,7 +46777,7 @@
     },
     "/api/v1/orders" : {
       "get" : {
-        "description" : "Returns a paginated list of job orders. toProcess=true keeps only the orders whose active Profit-hierarchy responsible unit is one of the caller's own units; orgUnitId narrows that to one of them. assignedToMe=true lists the orders the caller is an assignee of; it combines with neither toProcess nor squadronId.",
+        "description" : "Returns a paginated list of permitted job orders. toProcess=true keeps orders of current responsible or active supporting units in the caller's context and reach; orgUnitId narrows that to one of them. assignedToMe=true lists the orders the caller is an assignee of; it combines with neither toProcess nor squadronId.",
         "operationId" : "getAllJobOrders",
         "parameters" : [ {
           "in" : "query",

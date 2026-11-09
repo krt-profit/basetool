@@ -156,7 +156,8 @@ export function submitClaim() {
             qualityRequirement: quality,
             claimingOrgUnitId: squadronId,
             version: _odControlById('claim-version').value
-                ? Number(_odControlById('claim-version').value) : null,
+                ? Number(_odControlById('claim-version').value)
+                : null,
             amount,
         },
         toast: false,

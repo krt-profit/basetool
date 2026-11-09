@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -40,6 +41,7 @@ public class JobOrderWorkspaceAccess {
   private final AuthHelperService authHelper;
   private final JobOrderRepository orders;
   private final OrgUnitRepository orgUnits;
+  private final JobOrderParticipationRepository participations;
 
   /**
    * Tests whether the current caller has an order-reading context.
@@ -68,6 +70,7 @@ public class JobOrderWorkspaceAccess {
             : Set.of(scope.activeOrgUnitId());
     return !unitIds.isEmpty()
         && (orgUnits.countInActiveProfitHierarchyByIdIn(unitIds) > 0
-            || orders.existsByResponsibleOrgUnitIdIn(unitIds));
+            || orders.existsByResponsibleOrgUnitIdIn(unitIds)
+            || participations.existsByClaimingOrgUnitIdInAndActiveTrue(unitIds));
   }
 }

@@ -107,7 +107,9 @@ direct membership. Independent producer, mission, unrelated Inventory, Bank and 
 gates remain. V378 retains only observed order/unit relationships: current parties and retained
 claim facts migrate; authorised creates and edits retain their observed before/after parties.
 Current unit reach is required, and a former individual's lost membership grants nothing.
-The participation extension and money-linked readers follow their owning implementation slices.
+Current and ended participations provide observed supporting-unit readership; only active support
+enters the unit-work filter, independently of open promised quantities. Money-linked readers
+follow their owning implementation slice.
 
 The full order is readable by members of the requesting, responsible and active supporting units,
 leadership with existing reach over those units, personal Bearbeiter, members of actual
@@ -132,7 +134,7 @@ reduced, capability-based surface.
 - [ ] Common read does not expose an independently private blueprint, mission or Bank account.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
-`V378JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
+`JobOrderSupportReadIntegrationTest`, `V378JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
 `JobOrderScopeQueryIntegrationTest`, `JobOrderLinkedStockReadNoNPlusOneTest` and the frontend
 order render tests cover the implemented workspace; linked money readers remain pending.
 **Issues:** #3197, #3200, #3201

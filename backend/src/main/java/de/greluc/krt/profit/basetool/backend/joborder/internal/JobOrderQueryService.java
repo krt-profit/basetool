@@ -103,9 +103,8 @@ public class JobOrderQueryService {
    * Paged list with optional status and squadron display filters, always constrained to the
    * caller's visibility scope.
    *
-   * <p>SK-responsible orders are public, squadron-responsible orders private to that squadron and
-   * admins; a caller outside the order workflow ({@link RequestScopeResolver#canViewJobOrders()})
-   * gets an empty page. {@code squadronIds} can only narrow the result.
+   * <p>Current contextual, personal and observed historical relationships determine the complete
+   * read set (REQ-ORDERS-052). {@code squadronIds} can only narrow the result.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -124,11 +123,9 @@ public class JobOrderQueryService {
    * Paged list with optional status, squadron and processing filters, always constrained to the
    * caller's visibility scope.
    *
-   * <p>With {@code toProcess} only orders whose active Profit-hierarchy responsible unit is one of
-   * the caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned
-   * org unit when one is active, otherwise the caller's direct memberships. The filter only narrows
-   * the scoped result; a caller with no processing unit gets an empty page. Without it the scope
-   * also holds the orders the caller is an assignee of (REQ-ORDERS-047).
+   * <p>With {@code toProcess}, only orders of current responsible or active supporting units in the
+   * caller's context and reach remain (REQ-ORDERS-040). This read filter grants no command
+   * authority; a caller with no current work unit gets an empty page.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;

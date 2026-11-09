@@ -271,7 +271,10 @@ class JobOrderAccessPolicyDifferentialTest {
               itemHandovers,
               org.mockito.Mockito.mock(
                   de.greluc.krt.profit.basetool.backend.joborder.internal
-                      .JobOrderUnitReadHistoryRepository.class));
+                      .JobOrderUnitReadHistoryRepository.class),
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.internal
+                      .JobOrderParticipationRepository.class));
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {

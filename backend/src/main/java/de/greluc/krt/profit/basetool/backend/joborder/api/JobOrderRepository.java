@@ -299,7 +299,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
           + JobOrderScope.READ_PREDICATE
           + " AND o.type IN :types AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR"
           + " o.responsibleOrgUnit.id IN :squadronIds OR o.requestingOrgUnit.id IN :squadronIds)"
-          + " AND (:processingFilter = FALSE OR o.responsibleOrgUnit.id IN :processingOrgUnitIds)")
+          + " AND (:processingFilter = FALSE OR o.responsibleOrgUnit.id IN :processingOrgUnitIds"
+          + " OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o"
+          + " AND p.active = true AND p.claimingOrgUnit.id IN :processingOrgUnitIds))")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
@@ -464,18 +466,6 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
-
-  /**
-   * Takes a {@link LockModeType#PESSIMISTIC_WRITE} row lock on one job order so concurrent material
-   * claims on it serialise and each sees the others' committed claims (REQ-ORDERS-024, ADR-0092).
-   * Locks only this order's row.
-   *
-   * @param id the order to row-lock.
-   * @return the locked order, or {@link Optional#empty} when the id is unknown.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT o FROM JobOrder o WHERE o.id = :id")
-  Optional<JobOrder> lockForClaimUpsert(@Param("id") UUID id);
 
   /** Returns every job order the given user is an assignee of. */
   @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")
