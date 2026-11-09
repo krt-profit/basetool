@@ -6270,13 +6270,15 @@ Keycloak holds none of them and no token carries them.
 
 The provisioner deletes the four realm roles (with KRT Member's place in `default-roles-<realm>`)
 and withholds the `roles` client scope from `basetool-frontend`; the e2e and sandbox realms carry
-neither. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
+neither. The frontend therefore requests only `openid, profile, email`, since Keycloak refuses a
+scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
 final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
 
 **Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
 `UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`, `UserRegistrationServiceTest`,
 `BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`, `BankGrantsPageControllerTest`,
-`SecurityConfigTest` (frontend), `provision-keycloak-realm.test.sh` (section 4c),
+`SecurityConfigTest` (frontend), `FrontendRequestedScopesParityTest`,
+`provision-keycloak-realm.test.sh` (section 4c),
 `build-sandbox-realm.py --selftest`, `restore-keycloak-realm-roles.py --selftest` ·
 **Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
 `RoleChangeRecorder`, `BootstrapAdminGrant`, `ApprovalMemberGrant`, `identity/web/UserRoleController`,
@@ -6296,6 +6298,7 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] The roster sync writes no role.
 - [x] The frontend maps no role from the OIDC token.
 - [x] The provisioner deletes the four realm roles and the web login's role claim.
+- [x] The frontend requests no scope its client is not offered in the e2e and sandbox realms.
 
 ## Out of scope
 
