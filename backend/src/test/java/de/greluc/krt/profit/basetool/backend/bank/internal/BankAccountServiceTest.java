@@ -66,7 +66,33 @@ class BankAccountServiceTest {
   @Mock private BankGrantService bankGrantService;
   @Mock private BankApprovalLimitService bankApprovalLimitService;
 
+  @Mock private BankHolderPostingRepository holderPostingRepository;
+
   @InjectMocks private BankAccountService bankAccountService;
+
+  @Test
+  void toBookingDtosWithoutHolders_readsNoHolderLegs() {
+    BankBookingRow deposit =
+        new BankBookingRow(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            BankTransactionType.DEPOSIT,
+            new BigDecimal("500"),
+            null,
+            null,
+            null,
+            Instant.parse("2026-11-01T10:00:00Z"),
+            null,
+            BigDecimal.ZERO,
+            null,
+            null,
+            null);
+
+    List<BankBookingDto> dtos = bankAccountService.toBookingDtosWithoutHolders(List.of(deposit));
+
+    assertEquals(1, dtos.size());
+    verify(holderPostingRepository, never()).findHolderLegsByTransactionIds(any());
+  }
 
   @Test
   void createAccount_orgUnit_requiresReferenceAndUniqueness() {

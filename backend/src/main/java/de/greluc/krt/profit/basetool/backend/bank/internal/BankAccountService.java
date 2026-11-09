@@ -166,6 +166,35 @@ public class BankAccountService {
       return List.of();
     }
     List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
+    return toBookingDtos(
+        rows,
+        holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+            .collect(Collectors.groupingBy(BankHolderLeg::transactionId)));
+  }
+
+  /**
+   * Maps booking rows to their DTOs without reading the holder legs, for a reader that never shows
+   * a holder (REQ-BANK-038): the holder handles stay {@code null}.
+   *
+   * @param rows the projected booking rows
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  List<BankBookingDto> toBookingDtosWithoutHolders(@NotNull List<BankBookingRow> rows) {
+    return rows.isEmpty() ? List.of() : toBookingDtos(rows, Map.of());
+  }
+
+  /**
+   * Maps booking rows to their DTOs with the counter-accounts resolved in batch.
+   *
+   * @param rows the projected booking rows, not empty
+   * @param holderLegsByTx the holder legs to annotate, grouped by transaction
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  private List<BankBookingDto> toBookingDtos(
+      @NotNull List<BankBookingRow> rows,
+      @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
     List<UUID> transferTxIds =
         rows.stream()
             .filter(r -> r.type() == BankTransactionType.TRANSFER)
@@ -177,9 +206,6 @@ public class BankAccountService {
             ? Map.of()
             : postingRepository.findLegsByTransactionIds(transferTxIds).stream()
                 .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
-    Map<UUID, List<BankHolderLeg>> holderLegsByTx =
-        holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
-            .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
     return rows.stream().map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx)).toList();
   }
 
