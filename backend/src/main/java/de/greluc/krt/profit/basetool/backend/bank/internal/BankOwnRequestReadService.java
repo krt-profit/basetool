@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class BankOwnRequestReadService implements BankOwnRequestReads {
 
   private final BankBookingRequestRepository requestRepository;
+  private final BankExchangeProperties properties;
 
   @Override
   @NotNull
@@ -67,6 +68,11 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
     return requestRepository.findByRequestedByAndIdIn(requester, ids).stream()
         .map(BankOwnRequestReadService::toOwnRequest)
         .toList();
+  }
+
+  @Override
+  public int openRequestCap() {
+    return properties.openRequestCap();
   }
 
   /**

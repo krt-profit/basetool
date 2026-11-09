@@ -128,6 +128,11 @@ the cursor once, with its current state, and a request that no longer exists as 
 snapshot. Raising, correcting or cancelling a request in the Basetool, a bank decision, a renamed
 account or a new org-unit shorthand all reach the feed.
 
+Every page, snapshot and feed alike, also carries `openRequestCap`: the most pending requests the
+member may hold (20 today). Count the `PENDING` items you hold; once they reach the cap, a raise
+answers `409 BANK_OPEN_REQUEST_CAP`, so hide or disable your `new request` action until one is
+decided or cancelled.
+
 Each item is a [`bank-request`](../schemas/):
 
 ```json

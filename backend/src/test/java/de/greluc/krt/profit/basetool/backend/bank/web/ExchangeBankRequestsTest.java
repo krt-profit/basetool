@@ -78,6 +78,9 @@ class ExchangeBankRequestsTest {
           "splitEnabled",
           "splitPercent");
 
+  /** The default of {@code app.bank.exchange.open-request-cap}. */
+  private static final int OPEN_REQUEST_CAP = 20;
+
   @Autowired private WebApplicationContext context;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private EntityManager entityManager;
@@ -100,6 +103,8 @@ class ExchangeBankRequestsTest {
     assertThat(page.path("removed").isEmpty()).isTrue();
     assertThat(page.path("hasMore").asBoolean()).isFalse();
     assertThat(page.path("nextCursor").asString()).startsWith("f1.");
+    assertThat(page.path("openRequestCap").isIntegralNumber()).isTrue();
+    assertThat(page.path("openRequestCap").asInt()).isEqualTo(OPEN_REQUEST_CAP);
     for (JsonNode item : page.path("items")) {
       assertThat(new TreeSet<>(item.propertyNames())).isEqualTo(new TreeSet<>(REQUEST_FIELDS));
     }

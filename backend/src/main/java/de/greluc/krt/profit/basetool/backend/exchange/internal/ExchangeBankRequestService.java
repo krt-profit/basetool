@@ -44,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * The member's own booking requests as a snapshot and a change feed for exchange clients
  * (REQ-BXCH-003, REQ-XCH-013, ADR-0224). Every request the member raised counts, whichever channel
  * raised it; the feed's keys are request ids, written by the {@code bank_booking_request} triggers.
+ * Every page carries the open-request cap, so a client knows when the member may raise no more.
  * Every page served is counted (REQ-OBS-024).
  */
 @Service
@@ -105,7 +106,8 @@ public class ExchangeBankRequestService {
         rows.items().stream().map(ExchangeBankRequestService::toDto).toList(),
         List.of(),
         next,
-        rows.hasMore());
+        rows.hasMore(),
+        requestReads.openRequestCap());
   }
 
   /**
@@ -137,7 +139,8 @@ public class ExchangeBankRequestService {
         removed.add(changes.tombstone(key, key));
       }
     }
-    return new ExchangeBankRequestPageDto(items, removed, changes.nextCursor(), changes.more());
+    return new ExchangeBankRequestPageDto(
+        items, removed, changes.nextCursor(), changes.more(), requestReads.openRequestCap());
   }
 
   /**

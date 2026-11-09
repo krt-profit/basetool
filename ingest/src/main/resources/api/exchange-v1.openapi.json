@@ -1522,6 +1522,7 @@
       "get": {
         "operationId": "bank_requests",
         "summary": "The member's own booking requests, raised in the Basetool or through any client: snapshot or changes since a cursor.",
+        "description": "Every page carries openRequestCap, the most pending requests the member may hold; once the PENDING items reach it, a raise answers 409 BANK_OPEN_REQUEST_CAP.",
         "tags": [
           "bank"
         ],

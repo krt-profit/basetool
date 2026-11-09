@@ -56,5 +56,6 @@
   ],
   "removed": [],
   "nextCursor": "s1.2245871.0.9c8b7a6f-5e4d-4c3b-8a29-1f0e9d8c7b6a",
-  "hasMore": true
+  "hasMore": true,
+  "openRequestCap": 20
 }

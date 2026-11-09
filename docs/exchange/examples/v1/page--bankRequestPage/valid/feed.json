@@ -36,5 +36,6 @@
     }
   ],
   "nextCursor": "f1.2245900.0",
-  "hasMore": false
+  "hasMore": false,
+  "openRequestCap": 20
 }

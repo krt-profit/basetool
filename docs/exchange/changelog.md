@@ -5,6 +5,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-09
 
+- **New: `openRequestCap` on the own bank requests.** Every page of
+  `GET /exchange/v1/bank/requests` carries the most pending requests the member may hold, so a
+  client can tell before raising that the next raise would answer `409 BANK_OPEN_REQUEST_CAP`
+  ([bank](resources/bank.md#own-requests)). Additive: a reader that ignores it keeps working.
 - **Approved: the bank scopes for VerseKit.** `exchange.bank.read`, `exchange.bank.request` and
   `exchange.bank.queue` join VerseKit's row in the [approved-clients list][approved], under the
   bank-scope [criterion](onboarding.md#criteria). An administrator grants them in the registry
