@@ -978,6 +978,22 @@ val testNumberFormatJs =
     outputs.upToDateWhen { false }
   }
 
+val testLocalisedNameJs =
+  tasks.register<NodeTask>("testLocalisedNameJs") {
+    group = "verification"
+    description =
+      "Regression tests for the catalogue name a script shows under the game-text language policy."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/krt-localised-name.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/krt-localised-name.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testNotificationBellLabelJs =
   tasks.register<NodeTask>("testNotificationBellLabelJs") {
     group = "verification"
@@ -1185,6 +1201,7 @@ tasks.named("check").configure {
     testMemberRolesJs,
     testSearchJs,
     testNumberFormatJs,
+    testLocalisedNameJs,
     testNotificationBellLabelJs,
     testBlueprintStatsJs,
     testCatalogueAdminJs,

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
-/** A shop's place shows its German name on a German page unless that name is blank. */
+/** A shop's place shows its English name on every page (REQ-P4K-023). */
 class ItemShopAvailabilityDtoTest {
 
   private static ItemShopAvailabilityDto at(String placeName, String placeNameDe) {
@@ -32,12 +32,12 @@ class ItemShopAvailabilityDtoTest {
   }
 
   @Test
-  void aGermanPage_showsTheGermanPlaceName() {
-    assertThat(at("Lorville", "Lorville DE").placeName(Locale.GERMAN)).isEqualTo("Lorville DE");
+  void aGermanPage_showsTheEnglishPlaceName() {
+    assertThat(at("Lorville", "Lorville DE").placeName(Locale.GERMAN)).isEqualTo("Lorville");
   }
 
   @Test
-  void aGermanPage_fallsBackToTheEnglishName_whenTheGermanOneIsBlankOrAbsent() {
+  void aGermanPage_showsTheEnglishName_whenTheGermanOneIsBlankOrAbsent() {
     assertThat(at("Lorville", " ").placeName(Locale.GERMAN)).isEqualTo("Lorville");
     assertThat(at("Lorville", null).placeName(Locale.GERMAN)).isEqualTo("Lorville");
   }

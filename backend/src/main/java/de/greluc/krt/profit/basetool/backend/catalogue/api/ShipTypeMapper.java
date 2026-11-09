@@ -28,8 +28,8 @@ import org.mapstruct.Mapping;
 public interface ShipTypeMapper {
 
   /**
-   * Maps a {@link ShipType} to its DTO, with {@code description} taken from {@code descriptionDe},
-   * falling back to {@code descriptionEn}.
+   * Maps a {@link ShipType} to its DTO, with {@code description} taken from {@code descriptionEn},
+   * falling back to {@code descriptionDe} only when no English description exists (REQ-P4K-023).
    *
    * @param shipType the entity to project; {@code null} returns {@code null}
    * @return the ship-type DTO
@@ -37,8 +37,8 @@ public interface ShipTypeMapper {
   @Mapping(
       target = "description",
       expression =
-          "java(shipType.getDescriptionDe() != null ? shipType.getDescriptionDe()"
-              + " : shipType.getDescriptionEn())")
+          "java(shipType.getDescriptionEn() != null ? shipType.getDescriptionEn()"
+              + " : shipType.getDescriptionDe())")
   @Mapping(target = "catalogueFacts", expression = "java(ShipCatalogueFacts.of(shipType))")
   @Mapping(target = "noLongerInGame", expression = "java(shipType.isP4kRetired())")
   ShipTypeDto toDto(ShipType shipType);

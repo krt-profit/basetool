@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
  * @param id the ship type's id
  * @param name its name
  * @param manufacturer its manufacturer
- * @param description its German description, falling back to the English one
+ * @param description its English description, falling back to the German one
  * @param scu its cargo capacity
  * @param hidden whether an admin hid it from the pickers
  * @param catalogueFacts the source-owned vehicle facts, or {@code null} in a summary
@@ -55,7 +55,7 @@ public record ShipTypeDto(
    * @param id the ship type's id
    * @param name its name
    * @param manufacturer its manufacturer
-   * @param description its German description, falling back to the English one
+   * @param description its English description, falling back to the German one
    * @param scu its cargo capacity
    * @param hidden whether an admin hid it from the pickers
    * @param catalogueFacts the source-owned vehicle facts, or {@code null} in a summary
