@@ -60,7 +60,7 @@ probes), plus the app data networks the exporters bridge into. `net-docker-proxy
 compose file.
 
 **Grafana is the only UI**, published by the native edge (`docker/edge/conf.d/40-grafana.conf.template`)
-behind Keycloak OIDC and restricted to the realm role `Admin` (REQ-OBS-008).
+behind Keycloak OIDC and restricted to the client role `grafana-admin` of the `grafana` client (REQ-OBS-008).
 
 | Component | Runs as | Defined in |
 | --- | --- | --- |
@@ -193,7 +193,7 @@ sudo systemctl restart alloy.service            # the host-native shipper
 - **Loki is excluded from backups**, so its retention window cannot be extended by restoring an old
   snapshot.
 - **Traces — 14d.**
-- **Grafana is admin-only** (Keycloak realm role `Admin`).
+- **Grafana is admin-only** (Keycloak client role `grafana-admin` of the `grafana` client).
 
 ## Alert-response runbook (alert → first actions)
 
@@ -598,7 +598,7 @@ grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/lib/basetool/textf
 python3 scripts/check-conformance.py --ssh <host>   # from a workstation; covers scrape-targets-up, container-metrics, log-streams
 ```
 
-In Grafana, confirm the Keycloak login lets an `Admin` in and refuses anyone else, and that
+In Grafana, confirm the Keycloak login lets a holder of `grafana-admin` in and refuses anyone else, and that
 Explore shows one trace in Tempo, one `{app="edge"}` line and one `{app="host-auth"}` line in Loki.
 healthchecks.io must go green within minutes (the `Watchdog` heartbeat).
 
