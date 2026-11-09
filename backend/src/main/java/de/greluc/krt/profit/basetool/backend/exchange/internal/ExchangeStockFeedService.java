@@ -61,9 +61,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeStockFeedService {
 
-  /** The id before every row, which starts a snapshot. */
-  private static final UUID FIRST = new UUID(0, 0);
-
   /** The longest display name the published item and location references carry. */
   private static final int MAX_NAME = 200;
 
@@ -86,15 +83,11 @@ public class ExchangeStockFeedService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeStockPageDto page(
       @NotNull UUID member, @Nullable String cursor, int limit) {
-    int size = ExchangeFeedReader.pageSize(limit);
-    if (cursor == null) {
-      return snapshot(member, feedReader.snapshotStart(), FIRST, size);
-    }
-    ExchangeFeedCursor position = feedReader.resume(cursor);
-    UUID afterId = position.afterId();
-    return afterId != null
-        ? snapshot(member, position.position(), afterId, size)
-        : feed(member, position.position(), size);
+    return feedReader.answer(
+        cursor,
+        limit,
+        (at, afterId, size) -> snapshot(member, at, afterId, size),
+        (after, size) -> feed(member, after, size));
   }
 
   /**
@@ -108,22 +101,21 @@ public class ExchangeStockFeedService {
    */
   private @NotNull ExchangeStockPageDto snapshot(
       @NotNull UUID member, @NotNull ExchangeFeedPosition at, @NotNull UUID afterId, int size) {
-    List<ExchangeStockLotRow> rows = stockReads.exchangeLots(member, afterId, size + 1);
-    boolean more = rows.size() > size;
-    List<ExchangeStockLotRow> delivered = more ? rows.subList(0, size) : rows;
-    String next =
-        more
-            ? ExchangeFeedCursor.snapshot(at, delivered.getLast().getAnchor()).format()
-            : ExchangeFeedCursor.feed(at).format();
+    ExchangeFeedReader.Slice<ExchangeStockLotRow> page =
+        ExchangeFeedReader.slice(
+            stockReads.exchangeLots(member, afterId, size + 1),
+            size,
+            at,
+            ExchangeStockLotRow::getAnchor);
     Map<String, List<ExchangeStockSplitRow>> splits =
-        splits(member, delivered.stream().map(ExchangeStockLotRow::getLotKey).toList());
+        splits(member, page.items().stream().map(ExchangeStockLotRow::getLotKey).toList());
     return new ExchangeStockPageDto(
-        delivered.stream()
+        page.items().stream()
             .map(lot -> toDto(lot, splits.getOrDefault(lot.getLotKey(), List.of())))
             .toList(),
         List.of(),
-        next,
-        more);
+        page.next(),
+        page.more());
   }
 
   /**
