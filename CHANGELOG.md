@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v1.23.2](https://github.com/krt-profit/basetool/releases/tag/v1.23.2) - 2026-11-09
+
+### Fixed
+
+- The SC Wiki vehicle sync no longer tries to insert a second ship type for a Wiki variant that shares its name with a stored one (e.g. "Hammerhead" GS, "Polaris", "Skylark"); it reports an identity conflict instead of failing with duplicate-key errors in Postgres.
+
+- The Grafana "App errors & warnings" panel loads again: Loki accepts query results up to 64 MiB, so a range holding stack traces no longer times out with an empty panel.
+
+- The SC Wiki vehicle sync marks vehicles removed from the Wiki again: a Wiki variant that shares its name with a sibling (e.g. "Hammerhead" GS, "Skylark" Display) no longer leaves the run incomplete and so no longer stops the cleanup.
+
 ## [v1.23.1](https://github.com/krt-profit/basetool/releases/tag/v1.23.1) - 2026-11-09
 
 ### Changed
