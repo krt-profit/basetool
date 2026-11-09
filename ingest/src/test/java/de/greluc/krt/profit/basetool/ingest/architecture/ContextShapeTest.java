@@ -41,7 +41,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class ContextShapeTest {
 
   /** The gateway's shape under the test profile. */
-  static final ContextShape EXPECTED = new ContextShape(1, 0, 3, 2);
+  static final ContextShape EXPECTED = new ContextShape(1, 0, 4, 2);
 
   @MockitoBean private JwtDecoder jwtDecoder;
   @MockitoBean private HandoffStagingService handoffStagingService;

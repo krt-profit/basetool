@@ -240,7 +240,8 @@ public class ExchangeUndoService {
    *
    * @param resource the resource
    * @return its restorer
-   * @throws IllegalStateException for the org stock, whose entries are restored together
+   * @throws IllegalStateException for the org stock, whose entries are restored together, and for a
+   *     bank request, which writes no journal entry
    */
   private @NotNull ExchangeEntryRestorer restorer(@NotNull ExchangeResource resource) {
     return switch (resource) {
@@ -248,6 +249,8 @@ public class ExchangeUndoService {
       case STOCK -> stockJournal;
       case SHIP -> shipJournal;
       case ORG_STOCK -> throw new IllegalStateException("Org-stock entries are restored together");
+      case BANK_REQUEST ->
+          throw new IllegalStateException("The bank writes no exchange journal entry");
     };
   }
 
@@ -262,6 +265,8 @@ public class ExchangeUndoService {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK, ORG_STOCK -> liveSync.stockChanged(false);
       case SHIP -> liveSync.hangarChanged(member);
+      case BANK_REQUEST ->
+          throw new IllegalStateException("The bank writes no exchange journal entry");
       case null -> throw new NullPointerException("resource");
     }
   }

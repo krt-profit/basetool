@@ -129,6 +129,21 @@
           }
         }
       }
+    },
+    "bankRequestPage": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "description": "A snapshot page or a change-feed page of the member's own booking requests; removed names a request that no longer exists.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "bank-request.schema.json"
+          }
+        }
+      }
     }
   }
 }

@@ -99,7 +99,7 @@ class BankAccessPolicyRulesTest {
 
   /**
    * What the exchange may use of the bank (REQ-BXCH-001): the policy with its decision types, the
-   * actor adapter and the reads, with their value types.
+   * actor adapter and the account and own-request reads, with their value types.
    */
   private static final Set<String> EXCHANGE_SURFACE =
       Set.of(
@@ -112,7 +112,8 @@ class BankAccessPolicyRulesTest {
           BANK + ".api.BankRequestApprover",
           BANK + ".api.BankStaffRights",
           BANK + ".api.BankBookingRequestType",
-          BANK + ".api.BankAccountReads");
+          BANK + ".api.BankAccountReads",
+          BANK + ".api.BankOwnRequestReads");
 
   @Test
   @DisplayName("the bank access policy never reads the security context, directly or by a call")

@@ -1517,6 +1517,71 @@
           }
         ]
       }
+    },
+    "/exchange/v1/bank/requests": {
+      "get": {
+        "operationId": "bank_requests",
+        "summary": "The member's own booking requests, raised in the Basetool or through any client: snapshot or changes since a cursor.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankRequestPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Each request carries its status, amount, accounts, approval need, rejection reason and split. No staff note, no staff identities, no counterparty and no purpose. Retention class: the member's own data. A client may persist it.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

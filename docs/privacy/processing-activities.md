@@ -249,7 +249,10 @@ requires it and duplicating it into further files spreads personal data for no g
   member's account page, so no holder and no staff note, but with the handle of the member who
   handed money in or received it, unless that member withholds their name (REQ-BXCH-007). The
   client keeps other people's bank data in memory only, for at most 7 days, as its approval
-  requires. Reads are not journalled; they are counted per client and route without any id.
+  requires. The same scope gives the client the member's own booking requests (REQ-BXCH-003, built)
+  without any staff note, staff identity, counterparty or purpose; being the member's own data,
+  the client may keep them. Reads are not journalled; they are counted per client and route
+  without any id.
 - **Legal basis:** Art. 6(1)(b) for the transfer the member asked for and the connection records;
   Art. 6(1)(f) for the journal and the audit attribution (detecting misuse, undoing it), and for
   other people's bank data on a client (coordinating the bank's work; the name withholding is

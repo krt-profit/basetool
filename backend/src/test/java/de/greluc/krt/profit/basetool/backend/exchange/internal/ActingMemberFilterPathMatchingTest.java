@@ -163,6 +163,7 @@ class ActingMemberFilterPathMatchingTest {
         "/api/v1/exchange/bank/accounts",
         "/api/v1/exchange/bank/accounts/0b6f7a64-2a7e-4f43-9d0e-2c1f7c3a9b10/balance-series",
         "/api/v1/exchange/bank/accounts/0b6f7a64-2a7e-4f43-9d0e-2c1f7c3a9b10/bookings",
+        "/api/v1/exchange/bank/requests",
         "/api/v1/exchange/catalog/locations",
         "/api/v1/exchange/catalog/resolve",
         "/api/v1/exchange/me/account-check",
