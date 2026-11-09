@@ -198,23 +198,52 @@ public class BankAccessRules implements BankAccessPolicy {
   }
 
   /**
-   * The approval routing of a withdrawal or transfer the actor raises or corrects on the account
-   * (REQ-BANK-041, REQ-BANK-047): none for its responsible holder, the amount ladder on the KRT
-   * account, else the actor's applicable limit.
+   * The approval routing of the actor's correction of their own request, derived exactly as its
+   * raise was (REQ-BANK-042, REQ-BANK-056, REQ-BANK-061): none for a deposit, the purpose-bound
+   * routing for a purpose-bound request, else the routing of a withdrawal or transfer the actor
+   * raises on the account.
    *
    * @param actor the requester
-   * @param account the (source) account
-   * @param amount the whole-aUEC amount
+   * @param request the request being corrected
+   * @param amount the corrected whole-aUEC amount
    * @return the routing to stamp on the request
    */
   @NotNull
-  BankAdmission.Admitted route(
-      @NotNull BankActor actor, @NotNull BankAccount account, @NotNull BigDecimal amount) {
+  BankAdmission.Admitted routeCorrection(
+      @NotNull BankActor actor, @NotNull BankBookingRequest request, @NotNull BigDecimal amount) {
+    BankAccount account = request.getAccount();
+    if (request.getType() == BankBookingRequestType.DEPOSIT) {
+      return BankAdmission.Admitted.UNROUTED;
+    }
+    if (request.getPurposeKind() != null) {
+      return routePurposeBound(account, request.getType(), amount);
+    }
     return route(judgement(actor, null), account, amount);
   }
 
   /**
-   * The routing of {@link #route(BankActor, BankAccount, BigDecimal)} under a prepared judgement.
+   * The routing of a purpose-bound request on a funding account (REQ-BANK-061): a withdrawal from
+   * the KRT account climbs the amount ladder whoever raises it, every other one needs no approval.
+   *
+   * @param account the {@code CARTEL} or {@code SPECIAL} funding account
+   * @param type {@code DEPOSIT} or {@code WITHDRAWAL}
+   * @param amount the whole-aUEC amount
+   * @return the routing to stamp on the request
+   */
+  @NotNull
+  static BankAdmission.Admitted routePurposeBound(
+      @NotNull BankAccount account,
+      @NotNull BankBookingRequestType type,
+      @NotNull BigDecimal amount) {
+    return type == BankBookingRequestType.WITHDRAWAL && account.getType() == BankAccountType.CARTEL
+        ? cartelLadder(account, amount)
+        : BankAdmission.Admitted.UNROUTED;
+  }
+
+  /**
+   * The approval routing of a withdrawal or transfer the actor raises on the account (REQ-BANK-041,
+   * REQ-BANK-047): none for its responsible holder, the amount ladder on the KRT account, else the
+   * actor's applicable limit.
    *
    * @param judgement the actor's judgement
    * @param account the (source) account

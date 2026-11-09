@@ -215,7 +215,12 @@ class BankAccessRulesTest {
             .seat(staffelId, MembershipRole.STAFFELLEITER)
             .build();
 
-    BankAdmission.Admitted routing = policy.route(formerLead, staffelAccount, new BigDecimal("50"));
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(staffelAccount);
+    request.setType(BankBookingRequestType.WITHDRAWAL);
+
+    BankAdmission.Admitted routing =
+        policy.routeCorrection(formerLead, request, new BigDecimal("50"));
 
     assertThat(routing.requiresApproval()).isTrue();
     assertThat(routing.requiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);

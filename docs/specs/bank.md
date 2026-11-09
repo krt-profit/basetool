@@ -2909,9 +2909,11 @@ member cancels the request and raises it anew in its module (`BankBookingRequest
 
 **The approval snapshot is re-derived from the new amount.** This is the security-critical half:
 without it a requester could file 100 aUEC under a 1000 ceiling and then edit it to 100 000, arriving
-at the bank employee still carrying the original "no approval needed" snapshot. The seam resolves it
-through the *same* `resolveApprovalRouting` the create path uses — extracted precisely so the two
-cannot drift apart.
+at the bank employee still carrying the original "no approval needed" snapshot. The correction is
+routed exactly as its raise was (`BankAccessRules#routeCorrection`): a deposit stays unrouted
+(REQ-BANK-042), a purpose-bound request keeps the routing of its raise (the KRT ladder for a KRT
+withdrawal, none otherwise, REQ-BANK-061), and every other withdrawal or transfer runs the raise's
+routing for the new amount (`OrgUnitBankAccessServiceTest`, `updateOwnBookingRequest_*`).
 
 **An already-approved request is frozen** (`BANK_REQUEST_ALREADY_APPROVED`, 409). The approval was
 granted for the amount and reason **as they stood**; allowing an edit afterwards would convert a

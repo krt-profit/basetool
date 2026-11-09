@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -2069,6 +2070,66 @@ class OrgUnitBankAccessServiceTest {
     verify(bankBookingRequestService)
         .updateOwn(
             any(), eq(requestId), eq(update), eq(false), eq(new BigDecimal("1000")), isNull());
+  }
+
+  /** A corrected deposit is routed as its raise is: never flagged, no limit (REQ-BANK-042). */
+  @Test
+  void updateOwnBookingRequest_deposit_staysUnrouted() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest existing = new BankBookingRequest();
+    existing.setId(requestId);
+    existing.setAccount(
+        account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Other", "OTH")));
+    existing.setType(BankBookingRequestType.DEPOSIT);
+    existing.setRequestedBy(requester);
+    when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
+    actingAs(TestBankActor.member(requester));
+
+    UpdateBankBookingRequest update =
+        new UpdateBankBookingRequest(new BigDecimal("50000"), "typo", null, null, null, null, 0L);
+    requestService.updateOwnBookingRequest(requestId, update);
+
+    verify(bankBookingRequestService)
+        .updateOwn(any(), eq(requestId), eq(update), eq(false), isNull(), isNull());
+  }
+
+  /**
+   * A corrected purpose-bound KRT withdrawal keeps the ladder its raise applied, even for an OL
+   * member who holds the account (REQ-BANK-061).
+   */
+  @Test
+  void updateOwnBookingRequest_purposeBoundKrtWithdrawal_keepsTheLadder() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID olId = UUID.randomUUID();
+    BankAccount cartel = account(UUID.randomUUID(), "KB-0000", squadron(olId, "OL", "OL"));
+    cartel.setType(BankAccountType.CARTEL);
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    cartel.setAreaLeadApprovalCeiling(new BigDecimal("10000"));
+    BankBookingRequest existing = new BankBookingRequest();
+    existing.setId(requestId);
+    existing.setAccount(cartel);
+    existing.setType(BankBookingRequestType.WITHDRAWAL);
+    existing.setAmount(new BigDecimal("5000"));
+    existing.setPurposeKind(BankPurposeKind.PURCHASING_DEAL);
+    existing.setRequestedBy(requester);
+    when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
+    actingAs(TestBankActor.member(requester).seat(olId, MembershipRole.OL_MEMBER));
+
+    UpdateBankBookingRequest update =
+        new UpdateBankBookingRequest(new BigDecimal("5000"), "note", "reason", null, null, null, 0L);
+    requestService.updateOwnBookingRequest(requestId, update);
+
+    verify(bankBookingRequestService)
+        .updateOwn(
+            any(),
+            eq(requestId),
+            eq(update),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.BANK_MANAGEMENT));
   }
 
   /**

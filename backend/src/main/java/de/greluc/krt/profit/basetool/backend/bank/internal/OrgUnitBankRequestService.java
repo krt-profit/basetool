@@ -252,16 +252,10 @@ public class OrgUnitBankRequestService {
       throw new BadRequestException(
           "A purpose-bound request needs an active KRT or special account");
     }
-    BankAdmission.Admitted routing =
-        switch (type) {
-          case WITHDRAWAL ->
-              account.getType() == BankAccountType.CARTEL
-                  ? BankAccessRules.cartelLadder(account, amount)
-                  : BankAdmission.Admitted.UNROUTED;
-          case DEPOSIT -> BankAdmission.Admitted.UNROUTED;
-          case TRANSFER ->
-              throw new BadRequestException("A purpose-bound request is a deposit or a withdrawal");
-        };
+    if (type == BankBookingRequestType.TRANSFER) {
+      throw new BadRequestException("A purpose-bound request is a deposit or a withdrawal");
+    }
+    BankAdmission.Admitted routing = BankAccessRules.routePurposeBound(account, type, amount);
     return bankBookingRequestService.create(
         new BankBookingRequestDraft(
             accessService.actor(),
@@ -367,7 +361,7 @@ public class OrgUnitBankRequestService {
     if (!policy.ownsRequest(actor, existing)) {
       throw new NotFoundException("Booking request not found");
     }
-    BankAdmission.Admitted routing = policy.route(actor, existing.getAccount(), request.amount());
+    BankAdmission.Admitted routing = policy.routeCorrection(actor, existing, request.amount());
     return bankBookingRequestService.updateOwn(
         actor,
         requestId,
