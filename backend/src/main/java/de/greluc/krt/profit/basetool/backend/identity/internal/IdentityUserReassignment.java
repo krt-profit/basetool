@@ -29,6 +29,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The identity module's part of the account merge: the roles follow the member, joined with the
@@ -78,6 +80,7 @@ public class IdentityUserReassignment extends OwnedRowsReassignment {
    * @return the moved columns
    */
   @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull List<Moved> reassign(@NotNull UUID source, @NotNull UUID target) {
     List<Moved> moved = super.reassign(source, target);
     if (!moved.isEmpty()) {

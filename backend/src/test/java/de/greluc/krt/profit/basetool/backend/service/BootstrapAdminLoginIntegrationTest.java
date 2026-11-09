@@ -49,13 +49,15 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * The emergency Admin grant of {@code APP_BOOTSTRAP_ADMIN_SUBS} authorises the very request that
  * earns it (REQ-SEC-088), against a real database and the real transaction boundary between the
  * login sync and the authority assembly.
+ *
+ * <p>Runs in the shared context: the test profile lists {@link #BOOTSTRAP_SUB} as the only
+ * bootstrap subject, which no other test signs in as.
  */
-@SpringBootTest(
-    properties = "app.bootstrap.admin-subs=" + BootstrapAdminLoginIntegrationTest.BOOTSTRAP_SUB)
+@SpringBootTest
 class BootstrapAdminLoginIntegrationTest {
 
-  /** The one bootstrap subject this context is started with. */
-  static final String BOOTSTRAP_SUB = "11111111-2222-4333-8444-555555555555";
+  /** The bootstrap subject the test profile's {@code app.bootstrap.admin-subs} lists. */
+  private static final String BOOTSTRAP_SUB = "11111111-2222-4333-8444-555555555555";
 
   private static final UUID SUBJECT = UUID.fromString(BOOTSTRAP_SUB);
 
