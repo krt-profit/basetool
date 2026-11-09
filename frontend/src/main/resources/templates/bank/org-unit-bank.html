@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
-    <title th:text="#{bank.orgUnit.title} + ' - ' + ${appTitle}">Bank meiner Org-Einheit - Profit Basetool</title>
+    <title th:text="#{bank.orgUnit.title} + ' - ' + ${appTitle}">Bank meiner Einheit - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank/bank.css}">
         <link rel="stylesheet" th:href="@{/css/pages/bank/org-unit-bank.css}">
