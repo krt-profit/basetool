@@ -263,6 +263,25 @@ class UexClientTest {
     assertEquals("/commodities_prices_all", req.getPath());
   }
 
+  /** An SCU quantity past the {@code int} range is read in full (REQ-DATA-030). */
+  @Test
+  void getCommoditiesPricesAll_scuValuePastTheIntRange_isReadInFull() {
+    server.enqueue(
+        jsonOk(
+            """
+            {"status":"ok","data":[
+              {"id_commodity": 1, "id_terminal": 7, "scu_sell": 12, "scu_sell_avg": 4368560000}
+            ]}
+            """));
+
+    UexClient.FetchResult<UexCommodityPriceDto> result = client.getCommoditiesPricesAll();
+
+    assertTrue(result.complete());
+    assertEquals(4_368_560_000L, result.data().getFirst().scuSellAvg());
+    assertEquals(12L, result.data().getFirst().scuSell());
+    assertNull(meterRegistry.find(CatalogueMetricNames.EXTERNAL_FETCH_ERRORS).counter());
+  }
+
   @Test
   void getCommoditiesPricesAll_serverError_returnsEmptyList() {
     server.enqueue(new MockResponse().setResponseCode(503));

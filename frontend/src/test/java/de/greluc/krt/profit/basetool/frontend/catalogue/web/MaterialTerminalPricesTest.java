@@ -231,9 +231,9 @@ class MaterialTerminalPricesTest {
             true,
             BigDecimal.ZERO,
             new BigDecimal("3750.5"),
-            0,
-            120,
-            40,
+            0L,
+            4_368_560_000L,
+            40L,
             List.of(1, 2, 4, 8, 16, 24, 32),
             null);
 
@@ -243,8 +243,8 @@ class MaterialTerminalPricesTest {
     assertThat(row.averages().sellText()).isEqualTo("3.750,5");
     assertThat(row.averages().buyText()).isNull();
     assertThat(row.averages().scuBuy()).isNull();
-    assertThat(row.averages().scuSell()).isEqualTo(120);
-    assertThat(row.averages().scuSellStock()).isEqualTo(40);
+    assertThat(row.averages().scuSell()).isEqualTo(4_368_560_000L);
+    assertThat(row.averages().scuSellStock()).isEqualTo(40L);
     assertThat(row.containerRangeText()).isEqualTo("1–32");
     assertThat(row.containerListText()).isEqualTo("1, 2, 4, 8, 16, 24, 32");
   }

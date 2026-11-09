@@ -228,8 +228,8 @@ class MaterialMatrixQueryDataTest {
     Terminal terminal = persistTerminal("Averaged-" + uid, stanton, true, true, false);
     MaterialPrice price = persistPrice(copper, terminal, null, BigDecimal.valueOf(90));
     price.setPriceSellAvg(new BigDecimal("88.5"));
-    price.setScuSellAvg(120);
-    price.setScuSellStockAvg(40);
+    price.setScuSellAvg(4_368_560_000L);
+    price.setScuSellStockAvg(40L);
     price.setContainerSizes(List.of(1, 2, 4, 8, 16, 24, 32));
     entityManager.flush();
     entityManager.clear();
@@ -242,8 +242,8 @@ class MaterialMatrixQueryDataTest {
         .satisfies(dto -> {
           assertThat(dto.priceSellAvg()).isEqualByComparingTo("88.5");
           assertThat(dto.priceBuyAvg()).isNull();
-          assertThat(dto.scuSellAvg()).isEqualTo(120);
-          assertThat(dto.scuSellStockAvg()).isEqualTo(40);
+          assertThat(dto.scuSellAvg()).isEqualTo(4_368_560_000L);
+          assertThat(dto.scuSellStockAvg()).isEqualTo(40L);
           assertThat(dto.scuBuyAvg()).isNull();
           assertThat(dto.containerSizes()).containsExactly(1, 2, 4, 8, 16, 24, 32);
         });

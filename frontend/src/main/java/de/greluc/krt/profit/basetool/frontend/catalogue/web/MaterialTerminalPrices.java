@@ -77,9 +77,9 @@ public final class MaterialTerminalPrices {
   public record Averages(
       @Nullable BigDecimal priceBuy,
       @Nullable BigDecimal priceSell,
-      @Nullable Integer scuBuy,
-      @Nullable Integer scuSell,
-      @Nullable Integer scuSellStock) {
+      @Nullable Long scuBuy,
+      @Nullable Long scuSell,
+      @Nullable Long scuSellStock) {
 
     /**
      * The average sale price as the table shows it below the sale price.
@@ -391,7 +391,7 @@ public final class MaterialTerminalPrices {
    */
   @Nullable
   @Contract("null -> null")
-  private static Integer positive(@Nullable Integer scu) {
+  private static Long positive(@Nullable Long scu) {
     return scu != null && scu > 0 ? scu : null;
   }
 
