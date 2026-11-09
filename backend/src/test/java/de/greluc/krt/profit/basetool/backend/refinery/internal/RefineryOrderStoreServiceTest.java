@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
@@ -73,7 +74,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -115,7 +115,7 @@ class RefineryOrderStoreServiceTest {
 
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
-  @InjectMocks private RefineryOrderStoreService refineryOrderService;
+  private RefineryOrderStoreService refineryOrderService;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -132,9 +132,7 @@ class RefineryOrderStoreServiceTest {
 
   @BeforeEach
   void setUpEntities() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        refineryOrderService,
-        "stockCommands",
+    StockCommands stockCommands =
         new InventoryStockCommands(
             inventoryItemRepository,
             userRepository,
@@ -143,18 +141,20 @@ class RefineryOrderStoreServiceTest {
             auditService,
             bookInPolicy,
             null,
-            null));
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        refineryOrderService,
-        "storeBooking",
-        new RefineryOrderStoreBooking(
+            null);
+    refineryOrderService =
+        new RefineryOrderStoreService(
             refineryOrderRepository,
-            (de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands)
-                org.springframework.test.util.ReflectionTestUtils.getField(
-                    refineryOrderService, "stockCommands"),
-            auditService,
-            eventPublisher,
-            userService));
+            userRepository,
+            locationRepository,
+            materialRepository,
+            jobOrderRepository,
+            jobOrderItemService,
+            jobOrderVisibility,
+            orgUnitStampingService,
+            stockCommands,
+            new RefineryOrderStoreBooking(
+                refineryOrderRepository, stockCommands, auditService, eventPublisher, userService));
     lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);
