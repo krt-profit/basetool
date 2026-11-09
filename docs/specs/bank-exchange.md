@@ -250,6 +250,8 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   request of this member with answers that request with `201` and its current state, even when the
   gateway's answer cache missed it (a `5xx` after the commit is never cached) and even at the cap.
   The lookup runs under the member's open-request lock, so two retries never both insert.
+- **Live.** Every applied raise, correction and cancel refreshes the staff queue, the org-unit bank
+  and the request page in place, as the web's request forms do (REQ-XCH-030, REQ-BANK-068).
 - **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
   trail is `bank_audit_event` with its `client_id` (ADR-0153).
 - **Refusals.** `404 NOT_FOUND` for an unknown, closed or hidden account and for another member's

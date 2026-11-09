@@ -3196,7 +3196,8 @@ and the backend decides what it shows.
   (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
   button is the action the caller can take now.
 - **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
-  card in place through the org-unit bank room (REQ-FE-015).
+  card in place through the org-unit bank room (REQ-FE-015), a correction or cancellation through a
+  connected application included: the backend announces those itself (REQ-XCH-030).
 
 **Acceptance**
 

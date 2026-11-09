@@ -69,6 +69,18 @@ class ExchangeLiveSyncTest {
   }
 
   @Test
+  void aBankRequestWriteRefreshesTheStaffQueueAndTheOrgUnitBankAsTheWebFormsDo() {
+    liveSync.bankRequestsChanged();
+
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.global(LiveSyncTopicClass.BANK_STAFF)), eq(List.of("requestQueue")));
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.global(LiveSyncTopicClass.ORGUNIT_BANK)), eq(List.of("orgUnitBank")));
+  }
+
+  @Test
   void aBlueprintWriteRefreshesOnlyTheMembersOwnBlueprints() {
     liveSync.blueprintsChanged(MEMBER);
 
