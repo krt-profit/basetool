@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BankBookingRequestViewService {
 
+  /** The message of the {@code 404} for an unknown request and for one the actor may not see. */
+  private static final String NOT_FOUND = "Booking request not found";
+
   private final BankAccessRules policy;
   private final BankBookingRequestRepository requestRepository;
 
@@ -51,10 +55,7 @@ public class BankBookingRequestViewService {
   @NotNull
   @Transactional(readOnly = true)
   public BankBookingRequestViewDto view(@NotNull BankActor actor, @NotNull UUID requestId) {
-    BankBookingRequest request =
-        requestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Booking request not found"));
+    BankBookingRequest request = Entities.require(requestRepository.findById(requestId), NOT_FOUND);
     BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
     BankStaffRights rights = scope.rights();
     UUID accountId = request.getAccount().getId();
@@ -65,7 +66,7 @@ public class BankBookingRequestViewService {
             && scope.candidateAccountIds().contains(accountId)
             && scope.shows(request.getRequiredApprover(), accountId);
     if (!own && !staff && !approver) {
-      throw new NotFoundException("Booking request not found");
+      throw new NotFoundException(NOT_FOUND);
     }
     return new BankBookingRequestViewDto(
         BankBookingRequestDtos.of(
