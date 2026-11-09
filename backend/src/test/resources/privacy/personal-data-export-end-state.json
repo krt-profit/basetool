@@ -150,6 +150,12 @@
       "source_channel" : "system",
       "source_client" : null,
       "changed_at" : "<instant>"
+    }, {
+      "resource" : "BANK_REQUEST",
+      "entity_key" : "<uuid>",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
     } ],
     "truncated" : false
   }, {
