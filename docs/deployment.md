@@ -656,7 +656,9 @@ protection for a host that has not got the check yet, and it is how the first in
 > [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.11.0_PRODUCTION_RUNBOOK.md); the **External
 > Client Exchange go-live** (#2092, the first release after 1.12.0) →
 > [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md); **1.17.0** (the internal-only
-> backend, #2638) → [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.17.0_PRODUCTION_RUNBOOK.md).
+> backend, #2638) → [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.17.0_PRODUCTION_RUNBOOK.md);
+> **1.23.0** (roles in the Basetool, P4K catalogue version 2, bank and refinery orders on the
+> exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
@@ -1685,7 +1687,10 @@ switch. Every write below needs @greluc's explicit approval for this host.
 1. **Final roster sync, on the previous release.** Right before the promotion, run the Keycloak
    user sync once more (`POST /api/v1/users/sync` as an admin, or wait for `UserSyncTask` at 05:00
    Europe/Berlin), so a role changed in Keycloak since the last run reaches `user_roles`. From the
-   promotion on, roles are changed only in the Basetool.
+   promotion on, roles are changed only in the Basetool. On Keycloak 26.8.2 the sync answers
+   `401 UNAUTHORIZED` until `backend-service` has the built-in `kc-admin-api` default scope; the
+   provisioner of step 6 assigns it, so on the previous release assign it by hand first
+   (*Clients → `backend-service` → Client scopes → Add client scope → `kc-admin-api` → Default*).
 2. **Check that an admin exists.** A read-only count of active holders of `ADMIN` in `user_roles`
    must be at least one, or `APP_BOOTSTRAP_ADMIN_SUBS` in `basetool.env` names a subject that gets
    Admin at its next login (REQ-SEC-088). From the release on, an account merge moves the roles to
@@ -1746,7 +1751,9 @@ switch. Every write below needs @greluc's explicit approval for this host.
    factor. Compare both lists after the promotion: the read-only count of step 2 against *Realm
    roles → `Admin` → Users in role*.
 
-**Rollback.** Redeploy the previous release, run **its** provisioner (it creates the four realm
+**Rollback.** Redeploy the previous release — for 1.23.0 together with a restore of the database
+backup taken before the promotion, because `V344` drops columns that v1.22.3 maps
+([`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md` §5](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md#5-rollback)) —, run **its** provisioner (it creates the four realm
 roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back
 from the export, dry run first:
 
