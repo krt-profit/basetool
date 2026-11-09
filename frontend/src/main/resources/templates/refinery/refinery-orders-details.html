@@ -128,6 +128,7 @@
                 </div>
                 <div id="materials-container" class="rod-goods">
                     <div th:each="good, stat : *{goods}" class="material-entry rod-good">
+                        <input type="hidden" th:id="'goodId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].id}" data-testid="refinery-good-id" />
                         <div class="form-group rod-good__in">
                             <label class="rod-good__label" th:for="'inputMaterialId_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</span></label>
                             <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
@@ -252,7 +253,7 @@
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
                                 <span class="step-title" th:text="${stateName == 'PICKED_UP'} ? #{refinery.status.pickedUp} : #{refinery.status.stored}">Eingelagert</span>
-                                <span class="step-meta" th:if="${order != null and order.provenance != null and order.provenance.pickedUpByClient != null}" data-testid="refinery-picked-up-via"
+                                <span class="step-meta" th:if="${(stateName == 'PICKED_UP' or stateName == 'COMPLETED') and order != null and order.provenance != null and order.provenance.pickedUpByClient != null}" data-testid="refinery-picked-up-via"
                                       th:text="#{refineryorder.list.via(${order.provenance.pickedUpByClient})}">via VerseKit</span>
                             </span>
                         </li>

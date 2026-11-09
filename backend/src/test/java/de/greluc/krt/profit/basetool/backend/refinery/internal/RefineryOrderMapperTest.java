@@ -263,8 +263,7 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
-            null,
-            null,
+            java.util.Set.of(),
             null,
             null);
 
@@ -285,8 +284,7 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
-            null,
-            null,
+            java.util.Set.of(),
             null,
             null);
 
@@ -307,8 +305,7 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
-            null,
-            null,
+            java.util.Set.of(),
             null,
             null);
     RefineryOrderUpdateRequest absent =
@@ -323,8 +320,7 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
-            null,
-            null,
+            java.util.Set.of(),
             null,
             null);
     RefineryOrderUpdateRequest withId =
@@ -339,8 +335,7 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
-            null,
-            null,
+            java.util.Set.of(),
             null,
             null);
 
@@ -395,7 +390,7 @@ class RefineryOrderMapperTest {
   }
 
   @Test
-  void toEntity_fromAnUpdateRequest_carriesStatusAndVersionButNoIdentity() {
+  void toEntity_fromAnUpdateRequest_carriesStatusAndCountersButNoIdentity() {
     RefineryOrderUpdateRequest request =
         new RefineryOrderUpdateRequest(
             null,
@@ -408,10 +403,9 @@ class RefineryOrderMapperTest {
             null,
             "IN_PROGRESS",
             java.util.List.of(),
+            java.util.Set.of(),
             7L,
-            null,
-            null,
-            null);
+            3L);
 
     RefineryOrder entity = mapper.toEntity(request);
 
@@ -419,7 +413,9 @@ class RefineryOrderMapperTest {
     assertNull(entity.getOwner());
     assertNull(entity.getOwningOrgUnit());
     assertEquals(RefineryOrderStatus.IN_PROGRESS, entity.getStatus());
-    assertEquals(7L, entity.getVersion());
+    assertNull(entity.getVersion());
+    assertEquals(7L, entity.getGameDataVersion());
+    assertEquals(3L, entity.getFinancesVersion());
   }
 
   @Test

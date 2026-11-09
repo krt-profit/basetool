@@ -153,14 +153,14 @@ public interface RefineryOrderMapper {
 
   /**
    * Builds the transient {@link RefineryOrder} that carries an update request's values into {@code
-   * RefineryOrderService#updateRefineryOrder}. The order is identified by the path, so no id, owner
-   * or org unit is read from the request.
+   * RefineryOrderService#updateRefineryOrderParts}. The order is identified by the path, so no id,
+   * owner or org unit is read from the request.
    *
    * @param request the update request; {@code null} returns {@code null}
-   * @return a transient order holding the requested values, the last-seen version and the echoed
-   *     section counters
+   * @return a transient order holding the requested values and the echoed section counters
    */
   @Mapping(target = "id", ignore = true)
+  @Mapping(target = "version", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "missionId", source = "mission.id")
   @Mapping(

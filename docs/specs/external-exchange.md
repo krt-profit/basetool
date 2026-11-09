@@ -2246,8 +2246,14 @@ change and overwrites nothing; a later save is decided by the order's section co
 (REQ-REFINERY-029). When a client deletes an order whose detail page is open, the page stays where
 it is, locks its forms and shows a notice that the client deleted the order, with a link to the
 list — no redirect and no silent loss of input; the section `deleted` of its room carries that
-news (`refinery-orders-details.js`), and a later `order` frame whose section loads again, after
-the member's undo, hides the notice. A client learns of a web change only from the feed
+news (`refinery-orders-details.js`). The page locks only once its presence read (`GET
+/refinery-orders/{id}/presence`) answers `404` or `403`; a readable order re-renders its sections
+instead. `deleted` is a signal section: a reconnect's resync, a subscribe denial and an open dialog
+neither fire nor defer it, and the relay drops it from a browser's `changed` frame
+(`LiveSyncTopicClass.serverOnlySections`), so only the server publishes it; browser frames for a
+topic the browser did not subscribe to stay allowed, since all that is left of them triggers
+re-fetches (ADR-0094). A later frame of the order, after the member's undo, re-renders the order
+and the store section together and lifts the lock. A client learns of a web change only from the feed
 (REQ-XCH-051); no push channel to clients exists.
 
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
@@ -3547,8 +3553,11 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
   member confirms it; cancels and goods removals never trip it.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`.*
 - [x] An open detail page of a deleted order locks its forms and shows the notice with the link to
-  the list. *`RefineryOrderDetailPatternRenderTest` (the notice), `LiveSyncSectionMapParityTest`
-  (the `deleted` section).*
+  the list, after the server confirmed the order is gone; a reconnect never locks it and a browser
+  cannot publish `deleted`. *`RefineryOrderDetailPatternRenderTest` (the notice),
+  `LiveSyncSectionMapParityTest` (the `deleted` section), `RefineryOrderPresenceControllerTest`,
+  `LiveSyncWebSocketHandlerTest` (the server-only section), `krt-live-sync.test.mjs` (signal
+  sections).*
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
 `RefineryOrderDetailPatternRenderTest` · **Code:** `ExchangeRefineryOrderWriteService`,

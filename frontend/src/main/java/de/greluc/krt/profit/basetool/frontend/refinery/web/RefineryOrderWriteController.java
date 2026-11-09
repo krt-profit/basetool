@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -347,13 +348,14 @@ public class RefineryOrderWriteController {
         nullToZero(form.getOtherExpenses()),
         nullToZero(form.getOreSales()),
         refiningMethodOf(form),
-        goodsOf(form),
+        goodsOf(form, _ -> null),
         form.getOwningOrgUnitId());
   }
 
   /**
    * Builds the update request from the edit form, dropping goods rows without an input material or
-   * quantity. Shared by {@link #updateOrder} and its AJAX twin.
+   * quantity and keeping the id of each stored good a row edits. Shared by {@link #updateOrder} and
+   * its AJAX twin.
    *
    * @param form the bound edit form
    * @return the request ready to PUT, naming the parts the form changed and echoing both section
@@ -371,8 +373,7 @@ public class RefineryOrderWriteController {
         nullToZero(form.getOreSales()),
         refiningMethodOf(form),
         form.getStatus() != null ? form.getStatus() : RefineryOrderStatus.OPEN,
-        goodsOf(form),
-        null,
+        goodsOf(form, RefineryGoodForm::getId),
         changedParts(form),
         form.getGameDataVersion(),
         form.getFinancesVersion());
@@ -408,7 +409,7 @@ public class RefineryOrderWriteController {
    * @param request the update request
    */
   private void saveChangedParts(UUID id, RefineryOrderUpdateRequest request) {
-    if (request.parts() != null && request.parts().isEmpty()) {
+    if (request.parts().isEmpty()) {
       return;
     }
     refineryClient.update(id, request);
@@ -481,7 +482,15 @@ public class RefineryOrderWriteController {
             + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0));
   }
 
-  private static List<RefineryGoodDto> goodsOf(RefineryOrderForm form) {
+  /**
+   * Maps the form's goods rows with an input material to request goods.
+   *
+   * @param form the bound form
+   * @param idOf the id a row's good is sent with: the stored good's id on an edit, none on a create
+   * @return the request goods in row order
+   */
+  private static List<RefineryGoodDto> goodsOf(
+      RefineryOrderForm form, Function<RefineryGoodForm, @Nullable UUID> idOf) {
     List<RefineryGoodDto> goodsDto = new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
       if (g.getInputMaterialId() != null) {
@@ -523,7 +532,7 @@ public class RefineryOrderWriteController {
                 : null;
         goodsDto.add(
             new RefineryGoodDto(
-                null,
+                idOf.apply(g),
                 inMat,
                 g.getInputQuantity() != null ? g.getInputQuantity() : 0,
                 outMat,

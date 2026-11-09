@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
@@ -65,6 +66,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -636,29 +638,32 @@ class RefineryOrderServiceLifecycleTest {
   class UpdateRefineryOrderTests {
 
     @Test
-    void throwsOptimisticLockingFailure_whenVersionMismatch() {
+    void throwsOptimisticLockingFailure_whenTheGameDataCounterIsStale() {
       RefineryOrder existing = newSavedOrder();
-      existing.setVersion(5L);
+      existing.setGameDataVersion(5L);
 
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       RefineryOrder incoming = new RefineryOrder();
-      incoming.setVersion(2L);
+      incoming.setGameDataVersion(2L);
 
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
-          () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+          () -> updateEveryPart(OWNER_ID, incoming, false));
+      verify(refineryOrderRepository, never()).save(any());
     }
 
     @Test
-    void nullVersion_bypassesOptimisticCheck() {
+    void aStaleOrderVersionIsNotChecked() {
       RefineryOrder existing = newSavedOrder();
       existing.setVersion(5L);
 
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setVersion(2L);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       verify(refineryOrderRepository).save(existing);
     }
@@ -674,9 +679,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setStatus(RefineryOrderStatus.OPEN);
 
       BadRequestException ex =
-          assertThrows(
-              BadRequestException.class,
-              () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+          assertThrows(BadRequestException.class, () -> updateEveryPart(OWNER_ID, incoming, false));
       assertEquals("error.refinery_order.stored_status_locked", ex.getMessage());
       assertEquals(RefineryOrderStatus.COMPLETED, existing.getStatus());
       verify(refineryOrderRepository, never()).save(any());
@@ -693,7 +696,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setStatus(RefineryOrderStatus.COMPLETED);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       verify(refineryOrderRepository).save(existing);
     }
@@ -705,7 +708,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           AccessDeniedException.class,
-          () -> service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, new RefineryOrder(), false));
+          () -> updateEveryPart(OTHER_USER_ID, new RefineryOrder(), false));
     }
 
     @Test
@@ -715,8 +718,7 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
 
       assertThrows(
-          AccessDeniedException.class,
-          () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false));
+          AccessDeniedException.class, () -> updateEveryPart(OWNER_ID, new RefineryOrder(), false));
     }
 
     @Test
@@ -725,7 +727,7 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, new RefineryOrder(), true);
+      updateEveryPart(OTHER_USER_ID, new RefineryOrder(), true);
 
       verify(refineryOrderRepository).save(existing);
     }
@@ -743,7 +745,7 @@ class RefineryOrderServiceLifecycleTest {
       details.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
       details.setDurationMinutes(90L);
 
-      service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, details, true);
+      updateEveryPart(OTHER_USER_ID, details, true);
 
       assertNull(existing.getReadyNotifiedAt());
       assertEquals(
@@ -766,7 +768,7 @@ class RefineryOrderServiceLifecycleTest {
       details.setStartedAt(Instant.parse("2026-01-01T10:00:00Z"));
       details.setDurationMinutes(30L);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, details, false);
+      updateEveryPart(OWNER_ID, details, false);
 
       assertEquals(marker, existing.getReadyNotifiedAt());
       assertEquals(List.of(), publishedTypes());
@@ -781,7 +783,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder details = new RefineryOrder();
       details.setStatus(RefineryOrderStatus.CANCELED);
 
-      service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, details, true);
+      updateEveryPart(OTHER_USER_ID, details, true);
 
       assertEquals("CANCELED", changeCodeOfLastNotice());
     }
@@ -796,7 +798,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setLocation(refineryLocation);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       assertSame(refineryLocation, existing.getLocation());
     }
@@ -814,7 +816,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setLocation(place);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       assertSame(place, existing.getLocation());
       verify(refineryOrderRepository).save(existing);
@@ -833,8 +835,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setLocation(place);
 
       assertThrows(
-          LocationNotOfferedException.class,
-          () -> service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false));
+          LocationNotOfferedException.class, () -> updateEveryPart(OWNER_ID, incoming, false));
       assertSame(refineryLocation, existing.getLocation());
       verify(refineryOrderRepository, never()).save(any());
     }
@@ -849,7 +850,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setMissionId(null);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
       assertNull(existing.getMissionId());
       verifyNoInteractions(missionParticipantRepository);
     }
@@ -864,7 +865,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setMissionReferenceWithoutId(true);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       assertEquals(MISSION_ID, existing.getMissionId());
       verifyNoInteractions(missionParticipantRepository);
@@ -884,7 +885,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setMissionId(MISSION_ID);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
       assertEquals(MISSION_ID, existing.getMissionId());
     }
 
@@ -903,7 +904,7 @@ class RefineryOrderServiceLifecycleTest {
 
       assertThrows(
           MissionParticipantRequiredException.class,
-          () -> service.updateRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming, true));
+          () -> updateEveryPart(OTHER_USER_ID, incoming, true));
       assertNull(existing.getMissionId());
       verify(refineryOrderRepository, never()).save(any());
     }
@@ -918,7 +919,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setMissionId(MISSION_ID);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       assertEquals(MISSION_ID, existing.getMissionId());
       verifyNoInteractions(missionParticipantRepository);
@@ -932,7 +933,7 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
+      updateEveryPart(OWNER_ID, new RefineryOrder(), false);
       assertNull(existing.getRefiningMethod());
     }
 
@@ -946,7 +947,7 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setStatus(RefineryOrderStatus.IN_PROGRESS);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
       assertEquals(RefineryOrderStatus.IN_PROGRESS, existing.getStatus());
     }
 
@@ -957,7 +958,7 @@ class RefineryOrderServiceLifecycleTest {
       when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
       when(refineryOrderRepository.save(existing)).thenReturn(existing);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, new RefineryOrder(), false);
+      updateEveryPart(OWNER_ID, new RefineryOrder(), false);
       assertEquals(
           RefineryOrderStatus.OPEN,
           existing.getStatus(),
@@ -975,15 +976,15 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setOtherExpenses(0.0);
       incoming.setOreSales(0.0);
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
       assertNull(existing.getExpenses());
       assertNull(existing.getOtherExpenses());
       assertNull(existing.getOreSales());
     }
 
     @Test
-    void goodsReplacement_clearsAndReadsAllValidatedGoods() {
-      RefineryGood preexisting = new RefineryGood();
+    void goodsWithoutAnIdReplaceTheGoodsTheRequestDoesNotName() {
+      RefineryGood preexisting = heldGood(UUID.randomUUID());
       RefineryOrder existing = newSavedOrder();
       existing.setGoods(new HashSet<>(Set.of(preexisting)));
 
@@ -995,10 +996,60 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = new RefineryOrder();
       incoming.setGoods(new HashSet<>(Set.of(replacement)));
 
-      service.updateRefineryOrder(OWNER_ID, ORDER_ID, incoming, false);
+      updateEveryPart(OWNER_ID, incoming, false);
 
       assertEquals(1, existing.getGoods().size());
-      assert !existing.getGoods().contains(preexisting);
+      assertSame(replacement, existing.getGoods().iterator().next());
+    }
+
+    @Test
+    void aGoodCarryingAHeldIdIsChangedInPlaceAndKeepsItsId() {
+      UUID heldId = UUID.randomUUID();
+      RefineryGood held = heldGood(heldId);
+      RefineryOrder existing = newSavedOrder();
+      existing.setGoods(new HashSet<>(Set.of(held)));
+
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(materialRepository.findById(INPUT_MATERIAL_ID)).thenReturn(Optional.of(rawInput));
+      when(refineryOrderRepository.save(existing)).thenReturn(existing);
+
+      RefineryGood edited = newGoodWithInput(INPUT_MATERIAL_ID);
+      edited.setId(heldId);
+      edited.setInputQuantity(40);
+      edited.setOutputQuantity(30);
+      edited.setQuality(800);
+      RefineryGood added = newGoodWithInput(INPUT_MATERIAL_ID);
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setGoods(new HashSet<>(Set.of(edited, added)));
+
+      updateEveryPart(OWNER_ID, incoming, false);
+
+      assertEquals(2, existing.getGoods().size());
+      assertTrue(existing.getGoods().stream().anyMatch(good -> good == held));
+      assertEquals(heldId, held.getId());
+      assertEquals(40, held.getInputQuantity());
+      assertEquals(30, held.getOutputQuantity());
+      assertEquals(800, held.getQuality());
+      assertSame(rawInput, held.getInputMaterial());
+    }
+
+    @Test
+    void aGoodCarryingAnIdTheOrderDoesNotHoldIsRefused() {
+      RefineryOrder existing = newSavedOrder();
+      existing.setGoods(new HashSet<>(Set.of(heldGood(UUID.randomUUID()))));
+
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(existing));
+      when(materialRepository.findById(INPUT_MATERIAL_ID)).thenReturn(Optional.of(rawInput));
+
+      RefineryGood foreign = newGoodWithInput(INPUT_MATERIAL_ID);
+      foreign.setId(UUID.randomUUID());
+      RefineryOrder incoming = new RefineryOrder();
+      incoming.setGoods(new HashSet<>(Set.of(foreign)));
+
+      BadRequestException ex =
+          assertThrows(BadRequestException.class, () -> updateEveryPart(OWNER_ID, incoming, false));
+      assertEquals("error.refinery_order.good_unknown", ex.getMessage());
+      verify(refineryOrderRepository, never()).save(any());
     }
   }
 
@@ -1192,6 +1243,21 @@ class RefineryOrderServiceLifecycleTest {
   private void stubUserAndLocation() {
     when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(refineryLocation));
+  }
+
+  private RefineryOrder updateEveryPart(UUID userId, RefineryOrder details, boolean isLogistician) {
+    return service.updateRefineryOrderParts(
+        userId, ORDER_ID, details, EnumSet.allOf(RefineryOrderPart.class), isLogistician);
+  }
+
+  private RefineryGood heldGood(UUID id) {
+    RefineryGood good = new RefineryGood();
+    good.setId(id);
+    good.setInputMaterial(rawInput);
+    good.setInputQuantity(10);
+    good.setOutputQuantity(10);
+    good.setQuality(500);
+    return good;
   }
 
   private static RefineryGood newGoodWithInput(UUID inputMaterialId) {

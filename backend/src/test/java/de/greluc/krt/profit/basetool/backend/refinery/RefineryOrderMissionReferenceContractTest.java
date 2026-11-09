@@ -235,9 +235,15 @@ class RefineryOrderMissionReferenceContractTest {
             put("/api/v1/refinery-orders/" + orderId)
                 .with(asOwner())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(missionReference).toString()))
+                .content(updateBody(missionReference).toString()))
         .andExpect(status().isOk());
     entityManager.flush();
+  }
+
+  private ObjectNode updateBody(ObjectNode missionReference) {
+    ObjectNode body = body(missionReference);
+    body.putArray("parts").add("MISSION_LINK");
+    return body;
   }
 
   private UUID order() {

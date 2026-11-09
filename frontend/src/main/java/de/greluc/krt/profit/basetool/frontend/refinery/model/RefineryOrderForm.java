@@ -72,15 +72,16 @@ public class RefineryOrderForm {
   private Long financesVersion;
 
   /**
-   * Whether the edit form changed its game-data fields; {@code null} when the page script did not
-   * report it, which writes the section.
+   * Whether the edit form changed its game-data fields. The page renders it {@code true} and the
+   * page script clears it for an unchanged section, so a submit without the script writes the
+   * section; {@code null} writes it as well (REQ-FE-006).
    */
   private Boolean gameDataChanged;
 
-  /** Whether the edit form changed its finance fields; {@code null} writes the section. */
+  /** Whether the edit form changed its finance fields, rendered like {@link #gameDataChanged}. */
   private Boolean financesChanged;
 
-  /** Whether the edit form changed the mission link; {@code null} writes the link. */
+  /** Whether the edit form changed the mission link, rendered like {@link #gameDataChanged}. */
   private Boolean missionChanged;
 
   private String source;

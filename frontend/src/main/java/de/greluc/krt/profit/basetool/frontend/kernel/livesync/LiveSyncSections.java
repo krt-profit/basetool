@@ -83,8 +83,9 @@ final class LiveSyncSections {
   }
 
   /**
-   * Sanitises an inbound {@code sections} array: drops non-strings and keys outside {@link
-   * LiveSyncTopicClass#allowedSections()}, collapses duplicates and caps at {@link
+   * Sanitises the {@code sections} array of a browser's {@code changed} frame: drops non-strings,
+   * keys outside {@link LiveSyncTopicClass#allowedSections()} and the class's {@link
+   * LiveSyncTopicClass#serverOnlySections()}, collapses duplicates and caps at {@link
    * #MAX_CHANGED_SECTIONS}.
    *
    * @param sectionsNode the raw {@code sections} node (may be {@code null} or not an array)
@@ -98,6 +99,7 @@ final class LiveSyncSections {
       return new Filtered(sections, 0, null);
     }
     Set<String> allowed = topicClass.allowedSections();
+    Set<String> serverOnly = topicClass.serverOnlySections();
     int rejected = 0;
     String firstRejected = null;
     for (JsonNode element : sectionsNode) {
@@ -108,7 +110,7 @@ final class LiveSyncSections {
         continue;
       }
       String key = element.asString();
-      if (!allowed.contains(key)) {
+      if (!allowed.contains(key) || serverOnly.contains(key)) {
         rejected++;
         if (firstRejected == null) {
           firstRejected = key;

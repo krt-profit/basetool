@@ -781,14 +781,15 @@ public class RefineryOrderPageController {
       form.setStatus(orderDto.status());
       form.setGameDataVersion(orderDto.gameDataVersion());
       form.setFinancesVersion(orderDto.financesVersion());
-      form.setGameDataChanged(false);
-      form.setFinancesChanged(false);
-      form.setMissionChanged(false);
+      form.setGameDataChanged(true);
+      form.setFinancesChanged(true);
+      form.setMissionChanged(true);
 
       if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
         List<RefineryGoodForm> goodsForm = new ArrayList<>();
         for (RefineryGoodDto goodDto : orderDto.goods()) {
           RefineryGoodForm goodForm = new RefineryGoodForm();
+          goodForm.setId(goodDto.id());
           if (goodDto.inputMaterial() != null) {
             goodForm.setInputMaterialId(goodDto.inputMaterial().id());
           }

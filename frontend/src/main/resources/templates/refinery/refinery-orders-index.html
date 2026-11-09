@@ -78,7 +78,7 @@
                             <span th:case="*" class="refinery-done__text refinery-done__text--danger"
                                   th:text="#{refineryorder.status.CANCELED}">Abgebrochen</span>
                         </th:block>
-                        <span th:if="${o.provenance != null and o.provenance.pickedUpByClient != null}" class="refinery-done__via" data-testid="refinery-picked-up-via"
+                        <span th:if="${(row.state().name() == 'PICKED_UP' or row.state().name() == 'COMPLETED') and o.provenance != null and o.provenance.pickedUpByClient != null}" class="refinery-done__via" data-testid="refinery-picked-up-via"
                               th:text="#{refineryorder.list.via(${o.provenance.pickedUpByClient})}">via VerseKit</span>
                         <span th:if="${row.state().name() == 'RUNNING' or row.ready()}" class="meter refinery-meter" aria-hidden="true"
                               ><i th:classappend="${row.ready()} ? 'meter__fill--success'" th:attr="data-krtm-width=${row.progressPercent()}"></i></span>

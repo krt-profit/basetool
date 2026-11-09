@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -42,18 +43,21 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPol
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderMapper;
+import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderPart;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreService;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -96,14 +100,15 @@ class RefineryOrderControllerTest {
     @Test
     void logistician_routesToTheExistingOwner() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
-      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(service.lockRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       RefineryOrder mapped = new RefineryOrder();
       when(mapper.toEntity(incoming)).thenReturn(mapped);
       RefineryOrder updated = new RefineryOrder();
-      when(service.updateRefineryOrder(eq(OTHER_USER_ID), eq(ORDER_ID), eq(mapped), eq(true)))
+      when(service.updateRefineryOrderParts(
+              eq(OTHER_USER_ID), eq(ORDER_ID), eq(mapped), any(), eq(true)))
           .thenReturn(updated);
       RefineryOrderDto out = dto();
       when(mapper.toDto(eq(updated), any())).thenReturn(out);
@@ -113,7 +118,8 @@ class RefineryOrderControllerTest {
       assertSame(out, result);
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
       verify(service)
-          .updateRefineryOrder(userIdCaptor.capture(), eq(ORDER_ID), eq(mapped), eq(true));
+          .updateRefineryOrderParts(
+              userIdCaptor.capture(), eq(ORDER_ID), eq(mapped), any(), eq(true));
       assertEquals(
           OTHER_USER_ID,
           userIdCaptor.getValue(),
@@ -124,20 +130,21 @@ class RefineryOrderControllerTest {
     void logisticianWithNoOwnerAnywhere_fallsBackToCaller() {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
-      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(service.lockRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(true);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.updateRefineryOrder(
-              any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+      when(service.updateRefineryOrderParts(
+              any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).updateRefineryOrder(userIdCaptor.capture(), any(), any(), eq(true));
+      verify(service)
+          .updateRefineryOrderParts(userIdCaptor.capture(), any(), any(), any(), eq(true));
       assertEquals(
           CALLER_ID,
           userIdCaptor.getValue(),
@@ -147,27 +154,32 @@ class RefineryOrderControllerTest {
     @Test
     void nonLogistician_andCallerIsOwner_passesThrough() {
       RefineryOrder existing = newOrder(CALLER_ID);
-      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(service.lockRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.updateRefineryOrder(
-              any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+      when(service.updateRefineryOrderParts(
+              any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-      verify(service).updateRefineryOrder(userIdCaptor.capture(), any(), any(), eq(false));
+      verify(service)
+          .updateRefineryOrderParts(userIdCaptor.capture(), any(), any(), any(), eq(false));
       assertEquals(CALLER_ID, userIdCaptor.getValue());
+      InOrder order = inOrder(service, refineryAccessPolicy);
+      order.verify(service).lockRefineryOrder(ORDER_ID);
+      order.verify(refineryAccessPolicy).isLogisticianOfOrder(ORDER_ID);
+      verify(queryService, never()).getRefineryOrder(any());
     }
 
     @Test
     void nonLogistician_andCallerIsNotOwner_throwsAccessDenied() {
       RefineryOrder existing = newOrder(OTHER_USER_ID);
-      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(service.lockRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -176,14 +188,15 @@ class RefineryOrderControllerTest {
           AccessDeniedException.class,
           () -> controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming));
       verify(service, never())
-          .updateRefineryOrder(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+          .updateRefineryOrderParts(
+              any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test
     void nonLogistician_andExistingOwnerIsNull_throwsAccessDenied() {
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
-      when(queryService.getRefineryOrder(ORDER_ID)).thenReturn(existing);
+      when(service.lockRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(refineryAccessPolicy.isLogisticianOfOrder(ORDER_ID)).thenReturn(false);
 
       RefineryOrderUpdateRequest incoming = updateRequest();
@@ -192,7 +205,8 @@ class RefineryOrderControllerTest {
           AccessDeniedException.class,
           () -> controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming));
       verify(service, never())
-          .updateRefineryOrder(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+          .updateRefineryOrderParts(
+              any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
   }
 
@@ -250,7 +264,6 @@ class RefineryOrderControllerTest {
               "refiningMethod",
               "status",
               "goods",
-              "version",
               "parts",
               "gameDataVersion",
               "financesVersion"),
@@ -288,7 +301,10 @@ class RefineryOrderControllerTest {
 
       controller.deleteMyRefineryOrder(jwt, ORDER_ID);
 
-      verify(service).deleteRefineryOrder(CALLER_ID, ORDER_ID, true);
+      InOrder order = inOrder(service, refineryAccessPolicy);
+      order.verify(service).lockRefineryOrder(ORDER_ID);
+      order.verify(refineryAccessPolicy).isLogisticianOfOrder(ORDER_ID);
+      order.verify(service).deleteRefineryOrder(CALLER_ID, ORDER_ID, true);
     }
 
     @Test
@@ -315,16 +331,16 @@ class RefineryOrderControllerTest {
     void updateUserRefineryOrder_admin_alwaysPassesLogisticianTrue() {
       RefineryOrderUpdateRequest incoming = updateRequest();
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
-      when(service.updateRefineryOrder(
-              any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+      when(service.updateRefineryOrderParts(
+              any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
           .thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(dto());
 
       controller.updateUserRefineryOrder(OTHER_USER_ID, ORDER_ID, incoming);
 
       verify(service)
-          .updateRefineryOrder(
-              eq(OTHER_USER_ID), eq(ORDER_ID), any(), org.mockito.ArgumentMatchers.eq(true));
+          .updateRefineryOrderParts(
+              eq(OTHER_USER_ID), eq(ORDER_ID), any(), any(), org.mockito.ArgumentMatchers.eq(true));
     }
 
     @Test
@@ -336,7 +352,10 @@ class RefineryOrderControllerTest {
 
       controller.storeMyRefineryOrder(jwt, ORDER_ID, dto);
 
-      verify(storeService).storeRefineryOrder(CALLER_ID, ORDER_ID, dto, false);
+      InOrder order = inOrder(service, refineryAccessPolicy, storeService);
+      order.verify(service).lockRefineryOrder(ORDER_ID);
+      order.verify(refineryAccessPolicy).isLogisticianOfOrder(ORDER_ID);
+      order.verify(storeService).storeRefineryOrder(CALLER_ID, ORDER_ID, dto, false);
     }
 
     @Test
@@ -468,8 +487,7 @@ class RefineryOrderControllerTest {
         null,
         "OPEN",
         java.util.List.of(),
-        1L,
-        null,
+        Set.of(RefineryOrderPart.GAME_DATA),
         null,
         null);
   }

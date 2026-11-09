@@ -318,11 +318,11 @@ class RefineryOrderTenancyE2eTest {
    */
   @Test
   void sameSquadronNonOwnerCannotEdit() {
-    long version = seeder.getRefineryOrderVersion(MEMBER_USER, MEMBER_PASSWORD, orderA);
+    long counter = seeder.getRefineryOrderGameDataVersion(MEMBER_USER, MEMBER_PASSWORD, orderA);
     assertEquals(
         403,
         seeder.attemptUpdateRefineryOrderStatus(
-            MEMBER_USER, MEMBER_PASSWORD, orderA, hubLocationId, materialId, version),
+            MEMBER_USER, MEMBER_PASSWORD, orderA, hubLocationId, materialId, counter),
         "a non-owner non-logistician squadron member must not edit another member's order");
   }
 

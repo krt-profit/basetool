@@ -306,7 +306,14 @@ function createReceiver(cfg) {
     Object.keys(sections).forEach((sectionKey) => {
         sectionContainers[sectionKey] = containerSelector(sections[sectionKey]);
     });
-    const allSections = Object.keys(sectionContainers);
+    /** Signal sections are never deferred and never part of a refresh of every section. */
+    const signalSections = Object.keys(sections).filter((sectionKey) => {
+        const value = sections[sectionKey];
+        return typeof value === 'object' && value !== null && value.signal === true;
+    });
+    const allSections = Object.keys(sectionContainers).filter((sectionKey) => {
+        return signalSections.indexOf(sectionKey) < 0;
+    });
 
     /** @type {Record<string, boolean>} */
     const pendingNow = {};
@@ -320,6 +327,9 @@ function createReceiver(cfg) {
      * @returns {boolean} whether the section must not be re-rendered now
      */
     function sectionBusy(sectionKey) {
+        if (signalSections.indexOf(sectionKey) >= 0) {
+            return false;
+        }
         if (anyModalOpen()) {
             return true;
         }

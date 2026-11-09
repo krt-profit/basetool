@@ -345,7 +345,12 @@ VerseKit-specific: the name shown is the client's display name from the registry
   reaches an open list or detail page live (REQ-XCH-030, REQ-FE-001…010).
 - **Deleted by a client** (REQ-XCH-055): an open detail page of the order stays where it is, locks
   its forms, keeps what the member typed on screen and shows a notice that a connected application
-  deleted the order, with a link to the list; no redirect.
+  deleted the order, with a link to the list; no redirect. The page locks only after its presence
+  read (`GET /refinery-orders/{id}/presence`) answers `404` or `403`; a readable order re-renders
+  its sections instead. The `deleted` section is a signal section: a reconnect, a subscribe denial
+  and an open dialog neither fire nor defer it, and the relay drops it from a browser's frame, so
+  only the server publishes it. A later change of the order (an undo) re-renders the order and the
+  store section together and lifts the lock.
 - The exchange feed carries the creator as the client marker (REQ-XCH-051).
 - **Storage:** migration `V369` adds `created_source` / `created_client`, `last_change_source` /
   `last_change_client`, `last_changed_at` and the pickup marker `picked_up_at` /
@@ -390,9 +395,10 @@ order's status stays editable in the web, as for an order completed without a st
 running orders without `storedAt`.
 
 The web derives the label from the markers alone (`RefineryProgress.State.PICKED_UP`): an order
-reopened to `OPEN` or `IN_PROGRESS` reads by its run again, and an order with `pickedUpAt` and
-`storedAt` shows „Eingelagert" with „via <client>". A picked-up order offers no store action, as
-for any `COMPLETED` order.
+reopened to `OPEN` or `IN_PROGRESS`, or canceled, reads by its status again and shows no „via
+<client>", and an order with `pickedUpAt` and `storedAt` shows „Eingelagert" with „via <client>". „via
+<client>" shows only while the order is `COMPLETED`, in the list and on the detail page. A picked-up
+order offers no store action, as for any `COMPLETED` order.
 
 **Acceptance**
 
@@ -401,8 +407,9 @@ for any `COMPLETED` order.
 - [x] The labels come from the bundles in DE and EN.
 
 **Enforced by:** `RefineryProgressTest` (`aPickupWithoutStoreIsItsOwnState`,
-`aPickedUpRowIsClosed`), `RefineryOrdersListPatternRenderTest` (`rendersTheClientChipAndThePickup`),
-`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderWriteControllerTest` (the pickup op
+`aPickedUpRowIsClosed`), `RefineryOrdersListPatternRenderTest` (`rendersTheClientChipAndThePickup`,
+`aReopenedOrCanceledPickupDropsTheViaClient`), `RefineryOrderDetailPatternRenderTest`
+(`aReopenedPickupDropsTheViaClient`), `ExchangeRefineryOrderWriteControllerTest` (the pickup op
 and its undo) · **Code:** `RefineryProgress.state`,
 `RefineryOrderProvenanceDto.pickedUpWithoutStore`, `RefineryOrderProvenance.recordPickup`,
 `RefineryExchangeWrites.pickUp`
@@ -433,12 +440,23 @@ exchange feed carry both.
 On `PUT /api/v1/refinery-orders/{id}` (and the logistician's per-target path) the request names the
 parts it writes in `parts` (`GAME_DATA`, `FINANCES`, `MISSION_LINK`) and echoes `gameDataVersion` /
 `financesVersion` for each section among them; the values of a part it does not name are not
-applied. A request without `parts` writes every part, checks the order `version` when it sends one
-and raises both counters, so a caller that knows no counters keeps its full-replace contract. The
-store and the cancel raise the game-data counter without an echo. Every order write row-locks the
-order first, so the check and the raise of a counter cannot interleave with another writer
-(`RefineryOrderRepository.lockById`). The edit form tracks which of its parts the member changed
-and sends only those; an edit that changed nothing sends no request.
+applied. `parts` is required: a request without it is refused `400`, and there is no full-replace
+update and no order `version` on the request. An empty `parts` writes nothing. The store and the
+cancel raise the game-data counter without an echo. Every order write row-locks the order before it
+reads it at all, the controller's owner and logistician checks included, so the check and the raise
+of a counter cannot interleave with another writer and a writer that committed a section the
+request does not touch never turns into a `409` (`RefineryOrderService.lockRefineryOrder`,
+`RefineryOrderRepository.lockById`).
+
+A game-data write keeps the goods' ids (the exchange contract, REQ-XCH-051): a good that carries
+the id of a good the order holds changes that good in place, a good without an id is added, a held
+good the request does not list is removed, and an id the order does not hold is refused `400`
+(`error.refinery_order.good_unknown`). The edit form carries each row's good id in a hidden field.
+
+The edit form tracks which of its parts the member changed and sends only those; an edit that
+changed nothing sends no request. The page renders its three change flags as `true` and the page
+script clears them on load, so a submit the script did not intercept writes every part (the no-JS
+fallback of REQ-FE-006).
 
 **Acceptance**
 
@@ -449,9 +467,13 @@ and sends only those; an edit that changed nothing sends no request.
 - [x] The edit form echoes both counters and a stale one of an unchanged section does not refuse
   the save.
 
-**Status:** implemented for the web, the order API and the exchange feed — #3165
-(`RefineryOrderSectionCounterTest`, `RefineryOrderChangedPartsTest`), #3167
-(`ExchangeRefineryOrderControllerTest`); the exchange ops follow with REQ-XCH-052.
+**Enforced by:** `RefineryOrderSectionCounterTest`, `RefineryOrderWebLockOrderIntegrationTest`
+(a save, cancel and store while another writer commits), `RefineryOrderControllerTest`,
+`RefineryOrderServiceLifecycleTest` (goods kept in place), `RefineryOrderChangedPartsTest`,
+`RefineryOrderDetailFragmentMvcTest` (flags and good ids rendered), `ExchangeRefineryOrderControllerTest`
+
+**Status:** implemented for the web, the order API and the exchange feed — #3165, #3167; the
+exchange ops follow with REQ-XCH-052.
 
 ## Out of scope
 

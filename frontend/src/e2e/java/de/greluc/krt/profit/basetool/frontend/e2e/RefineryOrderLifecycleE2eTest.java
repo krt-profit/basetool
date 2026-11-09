@@ -218,23 +218,23 @@ class RefineryOrderLifecycleE2eTest {
         "an empty goods list must be rejected with 400");
   }
 
-  /** Submitting an update with a stale optimistic-lock version is rejected with 409. */
+  /** Submitting a game-data update with a stale game-data counter is rejected with 409. */
   @Test
   void rejectsStaleVersionUpdateWith409() {
     String orderId =
         seeder.createRefineryOrder(USERNAME, PASSWORD, hubLocationId, materialId, null, null);
-    long version = seeder.getRefineryOrderVersion(USERNAME, PASSWORD, orderId);
+    long counter = seeder.getRefineryOrderGameDataVersion(USERNAME, PASSWORD, orderId);
 
     int first =
         seeder.attemptUpdateRefineryOrderStatus(
-            USERNAME, PASSWORD, orderId, hubLocationId, materialId, version);
-    assertTrue(first >= 200 && first < 300, "the first update at the current version succeeds");
+            USERNAME, PASSWORD, orderId, hubLocationId, materialId, counter);
+    assertTrue(first >= 200 && first < 300, "the first update at the current counter succeeds");
 
     assertEquals(
         409,
         seeder.attemptUpdateRefineryOrderStatus(
-            USERNAME, PASSWORD, orderId, hubLocationId, materialId, version),
-        "re-using the now-stale version must conflict with 409");
+            USERNAME, PASSWORD, orderId, hubLocationId, materialId, counter),
+        "re-using the now-stale counter must conflict with 409");
   }
 
   /**

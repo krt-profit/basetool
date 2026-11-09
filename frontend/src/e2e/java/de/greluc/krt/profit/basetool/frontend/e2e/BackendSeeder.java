@@ -663,36 +663,37 @@ public final class BackendSeeder {
   }
 
   /**
-   * Reads the optimistic-lock {@code version} of a refinery order as the given user, so a test can
-   * drive the 409 conflict (send a stale version) or the owner gate (send the current version so
-   * the version check passes and the owner check fires). The caller must be allowed to see the
+   * Reads the game-data counter of a refinery order as the given user (REQ-REFINERY-029), so a test
+   * can drive the 409 conflict (send a stale counter) or the owner gate (send the current counter
+   * so the counter check passes and the owner check fires). The caller must be allowed to see the
    * order (same org-unit scope, owner, or admin) or the backend 403s and this throws.
    *
    * @param username the Keycloak username of the (in-scope) reader
    * @param password the Keycloak password of the reader
    * @param orderId the refinery order id
-   * @return the order's current {@code @Version} value
+   * @return the order's current {@code gameDataVersion}
    */
-  public long getRefineryOrderVersion(String username, String password, String orderId) {
+  public long getRefineryOrderGameDataVersion(String username, String password, String orderId) {
     try {
       return getJson("/api/v1/refinery-orders/" + orderId, passwordGrant(username, password))
-          .get("version")
+          .get("gameDataVersion")
           .getAsLong();
     } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.getRefineryOrderVersion failed", e);
+      throw new IllegalStateException("BackendSeeder.getRefineryOrderGameDataVersion failed", e);
     }
   }
 
   /**
-   * Attempts {@code PUT /api/v1/refinery-orders/{id}} with the given version, setting the status to
-   * {@code IN_PROGRESS}, and returns the HTTP status without throwing.
+   * Attempts {@code PUT /api/v1/refinery-orders/{id}} writing the game-data section against the
+   * given counter, setting the status to {@code IN_PROGRESS}, and returns the HTTP status without
+   * throwing.
    *
    * @param username the Keycloak username of the acting user
    * @param password the Keycloak password of the acting user
    * @param orderId the refinery order id to update
    * @param locationId the id of the refinery-hosting location to re-send
    * @param inputMaterialId the id of the manual RAW input material to re-send
-   * @param version the optimistic-lock version to submit (current passes; stale gives 409)
+   * @param gameDataVersion the game-data counter to echo (current passes; stale gives 409)
    * @return the HTTP status code of the update attempt
    */
   public int attemptUpdateRefineryOrderStatus(
@@ -701,15 +702,16 @@ public final class BackendSeeder {
       String orderId,
       String locationId,
       String inputMaterialId,
-      long version) {
+      long gameDataVersion) {
     String body =
         "{\"location\":{\"id\":\""
             + locationId
             + "\",\"hidden\":false,\"homeLocation\":false},\"status\":\"IN_PROGRESS\","
             + "\"goods\":[{\"inputMaterial\":{\"id\":\""
             + inputMaterialId
-            + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}],\"version\":"
-            + version
+            + "\"},\"inputQuantity\":100,\"outputQuantity\":100,\"quality\":750}],"
+            + "\"parts\":[\"GAME_DATA\"],\"gameDataVersion\":"
+            + gameDataVersion
             + "}";
     try {
       return put(passwordGrant(username, password), "/api/v1/refinery-orders/" + orderId, body);

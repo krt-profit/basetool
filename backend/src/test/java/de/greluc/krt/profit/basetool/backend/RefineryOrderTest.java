@@ -214,6 +214,16 @@ class RefineryOrderTest {
     return node.toString();
   }
 
+  /**
+   * Serialises an order as an update request that writes every part against the counters the order
+   * carries (REQ-REFINERY-029).
+   */
+  private String updatePayload(RefineryOrder order) {
+    ObjectNode node = (ObjectNode) objectMapper.readTree(payload(order));
+    node.putArray("parts").add("GAME_DATA").add("FINANCES").add("MISSION_LINK");
+    return node.toString();
+  }
+
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
@@ -299,7 +309,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(updatePayload)))
+                .content(updatePayload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();
@@ -409,7 +419,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(updatePayload)))
+                .content(updatePayload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();
@@ -471,7 +481,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(updatePayload(order)))
         .andExpect(status().isForbidden());
 
     mockMvc
@@ -488,7 +498,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(updatePayload(order)))
         .andExpect(status().isForbidden());
   }
 

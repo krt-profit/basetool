@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,7 +124,10 @@ class RefineryOrderProvenanceStampingTest {
     details.setStatus(RefineryOrderStatus.IN_PROGRESS);
 
     RefineryOrderProvenance provenance =
-        service.updateRefineryOrder(OWNER_ID, ORDER_ID, details, false).getProvenance();
+        service
+            .updateRefineryOrderParts(
+                OWNER_ID, ORDER_ID, details, Set.of(RefineryOrderPart.GAME_DATA), false)
+            .getProvenance();
 
     assertThat(provenance.getCreatedSource()).isEqualTo(RefineryChangeSource.CLIENT);
     assertThat(provenance.getCreatedClient()).isEqualTo(CLIENT);
