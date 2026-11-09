@@ -314,7 +314,7 @@ public final class ExchangeTestSupport {
     if (userAgent != null) {
       request.header(HttpHeaders.USER_AGENT, userAgent);
     }
-    if (method == HttpMethod.POST || method == HttpMethod.PUT) {
+    if (method == HttpMethod.POST) {
       request.header("Idempotency-Key", "test-" + UUID.randomUUID());
     }
     if (json != null) {

@@ -423,7 +423,7 @@ class BotProtectionFilterTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"DELETE", "PATCH", "TRACE"})
+  @ValueSource(strings = {"PUT", "DELETE", "PATCH", "TRACE"})
   void doFilterInternal_shouldAnswerNotFoundProblem_whenAnExchangeRouteIsCalledWithABlockedMethod(
       String method) throws Exception {
     MockHttpServletRequest request = new MockHttpServletRequest(method, "/exchange/v1/me/stock");
@@ -437,19 +437,6 @@ class BotProtectionFilterTest {
     assertEquals("NOT_FOUND", problem(response).path("code").asString());
     verify(filterChain, never()).doFilter(request, response);
     assertEquals(1.0, botCount(MetricNames.BOT_RULE_METHOD));
-  }
-
-  @Test
-  void doFilterInternal_shouldPassAPutOnAnExchangePathToTheGate() throws Exception {
-    MockHttpServletRequest request =
-        new MockHttpServletRequest("PUT", "/exchange/v1/bank/requests/x");
-    request.setRequestURI("/exchange/v1/bank/requests/x");
-    MockHttpServletResponse response = new MockHttpServletResponse();
-
-    filter.doFilterInternal(request, response, filterChain);
-
-    verify(filterChain, times(1)).doFilter(request, response);
-    assertEquals(0.0, botCount(MetricNames.BOT_RULE_METHOD));
   }
 
   @Test

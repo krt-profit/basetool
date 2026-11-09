@@ -3176,7 +3176,7 @@ a correction through another channel keeps it.
   and a link in the justification renders as text (`BankRequestsPatternRenderTest`).
 
 **Enforced by:** `BankBookingRequest#clientId`, `BankRequestClientNames`, `BankBookingRequestDtos`
-(backend) · `bank/fragments/bank-request-origin` (frontend) · V367 · **Related:** REQ-BANK-023,
+(backend) · `bank/fragments/bank-request-origin` (frontend) · V366 · **Related:** REQ-BANK-023,
 REQ-BANK-046, REQ-BANK-068, REQ-BXCH-004 · **Issues:** #3113, #3119, #3159
 
 ### REQ-BANK-068 — One booking request has a page of its own

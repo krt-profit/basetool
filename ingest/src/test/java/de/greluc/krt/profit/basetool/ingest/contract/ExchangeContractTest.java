@@ -93,7 +93,7 @@ class ExchangeContractTest {
           "/exchange/v1/bank/accounts/{id}/balance-series",
           "/exchange/v1/bank/queue",
           "/exchange/v1/bank/requests",
-          "/exchange/v1/bank/requests/{id}",
+          "/exchange/v1/bank/requests/{id}/correction",
           "/exchange/v1/bank/requests/{id}/cancel");
 
   /**
@@ -186,8 +186,8 @@ class ExchangeContractTest {
     assertThat(new TreeSet<>(doc.path("paths").propertyNames()))
         .containsExactlyInAnyOrderElementsOf(ROUTES);
     for (String route : doc.path("paths").propertyNames()) {
-      assertThat(List.of("get", "post", "put"))
-          .as("only GET, POST and PUT pass the ingest bot filter on the exchange: " + route)
+      assertThat(List.of("get", "post"))
+          .as("only GET and POST pass the ingest bot filter: " + route)
           .containsAll(doc.path("paths").path(route).propertyNames());
     }
   }

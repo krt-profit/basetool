@@ -263,9 +263,9 @@ public final class ExchangeSeam {
               "bank-request-write.schema.json#/$defs/raise",
               "bank-request-write.schema.json#/$defs/written"),
           new RelayOperation(
-              "PUT",
-              "/bank/requests/{id}",
-              "/bank/requests/{id}",
+              "POST",
+              "/bank/requests/{id}/correction",
+              "/bank/requests/{id}/correction",
               "exchange.bank.request",
               false,
               "bank-request-write.schema.json#/$defs/correction",

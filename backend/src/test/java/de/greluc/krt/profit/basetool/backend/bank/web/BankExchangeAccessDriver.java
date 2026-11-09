@@ -135,7 +135,7 @@ final class BankExchangeAccessDriver {
     body.put("justification", BankAccessSeeder.JUSTIFICATION);
     body.put("version", ownerVersion(request));
     return render(
-        relay.write(HttpMethod.PUT, member, "/requests/" + request, body),
+        relay.write(HttpMethod.POST, member, "/requests/" + request + "/correction", body),
         answer -> routing(member, answer.path("id").asString()));
   }
 

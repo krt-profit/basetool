@@ -147,8 +147,8 @@ GET /api/v1/exchange/bank/accounts/{id}/bookings | ExchangeBankController#bookin
 GET /api/v1/exchange/bank/queue | ExchangeBankQueueController#queue | pre=@exchangeGate.allows('exchange.bank.queue', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/requests | ExchangeBankRequestController#requests | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/bank/requests | ExchangeBankRequestController#raise | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
-PUT /api/v1/exchange/bank/requests/{id} | ExchangeBankRequestController#correct | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/bank/requests/{id}/cancel | ExchangeBankRequestController#cancel | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/bank/requests/{id}/correction | ExchangeBankRequestController#correct | pre=@exchangeGate.allows('exchange.bank.request', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/catalog/resolve | ExchangeCatalogController#resolve | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/account-check | ExchangeAccountCheckController#check | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated

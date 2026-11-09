@@ -209,8 +209,9 @@ The answer is `201` with only the request's id, status, version and amount:
 Read the rest — the approval need, the accounts — from the [own requests](#own-requests), where the
 new request follows in the feed.
 
-`PUT /exchange/v1/bank/requests/{id}` corrects a pending, not yet approved own request, raised
-anywhere: `amount`, `note`, `justification`, `targetAccountId` and the `version` last read. Every
+`POST /exchange/v1/bank/requests/{id}/correction` corrects a pending, not yet approved own
+request, raised anywhere: `amount`, `note`, `justification`, `targetAccountId` and the `version`
+last read. Every
 field replaces the stored one; the type and the source account stay. The approval need is derived
 anew. The answer is `200` like the one above.
 

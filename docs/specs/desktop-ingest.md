@@ -600,11 +600,9 @@ or an identity-provider round-trip — using four fixed, case-insensitive strate
   `maxParameterCount` cap) are left to the exception handler rather than re-implemented here.
 - **Disallowed HTTP method → 405.** The gateway only ever uses `GET` (actuator / api-docs and the
   exchange reads), `POST` (the exchange writes and drafts), `HEAD` (health
-  probes) and `OPTIONS` (CORS preflight), and on an `/exchange` path also `PUT` (the bank request
-  correction, REQ-BXCH-004), whose unrouted uses the exchange gate answers `404 NOT_FOUND`. Every
-  other method — `PUT` outside `/exchange`, `DELETE`/`PATCH` verb-tampering, `TRACE`/`CONNECT`,
-  WebDAV `PROPFIND`/`MKCOL`/… — is refused. This method set is deliberately narrower than the
-  frontend's.
+  probes) and `OPTIONS` (CORS preflight). Every other method — `PUT`/`DELETE`/`PATCH`
+  verb-tampering, `TRACE`/`CONNECT`, WebDAV `PROPFIND`/`MKCOL`/… — is refused. This method set is
+  deliberately narrower than the frontend's.
 - **Known bot/scanner path prefix → 404** (`/wp-*`, `/.env`, `/phpmyadmin`, `/actuator/env`, …).
 - **Never-served file extension → 404** (`.php`, `.asp`, `.sql`, `.env`, …).
 

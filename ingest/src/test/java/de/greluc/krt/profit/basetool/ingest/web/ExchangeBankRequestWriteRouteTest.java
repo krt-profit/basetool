@@ -127,12 +127,13 @@ class ExchangeBankRequestWriteRouteTest {
 
   @Test
   void aCorrectionIsRelayedToItsRequest() throws Exception {
-    when(relay.forward(eq(HttpMethod.PUT), eq(BACKEND + "/" + REQUEST), any(), any(), any()))
+    when(relay.forward(
+            eq(HttpMethod.POST), eq(BACKEND + "/" + REQUEST + "/correction"), any(), any(), any()))
         .thenReturn(ok(example("bank-request-write--written/valid/pending.json")));
 
     call(
-            HttpMethod.PUT,
-            ROUTE + "/" + REQUEST,
+            HttpMethod.POST,
+            ROUTE + "/" + REQUEST + "/correction",
             example("bank-request-write--correction/valid/new-amount.json"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.version").value(0));
@@ -161,8 +162,8 @@ class ExchangeBankRequestWriteRouteTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
     call(
-            HttpMethod.PUT,
-            ROUTE + "/not-an-id",
+            HttpMethod.POST,
+            ROUTE + "/not-an-id/correction",
             example("bank-request-write--correction/valid/new-amount.json"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors[0].pointer").value("/id"));

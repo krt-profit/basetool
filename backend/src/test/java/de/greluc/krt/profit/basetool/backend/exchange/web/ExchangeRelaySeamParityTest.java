@@ -259,8 +259,7 @@ class ExchangeRelaySeamParityTest {
     List<String> listed = patterns.stream().map(p -> ((PathPattern) p).getPatternString()).toList();
     assertThat(listed).as("25 paths").hasSize(25).doesNotHaveDuplicates();
     assertThat(listed)
-        .allSatisfy(
-            path -> assertThat(path.replaceAll("/\\{id}(?=/|$)", "")).doesNotContain("*", "{"));
+        .allSatisfy(path -> assertThat(path.replace("/{id}/", "/")).doesNotContain("*", "{"));
     assertThat(new TreeSet<>(listed)).isEqualTo(new TreeSet<>(expected));
   }
 

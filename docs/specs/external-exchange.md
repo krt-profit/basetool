@@ -1999,8 +1999,7 @@ The gateway admits extensions cross-origin on `/exchange/**` only: each approved
 fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-extension://<id>`
 (`app.exchange.cors.extension-origins`, from `BASETOOL_EXCHANGE_CORS_EXTENSION_ORIGINS`), and
 `moz-extension://*` while one client has a Firefox build (`app.exchange.cors.firefox-clients`, from
-`BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST`, `PUT` (the bank request correction,
-REQ-BXCH-004) and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
+`BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed`, `X-Correlation-Id` and

@@ -153,7 +153,7 @@ class ExchangeWireContractTest {
    * {@code ExchangeBankRequestWritesTest} sends them on one.
    */
   private static final Set<String> BANK_WRITES =
-      Set.of("/bank/requests", "/bank/requests/{id}", "/bank/requests/{id}/cancel");
+      Set.of("/bank/requests", "/bank/requests/{id}/correction", "/bank/requests/{id}/cancel");
 
   /** The backend's answer type of every published answer schema it produces. */
   private static final Map<String, Class<?>> ANSWER_TYPES =

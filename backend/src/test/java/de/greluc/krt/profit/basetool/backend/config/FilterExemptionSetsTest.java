@@ -65,8 +65,8 @@ class FilterExemptionSetsTest {
           "/api/v1/exchange/bank/accounts/{id}/bookings",
           "/api/v1/exchange/bank/queue",
           "/api/v1/exchange/bank/requests",
-          "/api/v1/exchange/bank/requests/{id}",
           "/api/v1/exchange/bank/requests/{id}/cancel",
+          "/api/v1/exchange/bank/requests/{id}/correction",
           "/api/v1/exchange/catalog/locations",
           "/api/v1/exchange/catalog/resolve",
           "/api/v1/exchange/me/account-check",
@@ -117,8 +117,7 @@ class FilterExemptionSetsTest {
         Stream.of(PENDING_EXEMPT, TERMS_EXEMPT, ACTING_PATHS).flatMap(List::stream).toList();
 
     assertThat(all)
-        .noneMatch(
-            path -> path.contains("*") || path.replaceAll("/\\{id}(?=/|$)", "").contains("{"));
+        .noneMatch(path -> path.contains("*") || path.replace("/{id}/", "/").contains("{"));
     assertThat(PathControlInventory.unmappedPaths(all, PathControlInventory.dispatcher(context)))
         .isEmpty();
   }

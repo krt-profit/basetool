@@ -79,7 +79,7 @@ public final class ExchangeRoutes {
           route(HttpMethod.GET, BANK_PATH + "/queue", "exchange.bank.queue"),
           route(HttpMethod.GET, BANK_PATH + "/requests", "exchange.bank.read"),
           write(HttpMethod.POST, BANK_PATH + "/requests", "exchange.bank.request"),
-          write(HttpMethod.PUT, BANK_PATH + "/requests/{id}", "exchange.bank.request"),
+          write(HttpMethod.POST, BANK_PATH + "/requests/{id}/correction", "exchange.bank.request"),
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"));
 
   /** Not instantiable. */

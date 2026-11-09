@@ -195,7 +195,7 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
 | Route | Body | Answer |
 |---|---|---|
 | `POST /exchange/v1/bank/requests` | `type`, `sourceAccountId`, `targetAccountId` (transfer), `amount`, `note`, `justification`, `splitEnabled` / `splitPercent` (deposit) | `201 { id, status, version, amount }` |
-| `PUT /exchange/v1/bank/requests/{id}` | `amount`, `note`, `justification`, `targetAccountId`, `version` | `200 { id, status, version, amount }` |
+| `POST /exchange/v1/bank/requests/{id}/correction` | `amount`, `note`, `justification`, `targetAccountId`, `version` | `200 { id, status, version, amount }` |
 | `POST /exchange/v1/bank/requests/{id}/cancel` | `{ version }` | `200 { id, status, version }` |
 
 - **The web's rules, through the bank policy.** `BankOwnRequestWrites` runs the web's bean
@@ -210,7 +210,7 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
 - **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
   requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise.
 - **Origin.** A raised request records the registry client the exchange gate admitted in
-  `bank_booking_request.client_id` (V367); the own requests (REQ-BXCH-003) and the staff queue
+  `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
   (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
 - **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
   trail is `bank_audit_event` with its `client_id` (ADR-0153).
@@ -221,8 +221,6 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   `BANK_SELF_TRANSFER`, `BANK_REQUEST_NOT_PENDING`, `BANK_REQUEST_ALREADY_APPROVED`,
   `BANK_OPEN_REQUEST_CAP` and `VERSION_CONFLICT` (the backend's `OPTIMISTIC_LOCK`); the gateway's
   own idempotency and quota codes.
-- **Methods.** `PUT` passes the gateway's bot filter and the exchange CORS on `/exchange/**` only
-  (REQ-INGEST-009).
 - **Counted.** Every write counts `basetool_exchange_writes_total{client_id,
   resource="bank_request", outcome=applied|rejected}`, every shared `404`
   `basetool_exchange_bank_refused_total{reason="not_found"}` and every cap refusal
@@ -246,8 +244,8 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
 
 **Enforced by:** `ExchangeBankRequestController`, `ExchangeBankRequestWriteService`,
 `BankOwnRequestWriteService`, `OrgUnitBankRequestService` (backend) · `ExchangeBankRequestController`,
-`ExchangeRoutes`, `ExchangeRelay`, `BotProtectionFilter` (gateway) ·
-`bank-request-write.schema.json` · V367 · **Related:** REQ-BANK-022, REQ-BANK-039…042,
+`ExchangeRoutes`, `ExchangeRelay` (gateway) ·
+`bank-request-write.schema.json` · V366 · **Related:** REQ-BANK-022, REQ-BANK-039…042,
 REQ-BANK-056, REQ-BANK-067, REQ-XCH-020, REQ-XCH-023 · **Issues:** #3113, #3119, #3121, #3159
 
 ### REQ-BXCH-005 — The read-only bank-staff queue

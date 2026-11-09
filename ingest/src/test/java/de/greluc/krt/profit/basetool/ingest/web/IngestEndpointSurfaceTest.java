@@ -75,7 +75,8 @@ class IngestEndpointSurfaceTest {
           new Call(HttpMethod.GET, "/exchange/v1/bank/requests"),
           new Call(HttpMethod.POST, "/exchange/v1/bank/requests"),
           new Call(
-              HttpMethod.PUT, "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000"),
+              HttpMethod.POST,
+              "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000/correction"),
           new Call(
               HttpMethod.POST,
               "/exchange/v1/bank/requests/00000000-0000-4000-8000-000000000000/cancel"),

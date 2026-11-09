@@ -509,10 +509,10 @@ class ExchangeGoldenAnswerTest {
         "route-post-bank-request",
         post("/bank/requests", fixture("bank-request-write--raise/valid/withdrawal.json")));
     routes.put(
-        "route-put-bank-request",
+        "route-post-bank-request-correction",
         new Call(
-            HttpMethod.PUT,
-            "/bank/requests/33333333-4444-4555-8666-777777777777",
+            HttpMethod.POST,
+            "/bank/requests/33333333-4444-4555-8666-777777777777/correction",
             fixture("bank-request-write--correction/valid/new-amount.json")));
     routes.put(
         "route-post-bank-request-cancel",
@@ -567,7 +567,8 @@ class ExchangeGoldenAnswerTest {
             fixture("bank-queue/valid/staff-and-approver.json");
         case "GET /api/v1/exchange/bank/requests" ->
             fixture("page--bankRequestPage/valid/snapshot.json");
-        case "POST /api/v1/exchange/bank/requests", "PUT /api/v1/exchange/bank/requests/{id}" ->
+        case "POST /api/v1/exchange/bank/requests",
+            "POST /api/v1/exchange/bank/requests/{id}/correction" ->
             fixture("bank-request-write--written/valid/pending.json");
         case "POST /api/v1/exchange/bank/requests/{id}/cancel" ->
             fixture("bank-request-write--cancelled/valid/cancelled.json");

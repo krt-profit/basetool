@@ -336,9 +336,9 @@ class ExchangeBankRequestWritesTest {
   private MockHttpServletResponse correct(
       @NotNull Actor actor, @NotNull UUID id, long amount, long version) throws Exception {
     return relay.write(
-        HttpMethod.PUT,
+        HttpMethod.POST,
         world.user(actor),
-        REQUESTS + "/" + id,
+        REQUESTS + "/" + id + "/correction",
         Map.of(
             "amount", amount, "justification", BankAccessSeeder.JUSTIFICATION, "version", version));
   }

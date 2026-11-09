@@ -1,5 +1,5 @@
 === request
-PUT /exchange/v1/bank/requests/33333333-4444-4555-8666-777777777777
+POST /exchange/v1/bank/requests/33333333-4444-4555-8666-777777777777/correction
 {
   "amount": 9000,
   "note": "Refuel at Port Olisar",
@@ -7,7 +7,7 @@ PUT /exchange/v1/bank/requests/33333333-4444-4555-8666-777777777777
   "version": 1
 }
 === relayed
-PUT /api/v1/exchange/bank/requests/33333333-4444-4555-8666-777777777777
+POST /api/v1/exchange/bank/requests/33333333-4444-4555-8666-777777777777/correction
 accept: application/json, application/problem+json
 accept-encoding: gzip, deflate
 authorization: Bearer gateway-service-token
