@@ -68,7 +68,7 @@ interface ExchangeEntryRestorer {
       @NotNull ExchangeJournalEntry newest,
       @NotNull String feedKey) {
     Optional<ExchangeChange> latest =
-        changes.findLatestForKey(member, newest.getResource().name(), feedKey);
+        changes.findLatestForKey(member, newest.getResource().feed().name(), feedKey);
     return latest.isEmpty() || latest.get().getTx() != newest.getTx();
   }
 

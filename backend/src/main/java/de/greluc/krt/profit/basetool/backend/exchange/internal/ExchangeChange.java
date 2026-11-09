@@ -62,7 +62,7 @@ public class ExchangeChange {
   /** The resource the entity belongs to. */
   @Enumerated(EnumType.STRING)
   @Column(name = "resource", nullable = false, updatable = false, length = 16)
-  private ExchangeResource resource;
+  private ExchangeFeedResource resource;
 
   /** The entity's key within the resource, such as a blueprint's product key. */
   @Column(name = "entity_key", nullable = false, updatable = false, length = 255)

@@ -41,15 +41,13 @@ class ExchangeResourceTest {
             ExchangeResource.BLUEPRINT, ExchangeCapability.BLUEPRINTS_WRITE,
             ExchangeResource.STOCK, ExchangeCapability.STOCK_WRITE,
             ExchangeResource.SHIP, ExchangeCapability.HANGAR_WRITE,
-            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE,
-            ExchangeResource.BANK_REQUEST, ExchangeCapability.BANK_REQUEST);
+            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE);
     Map<ExchangeResource, String> tags =
         Map.of(
             ExchangeResource.BLUEPRINT, "blueprint",
             ExchangeResource.STOCK, "stock",
             ExchangeResource.SHIP, "ship",
-            ExchangeResource.ORG_STOCK, "org_stock",
-            ExchangeResource.BANK_REQUEST, "bank_request");
+            ExchangeResource.ORG_STOCK, "org_stock");
 
     assertThat(capabilities).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
     for (ExchangeResource resource : ExchangeResource.values()) {
@@ -62,13 +60,24 @@ class ExchangeResourceTest {
   }
 
   @Test
-  void theBankRequestFeedHasNoMassChange() {
-    assertThat(ExchangeResource.BANK_REQUEST.massChangeName()).isNull();
+  void everyResourceWritesIntoTheFeedOfItsName() {
+    for (ExchangeResource resource : ExchangeResource.values()) {
+      assertThat(resource.feed().name()).isEqualTo(resource.name());
+    }
+  }
+
+  @Test
+  void theFeedsAreTheValuesTheChangeTableAllows() {
+    assertThat(Arrays.stream(ExchangeFeedResource.values()).map(Enum::name))
+        .containsExactly("BLUEPRINT", "STOCK", "SHIP", "ORG_STOCK", "BANK_REQUEST");
   }
 
   @Test
   void anyOtherNameMapsToNoResource() {
-    for (String name : new String[] {null, "", "hangar", "ship", "SHIPS", "blueprint", " stock"}) {
+    for (String name :
+        new String[] {
+          null, "", "hangar", "ship", "SHIPS", "blueprint", " stock", "bank-requests"
+        }) {
       assertThat(ExchangeResource.fromMassChangeName(name)).as(String.valueOf(name)).isEmpty();
     }
   }

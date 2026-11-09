@@ -241,7 +241,6 @@ public class ExchangeMassChangeService {
             ? orgStockWriteService.apply(caller, changeSet)
             : orgStockWriteService.applyConfirmed(caller, changeSet);
       }
-      case BANK_REQUEST -> throw new BadRequestException("The staged change set names no resource");
     };
   }
 

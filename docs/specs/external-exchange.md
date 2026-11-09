@@ -861,6 +861,12 @@ transaction (`web`, `app`, `client|<id>|<installation key>`, otherwise `system`)
 (`exchange_change_retention`, 03:30 UTC) purges entries older than 90 days and records the highest
 purged position as the horizon, below which a cursor has expired.
 
+The feeds are `ExchangeFeedResource`, whose constants are the `exchange_change.resource` values
+`ck_exchange_change_resource` allows: `BLUEPRINT`, `STOCK`, `SHIP`, `ORG_STOCK` and the read-only
+`BANK_REQUEST` (REQ-BXCH-003). The resources a client writes are the separate `ExchangeResource`
+(REQ-XCH-022), each of which names its feed, so a switch over either type covers only the values it
+applies to.
+
 **Acceptance**
 
 - [x] A test fails for any write path to the synced tables that bypasses the sequence.
@@ -1606,6 +1612,8 @@ resource writes, reads back and restores (`ExchangeBlueprintJournal`, `ExchangeS
 of the writer. It is written in the write's own transaction, purged with the
 change feed after 90 days by `exchange_change_retention`, exported under Art. 15, stays with the
 source account on a merge, and its states are searched by the Personensuche.
+The journaled resources are `ExchangeResource` — blueprints, stock, ships and org stock — the same ones the mass-change guard
+and the undo cover; a bank booking request has a feed but no journal and no undo (ADR-0354).
 
 The member undoes from „Verbundene Anwendungen" with `POST /api/v1/connected-apps/{clientId}/undo
 {since}` (member session only), reaching back at most as far as the configured journal and

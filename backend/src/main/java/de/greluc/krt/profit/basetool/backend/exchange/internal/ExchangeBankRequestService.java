@@ -123,7 +123,7 @@ public class ExchangeBankRequestService {
   private ExchangeBankRequestPageDto feed(
       @NotNull UUID member, @NotNull ExchangeFeedPosition after, int size) {
     ExchangeFeedReader.Changes changes =
-        feedReader.changes(member, ExchangeResource.BANK_REQUEST, after, size);
+        feedReader.changes(member, ExchangeFeedResource.BANK_REQUEST, after, size);
     Map<String, BankOwnRequestReads.OwnRequest> current =
         requestReads
             .ownRequestsByIds(member, changes.keys().stream().map(UUID::fromString).toList())
