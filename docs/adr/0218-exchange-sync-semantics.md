@@ -62,7 +62,8 @@ visible, bounded and reversible.
 7. **Idempotency.** Writes carry an `Idempotency-Key` (24 h), keyed per (client, member, key). The
    gateway runs every gate first and caches only results produced after them — never `401`, `403`,
    `429`, `503`, a guard staging or a `5xx`; a parallel duplicate waits on a lock. Batches hold at
-   most 500 ops, and results are compact (≤ 32 KiB).
+   most 500 ops, and results are compact; a result above 32 KiB is delivered but not kept for a
+   replay, so a retry under its key runs the batch again.
 8. **Drafts stay drafts.** The review-in-browser flows (`exchange.drafts.*`) keep REQ-INGEST-004's
    review-before-commit; only the „me" resources are written directly.
 

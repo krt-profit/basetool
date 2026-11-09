@@ -22,22 +22,17 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceJobOrdersDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceReceiversDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -59,9 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeStoreChoices {
 
-  private final OrgUnitMembershipQueryService membershipQueryService;
-  private final UserRepository userRepository;
-  private final ExchangeNameWithholdings nameWithholdings;
+  private final ExchangeOrgUnitService orgUnitService;
+  private final ExchangeOrgStockRoster roster;
   private final ExchangeHolderRefs holderRefs;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemService jobOrderItemService;
@@ -78,14 +72,10 @@ public class ExchangeStoreChoices {
   @Transactional(readOnly = true)
   public @NotNull Receivers receivers(@NotNull ExchangeCaller caller) {
     UUID self = caller.member();
-    Set<UUID> units = membershipQueryService.findLogisticianOrgUnitIds(self);
+    Set<UUID> units = orgUnitService.logisticianUnits(self);
     Set<UUID> members = new LinkedHashSet<>();
     members.add(self);
-    Set<UUID> others =
-        new LinkedHashSet<>(membershipQueryService.findDirectMemberUserIdsOfUnits(units));
-    others.remove(self);
-    others.removeAll(nameWithholdings.withholding(others));
-    members.addAll(others);
+    members.addAll(roster.members(units));
     Function<UUID, String> refs = holderRefs.forClient(caller.clientId());
     Map<String, UUID> byRef = new HashMap<>();
     members.forEach(member -> byRef.put(refs.apply(member), member));
@@ -101,32 +91,19 @@ public class ExchangeStoreChoices {
   @Transactional(readOnly = true)
   public @NotNull ExchangeStoreChoiceReceiversDto receiverList(@NotNull ExchangeCaller caller) {
     Receivers receivers = receivers(caller);
-    Map<UUID, String> refOf = new HashMap<>();
-    receivers.byRef().forEach((ref, member) -> refOf.put(member, ref));
-    Map<UUID, List<OrgUnitMembershipOptionDto>> memberships =
-        membershipQueryService.listDirectMembershipOptionsByUser(refOf.keySet());
-    List<ExchangeStoreChoiceReceiversDto.Receiver> items = new ArrayList<>(refOf.size());
-    for (User user : userRepository.findAllById(refOf.keySet())) {
-      items.add(
-          new ExchangeStoreChoiceReceiversDto.Receiver(
-              Objects.requireNonNull(refOf.get(user.getId())),
-              ExchangeStockFeedService.cut(Objects.requireNonNullElse(user.getEffectiveName(), "")),
-              user.getId().equals(receivers.self()),
-              memberships.getOrDefault(user.getId(), List.of()).stream()
-                  .map(option ->
-                      new ExchangeOrgUnitDto(
-                          option.orgUnitId(),
-                          option.orgUnitName(),
-                          option.orgUnitShorthand(),
-                          option.kind()))
-                  .toList()));
-    }
-    items.sort(
-        Comparator.comparing((ExchangeStoreChoiceReceiversDto.Receiver item) -> !item.self())
-            .thenComparing(
-                ExchangeStoreChoiceReceiversDto.Receiver::name, String.CASE_INSENSITIVE_ORDER)
-            .thenComparing(ExchangeStoreChoiceReceiversDto.Receiver::ref));
-    return new ExchangeStoreChoiceReceiversDto(List.copyOf(items));
+    Collection<UUID> members = receivers.byRef().values();
+    Map<UUID, List<ExchangeOrgUnitDto>> memberships = orgUnitService.orgUnitsOf(members);
+    List<ExchangeStoreChoiceReceiversDto.Receiver> items =
+        roster.holders(caller.clientId(), members).stream()
+            .sorted(Comparator.comparing(holder -> !holder.userId().equals(receivers.self())))
+            .map(holder ->
+                new ExchangeStoreChoiceReceiversDto.Receiver(
+                    holder.ref(),
+                    holder.name(),
+                    holder.userId().equals(receivers.self()),
+                    memberships.getOrDefault(holder.userId(), List.of())))
+            .toList();
+    return new ExchangeStoreChoiceReceiversDto(items);
   }
 
   /**

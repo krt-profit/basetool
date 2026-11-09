@@ -29,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeRequestDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -36,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientSta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeHolderRefs;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLiveSync;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLocationResolver;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMassChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoResultDto;
@@ -47,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,6 +72,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -75,6 +82,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * A client's pickup with store lines and the two store-choice reads it needs, relayed from the
@@ -101,6 +110,7 @@ class ExchangeRefineryStoreControllerTest {
   @Autowired private ExchangeSettingsRepository settingsRepository;
   @Autowired private ExchangeHolderRefs holderRefs;
   @Autowired private ExchangeUndoService undoService;
+  @Autowired private ExchangeMassChangeService massChangeService;
   @Autowired private JdbcTemplate jdbc;
   @MockitoSpyBean private ExchangeLiveSync liveSync;
 
@@ -430,6 +440,104 @@ class ExchangeRefineryStoreControllerTest {
     assertThat(stockOf(member)).isZero();
   }
 
+  @Test
+  void severalLinesOnOneGoodWriteTheirSumBackIntoItsYield() throws Exception {
+    UUID order = order("IN_PROGRESS");
+
+    changes(pickup(order, line(refined, 3.0, null) + "," + line(refined, 2.0, null)))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(yieldOf(order)).isEqualTo(500);
+    assertThat(stockOf(member)).isEqualTo(2);
+  }
+
+  @Test
+  void aDryRunWritesAPickupsLinesBackIntoTheGoodsAsTheRealRunDoes() throws Exception {
+    UUID order = order("IN_PROGRESS");
+    UUID good =
+        jdbc.queryForObject(
+            "SELECT id FROM refinery_good WHERE refinery_order_id = ?", UUID.class, order);
+    String set =
+        pickup(order, line(refined, 4.0, null))
+            + ",{\"op\": \"good-update\", \"id\": \""
+            + order
+            + "\", \"versions\": {\"gameData\": 1}, \"goodId\": \""
+            + good
+            + "\", \"outputQuantity\": 400}";
+
+    changes(true, set)
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.unchanged").value(1));
+    changes(set)
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.unchanged").value(1));
+
+    assertThat(yieldOf(order)).isEqualTo(400);
+  }
+
+  @Test
+  void storeLinesOnACompletedOrderAreOrderStoredAndBookNothing() throws Exception {
+    UUID order = order("COMPLETED");
+
+    changes(pickup(order, line(refined, null)))
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("ORDER_STORED"));
+
+    assertThat(stockOf(member)).isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT stored_at FROM refinery_order WHERE id = ?", Instant.class, order))
+        .isNull();
+  }
+
+  @Test
+  void aConfirmedSetDecidesItsJobOrdersAsTheRelayDoesNotAsTheBrowsersAdminSession()
+      throws Exception {
+    profitEligible();
+    jdbc.update(
+        "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+        member,
+        roleRepository.findByCode(Roles.ADMIN).orElseThrow().getId());
+    UUID foreignJob = jobOrder(foreignUnit, "OPEN", refined);
+    UUID order = order("OPEN");
+    String pickup = pickup(order, line(refined, "\"jobOrder\": \"" + foreignJob + "\""));
+    changes(true, pickup).andExpect(jsonPath("$.results[0].reason").value("JOB_ORDER_INVALID"));
+
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new TestingAuthenticationToken(member.toString(), null, Roles.authority(Roles.ADMIN)));
+    MockHttpServletRequest browser = new MockHttpServletRequest();
+    browser.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, foreignUnit.toString());
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(browser));
+    ConnectedAppMassChangeResultDto preview;
+    try {
+      preview =
+          massChangeService.preview(
+              member,
+              new ConnectedAppMassChangeRequestDto(
+                  client, KEY, "refinery-orders", "{\"ops\": [" + pickup + "]}", Instant.now()));
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+      SecurityContextHolder.clearContext();
+    }
+
+    assertThat(preview.applied()).isZero();
+    assertThat(preview.notApplied()).isEqualTo(1);
+  }
+
+  /**
+   * Reads the yield of an order's only good.
+   *
+   * @param order the order
+   * @return the good's output quantity in units
+   */
+  private int yieldOf(@NotNull UUID order) {
+    return jdbc.queryForObject(
+        "SELECT output_quantity FROM refinery_good WHERE refinery_order_id = ?",
+        Integer.class,
+        order);
+  }
+
   /**
    * A pickup with store lines of the order a client key names, its counter echoed at 0.
    *
@@ -468,11 +576,25 @@ class ExchangeRefineryStoreControllerTest {
    * @return the line
    */
   private @NotNull String line(@NotNull UUID material, @Nullable String extra) {
+    return line(material, 4.5, extra);
+  }
+
+  /**
+   * A store line at quality 500 at the test refinery.
+   *
+   * @param material the line's material
+   * @param scu the amount in SCU
+   * @param extra further members, comma-separated, or {@code null}
+   * @return the line
+   */
+  private @NotNull String line(@NotNull UUID material, double scu, @Nullable String extra) {
     return "{\"material\": {\"bt\": \""
         + material
         + "\"}, \"location\": {\"name\": \"ARC-L1 Refinery "
         + refinery
-        + "\"}, \"quality\": 500, \"quantity\": {\"amount\": 4.5, \"unit\": \"SCU\"}"
+        + "\"}, \"quality\": 500, \"quantity\": {\"amount\": "
+        + scu
+        + ", \"unit\": \"SCU\"}"
         + (extra == null ? "" : ", " + extra)
         + "}";
   }

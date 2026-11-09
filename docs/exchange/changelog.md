@@ -34,10 +34,13 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
     `store-choice-receivers.schema.json` and `store-choice-job-orders.schema.json`
     ([store choices](resources/store-choices.md)).
   - **Per-op reasons.** `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
-    `ALREADY_EXISTS`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`, `ORDER_CANCELED`,
-    `MATERIAL_NOT_AN_OUTPUT`, `RECEIVER_UNKNOWN`, `ORG_UNIT_NOT_ALLOWED` and `JOB_ORDER_INVALID`;
-    `NOT_A_MEMBER`, `LOCATION_UNKNOWN`, `UNIT_MISMATCH` and `VERSION_CONFLICT` refuse refinery-order
-    ops too ([errors](errors.md)).
+    `GOODS_REQUIRED`, `ALREADY_EXISTS`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`,
+    `ORDER_CANCELED`, `MATERIAL_NOT_AN_OUTPUT`, `RECEIVER_UNKNOWN`, `ORG_UNIT_NOT_ALLOWED` and
+    `JOB_ORDER_INVALID`; `NOT_A_MEMBER`, `LOCATION_UNKNOWN`, `UNIT_MISMATCH` and `VERSION_CONFLICT`
+    refuse refinery-order ops too ([errors](errors.md)).
+  - **Limits and locks.** An order keeps at least one good; `durationMinutes` is at most 525600 (one
+    year); a field an op's kind does not use is reported `UNKNOWN_FIELD` and ignored. A set that
+    cannot lock an order it names answers `409 PESSIMISTIC_LOCK` and applied nothing; retry it.
 - **Changed: the refinery draft points at the direct writes.** The
   [refinery draft](resources/drafts.md#refinery-draft--post-exchangev1medraftsrefinery-orders)
   stays for an order the member reviews in the browser; to write orders directly, send a change set

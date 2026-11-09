@@ -36,14 +36,18 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JsonPointer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Checks exchange documents against the committed v1 JSON Schemas (REQ-XCH-011, REQ-XCH-026):
- * whether a body is valid, and which of its fields no schema declares. In a client's request those
- * fields are ignored and reported as {@code UNKNOWN_FIELD} warnings, since the schemas stay open;
- * in a backend answer they break the contract, which fails closed (REQ-XCH-050).
+ * whether a body is valid, and which of its fields no schema declares; of a body that branches by a
+ * {@code const} discriminator such as an op's {@code op}, only the matching branches declare its
+ * fields. In a client's request those fields are ignored and reported as {@code UNKNOWN_FIELD}
+ * warnings, since the schemas stay open; in a backend answer they break the contract, which fails
+ * closed (REQ-XCH-050).
  */
 @Component
 public class ExchangeSchemas {
@@ -131,6 +135,30 @@ public class ExchangeSchemas {
   }
 
   /**
+   * Returns a request without the fields its schema does not declare, so the Basetool never sees a
+   * field the contract ignores.
+   *
+   * @param instance the request
+   * @param unknown JSON Pointers to its unknown fields, as {@link #unknownFields} lists them
+   * @return the request itself when it has none, else a copy without them
+   */
+  public @NotNull JsonNode withoutFields(
+      @NotNull JsonNode instance, @NotNull List<String> unknown) {
+    if (unknown.isEmpty()) {
+      return instance;
+    }
+    JsonNode copy = instance.deepCopy();
+    for (String pointer : unknown) {
+      JsonPointer field = JsonPointer.compile(pointer);
+      JsonNode parent = copy.at(field.head());
+      if (parent instanceof ObjectNode object) {
+        object.remove(field.last().getMatchingProperty());
+      }
+    }
+    return copy;
+  }
+
+  /**
    * Lists where an answer breaks its contract: every value that violates the schema and every
    * property the schema does not declare (REQ-XCH-050). The content of a declared free-form map,
    * such as {@code extensions}, is not inspected.
@@ -189,6 +217,7 @@ public class ExchangeSchemas {
       branches.addAll(expand(schema, new HashSet<>()));
     }
     if (instance.isObject()) {
+      branches = branches.stream().filter(branch -> admits(branch.node(), instance)).toList();
       Map<String, List<Located>> declared = new HashMap<>();
       boolean open = false;
       for (Located branch : branches) {
@@ -229,6 +258,30 @@ public class ExchangeSchemas {
         }
       }
     }
+  }
+
+  /**
+   * Whether a branch can describe an object: every property it fixes with {@code const}, such as an
+   * op's {@code op}, is absent from the object or holds that value. A field only another op's
+   * branch declares is thereby unknown to an op.
+   *
+   * @param branch the schema branch
+   * @param instance the object
+   * @return {@code false} when the object holds another value for a property the branch fixes
+   */
+  private static boolean admits(@NotNull JsonNode branch, @NotNull JsonNode instance) {
+    JsonNode properties = branch.get("properties");
+    if (properties == null || !properties.isObject()) {
+      return true;
+    }
+    for (Map.Entry<String, JsonNode> property : properties.properties()) {
+      JsonNode fixed = property.getValue().get("const");
+      JsonNode value = instance.get(property.getKey());
+      if (fixed != null && value != null && !fixed.equals(value)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

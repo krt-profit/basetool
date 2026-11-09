@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -56,11 +57,36 @@ public class ExchangeOrgStockRoster {
    * @return the members, ordered by name and then by ref
    */
   public @NotNull @Unmodifiable List<Holder> of(@NotNull String clientId, @NotNull UUID unit) {
-    Set<UUID> members = new LinkedHashSet<>(membershipQueryService.findDirectMemberUserIds(unit));
+    return holders(clientId, members(Set.of(unit)));
+  }
+
+  /**
+   * Lists the direct members of the given units who do not withhold their name.
+   *
+   * @param units the units
+   * @return the members, each once
+   */
+  public @NotNull Set<UUID> members(@NotNull Collection<UUID> units) {
+    Set<UUID> members =
+        new LinkedHashSet<>(membershipQueryService.findDirectMemberUserIdsOfUnits(units));
+    if (!members.isEmpty()) {
+      members.removeAll(nameWithholdings.withholding(members));
+    }
+    return members;
+  }
+
+  /**
+   * Lists members as a client sees them, with their pseudonym and the name the web shows.
+   *
+   * @param clientId the client, whose salt the refs are made with
+   * @param members the members
+   * @return the members, ordered by name and then by ref
+   */
+  public @NotNull @Unmodifiable List<Holder> holders(
+      @NotNull String clientId, @NotNull Collection<UUID> members) {
     if (members.isEmpty()) {
       return List.of();
     }
-    members.removeAll(nameWithholdings.withholding(members));
     Function<UUID, String> refs = holderRefs.forClient(clientId);
     List<Holder> holders = new ArrayList<>();
     for (User user : userRepository.findAllById(members)) {

@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -58,49 +59,58 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ExchangeRefineryStoreLines {
 
-  private final ExchangeRefineryMaterials materials;
   private final ExchangeLocationResolver locationResolver;
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final ExchangeStoreChoices storeChoices;
 
   /**
-   * Resolves the store lines of every op, every material in one resolver call.
+   * Resolves the store lines of every op.
    *
    * @param caller the client and member
    * @param ops the ops
+   * @param materials every line's material by reference, resolved once for the change set
    * @return per op the resolved lines, empty for an op without lines, or the refusal of its first
    *     refused line
    * @throws BadRequestException when a line's amount rounds to zero
    */
   @NotNull
   @Unmodifiable
-  List<Lines> resolve(@NotNull ExchangeCaller caller, @NotNull List<Op> ops) {
+  List<Lines> resolve(
+      @NotNull ExchangeCaller caller,
+      @NotNull List<Op> ops,
+      @NotNull Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> materials) {
     if (ops.stream().allMatch(op -> linesOf(op).isEmpty())) {
       return ops.stream().map(_ -> Lines.NONE).toList();
     }
-    Context context =
-        new Context(
-            materials.resolve(
-                ops.stream().flatMap(op -> linesOf(op).stream()).map(StoreLine::material).toList()),
-            storeChoices.receivers(caller),
-            new HashMap<>());
+    Context context = new Context(materials, storeChoices.receivers(caller), new HashMap<>());
     return ops.stream().map(op -> lines(op, context)).toList();
   }
 
   /**
-   * Refuses a pickup's store lines an order cannot take: a stored order, or a line whose material
-   * is none of the order's outputs (REQ-XCH-053).
+   * The materials an op's store lines name.
+   *
+   * @param op the op
+   * @return a pickup's line materials, empty for every other op
+   */
+  static @NotNull List<ExchangeItemRef> materialsOf(@NotNull Op op) {
+    return linesOf(op).stream().map(StoreLine::material).toList();
+  }
+
+  /**
+   * Refuses a pickup's store lines an order cannot take (REQ-XCH-053): an order that is completed
+   * or stored, whose yield counts as handled as in the web's store, or a line whose material is
+   * none of the order's outputs.
    *
    * @param order the order as the earlier ops left it
    * @param lines the resolved store lines
    * @return the refusal, or {@code null} when every line fits or there is none
    */
   static @Nullable Outcome refusalFor(
-      @NotNull ExchangeRefineryOrderView order, @NotNull List<RefineryExchangeStoreLine> lines) {
+      @NotNull ExchangeRefineryOrderState order, @NotNull List<RefineryExchangeStoreLine> lines) {
     if (lines.isEmpty()) {
       return null;
     }
-    if (order.stored()) {
+    if (order.stored() || order.status() == RefineryOrderStatus.COMPLETED) {
       return Outcome.rejected(ExchangeRefineryReasons.ORDER_STORED);
     }
     Set<UUID> outputs = order.outputs();
@@ -125,20 +135,18 @@ public class ExchangeRefineryStoreLines {
       if (material == null) {
         return new Lines(List.of(), match.refusal());
       }
-      String unit =
-          material.getQuantityType() == QuantityType.PIECE
-              ? QuantityType.PIECE.name()
-              : QuantityType.SCU.name();
-      if (!unit.equals(line.quantity().unit())) {
-        return Lines.refused(ExchangeStockWriteService.UNIT_MISMATCH);
+      QuantityType unit =
+          material.getQuantityType() == QuantityType.PIECE ? QuantityType.PIECE : QuantityType.SCU;
+      if (!unit.name().equals(line.quantity().unit())) {
+        return Lines.refused(ExchangeReasons.UNIT_MISMATCH);
       }
-      BigDecimal amount = ExchangeOps.round(line.quantity().amount(), unit);
+      BigDecimal amount = ExchangeOps.round(line.quantity().amount(), unit.name());
       if (amount.signum() <= 0) {
         throw new BadRequestException("A store line's quantity rounds to zero");
       }
       Optional<Location> location = locationResolver.resolve(line.location());
       if (location.isEmpty() || !OfferedLocations.isOffered(location.get())) {
-        return Lines.refused(ExchangeRefineryReasons.LOCATION_UNKNOWN);
+        return Lines.refused(ExchangeReasons.LOCATION_UNKNOWN);
       }
       UUID receiver = context.receivers().resolve(line.receiver());
       if (receiver == null) {
@@ -150,7 +158,7 @@ public class ExchangeRefineryStoreLines {
               .computeIfAbsent(receiver, membershipQueryService::findDirectMembershipOrgUnitIds);
       UUID orgUnit = unit(line, memberships, context.receivers().units());
       if (orgUnit == null && (line.orgUnit() != null || memberships.size() > 1)) {
-        return Lines.refused(ExchangeRefineryReasons.ORG_UNIT_NOT_ALLOWED);
+        return Lines.refused(ExchangeReasons.ORG_UNIT_NOT_ALLOWED);
       }
       UUID jobOrder = null;
       if (line.jobOrder() != null) {
@@ -165,6 +173,7 @@ public class ExchangeRefineryStoreLines {
               location.get().getId(),
               line.quality(),
               amount.doubleValue(),
+              unit,
               receiver,
               orgUnit,
               Boolean.TRUE.equals(line.personal()),

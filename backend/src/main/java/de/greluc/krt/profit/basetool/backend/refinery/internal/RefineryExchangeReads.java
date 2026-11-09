@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.util.Collection;
 import java.util.Comparator;
@@ -39,6 +40,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -93,12 +95,29 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
   }
 
   /**
-   * Maps an order with its loaded graph.
+   * Reads an order as the exchange serves it: its section counters, its provenance, the end of its
+   * run derived from its start and length, and every good with both materials, ordered by id.
    *
-   * @param order the order
-   * @return the exchange row with its section counters and provenance
+   * @param order the order with its graph reachable
+   * @return the exchange row
    */
   static @NotNull RefineryExchangeOrder toRow(@NotNull RefineryOrder order) {
+    return toRow(
+        order,
+        order.getGoods().stream()
+            .sorted(Comparator.comparing(good -> String.valueOf(good.getId())))
+            .toList());
+  }
+
+  /**
+   * Reads an order as {@link #toRow(RefineryOrder)} does, its goods in the given order.
+   *
+   * @param order the order with its graph reachable
+   * @param goods the order's goods in the order the row lists them
+   * @return the exchange row
+   */
+  static @NotNull RefineryExchangeOrder toRow(
+      @NotNull RefineryOrder order, @NotNull List<RefineryGood> goods) {
     RefiningMethod method = order.getRefiningMethod();
     OrgUnit unit = order.getOwningOrgUnit();
     RefineryOrderProvenance provenance = order.getProvenance();
@@ -114,7 +133,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
             : new RefineryExchangeOrder.Method(method.getId(), method.getCode(), method.getName()),
         order.getStartedAt(),
         order.getDurationMinutes(),
-        order.getEndsAt(),
+        RefineryExchangeRules.endsAt(order.getStartedAt(), order.getDurationMinutes()),
         provenance.getPickedUpAt(),
         order.getStoredAt(),
         order.getExpenses(),
@@ -122,14 +141,35 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
         order.getOreSales(),
         order.getMissionId(),
         unit == null ? null : unit.getId(),
-        order.getGoods().stream()
+        goods.stream()
+            .filter(RefineryExchangeReads::served)
             .map(RefineryExchangeReads::good)
-            .sorted(Comparator.comparing(good -> good.id().toString()))
             .toList());
   }
 
   /**
-   * Maps the refinery's location.
+   * Whether the exchange serves a good: one that names both its input and its output material. A
+   * good stored without them is neither served nor removed by an exchange write.
+   *
+   * @param good the good
+   * @return {@code true} when both materials are set
+   */
+  static boolean served(@NotNull RefineryGood good) {
+    return good.getInputMaterial() != null && good.getOutputMaterial() != null;
+  }
+
+  /**
+   * Reads a good's quantity or quality as the exchange serves it.
+   *
+   * @param value the stored value, {@code null} in a good stored without it
+   * @return the value, 0 for none
+   */
+  static int units(@Nullable Integer value) {
+    return value == null ? 0 : value;
+  }
+
+  /**
+   * Reads the refinery's location with the UEX ids of its city and space station.
    *
    * @param location the location with its city and space station loaded
    * @return the place
@@ -145,9 +185,10 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
   }
 
   /**
-   * Maps a good.
+   * Reads a served good with the names of its materials; a quantity or quality stored as none reads
+   * as 0.
    *
-   * @param good the good with its materials loaded
+   * @param good the good with both materials loaded
    * @return the good's row
    */
   private static @NotNull RefineryExchangeOrder.Good good(@NotNull RefineryGood good) {
@@ -155,10 +196,10 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
         good.getId(),
         good.getInputMaterial().getId(),
         good.getInputMaterial().getName(),
-        good.getInputQuantity(),
+        units(good.getInputQuantity()),
         good.getOutputMaterial().getId(),
         good.getOutputMaterial().getName(),
-        good.getOutputQuantity(),
-        good.getQuality());
+        units(good.getOutputQuantity()),
+        units(good.getQuality()));
   }
 }

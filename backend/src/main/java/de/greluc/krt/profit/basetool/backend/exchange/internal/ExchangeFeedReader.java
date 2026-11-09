@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,9 @@ public class ExchangeFeedReader {
   /** The page size when the client names none. */
   public static final int DEFAULT_LIMIT = 500;
 
+  /** The id before every row, which starts a snapshot. */
+  private static final UUID FIRST = new UUID(0, 0);
+
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeInstallationRepository installationRepository;
   private final ExchangeChangeRetentionService retentionService;
@@ -62,6 +66,61 @@ public class ExchangeFeedReader {
    */
   public static int pageSize(int limit) {
     return Math.clamp(limit, 1, MAX_LIMIT);
+  }
+
+  /**
+   * Answers one page of a resource whose snapshot pages by row id and then hands over to the feed:
+   * without a cursor the first page of a new snapshot, with a snapshot cursor its next page, with a
+   * feed cursor the changes after it.
+   *
+   * @param cursor the cursor the client echoed, or {@code null} for a new snapshot
+   * @param limit the requested page size
+   * @param snapshot reads a snapshot page
+   * @param feed reads a feed page
+   * @param <P> the resource's page
+   * @return the page
+   * @throws ExchangeProblemException {@code 410 CURSOR_EXPIRED} for a cursor older than the
+   *     retained changes or not issued by the server
+   */
+  public <P> @NotNull P answer(
+      @Nullable String cursor,
+      int limit,
+      @NotNull SnapshotPage<P> snapshot,
+      @NotNull FeedPage<P> feed) {
+    int size = pageSize(limit);
+    if (cursor == null) {
+      return snapshot.read(snapshotStart(), FIRST, size);
+    }
+    ExchangeFeedCursor position = resume(cursor);
+    UUID afterId = position.afterId();
+    return afterId != null
+        ? snapshot.read(position.position(), afterId, size)
+        : feed.read(position.position(), size);
+  }
+
+  /**
+   * Cuts a snapshot page from rows read one beyond it and positions the next page: the snapshot's
+   * next row, or the feed at the snapshot's position once the snapshot is through.
+   *
+   * @param rows the rows, at most one more than the page
+   * @param size the page size
+   * @param at the feed position the snapshot was taken at
+   * @param id a row's id
+   * @param <T> the row
+   * @return the page's rows and the next cursor
+   */
+  public static <T> @NotNull Slice<T> slice(
+      @NotNull List<T> rows,
+      int size,
+      @NotNull ExchangeFeedPosition at,
+      @NotNull Function<T, UUID> id) {
+    boolean more = rows.size() > size;
+    List<T> delivered = more ? rows.subList(0, size) : rows;
+    String next =
+        more
+            ? ExchangeFeedCursor.snapshot(at, id.apply(delivered.getLast())).format()
+            : ExchangeFeedCursor.feed(at).format();
+    return new Slice<>(List.copyOf(delivered), next, more);
   }
 
   /**
@@ -283,4 +342,54 @@ public class ExchangeFeedReader {
    * @param by who, as the tombstone names it
    */
   public record Removal(@NotNull Instant at, @NotNull ExchangeRemovedByDto by) {}
+
+  /**
+   * Reads one snapshot page of a resource.
+   *
+   * @param <P> the resource's page
+   */
+  @FunctionalInterface
+  public interface SnapshotPage<P> {
+
+    /**
+     * Reads the page.
+     *
+     * @param at the feed position the snapshot was taken at
+     * @param afterId the last row delivered, the zero id for the first page
+     * @param size the page size
+     * @return the page
+     */
+    @NotNull
+    P read(@NotNull ExchangeFeedPosition at, @NotNull UUID afterId, int size);
+  }
+
+  /**
+   * Reads one feed page of a resource.
+   *
+   * @param <P> the resource's page
+   */
+  @FunctionalInterface
+  public interface FeedPage<P> {
+
+    /**
+     * Reads the page.
+     *
+     * @param after the last change delivered
+     * @param size the page size
+     * @return the page
+     */
+    @NotNull
+    P read(@NotNull ExchangeFeedPosition after, int size);
+  }
+
+  /**
+   * One snapshot page's rows and the cursor of the next page.
+   *
+   * @param items the rows
+   * @param next the next cursor
+   * @param more whether the snapshot has more rows
+   * @param <T> the row
+   */
+  public record Slice<T>(
+      @NotNull @Unmodifiable List<T> items, @NotNull String next, boolean more) {}
 }

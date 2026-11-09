@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -62,7 +63,8 @@ public class ExchangeRefineryOrderReferences {
   private final ExchangeRefineryStoreLines storeLines;
 
   /**
-   * Resolves the references of every op, every input material in one resolver call.
+   * Resolves the references of every op, every material an input or a store line names in one
+   * resolver call and one read.
    *
    * @param caller the caller, whose memberships a create's unit must be among
    * @param ops the ops
@@ -73,12 +75,17 @@ public class ExchangeRefineryOrderReferences {
   public @NotNull @Unmodifiable List<Refs> resolve(
       @NotNull ExchangeCaller caller, @NotNull List<Op> ops) {
     Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> inputs =
-        materials.resolve(ops.stream().flatMap(op -> inputs(op).stream()).toList());
+        materials.resolve(
+            ops.stream()
+                .flatMap(op ->
+                    Stream.concat(
+                        inputs(op).stream(), ExchangeRefineryStoreLines.materialsOf(op).stream()))
+                .toList());
     Set<UUID> memberships =
         ops.stream().anyMatch(op -> op.kind() == ExchangeRefineryOrderChangeSet.Kind.CREATE)
             ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
             : Set.of();
-    List<ExchangeRefineryStoreLines.Lines> lines = storeLines.resolve(caller, ops);
+    List<ExchangeRefineryStoreLines.Lines> lines = storeLines.resolve(caller, ops, inputs);
     List<Refs> refs = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeRefineryStoreLines.Lines opLines = lines.get(i);
@@ -103,18 +110,16 @@ public class ExchangeRefineryOrderReferences {
       @NotNull Op op,
       @NotNull Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> resolved,
       @NotNull Set<UUID> memberships) {
-    UUID location = null;
-    boolean offered = false;
+    Location location = null;
     if (op.location() != null) {
       Optional<Location> found = locationResolver.resolve(op.location());
       if (found.isEmpty()) {
-        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.LOCATION_UNKNOWN));
+        return Refs.refused(Outcome.rejected(ExchangeReasons.LOCATION_UNKNOWN));
       }
       if (!RefineryExchangeRules.hostsRefinery(found.get())) {
         return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.NOT_A_REFINERY));
       }
-      location = found.get().getId();
-      offered = OfferedLocations.isOffered(found.get());
+      location = found.get();
     }
     UUID method = null;
     if (op.method() != null) {
@@ -142,13 +147,14 @@ public class ExchangeRefineryOrderReferences {
     if (op.orgUnit() != null) {
       orgUnit = ExchangeIds.parse(op.orgUnit().id());
       if (orgUnit == null || !memberships.contains(orgUnit)) {
-        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.NOT_A_MEMBER));
+        return Refs.refused(Outcome.rejected(ExchangeReasons.NOT_A_MEMBER));
       }
     }
     return new Refs(
         null,
-        location,
-        offered,
+        location == null ? null : location.getId(),
+        location == null ? null : location.getName(),
+        location != null && OfferedLocations.isOffered(location),
         method,
         orgUnit,
         List.copyOf(inputs),
@@ -166,8 +172,7 @@ public class ExchangeRefineryOrderReferences {
     if (ref.code() != null) {
       List<RefiningMethod> byCode = refiningMethodRepository.findAllByCode(ref.code());
       if (byCode.size() > 1) {
-        return new MethodMatch(
-            null, new Outcome(ExchangeOps.AMBIGUOUS, ExchangeRefineryReasons.AMBIGUOUS));
+        return new MethodMatch(null, new Outcome(ExchangeOps.AMBIGUOUS, ExchangeReasons.AMBIGUOUS));
       }
       if (byCode.size() == 1) {
         return new MethodMatch(byCode.getFirst().getId(), null);
@@ -179,8 +184,7 @@ public class ExchangeRefineryOrderReferences {
         return new MethodMatch(byName.get().getId(), null);
       }
     }
-    return new MethodMatch(
-        null, new Outcome(ExchangeOps.UNMATCHED, ExchangeRefineryReasons.UNMATCHED));
+    return new MethodMatch(null, new Outcome(ExchangeOps.UNMATCHED, ExchangeReasons.UNMATCHED));
   }
 
   /**
@@ -206,6 +210,7 @@ public class ExchangeRefineryOrderReferences {
    *
    * @param refusal the refusal the references lead to, or {@code null}
    * @param location the location, or {@code null} when the op names none
+   * @param locationName the location's name, or {@code null} when the op names none
    * @param locationOffered whether the location is one the web's picker offers
    * @param method the refining method, or {@code null} when the op names none
    * @param orgUnit the owning unit of a create, or {@code null}
@@ -216,6 +221,7 @@ public class ExchangeRefineryOrderReferences {
   record Refs(
       @Nullable Outcome refusal,
       @Nullable UUID location,
+      @Nullable String locationName,
       boolean locationOffered,
       @Nullable UUID method,
       @Nullable UUID orgUnit,
@@ -232,7 +238,15 @@ public class ExchangeRefineryOrderReferences {
     @NotNull
     Refs withLines(@NotNull @Unmodifiable List<RefineryExchangeStoreLine> storeLines) {
       return new Refs(
-          refusal, location, locationOffered, method, orgUnit, inputs, outputs, storeLines);
+          refusal,
+          location,
+          locationName,
+          locationOffered,
+          method,
+          orgUnit,
+          inputs,
+          outputs,
+          storeLines);
     }
 
     /**
@@ -242,7 +256,7 @@ public class ExchangeRefineryOrderReferences {
      * @return the references
      */
     static @NotNull Refs refused(@NotNull Outcome refusal) {
-      return new Refs(refusal, null, false, null, null, List.of(), Map.of(), List.of());
+      return new Refs(refusal, null, null, false, null, null, List.of(), Map.of(), List.of());
     }
   }
 

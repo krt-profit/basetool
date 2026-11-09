@@ -96,6 +96,32 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Optional<RefineryOrder> lockById(@Param("id") UUID id);
 
   /**
+   * Loads one of a member's orders and row-locks it until the transaction ends; an order of another
+   * member is neither returned nor locked (REQ-XCH-052).
+   *
+   * @param id the order id
+   * @param owner the member
+   * @return the locked order, or empty when the member owns none of that id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.id = :id AND r.owner.id = :owner")
+  Optional<RefineryOrder> lockOwnedById(@Param("id") UUID id, @Param("owner") UUID owner);
+
+  /**
+   * Row-locks a member's orders among the given ids in ascending id order, so two writers over
+   * overlapping orders queue instead of deadlocking; an order of another member is neither returned
+   * nor locked (REQ-XCH-052).
+   *
+   * @param owner the member
+   * @param ids the order ids
+   * @return the member's orders among them, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.owner.id = :owner AND r.id IN :ids ORDER BY r.id")
+  List<RefineryOrder> lockOwnedByIdsOrderById(
+      @Param("owner") UUID owner, @Param("ids") Collection<UUID> ids);
+
+  /**
    * Counts refinery orders in the given lifecycle status, backing the {@code
    * basetool_refinery_order_open_*} queue-depth gauge (REQ-OBS-011).
    *

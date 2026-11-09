@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -60,9 +59,6 @@ public record RefineryOrderListDto(
    */
   @Nullable
   public Instant getEndsAt() {
-    if (startedAt != null && durationMinutes != null) {
-      return startedAt.plus(durationMinutes, ChronoUnit.MINUTES);
-    }
-    return null;
+    return RefineryExchangeRules.endsAt(startedAt, durationMinutes);
   }
 }

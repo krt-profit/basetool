@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
@@ -30,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeRequestDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppMassChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
@@ -40,10 +43,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLiveSync;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLocationResolver;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMassChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderKeys;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderLinkRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoService;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -51,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -60,7 +66,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +87,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -99,6 +113,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   @Autowired private ExchangeMassChangeService massChangeService;
   @Autowired private ExchangeRefineryOrderKeys refineryOrderKeys;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private PlatformTransactionManager transactionManager;
   @MockitoSpyBean private ExchangeLiveSync liveSync;
 
   /** Spied by the same name as in the other exchange write tests, so they share one context. */
@@ -482,16 +497,19 @@ class ExchangeRefineryOrderWriteControllerTest {
     UUID id = foreignOrder();
     jdbc.update("UPDATE refinery_order SET owner_id = ? WHERE id = ?", member, id);
     UUID good = UUID.randomUUID();
-    jdbc.update(
-        """
-        INSERT INTO refinery_good (id, version, input_material_id, input_quantity,
-                                   output_material_id, output_quantity, quality, refinery_order_id)
-        VALUES (?, 0, ?, 300, ?, 200, 500, ?)
-        """,
-        good,
-        ore,
-        refined,
-        id);
+    for (UUID row : List.of(good, UUID.randomUUID())) {
+      jdbc.update(
+          """
+          INSERT INTO refinery_good (id, version, input_material_id, input_quantity,
+                                     output_material_id, output_quantity, quality,
+                                     refinery_order_id)
+          VALUES (?, 0, ?, 300, ?, 200, 500, ?)
+          """,
+          row,
+          ore,
+          refined,
+          id);
+    }
     Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
     changes(
             client,
@@ -1101,6 +1119,374 @@ class ExchangeRefineryOrderWriteControllerTest {
         .containsExactlyInAnyOrder(announced, existing);
   }
 
+  @Test
+  void twoRefsToOneMaterialResolveAndACreateNamesItsNewGoodsInTheOrderItListsThem()
+      throws Exception {
+    String byName =
+        "{\"input\": {\"bt\": \""
+            + ore
+            + "\", \"name\": \"Quantainium "
+            + ore
+            + "\"}, \"inputQuantity\": 300, \"outputQuantity\": 200, \"quality\": 700}";
+
+    String body =
+        changes(
+                client,
+                createWith("m-1", refineryRef(), unit, "[" + good(500, 400) + "," + byName + "]")
+                    + ","
+                    + createWith(
+                        "m-2",
+                        refineryRef(),
+                        unit,
+                        "["
+                            + good(100, 90)
+                            + ","
+                            + good(200, 150)
+                            + ","
+                            + good(300, 250)
+                            + ","
+                            + good(400, 350)
+                            + "]"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(2))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(inputQuantities(JsonPath.read(body, "$.orders[0].goods"))).containsExactly(500, 300);
+    assertThat(inputQuantities(JsonPath.read(body, "$.orders[1].goods")))
+        .containsExactly(100, 200, 300, 400);
+  }
+
+  @Test
+  void aCreateWithoutGoodsAndARemovalOfAnOrdersLastGoodAreGoodsRequired() throws Exception {
+    String created = changes(client, create("g-1")).andReturn().getResponse().getContentAsString();
+    String id = JsonPath.read(created, "$.orders[0].id");
+    String good = JsonPath.read(created, "$.orders[0].goods[0]");
+
+    changes(
+            client,
+            createWith("g-2", refineryRef(), unit, null)
+                + ","
+                + createWith("g-3", refineryRef(), unit, "[]")
+                + ",{\"op\": \"good-remove\", \"id\": \""
+                + id
+                + "\", \"versions\": {\"gameData\": 0}, \"goodId\": \""
+                + good
+                + "\"}")
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("GOODS_REQUIRED"))
+        .andExpect(jsonPath("$.results[1].reason").value("GOODS_REQUIRED"))
+        .andExpect(jsonPath("$.results[2].reason").value("GOODS_REQUIRED"));
+
+    assertThat(ownedOrders()).isEqualTo(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM refinery_good WHERE id = ?",
+                Integer.class,
+                UUID.fromString(good)))
+        .isEqualTo(1);
+  }
+
+  @Test
+  void anotherMembersOrderIsNeverLockedSoItsOwnersConcurrentEditDoesNotHoldUpTheSet()
+      throws Exception {
+    UUID theirs = foreignOrder();
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    Thread owner =
+        new Thread(() ->
+            new TransactionTemplate(transactionManager)
+                .executeWithoutResult(_ -> {
+                  jdbc.queryForList(
+                      "SELECT id FROM refinery_order WHERE id = ? FOR UPDATE", theirs);
+                  locked.countDown();
+                  awaitQuietly(release);
+                }));
+    owner.start();
+    try {
+      assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+      assertTimeoutPreemptively(
+          Duration.ofSeconds(10),
+          () ->
+              changes(
+                      client,
+                      "{\"op\": \"update\", \"id\": \""
+                          + theirs
+                          + "\", \"versions\": {\"finances\": 0}, \"expenses\": 10},"
+                          + cancel(theirs, 0)
+                          + ","
+                          + delete(theirs))
+                  .andExpect(status().isOk())
+                  .andExpect(jsonPath("$.applied").value(0))
+                  .andExpect(jsonPath("$.results[0].reason").value("ORDER_UNKNOWN"))
+                  .andExpect(jsonPath("$.results[1].reason").value("ORDER_UNKNOWN"))
+                  .andExpect(jsonPath("$.results[2].reason").value("ORDER_UNKNOWN")));
+    } finally {
+      release.countDown();
+      owner.join(30_000);
+    }
+    assertThat(statusOf(theirs)).isEqualTo("OPEN");
+  }
+
+  @Test
+  void aCreateWaitsForAConcurrentCreateUnderItsKeyAndThenNamesThatOrder() throws Exception {
+    UUID theirs = UUID.randomUUID();
+    CountDownLatch locked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    Thread concurrent =
+        new Thread(() ->
+            new TransactionTemplate(transactionManager)
+                .executeWithoutResult(_ -> {
+                  jdbc.queryForList(
+                      "SELECT pg_advisory_xact_lock(?, hashtext(CAST(? AS text) || '|' || ?"
+                          + " || '|' || ?))",
+                      ExchangeRefineryOrderLinkRepository.KEY_LOCK_SPACE,
+                      member,
+                      client,
+                      "k-race");
+                  locked.countDown();
+                  awaitQuietly(release);
+                  jdbc.update(
+                      "INSERT INTO refinery_order (id, version, owner_id, location_id, status,"
+                          + " last_changed_at) VALUES (?, 0, ?, ?, 'OPEN', now())",
+                      theirs,
+                      member,
+                      refinery);
+                  jdbc.update(
+                      "INSERT INTO exchange_refinery_order_link (id, user_id, client_id,"
+                          + " client_key, refinery_order_id) VALUES (?, ?, ?, 'k-race', ?)",
+                      UUID.randomUUID(),
+                      member,
+                      client,
+                      theirs);
+                }));
+    concurrent.start();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+      Future<String> result =
+          executor.submit(() ->
+              changes(client, create("k-race")).andReturn().getResponse().getContentAsString());
+      assertTimeoutPreemptively(
+          Duration.ofSeconds(10),
+          () -> {
+            while (jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted",
+                    Integer.class)
+                == 0) {
+              Thread.onSpinWait();
+            }
+          });
+      release.countDown();
+      String body = result.get(30, TimeUnit.SECONDS);
+      assertThat(JsonPath.<Integer>read(body, "$.applied")).isZero();
+      assertThat(JsonPath.<String>read(body, "$.results[0].reason")).isEqualTo("ALREADY_EXISTS");
+      assertThat(JsonPath.<String>read(body, "$.results[0].id")).isEqualTo(theirs.toString());
+    } finally {
+      release.countDown();
+      concurrent.join(30_000);
+      executor.shutdownNow();
+    }
+    assertThat(ownedOrders()).isEqualTo(1);
+  }
+
+  @Test
+  void aRunLongerThanAYearIsMalformed() throws Exception {
+    UUID id = ownOrder();
+    String update =
+        "{\"op\": \"update\", \"id\": \""
+            + id
+            + "\", \"versions\": {\"gameData\": 0}, \"endsAt\": \"2030-01-01T12:00:00Z\","
+            + " \"durationMinutes\": %d}";
+
+    changes(client, update.formatted(ExchangeRefineryOrderChangeSet.MAX_DURATION_MINUTES + 1))
+        .andExpect(status().isBadRequest());
+    changes(client, update.formatted(ExchangeRefineryOrderChangeSet.MAX_DURATION_MINUTES))
+        .andExpect(jsonPath("$.applied").value(1));
+  }
+
+  @Test
+  void fieldsAnOpKindDoesNotUseAreIgnored() throws Exception {
+    UUID id = ownOrder();
+
+    changes(
+            client,
+            "{\"op\": \"update\", \"id\": \""
+                + id
+                + "\", \"versions\": {\"finances\": 0}, \"expenses\": 10, \"orgUnit\": {\"id\": \""
+                + foreignUnit
+                + "\"}, \"goodId\": \"x\"},"
+                + "{\"op\": \"pickup\", \"id\": \""
+                + id
+                + "\", \"versions\": {\"gameData\": 0}, \"location\": {\"name\": \"Lorville Gate "
+                + plainPlace
+                + "\"}, \"durationMinutes\": 90, \"method\": {\"code\": \"NO-SUCH-CODE\"}}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+
+    assertThat(statusOf(id)).isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void deletesThatRemoveNothingNeverHoldTheSetBack() throws Exception {
+    for (int i = 0; i < 6; i++) {
+      ownOrder();
+    }
+    String deletes =
+        String.join(",", IntStream.range(0, 6).mapToObj(_ -> delete(UUID.randomUUID())).toList());
+
+    changes(client, deletes)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[5].reason").value("ORDER_UNKNOWN"));
+  }
+
+  @Test
+  void aSecondCreateUnderTheKeyOfARefusedOneIsRefusedAsItsSuccessorNotAsExisting()
+      throws Exception {
+    changes(
+            client,
+            createWith("x-1", refineryRef(), foreignUnit, "[" + good(500, 400) + "]")
+                + ","
+                + create("x-1"))
+        .andExpect(jsonPath("$.results[0].reason").value("NOT_A_MEMBER"))
+        .andExpect(jsonPath("$.results[1].reason").value("PRECEDING_OP_REJECTED"))
+        .andExpect(jsonPath("$.results[1].id").doesNotExist());
+  }
+
+  @Test
+  void anEndBeyondTheMicrosecondTheDatabaseKeepsIsUnchangedWhenSentAgain() throws Exception {
+    UUID id = ownOrder();
+    String update =
+        "{\"op\": \"update\", \"id\": \""
+            + id
+            + "\", \"versions\": {\"gameData\": %d}, \"endsAt\":"
+            + " \"2030-01-01T12:00:00.123456789Z\", \"durationMinutes\": 90}";
+
+    changes(client, update.formatted(0)).andExpect(jsonPath("$.applied").value(1));
+    changes(client, update.formatted(1)).andExpect(jsonPath("$.unchanged").value(1));
+  }
+
+  @Test
+  void aGoodWhoseInputIsNoLongerRefinableStaysWritableInTheDryRunAndTheRealRunAlike()
+      throws Exception {
+    String created = changes(client, create("r-1")).andReturn().getResponse().getContentAsString();
+    String id = JsonPath.read(created, "$.orders[0].id");
+    String good = JsonPath.read(created, "$.orders[0].goods[0]");
+    jdbc.update("UPDATE material SET type = 'REFINED' WHERE id = ?", ore);
+    String update =
+        "{\"op\": \"good-update\", \"id\": \""
+            + id
+            + "\", \"versions\": {\"gameData\": 0}, \"goodId\": \""
+            + good
+            + "\", \"outputQuantity\": 350}";
+
+    changes(client, true, update).andExpect(jsonPath("$.applied").value(1));
+    changes(client, update).andExpect(status().isOk()).andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT output_quantity FROM refinery_good WHERE id = ?",
+                Integer.class,
+                UUID.fromString(good)))
+        .isEqualTo(350);
+  }
+
+  @Test
+  void aGoodStoredWithoutItsYieldQualityOrOutputNeitherBreaksTheFeedNorAWrite() throws Exception {
+    UUID id = ownOrder();
+    UUID legacy = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO refinery_good (id, version, input_material_id, input_quantity,
+                                   output_material_id, output_quantity, quality, refinery_order_id)
+        VALUES (?, 0, ?, 300, NULL, NULL, NULL, ?)
+        """,
+        legacy,
+        ore,
+        id);
+
+    relayed(get(FEED), client)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[?(@.id == '" + id + "')].goods.length()").value(0));
+    changes(
+            client,
+            "{\"op\": \"good-add\", \"id\": \""
+                + id
+                + "\", \"versions\": {\"gameData\": 0}, \"good\": "
+                + good(500, 400)
+                + "}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM refinery_good WHERE refinery_order_id = ?",
+                Integer.class,
+                id))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void aCancelSentAgainWithItsFirstCounterIsUnchanged() throws Exception {
+    UUID id = ownOrder();
+
+    changes(client, cancel(id, 0)).andExpect(jsonPath("$.applied").value(1));
+    changes(client, cancel(id, 0)).andExpect(jsonPath("$.unchanged").value(1));
+  }
+
+  @Test
+  void aStagedSetThatBooksStockNeedsTheStoreCapabilityWhenTheMemberConfirmsIt() throws Exception {
+    UUID id = ownOrder();
+    changes(client, cancel(UUID.randomUUID(), 0)).andExpect(status().isOk());
+    String staged =
+        "{\"ops\": [{\"op\": \"pickup\", \"id\": \""
+            + id
+            + "\", \"versions\": {\"gameData\": 0}, \"lines\": [{\"material\": {\"bt\": \""
+            + refined
+            + "\"}, \"location\": "
+            + refineryRef()
+            + ", \"quality\": 500, \"quantity\": {\"amount\": 1, \"unit\": \"SCU\"}}]}]}";
+    ConnectedAppMassChangeRequestDto request =
+        new ConnectedAppMassChangeRequestDto(client, KEY, "refinery-orders", staged, Instant.now());
+
+    assertThatThrownBy(() -> massChangeService.confirm(member, request))
+        .isInstanceOfSatisfying(
+            ExchangeProblemException.class,
+            problem -> assertThat(problem.code()).isEqualTo("SCOPE_MISSING"));
+    assertThat(statusOf(id)).isEqualTo("OPEN");
+  }
+
+  /**
+   * Reads the input quantities of goods rows in the given order.
+   *
+   * @param goods the rows' ids
+   * @return each row's input quantity
+   */
+  private @NotNull List<Integer> inputQuantities(@NotNull List<String> goods) {
+    return goods.stream()
+        .map(good ->
+            jdbc.queryForObject(
+                "SELECT input_quantity FROM refinery_good WHERE id = ?",
+                Integer.class,
+                UUID.fromString(good)))
+        .toList();
+  }
+
+  /**
+   * Waits for a latch, keeping the thread's interrupt.
+   *
+   * @param latch the latch
+   */
+  private static void awaitQuietly(@NotNull CountDownLatch latch) {
+    try {
+      latch.await(30, TimeUnit.SECONDS);
+    } catch (InterruptedException _) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
   /**
    * Moves every journal entry of the member an hour back, so an undo since a minute ago leaves them
    * out whatever the database clock's drift against the JVM's.
@@ -1172,7 +1558,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   }
 
   /**
-   * A create at the test refinery in the member's unit, running.
+   * A create at the test refinery in the member's unit, running, with one good of the test ore.
    *
    * @param key the client key
    * @return the op
@@ -1184,7 +1570,26 @@ class ExchangeRefineryOrderWriteControllerTest {
         + unit
         + "\"}, \"location\": "
         + refineryRef()
-        + ", \"status\": \"IN_PROGRESS\"}";
+        + ", \"status\": \"IN_PROGRESS\", \"goods\": ["
+        + good(500, 400)
+        + "]}";
+  }
+
+  /**
+   * A good of the test ore at grade 700.
+   *
+   * @param inputQuantity the input amount in units
+   * @param outputQuantity the yield in units
+   * @return the good
+   */
+  private @NotNull String good(int inputQuantity, int outputQuantity) {
+    return "{\"input\": {\"bt\": \""
+        + ore
+        + "\"}, \"inputQuantity\": "
+        + inputQuantity
+        + ", \"outputQuantity\": "
+        + outputQuantity
+        + ", \"quality\": 700}";
   }
 
   /**

@@ -21,7 +21,12 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,13 +53,37 @@ public class ExchangeOrgUnitService {
   public @NotNull ExchangeOrgUnitListDto orgUnits(@NotNull UUID member) {
     return new ExchangeOrgUnitListDto(
         membershipQueryService.listDirectMembershipOptions(member).stream()
-            .map(option ->
-                new ExchangeOrgUnitDto(
-                    option.orgUnitId(),
-                    option.orgUnitName(),
-                    option.orgUnitShorthand(),
-                    option.kind()))
+            .map(ExchangeOrgUnitService::toDto)
             .toList());
+  }
+
+  /**
+   * Lists the direct memberships of several members, in the order {@link #orgUnits(UUID)} gives
+   * each.
+   *
+   * @param members the members
+   * @return each member's org units; a member without a direct membership is absent
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Map<UUID, List<ExchangeOrgUnitDto>> orgUnitsOf(
+      @NotNull Collection<UUID> members) {
+    Map<UUID, List<ExchangeOrgUnitDto>> units = new HashMap<>();
+    membershipQueryService
+        .listDirectMembershipOptionsByUser(members)
+        .forEach((member, options) ->
+            units.put(member, options.stream().map(ExchangeOrgUnitService::toDto).toList()));
+    return units;
+  }
+
+  /**
+   * Reads a membership option as the exchange names an org unit.
+   *
+   * @param option the option
+   * @return the org unit
+   */
+  private static @NotNull ExchangeOrgUnitDto toDto(@NotNull OrgUnitMembershipOptionDto option) {
+    return new ExchangeOrgUnitDto(
+        option.orgUnitId(), option.orgUnitName(), option.orgUnitShorthand(), option.kind());
   }
 
   /**

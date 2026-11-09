@@ -57,9 +57,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeRefineryOrderFeedService {
 
-  /** The id before every order, which starts a snapshot. */
-  private static final UUID FIRST = new UUID(0, 0);
-
   private final RefineryExchangeReader refineryReader;
   private final ExchangeFeedReader feedReader;
   private final LocationRepository locationRepository;
@@ -79,15 +76,11 @@ public class ExchangeRefineryOrderFeedService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeRefineryOrderPageDto page(
       @NotNull ExchangeCaller caller, @Nullable String cursor, int limit) {
-    int size = ExchangeFeedReader.pageSize(limit);
-    if (cursor == null) {
-      return snapshot(caller, feedReader.snapshotStart(), FIRST, size);
-    }
-    ExchangeFeedCursor position = feedReader.resume(cursor);
-    UUID afterId = position.afterId();
-    return afterId != null
-        ? snapshot(caller, position.position(), afterId, size)
-        : feed(caller, position.position(), size);
+    return feedReader.answer(
+        cursor,
+        limit,
+        (at, afterId, size) -> snapshot(caller, at, afterId, size),
+        (after, size) -> feed(caller, after, size));
   }
 
   /**
@@ -104,18 +97,20 @@ public class ExchangeRefineryOrderFeedService {
       @NotNull ExchangeFeedPosition at,
       @NotNull UUID afterId,
       int size) {
-    List<RefineryExchangeOrder> rows =
-        refineryReader.openOrders(caller.member(), afterId, size + 1);
-    boolean more = rows.size() > size;
-    List<RefineryExchangeOrder> delivered = more ? rows.subList(0, size) : rows;
-    String next =
-        more
-            ? ExchangeFeedCursor.snapshot(at, delivered.getLast().id()).format()
-            : ExchangeFeedCursor.feed(at).format();
+    ExchangeFeedReader.Slice<RefineryExchangeOrder> page =
+        ExchangeFeedReader.slice(
+            refineryReader.openOrders(caller.member(), afterId, size + 1),
+            size,
+            at,
+            RefineryExchangeOrder::id);
     References refs =
-        references(caller, delivered.stream().map(RefineryExchangeOrder::id).toList(), delivered);
+        references(
+            caller, page.items().stream().map(RefineryExchangeOrder::id).toList(), page.items());
     return new ExchangeRefineryOrderPageDto(
-        delivered.stream().map(order -> toDto(order, refs)).toList(), List.of(), next, more);
+        page.items().stream().map(order -> toDto(order, refs)).toList(),
+        List.of(),
+        page.next(),
+        page.more());
   }
 
   /**
@@ -227,10 +222,11 @@ public class ExchangeRefineryOrderFeedService {
   }
 
   /**
-   * Maps an order.
+   * Builds an order's feed entry: the caller's own key, the creating client's display name and the
+   * location's starmap GUID from the page's references, names cut to the contract's length.
    *
    * @param order the order
-   * @param refs the page's location GUIDs and client names
+   * @param refs the page's location GUIDs, client names and keys
    * @return the feed entry
    */
   private static @NotNull ExchangeRefineryOrderDto toDto(
@@ -270,7 +266,8 @@ public class ExchangeRefineryOrderFeedService {
   }
 
   /**
-   * Maps a good.
+   * Builds a good's feed entry, its materials as item references with their names cut to the
+   * contract's length.
    *
    * @param good the good
    * @return the feed's good

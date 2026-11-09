@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,9 +38,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Keeps the client keys of refinery orders ({@link ExchangeRefineryOrderLink}) in step with the
- * orders: the undo gives a recreated order its key back and frees the key of an order it removes,
- * the account merge keeps the key of an order that still exists, and the retention deletes a link
- * nothing refers to any more (REQ-XCH-052, REQ-XCH-056).
+ * orders: a create under a key is serialised and links its order, the undo gives a recreated order
+ * its key back and frees the key of an order it removes, the account merge keeps the key of an
+ * order that still exists, and the retention deletes a link nothing refers to any more
+ * (REQ-XCH-052, REQ-XCH-056).
  */
 @Component
 @RequiredArgsConstructor
@@ -50,6 +53,66 @@ public class ExchangeRefineryOrderKeys {
   private final ExchangeRefineryOrderLinkRepository linkRepository;
   private final RefineryExchangeReader reader;
   private final Clock clock = Clock.systemUTC();
+
+  /**
+   * Takes the transaction's locks on the keys a change set creates under, in ascending order, so a
+   * concurrent create under one key waits until this transaction ends and then finds its order.
+   *
+   * @param member the member
+   * @param clientId the client
+   * @param keys the keys
+   */
+  void lockForCreates(
+      @NotNull UUID member, @NotNull String clientId, @NotNull Collection<String> keys) {
+    keys.stream().distinct().sorted().forEach(key -> linkRepository.lockKey(member, clientId, key));
+  }
+
+  /**
+   * Reads which orders the given keys name now.
+   *
+   * @param member the member
+   * @param clientId the client
+   * @param keys the keys
+   * @return the order each key's live link names; a key without one is absent
+   */
+  @NotNull
+  Map<String, UUID> named(
+      @NotNull UUID member, @NotNull String clientId, @NotNull Collection<String> keys) {
+    if (keys.isEmpty()) {
+      return Map.of();
+    }
+    return linkRepository
+        .findByUserIdAndClientIdAndClientKeyInAndRetiredAtIsNull(member, clientId, keys)
+        .stream()
+        .collect(
+            Collectors.toMap(
+                ExchangeRefineryOrderLink::getClientKey,
+                ExchangeRefineryOrderLink::getRefineryOrderId));
+  }
+
+  /**
+   * Gives an order a client created its key. A live link of the key whose order is gone is retired
+   * first, so its tombstone keeps naming it.
+   *
+   * @param member the member
+   * @param clientId the client
+   * @param key the client's key
+   * @param orderId the created order
+   * @param at when the client created it
+   * @param taken whether a live link of the key exists
+   */
+  void link(
+      @NotNull UUID member,
+      @NotNull String clientId,
+      @NotNull String key,
+      @NotNull UUID orderId,
+      @NotNull Instant at,
+      boolean taken) {
+    if (taken) {
+      linkRepository.retireKey(member, clientId, key, at);
+    }
+    linkRepository.insert(UUID.randomUUID(), member, clientId, key, orderId, at);
+  }
 
   /**
    * Lets the key of an order the undo recreated name it again when a later create took the key

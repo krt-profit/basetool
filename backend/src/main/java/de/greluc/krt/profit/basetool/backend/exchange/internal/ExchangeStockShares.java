@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExchangeStockShares {
 
   /** The refusal of a share into a unit the member is not a direct member of. */
-  static final String NOT_A_MEMBER = "NOT_A_MEMBER";
+  static final String NOT_A_MEMBER = ExchangeReasons.NOT_A_MEMBER;
 
   /** The refusal of a rebooking of more than the amount the client last saw at its source. */
   static final String QUANTITY_ABOVE_EXPECTED = "QUANTITY_ABOVE_EXPECTED";

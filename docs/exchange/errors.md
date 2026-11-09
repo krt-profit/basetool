@@ -62,6 +62,7 @@ codes, whichever side refuses it.
 | `BANK_SELF_TRANSFER` | 409 | backend | A bank transfer names its source as its destination. | Fix the destination. |
 | `BANK_REQUEST_NOT_PENDING` | 409 | backend | The bank request was decided or cancelled already. | Read the own requests again; do not retry. |
 | `BANK_REQUEST_ALREADY_APPROVED` | 409 | backend | The bank request was approved and can no longer be corrected. | Cancel it and raise a new one, if the member wants. |
+| `PESSIMISTIC_LOCK` | 409 | backend | Another write held an entry the change set needs, so the set could not start; nothing was applied. | Retry the same change set after a short wait. |
 | `MASS_CHANGE_CONFIRMATION_REQUIRED` | 409 | backend | The batch exceeds the mass-change guard; it is staged. An identical resend while it waits gets the same `confirmationUrl`. | Show the member `confirmationUrl`; do not retry the batch. |
 | `RATE_LIMITED` | 429 | gateway | A limit per minute or per hour is exhausted: per client and member, per client, per source IP address, or the hourly account check ([limits](sync-guide.md#rate-limits-quota-and-back-off)). | Honour `Retry-After`. |
 | `QUOTA_EXCEEDED` | 429 | gateway | The daily write quota is exhausted; an org-stock change set counts each of its ops and is refused as a whole when they do not all fit. | Retry after `Retry-After`, the next day at the latest. |
@@ -100,9 +101,10 @@ codes, whichever side refuses it.
 | `MATERIAL_NOT_RAW` | A refinery good's input is not a raw material. | Send the raw material the good refines. |
 | `ORDER_UNKNOWN` | A refinery-order op names no order of the member: an unknown `id`, another owner's order, or a `clientKey` your client never set. | Pull the feed; drop the order locally when it is gone. |
 | `GOOD_UNKNOWN` | A refinery-order `good-update` or `good-remove` names a `goodId` that is not a good of the order. | Pull the feed and use the good ids it shows. |
-| `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
-| `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
-| `ORDER_STORED` | A refinery-order op changes the status of, deletes or picks up with store lines an order whose yield was booked into stock. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
+| `ALREADY_EXISTS` | A refinery-order `create` carries a `clientKey` an order of the member already has; outside a dry run the result item's `id` names that order. | Adopt the order by that `id`; do not create it again. |
+| `GOODS_REQUIRED` | A refinery-order `create` without goods, or a `good-remove` of the order's last good. | Send the order with at least one good; replace a good with `good-update` instead of removing the last one. |
+| `PRECEDING_OP_REJECTED` | An earlier op of the change set on the same refinery order, or a refused `create` under the same `clientKey`, was not applied, so this one was not tried. | Fix the first refused op, then resend the rest. |
+| `ORDER_STORED` | A refinery-order op changes the status of or deletes an order whose yield was booked into stock, or picks up with store lines an order that is completed or stored. | Do not retry; the status is locked and the order stays. A `cancel` is still possible. |
 | `ORDER_CANCELED` | A refinery-order `pickup` names an order that was cancelled. | Do not retry; pull the feed for the order's status. |
 | `MATERIAL_NOT_AN_OUTPUT` | A store line of a refinery-order `pickup` books a material that is no output of the order's goods. | Book the goods' output materials as the feed shows them. |
 | `RECEIVER_UNKNOWN` | A store line names a receiver who is not among the member's [receivers](resources/store-choices.md#receivers), or a ref that names nobody. | Read the receivers again and let the member pick. |

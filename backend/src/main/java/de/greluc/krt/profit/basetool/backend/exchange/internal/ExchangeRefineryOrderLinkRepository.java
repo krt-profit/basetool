@@ -35,6 +35,68 @@ import org.springframework.stereotype.Repository;
 public interface ExchangeRefineryOrderLinkRepository
     extends JpaRepository<ExchangeRefineryOrderLink, UUID> {
 
+  /** The first key of the two-key advisory locks on client keys, {@code RXCH}; theirs alone. */
+  int KEY_LOCK_SPACE = 0x52584348;
+
+  /**
+   * Takes the lock on one client key of a member, which the transaction holds until it ends, so two
+   * creates under one key decide one after the other (REQ-XCH-052). Keys whose text hashes alike
+   * only wait for each other.
+   *
+   * @param userId the member
+   * @param clientId the client
+   * @param clientKey the client's key
+   * @return always one
+   */
+  @Query(
+      value =
+          "SELECT 1 FROM pg_advisory_xact_lock("
+              + KEY_LOCK_SPACE
+              + ", hashtext(CAST(:userId AS text) || '|' || :clientId || '|' || :clientKey))",
+      nativeQuery = true)
+  int lockKey(
+      @Param("userId") UUID userId,
+      @Param("clientId") String clientId,
+      @Param("clientKey") String clientKey);
+
+  /**
+   * Lists the links of a client's keys for a member that still name their order.
+   *
+   * @param userId the member
+   * @param clientId the client
+   * @param clientKeys the client's keys
+   * @return the links not retired among those keys
+   */
+  List<ExchangeRefineryOrderLink> findByUserIdAndClientIdAndClientKeyInAndRetiredAtIsNull(
+      UUID userId, String clientId, Collection<String> clientKeys);
+
+  /**
+   * Inserts the link of a new order under a key no live link holds, without reading first.
+   *
+   * @param id the link's id
+   * @param userId the member
+   * @param clientId the client
+   * @param clientKey the client's key
+   * @param orderId the order
+   * @param createdAt when the client created the order
+   */
+  @Modifying
+  @Query(
+      value =
+          """
+          INSERT INTO exchange_refinery_order_link
+              (id, user_id, client_id, client_key, refinery_order_id, created_at)
+          VALUES (:id, :userId, :clientId, :clientKey, :orderId, :createdAt)
+          """,
+      nativeQuery = true)
+  void insert(
+      @Param("id") UUID id,
+      @Param("userId") UUID userId,
+      @Param("clientId") String clientId,
+      @Param("clientKey") String clientKey,
+      @Param("orderId") UUID orderId,
+      @Param("createdAt") Instant createdAt);
+
   /**
    * Finds the order a client's key names for a member now.
    *

@@ -106,7 +106,7 @@ public class ExchangeEntryLabels {
           }
         }
         case REFINERY_ORDER -> {
-          String location = text(state, "locationName");
+          String location = state == null ? null : ExchangeRefineryOrderState.locationName(state);
           if (location != null) {
             labels.put(entry.getId(), location);
           }

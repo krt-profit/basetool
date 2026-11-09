@@ -293,6 +293,9 @@ class ExchangeGoldenAnswerTest {
     OVERRIDES.put(
         "POST /api/v1/exchange/me/stock/changes", json(409, "{\"code\":\"OPTIMISTIC_LOCK\"}"));
     OVERRIDES.put("GET /api/v1/exchange/me/ships", json(403, "{\"code\":\"SCOPE_MISSING\"}"));
+    OVERRIDES.put(
+        "POST /api/v1/exchange/me/refinery-orders/changes",
+        json(409, "{\"code\":\"PESSIMISTIC_LOCK\"}"));
     OVERRIDES.put("GET /api/v1/exchange/me/org-demand", json(500, "{\"code\":\"INTERNAL\"}"));
     OVERRIDES.put("GET /api/v1/exchange/catalog/locations", json(200, "{\"items\":[{}]}"));
     OVERRIDES.put(
@@ -300,6 +303,12 @@ class ExchangeGoldenAnswerTest {
     Map<String, Call> refusals = new LinkedHashMap<>();
     refusals.put("refused-stock-changes-version-conflict", post("/me/stock/changes", stockSet()));
     refusals.put("refused-ships-scope-missing", get("/me/ships"));
+    refusals.put(
+        "refused-refinery-order-changes-pessimistic-lock",
+        post(
+            "/me/refinery-orders/changes",
+            fixture(
+                "change-set--refineryOrderChangeSet/valid/create-then-update-by-client-key.json")));
     refusals.put("failed-org-demand-backend-error", get("/me/org-demand"));
     refusals.put("failed-locations-answer-breaks-schema", get("/catalog/locations"));
     refusals.put("refused-service-document-exchange-disabled", get(""));

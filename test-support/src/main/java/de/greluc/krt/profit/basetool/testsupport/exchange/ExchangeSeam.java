@@ -396,6 +396,7 @@ public final class ExchangeSeam {
           "NOT_BANK_STAFF",
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
+          "PESSIMISTIC_LOCK",
           "CURSOR_EXPIRED",
           "MASS_CHANGE_CONFIRMATION_REQUIRED",
           "BANK_JUSTIFICATION_REQUIRED",

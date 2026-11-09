@@ -7,7 +7,9 @@ dialog offers. Both reads are read-only; there is no paging and no cursor. Locat
 [`GET /me/org-units`](org-units.md).
 
 The Basetool decides both from its own records, never from a role the member holds elsewhere: an
-administrator's role adds nothing.
+administrator's role adds nothing. A change set the mass-change guard held is decided the same way
+when the member confirms it in the browser: neither their roles nor the unit they have pinned there
+change which receivers and job orders its store lines may name.
 
 ## Receivers
 
