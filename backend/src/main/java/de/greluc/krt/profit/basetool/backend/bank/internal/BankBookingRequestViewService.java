@@ -58,13 +58,10 @@ public class BankBookingRequestViewService {
   @Transactional(readOnly = true)
   public BankBookingRequestViewDto view(@NotNull BankActor actor, @NotNull UUID requestId) {
     BankBookingRequest request = Entities.require(requestRepository.findById(requestId), NOT_FOUND);
-    BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
-    BankStaffRights rights = scope.rights();
-    UUID accountId = request.getAccount().getId();
+    BankStaffRights rights = policy.staffRights(actor);
     boolean own = policy.ownsRequest(actor, request);
-    boolean staff = rights.canSee(accountId);
-    boolean approver = scope.approves(request);
-
+    boolean staff = rights.canSee(request.getAccount().getId());
+    boolean approver = policy.approves(actor, request);
     if (!own && !staff && !approver) {
       throw new NotFoundException(NOT_FOUND);
     }

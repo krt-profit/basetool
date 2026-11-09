@@ -433,15 +433,46 @@ public class BankAccessRules implements BankAccessPolicy {
     Set<UUID> responsible = new LinkedHashSet<>();
     Set<UUID> candidates = new LinkedHashSet<>();
     for (BankAccount account : accountRepository.findAllByOrderByAccountNoAsc()) {
-      if (rights.admin() || judgement.isResponsibleHolder(account)) {
+      boolean holds = rights.admin() || judgement.isResponsibleHolder(account);
+      if (holds) {
         responsible.add(account.getId());
       }
-      if (rights.management() && account.getType() == BankAccountType.CARTEL) {
+      if (isForeignRequestCandidate(rights, account, holds)) {
         candidates.add(account.getId());
       }
     }
-    candidates.addAll(responsible);
     return new ForeignRequestScope(rights, Set.copyOf(candidates), Set.copyOf(responsible));
+  }
+
+  /**
+   * Whether the actor acts on the approval of one request, decided for its account alone: the
+   * answer {@link ForeignRequestScope#approves} gives without reading every account.
+   *
+   * @param actor the actor
+   * @param request the request
+   * @return {@code true} iff the actor is one of the request's approvers
+   */
+  boolean approves(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
+    BankStaffRights rights = staffRights(actor);
+    BankAccount account = request.getAccount();
+    boolean holds = rights.admin() || judgement(actor, null).isResponsibleHolder(account);
+    return !rights.boundByFourEyes(request.getRequestedBy())
+        && isForeignRequestCandidate(rights, account, holds)
+        && rights.mayApprove(request.getRequiredApprover(), holds);
+  }
+
+  /**
+   * Whether an account's requests are the actor's foreign requests (REQ-BANK-046): an account the
+   * actor holds (every account for an administrator), and the KRT account for the Bankleitung.
+   *
+   * @param rights the actor's staff rights
+   * @param account the account
+   * @param holds whether the actor holds the account or is an administrator
+   * @return {@code true} iff the account is a candidate
+   */
+  private static boolean isForeignRequestCandidate(
+      @NotNull BankStaffRights rights, @NotNull BankAccount account, boolean holds) {
+    return holds || (rights.management() && account.getType() == BankAccountType.CARTEL);
   }
 
   /**

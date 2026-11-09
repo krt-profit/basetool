@@ -227,6 +227,30 @@ class BankAccessRulesTest {
   }
 
   @Test
+  void approves_decidesForTheRequestsAccountWithoutReadingEveryAccount() {
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(staffelAccount);
+    request.setRequestedBy(UUID.randomUUID());
+    request.setRequiredApprover(BankRequestApprover.RESPONSIBLE_HOLDER);
+    BankActor lead =
+        TestBankActor.member(UUID.randomUUID())
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .build();
+    BankActor member = TestBankActor.member(UUID.randomUUID()).build();
+
+    assertThat(policy.approves(lead, request)).isTrue();
+    assertThat(policy.approves(member, request)).isFalse();
+    assertThat(
+            policy.approves(
+                TestBankActor.member(request.getRequestedBy())
+                    .seat(staffelId, MembershipRole.STAFFELLEITER)
+                    .build(),
+                request))
+        .isFalse();
+    verify(accountRepository, never()).findAllByOrderByAccountNoAsc();
+  }
+
+  @Test
   void accessTo_krtAccount_readsNoApprovalLimitRows() {
     stubFind(cartelAccount);
 
