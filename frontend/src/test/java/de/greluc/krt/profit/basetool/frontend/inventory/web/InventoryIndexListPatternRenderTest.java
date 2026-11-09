@@ -229,12 +229,12 @@ class InventoryIndexListPatternRenderTest {
   }
 
   /**
-   * A German page shows the item's and its manufacturer's German names and the manufacturer's
+   * A German page shows the item's and its manufacturer's English names and the manufacturer's
    * abbreviation badge when it has no Fan Kit logo (REQ-P4K-022, REQ-P4K-023).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void itemsViewShowsGermanNamesAndTheManufacturerBadge() throws Exception {
+  void itemsViewShowsEnglishNamesAndTheManufacturerBadge() throws Exception {
     ManufacturerRefDto maker =
         new ManufacturerRefDto(
             UUID.randomUUID(), "Roberts Space Industries", "RSI DE", "RSI", null);
@@ -258,8 +258,9 @@ class InventoryIndexListPatternRenderTest {
             7.0);
 
     assertThat(render(pageOf(row), "view=items"))
-        .contains(">Quantenantrieb XL-1<")
-        .contains(">RSI DE<")
+        .contains(">Quantum Drive XL-1<")
+        .contains(">Roberts Space Industries<")
+        .doesNotContain("Quantenantrieb XL-1", "RSI DE")
         .contains("data-testid=\"manufacturer-badge\"");
   }
 

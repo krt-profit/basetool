@@ -109,7 +109,7 @@ class ItemPickerLabelsTest {
   }
 
   @Test
-  void germanPage_labelsWithTheGermanNameAndKeepsTheName() {
+  void germanPage_labelsWithTheEnglishName() {
     InventoryGameItemReferenceDto item =
         new InventoryGameItemReferenceDto(
             ID,
@@ -125,7 +125,7 @@ class ItemPickerLabelsTest {
             null);
 
     assertThat(labels.options(List.of(item)))
-        .containsExactly(new ItemPickerOption(ID, "FR-66", "FR-66 DE · S1 · A · Militär"));
+        .containsExactly(new ItemPickerOption(ID, "FR-66", "FR-66 · S1 · A · Militär"));
   }
 
   @Test

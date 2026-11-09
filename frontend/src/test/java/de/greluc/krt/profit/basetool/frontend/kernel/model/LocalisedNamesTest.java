@@ -21,28 +21,42 @@ package de.greluc.krt.profit.basetool.frontend.kernel.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocalisedNames.GameTextLanguage;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
-/**
- * A German page shows the German name when there is one, every other page the name (REQ-P4K-023).
- */
+/** The game-text language policy picks the name a page shows (REQ-P4K-023). */
 class LocalisedNamesTest {
 
   @Test
-  void aGermanPageShowsTheGermanName() {
-    assertThat(LocalisedNames.display("Aslarite", "Aslarit", Locale.GERMANY)).isEqualTo("Aslarit");
-  }
-
-  @Test
-  void anEnglishPageShowsTheName() {
+  void everyPageShowsTheEnglishName() {
+    assertThat(LocalisedNames.SHOWN).isEqualTo(GameTextLanguage.ENGLISH);
+    assertThat(LocalisedNames.display("Aslarite", "Aslarit", Locale.GERMANY)).isEqualTo("Aslarite");
     assertThat(LocalisedNames.display("Aslarite", "Aslarit", Locale.ENGLISH)).isEqualTo("Aslarite");
+    assertThat(LocalisedNames.display("Aslarite", "Aslarit", null)).isEqualTo("Aslarite");
   }
 
   @Test
-  void aGermanPageWithoutAGermanNameShowsTheName() {
-    assertThat(LocalisedNames.display("Aslarite", null, Locale.GERMAN)).isEqualTo("Aslarite");
-    assertThat(LocalisedNames.display("Aslarite", " ", Locale.GERMAN)).isEqualTo("Aslarite");
-    assertThat(LocalisedNames.display("Aslarite", "Aslarit", null)).isEqualTo("Aslarite");
+  void underThePageLanguageAGermanPageShowsTheGermanName() {
+    assertThat(
+            LocalisedNames.display(
+                "Aslarite", "Aslarit", Locale.GERMANY, GameTextLanguage.PAGE_LANGUAGE))
+        .isEqualTo("Aslarit");
+  }
+
+  @Test
+  void underThePageLanguageAnEnglishPageShowsTheName() {
+    assertThat(
+            LocalisedNames.display(
+                "Aslarite", "Aslarit", Locale.ENGLISH, GameTextLanguage.PAGE_LANGUAGE))
+        .isEqualTo("Aslarite");
+  }
+
+  @Test
+  void underThePageLanguageAGermanPageWithoutAGermanNameShowsTheName() {
+    GameTextLanguage page = GameTextLanguage.PAGE_LANGUAGE;
+    assertThat(LocalisedNames.display("Aslarite", null, Locale.GERMAN, page)).isEqualTo("Aslarite");
+    assertThat(LocalisedNames.display("Aslarite", " ", Locale.GERMAN, page)).isEqualTo("Aslarite");
+    assertThat(LocalisedNames.display("Aslarite", "Aslarit", null, page)).isEqualTo("Aslarite");
   }
 }

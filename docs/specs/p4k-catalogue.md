@@ -777,26 +777,31 @@ page), whose item references carry a `ManufacturerRefDto` with the GUID.
 
 ## Names
 
-### REQ-P4K-023 — a German name is stored beside the name and shown on German pages
+### REQ-P4K-023 — a German name is stored beside the name; every page shows the English game text
 
 `manufacturer`, `game_item`, `ship_type` and `material` gain `name_de`, written by the P4K import
 only (`name.de`); the commodity categories and starmap objects carry it as well (REQ-P4K-025,
-REQ-P4K-034). The UI shows `name_de` when the page language is German and
-falls back to `name`. Search and matching keep running on `name`.
+REQ-P4K-034). Which name a page shows follows one game-text language policy, set by the owner:
+under **English** (in force) every page shows `name`, whatever the page language; under **page
+language** a German page shows `name_de` and falls back to `name`. A ship type's description is
+the English one and falls back to the German one only where no English one exists. Search and
+matching keep running on `name`.
 
 **Acceptance**
 
-- [x] A German page shows the German name of an item; an English page, and a German page for a row
-  without `name_de`, show `name`.
+- [x] Under the English policy, a German and an English page both show `name`, also for a row with
+  `name_de`, and a ship type with both descriptions shows the English one.
+- [x] Under the page-language policy, a German page shows the German name of an item; an English
+  page, and a German page for a row without `name_de`, show `name`.
 - [x] A search for the German name alone finds nothing it would not find by `name`.
 
 The import writes `name.de` on every matched row and every row it creates; a blank German text or
 the game's missing-translation marker (a text starting with `!`) is no German name and leaves the
 stored one. The item merge of the SC Wiki / UEX reconciliation moves `name_de` with the P4K GUID.
 The DTOs of manufacturers, ship types, materials and item references carry `nameDe`, and a page
-picks the name by its language (`LocalisedNames` on server-rendered pages, `localisedName` of
-`krt-localised-name.js` in scripts). Every page that names a manufacturer, item, ship or material
-shows it: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
+picks the name through the policy (`LocalisedNames.SHOWN` on server-rendered pages,
+`GAME_TEXT_LANGUAGE` of `krt-localised-name.js` in scripts; both hold the same value). Every page
+that names a manufacturer, item, ship or material picks it this way: Ship-Data, the hangars and missions with their pickers, the materials list, overview,
 matrix, profit calculation and detail, the material and item pickers, job orders, supply,
 purchasing, the dashboard widgets, inventory and stock levels, refinery, the material exchange and
 the blueprint recipe pane. The page-specific DTOs carry the German name beside the name they
@@ -804,8 +809,9 @@ denormalise (`nameDe`, `materialNameDe`, `manufacturerNameDe`). Search, filters,
 and every value sent back to the server stay on `name`. Admin pages where an admin edits or maps a
 name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
 
-**Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `ShipDataPageControllerMvcTest`,
-`ItemPickerLabelsTest`, `ItemReconciliationServiceTest` ·
+**Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `:frontend:testLocalisedNameJs`,
+`ShipTypeMapperTest`, `ShipDataPageControllerMvcTest`, `ItemPickerLabelsTest`,
+`ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
 
 ## Commodities and categories

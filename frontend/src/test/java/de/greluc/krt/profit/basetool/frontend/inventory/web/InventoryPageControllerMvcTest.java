@@ -221,8 +221,8 @@ class InventoryPageControllerMvcTest {
 
     assertThat(listedHtml)
         .contains(
-            "item-available-at", "Dumper&#39;s Depot - Area 18", "Area18 DE", "CubbyBlast_Area18")
-        .doesNotContain("item-available-at-unknown");
+            "item-available-at", "Dumper&#39;s Depot - Area 18", "Area18", "CubbyBlast_Area18")
+        .doesNotContain("item-available-at-unknown", "Area18 DE");
     assertThat(unlistedHtml)
         .contains("item-available-at-unknown", "Unknown")
         .doesNotContain("item-available-at-shop", "Not available");

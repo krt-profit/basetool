@@ -106,13 +106,13 @@ class LocationNameDisplayTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  void aGermanPage_showsTheGermanP4kName_besideTheCuratedName() throws Exception {
+  void aGermanPage_showsTheEnglishP4kName_besideTheCuratedName() throws Exception {
     String html = render(Locale.GERMAN);
 
     assertThat(html)
         .containsPattern("class=\"cell-title\">KRT-Hauptlager<")
-        .containsPattern("data-testid=\"location-p4k-name\"[^>]*>Neu-Babbage<")
-        .doesNotContain(">New Babbage<")
+        .containsPattern("data-testid=\"location-p4k-name\"[^>]*>New Babbage<")
+        .doesNotContain(">Neu-Babbage<")
         .containsPattern("class=\"cell-title\">Freies Lager<");
     assertThat(html.split("data-testid=\"location-p4k-name\"", -1)).hasSize(2);
   }

@@ -18,17 +18,33 @@
  */
 
 /**
- * Picks the name a page shows for a catalogue row (REQ-P4K-023): the German name on a German
- * page, the name otherwise and whenever no German name exists. Mirrors `LocalisedNames` of the
- * server-rendered pages; search and matching keep using the name.
+ * The language a page shows the game's texts in (REQ-P4K-023): `'en'` shows the English text on
+ * every page, `'page'` the German text on a German page where one exists. Mirrors
+ * `LocalisedNames.SHOWN` of the server-rendered pages.
+ *
+ * @typedef {'en' | 'page'} GameTextLanguage
+ */
+
+/** @type {GameTextLanguage} */
+export const GAME_TEXT_LANGUAGE = 'en';
+
+/**
+ * Picks the name a page shows for a catalogue row under a game-text language (REQ-P4K-023).
+ * Mirrors `LocalisedNames` of the server-rendered pages; search and matching keep using the name.
  *
  * @param {string | null | undefined} name the row's name
  * @param {string | null | undefined} nameDe the row's German name
  * @param {string} [lang] the page language, the `lang` of the document by default
+ * @param {GameTextLanguage} [language] the game-text language, {@link GAME_TEXT_LANGUAGE} by default
  * @returns {string} the name to show, empty when both are absent
  */
-export function localisedName(name, nameDe, lang = document.documentElement.lang) {
-    const german = (lang || '').toLowerCase().startsWith('de');
+export function localisedName(
+    name,
+    nameDe,
+    lang = document.documentElement.lang,
+    language = GAME_TEXT_LANGUAGE,
+) {
+    const german = language === 'page' && (lang || '').toLowerCase().startsWith('de');
     if (german && nameDe && nameDe.trim() !== '') {
         return nameDe;
     }
