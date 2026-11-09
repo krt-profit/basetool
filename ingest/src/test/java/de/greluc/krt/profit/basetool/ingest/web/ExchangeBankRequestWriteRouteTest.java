@@ -78,7 +78,7 @@ class ExchangeBankRequestWriteRouteTest {
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private JwtDecoder jwtDecoder;
-  @MockitoBean private HandoffStagingService handoffStagingService;
+  @MockitoBean private HandoffStagingService stagingService;
   @MockitoBean private ExchangeRegistryReader registryReader;
   @MockitoBean private ExchangeRevocationReader revocationReader;
   @MockitoBean private ExchangeQuotas quotas;

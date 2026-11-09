@@ -276,11 +276,8 @@ class ExchangeRelaySeamParityTest {
       }
     }
     assertThat(routes).hasSize(27).isEqualTo(new TreeMap<>(expected));
-    assertThat(scopes)
-        .doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES)
-        .doesNotContainAnyElementsOf(ExchangeSeam.UNROUTED_SCOPES);
+    assertThat(scopes).doesNotContainAnyElementsOf(ExchangeSeam.ADDITIVE_SCOPES);
     scopes.addAll(ExchangeSeam.ADDITIVE_SCOPES);
-    scopes.addAll(ExchangeSeam.UNROUTED_SCOPES);
     assertThat(scopes).isEqualTo(new TreeSet<>(ExchangeSeam.CAPABILITY_SCOPES));
   }
 

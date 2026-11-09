@@ -336,12 +336,6 @@ public final class ExchangeSeam {
       Set.of("exchange.orgstock.details", "exchange.demand.details");
 
   /**
-   * The capability scopes the registry, the realm and the consent screen know although no route
-   * serves them yet; a client granted one is refused nothing and given nothing (REQ-BXCH-001).
-   */
-  public static final @Unmodifiable Set<String> UNROUTED_SCOPES = Set.of();
-
-  /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
    */
   public static final @Unmodifiable Map<String, Integer> GATE_STATUSES =
