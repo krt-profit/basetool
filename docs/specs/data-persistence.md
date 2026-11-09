@@ -564,7 +564,7 @@ Concrete handling, in order:
   change sequence, the write journal, the ship links and an admin bulk undo's per-member skips —
   `exchange_installation`, `exchange_client_revocation`, `exchange_change`, `exchange_journal`,
   `exchange_ship_link`, `exchange_refinery_order_link`, `exchange_bulk_undo_skip` (`V249`,
-  `V252`–`V254`, `V256`, `V373`) — each reference
+  `V252`–`V254`, `V256`, `V370`) — each reference
   `app_user(id)` with `ON DELETE CASCADE` and go with the account; `UserIdentityColumnForeignKeyTest`
   holds them to it like every other `user_id` column. The bulk-undo run itself stays and keeps its
   counts; its `requested_by` is `ON DELETE SET NULL` (`V256`).
@@ -1152,8 +1152,8 @@ The listed crossings:
 | The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship`, `inventory_item` (read) | A renamed unit re-announces its ships and, since V296, the lots of its pool in the exchange's key log (REQ-XCH-017, REQ-XCH-042, ADR-0261) |
 | The V296 org-stock triggers on `inventory_item` (extended), both allocation tables and `org_unit_membership` | `exchange_change` (write), `org_unit`, `inventory_item` (read) | A change of a pool's shared rows, an earmark or a join is written to the org-stock feed keyed by unit (REQ-XCH-042, ADR-0257) |
 | The V297 org-stock triggers on `app_user`, `exchange_name_withholding` and `mission` | `exchange_change` (write), `inventory_item`, `inventory_item_mission_allocation`, `org_unit` (read) | A holder's rename or name withholding, or the rename of an earmarked mission, re-announces the lots whose entries show it (REQ-XCH-043, REQ-XCH-044) |
-| The V359 change-feed triggers on `location`, `city`, `space_station` and `starmap_object` | `exchange_change` (write), `app_user`, `ship`, `inventory_item`, `org_unit`, since V370 `refinery_order` (read) | A change of what a place's location reference serialises to re-announces the ships, stock lots, refinery orders and org-stock lots at that place (REQ-XCH-018, REQ-XCH-051) |
-| The V370 change-feed triggers on `refinery_order` and `refinery_good` | `exchange_change` (write), `app_user` (read) | An order and its goods announce the order to its owner, once per writing transaction (REQ-XCH-051) |
+| The V359 change-feed triggers on `location`, `city`, `space_station` and `starmap_object` | `exchange_change` (write), `app_user`, `ship`, `inventory_item`, `org_unit`, since V367 `refinery_order` (read) | A change of what a place's location reference serialises to re-announces the ships, stock lots, refinery orders and org-stock lots at that place (REQ-XCH-018, REQ-XCH-051) |
+| The V367 change-feed triggers on `refinery_order` and `refinery_good` | `exchange_change` (write), `app_user` (read) | An order and its goods announce the order to its owner, once per writing transaction (REQ-XCH-051) |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station`, `starmap_object` (read) | Catalogue names and the place's starmap GUID joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
 

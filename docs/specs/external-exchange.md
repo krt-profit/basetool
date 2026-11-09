@@ -3292,18 +3292,18 @@ is named by id only.
   reference change re-announces the order. *`ExchangeRefineryOrderControllerTest`,
   `ExchangeChangeFeedTriggerIntegrationTest`.*
 - [x] A goods row change announces its order once; a bulk write bypassing the services appears in
-  the feed. *`ExchangeChangeFeedTriggerIntegrationTest` (`V370`).*
+  the feed. *`ExchangeChangeFeedTriggerIntegrationTest` (`V367`).*
 - [x] Without the scope the gateway answers `403 SCOPE_MISSING` and the backend refuses a relayed
   request the same way. *`ExchangeRefineryOrderRouteTest`, `ExchangeRefineryOrderControllerTest`.*
 
 **Enforced by:** `ExchangeRefineryOrderControllerTest`, `ExchangeChangeFeedTriggerIntegrationTest`,
 `ExchangeRefineryOrderRouteTest`, `ExchangeWireContractTest` · **Code:**
-`ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370`, `V373` · **Status:**
+`ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V367`, `V370` · **Status:**
 implemented — #3167 (scopes, triggers, read); `versions` carries the two section counters of
 #3165, `createdBy` and `pickedUpAt` the provenance of #3166, and `clientKey` the link table of
 #3168 (`exchange_refinery_order_link`, one row per order, kept without a foreign key to the order
 so a tombstone still names it; a later create that takes the key over retires the old row instead
-of removing it, `V377`)
+of removing it, `V374`)
 
 ### REQ-XCH-052 — A client writes the member's refinery orders in one change set
 
@@ -3401,7 +3401,7 @@ the order) (REQ-XCH-030).
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
 `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
 `ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
-`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373`, `V377` · **Status:** implemented
+`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V370`, `V374` · **Status:** implemented
 for `create`, `update` and the goods ops — #3168, `cancel` and `delete` — #3169, and `pickup`
 without store lines — #3170
 
@@ -3465,7 +3465,7 @@ room (section `stock`), beside the refinery rooms of REQ-XCH-052.
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`,
 `ExchangeRefineryOrderRouteTest` · **Code:** `ExchangeRefineryOrderWriteService.pickup`,
 `ExchangeRefineryStoreLines`, `ExchangeStoreChoices`, `RefineryExchangeWrites.pickUp`,
-`RefineryOrderStoreBooking`, `V375` · **Status:** implemented — #3170 (pickup without store lines),
+`RefineryOrderStoreBooking`, `V372` · **Status:** implemented — #3170 (pickup without store lines),
 #3171 (store lines)
 
 ### REQ-XCH-054 — A client reads the store choices under its own scope
@@ -3544,7 +3544,7 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
 `RefineryOrderDetailPatternRenderTest` · **Code:** `ExchangeRefineryOrderWriteService`,
-`RefineryExchangeWriter`/`RefineryExchangeWrites`, `ExchangeMassChangeService`, `V374` ·
+`RefineryExchangeWriter`/`RefineryExchangeWrites`, `ExchangeMassChangeService`, `V371` ·
 **Status:** implemented — #3169
 
 ### REQ-XCH-056 — Refinery-order writes are journaled and undone by section
@@ -3556,8 +3556,8 @@ before and after; a `delete` adds what the order held beyond them — the client
 the mission link, the creation time and the pickup and ready-notice markers. The
 `clientKey` stays in `exchange_refinery_order_link`, which keeps it after the order is gone. The
 journal actions are `REFINERY_CREATE`, `REFINERY_UPDATE`, `REFINERY_GOOD_ADD`,
-`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V373`), `REFINERY_CANCEL` and
-`REFINERY_DELETE` (`V374`), and `REFINERY_PICKUP` (`V375`); a delete is journaled as a removal for
+`REFINERY_GOOD_UPDATE` and `REFINERY_GOOD_REMOVE` (`V370`), `REFINERY_CANCEL` and
+`REFINERY_DELETE` (`V371`), and `REFINERY_PICKUP` (`V372`); a delete is journaled as a removal for
 the guard. Writes of one change set share their
 transaction and time, so the undo orders an order's writes by its counters, which every write
 raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as follows:
@@ -3598,12 +3598,12 @@ gone, is skipped `GONE`.
 - [x] An undo of a pickup with lines is skipped `STOCK_BOOKED`. *`ExchangeRefineryStoreControllerTest`.*
 
 The journal state records whether the order is stored (`stored`), so the undo tells a pickup that
-booked stock from one that did not; `V376` admits `STOCK_BOOKED` as a skip reason of the admin's
+booked stock from one that did not; `V373` admits `STOCK_BOOKED` as a skip reason of the admin's
 bulk undo.
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`,
 `ExchangeRefineryStoreControllerTest` · **Code:** `ExchangeRefineryOrderJournal`,
-`ExchangeUndoService`, `V373`, `V374`, `V375`, `V376` · **Status:** implemented — #3168 (journal,
+`ExchangeUndoService`, `V370`, `V371`, `V372`, `V373` · **Status:** implemented — #3168 (journal,
 undo of create, update and goods ops), #3169 (undo of cancel and delete), #3170 (undo of a pickup
 without store lines), #3171 (undo of a pickup with store lines)
 

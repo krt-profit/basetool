@@ -186,10 +186,6 @@ so does an entry that a migration claims after all or that lies above the tip.
 - **V268** — second number of #2370; given up when #2439 took V269.
 - **V270** — third number of #2370; given up when V271–V281 had landed and the PR merged
   as V282.
-- **V367** — reserved for the bank exchange of #3175 (range V360–V369); its slices needed
-  only V360–V366.
-- **V368** — reserved for the bank exchange of #3175; unused, as V367.
-- **V369** — reserved for the bank exchange of #3175; unused, as V367.
 
 A pull request that gives up a number after a higher one has merged adds the number here,
 with its reason, in the same change.

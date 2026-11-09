@@ -199,12 +199,12 @@ class TableOwnershipTest {
               "trg_refinery_order_exchange_change",
               new Crossing(
                   Set.of("exchange_change", "app_user"),
-                  "V370 change feed: the order id follows its owner (REQ-XCH-051).")),
+                  "V367 change feed: the order id follows its owner (REQ-XCH-051).")),
           Map.entry(
               "trg_refinery_good_exchange_change",
               new Crossing(
                   Set.of("exchange_change", "app_user"),
-                  "V370 change feed: a good announces its order to the order's owner"
+                  "V367 change feed: a good announces its order to the order's owner"
                       + " (REQ-XCH-051).")),
           Map.entry(
               "trg_org_unit_exchange_change",
@@ -249,7 +249,7 @@ class TableOwnershipTest {
     return new Crossing(
         Set.of(
             "exchange_change", "app_user", "ship", "inventory_item", "org_unit", "refinery_order"),
-        "V359/V370 change feed: a "
+        "V359/V367 change feed: a "
             + row
             + " whose change alters a place's location reference re-announces the ships, stock"
             + " lots, refinery orders and org-stock lots at that place, read from ship,"

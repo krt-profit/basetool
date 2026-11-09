@@ -347,7 +347,7 @@ VerseKit-specific: the name shown is the client's display name from the registry
   its forms, keeps what the member typed on screen and shows a notice that a connected application
   deleted the order, with a link to the list; no redirect.
 - The exchange feed carries the creator as the client marker (REQ-XCH-051).
-- **Storage:** migration `V372` adds `created_source` / `created_client`, `last_change_source` /
+- **Storage:** migration `V369` adds `created_source` / `created_client`, `last_change_source` /
   `last_change_client`, `last_changed_at` and the pickup marker `picked_up_at` /
   `picked_up_client` to `refinery_order`; a `CLIENT` source always names its client id, a `WEB`
   source never does (check constraints), and existing orders read as web orders whose last change
@@ -373,7 +373,7 @@ VerseKit-specific: the name shown is the client's display name from the registry
 `DataExportEndStateTest`, `PersonSearchCoverageTest` ·
 **Code:** `RefineryOrderProvenance`,
 `RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
-`refinery-orders-details.html`, migration `V372`
+`refinery-orders-details.html`, migration `V369`
 
 **Status:** implemented — the web side and the feed's marker (#3166, #3167), and the client
 writes that set a client source (#3168, `RefineryExchangeWrites`); the deleted notice (#3169,
