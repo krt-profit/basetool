@@ -90,6 +90,32 @@ class BankRequestPageControllerMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = {"BANK_EMPLOYEE"})
+  void bankOnlyStaffListenInTheStaffRoomAndNotInTheOrgUnitRoom() throws Exception {
+    stub(new BankBookingRequestViewDto(request(false, true), false, true, false));
+
+    mockMvc
+        .perform(get("/bank/requests/" + ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("data-livesync-staff-room")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("data-livesync-orgunit-room"))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void aMemberListensInTheOrgUnitRoomOnly() throws Exception {
+    stub(new BankBookingRequestViewDto(request(false, null), true, false, false));
+
+    mockMvc
+        .perform(get("/bank/requests/" + ID))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("data-livesync-orgunit-room")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("data-livesync-staff-room"))));
+  }
+
+  @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void anApproverIsLedToTheForeignRequestsAndNotToTheQueue() throws Exception {
     stub(new BankBookingRequestViewDto(request(true, null), false, false, true));

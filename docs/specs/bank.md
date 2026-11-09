@@ -3215,7 +3215,9 @@ and the backend decides what it shows.
   (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
   button is the action the caller can take now.
 - **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
-  card in place through the org-unit bank room (REQ-FE-015).
+  card in place (REQ-FE-015): a member listens in the org-unit bank room, a bank-staff account
+  without a membership role in the bank-staff room, since every request write publishes to both
+  (`BankRequestPageControllerMvcTest`).
 
 **Acceptance**
 
