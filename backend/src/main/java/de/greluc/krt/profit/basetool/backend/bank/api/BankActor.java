@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -134,17 +133,6 @@ public record BankActor(
     Set<UUID> ids = new LinkedHashSet<>();
     seats.forEach(seat -> ids.add(seat.orgUnitId()));
     return Collections.unmodifiableSet(ids);
-  }
-
-  /**
-   * The member's grant row on an account.
-   *
-   * @param accountId the account
-   * @return the grant, or empty when the member has none on it
-   */
-  @NotNull
-  public Optional<Grant> grantOn(@NotNull UUID accountId) {
-    return Optional.ofNullable(grants.get(accountId));
   }
 
   /**

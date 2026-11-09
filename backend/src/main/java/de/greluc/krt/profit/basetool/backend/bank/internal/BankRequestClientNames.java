@@ -20,7 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,7 +34,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Names the connected application a booking request was raised through, for the staff badge
- * (REQ-BANK-067).
+ * (REQ-BANK-067), with one registry read per batch of requests (REQ-DATA-003).
  */
 @Component
 @RequiredArgsConstructor
@@ -45,9 +51,28 @@ public class BankRequestClientNames {
    */
   @Nullable
   public String nameOf(@NotNull BankBookingRequest request) {
-    String clientId = request.getClientId();
-    return clientId == null
-        ? null
-        : clientDirectory.displayNames(List.of(clientId)).getOrDefault(clientId, clientId);
+    return forRequests(List.of(request)).apply(request);
+  }
+
+  /**
+   * Reads the client names of a batch of requests at once, for mapping a page or list.
+   *
+   * @param requests the requests about to be mapped
+   * @return names a request as {@link #nameOf(BankBookingRequest)} does, from the one read
+   */
+  @NotNull
+  public Function<BankBookingRequest, String> forRequests(
+      @NotNull Collection<BankBookingRequest> requests) {
+    Set<String> clientIds =
+        requests.stream()
+            .map(BankBookingRequest::getClientId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    Map<String, String> names =
+        clientIds.isEmpty() ? Map.of() : clientDirectory.displayNames(clientIds);
+    return request -> {
+      String clientId = request.getClientId();
+      return clientId == null ? null : names.getOrDefault(clientId, clientId);
+    };
   }
 }

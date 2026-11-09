@@ -279,7 +279,7 @@
                                     </select>
                                     <span class="bank-field-error" data-error-for="targetAccountId"></span>
                                 </div>
-                                <div class="bank-form-row">
+                                <div class="bank-form-row" th:if="${r.purposeKind() == null}">
                                     <label th:for="'ou-req-edit-amount-' + ${r.id()}" th:text="#{bank.field.amount}">Betrag (aUEC)</label>
                                     <input type="text" data-number-input inputmode="numeric" th:id="'ou-req-edit-amount-' + ${r.id()}" name="amount" min="1" step="1" required
                                            th:value="${@moneyFormat.round(r.amount())}"
@@ -287,7 +287,18 @@
                                     <span class="bank-field-hint" th:text="#{bank.request.edit.amountHint}">&Auml;nderst du den Betrag, wird die Freigabepflicht neu bewertet.</span>
                                     <span class="bank-field-error" data-error-for="amount"></span>
                                 </div>
-                                <th:block th:if="${r.type() == 'WITHDRAWAL'}">
+                                <th:block th:if="${r.purposeKind() != null}">
+                                    <input type="hidden" name="amount" th:value="${@moneyFormat.round(r.amount())}">
+                                    <input type="hidden" name="counterpartyUserId" th:value="${r.counterpartyUserId()}">
+                                    <input type="hidden" name="counterpartyOrgUnitId" th:value="${r.counterpartyOrgUnitId()}">
+                                    <div class="bank-form-row" data-testid="org-unit-bank-edit-purpose-fixed">
+                                        <span class="bank-detail-label" th:text="#{bank.field.amount}">Betrag (aUEC)</span>
+                                        <span class="bank-detail-value" th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
+                                        <span class="bank-field-hint" th:text="#{bank.request.edit.purposeFixedHint}">Betrag und Empf&auml;nger geh&ouml;ren zum Zweck des Antrags.</span>
+                                        <span class="bank-field-error" data-error-for="amount"></span>
+                                    </div>
+                                </th:block>
+                                <th:block th:if="${r.type() == 'WITHDRAWAL' and r.purposeKind() == null}">
                                     <div class="bank-form-row">
                                         <label th:for="'ou-req-edit-cp-' + ${r.id()}">
                                             <span th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
@@ -409,6 +420,7 @@
                                               class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                                               data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
                                             <input type="hidden" name="_id" th:value="${r.id()}">
+                                            <input type="hidden" name="version" th:value="${r.version()}">
                                             <button type="submit" class="btn btn-xs btn-success"
                                                     data-testid="org-unit-bank-grant-approval-btn"
                                                     th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>

@@ -229,7 +229,10 @@ new request follows in the feed.
 request, raised anywhere: `amount`, `note`, `justification`, `targetAccountId` and the `version`
 last read. Every
 field replaces the stored one; the type and the source account stay. The approval need is derived
-anew. The answer is `200` like the one above.
+anew as for a raise; a deposit never needs one. A request another Basetool module raised for a
+purpose, such as a purchasing tranche, keeps its amount and destination: a correction that changes
+them answers `400 SCHEMA_INVALID`, so correct only its note and justification. The answer is `200`
+like the one above.
 
 `POST /exchange/v1/bank/requests/{id}/cancel` with `{ "version": 2 }` cancels a pending own
 request, raised anywhere, and answers `200 { id, status, version }`.

@@ -29,8 +29,11 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Mono;
 
 /**
  * Typed backend client of the org-unit booking-request reads ({@code GET
@@ -88,14 +91,25 @@ public class OrgUnitBankRequestsBackendClient {
   }
 
   /**
-   * Reads one booking request the caller raised, sees as bank staff or approves (REQ-BANK-068).
+   * Reads one booking request the caller raised, sees as bank staff or approves (REQ-BANK-068). The
+   * backend's {@code 404} for an unknown or hidden request is an answer here, not a failure.
    *
    * @param id the request
    * @return the request with the caller's roles on it, or {@code null} when it is unknown or hidden
    *     from the caller
+   * @throws de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException on any
+   *     other backend failure
    */
   @Nullable
   public BankBookingRequestViewDto view(@NotNull UUID id) {
-    return backendApiClient.get(REQUESTS + "/{id}", BankBookingRequestViewDto.class, id);
+    String uri = REQUESTS + "/{id}";
+    return backendApiClient.execute(
+        HttpMethod.GET,
+        uri,
+        client -> client.get().uri(uri, id),
+        response ->
+            response
+                .bodyToMono(BankBookingRequestViewDto.class)
+                .onErrorResume(WebClientResponseException.NotFound.class, _ -> Mono.empty()));
   }
 }

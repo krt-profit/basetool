@@ -24,6 +24,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Request;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
@@ -74,6 +76,23 @@ class BankRequestViewTest {
     assertThat(view.path("own").asBoolean()).isTrue();
     assertThat(view.path("staff").asBoolean()).isFalse();
     assertThat(view.path("approver").asBoolean()).isFalse();
+  }
+
+  @Test
+  void theStaffNoteReachesStaffAndApproversButNotTheRequester() throws Exception {
+    UUID requestId = world.request(Request.APPROVE_OWN);
+    BankBookingRequestRepository requests = context.getBean(BankBookingRequestRepository.class);
+    BankBookingRequest request = requests.findById(requestId).orElseThrow();
+    request.setStaffNote("internal remark");
+    requests.saveAndFlush(request);
+
+    JsonNode requester = ok(read(Actor.MEMBER, requestId));
+    JsonNode approver = ok(read(Actor.STAFFELLEITER, requestId));
+    JsonNode staff = ok(read(Actor.MANAGEMENT, requestId));
+
+    assertThat(requester.path("request").path("staffNote").isNull()).isTrue();
+    assertThat(approver.path("request").path("staffNote").asString()).isEqualTo("internal remark");
+    assertThat(staff.path("request").path("staffNote").asString()).isEqualTo("internal remark");
   }
 
   @Test

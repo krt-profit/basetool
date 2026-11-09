@@ -118,13 +118,28 @@ export function initLiveSyncReceivers() {
         });
     }
 
-    if (document.querySelector('#bank-request-detail-results')) {
+    // Every request write publishes both bank/requestQueue and orgunit-bank/orgUnitBank, so either
+    // room alone keeps the card current; the server marks the rooms the caller may join.
+    const requestDetail = document.querySelector('#bank-request-detail-results');
+    if (requestDetail && requestDetail.hasAttribute('data-livesync-orgunit-room')) {
         bankRoom({
             topicClass: 'ORGUNIT_BANK',
             topic: 'orgunit-bank',
             coalesceMs: 1500,
             sections: {
                 orgUnitBank: {
+                    container: '#bank-request-detail-results',
+                    fragmentValue: 'requestDetail',
+                },
+            },
+        });
+    } else if (requestDetail && requestDetail.hasAttribute('data-livesync-staff-room')) {
+        bankRoom({
+            topicClass: 'BANK_STAFF',
+            topic: 'bank',
+            coalesceMs: 1500,
+            sections: {
+                requestQueue: {
                     container: '#bank-request-detail-results',
                     fragmentValue: 'requestDetail',
                 },

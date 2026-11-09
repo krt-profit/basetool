@@ -11,7 +11,8 @@
 <main th:attr="data-bank-refresh-error=#{bank.refresh.failed},data-bank-livesync-updates=#{livesync.updates_available}">
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.bank', titleText=#{bank.request.page.heading})}"></th:block>
 
-    <div id="bank-request-detail-results">
+    <div id="bank-request-detail-results"
+         th:attr="data-livesync-staff-room=${staffRoom ? 'true' : null},data-livesync-orgunit-room=${orgUnitRoom ? 'true' : null}">
         <th:block th:fragment="requestDetail">
         <section class="card" data-testid="bank-request-page" th:if="${view != null}"
                  th:with="r=${view.request()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}}">

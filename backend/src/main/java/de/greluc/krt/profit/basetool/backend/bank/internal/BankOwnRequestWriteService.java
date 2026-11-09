@@ -132,7 +132,7 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   @Transactional
   public Written cancel(@NotNull BankActor actor, @NotNull UUID requestId, long version) {
     ownRequest(actor, requestId);
-    bookingRequestService.cancelOwn(actor, requestId, version);
+    bookingRequestService.cancelOwn(actor.userId(), requestId, version);
     return written(requestId);
   }
 

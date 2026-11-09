@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -293,10 +294,7 @@ public class BankBookingRequestService {
       @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     return authHelperService
         .currentUserId()
-        .map(sub ->
-            requestRepository
-                .findByRequestedByAndStatusIn(sub, statuses, pageable)
-                .map(this::toDto))
+        .map(sub -> toDtos(requestRepository.findByRequestedByAndStatusIn(sub, statuses, pageable)))
         .orElseGet(() -> Page.empty(pageable));
   }
 
@@ -316,8 +314,9 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist or belongs to another user
    * @throws BankConflictException {@code BANK_REQUEST_NOT_PENDING} when already decided, {@code
    *     BANK_REQUEST_ALREADY_APPROVED} when the responsible holder already signed off
-   * @throws BadRequestException on an inconsistent destination account or counterparty, or a
-   *     missing Begr&uuml;ndung on a mandating account
+   * @throws BadRequestException on an inconsistent destination account or counterparty, a missing
+   *     Begr&uuml;ndung on a mandating account, or a changed amount, destination or recipient of a
+   *     purpose-bound request
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -340,6 +339,7 @@ public class BankBookingRequestService {
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
           "An approved request can no longer be edited; cancel it and raise a new one");
     }
+    PurposeBoundCorrections.requireTermsKept(request, update);
     BankBookingRequestType type = request.getType();
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
@@ -452,12 +452,16 @@ public class BankBookingRequestService {
     if (scope.candidateAccountIds().isEmpty()) {
       return List.of();
     }
-    return requestRepository
-        .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
-        .stream()
-        .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
-        .filter(request -> scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
-        .map(this::toDto)
+    List<BankBookingRequest> shown =
+        requestRepository
+            .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
+            .stream()
+            .filter(scope::approves)
+            .toList();
+
+    Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
+    return shown.stream()
+        .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
         .toList();
   }
 
@@ -466,7 +470,7 @@ public class BankBookingRequestService {
    * decided one a 409. Fires {@link BankBookingRequestCancelledEvent}, which clears the staff's
    * stale "new booking request" notifications (REQ-NOTIF-018).
    *
-   * @param actor the requester the ownership is checked for
+   * @param requester the member the ownership is checked for, or {@code null} for none
    * @param requestId the request to cancel
    * @param version the echoed optimistic-locking version
    * @return the cancelled request
@@ -477,9 +481,9 @@ public class BankBookingRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto cancelOwn(
-      @NotNull BankActor actor, @NotNull UUID requestId, long version) {
+      @Nullable UUID requester, @NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(actor, request)) {
+    if (!policy.ownsRequest(requester, request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);
@@ -570,12 +574,13 @@ public class BankBookingRequestService {
       return Page.empty(pageable);
     }
     BankStaffRights rights = staffRights();
-    return pageQueue(statuses, pageable, rights)
-        .map(request ->
-            BankBookingRequestDtos.of(
-                request,
-                clientNames.nameOf(request),
-                BankBookingRequestDtos.callerMayConfirm(request, rights)));
+    Page<BankBookingRequest> page = pageQueue(statuses, pageable, rights);
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request ->
+        BankBookingRequestDtos.of(
+            request,
+            names.apply(request),
+            BankBookingRequestDtos.callerMayConfirm(request, rights)));
   }
 
   /**
@@ -980,6 +985,19 @@ public class BankBookingRequestService {
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
     return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
+  }
+
+  /**
+   * Maps a page of request entities as {@link #toDto(BankBookingRequest)} does, naming every row's
+   * client from one registry read.
+   *
+   * @param page the page of request entities
+   * @return the page of wire DTOs
+   */
+  @NotNull
+  private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
   }
 
   /**

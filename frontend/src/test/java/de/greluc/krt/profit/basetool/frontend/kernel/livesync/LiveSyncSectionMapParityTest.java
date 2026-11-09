@@ -488,7 +488,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void bankStaffAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 4);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -496,7 +496,7 @@ class LiveSyncSectionMapParityTest {
 
   @Test
   void orgUnitAccountSeamMap_matchesTheBankAccountTopicWhitelist() throws IOException {
-    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 4);
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 5);
     assertThat(jsKeys)
         .as("sections keys in bank-livesync.js vs LiveSyncTopicClass.BANK_ACCOUNT" + " whitelist")
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.BANK_ACCOUNT.allowedSections());
@@ -526,6 +526,19 @@ class LiveSyncSectionMapParityTest {
         .as("sections keys of the request-detail seam in bank-livesync.js vs ORGUNIT_BANK")
         .containsExactly("orgUnitBank")
         .isSubsetOf(LiveSyncTopicClass.ORGUNIT_BANK.allowedSections());
+  }
+
+  /**
+   * A bank-staff account without a membership role follows the single-request page through the
+   * request-queue section of the BANK_STAFF room.
+   */
+  @Test
+  void bankRequestDetailStaffSeamMap_listensToTheBankStaffRequestQueueSection() throws IOException {
+    Set<String> jsKeys = seamMapKeys("/static/js/bank/bank-livesync.js", "sections", 3);
+    assertThat(jsKeys)
+        .as("sections keys of the request-detail staff seam in bank-livesync.js vs BANK_STAFF")
+        .containsExactly("requestQueue")
+        .isSubsetOf(LiveSyncTopicClass.BANK_STAFF.allowedSections());
   }
 
   /**

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -308,7 +309,7 @@ class OrgUnitBankAccessServiceTest {
     grant.setGranteeKind(BankAccountViewGranteeKind.MEMBERSHIP_ROLE);
     grant.setRoleCode(MembershipRole.ENSIGN.name());
     // Without the KRT Member role the seat's own-unit reach confers no oversight.
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.ENSIGN));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.ENSIGN));
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of(grant));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(account));
     when(bankPostingRepository.accountBalances(List.of(accountId)))
@@ -349,7 +350,8 @@ class OrgUnitBankAccessServiceTest {
     BankAccount cartelBank =
         typedAccount(cartelBankId, "KB-0001", BankAccountType.CARTEL_BANK, null);
     actingAs(
-        TestBankActor.of(UUID.randomUUID()).seat(profitBereichId, MembershipRole.BEREICHSLEITER));
+        TestBankActor.member(UUID.randomUUID())
+            .seat(profitBereichId, MembershipRole.BEREICHSLEITER));
     when(bereichRepository.findByDepartment(any())).thenReturn(List.of(profit));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(cartelBank));
     when(bankPostingRepository.accountBalances(List.of(cartelBankId)))
@@ -365,7 +367,8 @@ class OrgUnitBankAccessServiceTest {
     UUID specialId = UUID.randomUUID();
     BankAccount special = specialAccount(specialId, "KB-0001", BankAccountStatus.ACTIVE);
     actingAs(
-        TestBankActor.of(UUID.randomUUID()).seat(UUID.randomUUID(), MembershipRole.BEREICHSLEITER));
+        TestBankActor.member(UUID.randomUUID())
+            .seat(UUID.randomUUID(), MembershipRole.BEREICHSLEITER));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(special));
     when(bankPostingRepository.accountBalances(List.of(specialId)))
         .thenReturn(List.of(new BankAccountBalance(specialId, new BigDecimal("999"))));
@@ -610,7 +613,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(3L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
     when(bankAccountRepository.saveAndFlush(account)).thenReturn(account);
 
     var settings = settingsService.setBalanceTarget(accountId, new BigDecimal("10000"), 3L);
@@ -643,7 +646,7 @@ class OrgUnitBankAccessServiceTest {
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     account.setVersion(5L);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -680,7 +683,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
     when(viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
             accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, MembershipRole.ENSIGN.name()))
         .thenReturn(false);
@@ -699,7 +702,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     assertThrows(
         BadRequestException.class,
@@ -776,7 +779,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
   }
 
   @Test
@@ -818,7 +820,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
   }
 
   @Test
@@ -851,7 +852,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
@@ -1560,11 +1560,13 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setAccount(account);
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.member(UUID.randomUUID()));
 
-    assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId));
+    assertThrows(
+        AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId, 3L));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -1578,16 +1580,38 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setAccount(account);
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId, 3L);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
+  }
+
+  /** An approval of a request that changed since the approver read it is refused (REQ-BANK-056). */
+  @Test
+  void grantOwnerApproval_staleVersion_isAConflictAndApprovesNothing() {
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(
+        account(UUID.randomUUID(), "KB-0001", squadron(orgUnitId, "Own", "OWN")));
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(4L);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> requestService.grantOwnerApproval(requestId, 3L));
+    verifyNoInteractions(bankBookingRequestService);
   }
 
   @Test
@@ -1602,13 +1626,14 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
     bookingRequest.setRequiredApprover(BankRequestApprover.BANK_MANAGEMENT);
+    bookingRequest.setVersion(3L);
     actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId, 3L);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
@@ -2019,7 +2044,7 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("1000"));
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
-    actingAs(TestBankActor.of(requester).seat(orgUnitId, MembershipRole.MEMBER));
+    actingAs(TestBankActor.member(requester).seat(orgUnitId, MembershipRole.MEMBER));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
 
     UpdateBankBookingRequest update =
@@ -2057,7 +2082,7 @@ class OrgUnitBankAccessServiceTest {
     allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
     allMembers.setLimitAmount(new BigDecimal("1000"));
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
-    actingAs(TestBankActor.of(requester).seat(orgUnitId, MembershipRole.MEMBER));
+    actingAs(TestBankActor.member(requester).seat(orgUnitId, MembershipRole.MEMBER));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
 
     UpdateBankBookingRequest update =
@@ -2067,6 +2092,66 @@ class OrgUnitBankAccessServiceTest {
     verify(bankBookingRequestService)
         .updateOwn(
             any(), eq(requestId), eq(update), eq(false), eq(new BigDecimal("1000")), isNull());
+  }
+
+  /** A corrected deposit is routed as its raise is: never flagged, no limit (REQ-BANK-042). */
+  @Test
+  void updateOwnBookingRequest_deposit_staysUnrouted() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest existing = new BankBookingRequest();
+    existing.setId(requestId);
+    existing.setAccount(account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Other", "OTH")));
+    existing.setType(BankBookingRequestType.DEPOSIT);
+    existing.setRequestedBy(requester);
+    when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
+    actingAs(TestBankActor.member(requester));
+
+    UpdateBankBookingRequest update =
+        new UpdateBankBookingRequest(new BigDecimal("50000"), "typo", null, null, null, null, 0L);
+    requestService.updateOwnBookingRequest(requestId, update);
+
+    verify(bankBookingRequestService)
+        .updateOwn(any(), eq(requestId), eq(update), eq(false), isNull(), isNull());
+  }
+
+  /**
+   * A corrected purpose-bound KRT withdrawal keeps the ladder its raise applied, even for an OL
+   * member who holds the account (REQ-BANK-061).
+   */
+  @Test
+  void updateOwnBookingRequest_purposeBoundKrtWithdrawal_keepsTheLadder() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID olId = UUID.randomUUID();
+    BankAccount cartel = account(UUID.randomUUID(), "KB-0000", squadron(olId, "OL", "OL"));
+    cartel.setType(BankAccountType.CARTEL);
+    cartel.setEmployeeApprovalCeiling(new BigDecimal("1000"));
+    cartel.setAreaLeadApprovalCeiling(new BigDecimal("10000"));
+    BankBookingRequest existing = new BankBookingRequest();
+    existing.setId(requestId);
+    existing.setAccount(cartel);
+    existing.setType(BankBookingRequestType.WITHDRAWAL);
+    existing.setAmount(new BigDecimal("5000"));
+    existing.setPurposeKind(BankPurposeKind.PURCHASING_DEAL);
+    existing.setRequestedBy(requester);
+    when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
+    actingAs(TestBankActor.member(requester).seat(olId, MembershipRole.OL_MEMBER));
+
+    UpdateBankBookingRequest update =
+        new UpdateBankBookingRequest(
+            new BigDecimal("5000"), "note", "reason", null, null, null, 0L);
+    requestService.updateOwnBookingRequest(requestId, update);
+
+    verify(bankBookingRequestService)
+        .updateOwn(
+            any(),
+            eq(requestId),
+            eq(update),
+            eq(true),
+            eq(new BigDecimal("1000")),
+            eq(BankRequestApprover.BANK_MANAGEMENT));
   }
 
   /**
@@ -2181,7 +2266,7 @@ class OrgUnitBankAccessServiceTest {
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    actingAs(TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER));
 
     OrgUnitBankAccountSettingsDto settings = settingsService.getAccountSettings(accountId);
 
@@ -2308,14 +2393,15 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void cancelOwnBookingRequest_delegatesWithTheEchoedVersion() {
+  void cancelOwnBookingRequest_checksOwnershipByTheCallerIdWithoutBuildingTheActor() {
     UUID requestId = UUID.randomUUID();
-    BankActor requester = TestBankActor.of(UUID.randomUUID()).build();
-    actingAs(requester);
+    UUID requester = UUID.randomUUID();
+    when(bankCaller.userId()).thenReturn(requester);
 
     requestService.cancelOwnBookingRequest(requestId, 4L);
 
     verify(bankBookingRequestService).cancelOwn(requester, requestId, 4L);
+    verify(bankCaller, never()).actor();
   }
 
   @Test
@@ -2326,6 +2412,7 @@ class OrgUnitBankAccessServiceTest {
         account(UUID.randomUUID(), "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN")));
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.of(UUID.randomUUID()).admin());
