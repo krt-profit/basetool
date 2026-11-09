@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
@@ -423,7 +421,6 @@ class UserServiceMembershipSeamDifferentialTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    withinProfit(s, persistedProfitArea(orgUnitRepository));
     return squadronRepository.save(s);
   }
 
@@ -431,7 +428,6 @@ class UserServiceMembershipSeamDifferentialTest {
     SpecialCommand sc = new SpecialCommand();
     sc.setName(name);
     sc.setShorthand(shorthand);
-    withinProfit(sc, persistedProfitArea(orgUnitRepository));
     return specialCommandRepository.save(sc);
   }
 }

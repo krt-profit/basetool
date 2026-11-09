@@ -208,6 +208,7 @@ where authorized; historical names alone do not create access.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `InventoryJobOrderScopeIntegrationTest`,
+`StockRowViewCharacterisationTest`, `JobOrderModuleContractTest`,
 `JobOrderAssigneeGrantIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
 `ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest` cover current
 MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. Future participation

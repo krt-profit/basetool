@@ -122,14 +122,14 @@ class LiveSyncTopicRegistryParityTest {
             key("bank", false),
             key("orgunit-bank", false),
             key("refinery", false),
-            key("refinery-order", true))
+            key("refinery-order", true),
+            key("orders", false))
         .doesNotContain(
             key("bank", true),
             key("members", false),
             key("mission", true),
             key("missions", false),
             key("operation", true),
-            key("orders", false),
             key("org-structure", false),
             key("exchange-clients", false));
   }
