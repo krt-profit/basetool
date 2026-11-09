@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
@@ -101,31 +102,10 @@ public class BankBookingRequestService {
   /**
    * Persists a new {@code PENDING} booking request, audits it and fires the notification event
    * (REQ-BANK-022/-026). Enforces only the bank-domain rules; the caller has already checked
-   * visibility and resolved the approval snapshot.
+   * visibility and resolved the approval snapshot. The request is stamped with the draft's explicit
+   * requester, never with the security context's caller (ADR-0352).
    *
-   * @param accountId the source account (already view-checked by the caller)
-   * @param type deposit, withdrawal or transfer
-   * @param amount the requested whole-aUEC amount
-   * @param note the requester's optional note
-   * @param justification the requester's optional Begr&uuml;ndung; required for a {@code
-   *     WITHDRAWAL} / {@code TRANSFER} from a {@linkplain
-   *     BankAccountType#requiresDebitJustification() justification-mandating} account
-   *     (REQ-BANK-045)
-   * @param targetAccountId the transfer destination, or {@code null} for deposit/withdrawal
-   * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
-   *     (snapshot)
-   * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
-   * @param requiredApprover the approver class a flagged request needs (snapshot), or {@code null}
-   * @param splitEnabled whether a deposit is split across the squadron accounts on confirmation
-   *     (REQ-BANK-044); always {@code false} for withdrawal/transfer
-   * @param splitPercent the whole percent (1–100) to distribute; {@code null} unless {@code
-   *     splitEnabled}
-   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
-   *     {@code null} to derive the requester at confirmation
-   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
-   * @param purpose what another module raised the request for (REQ-BANK-061), or {@code null}
-   * @param clientId the connected application that raised it through the exchange (REQ-BANK-067),
-   *     or {@code null} for a request raised in the Basetool
+   * @param draft the requester, the payload and the approval snapshot
    * @return the created request
    * @throws NotFoundException when the source or destination account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
@@ -135,34 +115,21 @@ public class BankBookingRequestService {
    */
   @NotNull
   @Transactional
-  public BankBookingRequestDto create(
-      @NotNull UUID accountId,
-      @NotNull BankBookingRequestType type,
-      @NotNull BigDecimal amount,
-      @Nullable String note,
-      @Nullable String justification,
-      @Nullable UUID targetAccountId,
-      boolean requiresOwnerApproval,
-      @Nullable BigDecimal applicableLimit,
-      @Nullable BankRequestApprover requiredApprover,
-      boolean splitEnabled,
-      @Nullable BigDecimal splitPercent,
-      @Nullable UUID counterpartyUserId,
-      @Nullable UUID counterpartyOrgUnitId,
-      @Nullable BankPurpose purpose,
-      @Nullable String clientId) {
+  public BankBookingRequestDto create(@NotNull BankBookingRequestDraft draft) {
+    BankBookingRequestType type = draft.type();
     BankAccount account =
-        Entities.require(accountRepository.findById(accountId), "Bank account not found");
+        Entities.require(accountRepository.findById(draft.accountId()), "Bank account not found");
     requireActiveForRequest(account);
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
-      BankBookingGuards.requireDebitJustification(account, justification);
+      BankBookingGuards.requireDebitJustification(account, draft.justification());
     }
     BankAccount targetAccount = null;
     if (type == BankBookingRequestType.TRANSFER) {
+      UUID targetAccountId = draft.targetAccountId();
       if (targetAccountId == null) {
         throw new NotFoundException("A transfer request requires a destination account");
       }
-      if (targetAccountId.equals(accountId)) {
+      if (targetAccountId.equals(draft.accountId())) {
         throw new BankConflictException(
             BankConflictException.CODE_BANK_SELF_TRANSFER,
             "Source and destination account of a transfer must differ");
@@ -177,24 +144,29 @@ public class BankBookingRequestService {
     request.setAccount(account);
     request.setTargetAccount(targetAccount);
     request.setType(type);
-    request.setAmount(amount);
-    request.setNote(note);
-    request.setJustification(justification);
+    request.setAmount(draft.amount());
+    request.setNote(draft.note());
+    request.setJustification(draft.justification());
     applyCounterparty(
-        request, resolveRequestCounterparty(type, counterpartyUserId, counterpartyOrgUnitId));
+        request,
+        resolveRequestCounterparty(
+            type, draft.counterpartyUserId(), draft.counterpartyOrgUnitId()));
     request.setStatus(BankBookingRequestStatus.PENDING);
-    UUID requesterSub = authHelperService.currentUserId().orElse(null);
+    UUID requesterSub = draft.requester().userId();
     String requesterHandle = resolveHandle(requesterSub);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
+    BankAdmission.Admitted routing = draft.routing();
+    boolean requiresOwnerApproval = routing.requiresApproval();
     request.setRequiresOwnerApproval(requiresOwnerApproval);
-    request.setApplicableLimit(applicableLimit);
-    request.setRequiredApprover(requiredApprover);
-    request.setSplitEnabled(splitEnabled);
-    request.setSplitPercent(splitPercent);
+    request.setApplicableLimit(routing.applicableLimit());
+    request.setRequiredApprover(routing.requiredApprover());
+    request.setSplitEnabled(draft.splitEnabled());
+    request.setSplitPercent(draft.splitPercent());
+    BankPurpose purpose = draft.purpose();
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
-    request.setClientId(clientId);
+    request.setClientId(draft.clientId());
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -204,7 +176,7 @@ public class BankBookingRequestService {
         requesterSub,
         type
             + " request "
-            + plain(amount)
+            + plain(draft.amount())
             + " aUEC "
             + shortId(saved.getId())
             + (requiresOwnerApproval ? " (needs approval)" : ""));
@@ -215,7 +187,7 @@ public class BankBookingRequestService {
             saved.getId(),
             account.getId(),
             type,
-            amount,
+            draft.amount(),
             account.getAccountNo(),
             requesterHandle,
             orgUnit == null ? null : orgUnit.getShorthand(),
