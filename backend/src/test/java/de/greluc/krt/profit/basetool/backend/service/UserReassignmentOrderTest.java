@@ -88,7 +88,7 @@ class UserReassignmentOrderTest {
           "150:ExchangeUserReassignment|exchange_installation.user_id"
               + "[exchange_client_id+key_thumbprint],"
               + "exchange_ship_link.user_id[client_id+installation_key+external_id],"
-              + "exchange_refinery_order_link.user_id[client_id+client_key]"
+              + "exchange_refinery_order_link.user_id[client_id+client_key+retired_at]"
               + "|exchange_client_revocation.user_id,exchange_change.user_id,"
               + "exchange_journal.user_id,exchange_bulk_undo_run.requested_by,"
               + "exchange_bulk_undo_skip.user_id,exchange_name_withholding.user_id",
