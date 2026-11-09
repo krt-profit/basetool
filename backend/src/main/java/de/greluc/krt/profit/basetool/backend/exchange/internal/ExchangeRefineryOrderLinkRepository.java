@@ -76,4 +76,90 @@ public interface ExchangeRefineryOrderLinkRepository
       @Param("clientId") String clientId,
       @Param("clientKey") String clientKey,
       @Param("at") Instant at);
+
+  /**
+   * Finds the link of an order while its key still names it.
+   *
+   * @param orderId the order
+   * @return the link not retired, or empty
+   */
+  Optional<ExchangeRefineryOrderLink> findByRefineryOrderIdAndRetiredAtIsNull(UUID orderId);
+
+  /**
+   * Finds the link of an order whose key a later create took over.
+   *
+   * @param orderId the order
+   * @return the retired link, or empty
+   */
+  Optional<ExchangeRefineryOrderLink> findByRefineryOrderIdAndRetiredAtIsNotNull(UUID orderId);
+
+  /**
+   * Lists the retired links of one key, the latest retired first.
+   *
+   * @param userId the member
+   * @param clientId the client
+   * @param clientKey the client's key
+   * @return the retired links
+   */
+  List<ExchangeRefineryOrderLink>
+      findByUserIdAndClientIdAndClientKeyAndRetiredAtIsNotNullOrderByRetiredAtDesc(
+          UUID userId, String clientId, String clientKey);
+
+  /**
+   * Lists the links of the given members whose key still names their order.
+   *
+   * @param userIds the members
+   * @return the links not retired
+   */
+  List<ExchangeRefineryOrderLink> findByUserIdInAndRetiredAtIsNull(Collection<UUID> userIds);
+
+  /**
+   * Retires one link.
+   *
+   * @param id the link
+   * @param at when its key stops naming the order
+   * @return the number of links retired
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      "UPDATE ExchangeRefineryOrderLink l SET l.retiredAt = :at WHERE l.id = :id"
+          + " AND l.retiredAt IS NULL")
+  int retire(@Param("id") UUID id, @Param("at") Instant at);
+
+  /**
+   * Lets a retired link name its order by its key again; the key must have no other live link.
+   *
+   * @param id the link
+   * @return the number of links revived
+   */
+  @Modifying(flushAutomatically = true)
+  @Query("UPDATE ExchangeRefineryOrderLink l SET l.retiredAt = NULL WHERE l.id = :id")
+  int revive(@Param("id") UUID id);
+
+  /**
+   * Lists the orders of links that no journal entry and no change-feed entry refers to any more.
+   *
+   * @return the order ids, each once
+   */
+  @Query(
+      value =
+          """
+          SELECT DISTINCT l.refinery_order_id FROM exchange_refinery_order_link l
+          WHERE NOT EXISTS (SELECT 1 FROM exchange_journal j WHERE j.resource = 'REFINERY_ORDER'
+                              AND j.entity_key = CAST(l.refinery_order_id AS text))
+            AND NOT EXISTS (SELECT 1 FROM exchange_change c WHERE c.resource = 'REFINERY_ORDER'
+                              AND c.entity_key = CAST(l.refinery_order_id AS text))
+          """,
+      nativeQuery = true)
+  List<UUID> findUnreferencedOrderIds();
+
+  /**
+   * Deletes the links of the given orders.
+   *
+   * @param orderIds the orders
+   * @return the number of links deleted
+   */
+  @Modifying
+  @Query("DELETE FROM ExchangeRefineryOrderLink l WHERE l.refineryOrderId IN :orderIds")
+  int deleteByOrderIds(@Param("orderIds") Collection<UUID> orderIds);
 }

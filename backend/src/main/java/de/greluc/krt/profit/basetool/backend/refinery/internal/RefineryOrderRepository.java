@@ -113,6 +113,15 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   long countByOwnerId(@NotNull UUID ownerId);
 
   /**
+   * Lists which of the given orders exist, whoever owns them (REQ-XCH-052).
+   *
+   * @param ids the order ids
+   * @return the ids among {@code ids} that name an order
+   */
+  @Query("SELECT r.id FROM RefineryOrder r WHERE r.id IN :ids")
+  List<UUID> findExistingIds(@Param("ids") Collection<UUID> ids);
+
+  /**
    * Finds the creation timestamp of the oldest refinery order in the given status, for the "oldest
    * open refinery order age" gauge (REQ-OBS-011).
    *

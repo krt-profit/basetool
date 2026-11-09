@@ -84,6 +84,14 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
     return refineryOrderRepository.countByOwnerId(owner);
   }
 
+  @Override
+  public @NotNull @Unmodifiable Set<UUID> existing(@NotNull Collection<UUID> ids) {
+    if (ids.isEmpty()) {
+      return Set.of();
+    }
+    return Set.copyOf(refineryOrderRepository.findExistingIds(ids));
+  }
+
   /**
    * Maps an order with its loaded graph.
    *

@@ -3568,52 +3568,98 @@ journal actions are `REFINERY_CREATE`, `REFINERY_UPDATE`, `REFINERY_GOOD_ADD`,
 `REFINERY_DELETE` (`V371`), and `REFINERY_PICKUP` (`V372`); a delete is journaled as a removal for
 the guard. Writes of one change set share their
 transaction and time, so the undo orders an order's writes by its counters, which every write
-raises. The member's undo and the admin's bulk undo (REQ-XCH-034) restore it as follows:
+raises; a `REFINERY_DELETE` entry is always the order's last write, wherever the journal lists it.
+A section's restore is guarded by its counter: from the client's first write to the section on,
+every later write of the client must find the section as the client's previous write left it, and
+the order (or, for a delete, the deleted order) must still show the counter the client's last write
+left; otherwise the order is skipped `CHANGED_AFTERWARDS`, so the undo never reverts a write made
+in the web or by another client in between. Each touched section goes back to its state before the
+client's first write to that section. The member's undo and the admin's bulk undo (REQ-XCH-034)
+restore it as follows:
 
 - **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
   `clientKey`, client marker and every field; the mission link only while that mission still
   exists, the owning unit only while the member is still a direct member of it (else none). Both
   counters come back one above the deleted order's, so a client's stale echo is refused. Sections
-  the client's earlier writes in the span touched go back to their state before the first of them,
-  under the counter check below; an order the client also created in the span stays gone. The feed
-  shows it again under the same key. The restore is audited
-  `REFINERY_ORDER_RESTORED`; the undo itself stays `EXCHANGE_CHANGES_UNDONE`.
+  the client's earlier writes in the span touched go back under the counter check above, also when
+  those writes are in the delete's own change set; an order the client also created in the span
+  stays gone. When the restored run differs from the deleted one, the ready marker is cleared, so
+  the restored run is announced (REQ-REFINERY-023). The key names the order again: a link a later
+  create of the key left on an order that is gone, or that this undo removes, is retired. The feed
+  shows it again under the same key. The restore is audited `REFINERY_ORDER_RESTORED`; the undo
+  itself stays `EXCHANGE_CHANGES_UNDONE`.
 - **`create`** — the order is removed with its goods, audited `REFINERY_ORDER_DELETED`, while
-  neither section counter moved since; otherwise it is skipped `CHANGED_AFTERWARDS`. The feed
-  carries a tombstone with the `clientKey` for the creating client.
-- **`update`, goods ops and `cancel`** — the sections the client's writes touched go back to their
-  state before the client's first write in the span, goods rows under their old ids, while each of
-  those sections' counters shows no other write since or in between; otherwise the order is skipped
-  `CHANGED_AFTERWARDS`. A section the client did not touch is left as it is. The undo of a cancel
-  sets the status back also on a stored order, since the cancel changed it there too.
+  neither section counter moved since; otherwise it is skipped `CHANGED_AFTERWARDS`. Its key is
+  retired and goes back to the latest earlier order of that key that still exists. The feed carries
+  a tombstone with the `clientKey` for the creating client.
+- **`update`, goods ops and `cancel`** — the sections the client's writes touched go back, goods
+  rows under their old ids, under the counter check above. A section the client did not touch is
+  left as it is, and a location the restore would not change is not written again, so an order whose
+  station has lost its refinery since is still restored. The undo of a cancel sets the status back
+  also on a stored order, since the cancel changed it there too.
 - **`pickup`** — without store lines the status goes back and `pickedUpAt` is cleared, under the
   same counter check; with store lines it is skipped `STOCK_BOOKED`, because the booked stock is the
   member's to take back in the Lager.
 
 An order no longer the member's, or whose restore names a location, method or material that is
-gone, is skipped `GONE`.
+gone or may no longer be written (an earlier location that is no offered refinery any more, a
+material that may not be refined), is skipped `GONE`; the rest of the undo goes on.
+
+A key's link outlives its order for the tombstone and the undo: the nightly
+`exchange_change_retention` run deletes a link whose order is gone once no journal entry and no
+change-feed entry refers to that order any more (owner decision 2026-11-09). On an account merge
+(REQ-SEC-045), of two live links of one key the one whose order still exists is kept; retired
+links move.
 
 **Acceptance**
 
 - [x] An undo recreates a deleted order under its old ids with its client key and marker, and the
   feed shows it again; it is audited `REFINERY_ORDER_RESTORED`. An undo of a cancel reopens the
-  order. *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
+  order. *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoRecreatesADeletedOrderUnderItsIdsWithItsKeyMarkerAndMission`,
+  `aCancelSetsCanceledAsAChangeIsUnchangedTheSecondTimeAndIsUndoneBySection`).*
+- [x] An undo recreates orders that one change set updated, cancelled or added a good to and then
+  deleted, whatever order the journal lists the writes in.
+  *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoRecreatesOrdersTheSameSetWroteAndThenDeletedWhereverTheJournalListsTheDelete`).*
 - [x] An undo removes an unchanged create and skips one changed in the web; it brings a removed
   good back under its id and rolls back the finances of the same order.
-  *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`.*
+  *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoRemovesAnUnchangedCreateAndRollsBackAGoodsOpButSkipsAnOrderChangedInTheWeb`,
+  `anUndoOfAGoodRemovalBringsTheRowBackUnderItsIdAndRestoresTheFinances`).*
+- [x] An undo skips `CHANGED_AFTERWARDS` an order whose section the web wrote between two of the
+  client's writes, before the client's first write to that section.
+  *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoSkipsAnOrderWhoseGameDataTheWebMovedBetweenTwoOfTheClientsWrites`,
+  `anUndoSkipsAnOrderWhoseFinancesTheWebChangedBeforeTheClientsFirstFinancesWrite`).*
+- [x] An undo sets back the run of an order whose station lost its refinery, keeping its location,
+  together with the member's other orders. *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoSetsBackTheRunOfAnOrderWhoseStationLostItsRefineryAndKeepsItsLocation`).*
+- [x] An undo of a delete and of the create that took its key over gives the key back to the
+  recreated order; an undo of a delete that restores an earlier run clears the ready marker.
+  *`ExchangeRefineryOrderWriteControllerTest`
+  (`anUndoOfADeleteAndOfACreateThatTookItsKeyOverGivesTheKeyBackToTheDeletedOrder`,
+  `anUndoOfADeleteThatRestoresAnEarlierRunClearsTheReadyMarker`).*
 - [x] An undo of a pickup without lines reopens the order and clears `pickedUpAt`.
   *`ExchangeRefineryOrderWriteControllerTest`.*
 - [x] An undo of a pickup with lines is skipped `STOCK_BOOKED`. *`ExchangeRefineryStoreControllerTest`.*
+- [x] The retention deletes the key of a gone order only once nothing refers to it; a merge keeps
+  the moving order's key where the kept account's key names a gone order.
+  *`ExchangeRefineryOrderWriteControllerTest`
+  (`theRetentionDeletesTheKeyOfAGoneOrderOnlyOnceNothingRefersToTheOrder`),
+  `UserAccountMergeEndStateTest`.*
 
 The journal state records whether the order is stored (`stored`), so the undo tells a pickup that
 booked stock from one that did not; `V373` admits `STOCK_BOOKED` as a skip reason of the admin's
-bulk undo.
+bulk undo. `ExchangeRefineryOrderStateTest` pins the journal state's JSON shape.
 
-**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderJournalStateTest`,
-`ExchangeRefineryStoreControllerTest` · **Code:** `ExchangeRefineryOrderJournal`,
-`ExchangeUndoService`, `V370`, `V371`, `V372`, `V373` · **Status:** implemented — #3168 (journal,
-undo of create, update and goods ops), #3169 (undo of cancel and delete), #3170 (undo of a pickup
-without store lines), #3171 (undo of a pickup with store lines)
+**Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`,
+`UserAccountMergeEndStateTest`, `ExchangeRefineryOrderStateTest` · **Code:**
+`ExchangeRefineryOrderJournal`, `ExchangeRefineryOrderKeys`, `ExchangeUndoService`,
+`ExchangeUserReassignment`, `ExchangeChangeRetentionTask`, `V370`, `V371`, `V372`, `V373` ·
+**Status:** implemented — #3168 (journal, undo of create, update and goods ops), #3169 (undo of
+cancel and delete), #3170 (undo of a pickup without store lines), #3171 (undo of a pickup with
+store lines)
 
 ## Threat model
 

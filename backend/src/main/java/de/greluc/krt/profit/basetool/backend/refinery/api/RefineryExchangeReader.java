@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.refinery.api;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -62,4 +63,15 @@ public interface RefineryExchangeReader {
    * @return the number of orders the member owns
    */
   long count(@NotNull UUID owner);
+
+  /**
+   * Returns which of the given orders exist, whoever owns them, so the client keys of orders that
+   * are gone can be told from the keys of orders that are not (REQ-XCH-052).
+   *
+   * @param ids the order ids
+   * @return the ids among {@code ids} of orders that exist
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> existing(@NotNull Collection<UUID> ids);
 }
