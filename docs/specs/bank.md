@@ -2899,6 +2899,14 @@ against it at all; the type decides the whole field shape. Changing either makes
 click, on the same row. Keeping them out also keeps this endpoint off the eligibility-resolution
 path, where a mistake would be an authorization defect rather than a bad edit.
 
+**A purpose-bound request keeps its amount, destination and recipient** (REQ-BANK-061). Its
+purpose module checked them when it raised the request — a purchasing tranche against the deal
+total, the advance share and the limits — and books against them on confirmation, so a correction
+that changes any of them is refused with `400` and changes nothing; note and Begründung stay
+correctable. The edit form shows amount and recipient of such a request fixed. To change them, the
+member cancels the request and raises it anew in its module (`BankBookingRequestServiceTest`,
+`updateOwn_purposeBound*`).
+
 **The approval snapshot is re-derived from the new amount.** This is the security-critical half:
 without it a requester could file 100 aUEC under a 1000 ceiling and then edit it to 100 000, arriving
 at the bank employee still carrying the original "no approval needed" snapshot. The seam resolves it

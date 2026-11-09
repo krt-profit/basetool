@@ -212,8 +212,10 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   re-routing on correction. The exchange adds no rule of its own. A deposit may target any active
   account (REQ-BANK-042); a withdrawal or transfer needs an account the policy admits.
 - **Which requests.** Correction and cancel act on every own pending request, the web's included.
-  A correction keeps the counterparty a web request names. No counterparty, no purpose-bound and no
-  KRT direct-booking request is raised through a client.
+  A correction keeps the counterparty a web request names. A purpose-bound request keeps its
+  amount and destination too: a correction that changes them answers `400 SCHEMA_INVALID`
+  (REQ-BANK-056). A correction is routed as its raise was: a deposit never needs an approval. No
+  counterparty, no purpose-bound and no KRT direct-booking request is raised through a client.
 - **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
   requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise;
   the own requests answer the cap as `openRequestCap` (REQ-BXCH-003), so a client can tell first.

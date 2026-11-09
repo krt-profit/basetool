@@ -314,8 +314,9 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist or belongs to another user
    * @throws BankConflictException {@code BANK_REQUEST_NOT_PENDING} when already decided, {@code
    *     BANK_REQUEST_ALREADY_APPROVED} when the responsible holder already signed off
-   * @throws BadRequestException on an inconsistent destination account or counterparty, or a
-   *     missing Begr&uuml;ndung on a mandating account
+   * @throws BadRequestException on an inconsistent destination account or counterparty, a missing
+   *     Begr&uuml;ndung on a mandating account, or a changed amount, destination or recipient of a
+   *     purpose-bound request
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -338,6 +339,7 @@ public class BankBookingRequestService {
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
           "An approved request can no longer be edited; cancel it and raise a new one");
     }
+    requirePurposeBoundTermsKept(request, update);
     BankBookingRequestType type = request.getType();
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
@@ -378,6 +380,34 @@ public class BankBookingRequestService {
             orgUnit == null ? null : orgUnit.getShorthand(),
             request.getRequestedBy()));
     return toDto(request);
+  }
+
+  /**
+   * Refuses a correction of a purpose-bound request that changes what its purpose module checked at
+   * raise time: the amount, the destination or the recipient (REQ-BANK-061). Note and
+   * Begr&uuml;ndung stay correctable.
+   *
+   * @param request the locked request
+   * @param update the correction
+   * @throws BadRequestException when a purpose-bound request's amount, destination or recipient
+   *     would change
+   */
+  private static void requirePurposeBoundTermsKept(
+      @NotNull BankBookingRequest request, @NotNull UpdateBankBookingRequest update) {
+    if (request.getPurposeKind() == null) {
+      return;
+    }
+    BankAccount target = request.getTargetAccount();
+    boolean kept =
+        request.getAmount().compareTo(update.amount()) == 0
+            && Objects.equals(target == null ? null : target.getId(), update.targetAccountId())
+            && Objects.equals(request.getCounterpartyUserId(), update.counterpartyUserId())
+            && Objects.equals(request.getCounterpartyOrgUnitId(), update.counterpartyOrgUnitId());
+    if (!kept) {
+      throw new BadRequestException(
+          "A purpose-bound request keeps its amount, destination and recipient;"
+              + " cancel it and raise it anew in its module");
+    }
   }
 
   /**
