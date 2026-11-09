@@ -53,8 +53,8 @@ public class ExchangeBankQueueService {
   /** The largest page of each section. */
   public static final int MAX_LIMIT = 500;
 
-  /** The age from which the oldest request counts as overdue, the pending-request alert's. */
-  static final Duration OVERDUE_AFTER = Duration.ofHours(48);
+  /** The age from which the oldest request is overdue: 48 hours, as the pending-request alert. */
+  static final Duration OVERDUE_AFTER = Duration.ofDays(2);
 
   /** The Basetool page of one request; the request id follows. */
   static final String LINK_PREFIX = "https://profit-base.online/bank/requests/";

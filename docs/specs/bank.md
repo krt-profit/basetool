@@ -3152,6 +3152,38 @@ answers `404` like an unknown id, through the real token chain) ·
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
 REQ-BANK-038, REQ-BANK-056
 
+### REQ-BANK-068 — One booking request has a page of its own
+
+`/bank/requests/{id}` shows one booking request: its type, status, approval state, account and
+target, amount, requester, justification and note, and once decided when, by whom and why. It is the
+page the exchange staff queue's `link` opens (REQ-BXCH-005), so it is open to every signed-in member
+and the backend decides what it shows.
+
+- **Who sees it.** `GET /api/v1/bank/org-units/requests/{id}` answers for the requester
+  (REQ-BANK-022), the bank staff who see the request's account (REQ-BANK-009, REQ-BANK-023) and its
+  approvers (REQ-BANK-041, REQ-BANK-046); four-eyes keeps the requester out of the approvers
+  (REQ-BANK-062). Anyone else and an unknown id get the same `404`, and the page shows "Antrag nicht
+  gefunden".
+- **Where to act.** The page decides nothing itself. While the request is pending it leads bank staff
+  into the staff queue (`/bank/requests?focus={id}`), an approver to "Anträge an unsere Konten"
+  (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
+  button is the action the caller can take now.
+- **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
+  card in place through the org-unit bank room (REQ-FE-015).
+
+**Acceptance**
+
+- [x] The requester, a granted employee (with `callerMayConfirm`) and an approver read the request;
+  a foreign member, an employee without a grant on the account and an unknown id get `404`
+  (`BankRequestViewTest`).
+- [x] The page renders the details and the right way to act for staff, approvers and the requester,
+  its `requestDetail` fragment resolves, and a hidden request shows the empty state
+  (`BankRequestPageControllerMvcTest`).
+
+**Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankController#getRequest` (backend) ·
+`BankRequestPageController`, `templates/bank/bank-request.html`, `bank-livesync.js` (frontend) ·
+**Related:** REQ-BANK-023, REQ-BANK-041, REQ-BANK-062, REQ-BXCH-005 · **Issues:** #3120, #3160
+
 ## Tests
 
 ### Bank access characterisation matrix

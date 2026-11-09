@@ -204,7 +204,7 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @return the requests with their accounts and org unit loaded
    */
   @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
-  List<BankBookingRequest> findByStatus(BankBookingRequestStatus status);
+  List<BankBookingRequest> findAllByStatus(BankBookingRequestStatus status);
 
   /**
    * Existence probe backing the close-account guard (REQ-BANK-025): an account with an open request

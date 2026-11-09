@@ -71,8 +71,8 @@ function bankRoom(room) {
 }
 
 /**
- * Opens the live-sync receivers the page's rooms call for: the staff overview, the org-unit bank
- * and the single-account room (REQ-FE-015).
+ * Opens the live-sync receivers the page's rooms call for: the staff overview, the org-unit bank,
+ * the single-request page and the single-account room (REQ-FE-015).
  */
 export function initLiveSyncReceivers() {
     const hasStaffRoom =
@@ -113,6 +113,20 @@ export function initLiveSyncReceivers() {
                 orgUnitBankSettings: {
                     container: '#org-unit-bank-settings-results',
                     fragmentValue: 'orgUnitBankSettings',
+                },
+            },
+        });
+    }
+
+    if (document.querySelector('#bank-request-detail-results')) {
+        bankRoom({
+            topicClass: 'ORGUNIT_BANK',
+            topic: 'orgunit-bank',
+            coalesceMs: 1500,
+            sections: {
+                orgUnitBank: {
+                    container: '#bank-request-detail-results',
+                    fragmentValue: 'requestDetail',
                 },
             },
         });

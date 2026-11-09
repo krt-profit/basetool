@@ -67,7 +67,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
     BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
     BankStaffRights rights = scope.rights();
     List<BankBookingRequest> pending =
-        requestRepository.findByStatus(BankBookingRequestStatus.PENDING).stream()
+        requestRepository.findAllByStatus(BankBookingRequestStatus.PENDING).stream()
             .sorted(Comparator.comparing(BankStaffQueueReadService::key, ORDER))
             .toList();
     List<BankBookingRequest> open =
