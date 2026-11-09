@@ -29,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
@@ -152,7 +153,6 @@ class BankPurposeBoundRequestServiceTest {
   @Test
   void aRequestCreatedWithAPurposeStoresKindAndReference() {
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
     when(requestRepository.save(any(BankBookingRequest.class)))
         .thenAnswer(invocation -> {
           BankBookingRequest saved = invocation.getArgument(0);
@@ -162,21 +162,21 @@ class BankPurposeBoundRequestServiceTest {
 
     BankBookingRequestDto dto =
         service.create(
-            accountId,
-            BankBookingRequestType.DEPOSIT,
-            new BigDecimal("500"),
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId),
-            null);
+            new BankBookingRequestDraft(
+                TestBankActor.of(requester).build(),
+                accountId,
+                BankBookingRequestType.DEPOSIT,
+                new BigDecimal("500"),
+                null,
+                null,
+                null,
+                BankAdmission.Admitted.UNROUTED,
+                false,
+                null,
+                null,
+                null,
+                new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId),
+                null));
 
     assertThat(dto.purposeKind()).isEqualTo(BankPurposeKind.PURCHASING_DEAL);
     assertThat(dto.purposeRef()).isEqualTo(dealId);
@@ -185,7 +185,6 @@ class BankPurposeBoundRequestServiceTest {
   @Test
   void aRequestCreatedWithoutAPurposeCarriesNone() {
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account()));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requester));
     when(requestRepository.save(any(BankBookingRequest.class)))
         .thenAnswer(invocation -> {
           BankBookingRequest saved = invocation.getArgument(0);
@@ -195,21 +194,21 @@ class BankPurposeBoundRequestServiceTest {
 
     BankBookingRequestDto dto =
         service.create(
-            accountId,
-            BankBookingRequestType.DEPOSIT,
-            new BigDecimal("500"),
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null);
+            new BankBookingRequestDraft(
+                TestBankActor.of(requester).build(),
+                accountId,
+                BankBookingRequestType.DEPOSIT,
+                new BigDecimal("500"),
+                null,
+                null,
+                null,
+                BankAdmission.Admitted.UNROUTED,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null));
 
     assertThat(dto.purposeKind()).isNull();
     assertThat(dto.purposeRef()).isNull();

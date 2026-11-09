@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
@@ -367,7 +368,6 @@ class BankBookingRequestServiceTest {
     UUID orgUnitId = UUID.randomUUID();
     BankAccount account = account(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
     User requester = new User();
     requester.setUsername("officer");
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(requester));
@@ -389,21 +389,21 @@ class BankBookingRequestServiceTest {
 
     BankBookingRequestDto dto =
         service.create(
-            accountId,
-            BankBookingRequestType.WITHDRAWAL,
-            new BigDecimal("500"),
-            null,
-            "reason",
-            null,
-            false,
-            null,
-            null,
-            false,
-            null,
-            recipientId,
-            orgUnitId,
-            null,
-            null);
+            new BankBookingRequestDraft(
+                TestBankActor.of(requesterSub).build(),
+                accountId,
+                BankBookingRequestType.WITHDRAWAL,
+                new BigDecimal("500"),
+                null,
+                "reason",
+                null,
+                BankAdmission.Admitted.UNROUTED,
+                false,
+                null,
+                recipientId,
+                orgUnitId,
+                null,
+                null));
 
     assertThat(dto.counterpartyUserId()).isEqualTo(recipientId);
     assertThat(dto.counterpartyHandle()).isEqualTo("payee");
@@ -432,21 +432,21 @@ class BankBookingRequestServiceTest {
         BadRequestException.class,
         () ->
             service.create(
-                accountId,
-                BankBookingRequestType.WITHDRAWAL,
-                new BigDecimal("500"),
-                null,
-                "reason",
-                null,
-                false,
-                null,
-                null,
-                false,
-                null,
-                recipientId,
-                UUID.randomUUID(),
-                null,
-                null));
+                new BankBookingRequestDraft(
+                    BankActor.NOBODY,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    "reason",
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    recipientId,
+                    UUID.randomUUID(),
+                    null,
+                    null)));
     verify(requestRepository, never()).save(any(BankBookingRequest.class));
   }
 
@@ -465,21 +465,21 @@ class BankBookingRequestServiceTest {
         BadRequestException.class,
         () ->
             service.create(
-                accountId,
-                BankBookingRequestType.DEPOSIT,
-                new BigDecimal("500"),
-                null,
-                null,
-                null,
-                false,
-                null,
-                null,
-                false,
-                null,
-                UUID.randomUUID(),
-                null,
-                null,
-                null));
+                new BankBookingRequestDraft(
+                    BankActor.NOBODY,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    UUID.randomUUID(),
+                    null,
+                    null,
+                    null)));
     verify(requestRepository, never()).save(any(BankBookingRequest.class));
   }
 
@@ -489,7 +489,6 @@ class BankBookingRequestServiceTest {
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = account(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
     User user = new User();
     user.setUsername("officer");
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(user));
@@ -502,21 +501,21 @@ class BankBookingRequestServiceTest {
 
     BankBookingRequestDto dto =
         service.create(
-            accountId,
-            BankBookingRequestType.DEPOSIT,
-            new BigDecimal("500"),
-            "from sale",
-            null,
-            null,
-            false,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null,
-            null);
+            new BankBookingRequestDraft(
+                TestBankActor.of(requesterSub).build(),
+                accountId,
+                BankBookingRequestType.DEPOSIT,
+                new BigDecimal("500"),
+                "from sale",
+                null,
+                null,
+                BankAdmission.Admitted.UNROUTED,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null));
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.PENDING);
     assertThat(dto.type()).isEqualTo(BankBookingRequestType.DEPOSIT);
@@ -533,6 +532,7 @@ class BankBookingRequestServiceTest {
     assertThat(event.getValue().accountId()).isEqualTo(accountId);
     assertThat(event.getValue().contextAccountId()).isEqualTo(accountId);
     assertThat(event.getValue().actorSub()).isEqualTo(requesterSub);
+    verifyNoInteractions(authHelperService);
   }
 
   @Test
@@ -541,7 +541,6 @@ class BankBookingRequestServiceTest {
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = account(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
@@ -552,21 +551,21 @@ class BankBookingRequestServiceTest {
         });
 
     service.create(
-        accountId,
-        BankBookingRequestType.DEPOSIT,
-        new BigDecimal("1000"),
-        "from sale",
-        null,
-        null,
-        false,
-        null,
-        null,
-        true,
-        new BigDecimal("30"),
-        null,
-        null,
-        null,
-        null);
+        new BankBookingRequestDraft(
+            TestBankActor.of(requesterSub).build(),
+            accountId,
+            BankBookingRequestType.DEPOSIT,
+            new BigDecimal("1000"),
+            "from sale",
+            null,
+            null,
+            BankAdmission.Admitted.UNROUTED,
+            true,
+            new BigDecimal("30"),
+            null,
+            null,
+            null,
+            null));
 
     assertThat(saved.getValue().isSplitEnabled()).isTrue();
     assertThat(saved.getValue().getSplitPercent()).isEqualByComparingTo(new BigDecimal("30"));
@@ -584,21 +583,21 @@ class BankBookingRequestServiceTest {
             BankConflictException.class,
             () ->
                 service.create(
-                    accountId,
-                    BankBookingRequestType.DEPOSIT,
-                    new BigDecimal("500"),
-                    null,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null));
+                    new BankBookingRequestDraft(
+                        BankActor.NOBODY,
+                        accountId,
+                        BankBookingRequestType.DEPOSIT,
+                        new BigDecimal("500"),
+                        null,
+                        null,
+                        null,
+                        BankAdmission.Admitted.UNROUTED,
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_ACCOUNT_CLOSED);
     verify(requestRepository, never()).save(any());
   }
@@ -614,21 +613,22 @@ class BankBookingRequestServiceTest {
             BankConflictException.class,
             () ->
                 service.create(
-                    accountId,
-                    BankBookingRequestType.WITHDRAWAL,
-                    new BigDecimal("500"),
-                    null,
-                    "   ",
-                    null,
-                    true,
-                    null,
-                    BankRequestApprover.RESPONSIBLE_HOLDER,
-                    false,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null));
+                    new BankBookingRequestDraft(
+                        BankActor.NOBODY,
+                        accountId,
+                        BankBookingRequestType.WITHDRAWAL,
+                        new BigDecimal("500"),
+                        null,
+                        "   ",
+                        null,
+                        new BankAdmission.Admitted(
+                            true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null)));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_JUSTIFICATION_REQUIRED);
     verify(requestRepository, never()).save(any());
   }
@@ -639,7 +639,6 @@ class BankBookingRequestServiceTest {
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = account(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
@@ -650,21 +649,21 @@ class BankBookingRequestServiceTest {
         });
 
     service.create(
-        accountId,
-        BankBookingRequestType.WITHDRAWAL,
-        new BigDecimal("500"),
-        null,
-        null,
-        null,
-        true,
-        null,
-        BankRequestApprover.RESPONSIBLE_HOLDER,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
+        new BankBookingRequestDraft(
+            TestBankActor.of(requesterSub).build(),
+            accountId,
+            BankBookingRequestType.WITHDRAWAL,
+            new BigDecimal("500"),
+            null,
+            null,
+            null,
+            new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+            false,
+            null,
+            null,
+            null,
+            null,
+            null));
 
     assertThat(saved.getValue().getJustification()).isNull();
   }
@@ -675,7 +674,6 @@ class BankBookingRequestServiceTest {
     UUID requesterSub = UUID.randomUUID();
     BankAccount account = cartelAccount(accountId);
     when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(requesterSub));
     when(userRepository.findById(requesterSub)).thenReturn(Optional.of(new User()));
     ArgumentCaptor<BankBookingRequest> saved = ArgumentCaptor.forClass(BankBookingRequest.class);
     when(requestRepository.save(saved.capture()))
@@ -686,21 +684,21 @@ class BankBookingRequestServiceTest {
         });
 
     service.create(
-        accountId,
-        BankBookingRequestType.WITHDRAWAL,
-        new BigDecimal("500"),
-        null,
-        "Reparaturkosten",
-        null,
-        true,
-        null,
-        BankRequestApprover.RESPONSIBLE_HOLDER,
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
+        new BankBookingRequestDraft(
+            TestBankActor.of(requesterSub).build(),
+            accountId,
+            BankBookingRequestType.WITHDRAWAL,
+            new BigDecimal("500"),
+            null,
+            "Reparaturkosten",
+            null,
+            new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+            false,
+            null,
+            null,
+            null,
+            null,
+            null));
 
     assertThat(saved.getValue().getJustification()).isEqualTo("Reparaturkosten");
   }
