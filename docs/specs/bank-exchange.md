@@ -219,8 +219,9 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   the own requests answer the cap as `openRequestCap` (REQ-BXCH-003), so a client can tell first.
   The raise counts under a per-member transaction lock (`pg_advisory_xact_lock`), so two concurrent
   raises of one member never take them past the cap.
-- **The explicit actor.** Correction and cancel check ownership for the actor the exchange built,
-  down every call; neither reads who calls from the security context
+- **The explicit actor.** A raise is admitted for and stamped with the actor the exchange built,
+  and correction and cancel check ownership for it, down every call; none reads who calls from the
+  security context
   (`BankAccessPolicyRulesTest.theExchangeOwnRequestWritesDecideForTheExplicitActor`).
 - **Origin.** A raised request records the registry client the exchange gate admitted in
   `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
@@ -250,7 +251,7 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   as listed (`ExchangeBankRequestWritesTest`).
 - [x] A raise racing the member's last free slot waits for the other raise and is refused with the
   cap (`BankOpenRequestCapConcurrencyTest`).
-- [x] A correction or cancel path that reaches the security context fails the build
+- [x] A raise, correction or cancel path that reaches the security context fails the build
   (`BankAccessPolicyRulesTest`).
 - [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,
   with `201` for a raise and the shared `404` for a refusal (`BankExchangeParityTest`).
