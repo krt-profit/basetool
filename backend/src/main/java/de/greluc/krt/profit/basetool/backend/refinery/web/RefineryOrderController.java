@@ -174,11 +174,11 @@ public class RefineryOrderController {
   /**
    * Updates a refinery order. Non-logistician callers must be the owner (HTTP-boundary check
    * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner). A
-   * Logistician of the order's unit may edit it.
+   * Logistician of the order's unit may edit it. The order is row-locked before it is read.
    *
    * @param jwt the caller's token
    * @param id the order to update
-   * @param request the new values, the parts to write and the last-seen version or counters
+   * @param request the new values, the parts to write and the echoed section counters
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -188,7 +188,7 @@ public class RefineryOrderController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull RefineryOrderUpdateRequest request) {
     UUID callerId = userService.getUserIdFromJwt(jwt);
-    RefineryOrder existing = refineryOrderQueryService.getRefineryOrder(id);
+    RefineryOrder existing = refineryOrderService.lockRefineryOrder(id);
 
     boolean isLogistician = refineryAccessPolicy.isLogisticianOfOrder(id);
 
@@ -210,19 +210,19 @@ public class RefineryOrderController {
 
   /**
    * Cancels (soft-deletes) a refinery order. Same owner-vs-logistician rule as {@link
-   * #updateMyRefineryOrder}.
+   * #updateMyRefineryOrder}; the order is row-locked before it is read.
    */
   @DeleteMapping("/{id}")
   @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id)")
   public void deleteMyRefineryOrder(
       @AuthenticationPrincipal Jwt jwt, @PathVariable @NotNull UUID id) {
-    refineryOrderService.deleteRefineryOrder(
-        userService.getUserIdFromJwt(jwt), id, refineryAccessPolicy.isLogisticianOfOrder(id));
+    UUID callerId = userService.getUserIdFromJwt(jwt);
+    refineryOrderService.deleteRefineryOrder(callerId, id, lockAndCheckLogistician(id));
   }
 
   /**
    * Completes a refinery order by storing the refined output as inventory items at the chosen
-   * target location.
+   * target location; the order is row-locked before it is read.
    */
   @PostMapping("/{id}/store")
   @PreAuthorize("isAuthenticated() and @refineryAccessPolicy.canEditRefineryOrder(#id)")
@@ -230,8 +230,8 @@ public class RefineryOrderController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull RefineryOrderStoreDto dto) {
-    refineryOrderStoreService.storeRefineryOrder(
-        userService.getUserIdFromJwt(jwt), id, dto, refineryAccessPolicy.isLogisticianOfOrder(id));
+    UUID callerId = userService.getUserIdFromJwt(jwt);
+    refineryOrderStoreService.storeRefineryOrder(callerId, id, dto, lockAndCheckLogistician(id));
   }
 
   /**
@@ -326,7 +326,7 @@ public class RefineryOrderController {
    *
    * @param userId the member whose order is updated
    * @param orderId the order to update
-   * @param request the new values, the parts to write and the last-seen version or counters
+   * @param request the new values, the parts to write and the echoed section counters
    * @return the persisted DTO
    */
   @PutMapping("/users/{userId}/{orderId}")
@@ -367,8 +367,19 @@ public class RefineryOrderController {
   }
 
   /**
-   * Writes an update request: the named parts against their section counters, or every part against
-   * the order version when the request names none (REQ-REFINERY-029).
+   * Row-locks the order in this request's transaction and then decides whether the caller is a
+   * logistician of its unit, so no read of the order precedes the lock (REQ-REFINERY-029).
+   *
+   * @param orderId the order
+   * @return whether the caller is a logistician of the order's unit
+   */
+  private boolean lockAndCheckLogistician(UUID orderId) {
+    refineryOrderService.lockRefineryOrder(orderId);
+    return refineryAccessPolicy.isLogisticianOfOrder(orderId);
+  }
+
+  /**
+   * Writes the parts an update request names against their section counters (REQ-REFINERY-029).
    *
    * @param userId the member acting, or the owner when a logistician acts
    * @param orderId the order to update
@@ -378,10 +389,7 @@ public class RefineryOrderController {
    */
   private RefineryOrder update(
       UUID userId, UUID orderId, RefineryOrderUpdateRequest request, boolean isLogistician) {
-    RefineryOrder details = mapper.toEntity(request);
-    return request.parts() == null
-        ? refineryOrderService.updateRefineryOrder(userId, orderId, details, isLogistician)
-        : refineryOrderService.updateRefineryOrderParts(
-            userId, orderId, details, request.parts(), isLogistician);
+    return refineryOrderService.updateRefineryOrderParts(
+        userId, orderId, mapper.toEntity(request), request.parts(), isLogistician);
   }
 }

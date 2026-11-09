@@ -33,7 +33,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
@@ -44,6 +43,11 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +56,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -209,32 +214,18 @@ public class RefineryOrderService {
   }
 
   /**
-   * Updates every part of a refinery order, replacing its goods; only the owner or a logistician
-   * may do so. The order version is checked when the caller sends one, and both section counters
-   * are raised (REQ-REFINERY-029).
+   * Row-locks a refinery order in the caller's transaction. A web write takes this lock before it
+   * reads the order at all, so a writer that committed in the meantime is seen rather than reported
+   * as a stale managed instance (REQ-REFINERY-029).
    *
-   * @param userId the acting member, or the owner when a logistician acts
    * @param orderId the order
-   * @param details the transient order holding the requested values and the last-seen version
-   * @param isLogistician whether the caller is a logistician of the order's unit
-   * @return the saved order
-   * @throws AccessDeniedException when the caller is neither owner nor logistician
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
-   * @throws BadRequestException when the order is already stored and the status would change
-   * @throws MissionParticipantRequiredException when the mission is changed to one the owner does
-   *     not take part in (REQ-SEC-042)
+   * @return the locked, managed order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no order has that
+   *     id
    */
-  @Transactional
-  public RefineryOrder updateRefineryOrder(
-      @NotNull UUID userId,
-      @NotNull UUID orderId,
-      @NotNull RefineryOrder details,
-      boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
-    OptimisticLock.checkOptionalClient(
-        order.getVersion(), details.getVersion(), RefineryOrder.class, orderId);
-    return update(userId, order, details, RefineryOrderPart.ALL, isLogistician);
+  @Transactional(propagation = Propagation.MANDATORY)
+  public RefineryOrder lockRefineryOrder(@NotNull UUID orderId) {
+    return RefineryOrders.requireLocked(refineryOrderRepository, orderId);
   }
 
   /**
@@ -386,15 +377,42 @@ public class RefineryOrderService {
     }
 
     if (details.getGoods() != null) {
-      order.getGoods().clear();
-      details
-          .getGoods()
-          .forEach(good -> {
-            resolveGood(good, order);
-            order.getGoods().add(good);
-          });
+      setGoods(order, details.getGoods());
     }
     return runTimeChanged;
+  }
+
+  /**
+   * Makes the order hold exactly the given goods: a good with the id of a held row changes that row
+   * in place and keeps its id, a good without an id is added, and every other row is removed.
+   *
+   * @param order the locked, managed order
+   * @param goods every good the order holds afterwards, transient with id-only material references
+   * @throws BadRequestException when a good names an id the order does not hold, or names one twice
+   */
+  private void setGoods(@NotNull RefineryOrder order, @NotNull Set<RefineryGood> goods) {
+    Map<UUID, RefineryGood> held = new HashMap<>();
+    order.getGoods().forEach(good -> held.put(good.getId(), good));
+    Set<UUID> kept = new HashSet<>();
+    List<RefineryGood> added = new ArrayList<>();
+    for (RefineryGood good : goods) {
+      resolveGood(good, order);
+      if (good.getId() == null) {
+        added.add(good);
+        continue;
+      }
+      RefineryGood row = held.get(good.getId());
+      if (row == null || !kept.add(good.getId())) {
+        throw new BadRequestException("error.refinery_order.good_unknown");
+      }
+      row.setInputMaterial(good.getInputMaterial());
+      row.setInputQuantity(good.getInputQuantity());
+      row.setOutputMaterial(good.getOutputMaterial());
+      row.setOutputQuantity(good.getOutputQuantity());
+      row.setQuality(good.getQuality());
+    }
+    order.getGoods().removeIf(good -> !kept.contains(good.getId()));
+    order.getGoods().addAll(added);
   }
 
   /**
@@ -446,7 +464,7 @@ public class RefineryOrderService {
 
   /**
    * Cancels (soft-deletes) a refinery order. Same owner-vs-logistician gate as {@link
-   * #updateRefineryOrder}.
+   * #updateRefineryOrderParts}.
    *
    * @throws AccessDeniedException when the caller is not allowed to delete this order
    */

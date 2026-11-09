@@ -93963,13 +93963,9 @@
           },
           "status" : {
             "type" : "string"
-          },
-          "version" : {
-            "type" : "integer",
-            "format" : "int64"
           }
         },
-        "required" : [ "goods", "location" ]
+        "required" : [ "goods", "location", "parts" ]
       },
       "RefinerySettingsDto" : {
         "type" : "object",

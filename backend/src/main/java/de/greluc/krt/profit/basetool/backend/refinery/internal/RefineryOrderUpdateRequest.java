@@ -49,11 +49,11 @@ import org.jetbrains.annotations.Nullable;
  * @param oreSales the ore sales
  * @param refiningMethod the refining method, or {@code null} to clear it
  * @param status the new status name, or {@code null} to keep the current one
- * @param goods the goods of the run, replacing the stored ones
- * @param version the last-seen order version, read only when {@code parts} is absent; {@code null}
- *     skips the check
- * @param parts the parts the request writes (REQ-REFINERY-029); absent writes every part, and the
- *     values of a part not named are not applied
+ * @param goods every good of the run; a good carrying the id of a stored good changes that good in
+ *     place and keeps its id, a good without an id is added, and a stored good not listed is
+ *     removed
+ * @param parts the parts the request writes (REQ-REFINERY-029); the values of a part not named are
+ *     not applied, and an empty set writes nothing
  * @param gameDataVersion the last-seen game-data counter, required when {@code parts} names {@code
  *     GAME_DATA}
  * @param financesVersion the last-seen finances counter, required when {@code parts} names {@code
@@ -70,7 +70,6 @@ public record RefineryOrderUpdateRequest(
     RefiningMethodDto refiningMethod,
     String status,
     @NotEmpty List<@Valid RefineryGoodDto> goods,
-    Long version,
-    @Nullable Set<RefineryOrderPart> parts,
+    @NotNull Set<RefineryOrderPart> parts,
     @Nullable Long gameDataVersion,
     @Nullable Long financesVersion) {}

@@ -19,10 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import java.util.EnumSet;
-import java.util.Set;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Unmodifiable;
 
 /** A part of a refinery order an update request writes (REQ-REFINERY-029). */
 public enum RefineryOrderPart {
@@ -32,10 +29,6 @@ public enum RefineryOrderPart {
   FINANCES,
   /** The mission link, which belongs to neither section and is not checked. */
   MISSION_LINK;
-
-  /** Every part, written by a request that names none. */
-  @Unmodifiable
-  static final Set<RefineryOrderPart> ALL = Set.copyOf(EnumSet.allOf(RefineryOrderPart.class));
 
   /**
    * The counter section this part writes.

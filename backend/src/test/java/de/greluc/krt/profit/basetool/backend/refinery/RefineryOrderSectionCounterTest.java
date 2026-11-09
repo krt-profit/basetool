@@ -252,24 +252,54 @@ class RefineryOrderSectionCounterTest {
   }
 
   @Test
-  void aWriteWithoutPartsReplacesBothSectionsAndRaisesBothCounters() throws Exception {
-    ObjectNode legacy = body(45L, 0d);
-    legacy.put("expenses", 70d);
-    send(legacy)
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.gameDataVersion").value(1))
-        .andExpect(jsonPath("$.financesVersion").value(1));
+  void aWriteWithoutPartsIsRefusedAndWritesNothing() throws Exception {
+    ObjectNode withoutParts = body(45L, 0d);
+    withoutParts.put("gameDataVersion", 0);
+    withoutParts.put("financesVersion", 0);
+    send(withoutParts).andExpect(status().isBadRequest());
 
     Map<String, Object> row = row();
-    assertThat(row.get("duration_minutes")).isEqualTo(45L);
-    assertThat(row.get("expenses")).isEqualTo(70d);
+    assertThat(row.get("duration_minutes")).isEqualTo(60L);
+    assertThat(row.get("game_data_version")).isEqualTo(0L);
   }
 
   @Test
-  void aWriteWithoutPartsStillChecksTheOrderVersion() throws Exception {
-    ObjectNode legacy = body(45L, 0d);
-    legacy.put("version", 99);
-    send(legacy).andExpect(status().isConflict());
+  void aGoodsEditCarryingTheGoodsIdKeepsTheIdAndAGoodWithoutAnIdIsAdded() throws Exception {
+    UUID heldId =
+        jdbcTemplate.queryForObject(
+            "select id from refinery_good where refinery_order_id = ?", UUID.class, orderId);
+    ObjectNode edit = body(60L, 0d);
+    ObjectNode held = edit.withArray("goods").get(0).asObject();
+    held.put("id", heldId.toString());
+    held.put("quality", 700);
+    ObjectNode added = edit.withArray("goods").addObject();
+    added.putObject("inputMaterial").put("id", ore.getId().toString());
+    added.put("inputQuantity", 5);
+    added.put("outputQuantity", 4);
+    added.put("quality", 200);
+    parts(edit, "GAME_DATA");
+    edit.put("gameDataVersion", 0);
+    send(edit).andExpect(status().isOk());
+
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select quality from refinery_good where id = ?", Integer.class, heldId))
+        .isEqualTo(700);
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from refinery_good where refinery_order_id = ?",
+                Integer.class,
+                orderId))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void aGoodsEditNamingAGoodTheOrderDoesNotHoldIsRefused() throws Exception {
+    ObjectNode edit = body(60L, 0d);
+    edit.withArray("goods").get(0).asObject().put("id", UUID.randomUUID().toString());
+    parts(edit, "GAME_DATA");
+    edit.put("gameDataVersion", 0);
+    send(edit).andExpect(status().isBadRequest());
   }
 
   @Test
