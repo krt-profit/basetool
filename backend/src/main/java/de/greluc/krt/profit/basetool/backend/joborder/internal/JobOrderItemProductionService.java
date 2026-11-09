@@ -63,6 +63,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -274,22 +275,7 @@ public class JobOrderItemProductionService {
     line.setManufacturedAmount(line.getManufacturedAmount() + amount);
     jobOrderRepository.flush();
 
-    for (ConsumedItem ci : consumedItems) {
-      if (!ci.depleted()) {
-        stockCommands.lowered(ci.itemId(), ci.remaining(), StockChangeReason.PRODUCTION);
-      }
-      auditRecorder.record(
-          AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION,
-          ci.itemId(),
-          ci.label(),
-          null,
-          AuditDetails.of("source", "PRODUCTION")
-              .with("jobOrder", "#" + orderDisplayId)
-              .with("material", ci.material())
-              .with("amount", ci.amount())
-              .with("remaining", ci.remaining())
-              .with("depleted", ci.depleted()));
-    }
+    recordConsumedStock(consumedItems, orderDisplayId);
     auditRecorder.record(
         AuditEventType.JOB_ORDER_PRODUCTION_BOOKED,
         jobOrderId,
@@ -307,6 +293,33 @@ public class JobOrderItemProductionService {
             .filter(d -> d.id().equals(jobOrderItemId))
             .findFirst(),
         "Item line not found after production booking");
+  }
+
+  /**
+   * Reports surviving stock reductions and audits each consumed row from its pre-consumption
+   * snapshot.
+   *
+   * @param consumedItems the consumed stock snapshots in production order
+   * @param orderDisplayId the order's display number, or null when unassigned
+   */
+  private void recordConsumedStock(
+      @NotNull List<ConsumedItem> consumedItems, @Nullable Integer orderDisplayId) {
+    for (ConsumedItem ci : consumedItems) {
+      if (!ci.depleted()) {
+        stockCommands.lowered(ci.itemId(), ci.remaining(), StockChangeReason.PRODUCTION);
+      }
+      auditRecorder.record(
+          AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION,
+          ci.itemId(),
+          ci.label(),
+          null,
+          AuditDetails.of("source", "PRODUCTION")
+              .with("jobOrder", "#" + orderDisplayId)
+              .with("material", ci.material())
+              .with("amount", ci.amount())
+              .with("remaining", ci.remaining())
+              .with("depleted", ci.depleted()));
+    }
   }
 
   /**

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /** Supplies the current responsibility and recovery authority for order projections. */
 public interface JobOrderAuthority {
@@ -32,7 +33,7 @@ public interface JobOrderAuthority {
    * @param orders the concrete orders to project
    * @return authority flags by order identity
    */
-  Map<UUID, JobOrderAuthorityFlags> authorityFor(Collection<JobOrder> orders);
+  Map<UUID, JobOrderAuthorityFlags> authorityFor(@NotNull Collection<JobOrder> orders);
 
   /**
    * Reports invalid responsibility against the current hierarchy and verified original boundary.
@@ -40,7 +41,7 @@ public interface JobOrderAuthority {
    * @param order the order to inspect
    * @return whether only reading and valid recovery transfer are available
    */
-  boolean responsibilityInvalid(JobOrder order);
+  boolean responsibilityInvalid(@NotNull JobOrder order);
 
   /**
    * Reports current-unit recovery authority independent of general Profit access.
@@ -48,5 +49,5 @@ public interface JobOrderAuthority {
    * @param order the order to inspect
    * @return whether the caller may transfer responsibility
    */
-  boolean canTransferResponsibility(JobOrder order);
+  boolean canTransferResponsibility(@NotNull JobOrder order);
 }

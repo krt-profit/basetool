@@ -234,7 +234,7 @@
                             <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
+                        <button th:if="${c.claimingOrgUnit != null and claimingOrgUnitIds.contains(c.claimingOrgUnit.id)}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                 th:title="#{orders.claim.edit}"
                                 th:aria-label="#{orders.claim.edit}"
                                 th:data-material-id="${mat.material.id}"
@@ -255,7 +255,7 @@
                             <span th:case="'PIECE'" th:text="|${mat.openAmount != null ? #numbers.formatInteger(mat.openAmount, 1) : '0'} #{material.quantity.piece}|"></span>
                             <span th:case="*" th:text="|${mat.openAmount != null ? #numbers.formatDecimal(mat.openAmount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-xs btn-claim-add" data-claim-control data-trigger="claim-add"
+                        <button th:if="${!claimingOptions.isEmpty()}" type="button" class="btn btn-ghost btn-xs btn-claim-add" data-claim-control data-trigger="claim-add"
                                 th:data-material-id="${mat.material.id}"
                                 th:data-quality="${mat.qualityTier != null ? mat.qualityTier.code : 'NONE'}"
                                 th:data-quality-label="${mat.qualityTier != null ? mat.qualityTier.label(#locale) : ''}"
@@ -460,7 +460,7 @@
                                     <span th:case="'PIECE'" th:text="|${#numbers.formatInteger(c.amount, 1)} #{material.quantity.piece}|"></span>
                                     <span th:case="*" th:text="|${#numbers.formatDecimal(c.amount, 1, 'DEFAULT', 3, 'DEFAULT')} #{material.quantity.scu}|"></span>
                                 </span>
-                                <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
+                                <button th:if="${c.claimingOrgUnit != null and claimingOrgUnitIds.contains(c.claimingOrgUnit.id)}" type="button" class="btn btn-ghost btn-icon btn-claim-edit" data-claim-control data-trigger="claim-edit"
                                         th:title="#{orders.claim.edit}"
                                         th:aria-label="#{orders.claim.edit}"
                                         th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
@@ -475,7 +475,7 @@
                                         th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                             </span>
                         </span>
-                        <button th:if="${isLogistician}" type="button" class="btn btn-ghost btn-xs btn-claim-add" data-claim-control data-trigger="claim-add"
+                        <button th:if="${!claimingOptions.isEmpty()}" type="button" class="btn btn-ghost btn-xs btn-claim-add" data-claim-control data-trigger="claim-add"
                                 th:data-material-id="${agg.material != null ? agg.material.id() : ''}"
                                 th:data-quality="${agg.qualityRequirement}"
                                 th:data-quality-label="${agg.qualityTier != null ? agg.qualityTier.label(#locale) : ''}"
@@ -909,7 +909,7 @@
     </th:block>
 </th:block>
 
-<th:block th:if="${isLogistician}">
+<th:block th:if="${!claimingOptions.isEmpty()}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='claim-modal', titleKey='orders.claim.modal.title.add', titleId='claim-modal-title', body=~{::claim-modal-body})}">
     <th:block th:ref="claim-modal-body">
         <div class="krt-modal-body">
@@ -923,7 +923,7 @@
             <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>
             <select class="w-full" id="claim-squadron">
                 <option value="" th:text="#{orders.claim.squadron.choose}">Bitte wählen…</option>
-                <option th:each="s : ${responsibleOptions}" th:if="${s.kind == 'SQUADRON'}" th:value="${s.orgUnitId}" th:text="${s.orgUnitName}"></option>
+                <option th:each="s : ${claimingOptions}" th:value="${s.orgUnitId}" th:text="${s.orgUnitName}"></option>
             </select>
         </div>
         <div class="form-group mb-2">

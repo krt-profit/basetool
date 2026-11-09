@@ -139,7 +139,8 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN,
             NotificationType.JOB_ORDER_CLAIM_WITHDRAWN,
             true,
-            SelectorKind.EVENT_RECIPIENT),
+            SelectorKind.EVENT_RECIPIENT,
+            SelectorKind.EVENT_RECIPIENTS),
         rule(
             NotificationEventType.REFINERY_ORDER_READY,
             NotificationType.REFINERY_ORDER_READY,

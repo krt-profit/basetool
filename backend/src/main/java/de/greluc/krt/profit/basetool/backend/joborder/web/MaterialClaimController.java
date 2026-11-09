@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -82,6 +83,24 @@ public class MaterialClaimController {
   }
 
   /**
+   * Lists the current caller's writable claiming squadrons for a readable order.
+   *
+   * @param jobOrderId the order id
+   * @return current claiming options, empty when claim writes are unavailable
+   */
+  @GetMapping("/claiming-options")
+  @Operation(
+      summary = "List writable claiming squadrons for an order",
+      description =
+          "Returns eligible squadrons allowed by the current claim-write authority."
+              + " Terminal, invalid or non-SK orders return an empty list.")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
+  @Transactional(readOnly = true)
+  public List<OrgUnitMembershipOptionDto> claimingOptions(@PathVariable UUID jobOrderId) {
+    return materialClaimService.claimingOptions(jobOrderId);
+  }
+
+  /**
    * Creates or updates the calling context's claim for a bucket, upserting on {@code (bucket,
    * squadron)}.
    *
@@ -94,15 +113,17 @@ public class MaterialClaimController {
   @Operation(
       summary = "Create or update a material claim",
       description =
-          "Signs a active Profit-hierarchy squadron up for a partial quantity of a material bucket"
-              + " on a Spezialkommando order, or updates its existing claim. Rejected on non-SK or"
-              + " terminal orders, on overclaim, and when a new claim names a squadron that is not"
-              + " active Profit-hierarchy.")
+          "Creates or updates a partial material promise of an active squadron in the actual Profit"
+              + " hierarchy on a nonterminal SK order. Current responsibility and claiming-unit"
+              + " eligibility are required for every write. Bucket, overclaim and contextual writer"
+              + " checks apply.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Claim created or updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not an open SK order, unknown bucket, overclaim, or non-profit squadron"),
+        description =
+            "Invalid responsibility or claiming unit, terminal/non-SK order, unknown bucket, or"
+                + " overclaim"),
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })

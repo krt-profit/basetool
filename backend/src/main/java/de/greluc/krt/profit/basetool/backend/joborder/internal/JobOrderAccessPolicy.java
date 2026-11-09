@@ -223,7 +223,7 @@ public class JobOrderAccessPolicy
   }
 
   @Override
-  public Map<UUID, JobOrderAuthorityFlags> authorityFor(Collection<JobOrder> orders) {
+  public Map<UUID, JobOrderAuthorityFlags> authorityFor(@NotNull Collection<JobOrder> orders) {
     if (orders.isEmpty()) {
       return Map.of();
     }
@@ -254,12 +254,12 @@ public class JobOrderAccessPolicy
   }
 
   @Override
-  public boolean responsibilityInvalid(JobOrder order) {
+  public boolean responsibilityInvalid(@NotNull JobOrder order) {
     return !responsibilityGuard.isValid(order);
   }
 
   @Override
-  public boolean canTransferResponsibility(JobOrder order) {
+  public boolean canTransferResponsibility(@NotNull JobOrder order) {
     return accessGateService.canActAsLogisticianInOwner(
         OrgUnit.idOf(order.getResponsibleOrgUnit()));
   }

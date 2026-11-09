@@ -26,11 +26,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -52,8 +54,9 @@ class DataExportMaterialClaimSectionIntegrationTest {
   @Autowired private UserRepository userRepository;
   @Autowired private JdbcTemplate jdbc;
 
-  @Test
-  void aClaimNamesTheCodeOfItsQualityTier() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void aClaimIncludesItsQualityAndOwnEndingHistory(boolean ended) {
     User member = new User();
     member.setId(UUID.randomUUID());
     member.setUsername("ZzzClaimExportZzz");
@@ -79,22 +82,28 @@ class DataExportMaterialClaimSectionIntegrationTest {
         order,
         unit,
         unit);
+    OffsetDateTime recordedAt = OffsetDateTime.parse("2026-05-05T12:00:00Z");
     jdbc.update(
         "INSERT INTO material_claim (id, job_order_id, material_id, quality_tier_id,"
-            + " claiming_org_unit_id, amount, claimed_by_user_id) VALUES (?, ?, ?, ?, ?, 12, ?)",
+            + " claiming_org_unit_id, amount, claimed_by_user_id, created_at, ended_at)"
+            + " VALUES (?, ?, ?, ?, ?, 12, ?, ?, ?)",
         UUID.randomUUID(),
         order,
         material,
         GOOD_TIER,
         unit,
-        subject);
+        subject,
+        recordedAt,
+        ended ? recordedAt : null);
 
     List<Map<String, Object>> rows = sectionRows(subject);
 
     assertThat(rows).hasSize(1);
     assertThat(rows.get(0))
         .containsEntry("material", "Zzz Claim Ore")
-        .containsEntry("quality_requirement", "GOOD");
+        .containsEntry("quality_requirement", "GOOD")
+        .containsEntry("ended_at", ended ? rows.getFirst().get("created_at") : null);
+    assertThat(rows.getFirst().get("created_at")).isNotNull();
   }
 
   private @NotNull List<Map<String, Object>> sectionRows(@NotNull UUID subject) {

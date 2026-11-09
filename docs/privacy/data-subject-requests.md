@@ -1,6 +1,6 @@
 # Handling a data-subject request (Art. 12, 15–21 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-11-09.
 
 A request can arrive by any channel and in any wording. Somebody writing *"please delete my
 account"* has exercised Art. 17 whether or not they cite it, and the clock starts when the message
@@ -44,6 +44,10 @@ enough; demanding an ID document by default is itself a data-protection problem.
 The member exports their own data in the application: **Profile → Meine Daten exportieren**. The
 export covers every category the tool holds about them. For the categories it deliberately leaves
 out, and why, see [the export's limits](#what-the-export-does-not-contain).
+
+The recorder-related material-claim section includes active and ended promises and their ending
+timestamp. It retains the same subject filter and timestamp/null representation as the other
+exported dates. Ending a promise does not omit its retained personal history from the JSON export.
 
 If the requester cannot sign in — locked out, or an account already disabled — an admin produces
 the identical document from **Administration → Mitglieder → the member → Datenauskunft**. Identical

@@ -25,8 +25,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
@@ -51,7 +49,9 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface InventoryItemRepository
-    extends JpaRepository<InventoryItem, UUID>, InventoryLotLockRepository {
+    extends JpaRepository<InventoryItem, UUID>,
+        InventoryLotLockRepository,
+        InventoryOrderAllocationQueries {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.
@@ -774,43 +774,6 @@ public interface InventoryItemRepository
       @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
 
   /**
-   * Returns every material allocation of the given job orders as one row each (row, material,
-   * quality, amount), in a single query (REQ-DATA-003).
-   *
-   * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
-   *     empty list.
-   * @return one {@link JobOrderMaterialStockRow} per material job-order allocation, never {@code
-   *     null}.
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
-      AND a.inventoryItem.material IS NOT NULL
-      """)
-  List<JobOrderMaterialStockRow> findMaterialStockRowsByJobOrderIds(
-      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
-
-  /**
-   * Returns every game-item allocation of the given job orders as one row each, in a single query
-   * (REQ-INV-039).
-   *
-   * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
-   *     an empty list.
-   * @return one {@link
-   *     de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow} per game-item
-   *     job-order allocation, never {@code null}.
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
-      AND a.inventoryItem.gameItem IS NOT NULL
-      """)
-  List<JobOrderGameItemStockRow> findGameItemStockRowsByJobOrderIds(
-      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
-
-  /**
    * Deletes every job-order allocation of the given order; the inventory entries themselves stay
    * (REQ-INV-027).
    *
@@ -1290,33 +1253,4 @@ public interface InventoryItemRepository
    */
   @EntityGraph(attributePaths = {"material"})
   List<InventoryItem> findWithMaterialByIdIn(Collection<UUID> ids);
-
-  /**
-   * Resolves order slices before a stock-row write.
-   *
-   * @param rowIds the affected entries
-   * @return distinct affected order ids
-   */
-  @Query(
-      "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a WHERE a.inventoryItem.id IN"
-          + " :rowIds")
-  List<UUID> findAllocatedOrderIds(@Param("rowIds") Collection<UUID> rowIds);
-
-  /**
-   * Resolves the order slices removed by a scoped nonpersonal wipe.
-   *
-   * @param adminAll whether all rows are in scope
-   * @param activeUnit the pinned unit
-   * @param memberUnits the scoped units
-   * @return distinct affected order ids
-   */
-  @Query(
-      "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i WHERE"
-          + " i.personal = false AND (:adminAll = true OR (:activeUnit IS NOT NULL AND"
-          + " i.owningOrgUnit.id = :activeUnit) OR (:activeUnit IS NULL AND i.owningOrgUnit.id IN"
-          + " :memberUnits))")
-  List<UUID> findAllocatedOrdersInWipeScope(
-      @Param("adminAll") boolean adminAll,
-      @Param("activeUnit") @Nullable UUID activeUnit,
-      @Param("memberUnits") Collection<UUID> memberUnits);
 }

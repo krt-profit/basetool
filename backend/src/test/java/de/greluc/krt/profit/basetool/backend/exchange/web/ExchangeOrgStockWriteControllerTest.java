@@ -505,6 +505,7 @@ class ExchangeOrgStockWriteControllerTest {
   @Test
   void earmarkedStockIsProtectedUnlessTheBookOutNamesTheEarmark() throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID titanium = material("SCU");
     UUID entry = stock(holder, titanium, location(), 10, staffel, false);
@@ -1240,6 +1241,7 @@ class ExchangeOrgStockWriteControllerTest {
   void aLogisticianChangesAndRemovesEarmarksAndAnEditThatFindsTheEntryAsAskedIsUnchanged()
       throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
     UUID order = earmarkToJobOrder(entry, 6, staffel);
@@ -1293,6 +1295,7 @@ class ExchangeOrgStockWriteControllerTest {
   @Test
   void aChangeToTheAmountAnEarmarkHasIsUnchangedEvenOnAnOverAllocatedEntry() throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID entry = stock(holder, material("SCU"), location(), 4, staffel, false);
     UUID order = earmarkToJobOrder(entry, 6, staffel);
@@ -1318,6 +1321,7 @@ class ExchangeOrgStockWriteControllerTest {
   @Test
   void aMoveTakesTheEarmarksItsPlanNamesAlongAndAPlanOnAMissingEarmarkIsRefused() throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID titanium = material("SCU");
     UUID entry = stock(holder, titanium, location(), 10, staffel, false);

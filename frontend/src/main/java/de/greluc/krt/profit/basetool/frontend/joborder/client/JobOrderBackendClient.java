@@ -592,6 +592,18 @@ public class JobOrderBackendClient {
   }
 
   /**
+   * Reads the squadrons whose claims the caller may manage on this order.
+   *
+   * @param id the order
+   * @return the permitted claiming squadrons, or null when no response body was sent
+   */
+  @Nullable
+  public List<OrgUnitMembershipOptionDto> claimingOptions(@NotNull UUID id) {
+    return backendApiClient.get(
+        "/api/v1/orders/{id}/claims/claiming-options", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, id);
+  }
+
+  /**
    * Creates or updates a material claim on an order.
    *
    * @param id the order

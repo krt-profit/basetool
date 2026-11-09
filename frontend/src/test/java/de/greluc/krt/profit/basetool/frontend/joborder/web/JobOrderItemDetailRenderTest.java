@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
@@ -1507,7 +1508,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             null,
             false);
-    stubDetail(orderId, userId, order);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            logisticianDetail(order, userId)
+                .claimingOptions(
+                    List.of(
+                        new OrgUnitMembershipOptionDto(
+                            UUID.randomUUID(), "Claiming Squadron", "CS", "SQUADRON")))
+                .build());
 
     String html =
         mockMvc

@@ -24,14 +24,14 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code OrgUnitMembershipOptionDto}: one option of the
- * owning-org-unit picker, as returned by {@code GET /api/v1/org-units/members/{id}/memberships}.
+ * Frontend mirror of the backend {@code OrgUnitMembershipOptionDto}: an org-unit option for
+ * membership, ownership, responsibility and claim pickers.
  *
  * @param orgUnitId Identifier of the org unit (used as the {@code <option value="...">}).
  * @param orgUnitName Visible name (used as the option label).
  * @param orgUnitShorthand Abbreviated badge text; may be {@code null}.
  * @param kind Discriminator string ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
- *     {@code ORGANISATIONSLEITUNG}); the membership picker only ever sees the first two.
+ *     {@code ORGANISATIONSLEITUNG}).
  */
 @DtoMirror
 public record OrgUnitMembershipOptionDto(

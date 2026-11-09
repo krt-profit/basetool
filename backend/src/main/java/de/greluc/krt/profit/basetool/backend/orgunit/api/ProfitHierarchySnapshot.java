@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -29,7 +30,8 @@ import org.jetbrains.annotations.Nullable;
  * @param profitRootId the unique active root, or null when the prerequisite is absent
  * @param eligibleUnitIds the active root and eligible active descendants
  */
-public record ProfitHierarchySnapshot(@Nullable UUID profitRootId, Set<UUID> eligibleUnitIds) {
+public record ProfitHierarchySnapshot(
+    @Nullable UUID profitRootId, @NotNull Set<UUID> eligibleUnitIds) {
 
   /** Copies eligible identities so a caller cannot change a transaction's authority snapshot. */
   public ProfitHierarchySnapshot {

@@ -545,3 +545,7 @@ editing rights. [REQ-ORDERS-050/-053/-055](../specs/orders-core.md) and
 bounded order-ID/claim pages through the same audited maintenance. Order projections expose distinct
 processing, requester-edit and recovery decisions through `JobOrderAuthority`; requester delivery
 restrictions are loaded in a batch.
+
+The claim service separately projects writable claiming-Staffel options through a concrete-order
+read. This keeps existing own-Staffel claim authority distinct from responsible-side processing;
+the frontend renders its claim controls from those options and reuses the ordinary claim writes.

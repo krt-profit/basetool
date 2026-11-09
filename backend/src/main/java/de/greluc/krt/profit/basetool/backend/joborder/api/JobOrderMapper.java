@@ -80,7 +80,7 @@ public abstract class JobOrderMapper {
 
   /**
    * Maps a {@link JobOrder} entity to its outbound DTO, projecting the responsible and requesting
-   * org units (Staffel or Spezialkommando) into {@code SquadronReferenceDto} slots.
+   * org units, including the Profit Bereich, into {@code SquadronReferenceDto} slots.
    *
    * @param jobOrder the entity to project; {@code null} returns {@code null}
    * @param authority current authority for this page
@@ -123,16 +123,6 @@ public abstract class JobOrderMapper {
   }
 
   /**
-   * Resolves current authority once for a page of orders.
-   *
-   * @param orders the concrete page
-   * @return current responsibility and writer flags by order identity
-   */
-  public Map<UUID, JobOrderAuthorityFlags> authorityFor(Collection<JobOrder> orders) {
-    return orderAuthority.authorityFor(orders);
-  }
-
-  /**
    * Maps a {@link JobOrderMaterial} child to its DTO, leaving the service-owned {@code
    * currentStock}, {@code claims} and {@code openAmount} unmapped.
    */
@@ -150,6 +140,16 @@ public abstract class JobOrderMapper {
    * @return the assignee DTO
    */
   public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
+
+  /**
+   * Resolves current authority once for a page of orders.
+   *
+   * @param orders the concrete page
+   * @return current responsibility and writer flags by order identity
+   */
+  public Map<UUID, JobOrderAuthorityFlags> authorityFor(@NotNull Collection<JobOrder> orders) {
+    return orderAuthority.authorityFor(orders);
+  }
 
   /**
    * Reads the floor of a line's quality tier for the legacy {@code minQuality} field.

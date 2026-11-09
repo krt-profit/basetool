@@ -432,6 +432,7 @@ PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResp
 PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#getClaimBuckets | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/claiming-options | MaterialClaimController#claimingOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
 POST /api/v1/orders/{jobOrderId}/handovers/report/preview | JobOrderHandoverController#previewHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report | JobOrderHandoverController#downloadHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
@@ -460,6 +461,7 @@ DELETE /api/v1/org-units/organisationsleitung/{id}/grand-admiral | OrgHierarchyC
 PUT /api/v1/org-units/organisationsleitung/{id}/grand-admiral | OrgHierarchyController#setGrandAdmiral | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/org-units/organisationsleitung/{id}/members | OrgHierarchyController#addOlMember | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/org-units/organisationsleitung/{id}/members/{userId} | OrgHierarchyController#removeOlMember | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/org-units/profit-responsible | OrgUnitController#listProfitResponsibleOrgUnits | pre=isAuthenticated() | url=anyRequest -> authenticated
 PATCH /api/v1/org-units/{id}/parent | OrgHierarchyController#setParent | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/outposts | OutpostController#getAllOutposts | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/outposts/{id} | OutpostController#getOutpost | pre=hasRole('ADMIN') | url=anyRequest -> authenticated

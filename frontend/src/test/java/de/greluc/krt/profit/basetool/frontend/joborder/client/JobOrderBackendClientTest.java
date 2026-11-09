@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsible
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -300,6 +301,19 @@ class JobOrderBackendClientTest {
         "/api/v1/orders/" + ORDER + "/blueprint-variant-counting",
         "{\"countBlueprintsWithVariants\":true,\"version\":3}");
     backend.expect("DELETE", "/api/v1/orders/" + ORDER, null);
+  }
+
+  @Test
+  void claimingOptionsRetainTheBackendAuthorityAndOrderSpecificRoute() {
+    backend.answerJson(
+        "[{\"orgUnitId\":\""
+            + SQUADRON
+            + "\",\"orgUnitName\":\"Alpha\",\"orgUnitShorthand\":\"ALP\",\"kind\":\"SQUADRON\"}]");
+
+    assertThat(client.claimingOptions(ORDER))
+        .containsExactly(new OrgUnitMembershipOptionDto(SQUADRON, "Alpha", "ALP", "SQUADRON"));
+
+    backend.expect("GET", "/api/v1/orders/" + ORDER + "/claims/claiming-options", null);
   }
 
   @Test

@@ -196,6 +196,8 @@ public class JobOrderPageReader {
    * @param blueprintOwners the blueprint owners of an item order
    * @param itemStockByGameItem the stock groups of an item order's lines keyed by game item
    * @param orphanedInventory the stock linked to the order but needed by none of its materials
+   * @param responsibleOptions the currently eligible responsible units
+   * @param claimingOptions the squadrons whose claims the caller may manage on this order
    */
   public record OrderDetailPage(
       @NotNull JobOrderDto order,
@@ -210,7 +212,8 @@ public class JobOrderPageReader {
       @NotNull Part<JobOrderItemBlueprintOwnersDto> blueprintOwners,
       @NotNull Part<Map<UUID, JobOrderItemStockGroupDto>> itemStockByGameItem,
       @NotNull Part<List<InventoryItemDto>> orphanedInventory,
-      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {}
+      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
+      @NotNull List<OrgUnitMembershipOptionDto> claimingOptions) {}
 
   /**
    * Everything the create form renders.
@@ -336,6 +339,14 @@ public class JobOrderPageReader {
         fragment == null ? orphanedInventory(id) : Part.absent(),
         canAssign || Boolean.TRUE.equals(order.canTransferResponsibility())
             ? responsibleOptions()
+            : List.of(),
+        !requesterView
+                && !order.responsibilityInvalid()
+                && (fragment == null
+                    || "materials".equalsIgnoreCase(fragment)
+                    || "aggregated".equalsIgnoreCase(fragment)
+                    || "dialogs".equalsIgnoreCase(fragment))
+            ? claimingOptions(id)
             : List.of());
   }
 
@@ -549,6 +560,17 @@ public class JobOrderPageReader {
     List<OrgUnitMembershipOptionDto> options =
         SectionFallback.load(
             log, "job-order-responsible-org-units", orgUnitClient::profitResponsibleOrgUnits, null);
+    return options != null ? options : List.of();
+  }
+
+  @NotNull
+  private List<OrgUnitMembershipOptionDto> claimingOptions(@NotNull UUID id) {
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log,
+            "job-order-claiming-org-units",
+            () -> jobOrderClient.claimingOptions(id),
+            List.of());
     return options != null ? options : List.of();
   }
 

@@ -139,3 +139,19 @@ implementation. Actual inventory ownership and ordinary stock permissions stay w
 ## Open questions
 
 None for the approved quantity contract. Runtime checks remain pending implementation.
+
+The existing explicit administrator hard-delete of a MATERIAL/ITEM order (REQ-ORDERS-042) removes
+its dependent active and ended claim rows in the same transaction after the responsibility guard.
+The normal `JOB_ORDER_DELETED` audit survives. Automatic eligibility ending remains distinct: it
+retains every promise fact and never deletes its history.
+
+The current SK-only claim workflow exposes writable Staffel options through
+`GET /api/v1/orders/{jobOrderId}/claims/claiming-options`. The read requires access to the concrete
+order; empty options confer no write authority. Options and existing claim writes share the same
+claim-management predicate. A contextual Staffel writer can maintain its own existing claim
+without receiving responsible-side processing authority. The existing responsible-SK grant
+exception remains part of this workflow: `hasRoleInOrgUnit(SK, LOGISTICIAN)` differs from the
+active-context check `canActAsLogisticianIn(Staffel)`. The complete shared writer conversion must
+resolve that distinction against REQ-ORDERS-053 and the canonical leadership/context rules.
+`JobOrderHierarchyAuthorityIntegrationTest` and the frontend `JobOrderClaimControlsMvcTest` cover
+the current options, positive own-Staffel writes and foreign/ordinary/invalid denials.

@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -44,7 +46,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
@@ -54,6 +59,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -63,11 +69,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -89,6 +97,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   @Autowired private UserRepository users;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
+  @Autowired private MaterialClaimRepository claims;
+  @Autowired private JdbcTemplate jdbc;
   @Autowired private JobOrderHandoverRepository handovers;
   @Autowired private QualityTierRepository tiers;
   @Autowired private MaterialRepository materials;
@@ -323,6 +333,178 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         .andExpect(jsonPath("$.canEditAsRequester").value(false));
   }
 
+  @Test
+  void claimingOptionsPreserveOwnSquadronWritesWithoutGrantingProcessingOrForeignClaims()
+      throws Exception {
+    SpecialCommand processing = processingUnit();
+    Squadron foreign = squadron("Foreign claimant " + UUID.randomUUID(), profit);
+    var quality = tiers.findByCode("GOOD").orElseThrow();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(processing)
+            .requestingOrgUnit(requester)
+            .handle("Claim options fixture")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.getReferenceById(material))
+            .qualityTier(quality)
+            .amount(10.0)
+            .build());
+    order = orders.saveAndFlush(order);
+    MaterialClaim ownClaim =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(responsible)
+                .amount(2.0)
+                .build());
+    MaterialClaim foreignClaim =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(foreign)
+                .amount(3.0)
+                .build());
+    String path = "/api/v1/orders/" + order.getId();
+    String options = path + "/claims/claiming-options";
+
+    as(get(path), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canEdit").value(false));
+    as(get(options), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].orgUnitId").value(responsible.getId().toString()))
+        .andExpect(jsonPath("$[0].kind").value("SQUADRON"));
+    as(get(options), null).andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+    as(get(options).header("X-Active-Org-Unit-Id", requester.getId()), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isEmpty());
+    as(delete(path + "/claims/" + foreignClaim.getId()), responsible.getId())
+        .andExpect(status().isForbidden());
+    as(delete(path + "/claims/" + ownClaim.getId()), null).andExpect(status().isForbidden());
+    as(delete(path + "/claims/" + ownClaim.getId()), responsible.getId())
+        .andExpect(status().isNoContent());
+    claims.flush();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT ended_at IS NOT NULL FROM material_claim WHERE id = ?",
+                Boolean.class,
+                ownClaim.getId()))
+        .isTrue();
+    assertThat(claims.findById(foreignClaim.getId())).isPresent();
+
+    as(get(options).header("X-Active-Org-Unit-Id", requester.getId()), processing.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.orgUnitId == '" + responsible.getId() + "')]").isNotEmpty())
+        .andExpect(jsonPath("$[?(@.orgUnitId == '" + foreign.getId() + "')]").isNotEmpty());
+    JobOrder privateOrder =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(foreign)
+                .requestingOrgUnit(foreign)
+                .handle("Unrelated private order")
+                .build());
+    as(
+            get("/api/v1/orders/" + privateOrder.getId() + "/claims/claiming-options"),
+            responsible.getId())
+        .andExpect(status().isForbidden());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"COMPLETED", "REJECTED", "NON_SK", "INVALID"})
+  void claimingOptionsNeverOfferWritesForFrozenOrInvalidOrders(String block) throws Exception {
+    SpecialCommand processing = processingUnit();
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(processing)
+                .requestingOrgUnit(requester)
+                .handle("Blocked options")
+                .build());
+    switch (block) {
+      case "COMPLETED", "REJECTED" -> order.setStatus(JobOrderStatus.valueOf(block));
+      case "NON_SK" -> order.setResponsibleOrgUnit(responsible);
+      case "INVALID" -> hierarchy.setParent(processing.getId(), null, processing.getVersion());
+      default -> throw new IllegalArgumentException(block);
+    }
+    orders.flush();
+
+    as(get("/api/v1/orders/" + order.getId() + "/claims/claiming-options"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isEmpty());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"MATERIAL,true", "MATERIAL,false", "ITEM,true", "ITEM,false"})
+  void explicitAdminDeleteHandlesArchivedPromisesOnlyWithValidResponsibility(
+      JobOrderType kind, boolean validResponsibility) throws Exception {
+    String tag = UUID.randomUUID().toString();
+    SpecialCommand processing = new SpecialCommand();
+    processing.setName("Delete processing " + tag);
+    processing.setShorthand("DP" + tag);
+    processing.setParent(profit);
+    processing = units.saveAndFlush(processing);
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .type(kind)
+                .responsibleOrgUnit(processing)
+                .requestingOrgUnit(requester)
+                .status(JobOrderStatus.COMPLETED)
+                .handle("Delete fixture")
+                .build());
+    MaterialClaim archived =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(tiers.findByCode("GOOD").orElseThrow())
+                .claimingOrgUnit(responsible)
+                .amount(3.0)
+                .claimedByUser(users.getReferenceById(caller))
+                .endedAt(Instant.now())
+                .build());
+    if (!validResponsibility) {
+      hierarchy.setParent(processing.getId(), null, processing.getVersion());
+    }
+    var history = jdbc.queryForMap("SELECT * FROM material_claim WHERE id = ?", archived.getId());
+
+    mvc.perform(
+            delete("/api/v1/orders/" + order.getId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(caller.toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(validResponsibility ? status().isNoContent() : status().isBadRequest());
+
+    orders.flush();
+    assertThat(orders.existsById(order.getId())).isEqualTo(!validResponsibility);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE subject_id = ? AND event_type ="
+                    + " 'JOB_ORDER_DELETED'",
+                Integer.class,
+                order.getId()))
+        .isEqualTo(validResponsibility ? 1 : 0);
+    if (validResponsibility) {
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM material_claim WHERE id = ?",
+                  Integer.class,
+                  archived.getId()))
+          .isZero();
+    } else {
+      assertThat(jdbc.queryForMap("SELECT * FROM material_claim WHERE id = ?", archived.getId()))
+          .containsExactlyInAnyOrderEntriesOf(history);
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void coveringWriterCannotCommissionAfterRequesterMovesOutsideItsReach(boolean itemOrder)
@@ -365,6 +547,15 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             responsible.getId())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.originalProfitBoundaryUnknown").value(true));
+  }
+
+  private SpecialCommand processingUnit() {
+    String tag = UUID.randomUUID().toString();
+    SpecialCommand unit = new SpecialCommand();
+    unit.setName("Claim processing " + tag);
+    unit.setShorthand("CP" + tag);
+    unit.setParent(profit);
+    return units.saveAndFlush(unit);
   }
 
   private Squadron squadron(String name, OrgUnit parent) {

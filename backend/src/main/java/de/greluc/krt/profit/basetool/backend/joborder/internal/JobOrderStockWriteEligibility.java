@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.AppExceptionKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
@@ -54,7 +55,7 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
     Set<UUID> ids = Set.copyOf(orderIds);
     List<JobOrder> affected = orders.findAllById(ids);
     if (affected.size() != ids.size()) {
-      throw new NotFoundException("An affected job order no longer exists");
+      throw new NotFoundException(AppExceptionKind.NOT_FOUND.detailKey());
     }
     if (responsibilityGuard.validOrderIds(affected).size() != ids.size()) {
       throw new BadRequestException("orders.responsibility.invalid");

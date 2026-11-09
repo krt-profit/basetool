@@ -99,7 +99,7 @@
                 </thead>
                 <tbody th:with="queue=${orders.?[priority != null]}">
                 <tr th:each="order : ${orders}" data-testid="order-row"
-                    th:with="reorderable=${!order.responsibilityInvalid and isLogisticianOrAbove and order.priority != null}"
+                    th:with="reorderable=${order.callerMayEdit() and order.priority != null}"
                     th:attr="data-id=${order.id}, data-priority=${order.priority}, data-reorder-name=${reorderable} ? #{orders.index.reorderName(${order.displayId})} : null"
                     th:classappend="${reorderable} ? 'draggable-row' : ''"
                     th:draggable="${reorderable} ? 'true' : 'false'">

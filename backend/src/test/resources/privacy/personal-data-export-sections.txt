@@ -27,7 +27,7 @@
 27|missionUnitResponsibilities|ART_15|5b5d753615809f65|mission,unit|ship_type
 28|refineryOrdersOwned|ART_15_20|a02a6a4f67f8c551||location
 29|jobOrderAssignments|ART_15_20|82fe27ca0609f7df|note|
-30|materialClaims|ART_15_20|386f4357273f5ad9||job_order
+30|materialClaims|ART_15_20|2d389ecd2ec3ece1||job_order
 31|marketOffers|ART_15_20|b1b8a2043103cea4|remark|
 32|marketRequests|ART_15_20|fada87c5aa7c2624|remark|
 33|marketInterests|ART_15_20|771a4977c2791aef||

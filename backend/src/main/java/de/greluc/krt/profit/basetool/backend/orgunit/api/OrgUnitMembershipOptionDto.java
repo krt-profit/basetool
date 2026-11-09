@@ -23,7 +23,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.UUID;
 
 /**
- * Lean org-unit option derived from a user's membership, for {@code <select>} pickers.
+ * Lean org-unit option for membership, responsibility and claiming-unit pickers.
  *
  * @param orgUnitId the org unit's id, used as the option value
  * @param orgUnitName the org unit's name, used as the option label

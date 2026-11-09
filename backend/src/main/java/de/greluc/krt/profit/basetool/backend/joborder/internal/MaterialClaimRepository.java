@@ -128,6 +128,19 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       Pageable pageable);
 
   /**
+   * Loads a bounded page of active and ended promises for explicit whole-order deletion.
+   *
+   * @param orderId the order being deleted by its owning service
+   * @param pageable the bounded page
+   * @return managed dependent rows including history
+   */
+  @Query(
+      value = "SELECT c.* FROM material_claim c WHERE c.job_order_id = :orderId ORDER BY c.id",
+      nativeQuery = true)
+  List<MaterialClaim> findForOrderIncludingHistory(
+      @Param("orderId") UUID orderId, Pageable pageable);
+
+  /**
    * Clears the {@code claimedByUser} audit reference on every claim stamped by the given user, so
    * the user can be deleted without an FK violation; the claims themselves remain.
    *

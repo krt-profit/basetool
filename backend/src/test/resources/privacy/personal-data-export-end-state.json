@@ -361,7 +361,8 @@
       "material" : "Zzz Export Ore",
       "amount" : 5.0,
       "quality_requirement" : "GOOD",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "ended_at" : null
     } ],
     "truncated" : false
   }, {

@@ -428,7 +428,7 @@ public class InventoryStockCommands implements StockCommands {
                 .withPersonal(false));
     requireWholeUnits(target);
     final String sourceLabel = InventoryAuditLabels.label(source);
-    UUID sourceId = source.getId();
+    final UUID sourceId = source.getId();
     double remaining = ScuAmounts.roundToScuScale(sourceAmount - moved);
     Map<UUID, Double> orderPlan =
         AllocationReductions.resolveReductionPlan(source, null, moved, true);
@@ -541,7 +541,7 @@ public class InventoryStockCommands implements StockCommands {
     for (InventoryDonationAllocation slice :
         donationAllocationRepository.findByDonationId(donationId)) {
       InventoryItem row = slice.getInventoryItem();
-      double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
+      final double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
       row.removeDonationAllocation(slice);
       orderWrites.assertRow(row);
       inventoryRepository.saveAndFlush(row);

@@ -202,7 +202,8 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.of(null),
-                List.of(options.getFirst())));
+                List.of(options.getFirst()),
+                List.of()));
     Model model = new ExtendedModelMap();
 
     assertThat(controller.viewOrderDetail(ID, model, null, null))
@@ -254,6 +255,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
+                List.of(),
                 List.of()));
 
     assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))

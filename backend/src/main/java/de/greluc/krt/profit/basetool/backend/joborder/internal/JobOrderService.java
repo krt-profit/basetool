@@ -164,12 +164,7 @@ public class JobOrderService {
         jobOrder.getId(),
         JobOrderAuditLabel.of(jobOrder),
         null,
-        AuditDetails.of("type", "MATERIAL")
-            .with("materials", jobOrder.getMaterials().size())
-            .with("responsibleOrgUnit", orgUnitRef(responsible))
-            .with("requestingOrgUnit", orgUnitRef(requesting))
-            .with("profitOrgUnit", jobOrder.getOriginalProfitOrgUnitId())
-            .with("priority", jobOrder.getPriority()));
+        JobOrderResponsibilityAudit.created(jobOrder));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
@@ -222,12 +217,7 @@ public class JobOrderService {
         jobOrder.getId(),
         JobOrderAuditLabel.of(jobOrder),
         null,
-        AuditDetails.of("type", "ITEM")
-            .with("lines", jobOrder.getItems().size())
-            .with("responsibleOrgUnit", orgUnitRef(responsible))
-            .with("requestingOrgUnit", orgUnitRef(requesting))
-            .with("profitOrgUnit", jobOrder.getOriginalProfitOrgUnitId())
-            .with("priority", jobOrder.getPriority()));
+        JobOrderResponsibilityAudit.created(jobOrder));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
@@ -888,6 +878,7 @@ public class JobOrderService {
     final UUID deletedId = jobOrder.getId();
     final String deletedLabel = JobOrderAuditLabel.of(jobOrder);
     final NoticeEvent deletedNotice = finishedNotice(jobOrder, "DELETED");
+    materialClaimService.deleteForOrderWithinTransaction(jobOrder);
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
@@ -1085,7 +1076,7 @@ public class JobOrderService {
       throw new BadRequestException("orders.responsibility.boundary.invalid");
     }
 
-    OrgUnit previous = jobOrder.getResponsibleOrgUnit();
+    final OrgUnit previous = jobOrder.getResponsibleOrgUnit();
     jobOrder.setResponsibleOrgUnit(target);
     liveSyncPublisher.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, jobOrder.getId()),
@@ -1112,22 +1103,7 @@ public class JobOrderService {
     return JobOrderEdit.audited(
             jobOrder,
             AuditEventType.JOB_ORDER_REASSIGNED,
-            AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
-                .with("toOrgUnit", orgUnitRef(target))
-                .with("profitOrgUnit", root)
-                .with(
-                    "originalProfitBoundaryUnknown", jobOrder.getOriginalProfitOrgUnitId() == null))
+            JobOrderResponsibilityAudit.transferred(jobOrder, previous, root))
         .notifying(List.of(reassignedNotice));
-  }
-
-  /**
-   * Renders an org unit for an audit details payload as {@code <id>(<KIND>)}.
-   *
-   * @param orgUnit the org unit, or {@code null}
-   * @return {@code <id>(<KIND>)} or {@code -} when {@code null}
-   */
-  @NotNull
-  private static String orgUnitRef(OrgUnit orgUnit) {
-    return orgUnit == null ? "-" : orgUnit.getId() + "(" + orgUnit.getKind() + ")";
   }
 }

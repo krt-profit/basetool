@@ -54,7 +54,7 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 "Signed up for by the member.",
                 """
                 SELECT o.display_id AS job_order, m.name AS material, c.amount,
-                       t.code AS quality_requirement, c.created_at
+                       t.code AS quality_requirement, c.created_at, c.ended_at
                 FROM material_claim c
                   LEFT JOIN job_order o ON o.id = c.job_order_id
                   LEFT JOIN material m ON m.id = c.material_id

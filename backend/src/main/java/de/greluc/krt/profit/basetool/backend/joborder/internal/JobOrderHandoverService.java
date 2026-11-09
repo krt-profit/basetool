@@ -360,6 +360,28 @@ public class JobOrderHandoverService {
       jobOrderService.completeJobOrderWithinTransaction(managedJobOrder);
     }
 
+    recordHandedStock(handedItems, orderDisplayId);
+    auditRecorder.record(
+        AuditEventType.JOB_ORDER_HANDOVER_CREATED,
+        jobOrderId,
+        JobOrderAuditLabel.of(managedJobOrder.getDisplayId()),
+        null,
+        AuditDetails.of("handover", savedHandover.getId())
+            .with("items", handedItems.size())
+            .with("autoCompleted", allFulfilled));
+
+    return resultDto;
+  }
+
+  /**
+   * Reports surviving stock reductions and audits each handed row from its pre-consumption
+   * snapshot.
+   *
+   * @param handedItems the consumed stock snapshots in handover order
+   * @param orderDisplayId the order's display number, or null when unassigned
+   */
+  private void recordHandedStock(
+      @NotNull List<HandedItem> handedItems, @Nullable Integer orderDisplayId) {
     for (HandedItem h : handedItems) {
       if (!h.depleted()) {
         stockCommands.lowered(h.itemId(), h.remaining(), StockChangeReason.HANDOVER);
@@ -377,15 +399,5 @@ public class JobOrderHandoverService {
               .with("depleted", h.depleted())
               .with("quality", h.quality()));
     }
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_HANDOVER_CREATED,
-        jobOrderId,
-        JobOrderAuditLabel.of(managedJobOrder.getDisplayId()),
-        null,
-        AuditDetails.of("handover", savedHandover.getId())
-            .with("items", handedItems.size())
-            .with("autoCompleted", allFulfilled));
-
-    return resultDto;
   }
 }

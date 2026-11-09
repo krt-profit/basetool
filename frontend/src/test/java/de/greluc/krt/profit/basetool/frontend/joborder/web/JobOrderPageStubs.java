@@ -95,6 +95,7 @@ final class JobOrderPageStubs {
         JobOrderPageReader.Part.absent();
     private JobOrderPageReader.Part<List<InventoryItemDto>> orphanedInventory =
         JobOrderPageReader.Part.absent();
+    private List<OrgUnitMembershipOptionDto> claimingOptions = List.of();
 
     private DetailBuilder(JobOrderDto order) {
       this.order = order;
@@ -186,6 +187,17 @@ final class JobOrderPageStubs {
     }
 
     /**
+     * Sets the squadrons whose claims the caller may manage.
+     *
+     * @param options the backend-authorized claiming options
+     * @return this builder
+     */
+    DetailBuilder claimingOptions(List<OrgUnitMembershipOptionDto> options) {
+      this.claimingOptions = options;
+      return this;
+    }
+
+    /**
      * Builds the page with the default aging thresholds.
      *
      * @return the detail page
@@ -204,7 +216,8 @@ final class JobOrderPageStubs {
           blueprintOwners,
           itemStock,
           orphanedInventory,
-          List.of());
+          List.of(),
+          claimingOptions);
     }
   }
 

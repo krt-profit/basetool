@@ -51,7 +51,8 @@ public class JobOrderResponsibilityGuard {
     return isValid(order, profitHierarchy.snapshot());
   }
 
-  private static boolean isValid(JobOrder order, ProfitHierarchySnapshot snapshot) {
+  private static boolean isValid(
+      @NotNull JobOrder order, @NotNull ProfitHierarchySnapshot snapshot) {
     return order.getResponsibleOrgUnit() != null
         && snapshot.eligibleUnitIds().contains(order.getResponsibleOrgUnit().getId())
         && (order.getOriginalProfitOrgUnitId() == null
@@ -64,7 +65,7 @@ public class JobOrderResponsibilityGuard {
    * @param orders the orders whose mutable rows are considered
    * @return ids of orders with valid current responsibility and original boundary
    */
-  public Set<UUID> validOrderIds(Collection<JobOrder> orders) {
+  public Set<UUID> validOrderIds(@NotNull Collection<JobOrder> orders) {
     var snapshot = profitHierarchy.snapshot();
     return orders.stream()
         .filter(order -> isValid(order, snapshot))

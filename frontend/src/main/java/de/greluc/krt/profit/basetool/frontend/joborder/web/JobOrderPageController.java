@@ -46,6 +46,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -323,6 +324,12 @@ public class JobOrderPageController {
     model.addAttribute(
         "canTransferResponsibility", Boolean.TRUE.equals(order.canTransferResponsibility()));
     model.addAttribute("responsibleOptions", detail.responsibleOptions());
+    model.addAttribute("claimingOptions", detail.claimingOptions());
+    model.addAttribute(
+        "claimingOrgUnitIds",
+        detail.claimingOptions().stream()
+            .map(OrgUnitMembershipOptionDto::orgUnitId)
+            .collect(Collectors.toUnmodifiableSet()));
     model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
     if (canEditAsRequester || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());

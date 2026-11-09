@@ -67,7 +67,12 @@ not belong to Profit.
   flag cannot admit an outside unit or exclude a unit within the actual eligible hierarchy.
 - [ ] Reassignment takes effect without target approval and retains requester/history.
 
-**Enforced by:** Pending implementation · **Issues:** #3193, #3197, #3200
+**Enforced by:** The MATERIAL/ITEM foundation is covered by
+`JobOrderHierarchyAuthorityIntegrationTest`, `ProfitHierarchyIntegrationTest`,
+`ProfitHierarchyWriteRaceIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
+`ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest`.
+The complete shared participation and aUEC workflows remain pending.
+**Issues:** #3193, #3197, #3200
 
 ### REQ-ORDERS-051 — One Staffel participation carries support and promises
 
@@ -199,7 +204,13 @@ where authorized; historical names alone do not create access.
 - [ ] Ineligible support ends without deleting past contributions or reviving promises.
 - [ ] Migration cannot infer missing provenance solely from the current responsible unit.
 
-**Enforced by:** Pending implementation · **Issues:** #3193, #3197, #3200
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
+`ProfitHierarchyWriteRaceIntegrationTest`, `InventoryJobOrderScopeIntegrationTest`,
+`JobOrderAssigneeGrantIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
+`ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest` cover current
+MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. Future participation
+and money mutations must apply the same prerequisite.
+**Issues:** #3193, #3197, #3200
 
 ### REQ-ORDERS-056 — One shared overview leads to a central detail
 
@@ -225,10 +236,11 @@ Notification preferences, recipient deduplication and privacy gates remain; see
 
 ## Out of scope
 
-Implementation, automatic in-game payments, reading/verifying full player wallets, mixed-kind
-orders, money processing on MATERIAL/ITEM, production reversal and extra approval/workflow steps
-beyond the accepted decisions. Bank internals remain in the Bank specs.
+Automatic in-game payments, reading/verifying full player wallets, mixed-kind orders, money
+processing on MATERIAL/ITEM, production reversal and extra approval/workflow steps beyond the
+accepted decisions. Bank internals remain in the Bank specs.
 
 ## Open questions
 
-None for this shared contract. Runtime acceptance remains pending implementation.
+None for this shared contract. The hierarchy foundation is implemented; acceptance of the complete
+shared workflows remains pending.
