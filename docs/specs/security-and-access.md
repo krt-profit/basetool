@@ -6248,7 +6248,9 @@ Keycloak holds none of them and no token carries them.
   bank management assigns and withdraws Bank Employee in the bank grant management (*Bank-Mitarbeiter*)
   and sees only that role of a role set; anyone else gets `403`
   (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
-  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
+  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place. The role tab is the
+  `roles` section of the member's live-sync room `member:{userId}` (REQ-FE-015), so another admin's
+  open tab follows a change with the new counter.
 - **Its own counter.** `app_user.roles_version` guards a user's role set (V362) and is echoed on every
   change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
   role change, so a role change and an edit of the user record never collide. A change that leaves

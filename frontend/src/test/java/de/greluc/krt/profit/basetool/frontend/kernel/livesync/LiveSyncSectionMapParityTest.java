@@ -397,6 +397,15 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void memberRolesSeamMap_matchesTheMemberTopicWhitelist() throws IOException {
+    String js = readResource("/static/js/identity/member-roles.js");
+    assertThat(js).contains("topicClass: 'MEMBER'", "topic: `member:${userId}`");
+    assertThat(seamMapKeys("/static/js/identity/member-roles.js", "sections"))
+        .as("sections keys in member-roles.js vs LiveSyncTopicClass.MEMBER whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBER.allowedSections());
+  }
+
+  @Test
   void adminCatalogueSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
     Set<String> jsKeys = new LinkedHashSet<>();
     for (String page : List.of("starmap.js", "shops.js", "p4k-report.js")) {

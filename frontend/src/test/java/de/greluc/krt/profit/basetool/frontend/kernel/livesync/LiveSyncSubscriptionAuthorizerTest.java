@@ -132,6 +132,20 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
+  void aMemberRoomAdmitsOnlyAnAdmin_notEvenTheMemberThemselves() {
+    UUID member = UUID.randomUUID();
+    LiveSyncTopic topic = LiveSyncTopic.parse("member:" + member);
+
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_ADMIN"), UUID.randomUUID()))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_KRT_MEMBER"), member))
+        .isEqualTo(Decision.DENY);
+    assertThat(authorizer.authorize(topic, TOKEN, PIN, null, member))
+        .isEqualTo(Decision.DENY_INDETERMINATE);
+    assertThat(server.getRequestCount()).isZero();
+  }
+
+  @Test
   void catalogueRoom_requiresTheCatalogueReadRoles() {
     LiveSyncTopic topic = LiveSyncTopic.parse("catalogue");
     assertThat(authorizer.authorize(topic, TOKEN, PIN, Set.of("ROLE_KRT_MEMBER"), null))

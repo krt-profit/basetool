@@ -219,12 +219,15 @@
     <section id="member-panel-roles" class="member-edit-panel form-layout card" role="tabpanel" aria-labelledby="member-tab-roles" hidden
              sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)"
              data-member-roles="true" data-testid="member-roles-panel"
-             th:attr="data-user-id=${user.id},data-roles-version=${memberRoles != null ? memberRoles.version() : ''},data-saved=#{notification.success.save},data-error=#{error.member.roles.failed}">
+             th:attr="data-user-id=${user.id},data-saved=#{notification.success.save},data-error=#{error.member.roles.failed}">
         <fieldset class="form-section">
             <legend class="form-section__head" th:text="|1 · #{members.roles.title}|">1 · Rollen</legend>
+            <div id="member-roles-results">
+            <th:block th:fragment="memberRoles">
             <div class="alert alert-warning" role="alert" th:if="${memberRoles == null}"
                  th:text="#{members.roles.unavailable}">Die Rollen konnten nicht geladen werden.</div>
-            <div class="staffel-flags" role="group" th:if="${memberRoles != null}" th:aria-label="#{members.roles.title}">
+            <div class="staffel-flags" role="group" th:if="${memberRoles != null}" th:aria-label="#{members.roles.title}"
+                 data-member-role-set="true" th:attr="data-roles-version=${memberRoles.version()}">
                 <label class="check-row" th:each="assignable : ${assignableRoles}">
                     <input type="checkbox" data-role-toggle="true"
                            th:value="${assignable.name()}"
@@ -232,6 +235,8 @@
                            th:attr="data-testid=|member-role-${assignable.name()}|" />
                     <span th:text="#{|members.roles.role.${assignable.name()}|}">Admin</span>
                 </label>
+            </div>
+            </th:block>
             </div>
             <p class="form-hint" th:text="#{members.roles.hint}">Eine Änderung gilt sofort, wird protokolliert und dem Mitglied mitgeteilt.</p>
         </fieldset>

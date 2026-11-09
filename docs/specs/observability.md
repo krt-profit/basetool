@@ -2322,6 +2322,7 @@ the component that shipped the REQ-FE-010 staleness defect. Since #1102 (REQ-FE-
 counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` labels:
 `mission`, `operation`, `order_detail`, `orders_queue`, `bank_account`, `bank_staff`, `orgunit_bank`,
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
+the role tab's `member`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
 `hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room

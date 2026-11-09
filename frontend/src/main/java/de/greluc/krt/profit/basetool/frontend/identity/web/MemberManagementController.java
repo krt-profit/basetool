@@ -102,6 +102,9 @@ public class MemberManagementController {
   /** The single {@code roster} section of the global {@code members} room a mutation pokes. */
   private static final List<String> MEMBERS_ROSTER_SECTION = List.of("roster");
 
+  /** The fragment of {@code member-edit} that holds the role tab's toggles. */
+  private static final String MEMBER_ROLES_FRAGMENT = "memberRoles";
+
   /**
    * Renders the member list, optionally filtered by free-text search and paginated.
    *
@@ -202,6 +205,35 @@ public class MemberManagementController {
   }
 
   /**
+   * Re-renders only the role tab's toggles with the current role-set counter, the {@code roles}
+   * section of the member's live-sync room (REQ-SEC-088, REQ-FE-015).
+   *
+   * @param id the member
+   * @param model Thymeleaf model populated with the role set {@code memberRoles} ({@code null} when
+   *     it could not be read) and {@code assignableRoles}
+   * @return the {@code memberRoles} fragment of {@code member-edit}
+   */
+  @NotNull
+  @GetMapping(value = "/{id}/edit", params = "fragment=" + MEMBER_ROLES_FRAGMENT)
+  public String memberRolesFragment(@PathVariable @NotNull UUID id, @NotNull Model model) {
+    addRoleSet(id, model);
+    return "identity/member-edit :: " + MEMBER_ROLES_FRAGMENT;
+  }
+
+  /**
+   * Puts the member's role set and the assignable roles into the model the role tab renders from.
+   *
+   * @param id the member
+   * @param model the model to fill; {@code memberRoles} is {@code null} when the read failed
+   */
+  private void addRoleSet(@NotNull UUID id, @NotNull Model model) {
+    model.addAttribute(
+        "memberRoles",
+        SectionFallback.load(log, "member-edit-roles", () -> identityClient.userRoles(id), null));
+    model.addAttribute("assignableRoles", AssignableRole.values());
+  }
+
+  /**
    * Renders the member edit page; a form already in the model from a failed validation is kept.
    *
    * @param id user id
@@ -232,10 +264,7 @@ public class MemberManagementController {
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
-      model.addAttribute(
-          "memberRoles",
-          SectionFallback.load(log, "member-edit-roles", () -> identityClient.userRoles(id), null));
-      model.addAttribute("assignableRoles", AssignableRole.values());
+      addRoleSet(id, model);
 
       try {
         List<OrgUnitMembershipOptionDto> memberships = identityClient.memberships(id);

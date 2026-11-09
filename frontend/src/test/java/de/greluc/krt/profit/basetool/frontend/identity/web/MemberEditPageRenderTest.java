@@ -27,7 +27,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.identity.model.AssignableRole;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleSetDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
@@ -209,6 +211,51 @@ class MemberEditPageRenderTest {
         .contains("data-testid=\"empty-state\"")
         .contains("Keine OrgUnit-Mitgliedschaften.")
         .doesNotContain("member-memberships-table");
+  }
+
+  /**
+   * The roles tab is a live-synced section: the page joins the member's room, and its {@code
+   * memberRoles} fragment re-renders the toggles with the current counter alone.
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void rolesTab_isALiveSyncedSectionWithItsOwnFragment() throws Exception {
+    UUID id = stubMember();
+    stubRoles(id, List.of(AssignableRole.KRT_MEMBER), 7L);
+
+    assertThat(render(id, "members"))
+        .contains("id=\"member-roles-results\"")
+        .contains("data-roles-version=\"7\"");
+
+    String fragment =
+        mockMvc
+            .perform(
+                get("/members/{id}/edit", id)
+                    .param("fragment", "memberRoles")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(fragment)
+        .contains("data-roles-version=\"7\"")
+        .containsPattern("data-role-toggle=\"true\"[^>]*value=\"KRT_MEMBER\"[^>]*checked")
+        .doesNotContain("member-edit-form")
+        .doesNotContain("member-roles-results")
+        .doesNotContain("<html");
+  }
+
+  /**
+   * Stubs the member's role set.
+   *
+   * @param id the member
+   * @param held the roles the member holds
+   * @param version the role-set counter
+   */
+  private void stubRoles(@NotNull UUID id, @NotNull List<AssignableRole> held, long version) {
+    when(backendApiClient.get(eq("/api/v1/users/{id}/roles"), eq(UserRoleSetDto.class), eq(id)))
+        .thenReturn(new UserRoleSetDto(id, held, List.of(AssignableRole.values()), version));
   }
 
   /** Coming from the profile, the eyebrow leads back to the profile. */
