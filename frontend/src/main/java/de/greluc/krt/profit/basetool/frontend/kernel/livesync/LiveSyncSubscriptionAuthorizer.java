@@ -193,10 +193,8 @@ public class LiveSyncSubscriptionAuthorizer {
       if (authorities == null) {
         return indeterminate(topic);
       }
-      for (String role : requiredAnyRole) {
-        if (authorities.contains(role)) {
-          return Decision.ALLOW;
-        }
+      if (topic.topicClass().admitsAnyOf(authorities)) {
+        return Decision.ALLOW;
       }
       log.debug(
           "Live-sync subscribe denied for local-role topic {} (none of {} held)",

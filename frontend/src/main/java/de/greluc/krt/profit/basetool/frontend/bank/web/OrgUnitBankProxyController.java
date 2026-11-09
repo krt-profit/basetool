@@ -344,7 +344,7 @@ public class OrgUnitBankProxyController {
    * (REQ-BANK-041).
    *
    * @param id the request to approve
-   * @param body unused (path-only)
+   * @param body the request's echoed {@code version}
    * @return the updated request
    */
   @PostMapping("/requests/{id}/owner-approval")

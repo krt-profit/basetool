@@ -283,7 +283,13 @@ public class OrgUnitBankAccessService {
    * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   private void requireViewable(@NotNull UUID accountId) {
-    requireAccess(accountId, visible -> visible.has(BankAccountRight.VIEW));
+    BankAccount account =
+        bankAccountRepository
+            .findById(accountId)
+            .orElseThrow(OrgUnitBankAccessService::accountNotFound);
+    if (!policy.canView(actor(), account, pin())) {
+      throw accountNotFound();
+    }
   }
 
   /**
@@ -327,6 +333,16 @@ public class OrgUnitBankAccessService {
   @NotNull
   BankActor actor() {
     return bankCaller.actor();
+  }
+
+  /**
+   * The request's member id.
+   *
+   * @return the caller's id, or {@code null} without one
+   */
+  @Nullable
+  UUID userId() {
+    return bankCaller.userId();
   }
 
   /**

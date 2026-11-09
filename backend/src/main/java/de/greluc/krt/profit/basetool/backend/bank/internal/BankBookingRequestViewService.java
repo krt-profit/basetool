@@ -46,7 +46,8 @@ public class BankBookingRequestViewService {
   private final BankRequestClientNames clientNames;
 
   /**
-   * Reads a request the actor may see.
+   * Reads a request the actor may see; a requester who is neither staff nor approver gets it
+   * without the bank-internal staff note (REQ-BANK-054).
    *
    * @param actor the reading member
    * @param requestId the request
@@ -57,25 +58,19 @@ public class BankBookingRequestViewService {
   @Transactional(readOnly = true)
   public BankBookingRequestViewDto view(@NotNull BankActor actor, @NotNull UUID requestId) {
     BankBookingRequest request = Entities.require(requestRepository.findById(requestId), NOT_FOUND);
-    BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
-    BankStaffRights rights = scope.rights();
-    UUID accountId = request.getAccount().getId();
+    BankStaffRights rights = policy.staffRights(actor);
     boolean own = policy.ownsRequest(actor, request);
-    boolean staff = rights.canSee(accountId);
-    boolean approver =
-        !rights.boundByFourEyes(request.getRequestedBy())
-            && scope.candidateAccountIds().contains(accountId)
-            && scope.shows(request.getRequiredApprover(), accountId);
+    boolean staff = rights.canSee(request.getAccount().getId());
+    boolean approver = policy.approves(actor, request);
     if (!own && !staff && !approver) {
       throw new NotFoundException(NOT_FOUND);
     }
-    return new BankBookingRequestViewDto(
+    BankBookingRequestDto dto =
         BankBookingRequestDtos.of(
             request,
             clientNames.nameOf(request),
-            staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null),
-        own,
-        staff,
-        approver);
+            staff ? BankBookingRequestDtos.callerMayConfirm(request, rights) : null);
+    return new BankBookingRequestViewDto(
+        staff || approver ? dto : dto.withoutStaffNote(), own, staff, approver);
   }
 }

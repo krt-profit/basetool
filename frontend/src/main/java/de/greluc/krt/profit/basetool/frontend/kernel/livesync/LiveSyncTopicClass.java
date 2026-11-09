@@ -609,6 +609,17 @@ public enum LiveSyncTopicClass {
   }
 
   /**
+   * Reports whether a holder of the given authorities passes this class's local role check; a class
+   * without {@link #requiredAnyRole} admits everyone here and leaves the decision to its probes.
+   *
+   * @param authorities the caller's authorities, e.g. {@code ROLE_BANK_EMPLOYEE}
+   * @return {@code true} when the class needs no role or the caller holds one of them
+   */
+  public boolean admitsAnyOf(@NotNull Set<String> authorities) {
+    return requiredAnyRole == null || requiredAnyRole.stream().anyMatch(authorities::contains);
+  }
+
+  /**
    * Reports whether the topic is a member's personal room, admitting that member and, when {@link
    * #requiredAnyRole} is set, a holder of one of those authorities.
    *
