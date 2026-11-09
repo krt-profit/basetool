@@ -20,8 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /** Loads the single participation of a Staffel on an order. */
@@ -36,4 +39,31 @@ public interface JobOrderParticipationRepository
    */
   Optional<JobOrderParticipation> findByJobOrderIdAndClaimingOrgUnitId(
       UUID jobOrderId, UUID claimingOrgUnitId);
+
+  /**
+   * Tests a concrete observed support relationship, including ended support.
+   *
+   * @param jobOrderId the order
+   * @param claimingOrgUnitIds currently authorized units
+   * @return whether a current or historical participation exists
+   */
+  boolean existsByJobOrderIdAndClaimingOrgUnitIdIn(
+      UUID jobOrderId, Collection<UUID> claimingOrgUnitIds);
+
+  /**
+   * Tests whether current units support any order independently of open promised quantities.
+   *
+   * @param claimingOrgUnitIds currently authorized units
+   * @return whether an active support context exists
+   */
+  boolean existsByClaimingOrgUnitIdInAndActiveTrue(Collection<UUID> claimingOrgUnitIds);
+
+  /**
+   * Loads a bounded stable batch of managed dependents for order deletion.
+   *
+   * @param jobOrderId the order
+   * @param pageable the batch bound
+   * @return current and ended participations in id order
+   */
+  List<JobOrderParticipation> findByJobOrderIdOrderById(UUID jobOrderId, Pageable pageable);
 }

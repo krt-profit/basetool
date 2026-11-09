@@ -545,7 +545,7 @@ public class MaterialClaimService implements ClaimBucketSource {
   }
 
   /**
-   * Removes dependent promise rows only for explicit deletion of the whole order.
+   * Removes dependent promises and participations only for explicit deletion of the whole order.
    *
    * @param order the managed order whose responsibility has been validated
    */
@@ -557,10 +557,20 @@ public class MaterialClaimService implements ClaimBucketSource {
           materialClaimRepository.findForOrderIncludingHistory(
               order.getId(), PageRequest.of(0, CLAIM_BATCH_SIZE));
       if (batch.isEmpty()) {
-        return;
+        break;
       }
       materialClaimRepository.deleteAll(batch);
       materialClaimRepository.flush();
+    }
+    while (true) {
+      var batch =
+          participations.findByJobOrderIdOrderById(
+              order.getId(), PageRequest.of(0, CLAIM_BATCH_SIZE));
+      if (batch.isEmpty()) {
+        return;
+      }
+      participations.deleteAll(batch);
+      participations.flush();
     }
   }
 

@@ -49,11 +49,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
@@ -102,6 +104,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
   @Autowired private MaterialClaimRepository claims;
+  @Autowired private JobOrderParticipationRepository participations;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JobOrderHandoverRepository handovers;
   @Autowired private QualityTierRepository tiers;
@@ -790,6 +793,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(quality)
                 .claimingOrgUnit(responsible)
+                .participation(participation(order, responsible))
                 .amount(2.0)
                 .build());
     MaterialClaim foreignClaim =
@@ -799,6 +803,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(quality)
                 .claimingOrgUnit(foreign)
+                .participation(participation(order, foreign))
                 .amount(3.0)
                 .build());
     String path = "/api/v1/orders/" + order.getId();
@@ -898,10 +903,34 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(tiers.findByCode("GOOD").orElseThrow())
                 .claimingOrgUnit(responsible)
+                .participation(participation(order, responsible))
                 .amount(3.0)
                 .claimedByUser(users.getReferenceById(caller))
                 .endedAt(Instant.now())
                 .build());
+    UUID creditId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_provision_credit (id, job_order_id, claim_id, participation_id,"
+            + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount)"
+            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        creditId,
+        order.getId(),
+        archived.getId(),
+        archived.getParticipation().getId(),
+        responsible.getId(),
+        material,
+        archived.getQualityTier().getId(),
+        UUID.randomUUID(),
+        3.0);
+    jdbc.update(
+        "INSERT INTO material_provision_fragment (credit_id, origin, from_quanta, to_quanta)"
+            + " VALUES (?, ?, 0, 3000)",
+        creditId,
+        UUID.randomUUID());
+    var creditHistory =
+        jdbc.queryForMap("SELECT * FROM material_provision_credit WHERE id = ?", creditId);
+    var fragmentHistory =
+        jdbc.queryForMap("SELECT * FROM material_provision_fragment WHERE credit_id = ?", creditId);
     if (!validResponsibility) {
       hierarchy.setParent(processing.getId(), null, processing.getVersion());
     }
@@ -917,6 +946,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
     orders.flush();
     assertThat(orders.existsById(order.getId())).isEqualTo(!validResponsibility);
+    assertThat(jdbc.queryForMap("SELECT * FROM material_provision_credit WHERE id = ?", creditId))
+        .isEqualTo(creditHistory);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM material_provision_fragment WHERE credit_id = ?", creditId))
+        .isEqualTo(fragmentHistory);
+    assertThat(participations.existsById(archived.getParticipation().getId()))
+        .isEqualTo(!validResponsibility);
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM audit_event WHERE subject_id = ? AND event_type ="
@@ -979,6 +1016,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             responsible.getId())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.originalProfitBoundaryUnknown").value(true));
+  }
+
+  private JobOrderParticipation participation(JobOrder order, OrgUnit unit) {
+    JobOrderParticipation row = new JobOrderParticipation();
+    row.setJobOrder(order);
+    row.setClaimingOrgUnit(unit);
+    row.setActive(true);
+    return participations.saveAndFlush(row);
   }
 
   private SpecialCommand processingUnit() {
