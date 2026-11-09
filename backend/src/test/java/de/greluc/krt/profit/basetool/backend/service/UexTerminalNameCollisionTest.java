@@ -70,7 +70,11 @@ class UexTerminalNameCollisionTest {
         .thenReturn(
             fetched(
                 List.of(
-                    UexTerminalDto.builder().id(ITEM_TERMINAL).name(SHARED_NAME).type("item").build(),
+                    UexTerminalDto.builder()
+                        .id(ITEM_TERMINAL)
+                        .name(SHARED_NAME)
+                        .type("item")
+                        .build(),
                     UexTerminalDto.builder()
                         .id(COMMODITY_TERMINAL)
                         .name(SHARED_NAME)

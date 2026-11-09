@@ -47,8 +47,8 @@ public enum ScWikiCommodityRarity {
    * Reads a Wiki rarity label.
    *
    * @param label source label, matched case-insensitively
-   * @return the rarity, or {@code null} for an absent or unknown label so one new label never
-   *     fails the commodity page
+   * @return the rarity, or {@code null} for an absent or unknown label so one new label never fails
+   *     the commodity page
    */
   @JsonCreator
   @Nullable

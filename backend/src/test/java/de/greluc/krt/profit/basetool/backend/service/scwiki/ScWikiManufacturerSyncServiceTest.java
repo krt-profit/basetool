@@ -325,8 +325,7 @@ class ScWikiManufacturerSyncServiceTest {
                 List.of(
                     dto(UUID.randomUUID(), "Unknown One", "AEGS"),
                     dto(UUID.randomUUID(), "Unknown Two", " aegs "))));
-    when(manufacturerRepository.findByAbbreviationIgnoreCase(any()))
-        .thenReturn(List.of(unclaimed));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase(any())).thenReturn(List.of(unclaimed));
 
     assertEquals(0, service.syncManufacturers());
 
@@ -368,8 +367,7 @@ class ScWikiManufacturerSyncServiceTest {
     assertEquals(arcCorp, linkedArcCorp.getScwikiUuid());
     verify(manufacturerRepository).save(linkedArcCorp);
     verify(syncReportService, never())
-        .logScwikiEvent(
-            any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any(), any());
+        .logScwikiEvent(any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any(), any());
     verify(syncReportService, never()).recordIncomplete();
     verify(manufacturerRepository).markScwikiDeletedExcept(any(), any());
     verify(syncReportService).recordSweep(true);
@@ -384,7 +382,8 @@ class ScWikiManufacturerSyncServiceTest {
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
         .thenReturn(
             ScWikiClient.FetchResult.of(
-                List.of(dto(curelife, "Curelife", "CUR"), dto(cureLifeVariant, "CureLife", "CRLF"))));
+                List.of(
+                    dto(curelife, "Curelife", "CUR"), dto(cureLifeVariant, "CureLife", "CRLF"))));
     when(manufacturerRepository.findByP4kUuid(curelife)).thenReturn(Optional.of(linked));
     when(manufacturerRepository.findByNameIgnoreCase("CureLife")).thenReturn(Optional.of(linked));
 

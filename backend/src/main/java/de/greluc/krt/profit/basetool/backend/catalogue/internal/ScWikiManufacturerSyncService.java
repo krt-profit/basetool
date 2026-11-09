@@ -144,11 +144,7 @@ public class ScWikiManufacturerSyncService {
 
   @Nullable
   private UUID reconcile(
-      ScWikiManufacturerDto dto,
-      UUID runId,
-      Instant now,
-      Set<UUID> conflicts,
-      SourceKeys keys) {
+      ScWikiManufacturerDto dto, UUID runId, Instant now, Set<UUID> conflicts, SourceKeys keys) {
     ManufacturerMatch resolution = resolve(dto, keys);
     Manufacturer manufacturer = resolution.manufacturer();
     if (manufacturer == null) {
@@ -272,8 +268,7 @@ public class ScWikiManufacturerSyncService {
    * @param codes census rows per normalized engine code
    * @param census Wiki UUIDs of every valid census row
    */
-  private record SourceKeys(
-      Map<String, Long> names, Map<String, Long> codes, Set<UUID> census) {
+  private record SourceKeys(Map<String, Long> names, Map<String, Long> codes, Set<UUID> census) {
 
     /**
      * Tells whether a local row is already linked to another manufacturer of this census.

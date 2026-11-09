@@ -50,8 +50,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -119,9 +119,7 @@ public class ScWikiClient {
    * because the Wiki serialises an empty object field such as {@code quality_range} as {@code []}.
    */
   private final ObjectMapper objectMapper =
-      JsonMapper.builder()
-          .enable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
-          .build();
+      JsonMapper.builder().enable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT).build();
 
   /**
    * Builds the {@link RestClient} once after dependency injection, with the {@link
@@ -332,7 +330,7 @@ public class ScWikiClient {
       @Nullable Map<String, String> filters,
       @Nullable Integer pageSizeOverride) {
     FetchErrorLatch errorLatch = new FetchErrorLatch();
-    PageWalk<T> walk =
+    ScWikiPageWalk<T> walk =
         walkPages(endpoint, typeRef, resourceLabel, include, filters, pageSizeOverride, errorLatch);
     if (walk.shifted()) {
       log.info(
@@ -348,17 +346,6 @@ public class ScWikiClient {
   }
 
   /**
-   * Rows and census verdict of one page walk, before they are reported to the run.
-   *
-   * @param <T> row type
-   * @param rows decoded rows across the fetched pages
-   * @param validRows distinct rows with a usable UUID
-   * @param complete whether the walk enumerated the whole feed
-   * @param shifted whether every page was read but the feed re-paginated or grew during the walk
-   */
-  private record PageWalk<T>(List<T> rows, long validRows, boolean complete, boolean shifted) {}
-
-  /**
    * Walks every page of one endpoint once without reporting fetched rows to the run.
    *
    * @param <T> row type
@@ -371,7 +358,7 @@ public class ScWikiClient {
    * @param errorLatch the fetch's single error-counter latch, shared by a repeated walk
    * @return the walk's rows and verdict
    */
-  private <T extends ScWikiRow> PageWalk<T> walkPages(
+  private <T extends ScWikiRow> ScWikiPageWalk<T> walkPages(
       String endpoint,
       ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
       String resourceLabel,
@@ -387,7 +374,7 @@ public class ScWikiClient {
     ScWikiResponseDto<T> first =
         fetchSinglePage(firstPageUri, typeRef, resourceLabel, include, errorLatch);
     if (first == null) {
-      return new PageWalk<>(Collections.emptyList(), 0, false, false);
+      return new ScWikiPageWalk<>(Collections.emptyList(), 0, false, false);
     }
 
     List<T> accumulated = new ArrayList<>();
@@ -517,7 +504,8 @@ public class ScWikiClient {
         lastPage,
         complete);
     boolean paginated = meta != null && meta.lastPage() != null;
-    return new PageWalk<>(accumulated, validRows, complete, shifted && paginated && !walkAbandoned);
+    return new ScWikiPageWalk<>(
+        accumulated, validRows, complete, shifted && paginated && !walkAbandoned);
   }
 
   /**
