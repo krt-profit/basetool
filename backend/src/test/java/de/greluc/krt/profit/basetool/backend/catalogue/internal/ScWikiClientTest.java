@@ -40,6 +40,7 @@ import io.micrometer.observation.ObservationRegistry;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -762,6 +763,30 @@ class ScWikiClientTest {
     assertNull(result.data());
     assertEquals(1.0, fetchErrorCount());
     assertEquals(1, server.getRequestCount());
+  }
+
+  @Test
+  void commodityRarityLabelsRankOntoTiersAndAnUnknownLabelKeepsThePage() {
+    server.enqueue(
+        jsonOk(
+            pageBody(
+                1,
+                1,
+                """
+                {"uuid":"00000000-0000-0000-0000-000000000001","name":"Agricium","tier":"uncommon"},
+                {"uuid":"00000000-0000-0000-0000-000000000002","name":"Gold","tier":"Legendary"},
+                {"uuid":"00000000-0000-0000-0000-000000000003","name":"Iron","tier":"mythic"},
+                {"uuid":"00000000-0000-0000-0000-000000000004","name":"Tin","tier":null}
+                """)));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete());
+    assertEquals(
+        Arrays.asList(2, 5, null, null),
+        result.data().stream().map(row -> row.miningData().tier()).toList());
+    assertEquals(0.0, fetchErrorCount());
   }
 
   @Test
