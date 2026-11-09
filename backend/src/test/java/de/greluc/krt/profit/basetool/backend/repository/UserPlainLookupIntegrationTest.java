@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.UUID;
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.AfterEach;
@@ -75,7 +76,7 @@ class UserPlainLookupIntegrationTest {
   @BeforeEach
   void seed() {
     transactionTemplate.executeWithoutResult(status -> {
-      Role role = roleRepository.findAllWithPermissions().getFirst();
+      Role role = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
       roleName = role.getName();
       User user = new User();
       user.setId(UUID.randomUUID());

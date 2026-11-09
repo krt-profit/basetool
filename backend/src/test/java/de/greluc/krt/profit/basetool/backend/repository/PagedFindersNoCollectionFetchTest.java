@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
@@ -201,7 +202,7 @@ class PagedFindersNoCollectionFetchTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(username);
-    Role role = roleRepository.findAllWithPermissions().getFirst();
+    Role role = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
     user.getRoles().add(role);
     return userRepository.save(user);
   }

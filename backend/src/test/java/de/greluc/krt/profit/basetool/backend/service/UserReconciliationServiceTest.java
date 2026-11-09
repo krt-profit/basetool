@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedE
 import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminGrant;
 import de.greluc.krt.profit.basetool.backend.identity.internal.BootstrapAdminProperties;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleChangeRecorder;
+import de.greluc.krt.profit.basetool.backend.identity.internal.RoleSetWriter;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatNotifier;
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -138,6 +139,7 @@ class UserReconciliationServiceTest {
                 new BootstrapAdminProperties(bootstrapSubjects),
                 userRepository,
                 roleRepository,
+                new RoleSetWriter(userRepository, roleRepository, roleChangeRecorder),
                 roleChangeRecorder),
             meterRegistry);
     lenient()
@@ -196,7 +198,6 @@ class UserReconciliationServiceTest {
         new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
     assertEquals(Set.of(krtMember), existing.getRoles());
-    verify(roleRepository, never()).findAllWithPermissions();
     verify(seatNotifier, never()).onRolesChanged(any(), any());
   }
 
@@ -385,7 +386,6 @@ class UserReconciliationServiceTest {
 
       assertEquals(Set.of(krtMember), result.getRoles());
       verify(userRepository, never()).save(any(User.class));
-      verify(roleRepository, never()).findAllWithPermissions();
       verify(seatNotifier, never()).onRolesChanged(any(), any());
     }
 
@@ -953,6 +953,21 @@ class UserReconciliationServiceTest {
       assertEquals(ApprovalStatus.ACTIVE, member.getApprovalStatus());
       verify(userRepository).bumpRolesVersion(USER_ID);
       verify(roleChangeRecorder).bootstrapGranted(member);
+    }
+
+    /** The emergency grant to an account that already exists is counted like a new one. */
+    @Test
+    void anEmergencyGrantToAnExistingAccountIsCounted() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(0L);
+
+      loginOfAnExistingMember();
+
+      assertEquals(
+          1.0,
+          meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
+          "AdminAccountAutoActivated must fire for the usual emergency grant too");
     }
 
     @Test

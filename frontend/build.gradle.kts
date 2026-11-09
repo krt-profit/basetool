@@ -348,6 +348,7 @@ tasks.named<Test>("test") {
         "frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/E2eStackExtension.java",
       ),
       layout.settingsDirectory.file("frontend/src/e2e/resources/realm-export.e2e.json"),
+      layout.settingsDirectory.file("docker/sandbox/keycloak/realm-basetool.json"),
     )
     .withPropertyName("e2eAudienceParitySources")
     .withPathSensitivity(PathSensitivity.RELATIVE)

@@ -825,6 +825,13 @@ for a production origin, and the reset refuses a host whose `basetool.env` lacks
    `/etc/basetool/basetool.env`, render `env.d/` and restart the backend as in
    [Trusted Types](#trusted-types-report-then-enforce). The backend logs
    `JWT azp check enforced; accepted client ids: [basetool-frontend, basetool-ingest-gateway, basetool-seed]`.
+3. Make `seed-admin` the Basetool's bootstrap admin. Keycloak holds no Basetool role (ADR-0355), so
+   the seed assigns every role through the Basetool's role API as `seed-admin`, which must hold
+   Admin first. The first seed run creates the accounts and stops at the activation with
+   `seed-admin is no Admin in the Basetool. Set APP_BOOTSTRAP_ADMIN_SUBS=<id>`; set exactly that in
+   `/etc/basetool/basetool.env`, render `env.d/`, restart the backend and run the seed again. The
+   grant applies while no other active admin exists, which is the case on an emptied testing
+   database; the id stays valid until `purge` deletes the account.
 
 **Seeding**
 
@@ -1681,7 +1688,19 @@ switch. Every write below needs @greluc's explicit approval for this host.
    promotion on, roles are changed only in the Basetool.
 2. **Check that an admin exists.** A read-only count of active holders of `ADMIN` in `user_roles`
    must be at least one, or `APP_BOOTSTRAP_ADMIN_SUBS` in `basetool.env` names a subject that gets
-   Admin at its next login (REQ-SEC-088).
+   Admin at its next login (REQ-SEC-088). From the release on, an account merge moves the roles to
+   the surviving account; an account emptied by an earlier merge may still hold some. List them
+   read-only and withdraw them on the member page after the promotion, so an unreachable account
+   does not count for the last-admin rule:
+
+   ```sql
+   SELECT ur.user_id, r.code
+     FROM user_roles ur
+     JOIN role r ON r.id = ur.role_id
+    WHERE ur.user_id::text IN (SELECT substring(details FROM 'fromUser=([0-9a-f-]{36})')
+                                 FROM audit_event
+                                WHERE event_type = 'USER_MERGED');
+   ```
 3. **Export the assignments** for the rollback with the read-only
    `scripts/role-assignments-export.sql`, fed on stdin as the report above, and keep the file off
    the repository:
@@ -1710,7 +1729,8 @@ switch. Every write below needs @greluc's explicit approval for this host.
 
    The dry run lists `- default scope 'roles' withheld (…)` for `basetool-frontend`,
    `- realm role '<name>' deleted with its user mappings and its place in 'default-roles-basetool'
-   (…)` for each of the four roles, for `grafana` `+ mapper 'client roles' -> …` and
+   (…)` for `KRT Member`, `Bank Employee` and `Bank Management` (never for `Admin`, the admin-OTP
+   marker of REQ-SEC-082), for `grafana` `+ mapper 'client roles' -> …` and
    `- grafana: mapper 'realm roles' (…) removed (…)`, and for `backend-service`
    `- service-account roles realm-management:view-realm withdrawn (…)`, and exits `2`. When the
    provisioning identity cannot read or change that service account (it holds no `manage-users`),
@@ -1718,6 +1738,13 @@ switch. Every write below needs @greluc's explicit approval for this host.
    `backend-service` → Service account roles* by hand. Then sign in to Grafana as one of its admins
    to confirm the gate. The rollback's previous provisioner grants `view-realm` again and restores
    Grafana's realm-role mapper.
+7. **Keep the two Admin assignments in step, from now on.** The realm role `Admin` stays in
+   Keycloak only as the condition of the admin OTP (REQ-SEC-082, ADR-0355 *Amendment 3*); the
+   Basetool never reads it. Whoever gives an account the Basetool's `Admin` on the member page also
+   maps the realm role (*Users → <user> → Role mapping → Assign role → `Admin`*), and whoever
+   withdraws it unmaps the realm role; an admin without the realm role is not asked for a second
+   factor. Compare both lists after the promotion: the read-only count of step 2 against *Realm
+   roles → `Admin` → Users in role*.
 
 **Rollback.** Redeploy the previous release, run **its** provisioner (it creates the four realm
 roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back
@@ -1728,10 +1755,18 @@ python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-
 python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-command '<kcadm invocation>' --apply
 ```
 
-It maps each account to the roles the export lists, puts `KRT Member` back into
-`default-roles-basetool`, adds and never removes, reports accounts Keycloak no longer has, and
-refuses to run while a realm role is missing. A role assigned in the Basetool after the export is
-not in it: export again right before the rollback if the release ran for a while.
+It maps each account to the roles the export lists and puts `KRT Member` back into
+`default-roles-basetool`. Because that composite gives `KRT Member` to every account, each account
+the export lists as `DEPARTED` (approved, present in Keycloak, without `KRT Member` in the
+Basetool) loses its own mapping of `default-roles-basetool` and of `KRT Member`, so the previous
+release's login and roster sync do not make it a member again; nothing else is removed. It refuses
+to run while a realm role is missing, refuses an empty export, stops before writing when Keycloak
+refuses a role-mapping read, and exits `1` after reporting an account Keycloak no longer has (drop
+that line from the export once checked). The kcadm session needs the `realm-management` roles
+`view-users`, `manage-users` and `manage-realm`: give `basetool-provisioner`
+([`keycloak/README.md`](keycloak/README.md)) `view-users` and `manage-users` for the rollback and
+take them away afterwards. A role assigned in the Basetool after the export is not in it: export
+again right before the rollback if the release ran for a while.
 
 ### Updating the operational scripts and units
 

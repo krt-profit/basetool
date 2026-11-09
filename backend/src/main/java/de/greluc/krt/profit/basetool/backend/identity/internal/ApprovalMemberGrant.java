@@ -20,10 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
-import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -39,20 +36,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ApprovalMemberGrant implements ApprovalRoleGrant {
 
-  private final UserRepository userRepository;
-  private final RoleRepository roleRepository;
-  private final RoleChangeRecorder recorder;
+  private final RoleSetWriter writer;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void grantOnApproval(@NotNull User user, @NotNull UUID adminId) {
-    String code = AssignableRole.KRT_MEMBER.getCode();
-    if (user.getRoles().stream().anyMatch(role -> code.equals(role.getCode()))) {
+    if (RoleSetWriter.holds(user, AssignableRole.KRT_MEMBER)) {
       return;
     }
-    user.getRoles().add(Entities.require(roleRepository.findByCode(code), "Role not found"));
-    userRepository.bumpRolesVersion(user.getId());
-    user.setRolesVersion(user.getRolesVersion() + 1);
-    recorder.changed(user, AssignableRole.KRT_MEMBER, true, adminId);
+    writer.write(user, AssignableRole.KRT_MEMBER, true, user.getRolesVersion(), adminId);
   }
 }
