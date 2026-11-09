@@ -43,6 +43,7 @@ final class TestBankActor {
 
   /** The member's id. */
   private final UUID userId;
+
   private final Set<String> roles = new LinkedHashSet<>();
   private final List<BankActor.Seat> seats = new ArrayList<>();
   private final Set<UUID> officerReach = new LinkedHashSet<>();

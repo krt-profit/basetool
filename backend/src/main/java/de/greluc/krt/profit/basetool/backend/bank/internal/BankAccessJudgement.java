@@ -240,8 +240,7 @@ final class BankAccessJudgement {
    */
   @Nullable
   BigDecimal applicableLimit(
-      @NotNull BankAccount account,
-      @NotNull Supplier<List<BankAccountApprovalLimit>> limitRows) {
+      @NotNull BankAccount account, @NotNull Supplier<List<BankAccountApprovalLimit>> limitRows) {
     if (account.getType() == BankAccountType.CARTEL) {
       return account.getEmployeeApprovalCeiling();
     }

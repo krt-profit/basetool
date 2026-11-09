@@ -95,9 +95,8 @@ public class BankAccessRules implements BankAccessPolicy {
   }
 
   /**
-   * Whether the actor views the account on the org-unit side, the {@link
-   * BankAccountRight#VIEW} of {@link #accessTo(BankActor, BankAccount, UUID)} without deciding the
-   * other rights.
+   * Whether the actor views the account on the org-unit side, the {@link BankAccountRight#VIEW} of
+   * {@link #accessTo(BankActor, BankAccount, UUID)} without deciding the other rights.
    *
    * @param actor the actor
    * @param account the account

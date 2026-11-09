@@ -269,7 +269,8 @@ class BankAccessRulesTest {
         .thenReturn(List.of(allMembers));
 
     assertThat(policy.canView(member, staffelAccount, null)).isTrue();
-    assertThat(policy.canView(TestBankActor.member(UUID.randomUUID()).build(), staffelAccount, null))
+    assertThat(
+            policy.canView(TestBankActor.member(UUID.randomUUID()).build(), staffelAccount, null))
         .isFalse();
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }

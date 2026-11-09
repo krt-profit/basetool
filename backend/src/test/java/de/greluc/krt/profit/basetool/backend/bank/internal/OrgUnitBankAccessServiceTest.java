@@ -1565,7 +1565,8 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.member(UUID.randomUUID()));
 
-    assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId, 3L));
+    assertThrows(
+        AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId, 3L));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -2101,8 +2102,7 @@ class OrgUnitBankAccessServiceTest {
     UUID requester = UUID.randomUUID();
     BankBookingRequest existing = new BankBookingRequest();
     existing.setId(requestId);
-    existing.setAccount(
-        account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Other", "OTH")));
+    existing.setAccount(account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Other", "OTH")));
     existing.setType(BankBookingRequestType.DEPOSIT);
     existing.setRequestedBy(requester);
     when(bankBookingRequestRepository.findById(requestId)).thenReturn(Optional.of(existing));
@@ -2140,7 +2140,8 @@ class OrgUnitBankAccessServiceTest {
     actingAs(TestBankActor.member(requester).seat(olId, MembershipRole.OL_MEMBER));
 
     UpdateBankBookingRequest update =
-        new UpdateBankBookingRequest(new BigDecimal("5000"), "note", "reason", null, null, null, 0L);
+        new UpdateBankBookingRequest(
+            new BigDecimal("5000"), "note", "reason", null, null, null, 0L);
     requestService.updateOwnBookingRequest(requestId, update);
 
     verify(bankBookingRequestService)

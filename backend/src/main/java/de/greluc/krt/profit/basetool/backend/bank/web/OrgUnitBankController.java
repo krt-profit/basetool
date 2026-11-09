@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestVie
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
-import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDetailDto;

@@ -255,7 +255,6 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
         request.getRequiredApprover(),
         request.isOwnerApprovalGranted(),
         BankBookingRequestDtos.callerMayConfirm(request, rights),
-
         balances.get(account.getId()),
         request.getClientId());
   }

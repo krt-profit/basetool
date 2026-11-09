@@ -166,7 +166,7 @@ public class BankAccountService {
       return List.of();
     }
     List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
-    return toBookingDtos(
+    return mapBookingRows(
         rows,
         holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
             .collect(Collectors.groupingBy(BankHolderLeg::transactionId)));
@@ -181,7 +181,7 @@ public class BankAccountService {
    */
   @NotNull
   List<BankBookingDto> toBookingDtosWithoutHolders(@NotNull List<BankBookingRow> rows) {
-    return rows.isEmpty() ? List.of() : toBookingDtos(rows, Map.of());
+    return rows.isEmpty() ? List.of() : mapBookingRows(rows, Map.of());
   }
 
   /**
@@ -192,9 +192,8 @@ public class BankAccountService {
    * @return one DTO per row, in row order
    */
   @NotNull
-  private List<BankBookingDto> toBookingDtos(
-      @NotNull List<BankBookingRow> rows,
-      @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
+  private List<BankBookingDto> mapBookingRows(
+      @NotNull List<BankBookingRow> rows, @NotNull Map<UUID, List<BankHolderLeg>> holderLegsByTx) {
     List<UUID> transferTxIds =
         rows.stream()
             .filter(r -> r.type() == BankTransactionType.TRANSFER)
