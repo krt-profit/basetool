@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:c2da0541-a469-4cfb-b6ee-47aae9d448cb" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:601588fd-c9ca-4345-bb59-7a5518ae5466" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-09T11:56:51Z</timestamp>
+    <timestamp>2026-11-09T15:28:26Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.1?project_path=%3Abackend">
       <group>de.greluc.krt.profit.basetool</group>
       <name>backend</name>
-      <version>1.23.0</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend</purl>
+      <version>1.23.1</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.1?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/42612141941</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/42644601296</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -850,11 +850,11 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.1?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.23.0</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support</purl>
+      <version>1.23.1</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.1?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6343,13 +6343,13 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.1?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>
       <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar"/>
       <dependency ref="pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.1?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar"/>
@@ -6372,7 +6372,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.1?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
