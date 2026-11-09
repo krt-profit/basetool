@@ -825,6 +825,13 @@ for a production origin, and the reset refuses a host whose `basetool.env` lacks
    `/etc/basetool/basetool.env`, render `env.d/` and restart the backend as in
    [Trusted Types](#trusted-types-report-then-enforce). The backend logs
    `JWT azp check enforced; accepted client ids: [basetool-frontend, basetool-ingest-gateway, basetool-seed]`.
+3. Make `seed-admin` the Basetool's bootstrap admin. Keycloak holds no Basetool role (ADR-0355), so
+   the seed assigns every role through the Basetool's role API as `seed-admin`, which must hold
+   Admin first. The first seed run creates the accounts and stops at the activation with
+   `seed-admin is no Admin in the Basetool. Set APP_BOOTSTRAP_ADMIN_SUBS=<id>`; set exactly that in
+   `/etc/basetool/basetool.env`, render `env.d/`, restart the backend and run the seed again. The
+   grant applies while no other active admin exists, which is the case on an emptied testing
+   database; the id stays valid until `purge` deletes the account.
 
 **Seeding**
 
