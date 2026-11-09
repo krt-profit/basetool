@@ -1378,7 +1378,10 @@ request and no sync writes it.
 - **The UEX vehicle sync** resolves by `external_uuid`, then `uex_vehicle_id`, then the aliased
   class name when exactly one ship type carries it, then the name, and only then seeds.
 - **The SC Wiki vehicle sync** resolves by `external_uuid`, then the ship type that holds the UEX
-  vehicle id aliased to its class name, then the name.
+  vehicle id aliased to its class name, then the name when only one Wiki vehicle carries it. A Wiki
+  vehicle whose name several Wiki vehicles share (`AEGS_Hammerhead` / `AEGS_Hammerhead_GS`) and a
+  stored ship type already holds stays unlinked and is reported as `SOURCE_IDENTITY_CONFLICT`; it
+  never seeds a second row of that name, which `ship_type.name`'s unique key would refuse.
 - **The P4K import** resolves by `external_uuid`, then the class name, and when no row carries the
   class name, the ship type that holds the aliased UEX vehicle id, then the name.
 - A row matched through the alias keeps its own `name`; each source writes only its own columns, as
@@ -1395,6 +1398,8 @@ request and no sync writes it.
   alias naming several rows falls through to the name.
 - [x] A Wiki vehicle and a P4K ship whose class name is aliased link the UEX row instead of seeding
   a twin.
+- [x] A Wiki vehicle sharing its name with another Wiki vehicle links nothing by name; when the name
+  is already stored, it is reported as an identity conflict and no insert reaches the database.
 - [x] The V310 merge moves every reference onto the survivor, carries the UEX columns over, bumps
   the versions and deletes the UEX half; a half that is not `UEX_ONLY`, or an ambiguous class name,
   merges nothing.

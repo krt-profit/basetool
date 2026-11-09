@@ -180,20 +180,17 @@ public class ScWikiVehicleSyncService {
     if (match.isEmpty() && StringUtils.hasText(dto.className())) {
       match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
     }
-    if (match.isEmpty() && nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) == 1) {
-      match = shipTypeRepository.findByNameIgnoreCase(dto.name());
+    if (match.isEmpty()) {
+      Optional<ShipType> named = shipTypeRepository.findByNameIgnoreCase(dto.name());
+      if (named.isPresent()
+          && nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) > 1) {
+        return reportIdentityConflict(dto, runId, "Name is shared by several Wiki vehicles.");
+      }
+      match = named;
     }
     ShipType ship = match.orElseGet(ShipType::new);
     if (ship.getExternalUuid() != null && !ship.getExternalUuid().equals(dto.uuid())) {
-      syncReportService.logScwikiEvent(
-          runId,
-          SyncEventType.SOURCE_IDENTITY_CONFLICT,
-          "ship_type",
-          dto.uuid(),
-          dto.name(),
-          "Existing vehicle has another game UUID.");
-      syncReportService.recordIncomplete();
-      return null;
+      return reportIdentityConflict(dto, runId, "Existing vehicle has another game UUID.");
     }
     if (match.isEmpty()) {
       ship.setName(dto.name());
@@ -216,6 +213,23 @@ public class ScWikiVehicleSyncService {
     }
     ShipType saved = shipTypeRepository.save(ship);
     return saved.getExternalUuid();
+  }
+
+  /**
+   * Reports a Wiki vehicle that stays unlinked because its identity collides with a stored ship
+   * type, and marks the run incomplete so no sweep relies on it.
+   *
+   * @param dto the Wiki vehicle left unlinked
+   * @param runId the sync run the event belongs to
+   * @param reason the fixed, non-user text naming the collision
+   * @return always {@code null}, the upsert's "nothing written" result
+   */
+  @Nullable
+  private UUID reportIdentityConflict(ScWikiVehicleDto dto, UUID runId, String reason) {
+    syncReportService.logScwikiEvent(
+        runId, SyncEventType.SOURCE_IDENTITY_CONFLICT, "ship_type", dto.uuid(), dto.name(), reason);
+    syncReportService.recordIncomplete();
+    return null;
   }
 
   /**
