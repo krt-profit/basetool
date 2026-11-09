@@ -178,7 +178,7 @@ class InventoryItemCreateDtoValidationTest {
             UUID.randomUUID(),
             null,
             null,
-            List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
+            List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0, null)));
 
     assertViolationOn(payload, "missionFreeForGameItem");
   }

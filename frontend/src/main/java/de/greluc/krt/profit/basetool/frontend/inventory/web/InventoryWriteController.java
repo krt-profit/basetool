@@ -314,11 +314,12 @@ public class InventoryWriteController {
       if (entryAmount == null || entryAmount <= 0d) {
         return List.of();
       }
-      return List.of(new InventoryAllocationInput(targeted.getFirst().getTargetId(), entryAmount));
+      return List.of(
+          new InventoryAllocationInput(targeted.getFirst().getTargetId(), entryAmount, null));
     }
     return targeted.stream()
         .filter(row -> row.getAmount() != null)
-        .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount()))
+        .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount(), null))
         .toList();
   }
 

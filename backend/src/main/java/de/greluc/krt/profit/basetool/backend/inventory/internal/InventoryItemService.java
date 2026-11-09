@@ -104,6 +104,7 @@ public class InventoryItemService {
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryProperties inventoryProperties;
+  private final InventoryProvisionRecorder provisionRecorder;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -440,6 +441,7 @@ public class InventoryItemService {
     item.setNote(StringNormalization.trimToNull(note));
     List<InventoryAllocationInput> jobAllocations =
         effectiveAllocations(dto.jobOrderAllocations(), dto.jobOrderId(), item.getAmount());
+    provisionRecorder.prepareInitial(item, jobAllocations);
     List<InventoryAllocationInput> missionAllocations =
         effectiveAllocations(dto.missionAllocations(), dto.missionId(), item.getAmount());
     if (Boolean.TRUE.equals(isPersonal)
@@ -465,6 +467,7 @@ public class InventoryItemService {
           false);
     }
     Set<UUID> seenMissions = new HashSet<>();
+    provisionRecorder.assertUnattributed(missionAllocations);
     for (InventoryAllocationInput allocation : missionAllocations) {
       if (!seenMissions.add(allocation.targetId())) {
         throw new BadRequestException("A mission may be assigned at most once at check-in");
@@ -494,6 +497,7 @@ public class InventoryItemService {
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item, this::jobOrderDisplayIdOf))
             .with("mission", InventoryAuditLabels.missionName(item, this::missionNameOf)));
+    provisionRecorder.recordInitial(saved, jobAllocations);
     return inventoryCheckoutService.mergeStockIfRequested(
         saved, Boolean.TRUE.equals(dto.mergeStock()));
   }
@@ -592,6 +596,8 @@ public class InventoryItemService {
   public InventoryItemDto addAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     orderWrites.lockEligibility();
+    orderWrites.lockAllocation(
+        id, dto.field() == InventoryAllocationDimension.JOB_ORDER ? dto.targetId() : null);
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     addAllocationTo(item, dto);
     orderWrites.assertRow(item);
@@ -642,6 +648,7 @@ public class InventoryItemService {
   private void addAllocationTo(
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
+    provisionRecorder.validateDimension(dto);
     double amount = requireWriteAmount(dto, item);
     orderWrites.assertRow(item);
     if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
@@ -664,6 +671,7 @@ public class InventoryItemService {
         slice.setJobOrderId(dto.targetId());
         slice.setAmount(amount);
         item.getJobOrderAllocations().add(slice);
+        provisionRecorder.record(item, dto.targetId(), dto.provision(), amount);
         recordAllocation(
             AuditEventType.INVENTORY_ALLOCATION_ADDED,
             item,
@@ -712,6 +720,8 @@ public class InventoryItemService {
   public InventoryItemDto changeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     orderWrites.lockEligibility();
+    orderWrites.lockAllocation(
+        id, dto.field() == InventoryAllocationDimension.JOB_ORDER ? dto.targetId() : null);
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     changeAllocationOf(item, dto);
     orderWrites.assertRow(item);
@@ -730,6 +740,7 @@ public class InventoryItemService {
   private void changeAllocationOf(
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
+    provisionRecorder.validateDimension(dto);
     double amount = requireWriteAmount(dto, item);
     orderWrites.assertRow(item);
     if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
@@ -742,7 +753,10 @@ public class InventoryItemService {
           throw new NotFoundException("Job-order allocation not found");
         }
         assertFits(sumJobOrderAllocated(item, dto.targetId()) + amount, item.getAmount());
+        double previousAmount = slice.getAmount();
         slice.setAmount(amount);
+        provisionRecorder.record(
+            item, dto.targetId(), dto.provision(), Math.max(0.0, amount - previousAmount));
         recordAllocation(
             AuditEventType.INVENTORY_ALLOCATION_CHANGED,
             item,
@@ -757,7 +771,10 @@ public class InventoryItemService {
           throw new NotFoundException("Mission allocation not found");
         }
         assertFits(sumMissionAllocated(item, dto.targetId()) + amount, item.getAmount());
+        double previousAmount = slice.getAmount();
         slice.setAmount(amount);
+        provisionRecorder.record(
+            item, dto.targetId(), dto.provision(), Math.max(0.0, amount - previousAmount));
         recordAllocation(
             AuditEventType.INVENTORY_ALLOCATION_CHANGED,
             item,
@@ -787,6 +804,8 @@ public class InventoryItemService {
   public InventoryItemDto removeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
     orderWrites.lockEligibility();
+    orderWrites.lockAllocation(
+        id, dto.field() == InventoryAllocationDimension.JOB_ORDER ? dto.targetId() : null);
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     removeAllocationFrom(item, dto);
     orderWrites.assertRow(item);
@@ -802,6 +821,9 @@ public class InventoryItemService {
    */
   private void removeAllocationFrom(
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
+    if (dto.provision() != null) {
+      throw new BadRequestException("orders.claim.provision.only_material_order");
+    }
     orderWrites.assertRow(item);
     if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
       orderWrites.assertOrders(List.of(dto.targetId()));
@@ -865,6 +887,7 @@ public class InventoryItemService {
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
+    orderWrites.validateRows(List.of(id));
     boolean isOwner = item.getUser() != null && item.getUser().getId().equals(currentUserId);
     if (!isOwner && !isLogistician) {
       throw new AccessDeniedException(
@@ -1112,7 +1135,7 @@ public class InventoryItemService {
       return explicit;
     }
     if (singleId != null) {
-      return List.of(new InventoryAllocationInput(singleId, fullAmount));
+      return List.of(new InventoryAllocationInput(singleId, fullAmount, null));
     }
     return List.of();
   }
@@ -1161,7 +1184,10 @@ public class InventoryItemService {
     String normalizedNote = StringNormalization.trimToNull(request.note());
     item.setNote(normalizedNote);
 
-    orderWrites.assertRow(item);
+    orderWrites.assertOrders(
+        item.getJobOrderAllocations().stream()
+            .map(InventoryJobOrderAllocation::getJobOrderId)
+            .toList());
 
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(

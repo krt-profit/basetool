@@ -40,6 +40,27 @@ import org.jetbrains.annotations.Nullable;
  * #lockLotRows} in the order of the lots' keys, and only then books.
  */
 public interface StockCommands {
+  /**
+   * The complete material targets of one genuine book-in in a multi-line action.
+   *
+   * @param holder the stock holder
+   * @param lot the physical destination lot
+   * @param orderIds every initial job-order allocation target
+   */
+  record StockBookInScope(
+      @NotNull UUID holder, @NotNull StockLot lot, @NotNull List<UUID> orderIds) {
+    /** Retains an immutable copy of the requested target set. */
+    public StockBookInScope {
+      orderIds = List.copyOf(orderIds);
+    }
+  }
+
+  /**
+   * Locks all current and requested material scopes before a multi-line book-in writes stock.
+   *
+   * @param bookings every physical destination and initial allocation target of the action
+   */
+  void lockBookInScopes(@NotNull Collection<StockBookInScope> bookings);
 
   /**
    * Takes the transaction-scoped advisory lock of each of a member's lots, in ascending order of
@@ -328,7 +349,7 @@ public interface StockCommands {
       @NotNull Material material,
       @NotNull Location location,
       @Nullable Integer quality,
-      @Nullable Double amount,
+      double amount,
       @Nullable String note,
       boolean personal,
       @Nullable UUID jobOrderId,

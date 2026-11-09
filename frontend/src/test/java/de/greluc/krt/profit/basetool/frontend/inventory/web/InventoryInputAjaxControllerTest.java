@@ -144,9 +144,9 @@ class InventoryInputAjaxControllerTest {
 
     InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations())
-        .containsExactly(new InventoryAllocationInput(missionId, 23d));
+        .containsExactly(new InventoryAllocationInput(missionId, 23d, null));
     org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
-        .containsExactly(new InventoryAllocationInput(jobOrderId, 23d));
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 23d, null));
   }
 
   @Test
@@ -222,8 +222,8 @@ class InventoryInputAjaxControllerTest {
 
     org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
         .containsExactly(
-            new InventoryAllocationInput(firstMission, 5d),
-            new InventoryAllocationInput(secondMission, 8d));
+            new InventoryAllocationInput(firstMission, 5d, null),
+            new InventoryAllocationInput(secondMission, 8d, null));
   }
 
   @Test
@@ -247,7 +247,7 @@ class InventoryInputAjaxControllerTest {
         .andExpect(status().isOk());
 
     org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
-        .containsExactly(new InventoryAllocationInput(missionId, 7.5d));
+        .containsExactly(new InventoryAllocationInput(missionId, 7.5d, null));
   }
 
   @Test
@@ -295,7 +295,7 @@ class InventoryInputAjaxControllerTest {
 
     InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
-        .containsExactly(new InventoryAllocationInput(jobOrderId, 4d));
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 4d, null));
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
   }
 

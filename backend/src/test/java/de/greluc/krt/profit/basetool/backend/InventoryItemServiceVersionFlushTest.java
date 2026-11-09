@@ -63,7 +63,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * bookOutInventoryItem}) map their DTO from {@code saveAndFlush}, so the returned {@code @Version}
  * is current and the next edit does not 409.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceVersionFlushTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -142,7 +145,9 @@ class InventoryItemServiceVersionFlushTest {
             auditService,
             null,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                null));
   }
 
   private User userWithId(UUID id) {

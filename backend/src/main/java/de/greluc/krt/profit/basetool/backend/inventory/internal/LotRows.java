@@ -112,6 +112,7 @@ final class LotRows {
     part.setAmount(ScuAmounts.roundToScuScale(amount));
     part.setPersonal(placement.personal());
     part.setStolen(placement.stolen());
+    source.moveQuantityTo(part, amount);
     return part;
   }
 

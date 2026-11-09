@@ -139,18 +139,22 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockMergeNotes;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialQuantityArithmetic;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.GameMedia;
 import de.greluc.krt.profit.basetool.backend.kernel.GameText;
@@ -416,6 +420,10 @@ class ArchitectureTest {
           HandleSpellings.class,
           IngestGatewayProperties.class,
           InventoryAllocations.class,
+          InventoryQuantityComposition.class,
+          InventoryStockMergeNotes.class,
+          MaterialQuantityArithmetic.class,
+          StockQuantityFragment.class,
           InventoryAuditLabels.class,
           InventoryGameItemReferenceDto.class,
           InventoryItemDto.class,
@@ -1292,7 +1300,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 86);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 90);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

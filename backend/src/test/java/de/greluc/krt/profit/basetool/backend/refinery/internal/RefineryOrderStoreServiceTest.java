@@ -86,7 +86,10 @@ import org.springframework.security.access.AccessDeniedException;
  * lookups, assignee resolution, one new inventory row per output, note normalisation, output
  * quantity conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class RefineryOrderStoreServiceTest {
 
   @Mock private RefineryOrderRepository refineryOrderRepository;

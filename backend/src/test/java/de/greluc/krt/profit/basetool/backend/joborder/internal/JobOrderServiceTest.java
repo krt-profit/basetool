@@ -80,7 +80,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderServiceTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
@@ -192,6 +195,7 @@ class JobOrderServiceTest {
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
+                org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,

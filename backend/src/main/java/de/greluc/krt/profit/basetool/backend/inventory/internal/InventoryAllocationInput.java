@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvisionSelection;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One quantity-split earmark supplied at inventory check-in (REQ-INV-027): {@code amount} of the
@@ -30,5 +33,9 @@ import java.util.UUID;
  *
  * @param targetId the job order or mission to earmark to; never {@code null}
  * @param amount the SCU to earmark; strictly positive
+ * @param provision an explicitly selected matching unit promise, or null for unattributed stock
  */
-public record InventoryAllocationInput(@NotNull UUID targetId, @NotNull @Positive Double amount) {}
+public record InventoryAllocationInput(
+    @NotNull UUID targetId,
+    @NotNull @Positive Double amount,
+    @Valid @Nullable MaterialProvisionSelection provision) {}

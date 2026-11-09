@@ -80,7 +80,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
  * normalisation loop.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderServicePriorityAndStatusTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
@@ -157,6 +160,7 @@ class JobOrderServicePriorityAndStatusTest {
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
+                org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,

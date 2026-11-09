@@ -293,7 +293,7 @@ class InventoryJobOrderScopeIntegrationTest {
     long version = row.get("version").asLong();
     InventoryAllocationWriteDto allocation =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, orderId, 1.0, version);
+            InventoryAllocationDimension.JOB_ORDER, orderId, 1.0, version, null);
     MockHttpServletRequestBuilder request =
         switch (mutation) {
           case RELEASE_ROW -> delete("/api/v1/orders/" + orderId + "/allocations/" + rowId);
@@ -415,7 +415,7 @@ class InventoryJobOrderScopeIntegrationTest {
   private @NotNull ResultActions create(@Nullable UUID jobOrderId, @NotNull UUID owningOrgUnitId)
       throws Exception {
     List<InventoryAllocationInput> allocations =
-        jobOrderId == null ? null : List.of(new InventoryAllocationInput(jobOrderId, 2.0));
+        jobOrderId == null ? null : List.of(new InventoryAllocationInput(jobOrderId, 2.0, null));
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
             null,
@@ -443,7 +443,7 @@ class InventoryJobOrderScopeIntegrationTest {
       @NotNull UUID id, @NotNull UUID jobOrderId, long version) throws Exception {
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, jobOrderId, 2.0, version);
+            InventoryAllocationDimension.JOB_ORDER, jobOrderId, 2.0, version, null);
     return mockMvc.perform(
         post(PATH + "/" + id + "/allocation")
             .with(asMember())

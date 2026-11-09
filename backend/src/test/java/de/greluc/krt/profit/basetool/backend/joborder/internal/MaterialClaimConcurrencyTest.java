@@ -342,7 +342,7 @@ class MaterialClaimConcurrencyTest {
    * @return the create-claim payload
    */
   private CreateClaimDto claim(double amount) {
-    return new CreateClaimDto(fixture.materialId(), "GOOD", fixture.squadronId(), amount);
+    return new CreateClaimDto(fixture.materialId(), "GOOD", fixture.squadronId(), amount, null);
   }
 
   /**
@@ -353,7 +353,7 @@ class MaterialClaimConcurrencyTest {
    * @return the create-claim payload
    */
   private CreateClaimDto claimFor(UUID squadronId, double amount) {
-    return new CreateClaimDto(fixture.materialId(), "GOOD", squadronId, amount);
+    return new CreateClaimDto(fixture.materialId(), "GOOD", squadronId, amount, null);
   }
 
   /**

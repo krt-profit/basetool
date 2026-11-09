@@ -34,4 +34,25 @@ public interface OrderLinkedStockWriteObserver {
    * @param orderIds the actually affected orders
    */
   void beforeOrderLinkedStockWrite(@NotNull Collection<UUID> orderIds);
+
+  /**
+   * Locks every affected material capacity scope before stock lots or rows are locked.
+   *
+   * @param scopes the complete current and requested material scopes
+   */
+  void beforeOrderLinkedMaterialWrite(@NotNull Collection<OrderMaterialScope> scopes);
+
+  /**
+   * Rejects unplanned material scopes after stock locks without acquiring another material lock.
+   *
+   * @param scopes the actual material scopes found under stock locks
+   */
+  void assertOrderLinkedMaterialWrite(@NotNull Collection<OrderMaterialScope> scopes);
+
+  /**
+   * Credits a writer-selected promise from this action's genuinely new suitable provision.
+   *
+   * @param provision the actual stock facts and explicit selection before any merge
+   */
+  void recordMaterialProvision(MaterialProvision provision);
 }

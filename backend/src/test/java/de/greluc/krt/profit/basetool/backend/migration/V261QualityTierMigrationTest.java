@@ -123,13 +123,23 @@ class V261QualityTierMigrationTest {
         jdbcTemplate.queryForObject(
             "SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_material_claim_bucket_org_unit'",
             Integer.class);
-    Integer current =
+    Integer formerWholeHistoryIndex =
         jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM pg_indexes"
-                + " WHERE indexname = 'uq_material_claim_tier_bucket_org_unit'",
+            "SELECT count(*) FROM pg_indexes WHERE indexname ="
+                + " 'uq_material_claim_tier_bucket_org_unit'",
             Integer.class);
+    String activeIndex =
+        jdbcTemplate.queryForObject(
+            "SELECT indexdef FROM pg_indexes WHERE indexname ="
+                + " 'uq_material_claim_active_bucket_org_unit'",
+            String.class);
 
     assertThat(old).isZero();
-    assertThat(current).isEqualTo(1);
+    assertThat(formerWholeHistoryIndex).isZero();
+    assertThat(activeIndex)
+        .contains(
+            "CREATE UNIQUE INDEX",
+            "(job_order_id, material_id, quality_tier_id, claiming_org_unit_id)")
+        .contains("WHERE (ended_at IS NULL)");
   }
 }

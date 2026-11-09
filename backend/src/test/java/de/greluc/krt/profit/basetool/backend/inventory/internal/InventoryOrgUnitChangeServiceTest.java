@@ -59,7 +59,10 @@ import org.springframework.security.access.AccessDeniedException;
  * a direct membership or no unit as target, no event when nothing changes, and the merge rules
  * applied after the change.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryOrgUnitChangeServiceTest {
 
   private static final UUID CALLER = UUID.randomUUID();

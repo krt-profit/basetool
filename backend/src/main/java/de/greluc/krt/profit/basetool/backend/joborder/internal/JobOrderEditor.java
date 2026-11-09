@@ -55,6 +55,7 @@ public class JobOrderEditor {
 
   private final JobOrderRepository jobOrderRepository;
   private final ProfitHierarchyService profitHierarchy;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final AuditRecorder auditRecorder;
@@ -129,6 +130,7 @@ public class JobOrderEditor {
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
     profitHierarchy.lockForOrderWrite();
+    materialPromises.lockOrder(id);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     if (gate != JobOrderGate.TRANSFER) {
@@ -142,6 +144,7 @@ public class JobOrderEditor {
     }
     JobOrderEdit edit = mutation.apply(order);
     JobOrder result = edit.order();
+    materialPromises.reconcileOrder(id);
     if (edit.type() != null) {
       auditRecorder.record(
           edit.type(), result.getId(), JobOrderAuditLabel.of(result), null, edit.details());

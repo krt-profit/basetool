@@ -53,7 +53,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderHandoverServiceTest {
 
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
@@ -85,6 +88,7 @@ class JobOrderHandoverServiceTest {
     service =
         new JobOrderHandoverService(
             jobOrderRepository,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             jobOrderHandoverRepository,
             new InventoryStockCommands(

@@ -62,7 +62,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Booking a material handover against the chosen quality tier (REQ-ORDERS-038). */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderHandoverQualityTierTest {
 
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
@@ -90,6 +93,7 @@ class JobOrderHandoverQualityTierTest {
     service =
         new JobOrderHandoverService(
             jobOrderRepository,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             jobOrderHandoverRepository,
             new InventoryStockCommands(

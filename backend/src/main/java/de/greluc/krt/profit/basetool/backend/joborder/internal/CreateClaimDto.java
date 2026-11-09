@@ -34,9 +34,11 @@ import java.util.UUID;
  *     NONE} (REQ-ORDERS-036)
  * @param claimingOrgUnitId the squadron making the claim; one the caller may act for
  * @param amount the claimed quantity; positive and at most the bucket's open remainder
+ * @param version observed claim version; absent only for a new promise
  */
 public record CreateClaimDto(
     @NotNull UUID materialId,
     @NotBlank @Size(max = 32) String qualityRequirement,
     @NotNull UUID claimingOrgUnitId,
-    @NotNull @Positive Double amount) {}
+    @NotNull @Positive Double amount,
+    Long version) {}

@@ -243,7 +243,7 @@
                                 th:data-material-name="${mat.material.displayName(#locale)}"
                                 th:data-quantity-type="${mat.material.quantityType}"
                                 th:data-open="${mat.openAmount}"
-                                th:data-claim-id="${c.id}"
+                                th:data-claim-id="${c.id}" th:data-version="${c.version}"
                                 th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
                                 th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
                                 th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
@@ -469,7 +469,7 @@
                                         th:data-material-name="${agg.material != null ? agg.material.displayName(#locale) : ''}"
                                         th:data-quantity-type="${agg.material != null ? agg.material.quantityType() : 'SCU'}"
                                         th:data-open="${agg.openAmount}"
-                                        th:data-claim-id="${c.id}"
+                                        th:data-claim-id="${c.id}" th:data-version="${c.version}"
                                         th:data-squadron-id="${c.claimingOrgUnit != null ? c.claimingOrgUnit.id : ''}"
                                         th:data-squadron-name="${c.claimingOrgUnit != null ? c.claimingOrgUnit.shorthand : ''}"
                                         th:data-amount="${c.amount}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
@@ -918,6 +918,7 @@
         <input type="hidden" id="claim-material-id">
         <input type="hidden" id="claim-quality">
         <input type="hidden" id="claim-id">
+        <input type="hidden" id="claim-version">
         <input type="hidden" id="claim-max">
         <div class="form-group mb-2">
             <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>

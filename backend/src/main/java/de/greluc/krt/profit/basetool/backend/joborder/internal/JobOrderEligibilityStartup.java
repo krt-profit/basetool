@@ -40,6 +40,7 @@ public class JobOrderEligibilityStartup implements ApplicationRunner {
 
   private final ProfitHierarchyService profitHierarchy;
   private final MaterialClaimRepository claims;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderEligibilityMaintenance maintenance;
 
   /**
@@ -56,7 +57,11 @@ public class JobOrderEligibilityStartup implements ApplicationRunner {
     do {
       batch =
           claims.findActivePromiseOrderIdsAfter(afterOrderId, PageRequest.of(0, ORDER_BATCH_SIZE));
-      batch.forEach(maintenance::reconcileExistingPromises);
+      for (UUID orderId : batch) {
+        materialPromises.lockOrder(orderId);
+        maintenance.reconcileExistingPromises(orderId);
+        materialPromises.reconcileOrder(orderId);
+      }
       if (!batch.isEmpty()) {
         afterOrderId = batch.getLast();
       }
