@@ -1074,6 +1074,46 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   @Test
+  void multiplexedChanged_refineryOrderRoom_dropsTheServerOnlyDeletedSection() throws Exception {
+    String topic = "refinery-order:" + UUID.randomUUID();
+    FakeSession subscriber = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    subscriber.sent.clear();
+    FakeSession publisher = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(publisher, changedFrame(topic, "deleted", "order"));
+
+    assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("order");
+    assertThat(fanout.publishedSections).containsExactly(List.of("order"));
+  }
+
+  @Test
+  void multiplexedChanged_refineryOrderRoom_withOnlyDeleted_relaysNothing() throws Exception {
+    String topic = "refinery-order:" + UUID.randomUUID();
+    FakeSession subscriber = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    subscriber.sent.clear();
+    FakeSession publisher = openMultiplexedSession(oidcUser("user-1", "Alice"));
+
+    handler.handleTextMessage(publisher, changedFrame(topic, "deleted"));
+
+    assertThat(subscriber.sent).isEmpty();
+    assertThat(fanout.publishedTopics).isEmpty();
+  }
+
+  @Test
+  void serverAndFanoutSignals_refineryOrderRoom_relayTheDeletedSection() throws Exception {
+    String topic = "refinery-order:" + UUID.randomUUID();
+    FakeSession subscriber = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    subscriber.sent.clear();
+
+    handler.publishFromServer(topic, List.of("deleted"));
+    assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("deleted");
+
+    subscriber.sent.clear();
+    handler.deliverFromFanout(topic, List.of("deleted"));
+    assertThat(sectionsOf(lastBroadcast(subscriber))).containsExactly("deleted");
+  }
+
+  @Test
   void tickReaper_broadcastsFreshSnapshotToAffectedRoom() throws Exception {
     String topic = missionTopic();
     SimpleMeterRegistry reaperRegistry = new SimpleMeterRegistry();
