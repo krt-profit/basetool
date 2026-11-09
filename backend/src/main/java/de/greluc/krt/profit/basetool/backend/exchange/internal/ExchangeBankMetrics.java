@@ -79,7 +79,7 @@ public class ExchangeBankMetrics {
             MetricNames.TAG_CLIENT_ID,
             clientId,
             ExchangeMetricNames.TAG_RESOURCE,
-            ExchangeResource.BANK_REQUEST.name().toLowerCase(Locale.ROOT),
+            ExchangeFeedResource.BANK_REQUEST.name().toLowerCase(Locale.ROOT),
             MetricNames.TAG_OUTCOME,
             outcome)
         .increment();

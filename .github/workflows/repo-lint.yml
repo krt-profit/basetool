@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -fsSL "$url" -o /tmp/actionlint.tar.gz
+          curl -fsSL --retry 5 --retry-delay 10 "$url" -o /tmp/actionlint.tar.gz
           echo "${ACTIONLINT_SHA256}  /tmp/actionlint.tar.gz" | sha256sum -c -
           tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
           sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
@@ -81,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           url="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64"
-          curl -fsSL "$url" -o /tmp/hadolint
+          curl -fsSL --retry 5 --retry-delay 10 "$url" -o /tmp/hadolint
           echo "${HADOLINT_SHA256}  /tmp/hadolint" | sha256sum -c -
           sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
           hadolint --version

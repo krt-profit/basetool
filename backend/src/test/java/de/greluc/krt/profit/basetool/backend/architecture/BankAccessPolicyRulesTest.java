@@ -49,7 +49,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * who calls from the security context, no bank class outside the policy reads the caller's roles or
  * seats, which is what every bank rule needs, the exchange reaches the bank only through the
  * policy, the actor adapter, the reads and the own-request writes (REQ-BXCH-001), and the
- * exchange's correction and cancel decide for the explicit actor down every call (REQ-BXCH-004).
+ * exchange's raise, correction and cancel decide for the explicit actor down every call
+ * (REQ-BXCH-004).
  *
  * <p>Every rule is proven able to fail on {@link BankAccessPolicyFixtures}.
  */
@@ -121,7 +122,7 @@ class BankAccessPolicyRulesTest {
   private static final String OWN_REQUEST_WRITES = BANK + ".internal.BankOwnRequestWriteService";
 
   /** The own-request writes that decide for the explicit actor all the way down. */
-  private static final Set<String> EXPLICIT_ACTOR_WRITES = Set.of("correct", "cancel");
+  private static final Set<String> EXPLICIT_ACTOR_WRITES = Set.of("raise", "correct", "cancel");
 
   /**
    * The bank's audit trail, which stamps the acting member and client from the request's token
@@ -176,7 +177,7 @@ class BankAccessPolicyRulesTest {
 
   @Test
   @DisplayName(
-      "the exchange's correction and cancel never read who calls from the security context")
+      "the exchange's raise, correction and cancel never read who calls from the security context")
   void theExchangeOwnRequestWritesDecideForTheExplicitActor() {
     assertThat(
             methodCallerReads(
@@ -186,8 +187,8 @@ class BankAccessPolicyRulesTest {
                 ATTRIBUTION))
         .as(
             """
-            Calls by which the exchange's correction or cancel reaches the security context. \
-            They decide for the explicit BankActor the exchange built; pass it through \
+            Calls by which the exchange's raise, correction or cancel reaches the security \
+            context. They decide for the explicit BankActor the exchange built; pass it through \
             (REQ-BXCH-004, ADR-0352).\
             """)
         .isEmpty();

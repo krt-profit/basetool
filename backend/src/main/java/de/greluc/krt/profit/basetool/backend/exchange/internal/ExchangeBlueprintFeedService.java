@@ -148,7 +148,7 @@ public class ExchangeBlueprintFeedService {
   private @NotNull ExchangeBlueprintPageDto feed(
       @NotNull UUID member, @NotNull ExchangeFeedPosition after, int size) {
     ExchangeFeedReader.Changes changes =
-        feedReader.changes(member, ExchangeResource.BLUEPRINT, after, size);
+        feedReader.changes(member, ExchangeFeedResource.BLUEPRINT, after, size);
     Map<String, PersonalBlueprint> current =
         changes.keys().isEmpty()
             ? Map.of()

@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -102,6 +103,9 @@ class OrgUnitBankAccessServiceTest {
   private OrgUnitBankSettingsService settingsService;
   private OrgUnitBankRequestService requestService;
 
+  /** The actor {@link #actingAs(BankActor)} made the caller. */
+  private BankActor callingActor;
+
   @BeforeEach
   void defaultStubs() {
     actingAs(BankActor.NOBODY);
@@ -166,6 +170,7 @@ class OrgUnitBankAccessServiceTest {
    * @param actor the caller's actor
    */
   private void actingAs(BankActor actor) {
+    callingActor = actor;
     when(bankCaller.actor()).thenReturn(actor);
   }
 
@@ -752,21 +757,22 @@ class OrgUnitBankAccessServiceTest {
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("500")),
-            eq("from sale"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("500"),
+                    "from sale",
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
@@ -793,21 +799,22 @@ class OrgUnitBankAccessServiceTest {
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("1000")),
-            eq("from sale"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(true),
-            eq(new BigDecimal("30")),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("1000"),
+                    "from sale",
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    true,
+                    new BigDecimal("30"),
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
@@ -825,21 +832,22 @@ class OrgUnitBankAccessServiceTest {
     BankBookingRequestDto expected = requestDto(accountId, orgUnitId);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("500")),
-            eq("from sale"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("500"),
+                    "from sale",
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
@@ -857,21 +865,22 @@ class OrgUnitBankAccessServiceTest {
     BankBookingRequestDto expected = requestDto(accountId, null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(special));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("250")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("250"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
@@ -892,42 +901,44 @@ class OrgUnitBankAccessServiceTest {
             accountId, BankBookingRequestType.DEPOSIT, null, new BigDecimal("5000"), null);
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("5000")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("5000"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.DEPOSIT),
-            eq(new BigDecimal("5000")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.DEPOSIT,
+                    new BigDecimal("5000"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
@@ -979,42 +990,46 @@ class OrgUnitBankAccessServiceTest {
     actingAs(TestBankActor.member(caller).reach(orgUnitId));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(limit));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1029,42 +1044,44 @@ class OrgUnitBankAccessServiceTest {
     actingAs(TestBankActor.member(UUID.randomUUID()).reach(orgUnitId));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of());
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1079,42 +1096,44 @@ class OrgUnitBankAccessServiceTest {
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     actingAs(TestBankActor.member(UUID.randomUUID()).reach(orgUnitId));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.TRANSFER),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(destId),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.TRANSFER,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    destId,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.TRANSFER),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(destId),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.TRANSFER,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    destId,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1137,42 +1156,44 @@ class OrgUnitBankAccessServiceTest {
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of(viewGrant));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(null),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(true, null, BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1192,42 +1213,46 @@ class OrgUnitBankAccessServiceTest {
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   /**
@@ -1259,42 +1284,44 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("500"), "reason");
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(new BigDecimal("1000")),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(false, new BigDecimal("1000"), null),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(new BigDecimal("1000")),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(false, new BigDecimal("1000"), null),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1305,42 +1332,46 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("3000"), "reason");
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("3000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("3000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("3000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("3000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1351,42 +1382,46 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.ORGANISATIONSLEITUNG),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.ORGANISATIONSLEITUNG),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1403,42 +1438,44 @@ class OrgUnitBankAccessServiceTest {
             .reach(orgUnitId)
             .seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("2000000")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("2000000"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("2000000")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("2000000"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
     verify(approvalLimitRepository, never()).findByAccountId(accountId);
   }
 
@@ -1455,43 +1492,28 @@ class OrgUnitBankAccessServiceTest {
         TestBankActor.member(UUID.randomUUID())
             .reach(orgUnitId)
             .seat(orgUnitId, MembershipRole.STAFFELLEITER));
-    when(bankBookingRequestService.create(
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            anyBoolean(),
-            any(),
-            any(),
-            anyBoolean(),
-            any(),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
-        .thenReturn(requestDto(accountId, orgUnitId));
+    when(bankBookingRequestService.create(any())).thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("2000000")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("2000000"),
+                    null,
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1503,43 +1525,29 @@ class OrgUnitBankAccessServiceTest {
     CreateBankBookingRequest request =
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
-    when(bankBookingRequestService.create(
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            any(),
-            anyBoolean(),
-            any(),
-            any(),
-            anyBoolean(),
-            any(),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+    when(bankBookingRequestService.create(any()))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    "reason",
+                    null,
+                    null,
+                    BankAdmission.Admitted.UNROUTED,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1621,42 +1629,46 @@ class OrgUnitBankAccessServiceTest {
         new CreateBankBookingRequest(
             accountId, BankBookingRequestType.WITHDRAWAL, null, new BigDecimal("9000"), "reason");
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq("reason"),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    "reason",
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1669,21 +1681,23 @@ class OrgUnitBankAccessServiceTest {
     cartel.setAreaLeadApprovalCeiling(new BigDecimal("5000"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("3000")),
-            eq("note"),
-            eq("reason"),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("3000"),
+                    "note",
+                    "reason",
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.raiseCartelDirectBookingRequest(
@@ -1696,21 +1710,23 @@ class OrgUnitBankAccessServiceTest {
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("3000")),
-            eq("note"),
-            eq("reason"),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.BANK_MANAGEMENT),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("3000"),
+                    "note",
+                    "reason",
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.BANK_MANAGEMENT),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1723,21 +1739,23 @@ class OrgUnitBankAccessServiceTest {
     cartel.setAreaLeadApprovalCeiling(new BigDecimal("5000"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(cartel));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq(null),
-            eq("reason"),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    null,
+                    "reason",
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.ORGANISATIONSLEITUNG),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.raiseCartelDirectBookingRequest(
@@ -1745,21 +1763,23 @@ class OrgUnitBankAccessServiceTest {
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("9000")),
-            eq(null),
-            eq("reason"),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("1000")),
-            eq(BankRequestApprover.ORGANISATIONSLEITUNG),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("9000"),
+                    null,
+                    "reason",
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("1000"), BankRequestApprover.ORGANISATIONSLEITUNG),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1784,42 +1804,46 @@ class OrgUnitBankAccessServiceTest {
     when(approvalLimitRepository.findByAccountId(accountId))
         .thenReturn(List.of(roleLimit, userLimit));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, orgUnitId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(true),
-            eq(new BigDecimal("100")),
-            eq(BankRequestApprover.RESPONSIBLE_HOLDER),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(
+                        true, new BigDecimal("100"), BankRequestApprover.RESPONSIBLE_HOLDER),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   @Test
@@ -1848,42 +1872,44 @@ class OrgUnitBankAccessServiceTest {
     when(approvalLimitRepository.findByAccountId(accountId))
         .thenReturn(List.of(roleLimit, areaMembers));
     when(bankBookingRequestService.create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(new BigDecimal("1000")),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull()))
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(false, new BigDecimal("1000"), null),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null))))
         .thenReturn(requestDto(accountId, bereichId));
 
     requestService.createBookingRequest(request);
 
     verify(bankBookingRequestService)
         .create(
-            eq(accountId),
-            eq(BankBookingRequestType.WITHDRAWAL),
-            eq(new BigDecimal("500")),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(false),
-            eq(new BigDecimal("1000")),
-            isNull(),
-            eq(false),
-            eq(null),
-            eq(null),
-            eq(null),
-            isNull(),
-            isNull());
+            eq(
+                new BankBookingRequestDraft(
+                    callingActor,
+                    accountId,
+                    BankBookingRequestType.WITHDRAWAL,
+                    new BigDecimal("500"),
+                    null,
+                    null,
+                    null,
+                    new BankAdmission.Admitted(false, new BigDecimal("1000"), null),
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null)));
   }
 
   /**

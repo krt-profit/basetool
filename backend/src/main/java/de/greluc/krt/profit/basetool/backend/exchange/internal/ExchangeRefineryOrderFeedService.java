@@ -131,7 +131,7 @@ public class ExchangeRefineryOrderFeedService {
       @NotNull ExchangeCaller caller, @NotNull ExchangeFeedPosition after, int size) {
     UUID member = caller.member();
     ExchangeFeedReader.Changes changes =
-        feedReader.changes(member, ExchangeResource.REFINERY_ORDER, after, size);
+        feedReader.changes(member, ExchangeFeedResource.REFINERY_ORDER, after, size);
     Map<String, RefineryExchangeOrder> current =
         refineryReader
             .orders(member, changes.keys().stream().map(UUID::fromString).toList())

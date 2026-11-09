@@ -331,7 +331,7 @@ public class ExchangeBlueprintWriteService
   private boolean removedElsewhere(@NotNull ExchangeCaller caller, @NotNull String productKey) {
     Optional<ExchangeChange> latest =
         changeRepository.findLatestForKey(
-            caller.member(), ExchangeResource.BLUEPRINT.name(), productKey);
+            caller.member(), ExchangeFeedResource.BLUEPRINT.name(), productKey);
     if (latest.isEmpty()) {
       return false;
     }

@@ -85,16 +85,12 @@ public class OrgUnitBankRequestService {
     BankAccount account =
         Entities.require(
             bankAccountRepository.findById(request.sourceAccountId()), "Bank account not found");
+    BankActor actor = accessService.actor();
     return raise(
+        actor,
         account,
         request,
-        () ->
-            policy.admit(
-                accessService.actor(),
-                account,
-                accessService.pin(),
-                request.type(),
-                request.amount()),
+        () -> policy.admit(actor, account, accessService.pin(), request.type(), request.amount()),
         () ->
             new AccessDeniedException("The caller may not raise a booking request on this account"),
         null);
@@ -124,6 +120,7 @@ public class OrgUnitBankRequestService {
       @NotNull Supplier<? extends RuntimeException> hidden,
       @NotNull String clientId) {
     return raise(
+        actor,
         account,
         request,
         () -> policy.admit(actor, account, null, request.type(), request.amount()),
@@ -136,6 +133,7 @@ public class OrgUnitBankRequestService {
    * justification nor counterparty, a withdrawal or transfer is admitted and routed by the policy
    * and carries no split; only a transfer names a destination.
    *
+   * @param actor the requester the request is stamped with
    * @param account the source account
    * @param request the payload
    * @param admission asks the policy to admit a withdrawal or transfer; never called for a deposit
@@ -145,6 +143,7 @@ public class OrgUnitBankRequestService {
    */
   @NotNull
   private BankBookingRequestDto raise(
+      @NotNull BankActor actor,
       @NotNull BankAccount account,
       @NotNull CreateBankBookingRequest request,
       @NotNull Supplier<BankAdmission> admission,
@@ -155,21 +154,21 @@ public class OrgUnitBankRequestService {
         deposit ? BankAdmission.Admitted.UNROUTED : admitted(admission.get(), hidden);
     requireTargetShape(request.type(), request.targetAccountId());
     return bankBookingRequestService.create(
-        account.getId(),
-        request.type(),
-        request.amount(),
-        request.note(),
-        deposit ? null : request.justification(),
-        request.targetAccountId(),
-        routing.requiresApproval(),
-        routing.applicableLimit(),
-        routing.requiredApprover(),
-        deposit && request.splitEnabled(),
-        deposit ? request.splitPercent() : null,
-        deposit ? null : request.counterpartyUserId(),
-        deposit ? null : request.counterpartyOrgUnitId(),
-        null,
-        clientId);
+        new BankBookingRequestDraft(
+            actor,
+            account.getId(),
+            request.type(),
+            request.amount(),
+            request.note(),
+            deposit ? null : request.justification(),
+            request.targetAccountId(),
+            routing,
+            deposit && request.splitEnabled(),
+            deposit ? request.splitPercent() : null,
+            deposit ? null : request.counterpartyUserId(),
+            deposit ? null : request.counterpartyOrgUnitId(),
+            null,
+            clientId));
   }
 
   /**
@@ -264,21 +263,21 @@ public class OrgUnitBankRequestService {
               throw new BadRequestException("A purpose-bound request is a deposit or a withdrawal");
         };
     return bankBookingRequestService.create(
-        accountId,
-        type,
-        amount,
-        null,
-        justification,
-        null,
-        routing.requiresApproval(),
-        routing.applicableLimit(),
-        routing.requiredApprover(),
-        false,
-        null,
-        counterpartyUserId,
-        null,
-        purpose,
-        null);
+        new BankBookingRequestDraft(
+            accessService.actor(),
+            accountId,
+            type,
+            amount,
+            null,
+            justification,
+            null,
+            routing,
+            false,
+            null,
+            counterpartyUserId,
+            null,
+            purpose,
+            null));
   }
 
   /**
@@ -308,24 +307,23 @@ public class OrgUnitBankRequestService {
       @Nullable UUID targetAccountId) {
     BankAccount account =
         Entities.require(bankAccountRepository.findById(accountId), "Bank account not found");
-    BankAdmission.Admitted routing =
-        policy.routeCartelDirectBooking(accessService.actor(), account, amount);
+    BankActor actor = accessService.actor();
     return bankBookingRequestService.create(
-        accountId,
-        type,
-        amount,
-        note,
-        justification,
-        targetAccountId,
-        routing.requiresApproval(),
-        routing.applicableLimit(),
-        routing.requiredApprover(),
-        false,
-        null,
-        null,
-        null,
-        null,
-        null);
+        new BankBookingRequestDraft(
+            actor,
+            accountId,
+            type,
+            amount,
+            note,
+            justification,
+            targetAccountId,
+            policy.routeCartelDirectBooking(actor, account, amount),
+            false,
+            null,
+            null,
+            null,
+            null,
+            null));
   }
 
   /**

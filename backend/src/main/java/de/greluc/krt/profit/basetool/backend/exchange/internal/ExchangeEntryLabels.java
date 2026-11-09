@@ -111,8 +111,6 @@ public class ExchangeEntryLabels {
             labels.put(entry.getId(), location);
           }
         }
-        case BANK_REQUEST ->
-            throw new IllegalStateException("The bank writes no exchange journal entry");
         case null -> throw new NullPointerException("resource");
       }
     }

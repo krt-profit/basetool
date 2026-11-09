@@ -24,7 +24,12 @@ import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** A resource the exchange syncs, each with its own change feed (REQ-XCH-013, REQ-XCH-042). */
+/**
+ * A resource clients write through the exchange: journaled, undoable and guarded against mass
+ * changes (REQ-XCH-015, REQ-XCH-021, REQ-XCH-022, REQ-XCH-042).
+ *
+ * <p>Its constant names are the values of the journal and bulk-undo {@code resource} columns.
+ */
 public enum ExchangeResource {
   /** The member's personal blueprints, keyed by product. */
   BLUEPRINT,
@@ -39,18 +44,15 @@ public enum ExchangeResource {
   ORG_STOCK,
 
   /** The member's own refinery orders, keyed by order id (REQ-XCH-051). */
-  REFINERY_ORDER,
-
-  /** The member's own bank booking requests, keyed by request id; no mass change reaches them. */
-  BANK_REQUEST;
+  REFINERY_ORDER;
 
   /**
    * The resource's name in a staged mass change ({@code ConnectedAppMassChangeRequestDto}).
    *
    * @return {@code blueprints}, {@code stock}, {@code ships}, {@code org-stock} or {@code
-   *     refinery-orders}, or {@code null} for {@link #BANK_REQUEST}, which no mass change reaches
+   *     refinery-orders}
    */
-  @Nullable
+  @NotNull
   public String massChangeName() {
     return switch (this) {
       case BLUEPRINT -> "blueprints";
@@ -58,7 +60,6 @@ public enum ExchangeResource {
       case SHIP -> "ships";
       case ORG_STOCK -> "org-stock";
       case REFINERY_ORDER -> "refinery-orders";
-      case BANK_REQUEST -> null;
     };
   }
 
@@ -75,15 +76,14 @@ public enum ExchangeResource {
       case SHIP -> ExchangeCapability.HANGAR_WRITE;
       case ORG_STOCK -> ExchangeCapability.ORGSTOCK_WRITE;
       case REFINERY_ORDER -> ExchangeCapability.REFINERY_WRITE;
-      case BANK_REQUEST -> ExchangeCapability.BANK_REQUEST;
     };
   }
 
   /**
    * The value of the {@code resource} tag on the resource's mass-change metric.
    *
-   * @return {@code blueprint}, {@code stock}, {@code ship}, {@code org_stock}, {@code
-   *     refinery_order} or {@code bank_request}
+   * @return {@code blueprint}, {@code stock}, {@code ship}, {@code org_stock} or {@code
+   *     refinery_order}
    */
   @NotNull
   public String metricTag() {
@@ -93,7 +93,22 @@ public enum ExchangeResource {
       case SHIP -> "ship";
       case ORG_STOCK -> "org_stock";
       case REFINERY_ORDER -> "refinery_order";
-      case BANK_REQUEST -> "bank_request";
+    };
+  }
+
+  /**
+   * The change feed that sequences this resource's writes.
+   *
+   * @return the feed of the same name
+   */
+  @NotNull
+  public ExchangeFeedResource feed() {
+    return switch (this) {
+      case BLUEPRINT -> ExchangeFeedResource.BLUEPRINT;
+      case STOCK -> ExchangeFeedResource.STOCK;
+      case SHIP -> ExchangeFeedResource.SHIP;
+      case ORG_STOCK -> ExchangeFeedResource.ORG_STOCK;
+      case REFINERY_ORDER -> ExchangeFeedResource.REFINERY_ORDER;
     };
   }
 
