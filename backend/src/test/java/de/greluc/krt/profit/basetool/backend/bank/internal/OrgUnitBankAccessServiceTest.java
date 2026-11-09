@@ -779,7 +779,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
   }
 
   @Test
@@ -821,7 +820,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
   }
 
   @Test
@@ -854,7 +852,6 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(requestService.createBookingRequest(request)).isSameAs(expected);
-    verifyNoInteractions(requestScopeResolver);
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 

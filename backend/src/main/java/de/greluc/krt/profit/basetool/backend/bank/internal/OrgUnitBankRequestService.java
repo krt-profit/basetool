@@ -131,14 +131,14 @@ public class OrgUnitBankRequestService {
   }
 
   /**
-   * Raises a booking request (REQ-BANK-039…042): a deposit needs no admission and carries neither
-   * justification nor counterparty, a withdrawal or transfer is admitted and routed by the policy
-   * and carries no split; only a transfer names a destination.
+   * Raises a booking request (REQ-BANK-039…042): the policy admits and routes it, a deposit on any
+   * account and unrouted; a deposit carries neither justification nor counterparty, a withdrawal or
+   * transfer no split; only a transfer names a destination.
    *
    * @param actor the requester the request is stamped with
    * @param account the source account
    * @param request the payload
-   * @param admission asks the policy to admit a withdrawal or transfer; never called for a deposit
+   * @param admission asks the policy to admit the request
    * @param hidden builds the refusal of an account the policy does not admit the actor to
    * @param clientId the connected application's bounded label, or {@code null} for the Basetool
    * @return the created pending request
@@ -152,8 +152,7 @@ public class OrgUnitBankRequestService {
       @NotNull Supplier<? extends RuntimeException> hidden,
       @Nullable String clientId) {
     boolean deposit = request.type() == BankBookingRequestType.DEPOSIT;
-    BankAdmission.Admitted routing =
-        deposit ? BankAdmission.Admitted.UNROUTED : admitted(admission.get(), hidden);
+    BankAdmission.Admitted routing = admitted(admission.get(), hidden);
     requireTargetShape(request.type(), request.targetAccountId());
     return bankBookingRequestService.create(
         new BankBookingRequestDraft(
