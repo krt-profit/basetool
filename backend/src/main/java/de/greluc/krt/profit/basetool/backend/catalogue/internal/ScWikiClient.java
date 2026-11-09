@@ -51,6 +51,7 @@ import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -114,10 +115,13 @@ public class ScWikiClient {
   private ScWikiRequestExecutor requests;
 
   /**
-   * Jackson mapper that {@link #fetchOne} uses to unwrap the optional {@code {data: …}} envelope
-   * and bind the payload.
+   * Jackson mapper that binds pages and details. It reads an empty JSON array as an absent object,
+   * because the Wiki serialises an empty object field such as {@code quality_range} as {@code []}.
    */
-  private final ObjectMapper objectMapper = JsonMapper.builder().build();
+  private final ObjectMapper objectMapper =
+      JsonMapper.builder()
+          .enable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
+          .build();
 
   /**
    * Builds the {@link RestClient} once after dependency injection, with the {@link

@@ -37,11 +37,14 @@ import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -759,6 +762,32 @@ class ScWikiClientTest {
     assertNull(result.data());
     assertEquals(1.0, fetchErrorCount());
     assertEquals(1, server.getRequestCount());
+  }
+
+  @Test
+  void aBlueprintDetailWithEmptyArraysForAbsentRangesDecodes() throws Exception {
+    String captured;
+    try (InputStream input =
+        getClass().getResourceAsStream("/catalogue/scwiki-blueprint-detail.json")) {
+      assertNotNull(input);
+      captured = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    String withEmptyArrays =
+        captured
+            .replaceFirst("\"quality_range\": \\{[^}]*}", "\"quality_range\": []")
+            .replaceFirst("\"modifier_range\": \\{[^}]*}", "\"modifier_range\": []");
+    assertNotEquals(captured, withEmptyArrays, "the fixture must carry both ranges");
+    server.enqueue(jsonOk(withEmptyArrays));
+
+    var result =
+        client.fetchOneResult(
+            "/api/blueprints",
+            UUID.fromString("280f47b7-8434-410c-b854-380768fdccec"),
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertEquals(ScWikiClient.DetailOutcome.FOUND, result.outcome());
+    assertEquals(0.0, fetchErrorCount());
   }
 
   @Test
