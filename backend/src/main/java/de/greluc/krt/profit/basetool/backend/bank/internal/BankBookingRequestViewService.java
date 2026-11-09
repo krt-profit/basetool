@@ -63,10 +63,8 @@ public class BankBookingRequestViewService {
     UUID accountId = request.getAccount().getId();
     boolean own = policy.ownsRequest(actor, request);
     boolean staff = rights.canSee(accountId);
-    boolean approver =
-        !rights.boundByFourEyes(request.getRequestedBy())
-            && scope.candidateAccountIds().contains(accountId)
-            && scope.shows(request.getRequiredApprover(), accountId);
+    boolean approver = scope.approves(request);
+
     if (!own && !staff && !approver) {
       throw new NotFoundException(NOT_FOUND);
     }

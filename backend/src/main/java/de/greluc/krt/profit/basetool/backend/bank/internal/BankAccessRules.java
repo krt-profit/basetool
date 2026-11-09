@@ -500,5 +500,19 @@ public class BankAccessRules implements BankAccessPolicy {
     boolean shows(@Nullable BankRequestApprover approver, @NotNull UUID accountId) {
       return rights.mayApprove(approver, responsibleAccountIds.contains(accountId));
     }
+
+    /**
+     * Whether the actor acts on the request's approval: it lies on a candidate account, shows to
+     * the actor, and the four-eyes rule does not bar them (REQ-BANK-046, REQ-BANK-062).
+     *
+     * @param request the request
+     * @return {@code true} iff the actor is one of the request's approvers
+     */
+    boolean approves(@NotNull BankBookingRequest request) {
+      UUID accountId = request.getAccount().getId();
+      return !rights.boundByFourEyes(request.getRequestedBy())
+          && candidateAccountIds.contains(accountId)
+          && shows(request.getRequiredApprover(), accountId);
+    }
   }
 }

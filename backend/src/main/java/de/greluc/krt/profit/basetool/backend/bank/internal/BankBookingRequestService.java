@@ -463,10 +463,9 @@ public class BankBookingRequestService {
     }
     List<BankBookingRequest> shown =
         requestRepository.findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds()).stream()
-            .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
-            .filter(request ->
-                scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
+            .filter(scope::approves)
             .toList();
+
     Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
     return shown.stream()
         .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
