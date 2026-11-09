@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.BankGrantDto;
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserRoleHolderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -107,6 +108,36 @@ class BankGrantsPageControllerTest {
     assertEquals("KB-0001", selected.accountNo());
     verify(backendApiClient).get(eq("/api/v1/bank/grants?accountId=" + accountId), anyTypeRef());
     verify(backendApiClient, never()).get(startsWith("/api/v1/bank/accounts?"), anyTypeRef());
+  }
+
+  @Test
+  void grants_failedEmployeeRead_marksTheSectionUnavailableInsteadOfEmpty() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(startsWith("/api/v1/users/role-holders"), anyTypeRef(), any()))
+        .thenThrow(new BackendServiceException("down", null, 503));
+
+    controller.grants(null, null, null, "grantsMatrix", model);
+
+    assertEquals(Boolean.TRUE, model.getAttribute("bankEmployeesUnavailable"));
+  }
+
+  @Test
+  void grants_readEmployees_areAvailable() {
+    BackendApiClient backendApiClient = mock(BackendApiClient.class);
+    BankGrantsPageController controller =
+        new BankGrantsPageController(
+            new BankBackendClient(backendApiClient), new IdentityBackendClient(backendApiClient));
+    Model model = new ConcurrentModel();
+    when(backendApiClient.get(startsWith("/api/v1/users/role-holders"), anyTypeRef(), any()))
+        .thenReturn(List.of());
+
+    controller.grants(null, null, null, "grantsMatrix", model);
+
+    assertEquals(Boolean.FALSE, model.getAttribute("bankEmployeesUnavailable"));
   }
 
   @Test

@@ -69,7 +69,8 @@ public class BankGrantsPageController {
    * @param userId selected grantee in per-employee mode; absent = first employee with grants
    * @param fragment {@code "grantsMatrix"} to re-render only the matrix under the current filter
    *     (REQ-FE-005)
-   * @param model Spring MVC model
+   * @param model Spring MVC model; {@code bankEmployeesUnavailable} marks a failed read of the Bank
+   *     Employee holders, which the page shows as such rather than as an empty list
    * @return the grants template, or its {@code grantsMatrix} fragment
    */
   @NotNull
@@ -94,6 +95,7 @@ public class BankGrantsPageController {
             null);
     model.addAttribute(
         "bankEmployees", employees == null ? List.<UserRoleHolderDto>of() : employees);
+    model.addAttribute("bankEmployeesUnavailable", employees == null);
     if ("grantsMatrix".equals(fragment)) {
       return "bank/bank-grants :: grantsMatrix";
     }
