@@ -2,6 +2,477 @@
 
 ## [Unreleased]
 
+## [v1.23.0](https://github.com/krt-profit/basetool/releases/tag/v1.23.0) - 2026-11-09
+
+### Added
+
+- **Katalogdetails.** Materialien, Schiffe, Gegenstände und Baupläne zeigen zusätzliche Wiki-Angaben mit Quelle und Spielstand und aktualisieren sich nach dem Abgleich.
+
+- **Sync-Berichte.** Dauerhafte Laufberichte unterscheiden vollständige, teilweise und fehlgeschlagene Abgleiche und zeigen gelesene, angewendete und übersprungene Datensätze.
+
+- **Audit-Log: neuer Reiter „Katalog".** Jede Admin-Änderung an den Stammdaten (Materialien,
+  Kategorien, Aliasse, Standorte, Terminals, Ladedocks, Sternensysteme, Häufigkeiten, Tätigkeiten,
+  Sichtbarkeit von Herstellern und Schiffstypen), das Löschen von Sync-Berichten sowie P4K-Vorschau
+  und P4K-Import werden protokolliert, filterbar und exportierbar (REQ-AUDIT-001/002, REQ-P4K-046).
+  Jeder beendete UEX- und SC-Wiki-Sync-Lauf erscheint dort als Zusammenfassung mit Ergebnis und
+  Zählern.
+
+- **P4K-Import: Abgleich verschwundener Datensätze.** Ein vollständiger Katalog markiert Items,
+  Schiffe, Hersteller, Rohstoffe und Blaupausen, die er nicht mehr enthält, als „nicht mehr im
+  Spiel“; sie verschwinden aus allen Auswahllisten, bestehende Einträge im Lager, Hangar, in
+  Aufträgen und Einsätzen zeigen einen Hinweis. Über 5 % pro Typ nur mit „Markierung trotzdem anwenden“
+  (REQ-P4K-011…013).
+
+- **P4K-Import: Läufe, Änderungsbericht und Prüfliste.** Die Admin-Seite listet die angewendeten
+  Läufe, zeigt je Lauf und je Vorschau den filterbaren Änderungsbericht und die offenen Prüffälle,
+  die sich behalten oder ausblenden lassen (REQ-P4K-014…016).
+
+- **P4K-Import: Hinweis „P4K-Import fällig“.** Die Admin-Seite zeigt einen Hinweis, sobald UEX oder
+  das SC Wiki eine neuere Spielversion melden als der letzte angewendete Import; nach 7 Tagen warnt
+  das Monitoring (REQ-P4K-047, REQ-OBS-022).
+
+- **Monitoring: Dashboard „P4K catalogue“.** Kennzahlen des letzten Laufs je Typ, unbekannte Grade
+  und Klassen, der Anteil Items ohne Klasse, markierte Datensätze, offene Prüffälle und abgelehnte
+  Uploads, mit Warnungen bei Auffälligkeiten (REQ-OBS-022).
+
+- **P4K-Import: Standard-Loadouts und Lackierungen.** Der Import speichert für jeden bekannten
+  Schiffstyp den Port-Baum seines Standard-Loadouts mit den vorinstallierten Items und verknüpft
+  Lackierungen mit den Schiffstypen, auf die sie passen; unvollständig gelesene Loadouts stehen im
+  Änderungsbericht (REQ-P4K-040, REQ-P4K-041).
+
+- **Exchange: Lagerorte tragen ihre Sternkarten-GUID.** Ein Lagerort, der mit einem Objekt der
+  P4K-Sternkarte verknüpft ist, liefert dessen GUID zusätzlich zur UEX-Verknüpfung an angebundene
+  Apps; Apps können einen Ort damit auch beim Schreiben eindeutig benennen (REQ-P4K-037).
+
+- **Sternenkarte aus dem P4K.** Der P4K-Import übernimmt den Ortsbaum des Spiels (Systeme, Planeten,
+  Monde, Stationen, Sprungpunkte, POIs) und verknüpft die UEX-Orte damit; mehrdeutige Treffer landen
+  in der Prüfliste. Sichtbar ist nur, was in einem live verfügbaren System liegt (REQ-P4K-034…038).
+
+- **Admin-Seite „Sternenkarte“.** Admins sehen die Objekte mit ihrer Sichtbarkeit, können sie
+  ausdrücklich ein- oder ausblenden, UEX-Orte von Hand verknüpfen und auf einem sichtbaren Objekt
+  einen neuen Lagerort anlegen; jede Änderung landet im Audit-Log (REQ-P4K-046).
+
+- **Lagerorte zeigen ihren Spielnamen.** Ein mit der Sternenkarte verknüpfter Lagerort zeigt in der
+  Admin-Liste zusätzlich seinen Namen aus dem Spiel in der Seitensprache (REQ-P4K-037).
+
+- **Shops aus dem P4K.** Der P4K-Import übernimmt die Shops des Spiels mit Ort, Art und Marke und
+  verknüpft jeden über seinen Ort und Namen mit einem UEX-Terminal; mehrdeutige oder fehlende
+  Treffer landen in der Prüfliste. Preise und Bestand kommen weiter von UEX (REQ-P4K-042, REQ-P4K-043).
+
+- **„Erhältlich bei“ am Gegenstand.** Die Gegenstandsansicht nennt die Shops, deren Artikelliste
+  aus den Spieldateien ihn führt; ohne bekannte Liste steht dort „unbekannt“, nie „nicht erhältlich“
+  (REQ-P4K-044).
+
+- **Admin-Seite „Shops“.** Admins sehen die Shops mit ihrer Terminal-Verknüpfung und können sie von
+  Hand setzen, lösen oder an den Import zurückgeben; jede Änderung landet im Audit-Log
+  (REQ-P4K-046).
+
+- **Audit-Log Rollen & Mitglieder.** Anlegen, Bearbeiten, Deaktivieren und Reaktivieren von
+  Staffeln, Spezialkommandos, Bereichen und der Organisationsleitung, die Freigabe für
+  Auftragsbearbeitung und jede Änderung der übergeordneten Einheit werden jetzt protokolliert.
+
+- **Verbundene Apps: eigener Schalter für die Kartellbank.** Admins schalten die Bank im
+  Datenaustausch getrennt vom globalen Schalter ein und aus; er ist anfangs aus. Solange er aus ist,
+  antwortet jeder Bank-Pfad `503 BANK_EXCHANGE_DISABLED`, die übrigen Bereiche laufen weiter. Jede
+  Änderung steht im Audit-Log und benachrichtigt Admins und Bankleitung (REQ-BXCH-006).
+
+- **Monitoring: Bank im Datenaustausch.** Neue Zähler, die Alerts `BankExchangeNotFoundSpike`,
+  `BankExchangeOpenRequestCapHit` und `BankExchangeSwitchChanged` sowie eine Zeile „Bank" im
+  Exchange-Dashboard (REQ-OBS-024).
+
+- **Rollen werden im Basetool vergeben.** Admins vergeben und entziehen Admin, KRT Member, Bank Employee und Bank Management auf der Mitgliederseite (Reiter *Rollen*), die Bankleitung vergibt Bank Employee unter *Bank-Mitarbeiter*. Jede Änderung wird protokolliert und dem Mitglied mitgeteilt; der letzte aktive Admin behält seine Rolle.
+
+- **Notfallzugang für Admins.** `APP_BOOTSTRAP_ADMIN_SUBS` nennt Keycloak-Subjects, die beim Login die Admin-Rolle erhalten, solange kein aktiver Admin existiert.
+
+- **Raffinerie: Herkunft eines Auftrags.** Ein Auftrag, den eine verbundene App angelegt hat, trägt
+  in der Liste und im Detailkopf einen Chip mit dem Namen der App; die Karte „Zugeordnet" zeigt
+  „Erstellt von …" und „Zuletzt geändert: …, Zeit" (REQ-REFINERY-027, Migration `V369`).
+
+- **Raffinerie: Status „Abgeholt".** Ein von einer App abgeholter, nicht eingelagerter Auftrag
+  heißt „Abgeholt via <App>" und bekommt den Schritt „Abgeholt"; eingelagert bleibt er
+  „Eingelagert" (REQ-REFINERY-028).
+
+- **Verbundene Anwendungen: Raffinerieaufträge lesen.** Eine zugelassene Anwendung mit der
+  Berechtigung `exchange.refinery.read` liest die eigenen Raffinerieaufträge des Mitglieds über
+  `GET /exchange/v1/me/refinery-orders` – laufende und offene als Stand, danach jede Änderung,
+  auch Abschluss, Abbruch und Löschung (REQ-XCH-051).
+
+- **Verbundene Anwendungen: Raffinerieaufträge schreiben.** Eine zugelassene Anwendung mit
+  `exchange.refinery.write` legt die eigenen Raffinerieaufträge des Mitglieds über
+  `POST /exchange/v1/me/refinery-orders/changes` an und ändert Ort, Methode, Laufzeit, Status,
+  Kosten und Güter – geprüft gegen die Zähler je Abschnitt, mit Live-Aktualisierung der
+  Raffinerie-Seiten und Rückgängig-Machen auf „Verbundene Anwendungen" (REQ-XCH-052, REQ-XCH-056).
+
+- **Audit:** neues Ereignis `REFINERY_ORDER_DELETED`, wenn ein Rückgängig-Machen einen von der
+  Anwendung angelegten Auftrag wieder entfernt.
+
+- **Verbundene Anwendungen: Raffinerieaufträge abholen.** Eine Anwendung mit
+  `exchange.refinery.write` meldet über die Operation `pickup`, dass ein offener oder laufender
+  Auftrag im Spiel abgeholt wurde – auch vor Ablauf der Laufzeit. Der Auftrag wird abgeschlossen und
+  erscheint live als „Abgeholt via <Anwendung>"; eingelagert wird nichts, und das Rückgängig-Machen
+  öffnet ihn wieder (REQ-XCH-053, REQ-XCH-056).
+
+- **Verbundene Anwendungen: Raffinerieaufträge stornieren und löschen.** Eine Anwendung mit
+  `exchange.refinery.write` storniert einen eigenen Auftrag wie die Web-Oberfläche oder löscht einen
+  nicht eingelagerten Auftrag samt Gütern; gebuchter Bestand bleibt. Zu viele Löschungen auf einmal
+  muss das Mitglied auf „Verbundene Anwendungen" bestätigen, und ein Rückgängig-Machen stellt einen
+  gelöschten Auftrag unter seiner alten ID wieder her (REQ-XCH-055, REQ-XCH-056).
+
+- **Raffinerie:** Löscht eine Anwendung einen Auftrag, dessen Detailseite offen ist, sperrt die
+  Seite ihre Formulare und zeigt einen Hinweis mit Link zur Auftragsliste.
+
+- **Audit:** neues Ereignis `REFINERY_ORDER_RESTORED` für einen so wiederhergestellten Auftrag.
+
+- **Verbundene Anwendungen: Ertrag beim Abholen einlagern.** Eine Anwendung mit
+  `exchange.refinery.store` kann beim Abholen eines Raffinerieauftrags den Ertrag einlagern – mit
+  denselben Angaben wie der Einlager-Dialog im Web, für dich selbst, als Logistiker auch für
+  Mitglieder deiner Einheiten und auf einen Auftrag. Eine abgelehnte Zeile lehnt das ganze Abholen
+  ab; zwei neue Abfragen liefern die möglichen Empfänger und Aufträge (REQ-XCH-053, REQ-XCH-054).
+
+- **Verbundene Anwendungen: VerseKit darf Raffinerieaufträge abgleichen.**
+  `docs/legal/approved-clients.md` führt für VerseKit zusätzlich `exchange.refinery.read`, `.write`
+  und `.store` und ein Tageslimit von 2000 Schreibvorgängen; beides wird nach dem Release in der
+  Registry freigeschaltet (#3162, #3172).
+
+- **Datenaustausch: Kartellbank lesen.** Verbundene Anwendungen können mit dem neuen Recht
+  `exchange.bank.read` die Bankkonten lesen, die das Mitglied im Basetool sehen darf, samt
+  Buchungen und Tagesverlauf; ohne Verwahrer und interne Notizen, versteckte, geschlossene und
+  unbekannte Konten antworten gleich mit `404` (REQ-BXCH-002).
+
+- **Verbundene Apps: drei Bank-Rechte.** `exchange.bank.read`, `exchange.bank.request` und
+  `exchange.bank.queue` stehen auf der Admin-Seite und im Zustimmungsdialog; noch keine Anwendung
+  hat sie (REQ-BXCH-001).
+
+- **Datenschutz: Bank in verbundenen Anwendungen.** Die Datenschutzerklärung nennt die Bankdaten,
+  ihre Rechtsgrundlagen und die Namensverweigerung (REQ-BXCH-007).
+
+- **Datenaustausch: eigene Buchungsanträge.** Verbundene Anwendungen mit `exchange.bank.read`
+  lesen die eigenen Buchungsanträge des Mitglieds, auch die im Basetool gestellten, samt
+  Änderungs-Feed; ohne interne Notiz, Bankmitarbeiter, Empfänger und Zweck (REQ-BXCH-003).
+
+- **Datenaustausch: Antragseingang der Bank.** Verbundene Anwendungen können mit dem Recht
+  `exchange.bank.queue` die offenen Buchungsanträge lesen, die ein Bankmitarbeiter bestätigen oder
+  ein Freigeber freigeben soll, nur lesend und mit Link ins Basetool; ohne Bankrolle, Freigabe oder
+  offene Freigabe antwortet der Weg mit `403 NOT_BANK_STAFF` (REQ-BXCH-005).
+
+- **Bank: eigene Seite je Buchungsantrag.** `/bank/requests/{id}` zeigt einen Antrag dem
+  Antragsteller, den Bankmitarbeitern des Kontos und seinen Freigebern und führt zur Stelle, an der
+  sie ihn bearbeiten; Entscheidungen anderer erscheinen ohne Neuladen (REQ-BANK-068).
+
+- **Datenaustausch: Buchungsanträge stellen, korrigieren und stornieren.** Verbundene
+  Anwendungen mit `exchange.bank.request` stellen Einzahlungs-, Auszahlungs- und
+  Transferanträge des Mitglieds nach denselben Regeln wie im Basetool, korrigieren und stornieren
+  dessen offene Anträge; höchstens 20 offene Anträge je Mitglied (REQ-BXCH-004).
+
+- **Bank: Herkunft eines Antrags.** Ein über eine verbundene Anwendung gestellter Antrag trägt
+  in der Bearbeitungsliste, auf seiner Antragsseite und in den fremden Anträgen ein Abzeichen
+  mit der Anwendung, etwa „über VerseKit“ (REQ-BANK-067).
+
+- Der Reiter *Rollen* eines Mitglieds aktualisiert sich live, wenn ein anderer Admin dort eine Rolle ändert; der nächste Klick scheitert nicht mehr an einem veralteten Stand.
+
+- Eine Rollenänderung auf der Mitgliederseite aktualisiert die offenen Seiten *Bank-Mitarbeiter* und *Bankverwaltung* live, und eine Änderung unter *Bank-Mitarbeiter* den Reiter *Rollen* des Mitglieds.
+
+- Das Entziehen von KRT Member und das Entziehen der eigenen Admin-Rolle fragen vorher nach und nennen die Folgen (Verbundene Anwendungen und Sitzungen bzw. der eigene Admin-Zugang).
+
+- Verweigert das Basetool eine Rollenänderung, etwa weil der letzte aktive Admin seine Rolle behält, nennt der Reiter *Rollen* den Grund statt einer allgemeinen Fehlermeldung.
+
+### Changed
+
+- **Mein Inventar.** Ein Eintrag hängt jetzt an einem Lagerort statt an einer UEX-Nummer. Die
+  Ortsauswahl bietet die aktiven Lagerorte und die Orte, an denen du schon Einträge hast; bestehende
+  Einträge bleiben unverändert bearbeitbar, auch wenn ihr Ort nicht mehr verfügbar ist.
+
+- **P4K-Import: Katalog-Version 2 von p4kx.** Der Admin-Import liest nur noch LIVE-Kataloge mit
+  schemaVersion 2 als `.json`, `.json.gz` oder `.json.zst` (bis 64.000.000 Byte); andere Dateien
+  lehnt er sofort ab. Das alte Format des KRT P4K Readers wird nicht mehr gelesen (REQ-P4K-001…003).
+
+- **P4K-Import: Läufe und Abgleich.** Jedes Anwenden wird mit Build und Patch-Version gespeichert,
+  ein älterer Build wird abgelehnt, und der Abgleich erfolgt zuerst über die P4K-GUID; Konflikte
+  landen in der Prüfliste statt automatisch zusammengeführt zu werden (REQ-P4K-004…007).
+
+- **P4K-Import: Neue Einträge nur auf Wunsch.** „Neue Einträge anlegen" entfällt; neue Items und
+  Schiffe entstehen nur noch über das Häkchen „Neue Items und Schiffe anlegen" und nur für
+  spielbare Einträge (REQ-P4K-008…010).
+
+- **Mitgliedsrang frei wählbar.** Admins können jedem Mitglied jeden Rang 1–20 geben, unabhängig von
+  Leitungssitz oder Rolle; die Prüfung „Rang passt nicht zur Rolle“ (`RANK_OUTSIDE_ROLE_RANGE`) und
+  der Bereichshinweis unter dem Rang entfallen (REQ-ROLE-007, ADR-0348).
+
+- **Katalog: Gegenstände folgen dem P4K.** Ein P4K-Import setzt Name, Hersteller, Typ, Größe, Grad,
+  Klasse und Masse eines Gegenstands; das SC Wiki füllt nur noch Lücken, und eine abweichende
+  Wiki-Angabe erscheint im Sync-Bericht als „Weicht vom P4K ab" (Migration V346, REQ-P4K-017…019).
+
+- **Grad aus dem Spielarchiv.** Der Buchstabe A–D kommt nur für Kühler, Kraftwerke, Quantenantriebe,
+  Radare und Schilde aus dem P4K, sonst weiter aus dem Wiki; unbekannte Grade zählt
+  `basetool_catalogue_item_grade_unknown_total`.
+
+- **P4K-Import: Schiffsdaten aus dem Spiel.** Der Import übernimmt für bekannte Schiffe Name,
+  Klassenname, Hersteller, Crewgröße, Rolle, Laufbahn, Masse, Hüllenpunkte, Größe, Fahrzeugart und
+  die Versicherungswerte; die Fracht nur, wenn alle Frachtgitter lesbar sind. UEX und SC Wiki
+  überschreiben diese Werte nicht mehr, Abweichungen stehen im Sync-Bericht (REQ-P4K-031).
+
+- **Schiffstypen eindeutig zuordnen.** Hangar-Import und Exchange ordnen Schiffe zuerst über
+  Spiel-GUID und Klassenname zu, dann über UEX-ID, zuletzt über den Namen; ein Name, den mehrere
+  Schiffstypen tragen, wird nicht mehr dem erstbesten zugeordnet (REQ-P4K-032, REQ-XCH-012).
+
+- **P4K-Import: Rohstoffe.** Ein Rohstoff wird über seine eigene P4K-GUID erkannt; Name, Dichte,
+  Kategorie und das Raffinat kommen aus dem P4K. Ein Rohstoff, den ein Rezept braucht, wird beim
+  Import angelegt und ist sofort sichtbar; mehrdeutige Zuordnungen landen in der Prüfliste
+  (REQ-P4K-024, REQ-P4K-026).
+
+- **Rohstoffkategorien kommen aus dem Spiel.** Die Kategorien sind die Ressourcengruppen des P4K;
+  jedes erkannte Material bekommt seine Gruppe beim Import. Ein Material ohne Gruppe erscheint in
+  der Prüfliste, wo ein Admin eine bestehende Gruppe zuordnet. Die bisherigen Kategorien
+  verschwinden, sobald kein Material sie mehr nutzt; Admins legen keine Kategorien mehr an
+  (REQ-P4K-025).
+
+- **P4K-Import: Hersteller.** Der P4K-Import führt Name, Kürzel und Beschreibung (jetzt auch
+  deutsch) eines Herstellers; UEX schreibt die Beschreibung nicht mehr, und Abweichungen von UEX und
+  SC Wiki stehen im Sync-Bericht. Ist der P4K-Name schon vergeben, landet der Hersteller in der
+  Prüfliste; ein Hersteller entsteht nur für ein im selben Lauf angelegtes Item oder Schiff
+  (REQ-P4K-020, REQ-P4K-021).
+
+- **Deutsche Namen.** Hersteller, Items, Schiffe und Materialien zeigen auf deutschen Seiten ihren
+  deutschen Namen aus dem P4K-Katalog, sonst den englischen; die Suche läuft weiter über den Namen
+  (REQ-P4K-023).
+
+- **Herstellerlogos.** Ship-Data, die Hangars samt Schiffsauswahl und die Lager-Itemansichten
+  zeigen das Fan-Kit-Logo eines Herstellers, solange keines hinterlegt ist sein Kürzel
+  (REQ-P4K-022).
+
+- **Blueprints: ein Produkt, eine GUID.** Deine Blueprints hängen jetzt an der Spiel-GUID des
+  hergestellten Items statt am Namen; der P4K-Import stellt bestehende Einträge, Standard-Blueprints,
+  Aliase und Materialbörsen-Angebote automatisch um. Hattest du ein Produkt doppelt, bleibt ein
+  Eintrag mit dem frühesten Datum und deiner Notiz (REQ-INV-070, REQ-P4K-029).
+
+- **Blueprint-Import: mehrdeutige Namen.** Steht ein Name im Game.log für mehrere Produkte, schlägt
+  der Import alle vor; deine Auswahl wird als Alias gemerkt (REQ-INV-006).
+
+- **Exchange-API: `guid` für Blueprints.** Blueprint-Referenzen tragen `guid`; `bt` ist für
+  Blueprints veraltet und bleibt 90 Tage nutzbar (REQ-XCH-015).
+
+- **Neue Lagerorte nur noch auf der Sternenkarte.** Ein Lagerort ohne Stadt oder Station entsteht
+  nur noch auf einem sichtbaren Objekt der Sternenkarte (REQ-P4K-036).
+
+- **Aufträge.** Wer einen Auftrag einsehen darf, sieht Besitzer und Standort des verknüpften Bestands im Item-Bestand, in der Item- und Materialsammlung und in den Lager-Auswahlen; außerhalb der bearbeitenden Einheit stand dort bisher nur „—".
+
+- **P4K-Import: Blaupausen.** Rezept, Mengen samt Mengenfaktor, Wahlplätze, Mindestqualität,
+  Herstellzeit, Werte-Modifikatoren, Kategorie, Standard-Freischaltung und Zerlegen kommen aus dem
+  P4K; das SC Wiki füllt nur noch Lücken und meldet abweichende Werte im Sync-Bericht. Mit dem
+  Häkchen „neue Items und Schiffe anlegen“ legt der Import auch Blaupausen an, deren Item es gibt
+  (REQ-P4K-027, REQ-P4K-028).
+
+- **Prüfliste: Rohstoff zuordnen.** Eine Rezept-Ressource ohne eindeutigen Rohstoff bekommt in der
+  Prüfliste einen Rohstoff zugeordnet; die Zuordnung bleibt bei jedem weiteren Import erhalten
+  (REQ-P4K-024).
+
+- **Herstellbarkeit mit Wahlplätzen.** Muss man nur zwei von drei Plätzen füllen, zählt die
+  Herstellbarkeit die zwei Plätze, die das eigene Lager am besten abdeckt; additive Werte stehen im
+  Rezept als „+1“ statt als Prozentfaktor (REQ-INV-048, REQ-INV-069).
+
+- **Bauplan-Werte aus dem P4K-Katalog.** Die Grundwerte der Rezeptansicht (z. B. Schildstärke,
+  Schadensminderung, Temperaturen) kommen jetzt aus dem P4K-Katalog; das SC Wiki füllt nur noch
+  Lücken, und der Tooltip nennt die Quelle („P4K" oder „SC Wiki"). Weicht ein Wiki-Wert um mehr als
+  1 % ab, steht das im Sync-Bericht (REQ-P4K-030).
+
+- **Einsatzseite auf dem Smartphone mit mehr Platz.** Titel, Buttons und Eckdaten scrollen mit weg,
+  nur die Tabs bleiben oben; darüber erscheint eine schmale Leiste mit Name, Status und „Anmelden“.
+  Die Eckdaten stehen in einer Zeile, die Tabs tragen kurze Namen (REQ-MISSION-033).
+
+- **VerseKit statt SC Extractor.** Der Basetool SC Extractor wird nicht mehr weiterentwickelt. Die
+  Links neben dem Import auf der Blueprints-Seite und beim Anlegen eines Raffinerieauftrags führen
+  jetzt zu VerseKit, das seine Funktionen anbietet und mit dem Basetool synchronisiert; der
+  Extractor-Eintrag auf der Seite „Star-Citizen-Links" entfällt.
+
+- **Bank: Bestätigung über Limit.** Liegt keine Freigabe in der App vor, muss die Notiz
+  Bankmitarbeiter beim Bestätigen nennen, wer freigegeben hat („Wer hat freigegeben?“). Ohne diese
+  Angabe wird die Buchung abgelehnt.
+
+- **Bank: „Freigabe nötig" für die zuständige Freigabe.** Ein Antrag über dem Limit meldet nur noch
+  denen „Freigabe nötig", deren Freigabe er braucht – Kontoverantwortliche, Bankleitung im mittleren
+  KRT-Band, OL über T2 – statt ihnen „Neuer Buchungsantrag" zu schicken. Die Meldung verschwindet mit
+  Freigabe, Ablehnung, Rückzug oder Bestätigung (REQ-NOTIF-033).
+
+- **Bank: Weniger Meldungen für die OL.** Anträge auf das KRT-Konto melden der OL keinen neuen Antrag
+  mehr, nur noch „Freigabe nötig" über T2 (REQ-NOTIF-033).
+
+- **Raffinerie: Spieldaten und Finanzen getrennt gesperrt.** Ein Raffinerieauftrag hat jetzt je
+  einen Versionszähler für Spieldaten (Ort, Methode, Zeit, Status, Materialien) und Finanzen; wer
+  gleichzeitig die Zeit und die Kosten desselben Auftrags bearbeitet, speichert beides ohne
+  Konflikt, und das Formular schreibt nur die geänderten Teile (REQ-REFINERY-029).
+
+- **Rollen kommen nur noch aus dem Basetool.** Backend und Oberfläche lesen Admin, KRT Member, Bank Employee und Bank Management ausschließlich aus der Basetool-Datenbank; Login und täglicher Keycloak-Abgleich schreiben keine Rollen mehr. Eine Rollenänderung wirkt im Backend sofort, in der Oberfläche spätestens nach einer Minute.
+
+- **Freigabe einer Registrierung vergibt KRT Member.** Neue Konten erhalten die Rolle nicht mehr automatisch aus Keycloak.
+
+- **Keycloak-Realm ohne Anwendungsrollen.** Der Provisioner löscht die vier Realm-Rollen und nimmt der Web-Anmeldung den Rollen-Claim; `scripts/restore-keycloak-realm-roles.py` stellt sie für einen Rollback aus der Datenbank wieder her. `APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS` entfällt.
+
+- **Bankhalter folgen Rollenänderungen sofort.** Wer im Basetool die Rolle Bank-Mitarbeiter oder
+  Bank-Management erhält oder verliert, wird gleich danach als Halter angelegt, reaktiviert oder
+  deaktiviert, nicht erst beim nächsten nächtlichen Abgleich.
+
+- **Grafana-Zugang über eine eigene Keycloak-Rolle.** Grafana lässt nur noch Konten mit der
+  Client-Rolle `grafana-admin` am Keycloak-Client `grafana` herein; die Basetool-Rolle Admin genügt
+  dafür nicht mehr.
+
+- **Zugelassene Anwendungen: Bank-Rechte für VerseKit.** VerseKit ist für `exchange.bank.read`,
+  `exchange.bank.request` und `exchange.bank.queue` zugelassen, unter der Bedingung, fremde
+  Bankdaten nur im Speicher und höchstens 7 Tage zu halten. Freigeschaltet werden die Rechte erst
+  mit der VerseKit-Version, die sie nutzt; bis dahin bleibt der Bank-Schalter aus.
+
+- **Menü „Staffel": „Org-Einheits-Bank" heißt jetzt „Meine Einheit".** Der Eintrag öffnet die Reiter
+  „Bank" (bisher „Staffel-Bank") und „Leitung"; die Bankseite heißt „Bank meiner Einheit". Adresse,
+  Favoriten und Startseite bleiben unverändert.
+
+- **Raffinerie-API: `parts` ist Pflicht.** `PUT /api/v1/refinery-orders/{id}` verlangt die zu
+  schreibenden Teile und deren Abschnittszähler; das Ersetzen des ganzen Auftrags und das Feld
+  `version` entfallen (REQ-REFINERY-029).
+
+### Fixed
+
+- **Katalog-Abgleich.** Varianten bleiben getrennt; unvollständige Antworten und fehlgeschlagene Einzelzeilen lösen keine irrtümlichen Löschmarkierungen aus. Doppelte Artikel werden mit Archiv und Weiterleitungen zusammengeführt; Bestände und bestehende Verweise bleiben erhalten.
+
+- **Schiffsdaten.** Das Wiki-Inneninventar wird mit der richtigen SCU-Einheit übernommen; alle Wiki-Abfragen eines Laufs nutzen denselben Spielstand.
+
+- **Freigabe wirkt sofort.** Ein frisch freigegebenes Mitglied, das während der Wartezeit
+  angemeldet war, sah nach dem Login „Dashboard konnte nicht geladen werden“ statt der
+  Nutzungsbedingungen, bis es einige Minuten später neu lud. Das Backend speichert den Status
+  „wartet auf Freigabe“ nicht mehr im Berechtigungs-Cache zwischen (REQ-SEC-056).
+
+- Auftragsdetails: Die aufgeklappten Lagereinträge eines Materials zeigen die Mengeneinheit übersetzt („Stück" statt „PIECE") und Stückzahlen ohne Nachkommastellen.
+
+- **Keycloak.** Die Realm-Provisionierung ergänzt den erforderlichen Admin-API-Scope für Keycloak 26.8.2, damit Benutzersynchronisation und das Trennen verbundener Anwendungen funktionieren.
+
+- **Katalog-Abgleich: P4K-Identität bleibt erhalten.** Die automatische Zusammenführung doppelter
+  Wiki-/UEX-Items führt zwei Items mit verschiedenen P4K-GUIDs nicht mehr zusammen, sondern legt sie
+  der P4K-Prüfliste vor; eine P4K-GUID des aufgelösten Eintrags wandert auf den verbleibenden, und
+  dessen P4K-Name wird nicht mehr vom UEX-Namen überschrieben (REQ-P4K-007).
+
+- **P4K-Import: Anwenden wartet auf laufende Wiki-/UEX-Syncs.** Ein P4K-Anwenden läuft nie mehr
+  gleichzeitig mit einem Wiki- oder UEX-Sync; hält ein Sync die Sperre zu lange, schlägt der Job mit
+  einer Meldung fehl und ändert nichts (REQ-P4K-004).
+
+- **Aufträge.** Im Tab *Items* sehen alle Betrachter eines Auftrags die Zeile „Bedarf je Stück", nicht nur Bearbeiter mit Logistiker-Rechten.
+
+- **Exchange-API: Items nicht mehr fälschlich mehrdeutig.** Ein Item wie `CoverAll` oder `Mirage`
+  wird in Lager- und Org-Lager-Änderungen nicht mehr als `AMBIGUOUS` abgelehnt, nur weil ein
+  Materialname ähnlich klingt; ein exakter Item-Treffer geht jedem unscharfen Materialvorschlag vor.
+
+- **Exchange: regelmäßiger Sync füllt das Speicherbudget nicht mehr.** Ein Mitglied, dessen
+  Anwendung alle 5 Minuten Lager und Schiffe abgleicht, bekam Schreibvorgänge mit
+  `503 EXCHANGE_BUDGET_EXHAUSTED` abgewiesen. Das Gateway hält Idempotency-Antworten jetzt 1 Stunde
+  statt 24 und hat größere Budgets (4 MiB pro Mitglied, 64 MiB pro Anwendung, 128 MiB gesamt);
+  `Retry-After` einer Budget-Abweisung nennt die echte Wartezeit statt höchstens einer Stunde
+  (REQ-XCH-020, REQ-XCH-023, ADR-0221).
+
+- **Richtige Item-Namen im Katalog.** Der UEX-Abgleich überschreibt den Namen eines Items nicht
+  mehr, wenn P4K-Import oder SC Wiki es kennen; UEX führt manche Items doppelt unter einer UUID mit
+  falschem Namen. So heißt etwa die Behring-S6-Gatling wieder „AD6B Ballistic Gatling“ statt
+  „Breakneck S4 Gatling“, und die Namenssuche der Schnittstelle findet sie (REQ-P4K-017).
+
+- Dashboard: „Anpassen“ ist jetzt ein dezenter Button in der Datumszeile des Seitenkopfs und liegt auf dem Handy nicht mehr auf dem ersten Widget.
+
+- **Teilnehmerzeilen auf dem Handy vollständig lesbar.** Im Reiter „Teilnehmer & Einheiten“
+  wurden Name, Staffel-Kürzel und Wunschfunktion von Funktionsauswahl und Buttons abgeschnitten
+  oder überdeckt. Auswahl und Buttons rutschen bei wenig Platz jetzt in eine zweite Zeile
+  (REQ-MISSION-005).
+
+- Materialbörse: on a phone or tablet (including the PWA) the Angebote and Gesuche boards open on the list again; an entry's detail opens only when it is tapped, and „Liste" stays on the list after a refresh.
+
+- **Materialtabellen eines Auftrags auf dem Handy lesbar.** *Bedarf* und *Materialien* zeigen jedes
+  Material als Karte mit einer Zeile pro Wert – Beschriftung links, Zahl rechts – statt eines
+  verrutschten Fließtexts, in dem Zahl und Bezeichnung nicht mehr zusammenpassten.
+
+- **Staffel bearbeiten nach Bereichszuordnung.** Wurde eine Staffel einem Bereich zugeordnet, meldete
+  das Speichern unter Admin → Staffeln fälschlich „Konflikt: Jemand war schneller“, weil die
+  Staffelliste aus dem Cache eine veraltete Version lieferte. Die Zuordnung leert den Cache jetzt.
+
+- **Raffinerie einlagern: nur Ergebnisse des Auftrags.** Beim Einlagern eines Raffinerieauftrags
+  wird eine Position abgelehnt (400), deren Material kein Ergebnis des Auftrags ist; es wird dann
+  nichts eingelagert (REQ-REFINERY-022).
+
+- Aufträge: Die staffelübergreifenden E2E-Abläufe „A bestellt, B liefert" verknüpfen den Bestand von Staffel B wieder über ein Mitglied beider Staffeln, wie es die Tenancy-Regel der Lager-Zuordnung (REQ-ORDERS-018) verlangt; die Regel selbst bleibt unverändert.
+
+- **Verbundene Anwendungen: Aktivitäten an Raffinerieaufträgen** stehen im Verlauf als lesbarer
+  Text statt als interner Code.
+
+- **Verbundene Anwendungen: Rückgängig bei Raffinerieaufträgen** stellt einen Auftrag, den eine
+  Anwendung in einem Rutsch geändert und gelöscht hat, zuverlässig wieder her, mit seinem
+  Schlüssel, und überschreibt keine Änderung mehr, die du zwischendurch im Basetool gemacht hast.
+
+- Ein Auftrag an einer Station ohne Raffinerie lässt das Rückgängigmachen nicht mehr scheitern, und
+  ein wiederhergestellter Lauf meldet sich erneut, wenn er fertig ist.
+
+- **Bank: zweckgebundene Anträge behalten Betrag und Empfänger.** Eine Korrektur eines Ankauf-Antrags
+  darf Betrag, Zielkonto und Empfänger nicht mehr ändern, weder im Web noch über den Austausch;
+  Notiz und Begründung bleiben änderbar (REQ-BANK-056, REQ-BANK-061).
+
+- **Bank: korrigierte Einzahlungen brauchen keine Freigabe mehr.** Eine Korrektur wird jetzt genau
+  wie die Antragstellung eingestuft: Einzahlungen bleiben freigabefrei, zweckgebundene KRT-Abrufe
+  behalten ihre Freigabestufe (REQ-BANK-042, REQ-BANK-056).
+
+- **Raffinerie: Speichern, Abbrechen und Einlagern ohne falschen Konflikt.** Schreibt eine
+  verbundene Anwendung oder ein zweiter Tab gleichzeitig einen anderen Abschnitt des Auftrags,
+  scheitert die Aktion im Web nicht mehr mit einem Konflikt (REQ-REFINERY-029).
+
+- **Raffinerie: Speichern ohne JavaScript speichert wieder.** Ein Absenden des Auftragsformulars,
+  das das Seitenskript nicht abfängt, schreibt alle Abschnitte statt nichts (REQ-FE-006).
+
+- **Raffinerie: Waren behalten ihre ID.** Eine Änderung von Zeit, Status oder Waren im Web ändert
+  die vorhandenen Waren an Ort und Stelle, statt sie neu anzulegen; die IDs, die eine verbundene
+  Anwendung hält, bleiben gültig (REQ-REFINERY-029).
+
+- **Raffinerie: Gelöscht-Hinweis nur nach Rückfrage.** Die Detailseite sperrt sich erst, wenn der
+  Server bestätigt, dass der Auftrag weg ist; ein Verbindungsabbruch, ein geöffneter Dialog oder ein
+  fremdes Browser-Signal sperrt sie nicht mehr, und nach einem Rückgängig wird auch das
+  Einlagern-Formular wieder frei (REQ-XCH-055).
+
+- **Raffinerie: „via <Anwendung>" nur bei abgeschlossenen Aufträgen.** Ein wieder geöffneter oder
+  abgebrochener Auftrag zeigt den Hinweis auf die abholende Anwendung nicht mehr
+  (REQ-REFINERY-028).
+
+- **Bank: Freigaben gelten nur für den gelesenen Stand.** „Freigabe erteilen" schickt den Stand des
+  Antrags mit; wurde er inzwischen korrigiert, lehnt die Bank die Freigabe mit einem Konflikt ab,
+  statt einen geänderten Betrag freizugeben (REQ-BANK-056).
+
+- **Bank: „Antrag nicht gefunden" erscheint wieder.** Ein unbekannter oder nicht sichtbarer Antrag
+  zeigt auf `/bank/requests/{id}` den leeren Zustand statt der Fehlerseite, auch beim
+  Live-Aktualisieren (REQ-BANK-068).
+
+- Exchange refinery orders: a change set naming one material twice in different ways no longer fails with a server error, and a create returns its new goods ids in the order of its goods.
+
+- Exchange refinery orders: several store lines on one good book their sum into the good's yield, and a dry run decides later ops on those yields as the real run does.
+
+- Exchange refinery orders: confirming a held change set re-checks the store capability and decides job orders as the client's own request would, not under the browser session's role or pin.
+
+- Exchange refinery orders: a create needs at least one good and the last good cannot be removed (`GOODS_REQUIRED`); store lines on a completed order are `ORDER_STORED`.
+
+- Exchange refinery orders: concurrent creates under one key no longer duplicate an order, a set never locks another member's order, a resent cancel is `unchanged`, deletes that remove nothing no longer trip the mass-change guard, and fields an op does not use are ignored.
+
+### Security
+
+- **Exchange: Spieltexte bleiben im Basetool.** Beschreibungen aus Wiki, UEX und P4K sind als Spieltext markiert und erreichen keinen externen Client: ein Architekturtest verbietet dem Exchange, sie zu lesen, jedes veröffentlichte Feld ist klassifiziert, und das Gateway weist eine Backend-Antwort mit einem nicht deklarierten Feld mit `502` ab. Solche Antworten zählt `answer_contract_broken`, `ExchangeAnswerContractBroken` meldet sie (REQ-XCH-050, REQ-P4K-033, ADR-0344).
+
+- **Org-Bank: verborgene Konten wie unbekannte.** Ein Konto, das der Aufrufer nicht sehen darf,
+  antwortet auf allen Konto-Routen der Org-Bank mit demselben 404 wie eine unbekannte Konto-ID;
+  Konto-IDs lassen sich so nicht mehr erraten (REQ-BANK-066).
+
+- **Raffinerie einlagern: nur sichtbare Aufträge.** Beim Einlagern eines Raffinerieauftrags lässt sich
+  eine Position nur noch einem Auftrag zuordnen, den man in der eigenen Einheit sieht; ein Auftrag
+  einer fremden Einheit wird wie ein unbekannter abgelehnt (404) (REQ-REFINERY-022).
+
+- **Lager.** Beim Einbuchen und beim Zuordnen lässt sich Lagerbestand nur noch Aufträgen
+  zuordnen, die du in deiner Einheit siehst; ein Auftrag einer fremden Einheit wird wie ein
+  unbekannter abgewiesen.
+
+- **Weniger Rechte für das Admin-API-Konto des Backends.** Der Realm-Provisioner entzieht dem
+  Dienstkonto von `backend-service` die nicht mehr benötigte Keycloak-Rolle `view-realm`.
+
+- **Bank: Leitungssitze ohne KRT Member geben keine Kontorechte mehr.** Wer seine KRT-Member-Rolle
+  verliert, aber den Sitz behält, ist nicht mehr Kontoverantwortliche/r, ist nicht mehr von der
+  Freigabe befreit und darf nichts mehr freigeben oder einstellen — im Web und über den Austausch
+  (REQ-SEC-015, REQ-BANK-034).
+
 ## [v1.22.3](https://github.com/krt-profit/basetool/releases/tag/v1.22.3) - 2026-11-05
 
 ### Fixed

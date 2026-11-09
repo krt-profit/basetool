@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:96e4b03b-77b9-4ea9-a275-c24fdbbef28d",
+  "serialNumber" : "urn:uuid:c2da0541-a469-4cfb-b6ee-47aae9d448cb",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-05T20:09:40Z",
+    "timestamp" : "2026-11-09T11:56:51Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "backend",
-      "version" : "1.22.3",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend",
+      "version" : "1.23.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/42100398595"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/42612141941"
         },
         {
           "type" : "vcs",
@@ -879,6 +879,64 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "publisher" : "com.github.luben",
+      "group" : "com.github.luben",
+      "name" : "zstd-jni",
+      "version" : "1.5.7-24",
+      "description" : "JNI bindings for Zstd native library that provides fast and high compression lossless algorithm for Java and all JVM languages.",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "5f828f8883aed5dea2464f3209dc02af"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "03db28b2a682184f5be41eb6774c8ec1a81683c2"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "79f5e678ce437f09d5ab55df1c6e7fc8cf6a2eb8e73052f34b143464062fcb0b"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "a8d42052fd2716091913cd4e6ea001b93bc5530145e7ed571423a2cd551071da21a7d99bee93778f60101829d27a0d4d27d0bc4edb2b933747784a4429ac0487"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "e532465ed2e3ee1e48dd504f2f497b36f8d2c34e7f4815d7253348b4b1ba9599"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "55e1d031c2da4688d9cef7281656e6eab50fac02b09baa2a998f44f544d617bb37a82d8ec9f52002295e08d315a6ed38f0324317d44caf8e1a5a4a164b9dc07e"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "1f9b0b1756a84f2b7103c1388e69e08d6c47c8fb30750f3f9a3e42113a897e4a03a08e0b144e9f4a4a2ad4cd0d336457"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "03f7543c473e2ba8157a25dcd1218cf49a5f9d120f4b8dc8ab30487515c49224aa3a630f8d5fbcf6a1cb58c98f090df5"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "BSD-2-Clause"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
       "group" : "com.google.errorprone",
       "name" : "error_prone_annotations",
@@ -1629,11 +1687,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.22.3",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support",
+      "version" : "1.23.0",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -12499,6 +12557,10 @@
       ]
     },
     {
+      "ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "dependsOn" : [ ]
+    },
+    {
       "ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
       "dependsOn" : [ ]
     },
@@ -12568,13 +12630,14 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend",
       "dependsOn" : [
         "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
+        "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
         "pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
         "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
@@ -12599,7 +12662,7 @@
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"

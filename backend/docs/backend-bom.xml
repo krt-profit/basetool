@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:96e4b03b-77b9-4ea9-a275-c24fdbbef28d" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:c2da0541-a469-4cfb-b6ee-47aae9d448cb" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-05T20:09:40Z</timestamp>
+    <timestamp>2026-11-09T11:56:51Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend">
       <group>de.greluc.krt.profit.basetool</group>
       <name>backend</name>
-      <version>1.22.3</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend</purl>
+      <version>1.23.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/42100398595</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/42612141941</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -443,6 +443,33 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
+    <component type="library" bom-ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar">
+      <publisher>com.github.luben</publisher>
+      <group>com.github.luben</group>
+      <name>zstd-jni</name>
+      <version>1.5.7-24</version>
+      <description>JNI bindings for Zstd native library that provides fast and high compression lossless algorithm for Java and all JVM languages.</description>
+      <hashes>
+        <hash alg="MD5">5f828f8883aed5dea2464f3209dc02af</hash>
+        <hash alg="SHA-1">03db28b2a682184f5be41eb6774c8ec1a81683c2</hash>
+        <hash alg="SHA-256">79f5e678ce437f09d5ab55df1c6e7fc8cf6a2eb8e73052f34b143464062fcb0b</hash>
+        <hash alg="SHA-512">a8d42052fd2716091913cd4e6ea001b93bc5530145e7ed571423a2cd551071da21a7d99bee93778f60101829d27a0d4d27d0bc4edb2b933747784a4429ac0487</hash>
+        <hash alg="SHA3-256">e532465ed2e3ee1e48dd504f2f497b36f8d2c34e7f4815d7253348b4b1ba9599</hash>
+        <hash alg="SHA3-512">55e1d031c2da4688d9cef7281656e6eab50fac02b09baa2a998f44f544d617bb37a82d8ec9f52002295e08d315a6ed38f0324317d44caf8e1a5a4a164b9dc07e</hash>
+        <hash alg="SHA-384">1f9b0b1756a84f2b7103c1388e69e08d6c47c8fb30750f3f9a3e42113a897e4a03a08e0b144e9f4a4a2ad4cd0d336457</hash>
+        <hash alg="SHA3-384">03f7543c473e2ba8157a25dcd1218cf49a5f9d120f4b8dc8ab30487515c49224aa3a630f8d5fbcf6a1cb58c98f090df5</hash>
+      </hashes>
+      <licenses>
+        <license>
+          <id>BSD-2-Clause</id>
+        </license>
+      </licenses>
+      <purl>pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar</purl>
+      <modified>false</modified>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
     <component type="library" bom-ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar">
       <group>com.google.errorprone</group>
       <name>error_prone_annotations</name>
@@ -823,11 +850,11 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.22.3</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support</purl>
+      <version>1.23.0</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6285,6 +6312,7 @@
     <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar">
       <dependency ref="pkg:maven/com.aayushatharva.brotli4j/brotli4j@1.23.0?type=jar"/>
     </dependency>
+    <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar"/>
     <dependency ref="pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar"/>
     <dependency ref="pkg:maven/com.google.guava/failureaccess@1.0.3?type=jar"/>
     <dependency ref="pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar">
@@ -6315,12 +6343,13 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.22.3?project_path=%3Abackend">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.0?project_path=%3Abackend">
       <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
       <dependency ref="pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar"/>
+      <dependency ref="pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar"/>
       <dependency ref="pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
       <dependency ref="pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar"/>
@@ -6343,7 +6372,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.22.3?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.0?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
