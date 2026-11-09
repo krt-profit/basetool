@@ -3205,7 +3205,8 @@ and the backend decides what it shows.
   (REQ-BANK-022), the bank staff who see the request's account (REQ-BANK-009, REQ-BANK-023) and its
   approvers (REQ-BANK-041, REQ-BANK-046); four-eyes keeps the requester out of the approvers
   (REQ-BANK-062). Anyone else and an unknown id get the same `404`, and the page shows "Antrag nicht
-  gefunden".
+  gefunden". A requester who is neither staff nor approver reads it without the staff note
+  (REQ-BANK-054), as in their own list.
 - **Where to act.** The page decides nothing itself. While the request is pending it leads bank staff
   into the staff queue (`/bank/requests?focus={id}`), an approver to "Anträge an unsere Konten"
   (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
@@ -3216,8 +3217,8 @@ and the backend decides what it shows.
 **Acceptance**
 
 - [x] The requester, a granted employee (with `callerMayConfirm`) and an approver read the request;
-  a foreign member, an employee without a grant on the account and an unknown id get `404`
-  (`BankRequestViewTest`).
+  a foreign member, an employee without a grant on the account and an unknown id get `404`; the
+  staff note reaches staff and approvers, never the requester (`BankRequestViewTest`).
 - [x] The page renders the details and the right way to act for staff, approvers and the requester,
   its `requestDetail` fragment resolves, and a hidden request shows the empty state
   (`BankRequestPageControllerMvcTest`).
