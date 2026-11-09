@@ -32,8 +32,6 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -67,26 +65,22 @@ public class ExchangeActingMemberScope {
       @NotNull ExchangeCaller caller,
       @NotNull Collection<ExchangeCapability> capabilities,
       @NotNull Supplier<T> work) {
-    SecurityContext acting = SecurityContextHolder.createEmptyContext();
-    acting.setAuthentication(
+    ActingMemberFilter.ActingMemberAuthentication acting =
         new ActingMemberFilter.ActingMemberAuthentication(
             caller.member(),
             actingMemberAuthorities.exchangeAuthoritiesFor(
                 caller.member(), capabilities.stream().map(ExchangeCapability::getScope).toList()),
             caller.clientId(),
             caller.installationKey(),
-            null));
-    SecurityContext originalContext = SecurityContextHolder.getContext();
+            null);
     RequestAttributes originalRequest = RequestContextHolder.getRequestAttributes();
     if (originalRequest instanceof ServletRequestAttributes servlet) {
       RequestContextHolder.setRequestAttributes(
           new ServletRequestAttributes(new RelayedRequest(servlet.getRequest())));
     }
-    SecurityContextHolder.setContext(acting);
     try {
-      return work.get();
+      return ActingMemberFilter.callAs(acting, work);
     } finally {
-      SecurityContextHolder.setContext(originalContext);
       RequestContextHolder.setRequestAttributes(originalRequest);
     }
   }

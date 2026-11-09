@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
@@ -148,7 +147,7 @@ public class RefineryOrderService {
           OfferedLocations.require(
               locationRepository.findById(order.getLocation().getId()),
               "error.location.not_found"));
-      validateLocationHasRefinery(order.getLocation());
+      RefineryOrderEdits.requireRefinery(order.getLocation());
     } else {
       throw new BadRequestException("error.refinery_order.location_required");
     }
@@ -355,7 +354,7 @@ public class RefineryOrderService {
       order.setLocation(
           RefineryOrderEdits.offeredOrCurrent(
               locationRepository, order, details.getLocation().getId()));
-      validateLocationHasRefinery(order.getLocation());
+      RefineryOrderEdits.requireRefinery(order.getLocation());
     }
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
@@ -431,14 +430,7 @@ public class RefineryOrderService {
               materialRepository.findById(good.getInputMaterial().getId()),
               "error.material.input.not_found");
 
-      if (!RefineryExchangeRules.refinable(inMat)) {
-        throw new IllegalArgumentException(
-            "Refinery goods input must be of type RAW. Material '"
-                + inMat.getName()
-                + "' is "
-                + inMat.getType());
-      }
-      good.setInputMaterial(inMat);
+      good.setInputMaterial(RefineryOrderEdits.requireRefinable(inMat));
 
       if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
         Material outMat =
@@ -448,8 +440,7 @@ public class RefineryOrderService {
 
         if (inMat.getRefinedMaterial() != null
             && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
-          throw new IllegalArgumentException(
-              "Output material must match the refined material of the input material.");
+          throw new BadRequestException("error.refinery_order.output_not_refined");
         }
 
         good.setOutputMaterial(outMat);
@@ -515,21 +506,5 @@ public class RefineryOrderService {
             order.getLocation() == null ? null : order.getLocation().getName(),
             changeCode,
             userService.currentActor()));
-  }
-
-  /**
-   * Rejects a location whose derived {@code hasRefineryTerminal} flag is false, the same signal the
-   * picker uses (REQ-REFINERY-020).
-   *
-   * <p>Reads the parent through the association, never a query, so it cannot trigger an auto-flush
-   * mid-update.
-   *
-   * @param location the order's chosen location
-   * @throws IllegalArgumentException when the location hosts no live refinery terminal
-   */
-  private static void validateLocationHasRefinery(Location location) {
-    if (!RefineryExchangeRules.hostsRefinery(location)) {
-      throw new IllegalArgumentException("Selected location does not have a refinery.");
-    }
   }
 }

@@ -217,7 +217,7 @@ class RefineryOrderServiceLifecycleTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(notARefinery));
 
       assertThrows(
-          IllegalArgumentException.class,
+          BadRequestException.class,
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
@@ -314,7 +314,7 @@ class RefineryOrderServiceLifecycleTest {
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(cityLoc));
 
       assertThrows(
-          IllegalArgumentException.class,
+          BadRequestException.class,
           () -> service.createRefineryOrder(OWNER_ID, freshOrderWithLocation(), null));
     }
 
@@ -422,11 +422,11 @@ class RefineryOrderServiceLifecycleTest {
       RefineryOrder incoming = freshOrderWithLocation();
       incoming.setGoods(new HashSet<>(Set.of(bad)));
 
-      IllegalArgumentException ex =
+      BadRequestException ex =
           assertThrows(
-              IllegalArgumentException.class,
+              BadRequestException.class,
               () -> service.createRefineryOrder(OWNER_ID, incoming, null));
-      assert ex.getMessage().contains("RAW");
+      assertEquals("error.refinery_order.input_material_not_raw", ex.getMessage());
     }
 
     @Test
@@ -530,8 +530,7 @@ class RefineryOrderServiceLifecycleTest {
       incoming.setGoods(new HashSet<>(Set.of(good)));
 
       assertThrows(
-          IllegalArgumentException.class,
-          () -> service.createRefineryOrder(OWNER_ID, incoming, null));
+          BadRequestException.class, () -> service.createRefineryOrder(OWNER_ID, incoming, null));
     }
 
     @Test

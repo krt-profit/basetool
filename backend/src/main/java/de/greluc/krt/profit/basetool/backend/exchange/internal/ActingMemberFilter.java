@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -255,6 +256,27 @@ public class ActingMemberFilter extends OncePerRequestFilter {
               member, authorities, exchangeClient, installationKey, epochSecond(connectedAt)));
       SecurityContextHolder.setContext(acting);
       filterChain.doFilter(request, response);
+    } finally {
+      SecurityContextHolder.setContext(original);
+    }
+  }
+
+  /**
+   * Runs work under an acting member's authentication and restores the caller's security context
+   * afterwards, whatever the work does; the one place outside the filter chain that swaps it.
+   *
+   * @param acting the acting member's authentication
+   * @param work the work
+   * @param <T> the work's result
+   * @return the work's result
+   */
+  static <T> T callAs(@NotNull ActingMemberAuthentication acting, @NotNull Supplier<T> work) {
+    SecurityContext original = SecurityContextHolder.getContext();
+    SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(acting);
+    SecurityContextHolder.setContext(context);
+    try {
+      return work.get();
     } finally {
       SecurityContextHolder.setContext(original);
     }
