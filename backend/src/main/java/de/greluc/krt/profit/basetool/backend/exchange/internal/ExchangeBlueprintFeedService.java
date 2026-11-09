@@ -80,14 +80,11 @@ public class ExchangeBlueprintFeedService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeBlueprintPageDto page(
       @NotNull UUID member, @Nullable String cursor, int limit) {
-    int size = ExchangeFeedReader.pageSize(limit);
-    if (cursor == null) {
-      return snapshot(member, feedReader.snapshotStart(), null, size);
-    }
-    ExchangeFeedCursor position = feedReader.resume(cursor);
-    return position.isSnapshot()
-        ? snapshot(member, position.position(), position.afterId(), size)
-        : feed(member, position.position(), size);
+    return feedReader.answer(
+        cursor,
+        limit,
+        (at, afterId, size) -> snapshot(member, at, afterId, size),
+        (after, size) -> feed(member, after, size));
   }
 
   /**
@@ -114,26 +111,21 @@ public class ExchangeBlueprintFeedService {
    *
    * @param member the member
    * @param at the feed position the snapshot was taken at
-   * @param afterId the last row delivered, or {@code null} for the first page
+   * @param afterId the last row delivered, the zero id for the first page
    * @param size the page size
    * @return the page
    */
   private @NotNull ExchangeBlueprintPageDto snapshot(
-      @NotNull UUID member, @NotNull ExchangeFeedPosition at, @Nullable UUID afterId, int size) {
-    PageRequest page = PageRequest.of(0, size + 1);
-    List<PersonalBlueprint> rows =
-        afterId == null
-            ? blueprintRepository.findAllByOwnerUserIdOrderByIdAsc(member, page)
-            : blueprintRepository.findAllByOwnerUserIdAndIdGreaterThanOrderByIdAsc(
-                member, afterId, page);
-    boolean more = rows.size() > size;
-    List<PersonalBlueprint> delivered = more ? rows.subList(0, size) : rows;
-    String next =
-        more
-            ? ExchangeFeedCursor.snapshot(at, delivered.getLast().getId()).format()
-            : ExchangeFeedCursor.feed(at).format();
+      @NotNull UUID member, @NotNull ExchangeFeedPosition at, @NotNull UUID afterId, int size) {
+    ExchangeFeedReader.Slice<PersonalBlueprint> page =
+        ExchangeFeedReader.slice(
+            blueprintRepository.findAllByOwnerUserIdAndIdGreaterThanOrderByIdAsc(
+                member, afterId, PageRequest.of(0, size + 1)),
+            size,
+            at,
+            PersonalBlueprint::getId);
     return new ExchangeBlueprintPageDto(
-        delivered.stream().map(this::toDto).toList(), List.of(), next, more);
+        page.items().stream().map(this::toDto).toList(), List.of(), page.next(), page.more());
   }
 
   /**
