@@ -1802,7 +1802,7 @@ its former sibling pages become tabs of it.
 | Einsatz & Flotte | wedge | Missionen (Missionen · Operationen), Hangar (Hangar · Schiffskatalog) |
 | Logistik | crate | Lager (Lager · Mindestbestände), Raffinerie, Aufträge (Aufträge · Materialbedarf · Blueprint-Verfügbarkeit) |
 | Handel | swap arrows | Material (Liste · Übersicht · Profitberechnung), Materialbörse, Beschaffung (Bedarf · Meine Spenden · Ankauf) |
-| Staffel | users | Org-Einheits-Bank (Staffel-Bank · *Leitung*) |
+| Staffel | users | Meine Einheit (Bank · *Leitung*) |
 | Kartellbank (bank staff only) | bank | Kartellbank (Dashboard · Verwaltung · Berechtigungen · Anträge) |
 
 - *Shipped:* the groups, links and tabs are the entries of the registry (`NavigationRegistry`),

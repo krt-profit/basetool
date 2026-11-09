@@ -840,6 +840,13 @@ org-unit-blind.
 > „Details" button any more, the table view keeps „Details & Verlauf" / „Details & Verwaltung". Below
 > the account list the Konten tab shows **„Laufende Anträge"** — the caller's own and the
 > to-be-approved pending requests with their approval path (REQ-BANK-041).
+>
+> **Amendment (unit naming):** the page is named after the unit, not the code term „Org-Einheit",
+> because its menu link opens a tab bar that also carries „Leitung" (REQ-UI-026). The drawer link
+> in the „Staffel" group reads **„Meine Einheit"** (`nav.bank.myOrgUnit`, EN „My unit"), this
+> page's tab **„Bank"** (`nav.tab.unitBank`) and its title **„Bank meiner Einheit"**
+> (`bank.orgUnit.title`, EN „My unit's bank"). The entry key `orgunitbank.overview` and the URL
+> `/org-unit-bank` stay, so favourites, start pages and phone-tab slots keep working.
 
 **Acceptance**
 
@@ -2411,7 +2418,7 @@ action „Schwellen speichern". Bar, scale and example follow the fields as you 
 primary action in the page head (Halter: „+ Umbuchung", with „+ Halter registrieren" as a ghost
 button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anlegen").
 
-**Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Anträge
+**Approval surface & confirmation.** The two non-staff approvers act in **Meine Einheit → Bank → „Anträge
 an unsere Konten"** („Fremde Anträge" until 2026-10-03), band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
 `ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
 `BankStaffRights#mayApprove` short-circuit for an administrator before the band check); their in-app grant records
@@ -2814,7 +2821,7 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 
-A **withdrawal request** raised from the Org-Einheits-Bank page carries an optional
+A **withdrawal request** raised from the unit bank page (`/org-unit-bank`) carries an optional
 **Empfänger** — the member who receives the payout — pre-filled with the requester.
 
 Before this, only the bank employee's Kontobewegung modal could record a counterparty (REQ-BANK-044,
