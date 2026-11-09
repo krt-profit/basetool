@@ -3,7 +3,7 @@ GET /exchange/v1/openapi.json
 === response
 200
 cache-control: max-age=3600, public
-content-length: 47907
+content-length: 54571
 content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
 content-type: application/json
 vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers
@@ -11,4 +11,4 @@ x-content-type-options: nosniff
 x-correlation-id: <correlation-id>
 x-frame-options: DENY
 x-xss-protection: 0
-sha-256 75b54af1450c1cc4b3afe4546daab0a1d44c6c7e1cafb1aba5010078d4481b0d
+sha-256 72bd266a4c55a6def3bc5333507dfc275dc22047e84f48fe9dbd430d86f2aec0

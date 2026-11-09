@@ -97,7 +97,7 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
   /** The methods an extension may use cross-origin on {@code /exchange/**}. */
-  static final List<String> EXCHANGE_CORS_METHODS = List.of("GET", "POST", "OPTIONS");
+  static final List<String> EXCHANGE_CORS_METHODS = List.of("GET", "POST", "PUT", "OPTIONS");
 
   /** The request headers an extension may send cross-origin on {@code /exchange/**}. */
   static final List<String> EXCHANGE_CORS_REQUEST_HEADERS =

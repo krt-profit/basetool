@@ -203,7 +203,7 @@ class SecurityConfigTest {
     assertThat(configuration.checkOrigin("https://evil.example")).isNull();
     assertThat(configuration.checkOrigin("https://profit-base.online")).isNull();
     assertThat(configuration.getAllowedMethods())
-        .containsExactlyInAnyOrder("GET", "POST", "OPTIONS");
+        .containsExactlyInAnyOrder("GET", "POST", "PUT", "OPTIONS");
     assertThat(configuration.getAllowedHeaders())
         .contains(
             "Authorization", "DPoP", "Idempotency-Key", "User-Agent", "Exchange-Client-Agent");

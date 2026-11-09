@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
@@ -33,6 +34,8 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
@@ -76,7 +79,10 @@ final class BankExchangeRelay {
     registered.setDisplayName("Bank client");
     registered.setStatus(ExchangeClientStatus.ACTIVE);
     registered.setCapabilities(
-        EnumSet.of(ExchangeCapability.CONNECT, ExchangeCapability.BANK_READ));
+        EnumSet.of(
+            ExchangeCapability.CONNECT,
+            ExchangeCapability.BANK_READ,
+            ExchangeCapability.BANK_REQUEST));
     context.getBean(ExchangeClientRepository.class).saveAndFlush(registered);
     ExchangeSettingsRepository settingsRepository =
         context.getBean(ExchangeSettingsRepository.class);
@@ -116,6 +122,30 @@ final class BankExchangeRelay {
   }
 
   /**
+   * Sends one relayed write with a JSON body below {@link #BANK}.
+   *
+   * @param method the HTTP method
+   * @param member the acting member
+   * @param path the path below {@link #BANK}
+   * @param body the body, serialised as JSON
+   * @return the response
+   * @throws Exception when MockMvc fails to dispatch
+   */
+  @NotNull
+  MockHttpServletResponse write(
+      @NotNull HttpMethod method,
+      @NotNull UUID member,
+      @NotNull String path,
+      @NotNull Map<String, ?> body)
+      throws Exception {
+    MockHttpServletRequestBuilder call =
+        relayed(request(method, BANK + path), member)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(body));
+    return mockMvc.perform(call).andReturn().getResponse();
+  }
+
+  /**
    * Parses a response body.
    *
    * @param response the response
@@ -144,7 +174,9 @@ final class BankExchangeRelay {
         .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
         .header(
             ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER,
-            ExchangeCapability.BANK_READ.getScope())
+            ExchangeCapability.BANK_READ.getScope()
+                + ","
+                + ExchangeCapability.BANK_REQUEST.getScope())
         .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, KEY);
   }
 }

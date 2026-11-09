@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +96,7 @@ public class BankBookingRequestService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
   private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  private final ClientDirectory clientDirectory;
 
   /**
    * Persists a new {@code PENDING} booking request, audits it and fires the notification event
@@ -158,14 +160,15 @@ public class BankBookingRequestService {
         splitPercent,
         counterpartyUserId,
         counterpartyOrgUnitId,
+        null,
         null);
   }
 
   /**
    * Persists a new {@code PENDING} booking request that another module raised for a purpose
-   * (REQ-BANK-061); otherwise exactly {@link #create(UUID, BankBookingRequestType, BigDecimal,
-   * String, String, UUID, boolean, BigDecimal, BankRequestApprover, boolean, BigDecimal, UUID,
-   * UUID)}.
+   * (REQ-BANK-061) or a connected application raised through the exchange (REQ-BANK-067);
+   * otherwise exactly {@link #create(UUID, BankBookingRequestType, BigDecimal, String, String,
+   * UUID, boolean, BigDecimal, BankRequestApprover, boolean, BigDecimal, UUID, UUID)}.
    *
    * @param accountId the source account
    * @param type deposit, withdrawal or transfer
@@ -181,6 +184,8 @@ public class BankBookingRequestService {
    * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL}, or {@code null}
    * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
    * @param purpose what the request is for, or {@code null} for a request without a purpose
+   * @param clientId the connected application's bounded label, or {@code null} for a request
+   *     raised in the Basetool
    * @return the created request
    */
   @NotNull
@@ -199,7 +204,8 @@ public class BankBookingRequestService {
       @Nullable BigDecimal splitPercent,
       @Nullable UUID counterpartyUserId,
       @Nullable UUID counterpartyOrgUnitId,
-      @Nullable BankPurpose purpose) {
+      @Nullable BankPurpose purpose,
+      @Nullable String clientId) {
     BankAccount account =
         Entities.require(accountRepository.findById(accountId), "Bank account not found");
     requireActiveForRequest(account);
@@ -244,6 +250,7 @@ public class BankBookingRequestService {
     request.setSplitPercent(splitPercent);
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
+    request.setClientId(clientId);
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -1107,8 +1114,23 @@ public class BankBookingRequestService {
         request.getCounterpartyOrgUnitName(),
         request.getPurposeKind(),
         request.getPurposeRef(),
+        clientName(request.getClientId()),
         request.getVersion(),
         callerMayConfirm);
+  }
+
+  /**
+   * Names the connected application a request came through for the staff badge (REQ-BANK-067).
+   *
+   * @param clientId the stored client label, or {@code null} for a request raised in the Basetool
+   * @return the registry's display name, the label itself for a client the registry no longer
+   *     holds, or {@code null} for a request raised in the Basetool
+   */
+  @Nullable
+  private String clientName(@Nullable String clientId) {
+    return clientId == null
+        ? null
+        : clientDirectory.displayNames(List.of(clientId)).getOrDefault(clientId, clientId);
   }
 
   /**

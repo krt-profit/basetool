@@ -1581,6 +1581,195 @@
             }
           }
         ]
+      },
+      "post": {
+        "operationId": "bank_request_raise",
+        "summary": "Raise one of the member's own booking requests: a deposit, withdrawal or transfer.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "The Basetool's own validation and approval routing apply; nothing is booked until the bank confirms the request in the Basetool. A deposit may target any active account; a withdrawal or transfer needs an account the member may view. An unknown, closed or hidden account answers 404 NOT_FOUND. A member who already holds 20 pending requests, from any channel, gets 409 BANK_OPEN_REQUEST_CAP. The answer names only the request's id, status, version and amount. Counts one unit of the daily write quota. There is no undo: cancel the request.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/raise"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/bank/requests/{id}": {
+      "put": {
+        "operationId": "bank_request_correct",
+        "summary": "Correct one of the member's own pending booking requests, raised anywhere.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/written"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Replaces amount, note, justification and destination; the approval need is derived anew. Another member's request answers 404 NOT_FOUND; a decided one 409 BANK_REQUEST_NOT_PENDING; an approved one 409 BANK_REQUEST_ALREADY_APPROVED; a stale version 409 VERSION_CONFLICT. Counts one unit of the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The request's id as the own requests answer it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/correction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/bank/requests/{id}/cancel": {
+      "post": {
+        "operationId": "bank_request_cancel",
+        "summary": "Cancel one of the member's own pending booking requests, raised anywhere.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.request"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/cancelled"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Another member's request answers 404 NOT_FOUND; a decided one 409 BANK_REQUEST_NOT_PENDING; a stale version 409 VERSION_CONFLICT. Counts one unit of the daily write quota.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The request's id as the own requests answer it; a malformed id answers 400 SCHEMA_INVALID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-request-write.schema.json#/$defs/cancel"
+              }
+            }
+          }
+        }
       }
     }
   },

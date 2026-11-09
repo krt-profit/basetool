@@ -20,28 +20,33 @@
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
+import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Case;
+import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Request;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Runs the read cases of the {@link BankAccessMatrix} through the bank routes of the exchange and
- * renders each outcome in the vocabulary of {@link BankWebAccessDriver}.
+ * Runs the read and own-request cases of the {@link BankAccessMatrix} through the bank routes of the
+ * exchange and renders each outcome in the vocabulary of {@link BankWebAccessDriver}.
  *
  * <p>{@code ORG_BALANCES} runs as the account list and renders each listed account with {@code
  * canRequest} for {@code requestable} and the {@code ownLimit}; {@code ORG_VIEW} runs as the
  * bookings and the balance series of the account, which must answer alike, and renders the status
- * and refusal code.
+ * and refusal code. The raise and correction cases render the routing as the own requests answer
+ * it, without the limit, which the exchange does not expose; the cancel case renders the status.
  */
 final class BankExchangeAccessDriver {
 
@@ -62,9 +67,10 @@ final class BankExchangeAccessDriver {
   }
 
   /**
-   * Runs one read case.
+   * Runs one read or own-request case.
    *
-   * @param c a case of {@code ORG_BALANCES} or {@code ORG_VIEW}
+   * @param c a case of {@code ORG_BALANCES}, {@code ORG_VIEW}, a raise, {@code CORRECT_OWN} or
+   *     {@code CANCEL_OWN}
    * @return the outcome line
    * @throws Exception when MockMvc fails to dispatch
    * @throws IllegalArgumentException for an operation the exchange does not serve
@@ -76,8 +82,127 @@ final class BankExchangeAccessDriver {
       case ORG_BALANCES ->
           render(relay.read(member, "/accounts", Map.of("limit", "1000")), this::accountList);
       case ORG_VIEW -> view(member, world.account((Account) c.subject()));
+      case RAISE_DEPOSIT -> raise(c, "DEPOSIT");
+      case RAISE_WITHDRAWAL -> raise(c, "WITHDRAWAL");
+      case RAISE_TRANSFER -> raise(c, "TRANSFER");
+      case CORRECT_OWN -> correct(c);
+      case CANCEL_OWN -> cancel(c);
       default -> throw new IllegalArgumentException("Not an exchange read: " + c.operation());
     };
+  }
+
+/**
+   * Raises a request on the case's account, with the web driver's justification and transfer
+   * destination.
+   *
+   * @param c the case
+   * @param type the request type
+   * @return the status and the routing, or the refusal
+   * @throws Exception when MockMvc fails to dispatch
+   */
+  @NotNull
+  private String raise(@NotNull Case c, @NotNull String type) throws Exception {
+    Account source = (Account) c.subject();
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("type", type);
+    body.put("sourceAccountId", world.account(source));
+    body.put("amount", c.band().getAmount());
+    if (!"DEPOSIT".equals(type)) {
+      body.put("justification", BankAccessSeeder.JUSTIFICATION);
+    }
+    if ("TRANSFER".equals(type)) {
+      body.put("targetAccountId", world.transferTargetFor(source));
+    }
+    UUID member = world.user(c.actor());
+    return render(
+        relay.write(HttpMethod.POST, member, "/requests", body),
+        answer -> routing(member, answer.path("id").asString()));
+  }
+
+  /**
+   * Corrects the member's own request to the case's amount, keeping the justification.
+   *
+   * @param c the case
+   * @return the status and the routing, or the refusal
+   * @throws Exception when MockMvc fails to dispatch
+   */
+  @NotNull
+  private String correct(@NotNull Case c) throws Exception {
+    UUID member = world.user(c.actor());
+    UUID request = world.request((Request) c.subject());
+    Map<String, Object> body = new LinkedHashMap<>();
+    body.put("amount", c.band().getAmount());
+    body.put("justification", BankAccessSeeder.JUSTIFICATION);
+    body.put("version", ownerVersion(request));
+    return render(
+        relay.write(HttpMethod.PUT, member, "/requests/" + request, body),
+        answer -> routing(member, answer.path("id").asString()));
+  }
+
+  /**
+   * Cancels the member's own request.
+   *
+   * @param c the case
+   * @return the status, or the refusal
+   * @throws Exception when MockMvc fails to dispatch
+   */
+  @NotNull
+  private String cancel(@NotNull Case c) throws Exception {
+    UUID request = world.request((Request) c.subject());
+    return render(
+        relay.write(
+            HttpMethod.POST,
+            world.user(c.actor()),
+            "/requests/" + request + "/cancel",
+            Map.of("version", ownerVersion(request))),
+        _ -> "");
+  }
+
+  /**
+   * Renders the routing of a written request as the member's own requests answer it.
+   *
+   * @param member the requester
+   * @param id the request
+   * @return {@code approver=…}
+   */
+  @NotNull
+  private String routing(@NotNull UUID member, @NotNull String id) {
+    JsonNode own = ownRequest(member, id);
+    String approver = own.path("requiredApprover").asString();
+    return "approver=" + (approver.isEmpty() ? "none" : approver);
+  }
+
+  /**
+   * The version of a seeded request as its requester reads it.
+   *
+   * @param request the request
+   * @return its version
+   */
+  private long ownerVersion(@NotNull UUID request) {
+    return ownRequest(world.user(Actor.MEMBER), request.toString()).path("version").asLong();
+  }
+
+  /**
+   * One of a member's own requests.
+   *
+   * @param member the member
+   * @param id the request
+   * @return its item
+   * @throws IllegalStateException when the member's own requests do not list it
+   */
+  @NotNull
+  private JsonNode ownRequest(@NotNull UUID member, @NotNull String id) {
+    try {
+      for (JsonNode item :
+          relay.body(relay.read(member, "/requests", Map.of("limit", "1000"))).path("items")) {
+        if (id.equals(item.path("id").asString())) {
+          return item;
+        }
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException("The own requests could not be read", e);
+    }
+    throw new IllegalStateException(id + " is not among the member's own requests");
   }
 
   /**

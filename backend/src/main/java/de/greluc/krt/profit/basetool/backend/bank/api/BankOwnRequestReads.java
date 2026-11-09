@@ -77,6 +77,8 @@ public interface BankOwnRequestReads {
    * @param requiredApprover who must approve before staff may confirm, or {@code null}
    * @param ownerApprovalGranted whether that approval was granted in the Basetool
    * @param rejectReason the staff's reason for a rejection, or {@code null}
+   * @param client the connected application that raised it, or {@code null} for one raised in the
+   *     Basetool
    * @param splitEnabled whether a deposit distributes {@code splitPercent} across squadron accounts
    * @param splitPercent the whole percent distributed, or {@code null} without a split
    */
@@ -96,6 +98,7 @@ public interface BankOwnRequestReads {
       @Nullable BankRequestApprover requiredApprover,
       boolean ownerApprovalGranted,
       @Nullable String rejectReason,
+      @Nullable String client,
       boolean splitEnabled,
       @Nullable BigDecimal splitPercent) {}
 

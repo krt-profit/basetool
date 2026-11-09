@@ -169,7 +169,7 @@ public class ExchangeBankRequestService {
         approver == null ? null : approver.name(),
         request.ownerApprovalGranted(),
         request.rejectReason(),
-        null,
+        request.client(),
         request.splitEnabled(),
         split == null ? null : split.intValueExact());
   }

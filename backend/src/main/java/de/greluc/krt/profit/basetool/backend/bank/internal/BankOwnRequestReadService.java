@@ -100,6 +100,7 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
         request.getRequiredApprover(),
         request.isOwnerApprovalGranted(),
         request.getRejectReason(),
+        request.getClientId(),
         request.isSplitEnabled(),
         request.getSplitPercent());
   }

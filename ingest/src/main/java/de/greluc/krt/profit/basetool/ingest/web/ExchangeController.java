@@ -222,7 +222,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "installation.schema.json",
         "/me/installation",
@@ -246,7 +247,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "account-check-request.schema.json",
         "/me/account-check",
@@ -270,7 +272,8 @@ public class ExchangeController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return relayBody(
+    return responses.body(
+        HttpMethod.POST,
         body,
         "resolve-request.schema.json",
         "/catalog/resolve",
@@ -787,7 +790,7 @@ public class ExchangeController {
       return responses.schemaInvalid(violations);
     }
     List<String> unknown = schemas.unknownFields(schema, body);
-    ResponseEntity<?> unreportable = unreportable(unknown);
+    ResponseEntity<?> unreportable = responses.unreportable(unknown);
     if (unreportable != null) {
       return unreportable;
     }
@@ -1015,66 +1018,6 @@ public class ExchangeController {
         .header(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds))
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(problem);
-  }
-
-  /**
-   * Checks a body, relays it and checks the answer.
-   *
-   * @param body the request body
-   * @param requestSchema the body's schema
-   * @param path the route below {@code /exchange/v1}
-   * @param responseSchema the answer's schema
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the answer or a problem
-   */
-  private @NotNull ResponseEntity<?> relayBody(
-      @NotNull JsonNode body,
-      @NotNull String requestSchema,
-      @NotNull String path,
-      @NotNull String responseSchema,
-      @NotNull HttpServletRequest request,
-      @Nullable String acceptLanguage) {
-    ExchangeRequestContext context = ExchangeRequestContext.of(request);
-    if (context == null) {
-      return responses.failed();
-    }
-    List<ExchangeSchemas.Violation> violations = schemas.validate(requestSchema, body);
-    if (!violations.isEmpty()) {
-      return responses.schemaInvalid(violations);
-    }
-    List<String> unknown = schemas.unknownFields(requestSchema, body);
-    ResponseEntity<?> unreportable = unreportable(unknown);
-    if (unreportable != null) {
-      return unreportable;
-    }
-    return responses.relayed(
-        relay.forward(HttpMethod.POST, BACKEND + path, body, context, acceptLanguage),
-        responseSchema,
-        unknown,
-        context,
-        request);
-  }
-
-  /**
-   * Refuses a body whose undeclared field could not be reported as a warning, because its JSON
-   * Pointer exceeds {@link ExchangeSchemas#MAX_POINTER} characters; checked before the relay, so a
-   * write the backend committed always gets an answer that matches its schema.
-   *
-   * @param unknown the request's undeclared fields
-   * @return {@code 400 SCHEMA_INVALID} naming the fields' parents, or {@code null} when every field
-   *     can be reported
-   */
-  private @Nullable ResponseEntity<?> unreportable(@NotNull List<String> unknown) {
-    List<ExchangeSchemas.Violation> violations =
-        unknown.stream()
-            .filter(pointer -> pointer.length() > ExchangeSchemas.MAX_POINTER)
-            .map(pointer ->
-                new ExchangeSchemas.Violation(
-                    ExchangeSchemas.reportable(pointer), "holds a property name too long"))
-            .distinct()
-            .toList();
-    return violations.isEmpty() ? null : responses.schemaInvalid(violations);
   }
 
   /**

@@ -52,7 +52,7 @@ class ExchangeRoutesContractTest {
       }
       for (Map.Entry<String, JsonNode> operation : path.getValue().properties()) {
         String method = operation.getKey().toUpperCase(Locale.ROOT);
-        if (!Set.of("GET", "POST").contains(method)) {
+        if (!Set.of("GET", "POST", "PUT").contains(method)) {
           continue;
         }
         documented.add(method + " " + path.getKey());
@@ -80,7 +80,7 @@ class ExchangeRoutesContractTest {
   }
 
   @Test
-  void theChangeAndDraftRoutesAreTheWrites() {
+  void theChangeDraftAndBankRequestRoutesAreTheWrites() {
     Set<String> writes = new TreeSet<>();
     for (ExchangeRoutes.Route route : ExchangeRoutes.ROUTES) {
       if (route.write()) {
@@ -89,6 +89,9 @@ class ExchangeRoutesContractTest {
     }
     assertThat(writes)
         .containsExactly(
+            "/exchange/v1/bank/requests",
+            "/exchange/v1/bank/requests/{id}",
+            "/exchange/v1/bank/requests/{id}/cancel",
             "/exchange/v1/me/blueprints/changes",
             "/exchange/v1/me/drafts/blueprints",
             "/exchange/v1/me/drafts/refinery-orders",

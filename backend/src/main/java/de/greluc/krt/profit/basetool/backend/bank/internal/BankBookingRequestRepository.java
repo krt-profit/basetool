@@ -53,6 +53,16 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   long countByStatus(BankBookingRequestStatus status);
 
   /**
+   * Counts one requester's requests in the given status, whichever channel raised them; the
+   * open-request cap of the exchange counts the {@code PENDING} ones (REQ-BXCH-004).
+   *
+   * @param requestedBy the requesting user's id
+   * @param status the lifecycle state to count
+   * @return the number of the requester's requests in that status
+   */
+  long countByRequestedByAndStatus(UUID requestedBy, BankBookingRequestStatus status);
+
+  /**
    * Finds the creation timestamp of the oldest booking request in the given status, for the "oldest
    * pending booking request age" gauge (REQ-OBS-011).
    *

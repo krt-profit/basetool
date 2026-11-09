@@ -43,17 +43,30 @@ import org.springframework.web.context.WebApplicationContext;
  * reduced to the request flag and the limit, and the bookings and balance series of an account as
  * its read-only drill-in, reduced to the status.
  *
+ * <p>The own-request writes answer every raise, correction and cancel case as the web recorded it
+ * (REQ-BXCH-004), with the cap lifted so the member's seeded requests do not hit it.
+ *
  * <p>Two deviations are expected and pinned: an administrator acts on the exchange only through
  * their bank roles, grants and memberships (REQ-XCH-009), so the matrix's administrator without
  * memberships sees nothing; and a closed account is hidden on the exchange like an unknown one.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.bank.exchange.open-request-cap=1000")
 @Transactional
 class BankExchangeParityTest {
 
   private static final Set<Operation> READS = Set.of(Operation.ORG_BALANCES, Operation.ORG_VIEW);
 
   private static final Pattern LISTED = Pattern.compile("([A-Z_]+)\\{([^ }]+) (limit=[^}]+)}");
+
+  private static final Set<Operation> WRITES =
+      Set.of(
+          Operation.RAISE_DEPOSIT,
+          Operation.RAISE_WITHDRAWAL,
+          Operation.RAISE_TRANSFER,
+          Operation.CORRECT_OWN,
+          Operation.CANCEL_OWN);
+
+  private static final Pattern ROUTED = Pattern.compile("^200 (approver=\\S+) limit=\\S+$");
 
   private static final String NOT_FOUND = "404 NOT_FOUND";
 
@@ -74,6 +87,48 @@ class BankExchangeParityTest {
       softly.assertThat(driver.run(c)).as(c.key()).isEqualTo(expected(c, recorded.get(c.key())));
     }
     softly.assertAll();
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(Actor.class)
+  void theExchangeRaisesCorrectsAndCancelsAsTheWeb(Actor actor) throws Exception {
+    Map<String, String> recorded = BankAccessOutcomes.recorded();
+    BankExchangeAccessDriver driver =
+        new BankExchangeAccessDriver(context, new BankAccessSeeder(context).seed());
+
+    SoftAssertions softly = new SoftAssertions();
+    for (Case c : BankAccessMatrix.casesOf(actor)) {
+      if (!WRITES.contains(c.operation()) || c.pin() != Pin.NONE) {
+        continue;
+      }
+      softly
+          .assertThat(driver.run(c))
+          .as(c.key())
+          .isEqualTo(expectedWrite(c, recorded.get(c.key())));
+    }
+    softly.assertAll();
+  }
+
+  /**
+   * The exchange outcome of a raise, correction or cancel, derived from the web's: a raise answers
+   * {@code 201}, a refused or closed account the shared {@code 404}, and the routing stays without
+   * the limit, which the exchange does not expose.
+   *
+   * @param c the case
+   * @param web the web's recorded outcome
+   * @return the expected exchange outcome
+   */
+  @NotNull
+  private static String expectedWrite(@NotNull Case c, @NotNull String web) {
+    if (web.startsWith("403") || web.equals("409 BANK_ACCOUNT_CLOSED")) {
+      return NOT_FOUND;
+    }
+    Matcher routed = ROUTED.matcher(web);
+    boolean raise = c.operation() != Operation.CORRECT_OWN && c.operation() != Operation.CANCEL_OWN;
+    if (routed.matches()) {
+      return (raise ? "201 " : "200 ") + routed.group(1);
+    }
+    return web;
   }
 
   /**

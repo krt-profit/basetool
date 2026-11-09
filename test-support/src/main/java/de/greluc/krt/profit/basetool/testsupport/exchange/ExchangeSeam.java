@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 23 relay operations on 22 backend paths, each with the gateway route that relays it, the
+   * The 26 relay operations on 24 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -245,7 +245,31 @@ public final class ExchangeSeam {
               "exchange.bank.read",
               true,
               null,
-              "page.schema.json#/$defs/bankRequestPage"));
+              "page.schema.json#/$defs/bankRequestPage"),
+          new RelayOperation(
+              "POST",
+              "/bank/requests",
+              "/bank/requests",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/raise",
+              "bank-request-write.schema.json#/$defs/written"),
+          new RelayOperation(
+              "PUT",
+              "/bank/requests/{id}",
+              "/bank/requests/{id}",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/correction",
+              "bank-request-write.schema.json#/$defs/written"),
+          new RelayOperation(
+              "POST",
+              "/bank/requests/{id}/cancel",
+              "/bank/requests/{id}/cancel",
+              "exchange.bank.request",
+              false,
+              "bank-request-write.schema.json#/$defs/cancel",
+              "bank-request-write.schema.json#/$defs/cancelled"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -308,7 +332,7 @@ public final class ExchangeSeam {
    * serves them yet; a client granted one is refused nothing and given nothing (REQ-BXCH-001).
    */
   public static final @Unmodifiable Set<String> UNROUTED_SCOPES =
-      Set.of("exchange.bank.request", "exchange.bank.queue");
+      Set.of("exchange.bank.queue");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
@@ -336,7 +360,12 @@ public final class ExchangeSeam {
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
           "CURSOR_EXPIRED",
-          "MASS_CHANGE_CONFIRMATION_REQUIRED");
+          "MASS_CHANGE_CONFIRMATION_REQUIRED",
+          "BANK_JUSTIFICATION_REQUIRED",
+          "BANK_SELF_TRANSFER",
+          "BANK_REQUEST_NOT_PENDING",
+          "BANK_REQUEST_ALREADY_APPROVED",
+          "BANK_OPEN_REQUEST_CAP");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =
@@ -344,7 +373,8 @@ public final class ExchangeSeam {
           "ACCESS_DENIED", "NOT_PERMITTED",
           "VALIDATION_FAILED", "SCHEMA_INVALID",
           "BAD_REQUEST", "SCHEMA_INVALID",
-          "OPTIMISTIC_LOCK", "VERSION_CONFLICT");
+          "OPTIMISTIC_LOCK", "VERSION_CONFLICT",
+          "CONSTRAINT_VIOLATION", "SCHEMA_INVALID");
 
   /** The Redis key the backend writes the registry mirror under by default. */
   public static final String REGISTRY_KEY = "exchange:registry";

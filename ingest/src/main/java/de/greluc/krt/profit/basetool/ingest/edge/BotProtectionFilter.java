@@ -31,6 +31,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +49,7 @@ import tools.jackson.databind.ObjectMapper;
  * Rejects bot, scanner and exploit-probe requests before Spring Security (REQ-INGEST-009).
  *
  * <p>In order: a query chunk with an empty parameter name gets 400; a method other than GET, POST,
- * HEAD or OPTIONS gets 405; a known scanner path prefix or a foreign file extension gets 404. On an
+ * HEAD or OPTIONS, and on an exchange path also PUT, gets 405; a known scanner path prefix or a foreign file extension gets 404. On an
  * exchange route every refusal is a problem with a registered code instead (REQ-XCH-025): {@code
  * 400 SCHEMA_INVALID} for the query, {@code 404 NOT_FOUND} for the rest. Matching is
  * case-insensitive, and only the bounded rule is counted on {@code basetool_bot_blocked_total}.
@@ -141,8 +142,15 @@ public class BotProtectionFilter extends OncePerRequestFilter {
           ".swp", ".env", ".ini", ".log", ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd", ".xml.gz",
           ".tar", ".tar.gz", ".zip", ".rar", ".7z");
 
-  /** HTTP methods the gateway answers; any other method gets 405. */
+  /** HTTP methods the gateway answers outside {@code /exchange}; any other method gets 405. */
   static final Set<String> ALLOWED_HTTP_METHODS = Set.of("GET", "POST", "HEAD", "OPTIONS");
+
+  /**
+   * HTTP methods that pass on an {@code /exchange} path: the others and {@code PUT}, which the bank
+   * request correction uses (REQ-BXCH-004); the exchange gate answers an unrouted method itself.
+   */
+  static final Set<String> EXCHANGE_HTTP_METHODS =
+      Set.of("GET", "POST", "PUT", "HEAD", "OPTIONS");
 
   /**
    * Actuator paths exempt from {@link #isBotPath(String)}, matched case-insensitively as the exact
@@ -180,7 +188,8 @@ public class BotProtectionFilter extends OncePerRequestFilter {
       return;
     }
 
-    if (!ALLOWED_HTTP_METHODS.contains(method.toUpperCase())) {
+    if (!(exchange ? EXCHANGE_HTTP_METHODS : ALLOWED_HTTP_METHODS)
+        .contains(method.toUpperCase(Locale.ROOT))) {
       log.debug("Blocked disallowed HTTP method: {} {}", method, uri);
       recordBlocked(MetricNames.BOT_RULE_METHOD);
       refuse(response, exchange, HttpServletResponse.SC_METHOD_NOT_ALLOWED);

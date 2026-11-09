@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -79,6 +80,7 @@ class BankPurposeBoundRequestServiceTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
+  @Mock private ClientDirectory clientDirectory;
   @Mock private BookingRequestPurposeObserver observer;
 
   private BankBookingRequestService service;
@@ -111,7 +113,8 @@ class BankPurposeBoundRequestServiceTest {
             userRepository,
             orgUnitMembershipQueryService,
             eventPublisher,
-            purposeObservers);
+            purposeObservers,
+            clientDirectory);
   }
 
   @BeforeEach
@@ -173,7 +176,8 @@ class BankPurposeBoundRequestServiceTest {
             null,
             null,
             null,
-            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId));
+            new BankPurpose(BankPurposeKind.PURCHASING_DEAL, dealId),
+            null);
 
     assertThat(dto.purposeKind()).isEqualTo(BankPurposeKind.PURCHASING_DEAL);
     assertThat(dto.purposeRef()).isEqualTo(dealId);

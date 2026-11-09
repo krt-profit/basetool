@@ -19,23 +19,35 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.contract.ExchangeSchemas;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 /**
- * The member's own bank booking requests on the gateway (REQ-BXCH-003): a snapshot and its change
- * feed, the paging checked before the relay and the answer against its schema after it. The bank
- * switch and the route scope are checked by the gate before a handler runs.
+ * The member's own bank booking requests on the gateway: a snapshot and its change feed
+ * (REQ-BXCH-003), and the writes that raise, correct and cancel them (REQ-BXCH-004). The paging or
+ * body is checked before the relay and the answer against its schema after it; the bank switch, the
+ * route scope, the idempotency key and the write quota are checked before a handler runs.
  */
 @RestController
 @RequestMapping(ExchangeBankRequestController.REQUESTS)
@@ -48,6 +60,9 @@ public class ExchangeBankRequestController {
 
   /** The request routes below the relay prefix. */
   private static final String BANK_REQUESTS = "/bank/requests";
+
+  /** The schema of the request writes' bodies and answers. */
+  private static final String WRITE_SCHEMA = "bank-request-write.schema.json#/$defs/";
 
   private final ExchangeRelayResponses responses;
 
@@ -75,5 +90,101 @@ public class ExchangeBankRequestController {
         limit,
         request,
         acceptLanguage);
+  }
+
+  /**
+   * Raises a booking request for the member (REQ-BXCH-004).
+   *
+   * @param body the request
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return {@code 201} with the request's id, status, version and amount, or a problem
+   */
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> raise(
+      @NotNull @RequestBody JsonNode body,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    return responses.body(
+        HttpMethod.POST,
+        body,
+        WRITE_SCHEMA + "raise",
+        BANK_REQUESTS,
+        WRITE_SCHEMA + "written",
+        HttpStatus.CREATED,
+        request,
+        acceptLanguage);
+  }
+
+  /**
+   * Corrects one of the member's pending requests (REQ-BXCH-004).
+   *
+   * @param id the request's id
+   * @param body the corrected values and the version
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the request's id, status, version and amount, or a problem
+   */
+  @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> correct(
+      @NotNull @PathVariable String id,
+      @NotNull @RequestBody JsonNode body,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    if (!ExchangeController.UUID_SHAPE.matcher(id).matches()) {
+      return malformedId();
+    }
+    return responses.body(
+        HttpMethod.PUT,
+        body,
+        WRITE_SCHEMA + "correction",
+        BANK_REQUESTS + "/" + id.toLowerCase(Locale.ROOT),
+        WRITE_SCHEMA + "written",
+        request,
+        acceptLanguage);
+  }
+
+  /**
+   * Cancels one of the member's pending requests (REQ-BXCH-004).
+   *
+   * @param id the request's id
+   * @param body the version
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the request's id, status and version, or a problem
+   */
+  @PostMapping(value = "/{id}/cancel", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("isAuthenticated()")
+  public @NotNull ResponseEntity<?> cancel(
+      @NotNull @PathVariable String id,
+      @NotNull @RequestBody JsonNode body,
+      @NotNull HttpServletRequest request,
+      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
+          String acceptLanguage) {
+    if (!ExchangeController.UUID_SHAPE.matcher(id).matches()) {
+      return malformedId();
+    }
+    return responses.body(
+        HttpMethod.POST,
+        body,
+        WRITE_SCHEMA + "cancel",
+        BANK_REQUESTS + "/" + id.toLowerCase(Locale.ROOT) + "/cancel",
+        WRITE_SCHEMA + "cancelled",
+        request,
+        acceptLanguage);
+  }
+
+  /**
+   * Refuses a request id that is not a UUID before the relay.
+   *
+   * @return {@code 400 SCHEMA_INVALID} at {@code /id}
+   */
+  private @NotNull ResponseEntity<?> malformedId() {
+    return responses.schemaInvalid(
+        List.of(new ExchangeSchemas.Violation("/id", "must be a request id")));
   }
 }

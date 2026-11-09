@@ -159,6 +159,14 @@ public final class BankConflictException extends DomainProblem {
   public static final String CODE_BANK_FEE_EXCEEDS_AMOUNT =
       BankProblemCode.BANK_FEE_EXCEEDS_AMOUNT.code();
 
+  /**
+   * A connected application raised a request for a member who already holds {@code
+   * app.bank.exchange.open-request-cap} pending requests, whichever channel raised them
+   * (REQ-BXCH-004).
+   */
+  public static final String CODE_BANK_OPEN_REQUEST_CAP =
+      BankProblemCode.BANK_OPEN_REQUEST_CAP.code();
+
   /** The stable machine-readable problem code, one of the {@code CODE_BANK_*} constants. */
   private final String code;
 

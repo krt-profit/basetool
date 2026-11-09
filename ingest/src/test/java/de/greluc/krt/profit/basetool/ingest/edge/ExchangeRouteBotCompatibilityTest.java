@@ -62,7 +62,7 @@ class ExchangeRouteBotCompatibilityTest {
           continue;
         }
         String upper = method.toUpperCase(Locale.ROOT);
-        assertThat(BotProtectionFilter.ALLOWED_HTTP_METHODS).as(upper + " " + uri).contains(upper);
+        assertThat(BotProtectionFilter.EXCHANGE_HTTP_METHODS).as(upper + " " + uri).contains(upper);
         assertThat(filter.isBotPath(uri)).as("prefix rule hits " + uri).isFalse();
         assertThat(filter.isBotFileExtension(uri)).as("suffix rule hits " + uri).isFalse();
         checked.add(upper + " " + uri);
