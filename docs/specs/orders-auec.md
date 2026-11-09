@@ -149,7 +149,13 @@ its applicable rate. The integration spec owns the KRT-funded holder-transfer ex
 - [ ] A rate change cannot alter an already submitted attempt or historical correction.
 - [ ] Reclassifying a participant by name or membership does not change a posted movement's purpose.
 
-**Enforced by:** Required future exact-fee, movement, permission, history and atomic rollback checks.
+**Shared prerequisite:** `admin.api.TransferFeePolicy` captures a normalized immutable
+`RateSnapshot` and calculates `feeOn(amount, basis)` without resolving current settings.
+`TransferFeePolicyTest` verifies exact whole-aUEC arithmetic and a restored basis after a
+configuration change. This supplies no per-operation user input or order-to-Bank dependency.
+
+**Enforced by:** Shared fee-policy checks above; order movement, submitted-term persistence,
+permission, history and atomic rollback checks remain required with their owning implementation.
 
 ### REQ-ORDERS-061 — Settlement reuses movements and explicit purpose changes
 

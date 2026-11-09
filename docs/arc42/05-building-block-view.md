@@ -1,6 +1,6 @@
 # 5. Building block view
 
-> **Approved planned architecture, not implemented:** The [JobOrder core](../specs/orders-core.md), [money-operation contracts](../specs/orders-auec.md) and [optional bank contracts](../specs/orders-auec-bank.md) add a narrow adapter in existing application composition, synchronous owning-domain APIs and a configuration-owned fee policy. They add no deployable service or module cycle. The building blocks below describe current implementation.
+> **Approved planned JobOrder architecture:** The [JobOrder core](../specs/orders-core.md), [money-operation contracts](../specs/orders-auec.md) and [optional bank contracts](../specs/orders-auec-bank.md) add a narrow adapter and synchronous owning-domain APIs in existing application composition. They use the implemented configuration-owned fee policy (`admin.api.TransferFeePolicy`, ADR-0358). The JobOrder additions remain pending; they add no deployable service or module cycle. The building blocks below describe current implementation.
 
 ## 5.1 Level 1 — the whitebox of the whole system
 
@@ -146,7 +146,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | Module | `api` | `internal` | `web` |
 | --- | --- | --- | --- |
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
-| `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records | `SystemSettingController`, `SystemController`, `PingResponse` |
+| `admin` | `SystemSettings` (setting read, system flag write), `TransferFeePolicy` with immutable `RateSnapshot` (ADR-0358) | `ConfiguredTransferFeePolicy` (one rate parser, explicit-basis whole-aUEC fees), `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records | `SystemSettingController`, `SystemController`, `PingResponse` |
 | `exchange` | `ActingMemberAuthorities`, `IngestGatewayProperties`, the problem codes and the two events | the relay services, gates, mirrors and feed readers, the 14 entities and 10 repositories, `ActingMemberFilter`, the change-source transaction manager, the sandbox guard, the retention tasks; the relay wire records in `internal.dto` | the eight relay controllers under `/api/v1/exchange`, the registry and bulk-undo administration, `ConnectedAppsController` |
 | `personalinventory` | — (publishes nothing; the account deletion reaches the module through its `UserErasureParticipant`) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository (with the selectable-location queries of REQ-P4K-039), `PersonalInventoryItemService`, the mapper and records, `PersonalInventoryLocationOption` | `PersonalInventoryController`, `AdminPersonalInventoryController` |
 | `navigation` | — (a leaf: publishes nothing, since the frontend reaches it over REST; the account deletion reaches the rows through the `app_user` cascade) | `NavigationPreferences` (the per-member root), the repository, `NavigationPreferencesService` and its transactional `Writer`, the metrics and gauge, the export section and merge participant, the request and response records | `NavigationPreferencesController` |

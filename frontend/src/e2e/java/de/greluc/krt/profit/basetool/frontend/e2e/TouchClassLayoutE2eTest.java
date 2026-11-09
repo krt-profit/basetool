@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
 import de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -250,11 +253,12 @@ class TouchClassLayoutE2eTest {
   private static Browser browser;
   private static Path storageState;
 
-  /**
-   * Launches the browser and captures one authenticated session reused across every measurement.
-   */
+  /** Seeds a starmap object for the managed stack and captures a reusable authenticated session. */
   @BeforeAll
   static void setUp() {
+    if (STACK.managesStack()) {
+      new BackendSeeder().createLocation(USERNAME, PASSWORD, "E2E Layout starmap unknown flags");
+    }
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     storageState =
@@ -333,6 +337,42 @@ class TouchClassLayoutE2eTest {
             + ARTIFACTS.toAbsolutePath()
             + System.lineSeparator()
             + String.join(System.lineSeparator(), findings));
+  }
+
+  /** Each starmap list stays busy until its current result renders or its read fails. */
+  @Test
+  void starmapListsAnnounceIndependentPendingReads() {
+    List<Route> objectReads = new ArrayList<>();
+    AtomicReference<Route> placeRead = new AtomicReference<>();
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState)
+                .setViewportSize(375, 812)
+                .setHasTouch(true)
+                .setIsMobile(ENGINE_SUPPORTS_IS_MOBILE))) {
+      context.route("**/admin/starmap/objects?*", objectReads::add);
+      context.route("**/admin/starmap/places/**", placeRead::set);
+      Page page = context.newPage();
+      E2eSupport.navigate(page, STACK.baseUrl() + "/admin/starmap");
+      page.waitForCondition(() -> !objectReads.isEmpty() && placeRead.get() != null);
+      assertThat(page.locator("#starmap-objects")).hasAttribute("aria-busy", "true");
+      assertThat(page.locator("#starmap-links")).hasAttribute("aria-busy", "true");
+
+      page.locator("#starmap-objects-query").fill("E2E Layout starmap unknown flags");
+      page.waitForCondition(() -> objectReads.size() == 2);
+      assertThat(page.locator("#starmap-objects")).hasAttribute("aria-busy", "true");
+      page.waitForResponse(
+          response -> response.url().contains("/admin/starmap/objects?"),
+          () -> objectReads.get(1).resume());
+      assertThat(page.locator("#starmap-objects")).hasAttribute("aria-busy", "false");
+      assertThat(page.locator("#starmap-links")).hasAttribute("aria-busy", "true");
+
+      placeRead.get().abort();
+      assertThat(page.locator("#starmap-links")).hasAttribute("aria-busy", "false");
+      assertThat(page.locator(".notification-toast.error-toast")).isVisible();
+    }
   }
 
   /**

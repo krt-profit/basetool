@@ -874,7 +874,8 @@ same-holder transfers are **fee-free**. The internal holder-to-holder Umbuchung 
 **bears the fee on the KRT (`CARTEL`) account** (REQ-BANK-031, #998): the source holder's custody is
 reduced by the fee and the fee is debited from the KRT account (a missing/closed KRT or a fee it
 cannot cover rejects the Umbuchung); a tiny amount whose fee rounds to 0 stays fee-free
-(REQ-BANK-033, ADR-0052). **All bank
+(REQ-BANK-033, ADR-0052). Bank staff select the supported fee mode; the centrally configured rate
+and calculated fee have no per-booking override (ADR-0358). **All bank
 employees and Bank Management members are
 automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses all
 bank roles, their role-driven holder is automatically deactivated (the remaining balance

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingOutcomeDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
@@ -28,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransactionDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferFeeRateDto;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferFeeService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransferRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankWithdrawalRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRequestService;
@@ -65,7 +65,7 @@ public class BankBookingController {
 
   private final BankLedgerService bankLedgerService;
   private final BankSecurityService bankSecurityService;
-  private final BankTransferFeeService bankTransferFeeService;
+  private final TransferFeePolicy transferFeePolicy;
   private final OrgUnitBankRequestService orgUnitBankRequestService;
   private final BankDirectBookingNotifier bankDirectBookingNotifier;
 
@@ -83,7 +83,7 @@ public class BankBookingController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public BankTransferFeeRateDto getTransferFeeRate() {
-    return new BankTransferFeeRateDto(bankTransferFeeService.resolveTransferFeeRate());
+    return new BankTransferFeeRateDto(transferFeePolicy.snapshot().rate());
   }
 
   /**

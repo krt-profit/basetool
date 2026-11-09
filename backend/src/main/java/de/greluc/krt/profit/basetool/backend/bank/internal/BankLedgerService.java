@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -71,7 +72,7 @@ public class BankLedgerService {
   private final BankPostingRepository postingRepository;
   private final BankHolderPostingRepository holderPostingRepository;
   private final BankAuditService bankAuditService;
-  private final BankTransferFeeService transferFeeService;
+  private final TransferFeePolicy transferFeePolicy;
   private final UserRepository userRepository;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final BankPostingWriter writer;
@@ -306,9 +307,8 @@ public class BankLedgerService {
             request.counterpartyExternalName(),
             request.counterpartyOrgUnitId());
 
-    BigDecimal fee = transferFeeService.feeOn(request.amount());
-    BigDecimal debit =
-        request.feeInclusive() ? request.amount() : transferFeeService.totalDebit(request.amount());
+    BigDecimal fee = transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot());
+    BigDecimal debit = request.feeInclusive() ? request.amount() : request.amount().add(fee);
     if (request.feeInclusive()) {
       guards.requireAmountExceedsFee(request.amount(), fee);
     }
@@ -390,7 +390,10 @@ public class BankLedgerService {
     guards.requireActiveHolder(destinationHolder);
 
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
-    BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
+    BigDecimal fee =
+        holderChanges
+            ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
+            : BigDecimal.ZERO;
     final boolean inclusive = request.feeInclusive() && holderChanges;
     BigDecimal debit = inclusive ? request.amount() : request.amount().add(fee);
     final BigDecimal credit = inclusive ? request.amount().subtract(fee) : request.amount();
@@ -457,7 +460,7 @@ public class BankLedgerService {
     BankHolder sourceHolder = writer.requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = writer.requireHolder(request.destinationHolderId());
 
-    BigDecimal fee = transferFeeService.feeOn(request.amount());
+    BigDecimal fee = transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot());
     BankAccount cartel = null;
     if (fee.signum() > 0) {
       UUID cartelId =
