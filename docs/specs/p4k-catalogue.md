@@ -810,6 +810,7 @@ and every value sent back to the server stay on `name`. Admin pages where an adm
 name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
 
 **Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `:frontend:testLocalisedNameJs`,
+`:frontend:testCatalogueAdminJs`,
 `ShipTypeMapperTest`, `ShipDataPageControllerMvcTest`, `ItemPickerLabelsTest`,
 `ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890
