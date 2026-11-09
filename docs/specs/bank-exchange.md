@@ -156,7 +156,8 @@ REQ-BANK-064, REQ-BANK-066, REQ-XCH-013 · **Issues:** #3118, #3157
 it — the web's requests too — as a snapshot followed by the change feed of REQ-XCH-013.
 
 - **Snapshot.** `cursor` + `limit` (1…1000, default 500), in request-id order; the last page hands
-  over a feed cursor at the position the snapshot was taken.
+  over a feed cursor at the position the snapshot was taken. The index
+  `(requested_by, id)` (V366) serves every page in that order without a sort.
 - **Feed.** A new `ExchangeResource` `BANK_REQUEST`, keyed by the requester, with the request id as
   its key. The `bank_booking_request` trigger sequences every insert, update and delete; a change
   of an account's number, name or owning unit, and of the owning unit's shorthand, re-announces the
@@ -183,6 +184,8 @@ it — the web's requests too — as a snapshot followed by the change feed of R
 - [x] The snapshot lists every own request, the web-raised ones too, with exactly the allow-listed
   fields, and no other member's; it pages with an opaque cursor that ends at the feed; a foreign
   cursor is `410` (`ExchangeBankRequestsTest`).
+- [x] A snapshot page is read in index order without a sort
+  (`BankOwnRequestKeysetPlanIntegrationTest`).
 - [x] A request raised, decided or removed after the snapshot follows in the feed, a removal as a
   tombstone; another member's request never does; a cursor past the horizon is `410`
   (`ExchangeBankRequestFeedTest`).
