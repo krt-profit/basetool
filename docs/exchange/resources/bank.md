@@ -71,7 +71,8 @@ No holders, custody, approval-limit tables or ceilings leave the Basetool.
 
 `GET /exchange/v1/bank/accounts/{id}/bookings` — the bookings of one account the member views,
 newest first, paged with `cursor` and `limit`. `from` and `to` (both optional, inclusive,
-`date-time`) bound the booking time; they are a query bound, not a feed.
+`date-time`) bound the booking time; they are a query bound, not a feed. A bound is an RFC 3339
+date-time whose UTC instant lies in the years 0000 to 9999; anything else is `400 SCHEMA_INVALID`.
 
 Each item is a [`bank-booking`](../schemas/), redacted as on the member's account page in the
 Basetool: no holder and no staff note.

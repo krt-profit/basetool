@@ -168,6 +168,19 @@ class ExchangeBankRouteTest {
   }
 
   @Test
+  void aBoundOutsideTheRfc3339YearsIsRefusedBeforeTheRelay() throws Exception {
+    call("/exchange/v1/bank/accounts/" + ACCOUNT + "/bookings?to=9999-12-31T23:00:00-05:00")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/to"));
+    call("/exchange/v1/bank/accounts/" + ACCOUNT + "/bookings?from=-0001-01-01T00:00:00Z")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].pointer").value("/from"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
   void theBalanceSeriesIsRelayedWithBothBounds() throws Exception {
     String target =
         BACKEND

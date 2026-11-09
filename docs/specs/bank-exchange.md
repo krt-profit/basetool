@@ -112,6 +112,9 @@ Money is a JSON integer of whole aUEC; the enumerations are UPPER_SNAKE. A page 
 A cursor the server did not issue, or an account cursor whose account the member no longer views,
 answers `410 CURSOR_EXPIRED`.
 
+A `from` or `to` is an RFC 3339 `date-time` whose UTC instant lies in the years 0000 to 9999; any
+other value, a signed or five-digit year included, answers `400 SCHEMA_INVALID` at the gateway.
+
 **The shared `404`.** An unknown account, an account the member may not view and a closed account
 answer the same `404 NOT_FOUND`, on the bookings and the balance series alike; the gateway passes
 it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` at the gateway.
@@ -129,6 +132,8 @@ it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` a
   schema and relayed by the gateway (`ExchangeBankReadsTest`, `ExchangeGoldenAnswerTest`).
 - [x] The balance series has one point per day and refuses a missing bound, an inverted period and
   more than 365 days (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
+- [x] A bound outside the four-digit years is refused before the relay (`BankQueryTest`,
+  `ExchangeBankRouteTest`).
 - [x] A hidden, a closed and an unknown account answer the same `404 NOT_FOUND`, counted
   (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
 - [x] Every answer validates against its published schema; the routes, schemas, fixtures and goldens
