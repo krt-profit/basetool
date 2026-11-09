@@ -419,7 +419,7 @@ public class ExchangeShipWriteService
         shipId == null
             ? Optional.empty()
             : changeRepository.findLatestForKey(
-                caller.member(), ExchangeResource.SHIP.name(), shipId.toString());
+                caller.member(), ExchangeFeedResource.SHIP.name(), shipId.toString());
     if (tombstone.isEmpty()) {
       return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
     }
@@ -470,7 +470,7 @@ public class ExchangeShipWriteService
           shipId != null
               && !shipRepository.existsById(shipId)
               && changeRepository
-                  .findLatestForKey(caller.member(), ExchangeResource.SHIP.name(), rawId)
+                  .findLatestForKey(caller.member(), ExchangeFeedResource.SHIP.name(), rawId)
                   .isPresent();
       return known
           ? ExchangeChangeSetAdapter.skip(UNCHANGED, null)

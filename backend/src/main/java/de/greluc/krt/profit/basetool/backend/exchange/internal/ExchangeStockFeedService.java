@@ -138,7 +138,7 @@ public class ExchangeStockFeedService {
   private @NotNull ExchangeStockPageDto feed(
       @NotNull UUID member, @NotNull ExchangeFeedPosition after, int size) {
     ExchangeFeedReader.Changes changes =
-        feedReader.changes(member, ExchangeResource.STOCK, after, size);
+        feedReader.changes(member, ExchangeFeedResource.STOCK, after, size);
     Map<String, ExchangeStockLotRow> current =
         changes.keys().isEmpty()
             ? Map.of()

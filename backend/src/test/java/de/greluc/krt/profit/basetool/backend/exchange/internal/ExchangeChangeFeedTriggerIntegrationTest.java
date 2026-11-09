@@ -113,7 +113,7 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .singleElement()
         .satisfies(c -> {
-          assertThat(c.getResource()).isEqualTo(ExchangeResource.BLUEPRINT);
+          assertThat(c.getResource()).isEqualTo(ExchangeFeedResource.BLUEPRINT);
           assertThat(c.getEntityKey()).isEqualTo("laser rifle");
           assertThat(c.getSourceChannel()).isEqualTo("system");
           assertThat(c.getSourceClient()).isNull();
@@ -213,10 +213,10 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.STOCK, lot));
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot),
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.STOCK, lot));
   }
 
   @Test
@@ -311,7 +311,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
 
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
-        .containsOnly(org.assertj.core.groups.Tuple.tuple(ExchangeResource.SHIP, ship.toString()))
+        .containsOnly(
+            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.SHIP, ship.toString()))
         .hasSize(2);
     assertThat(changes(bob)).extracting(ExchangeChange::getEntityKey).contains(ship.toString());
   }
@@ -726,9 +727,12 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.BANK_REQUEST, request.toString()),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.BANK_REQUEST, request.toString()),
-            org.assertj.core.groups.Tuple.tuple(ExchangeResource.BANK_REQUEST, request.toString()));
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()),
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()),
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.BANK_REQUEST, request.toString()));
     assertThat(changes(bob)).isEmpty();
   }
 
@@ -742,7 +746,7 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .singleElement()
         .satisfies(c -> {
-          assertThat(c.getResource()).isEqualTo(ExchangeResource.BANK_REQUEST);
+          assertThat(c.getResource()).isEqualTo(ExchangeFeedResource.BANK_REQUEST);
           assertThat(c.getSourceChannel()).isEqualTo("client");
           assertThat(c.getSourceClient()).isEqualTo("versekit");
         });

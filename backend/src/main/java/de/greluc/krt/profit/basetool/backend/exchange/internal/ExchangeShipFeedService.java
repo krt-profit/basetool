@@ -145,7 +145,7 @@ public class ExchangeShipFeedService {
       @NotNull ExchangeCaller caller, @NotNull ExchangeFeedPosition after, int size) {
     UUID member = caller.member();
     ExchangeFeedReader.Changes changes =
-        feedReader.changes(member, ExchangeResource.SHIP, after, size);
+        feedReader.changes(member, ExchangeFeedResource.SHIP, after, size);
     Map<String, ExchangeShipRow> current =
         changes.keys().isEmpty()
             ? Map.of()

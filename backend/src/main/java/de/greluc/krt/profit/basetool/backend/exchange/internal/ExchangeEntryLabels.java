@@ -104,8 +104,6 @@ public class ExchangeEntryLabels {
             }
           }
         }
-        case BANK_REQUEST ->
-            throw new IllegalStateException("The bank writes no exchange journal entry");
         case null -> throw new NullPointerException("resource");
       }
     }

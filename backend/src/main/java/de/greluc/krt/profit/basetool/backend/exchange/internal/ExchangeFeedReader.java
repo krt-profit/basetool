@@ -102,7 +102,7 @@ public class ExchangeFeedReader {
    */
   public @NotNull Changes changes(
       @NotNull UUID member,
-      @NotNull ExchangeResource resource,
+      @NotNull ExchangeFeedResource resource,
       @NotNull ExchangeFeedPosition after,
       int size) {
     long watermark = changeRepository.watermark();
