@@ -513,9 +513,10 @@ def selftest() -> int:
 
         broken = copy.deepcopy(realm)
         offline = next(u for u in broken["users"] if u["username"] == target.offline_users[0])
-        offline["realmRoles"] = ["KRT Member"]
+        offline["realmRoles"] = []
         expect(f"{prefix} a device-grant account without the default roles is caught",
-               caught(broken))
+               problems(broken, provisioner, target)
+               == [f"user {offline['username']} lacks the default roles, so no offline token"])
 
         broken = copy.deepcopy(realm)
         broken["users"] = [u for u in broken["users"]
