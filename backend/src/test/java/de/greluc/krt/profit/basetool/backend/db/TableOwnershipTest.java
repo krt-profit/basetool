@@ -198,10 +198,29 @@ class TableOwnershipTest {
           Map.entry(
               "trg_org_unit_exchange_change",
               new Crossing(
-                  Set.of("exchange_change", "app_user", "ship", "inventory_item"),
-                  "V293/V296 change feed: a renamed unit re-announces its ships and the lots of its"
-                      + " pool, read from ship and inventory_item, so a client never keeps a stale"
-                      + " unit (REQ-XCH-017, REQ-XCH-042).")),
+                  Set.of(
+                      "exchange_change",
+                      "app_user",
+                      "ship",
+                      "inventory_item",
+                      "bank_account",
+                      "bank_booking_request"),
+                  "V293/V296/V365 change feed: a renamed unit re-announces its ships, the lots of"
+                      + " its pool and the booking requests on its bank accounts, read from ship,"
+                      + " inventory_item and bank_booking_request, so a client never keeps a stale"
+                      + " unit (REQ-XCH-017, REQ-XCH-042, REQ-BXCH-003).")),
+          Map.entry(
+              "trg_bank_booking_request_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user"),
+                  "V365 BANK_REQUEST feed: every write of a booking request is sequenced in its"
+                      + " requester's feed (REQ-BXCH-003).")),
+          Map.entry(
+              "trg_bank_account_exchange_change",
+              new Crossing(
+                  Set.of("exchange_change", "app_user"),
+                  "V365 BANK_REQUEST feed: a renumbered, renamed or re-homed account re-announces"
+                      + " the booking requests on and to it (REQ-BXCH-003).")),
           Map.entry("trg_location_exchange_change", locationReannouncement("place")),
           Map.entry("trg_city_exchange_change", locationReannouncement("city")),
           Map.entry("trg_space_station_exchange_change", locationReannouncement("space station")),
