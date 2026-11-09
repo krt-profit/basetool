@@ -59,7 +59,7 @@ public class ExchangeBankQueueService {
   /** The Basetool page of one request; the request id follows. */
   static final String LINK_PREFIX = "https://profit-base.online/bank/requests/";
 
-  private final BankActors bankActors;
+  private final ExchangeBankActors bankActors;
   private final BankStaffQueueReads queueReads;
   private final ExchangeNameWithholdings nameWithholdings;
   private final ExchangeBankMetrics metrics;
@@ -86,11 +86,7 @@ public class ExchangeBankQueueService {
             : BankExchangeCursor.parseQueue(cursor);
     BankStaffQueueReads.Snapshot snapshot =
         queueReads
-            .snapshot(
-                bankActors.forExchange(caller.member()),
-                position.open(),
-                position.toApprove(),
-                pageSize(limit))
+            .snapshot(bankActors.of(caller), position.open(), position.toApprove(), pageSize(limit))
             .orElseThrow(this::notBankStaff);
     Set<UUID> withheld =
         nameWithholdings.withholding(
@@ -171,7 +167,7 @@ public class ExchangeBankQueueService {
     return new ExchangeBankQueueItemDto(
         item.requestId(),
         item.type().name(),
-        ExchangeBankReadService.whole(item.amount()),
+        ExchangeAmounts.whole(item.amount()),
         item.createdAt(),
         Math.max(0, Duration.between(item.createdAt(), now).toHours()),
         new ExchangeBankQueueItemDto.Account(
@@ -184,7 +180,7 @@ public class ExchangeBankQueueService {
         approver == null ? null : approver.name(),
         item.ownerApprovalGranted(),
         item.mayConfirm(),
-        ExchangeBankReadService.wholeOrNull(item.accountBalance()),
+        ExchangeAmounts.wholeOrNull(item.accountBalance()),
         item.client(),
         LINK_PREFIX + item.requestId());
   }

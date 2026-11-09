@@ -713,9 +713,9 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.DEPOSIT, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
-    BankBookingRequestDto dto = service.cancelOwn(requestId, 0L);
+    BankBookingRequestDto dto = service.cancelOwn(actor, requestId, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CANCELLED);
     verify(bankAuditService)
@@ -750,9 +750,9 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(UUID.randomUUID()).build());
+    BankActor actor = TestBankActor.of(UUID.randomUUID()).build();
 
-    assertThrows(NotFoundException.class, () -> service.cancelOwn(requestId, 0L));
+    assertThrows(NotFoundException.class, () -> service.cancelOwn(actor, requestId, 0L));
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
   }
 
@@ -765,10 +765,10 @@ class BankBookingRequestServiceTest {
             requestId, account(UUID.randomUUID()), BankBookingRequestType.DEPOSIT, requester, 1L);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     BankConflictException ex =
-        assertThrows(BankConflictException.class, () -> service.cancelOwn(requestId, 1L));
+        assertThrows(BankConflictException.class, () -> service.cancelOwn(actor, requestId, 1L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
   }
 
@@ -785,9 +785,10 @@ class BankBookingRequestServiceTest {
     BankBookingRequest request =
         pending(requestId, account(accountId), BankBookingRequestType.WITHDRAWAL, requester, 0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     service.updateOwn(
+        actor,
         requestId,
         new UpdateBankBookingRequest(
             new BigDecimal("900"), "corrected note", "corrected reason", null, null, null, 0L),
@@ -842,9 +843,10 @@ class BankBookingRequestServiceTest {
     request.setRequiresOwnerApproval(false);
     request.setApplicableLimit(new BigDecimal("1000"));
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     service.updateOwn(
+        actor,
         requestId,
         new UpdateBankBookingRequest(new BigDecimal("5000"), null, "reason", null, null, null, 0L),
         true,
@@ -870,13 +872,14 @@ class BankBookingRequestServiceTest {
     request.setRequiresOwnerApproval(true);
     request.setOwnerApprovalGranted(true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     BankConflictException conflict =
         assertThrows(
             BankConflictException.class,
             () ->
                 service.updateOwn(
+                    actor,
                     requestId,
                     new UpdateBankBookingRequest(
                         new BigDecimal("999999"), null, "reason", null, null, null, 0L),
@@ -901,12 +904,13 @@ class BankBookingRequestServiceTest {
             UUID.randomUUID(),
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(UUID.randomUUID()).build());
+    BankActor actor = TestBankActor.of(UUID.randomUUID()).build();
 
     assertThrows(
         NotFoundException.class,
         () ->
             service.updateOwn(
+                actor,
                 requestId,
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, "reason", null, null, null, 0L),
@@ -929,13 +933,14 @@ class BankBookingRequestServiceTest {
             0L);
     request.setStatus(BankBookingRequestStatus.CONFIRMED);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     BankConflictException conflict =
         assertThrows(
             BankConflictException.class,
             () ->
                 service.updateOwn(
+                    actor,
                     requestId,
                     new UpdateBankBookingRequest(
                         new BigDecimal("900"), null, "reason", null, null, null, 0L),
@@ -959,12 +964,13 @@ class BankBookingRequestServiceTest {
             requester,
             3L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () ->
             service.updateOwn(
+                actor,
                 requestId,
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, "reason", null, null, null, 1L),
@@ -989,12 +995,13 @@ class BankBookingRequestServiceTest {
             requester,
             0L);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    callerIs(TestBankActor.of(requester).build());
+    BankActor actor = TestBankActor.of(requester).build();
 
     assertThrows(
         BankConflictException.class,
         () ->
             service.updateOwn(
+                actor,
                 requestId,
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, null, null, null, null, 0L),

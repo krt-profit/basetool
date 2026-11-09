@@ -127,6 +127,69 @@ public final class BankAccessPolicyFixtures {
     }
   }
 
+  /** An own-request writer whose correction reaches the security context two calls away. */
+  @RequiredArgsConstructor
+  public static final class PlantedOwnRequestWriter {
+
+    /** The request service the writer delegates to. */
+    private final PlantedRequestService requests;
+
+    /**
+     * Corrects through the service's context-reading path.
+     *
+     * @return whether a caller is bound
+     */
+    public boolean correct() {
+      return requests.updateOwn();
+    }
+
+    /**
+     * Cancels through the service's explicit-actor path.
+     *
+     * @param actor the requester
+     * @return whether the actor names a member
+     */
+    public boolean cancel(BankActor actor) {
+      return requests.cancelOwn(actor);
+    }
+  }
+
+  /** The request service the planted writer calls. */
+  @RequiredArgsConstructor
+  public static final class PlantedRequestService {
+
+    /** The identity read. */
+    private final AuthHelperService authHelperService;
+
+    /**
+     * Reads who calls from the security context.
+     *
+     * @return whether a caller is bound
+     */
+    public boolean updateOwn() {
+      return authHelperService.currentUserId().isPresent();
+    }
+
+    /**
+     * Decides for the given actor.
+     *
+     * @param actor the requester
+     * @return whether the actor names a member
+     */
+    public boolean cancelOwn(BankActor actor) {
+      return actor.userId() != null;
+    }
+
+    /**
+     * Reads who calls; no exchange path reaches it.
+     *
+     * @return whether a caller is bound
+     */
+    public boolean webOnly() {
+      return authHelperService.currentUserId().isPresent();
+    }
+  }
+
   /** A bank adapter that only reads who calls and the pin, which the rules allow. */
   @RequiredArgsConstructor
   public static final class PlantedAdapter {

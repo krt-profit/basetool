@@ -142,6 +142,12 @@
           "items": {
             "$ref": "bank-request.schema.json"
           }
+        },
+        "openRequestCap": {
+          "description": "The most pending requests the member may hold; once the PENDING items reach it, the next raise answers 409 BANK_OPEN_REQUEST_CAP. Every page from the server carries it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       }
     }

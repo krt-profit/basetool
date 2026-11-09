@@ -371,6 +371,7 @@ public class OrgUnitBankRequestService {
     }
     BankAdmission.Admitted routing = policy.route(actor, existing.getAccount(), request.amount());
     return bankBookingRequestService.updateOwn(
+        actor,
         requestId,
         request,
         routing.requiresApproval(),
@@ -417,7 +418,7 @@ public class OrgUnitBankRequestService {
    */
   @NotNull
   public BankBookingRequestDto cancelOwnBookingRequest(@NotNull UUID requestId, long version) {
-    return bankBookingRequestService.cancelOwn(requestId, version);
+    return bankBookingRequestService.cancelOwn(accessService.actor(), requestId, version);
   }
 
   /**

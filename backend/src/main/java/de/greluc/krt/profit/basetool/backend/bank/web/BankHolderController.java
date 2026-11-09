@@ -92,7 +92,7 @@ public class BankHolderController {
    */
   @Operation(summary = "Read one bank holder incl. global custody total")
   @GetMapping("/{id}")
-  @PreAuthorize("@bankSecurityService.canSeeHolder(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSeeHolder(#id)")
   @Transactional(readOnly = true)
   public BankHolderDto getHolder(@PathVariable @NotNull UUID id) {
     return bankHolderService.getHolder(id);
@@ -112,7 +112,7 @@ public class BankHolderController {
    */
   @Operation(summary = "List the custody history of a bank holder (paged)")
   @GetMapping("/{id}/transactions")
-  @PreAuthorize("@bankSecurityService.canSeeHolder(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSeeHolder(#id)")
   @Transactional(readOnly = true)
   public PageResponse<BankHolderBookingDto> getHolderBookings(
       @PathVariable @NotNull UUID id,

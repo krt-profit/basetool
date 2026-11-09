@@ -44,7 +44,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -98,7 +97,7 @@ public class BankBookingController {
   @PreAuthorize(
       "hasRole('"
           + Roles.BANK_EMPLOYEE
-          + "') and @bankSecurityService.canDeposit(#request.accountId, authentication)")
+          + "') and @bankSecurityService.canDeposit(#request.accountId)")
   @Transactional
   @ResponseStatus(HttpStatus.CREATED)
   public BankTransactionDto bookDeposit(@RequestBody @Valid BankDepositRequest request) {
@@ -124,7 +123,7 @@ public class BankBookingController {
   @PreAuthorize(
       "hasRole('"
           + Roles.BANK_EMPLOYEE
-          + "') and @bankSecurityService.canWithdraw(#request.accountId, authentication)")
+          + "') and @bankSecurityService.canWithdraw(#request.accountId)")
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookWithdrawal(
       @RequestBody @Valid BankWithdrawalRequest request) {
@@ -151,7 +150,6 @@ public class BankBookingController {
    * and handed to the service.
    *
    * @param request validated transfer payload
-   * @param authentication the caller's authentication (for the destination-visibility check)
    * @return acknowledgement of the created transaction
    */
   @Operation(
@@ -166,10 +164,10 @@ public class BankBookingController {
   @PreAuthorize(
       "hasRole('"
           + Roles.BANK_EMPLOYEE
-          + "') and @bankSecurityService.canTransfer(#request.sourceAccountId, authentication)")
+          + "') and @bankSecurityService.canTransfer(#request.sourceAccountId)")
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookTransfer(
-      @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
+      @RequestBody @Valid BankTransferRequest request) {
     if (bankSecurityService.exceedsCartelDirectBookingCeiling(
         request.sourceAccountId(), request.amount())) {
       BankBookingRequestDto raised =
@@ -182,8 +180,7 @@ public class BankBookingController {
               request.destinationAccountId());
       return ResponseEntity.accepted().body(BankBookingOutcomeDto.requestRaised(raised));
     }
-    boolean destinationVisible =
-        bankSecurityService.canSee(request.destinationAccountId(), authentication);
+    boolean destinationVisible = bankSecurityService.canSee(request.destinationAccountId());
     BankTransactionDto booked = bankLedgerService.bookTransfer(request, destinationVisible);
     bankDirectBookingNotifier.transferBooked(request, booked);
     return ResponseEntity.status(HttpStatus.CREATED).body(BankBookingOutcomeDto.booked(booked));

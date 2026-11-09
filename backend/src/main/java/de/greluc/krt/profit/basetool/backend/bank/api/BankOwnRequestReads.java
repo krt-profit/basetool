@@ -60,6 +60,14 @@ public interface BankOwnRequestReads {
   List<OwnRequest> ownRequestsByIds(@NotNull UUID requester, @NotNull Collection<UUID> ids);
 
   /**
+   * The most pending requests a member may hold before a connected application's next raise is
+   * refused (REQ-BXCH-004), so a client can tell the member before raising one.
+   *
+   * @return the configured {@code app.bank.exchange.open-request-cap}, at least 1
+   */
+  int openRequestCap();
+
+  /**
    * One of the member's requests.
    *
    * @param id the request

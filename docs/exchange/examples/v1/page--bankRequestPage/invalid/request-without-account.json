@@ -22,5 +22,6 @@
   ],
   "removed": [],
   "nextCursor": "f1.2245871.0",
-  "hasMore": false
+  "hasMore": false,
+  "openRequestCap": 20
 }

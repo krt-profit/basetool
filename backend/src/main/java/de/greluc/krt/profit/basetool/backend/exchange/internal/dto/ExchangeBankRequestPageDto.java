@@ -31,9 +31,12 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param removed the tombstones of requests that no longer exist
  * @param nextCursor the cursor of the next snapshot page or of the feed
  * @param hasMore whether a further page follows now
+ * @param openRequestCap the most pending requests the member may hold before a client's next raise
+ *     is refused; the client counts the pending ones among the items
  */
 public record ExchangeBankRequestPageDto(
     @NotNull @Unmodifiable List<ExchangeBankRequestDto> items,
     @NotNull @Unmodifiable List<ExchangeTombstoneDto> removed,
     @NotNull String nextCursor,
-    boolean hasMore) {}
+    boolean hasMore,
+    int openRequestCap) {}

@@ -2003,6 +2003,7 @@ class OrgUnitBankAccessServiceTest {
 
     verify(bankBookingRequestService)
         .updateOwn(
+            any(),
             eq(requestId),
             eq(update),
             eq(true),
@@ -2038,7 +2039,8 @@ class OrgUnitBankAccessServiceTest {
     requestService.updateOwnBookingRequest(requestId, update);
 
     verify(bankBookingRequestService)
-        .updateOwn(eq(requestId), eq(update), eq(false), eq(new BigDecimal("1000")), isNull());
+        .updateOwn(
+            any(), eq(requestId), eq(update), eq(false), eq(new BigDecimal("1000")), isNull());
   }
 
   /**
@@ -2064,7 +2066,8 @@ class OrgUnitBankAccessServiceTest {
                 requestId,
                 new UpdateBankBookingRequest(
                     new BigDecimal("900"), null, "reason", null, null, null, 0L)));
-    verify(bankBookingRequestService, never()).updateOwn(any(), any(), anyBoolean(), any(), any());
+    verify(bankBookingRequestService, never())
+        .updateOwn(any(), any(), any(), anyBoolean(), any(), any());
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
@@ -2281,10 +2284,12 @@ class OrgUnitBankAccessServiceTest {
   @Test
   void cancelOwnBookingRequest_delegatesWithTheEchoedVersion() {
     UUID requestId = UUID.randomUUID();
+    BankActor requester = TestBankActor.of(UUID.randomUUID()).build();
+    actingAs(requester);
 
     requestService.cancelOwnBookingRequest(requestId, 4L);
 
-    verify(bankBookingRequestService).cancelOwn(requestId, 4L);
+    verify(bankBookingRequestService).cancelOwn(requester, requestId, 4L);
   }
 
   @Test

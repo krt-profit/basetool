@@ -478,7 +478,7 @@ class TenancyGuardTest {
     assertThat(gate.isScopeGated("hasRole('ADMIN') or isAuthenticated()")).isFalse();
     assertThat(gate.isScopeGated("isAuthenticated() or @accessGateService.canEditShip(#id)"))
         .isFalse();
-    assertThat(gate.isScopeGated("@bankSecurityService.canSee(#id, authentication)")).isFalse();
+    assertThat(gate.isScopeGated("@bankSecurityService.canSee(#id)")).isFalse();
     assertThat(gate.isScopeGated("hasAnyRole('ADMIN', 'OFFICER')")).isFalse();
     assertThat(gate.isScopeGated("")).isFalse();
   }
