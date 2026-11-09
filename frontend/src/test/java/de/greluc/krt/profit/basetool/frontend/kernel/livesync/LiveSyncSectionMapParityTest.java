@@ -405,6 +405,31 @@ class LiveSyncSectionMapParityTest {
         .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.MEMBER.allowedSections());
   }
 
+  /**
+   * A role change reaches every surface that shows roles, from either side: the member page pokes
+   * the bank staff's grant and manage sections, and the bank grant management's role forms poke the
+   * member's room (REQ-SEC-088).
+   */
+  @Test
+  void roleChanges_reachTheBankStaffRoomAndTheMemberRoomFromEitherSide() throws IOException {
+    assertThat(readResource("/static/js/identity/member-roles.js"))
+        .contains("krtPageSections.publish('bank', ['grants', 'manage'])");
+    assertThat(LiveSyncTopicClass.BANK_STAFF.allowedSections()).contains("grants", "manage");
+
+    String grants = readResource("/templates/bank/bank-grants.html");
+    Matcher roleForms =
+        Pattern.compile(
+                "data-livesync=\"([^\"]*)\"\\s+data-endpoint=\"/api/proxy/users/\\{userId}/roles/")
+            .matcher(grants);
+    int forms = 0;
+    while (roleForms.find()) {
+      forms++;
+      assertThat(roleForms.group(1).split("\\s+"))
+          .containsExactlyInAnyOrder("bank/grants,manage", "member:@user/roles");
+    }
+    assertThat(forms).as("the assign and the withdraw form of Bank Employee").isEqualTo(2);
+  }
+
   @Test
   void adminCatalogueSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
     Set<String> jsKeys = new LinkedHashSet<>();

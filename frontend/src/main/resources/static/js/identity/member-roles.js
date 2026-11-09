@@ -81,7 +81,8 @@ function bindRoleToggles() {
     }
 
     /**
-     * Writes one toggle's change and announces it to the member's room.
+     * Writes one toggle's change and announces it to the member's room and to the bank staff's
+     * grant and manage sections, which list the bank roles and the members missing one.
      *
      * @param {HTMLInputElement} toggle the toggle the admin changed
      */
@@ -110,6 +111,7 @@ function bindRoleToggles() {
             onSuccess(body) {
                 apply(/** @type {MemberRoleSet | null} */ (body));
                 roles.notify('roles');
+                krtPageSections.publish('bank', ['grants', 'manage']);
             },
             onError: revert,
             onConflict: revert,
