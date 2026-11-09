@@ -37,7 +37,7 @@ public final class TestImages {
    * digest for the reader; the digest is what Docker resolves.
    */
   public static final String REDIS =
-      "redis:8-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537";
+      "redis:8-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80";
 
   /**
    * The production PostgreSQL image: the {@code 18-alpine} tag pinned to its multi-arch index

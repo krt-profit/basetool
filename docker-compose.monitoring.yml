@@ -179,7 +179,7 @@ services:
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
-    image: quay.io/prometheus/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
+    image: quay.io/prometheus/alertmanager:v0.35.0@sha256:5f6e66c01bd610aef6dd671642a52eee775fd3a89bd8788ebada33efaf373d10
     cap_drop: [ALL]
     environment:
       GOMEMLIMIT: "36MiB"
