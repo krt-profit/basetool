@@ -27,6 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -54,6 +56,7 @@ import de.greluc.krt.profit.basetool.ingest.store.ExchangeQuotas;
 import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -265,6 +268,34 @@ class ExchangeGateTest {
     call(HttpMethod.GET, "/exchange/v1/bankers")
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void anEncodedBankPathIsRefusedByTheBankSwitchBeforeItCountsAWrite() throws Exception {
+    bankRegistry(true, false);
+
+    call(HttpMethod.GET, "/exchange/v1/b%61nk/accounts")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("BANK_EXCHANGE_DISABLED"));
+    call(HttpMethod.POST, "/exchange/v1/%62ank/requests")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("BANK_EXCHANGE_DISABLED"));
+    call(HttpMethod.GET, "/exchange/v1/%62ank/no-such-route")
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("BANK_EXCHANGE_DISABLED"));
+
+    verify(quotas, never()).countWrite(anyString(), anyString());
+  }
+
+  @Test
+  void anEncodedBankPathWithoutARouteIsNotFoundWithoutCountingAWrite() throws Exception {
+    bankRegistry(true, true);
+
+    call(HttpMethod.POST, "/exchange/v1/%62ank/requests/x/y/z")
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+    verify(quotas, never()).countWrite(anyString(), anyString());
   }
 
   @Test
@@ -708,7 +739,7 @@ class ExchangeGateTest {
     String nonce =
         mockMvc
             .perform(
-                request(method, path)
+                request(method, URI.create(path))
                     .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
                     .header(
                         "DPoP", ExchangeTestSupport.proof(key, TOKEN, method.name(), path, null)))
@@ -716,7 +747,7 @@ class ExchangeGateTest {
             .getResponse()
             .getHeader(ExchangeTokenGateFilter.DPOP_NONCE_HEADER);
     return mockMvc.perform(
-        request(method, path)
+        request(method, URI.create(path))
             .header(HttpHeaders.AUTHORIZATION, "DPoP " + TOKEN)
             .header(HttpHeaders.USER_AGENT, USER_AGENT)
             .header("Idempotency-Key", "gate-" + UUID.randomUUID())

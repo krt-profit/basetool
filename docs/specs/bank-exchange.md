@@ -359,6 +359,12 @@ switch (REQ-XCH-003), with its own version counter `bank_version`, independent o
 `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`, whether a route serves it or not; with the
 switch on, a bank path no route serves is `404 NOT_FOUND`.
 
+- Membership is judged on the **decoded** path segments, as routing matches them, so a
+  percent-encoded spelling such as `/exchange/v1/b%61nk/accounts` is a bank path too; gateway and
+  backend judge it alike.
+- Both answers come before the daily write quota: a bank write the switch refuses, and a bank path
+  no route serves, count no write.
+
 - The global switch wins: while the exchange is off, a bank path answers `503 EXCHANGE_DISABLED`
   with `Retry-After: 30`.
 - The backend's exchange gate re-checks the switch for every path at or below
@@ -399,6 +405,8 @@ or closed account answers the same `404`.
 - [x] While it is off, every bank path answers `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`
   on the gateway and in the backend gate; the global switch wins; other routes and look-alike paths
   are untouched (ingest and backend `ExchangeGateTest`, `ExchangeRelayTest`).
+- [x] A percent-encoded bank path is a bank path on both sides, and neither it nor a bank path no
+  route serves counts a write (ingest `ExchangeGateTest`, `BankExchangeRoutesTest`).
 - [x] Every change is audited and notifies the admins and the Bankleitung
   (`ExchangeRegistryNoticeTest`, `SeededNotificationRulesIntegrationTest`).
 - [x] The open-request cap is 20 unless configured and refuses a value outside 1…1000
