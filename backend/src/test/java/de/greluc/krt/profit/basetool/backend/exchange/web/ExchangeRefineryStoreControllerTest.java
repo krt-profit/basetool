@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,6 +44,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
@@ -64,6 +69,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -96,6 +102,7 @@ class ExchangeRefineryStoreControllerTest {
   @Autowired private ExchangeHolderRefs holderRefs;
   @Autowired private ExchangeUndoService undoService;
   @Autowired private JdbcTemplate jdbc;
+  @MockitoSpyBean private LiveSyncPublisher publisher;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -375,6 +382,70 @@ class ExchangeRefineryStoreControllerTest {
     }
   }
 
+  @Test
+  void aPickupWithALineRefreshesTheOrdersStoreSectionAndAPlainOneOnlyTheOrder() throws Exception {
+    UUID stored = order("IN_PROGRESS");
+    UUID plain = order("IN_PROGRESS");
+
+    changes(
+            pickup(stored, line(refined, null))
+                + ",{\"op\": \"pickup\", \"id\": \""
+                + plain
+                + "\", \"versions\": {\"gameData\": 0}}")
+        .andExpect(jsonPath("$.applied").value(2));
+
+    verify(publisher)
+        .publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, stored), List.of("store"));
+    verify(publisher, never())
+        .publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, plain), List.of("store"));
+    verify(publisher)
+        .publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, plain), List.of("order"));
+  }
+
+  @Test
+  void aDryRunChecksAPickupsLinesAgainstTheGoodsAnEarlierCreateOfTheSetGivesTheOrder()
+      throws Exception {
+    String create =
+        "{\"op\": \"create\", \"clientKey\": \"s-1\", \"orgUnit\": {\"id\": \""
+            + unit
+            + "\"}, \"location\": {\"name\": \"ARC-L1 Refinery "
+            + refinery
+            + "\"}, \"status\": \"IN_PROGRESS\", \"goods\": [{\"input\": {\"bt\": \""
+            + ore
+            + "\"}, \"inputQuantity\": 600, \"outputQuantity\": 450, \"quality\": 500}]}";
+
+    changes(true, create + "," + pickupByKey("s-1", line(unrelated, null)))
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].index").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("MATERIAL_NOT_AN_OUTPUT"));
+    changes(true, create + "," + pickupByKey("s-1", line(refined, null)))
+        .andExpect(jsonPath("$.applied").value(2));
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM refinery_order WHERE owner_id = ?", Integer.class, member))
+        .isZero();
+    assertThat(stockOf(member)).isZero();
+  }
+
+  /**
+   * A pickup with store lines of the order a client key names, its counter echoed at 0.
+   *
+   * @param key the client key
+   * @param lines the lines, comma-separated
+   * @return the op
+   */
+  private static @NotNull String pickupByKey(@NotNull String key, @NotNull String lines) {
+    return "{\"op\": \"pickup\", \"clientKey\": \""
+        + key
+        + "\", \"versions\": {\"gameData\": 0}, \"lines\": ["
+        + lines
+        + "]}";
+  }
+
   /**
    * A pickup with store lines.
    *
@@ -476,8 +547,22 @@ class ExchangeRefineryStoreControllerTest {
    * @throws Exception if the request fails
    */
   private @NotNull ResultActions changes(@NotNull String ops) throws Exception {
+    return changes(false, ops);
+  }
+
+  /**
+   * Posts a change set with every refinery capability.
+   *
+   * @param dryRun whether only to decide
+   * @param ops the ops, comma-separated
+   * @return the result
+   * @throws Exception if the request fails
+   */
+  private @NotNull ResultActions changes(boolean dryRun, @NotNull String ops) throws Exception {
     return relayed(
-        post(CHANGES).contentType(MediaType.APPLICATION_JSON).content("{\"ops\": [" + ops + "]}"),
+        post(CHANGES)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"dryRun\": " + dryRun + ", \"ops\": [" + ops + "]}"),
         ALL);
   }
 

@@ -17,12 +17,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.refinery.internal;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
-/** Enumeration of Refinery Order Status values. */
+/** Where a refinery order stands in its run, as the web and the exchange read and write it. */
 public enum RefineryOrderStatus {
+  /** Entered, the run not yet started. */
   OPEN,
+  /** The run is going on. */
   IN_PROGRESS,
+  /** Picked up or stored. */
   COMPLETED,
+  /** Abandoned. */
   CANCELED
 }

@@ -21,9 +21,9 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderJournal.Good;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderJournal.State;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderState.Good;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,20 +31,20 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /** The refinery order's journal state survives the journal's JSON column (REQ-XCH-056). */
-class ExchangeRefineryOrderJournalStateTest {
+class ExchangeRefineryOrderStateTest {
 
   private final JsonMapper mapper = JsonMapper.builder().build();
 
   @Test
   void aStateReadsBackAsItWasWritten() {
-    State state =
-        new State(
+    ExchangeRefineryOrderState state =
+        new ExchangeRefineryOrderState(
             UUID.randomUUID(),
             "ARC-L1",
             UUID.randomUUID(),
             Instant.parse("2030-01-01T10:30:00Z"),
             90L,
-            "IN_PROGRESS",
+            RefineryOrderStatus.IN_PROGRESS,
             1250.5,
             null,
             400.0,
@@ -54,21 +54,23 @@ class ExchangeRefineryOrderJournalStateTest {
             false,
             null);
 
-    State read = State.read(mapper.readTree(mapper.writeValueAsString(state.toJournal())));
+    ExchangeRefineryOrderState read =
+        ExchangeRefineryOrderState.read(
+            mapper.readTree(mapper.writeValueAsString(state.toJournal())));
 
     assertThat(read).isEqualTo(state);
   }
 
   @Test
   void aDeletedOrdersStateKeepsItsMarkerUnitMissionAndPickup() {
-    State state =
-        new State(
+    ExchangeRefineryOrderState state =
+        new ExchangeRefineryOrderState(
                 UUID.randomUUID(),
                 "ARC-L1",
                 null,
                 null,
                 null,
-                "COMPLETED",
+                RefineryOrderStatus.COMPLETED,
                 null,
                 null,
                 null,
@@ -87,14 +89,18 @@ class ExchangeRefineryOrderJournalStateTest {
                     "vk-client",
                     null));
 
-    State read = State.read(mapper.readTree(mapper.writeValueAsString(state.toJournal())));
+    ExchangeRefineryOrderState read =
+        ExchangeRefineryOrderState.read(
+            mapper.readTree(mapper.writeValueAsString(state.toJournal())));
 
     assertThat(read).isEqualTo(state);
   }
 
   @Test
   void aStateWithoutItsCountersReadsAsNone() {
-    assertThat(State.read(mapper.readTree("{\"location\": \"" + UUID.randomUUID() + "\"}")))
+    assertThat(
+            ExchangeRefineryOrderState.read(
+                mapper.readTree("{\"location\": \"" + UUID.randomUUID() + "\"}")))
         .isNull();
   }
 }

@@ -276,7 +276,7 @@ public class ExchangeUndoService {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK, ORG_STOCK -> liveSync.stockChanged(false);
       case SHIP -> liveSync.hangarChanged(member);
-      case REFINERY_ORDER -> liveSync.refineryOrdersChanged(refineryOrders);
+      case REFINERY_ORDER -> refineryOrderJournal.announce(member, refineryOrders);
       case null -> throw new NullPointerException("resource");
     }
   }

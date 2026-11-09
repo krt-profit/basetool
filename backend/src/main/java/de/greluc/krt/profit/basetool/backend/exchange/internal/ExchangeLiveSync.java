@@ -57,6 +57,9 @@ public class ExchangeLiveSync {
   /** The section of a refinery order's detail room that holds the order's fields and goods. */
   static final String REFINERY_ORDER = "order";
 
+  /** The section of a refinery order's detail room that shows where its yield was stored. */
+  static final String REFINERY_STORE = "store";
+
   /** The section of a refinery order's detail room that announces the order's deletion. */
   static final String REFINERY_ORDER_DELETED = "deleted";
 
@@ -93,30 +96,26 @@ public class ExchangeLiveSync {
   }
 
   /**
-   * Refreshes the refinery-order list and the detail page of every written order after the commit
-   * (REQ-XCH-030, ADR-0351).
+   * Refreshes the refinery-order list after the commit, the detail page of every written order and
+   * the store part of every order a write stored, and tells the detail page of every removed order
+   * that it is gone (REQ-XCH-030, REQ-XCH-053, REQ-XCH-055).
    *
-   * @param orders the orders the write changed, created or removed
-   */
-  public void refineryOrdersChanged(@NotNull Collection<UUID> orders) {
-    refineryOrdersChanged(orders, List.of());
-  }
-
-  /**
-   * Refreshes the refinery-order list after the commit, the detail page of every written order, and
-   * tells the detail page of every deleted order that it is gone (REQ-XCH-030, REQ-XCH-055).
-   *
-   * @param orders the orders the write changed or created
-   * @param deleted the orders the write deleted
+   * @param orders the orders the write changed or created and kept
+   * @param stored the orders among them whose yield the write booked into stock
+   * @param deleted the orders the write removed
    */
   public void refineryOrdersChanged(
-      @NotNull Collection<UUID> orders, @NotNull Collection<UUID> deleted) {
+      @NotNull Collection<UUID> orders,
+      @NotNull Collection<UUID> stored,
+      @NotNull Collection<UUID> deleted) {
     if (orders.isEmpty() && deleted.isEmpty()) {
       return;
     }
     afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.REFINERY), REFINERY_QUEUE);
     orders.forEach(order ->
         afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER));
+    stored.forEach(order ->
+        afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_STORE));
     deleted.forEach(order ->
         afterCommit(
             LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER_DELETED));

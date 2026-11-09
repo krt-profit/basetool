@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * One refinery order as the exchange feed serves it, without its owner (REQ-XCH-051).
  *
  * @param id the order id, the feed key
- * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}
+ * @param status the status
  * @param gameDataVersion the counter of the game-data section (REQ-REFINERY-029)
  * @param financesVersion the counter of the finances section (REQ-REFINERY-029)
  * @param createdByClient the exchange client that created the order, or {@code null} when the web
@@ -51,7 +51,7 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 public record RefineryExchangeOrder(
     @NotNull UUID id,
-    @NotNull String status,
+    @NotNull RefineryOrderStatus status,
     long gameDataVersion,
     long financesVersion,
     @Nullable String createdByClient,

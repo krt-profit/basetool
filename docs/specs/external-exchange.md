@@ -3286,15 +3286,20 @@ is named by id only.
 `ExchangeRefineryOrderFeedService`, `RefineryExchangeReader`, `V370`, `V373` · **Status:**
 implemented — #3167 (scopes, triggers, read); `versions` carries the two section counters of
 #3165, `createdBy` and `pickedUpAt` the provenance of #3166, and `clientKey` the link table of
-#3168 (`exchange_refinery_order_link`, kept without a foreign key to the order so a tombstone still
-names it)
+#3168 (`exchange_refinery_order_link`, one row per order, kept without a foreign key to the order
+so a tombstone still names it; a later create that takes the key over retires the old row instead
+of removing it, `V377`)
 
 ### REQ-XCH-052 — A client writes the member's refinery orders in one change set
 
 `POST /exchange/v1/me/refinery-orders/changes` (`exchange.refinery.write`) applies a change set of
 1 to 500 ops with an `Idempotency-Key` (REQ-XCH-020) and an optional `dryRun`, through the shared
 runner (ADR-0285): the ops are decided in order, one result per op, with no shared rollback. A
-`dryRun` decides every op and writes nothing. The set counts **once** against the daily write quota
+`dryRun` decides every op exactly as the real run would and writes nothing: each op is decided
+against the order as the earlier ops of the set would leave it — its status, counters, goods and
+their outputs — so a cancel then a pickup, a second cancel or pickup, and a pickup's store lines on
+an order the set creates answer as they would for real. The set counts **once** against the daily
+write quota
 (REQ-XCH-023). Every write goes through the refinery module's own services, so its rules, its
 audit under the client (REQ-AUDIT-005) and its notices (REQ-REFINERY-023, -024) apply as in the
 web.
@@ -3306,8 +3311,10 @@ web.
   order of another owner, and a `clientKey` another client set, is unknown to the caller
   (`ORDER_UNKNOWN`).
 - **Client key.** A `create` carries a `clientKey` of at most 128 characters, unique per owner and
-  client. A `create` whose key already names an order of the member is refused `ALREADY_EXISTS`; its
-  result names the existing order's id, so the client adopts it, and nothing is overwritten.
+  client among the orders it names now. A `create` whose key already names an order of the member is
+  refused `ALREADY_EXISTS`; its result names the existing order's id, so the client adopts it, and
+  nothing is overwritten. A key whose order is gone may be used again: the new order takes it over,
+  and the removed order's tombstone keeps naming it (REQ-XCH-051).
 - **References.** The location, the refining method and a good's material are `ref`s resolved
   **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id or
   exact name, a method by its code or exact name, a material by `bt`, `scGuid`, `uexId` or exact
@@ -3363,19 +3370,25 @@ web.
   *`ExchangeRefineryOrderWriteControllerTest`.*
 - [x] `dryRun` decides every op and writes nothing; the set counts once against the quota.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`.*
+- [x] A `dryRun` answers a cancel then a pickup, a second cancel and a second pickup as the real run
+  does, and checks a pickup's store lines against the goods a create earlier in the set gives the
+  order. *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`.*
+- [x] A key a create takes over after a delete still names the deleted order's tombstone, and
+  addresses the new order. *`ExchangeRefineryOrderWriteControllerTest`.*
 
 The result lists each applied op in `orders` (index, `opId`, order id, created goods row ids,
 counters) and names the existing order of an `ALREADY_EXISTS` refusal in its `results` item's `id`;
 both are additive fields of `change-result.schema.json`. Each applied write publishes, after the
 commit, into the `refinery` room (section `queue`) and the order's `refinery-order` room (section
-`order`) (REQ-XCH-030).
+`order`; also `store` when a pickup booked the yield, and `deleted` when a delete or an undo removed
+the order) (REQ-XCH-030).
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
 `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
 `ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
-`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373` · **Status:** implemented for `create`,
-`update` and the goods ops — #3168, `cancel` and `delete` — #3169, and `pickup` without store
-lines — #3170
+`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V373`, `V377` · **Status:** implemented
+for `create`, `update` and the goods ops — #3168, `cancel` and `delete` — #3169, and `pickup`
+without store lines — #3170
 
 ### REQ-XCH-053 — A pickup closes an order and books stock only with store lines
 

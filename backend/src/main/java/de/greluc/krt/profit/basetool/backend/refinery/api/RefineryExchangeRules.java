@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.refinery.api;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * The rules a refinery order's location and goods follow in the web and in the exchange alike
- * (REQ-REFINERY-020, REQ-XCH-052).
+ * The rules a refinery order's location, goods and money fields follow in the web and in the
+ * exchange alike (REQ-REFINERY-020, REQ-XCH-052).
  */
 public final class RefineryExchangeRules {
 
@@ -57,6 +59,17 @@ public final class RefineryExchangeRules {
   public static boolean refinable(@NotNull Material material) {
     return material.getType() == MaterialType.RAW
         || Boolean.TRUE.equals(material.getIsManualRawMaterial());
+  }
+
+  /**
+   * The value a money field stores: 0 means none and is stored as {@code null}.
+   *
+   * @param value the requested value
+   * @return the value, or {@code null} for {@code null} and 0
+   */
+  @Contract("null -> null")
+  public static @Nullable Double money(@Nullable Double value) {
+    return value == null || value == 0.0 ? null : value;
   }
 
   /**

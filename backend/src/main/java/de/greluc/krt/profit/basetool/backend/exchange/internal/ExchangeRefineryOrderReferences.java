@@ -20,23 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Outcome;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatalogKind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet.Op;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,28 +55,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ExchangeRefineryOrderReferences {
 
-  /** The refusal of a place without a Lager location. */
-  static final String LOCATION_UNKNOWN = "LOCATION_UNKNOWN";
-
-  /** The refusal of a location the web's refinery picker does not offer. */
-  static final String NOT_A_REFINERY = "NOT_A_REFINERY";
-
-  /** The refusal of an input material that is neither raw nor manual-raw. */
-  static final String MATERIAL_NOT_RAW = "MATERIAL_NOT_RAW";
-
-  /** The refusal of an owning unit that is not one of the member's direct memberships. */
-  static final String NOT_A_MEMBER = "NOT_A_MEMBER";
-
-  /** The reason of a reference that names nothing. */
-  static final String UNMATCHED_REASON = "UNMATCHED";
-
-  /** The reason of a reference that names several entries. */
-  static final String AMBIGUOUS_REASON = "AMBIGUOUS";
-
-  private final ExchangeResolveService resolveService;
+  private final ExchangeRefineryMaterials materials;
   private final ExchangeLocationResolver locationResolver;
   private final RefiningMethodRepository refiningMethodRepository;
-  private final MaterialRepository materialRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final ExchangeRefineryStoreLines storeLines;
 
@@ -95,17 +72,17 @@ public class ExchangeRefineryOrderReferences {
    */
   public @NotNull @Unmodifiable List<Refs> resolve(
       @NotNull ExchangeCaller caller, @NotNull List<Op> ops) {
-    Map<ExchangeItemRef, Outcome> unresolved = new HashMap<>();
-    Map<ExchangeItemRef, UUID> materials = materials(ops, unresolved);
+    Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> inputs =
+        materials.resolve(ops.stream().flatMap(op -> inputs(op).stream()).toList());
     Set<UUID> memberships =
-        ops.stream().anyMatch(op -> ExchangeRefineryOrderChangeSet.CREATE.equals(op.op()))
+        ops.stream().anyMatch(op -> op.kind() == ExchangeRefineryOrderChangeSet.Kind.CREATE)
             ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
             : Set.of();
     List<ExchangeRefineryStoreLines.Lines> lines = storeLines.resolve(caller, ops);
     List<Refs> refs = new ArrayList<>(ops.size());
     for (int i = 0; i < ops.size(); i++) {
       ExchangeRefineryStoreLines.Lines opLines = lines.get(i);
-      Refs opRefs = refs(ops.get(i), materials, unresolved, memberships);
+      Refs opRefs = refs(ops.get(i), inputs, memberships);
       refs.add(
           opRefs.refusal() != null || opLines.refusal() == null
               ? opRefs.withLines(opLines.lines())
@@ -118,25 +95,23 @@ public class ExchangeRefineryOrderReferences {
    * Resolves one op's references.
    *
    * @param op the op
-   * @param materials the resolved input materials by reference
-   * @param unresolved the outcome of every reference that did not resolve to a refinable material
+   * @param resolved the input materials by reference
    * @param memberships the member's direct org-unit memberships, empty when no op creates
    * @return the references, or the refusal they lead to
    */
   private @NotNull Refs refs(
       @NotNull Op op,
-      @NotNull Map<ExchangeItemRef, UUID> materials,
-      @NotNull Map<ExchangeItemRef, Outcome> unresolved,
+      @NotNull Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> resolved,
       @NotNull Set<UUID> memberships) {
     UUID location = null;
     boolean offered = false;
     if (op.location() != null) {
       Optional<Location> found = locationResolver.resolve(op.location());
       if (found.isEmpty()) {
-        return Refs.refused(Outcome.rejected(LOCATION_UNKNOWN));
+        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.LOCATION_UNKNOWN));
       }
       if (!RefineryExchangeRules.hostsRefinery(found.get())) {
-        return Refs.refused(Outcome.rejected(NOT_A_REFINERY));
+        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.NOT_A_REFINERY));
       }
       location = found.get().getId();
       offered = OfferedLocations.isOffered(found.get());
@@ -150,64 +125,35 @@ public class ExchangeRefineryOrderReferences {
       method = match.id();
     }
     List<UUID> inputs = new ArrayList<>();
+    Map<UUID, UUID> outputs = new HashMap<>();
     for (ExchangeItemRef input : inputs(op)) {
-      Outcome refusal = unresolved.get(input);
-      if (refusal != null) {
-        return Refs.refused(refusal);
+      ExchangeRefineryMaterials.Resolved match = Objects.requireNonNull(resolved.get(input));
+      Material material = match.material();
+      if (material == null) {
+        return Refs.refused(Objects.requireNonNull(match.refusal()));
       }
-      inputs.add(Objects.requireNonNull(materials.get(input)));
+      if (!RefineryExchangeRules.refinable(material)) {
+        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.MATERIAL_NOT_RAW));
+      }
+      inputs.add(material.getId());
+      outputs.put(material.getId(), RefineryExchangeRules.output(material).getId());
     }
     UUID orgUnit = null;
     if (op.orgUnit() != null) {
-      orgUnit = parse(op.orgUnit().id());
+      orgUnit = ExchangeIds.parse(op.orgUnit().id());
       if (orgUnit == null || !memberships.contains(orgUnit)) {
-        return Refs.refused(Outcome.rejected(NOT_A_MEMBER));
+        return Refs.refused(Outcome.rejected(ExchangeRefineryReasons.NOT_A_MEMBER));
       }
     }
-    return new Refs(null, location, offered, method, orgUnit, List.copyOf(inputs), List.of());
-  }
-
-  /**
-   * Resolves every input material the ops name in one resolver call.
-   *
-   * @param ops the ops
-   * @param unresolved receives the outcome of every reference that names no refinable material
-   * @return the material of every reference that resolved to a refinable one
-   */
-  private @NotNull Map<ExchangeItemRef, UUID> materials(
-      @NotNull List<Op> ops, @NotNull Map<ExchangeItemRef, Outcome> unresolved) {
-    List<ExchangeItemRef> refs =
-        List.copyOf(new LinkedHashSet<>(ops.stream().flatMap(op -> inputs(op).stream()).toList()));
-    Map<ExchangeItemRef, UUID> resolved = new HashMap<>();
-    if (refs.isEmpty()) {
-      return resolved;
-    }
-    ExchangeResolveResponse response =
-        resolveService.resolve(new ExchangeResolveRequest(ExchangeCatalogKind.MATERIAL, refs));
-    for (ExchangeResolveResponse.Result result : response.results()) {
-      ExchangeItemRef ref = refs.get(result.index());
-      Outcome refusal =
-          switch (result.status()) {
-            case RESOLVED -> {
-              UUID id = UUID.fromString(Objects.requireNonNull(result.ref()).bt());
-              boolean refinable =
-                  materialRepository
-                      .findById(id)
-                      .filter(RefineryExchangeRules::refinable)
-                      .isPresent();
-              if (refinable) {
-                resolved.put(ref, id);
-              }
-              yield refinable ? null : Outcome.rejected(MATERIAL_NOT_RAW);
-            }
-            case AMBIGUOUS -> new Outcome(ExchangeOps.AMBIGUOUS, AMBIGUOUS_REASON);
-            case UNMATCHED -> new Outcome(ExchangeOps.UNMATCHED, UNMATCHED_REASON);
-          };
-      if (refusal != null) {
-        unresolved.put(ref, refusal);
-      }
-    }
-    return resolved;
+    return new Refs(
+        null,
+        location,
+        offered,
+        method,
+        orgUnit,
+        List.copyOf(inputs),
+        Map.copyOf(outputs),
+        List.of());
   }
 
   /**
@@ -220,7 +166,8 @@ public class ExchangeRefineryOrderReferences {
     if (ref.code() != null) {
       List<RefiningMethod> byCode = refiningMethodRepository.findAllByCode(ref.code());
       if (byCode.size() > 1) {
-        return new MethodMatch(null, new Outcome(ExchangeOps.AMBIGUOUS, AMBIGUOUS_REASON));
+        return new MethodMatch(
+            null, new Outcome(ExchangeOps.AMBIGUOUS, ExchangeRefineryReasons.AMBIGUOUS));
       }
       if (byCode.size() == 1) {
         return new MethodMatch(byCode.getFirst().getId(), null);
@@ -232,7 +179,8 @@ public class ExchangeRefineryOrderReferences {
         return new MethodMatch(byName.get().getId(), null);
       }
     }
-    return new MethodMatch(null, new Outcome(ExchangeOps.UNMATCHED, UNMATCHED_REASON));
+    return new MethodMatch(
+        null, new Outcome(ExchangeOps.UNMATCHED, ExchangeRefineryReasons.UNMATCHED));
   }
 
   /**
@@ -242,31 +190,15 @@ public class ExchangeRefineryOrderReferences {
    * @return a create's goods' inputs, a good-add's input, or a good-update's new input
    */
   private static @NotNull List<ExchangeItemRef> inputs(@NotNull Op op) {
-    return switch (op.op()) {
-      case ExchangeRefineryOrderChangeSet.CREATE ->
+    return switch (op.kind()) {
+      case CREATE ->
           op.goods() == null
               ? List.of()
               : op.goods().stream().map(ExchangeRefineryOrderChangeSet.Good::input).toList();
-      case ExchangeRefineryOrderChangeSet.GOOD_ADD ->
-          List.of(Objects.requireNonNull(op.good()).input());
-      case ExchangeRefineryOrderChangeSet.GOOD_UPDATE ->
-          op.input() == null ? List.of() : List.of(op.input());
-      default -> List.of();
+      case GOOD_ADD -> List.of(Objects.requireNonNull(op.good()).input());
+      case GOOD_UPDATE -> op.input() == null ? List.of() : List.of(op.input());
+      case UPDATE, GOOD_REMOVE, CANCEL, DELETE, PICKUP -> List.of();
     };
-  }
-
-  /**
-   * Reads a client's id.
-   *
-   * @param raw the id as sent
-   * @return the id, or {@code null} when it is no Basetool id
-   */
-  static @Nullable UUID parse(@NotNull String raw) {
-    try {
-      return UUID.fromString(raw);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
   }
 
   /**
@@ -278,6 +210,7 @@ public class ExchangeRefineryOrderReferences {
    * @param method the refining method, or {@code null} when the op names none
    * @param orgUnit the owning unit of a create, or {@code null}
    * @param inputs the input materials in the order the op names them
+   * @param outputs the output material of each input
    * @param lines a pickup's store lines, resolved and decided; empty when it books nothing
    */
   record Refs(
@@ -287,6 +220,7 @@ public class ExchangeRefineryOrderReferences {
       @Nullable UUID method,
       @Nullable UUID orgUnit,
       @NotNull @Unmodifiable List<UUID> inputs,
+      @NotNull @Unmodifiable Map<UUID, UUID> outputs,
       @NotNull @Unmodifiable List<RefineryExchangeStoreLine> lines) {
 
     /**
@@ -297,7 +231,8 @@ public class ExchangeRefineryOrderReferences {
      */
     @NotNull
     Refs withLines(@NotNull @Unmodifiable List<RefineryExchangeStoreLine> storeLines) {
-      return new Refs(refusal, location, locationOffered, method, orgUnit, inputs, storeLines);
+      return new Refs(
+          refusal, location, locationOffered, method, orgUnit, inputs, outputs, storeLines);
     }
 
     /**
@@ -307,7 +242,7 @@ public class ExchangeRefineryOrderReferences {
      * @return the references
      */
     static @NotNull Refs refused(@NotNull Outcome refusal) {
-      return new Refs(refusal, null, false, null, null, List.of(), List.of());
+      return new Refs(refusal, null, false, null, null, List.of(), Map.of(), List.of());
     }
   }
 

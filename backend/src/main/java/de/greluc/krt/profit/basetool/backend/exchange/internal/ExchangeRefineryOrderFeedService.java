@@ -147,7 +147,7 @@ public class ExchangeRefineryOrderFeedService {
       if (order != null) {
         items.add(toDto(order, refs));
       } else {
-        removed.add(changes.tombstone(key, key).withClientKey(refs.clientKeys().get(key)));
+        removed.add(changes.tombstone(key, key).withClientKey(refs.removedKeys().get(key)));
       }
     }
     return new ExchangeRefineryOrderPageDto(items, removed, changes.nextCursor(), changes.more());
@@ -166,18 +166,31 @@ public class ExchangeRefineryOrderFeedService {
       @NotNull ExchangeCaller caller,
       @NotNull Collection<UUID> keys,
       @NotNull Collection<RefineryExchangeOrder> orders) {
-    Map<String, String> clientKeys =
+    List<ExchangeRefineryOrderLink> links =
         keys.isEmpty()
-            ? Map.of()
-            : linkRepository
-                .findByUserIdAndClientIdAndRefineryOrderIdIn(
-                    caller.member(), caller.clientId(), keys)
-                .stream()
-                .collect(
-                    Collectors.toMap(
-                        link -> link.getRefineryOrderId().toString(),
-                        ExchangeRefineryOrderLink::getClientKey));
-    return new References(guids(orders), clientNames(orders), clientKeys);
+            ? List.of()
+            : linkRepository.findByUserIdAndClientIdAndRefineryOrderIdIn(
+                caller.member(), caller.clientId(), keys);
+    return new References(
+        guids(orders),
+        clientNames(orders),
+        keysByOrder(links.stream().filter(link -> link.getRetiredAt() == null).toList()),
+        keysByOrder(links));
+  }
+
+  /**
+   * Maps links to their keys by order id.
+   *
+   * @param links the links, at most one per order
+   * @return the client key by order id
+   */
+  private static @NotNull Map<String, String> keysByOrder(
+      @NotNull List<ExchangeRefineryOrderLink> links) {
+    return links.stream()
+        .collect(
+            Collectors.toMap(
+                link -> link.getRefineryOrderId().toString(),
+                ExchangeRefineryOrderLink::getClientKey));
   }
 
   /**
@@ -234,7 +247,7 @@ public class ExchangeRefineryOrderFeedService {
                 creator,
                 ExchangeStockFeedService.cut(refs.clientNames().getOrDefault(creator, creator))),
         new ExchangeRefineryOrderDto.Versions(order.gameDataVersion(), order.financesVersion()),
-        order.status(),
+        order.status().name(),
         new ExchangeLocationDto(
             ExchangeStockFeedService.cut(place.name()),
             ExchangeCatalogService.uex(place.uexCityId(), place.uexSpaceStationId()),
@@ -282,10 +295,13 @@ public class ExchangeRefineryOrderFeedService {
    *
    * @param guids the starmap GUID by location id
    * @param clientNames the display name by client id
-   * @param clientKeys the caller's own key by order id
+   * @param clientKeys the caller's own key by id of an order it still names
+   * @param removedKeys the caller's own key by id of every order, for a tombstone; a key a later
+   *     create took over still names the removed order
    */
   private record References(
       @NotNull Map<UUID, UUID> guids,
       @NotNull Map<String, String> clientNames,
-      @NotNull Map<String, String> clientKeys) {}
+      @NotNull Map<String, String> clientKeys,
+      @NotNull Map<String, String> removedKeys) {}
 }

@@ -54,15 +54,7 @@ final class ExchangeJournalJson {
    * @return its UUID, or {@code null} when absent, null or no UUID
    */
   static @Nullable UUID uuid(@Nullable JsonNode node, @NotNull String field) {
-    String raw = text(node, field);
-    if (raw == null) {
-      return null;
-    }
-    try {
-      return UUID.fromString(raw);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
+    return ExchangeIds.parse(text(node, field));
   }
 
   /**

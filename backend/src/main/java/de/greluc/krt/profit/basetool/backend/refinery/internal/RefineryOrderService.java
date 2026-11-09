@@ -39,15 +39,14 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
@@ -172,9 +171,8 @@ public class RefineryOrderService {
       order.setStartedAt(Instant.now());
     }
 
-    order.setExpenses(zeroToNull(order.getExpenses()));
-    order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
-    order.setOreSales(zeroToNull(order.getOreSales()));
+    RefineryOrderEdits.setFinances(
+        order, order.getExpenses(), order.getOtherExpenses(), order.getOreSales());
 
     RefineryOrder saved = refineryOrderRepository.save(order);
     auditRecorder.record(
@@ -182,10 +180,7 @@ public class RefineryOrderService {
         saved.getId(),
         RefineryOrders.label(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", saved.getStatus()));
+        RefineryOrders.summary(saved, saved.getStatus()));
     return saved;
   }
 
@@ -211,21 +206,6 @@ public class RefineryOrderService {
       throw new MissionParticipantRequiredException();
     }
     return mission.getId();
-  }
-
-  /**
-   * Stores a money field: 0 means "not set" and is persisted as {@code null}.
-   *
-   * @param value the requested value
-   * @return the value, or {@code null} for {@code null} and 0
-   */
-  @Contract("null -> null")
-  @Nullable
-  static Double zeroToNull(@Nullable Double value) {
-    if (value == null) {
-      return null;
-    }
-    return value == 0.0 ? null : value;
   }
 
   /**
@@ -326,9 +306,8 @@ public class RefineryOrderService {
       applyMissionLink(order, details);
     }
     if (parts.contains(RefineryOrderPart.FINANCES)) {
-      order.setExpenses(zeroToNull(details.getExpenses()));
-      order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
-      order.setOreSales(zeroToNull(details.getOreSales()));
+      RefineryOrderEdits.setFinances(
+          order, details.getExpenses(), details.getOtherExpenses(), details.getOreSales());
     }
     for (RefineryOrderPart part : parts) {
       RefineryOrderSection section = part.section();
@@ -339,11 +318,7 @@ public class RefineryOrderService {
     order.getProvenance().recordWebChange(Instant.now());
 
     RefineryOrder saved = refineryOrderRepository.save(order);
-    if (runTimeChanged
-        || saved.getStatus() == RefineryOrderStatus.COMPLETED
-        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
-      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
-    }
+    RefineryOrderEdits.clearReadyNoticeIfDue(eventPublisher, saved, runTimeChanged);
     announceByOther(
         saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
     auditRecorder.record(
@@ -351,10 +326,7 @@ public class RefineryOrderService {
         saved.getId(),
         RefineryOrders.label(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", previousStatus + "->" + saved.getStatus()));
+        RefineryOrders.summary(saved, previousStatus + "->" + saved.getStatus()));
     return saved;
   }
 
@@ -387,19 +359,11 @@ public class RefineryOrderService {
    * @throws BadRequestException when the order is already stored and the status would change
    */
   private boolean applyGameData(@NotNull RefineryOrder order, @NotNull RefineryOrder details) {
-    if (order.getStoredAt() != null
-        && details.getStatus() != null
-        && details.getStatus() != order.getStatus()) {
-      throw new BadRequestException("error.refinery_order.stored_status_locked");
-    }
-
+    RefineryOrderEdits.requireStatusUnlocked(order, details.getStatus());
     if (details.getLocation() != null && details.getLocation().getId() != null) {
       order.setLocation(
-          OfferedLocations.requireOfferedOrCurrent(
-              Entities.require(
-                  locationRepository.findById(details.getLocation().getId()),
-                  "error.location.not_found"),
-              order.getLocation()));
+          RefineryOrderEdits.offeredOrCurrent(
+              locationRepository, order, details.getLocation().getId()));
       validateLocationHasRefinery(order.getLocation());
     }
 
@@ -412,16 +376,11 @@ public class RefineryOrderService {
       order.setRefiningMethod(null);
     }
 
-    final Instant previousStart = order.getStartedAt();
-    final Long previousDuration = order.getDurationMinutes();
-    order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
-    order.setDurationMinutes(details.getDurationMinutes());
     final boolean runTimeChanged =
-        !Objects.equals(previousStart, order.getStartedAt())
-            || !Objects.equals(previousDuration, order.getDurationMinutes());
-    if (runTimeChanged) {
-      order.setReadyNotifiedAt(null);
-    }
+        RefineryOrderEdits.setRunTime(
+            order,
+            details.getStartedAt() != null ? details.getStartedAt() : Instant.now(),
+            details.getDurationMinutes());
     if (details.getStatus() != null) {
       order.setStatus(details.getStatus());
     }
@@ -550,7 +509,7 @@ public class RefineryOrderService {
    * @param location the order's chosen location
    * @throws IllegalArgumentException when the location hosts no live refinery terminal
    */
-  static void validateLocationHasRefinery(Location location) {
+  private static void validateLocationHasRefinery(Location location) {
     if (!RefineryExchangeRules.hostsRefinery(location)) {
       throw new IllegalArgumentException("Selected location does not have a refinery.");
     }

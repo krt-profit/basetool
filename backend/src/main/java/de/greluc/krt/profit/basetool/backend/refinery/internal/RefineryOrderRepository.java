@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -344,8 +345,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query(
       """
       SELECT o.id FROM RefineryOrder o
-      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
-                         de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.IN_PROGRESS)
+      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
+                         de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.IN_PROGRESS)
         AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
         AND o.endsAt IS NOT NULL AND o.endsAt > :notBefore AND o.endsAt <= :now
       ORDER BY o.endsAt, o.id

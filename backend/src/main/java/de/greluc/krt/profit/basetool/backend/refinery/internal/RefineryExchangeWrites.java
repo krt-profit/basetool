@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRestor
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import jakarta.persistence.EntityManager;
@@ -116,7 +117,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
                 locationRepository.findById(
                     Objects.requireNonNull(edit.locationId(), "locationId")),
                 "error.location.not_found")));
-    order.setStatus(RefineryOrderStatus.valueOf(Objects.requireNonNull(edit.status(), "status")));
+    order.setStatus(Objects.requireNonNull(edit.status(), "status"));
     order.setGameDataVersion(0L);
     order.setFinancesVersion(0L);
     order.setProvenance(RefineryOrderProvenance.createdByClient(clientId, Instant.now()));
@@ -141,10 +142,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
         saved.getId(),
         RefineryOrders.label(saved),
         owner,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods().size())
-            .with("status", saved.getStatus()));
+        RefineryOrders.summary(saved, saved.getStatus()));
     return RefineryExchangeReads.toRow(saved);
   }
 
@@ -179,20 +177,13 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
       reinsert(saved.getId(), reinserted);
       entityManager.refresh(saved);
     }
-    if (runTimeChanged
-        || saved.getStatus() == RefineryOrderStatus.COMPLETED
-        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
-      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
-    }
+    RefineryOrderEdits.clearReadyNoticeIfDue(eventPublisher, saved, runTimeChanged);
     auditRecorder.record(
         AuditEventType.REFINERY_ORDER_UPDATED,
         saved.getId(),
         RefineryOrders.label(saved),
         owner,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods().size())
-            .with("status", previousStatus + "->" + saved.getStatus()));
+        RefineryOrders.summary(saved, previousStatus + "->" + saved.getStatus()));
     return RefineryExchangeReads.toRow(saved);
   }
 
@@ -242,10 +233,7 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
         saved.getId(),
         RefineryOrders.label(saved),
         owner,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods().size())
-            .with("status", previousStatus + "->" + saved.getStatus())
+        RefineryOrders.summary(saved, previousStatus + "->" + saved.getStatus())
             .with("pickup", true));
     return RefineryExchangeReads.toRow(saved);
   }
@@ -308,10 +296,10 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
             timer == null ? null : timer.startedAt(),
             timer == null ? null : timer.durationMinutes(),
             method,
-            finances == null ? null : RefineryOrderService.zeroToNull(finances.expenses()),
-            finances == null ? null : RefineryOrderService.zeroToNull(finances.otherExpenses()),
-            finances == null ? null : RefineryOrderService.zeroToNull(finances.oreSales()),
-            RefineryOrderStatus.valueOf(Objects.requireNonNull(edit.status(), "status")).name(),
+            finances == null ? null : RefineryExchangeRules.money(finances.expenses()),
+            finances == null ? null : RefineryExchangeRules.money(finances.otherExpenses()),
+            finances == null ? null : RefineryExchangeRules.money(finances.oreSales()),
+            Objects.requireNonNull(edit.status(), "status").name(),
             origin.readyNotifiedAt(),
             unit == null ? null : unit.getId(),
             restore.gameDataVersion(),
@@ -394,34 +382,22 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
    */
   private boolean applyGameData(
       @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit edit, boolean byClient) {
-    RefineryOrderStatus status =
-        edit.status() == null ? null : RefineryOrderStatus.valueOf(edit.status());
-    if (byClient && status != null && order.getStoredAt() != null && status != order.getStatus()) {
-      throw new BadRequestException("error.refinery_order.stored_status_locked");
+    RefineryOrderStatus status = edit.status();
+    if (byClient) {
+      RefineryOrderEdits.requireStatusUnlocked(order, status);
     }
     if (edit.locationId() != null) {
       order.setLocation(
           refinery(
-              OfferedLocations.requireOfferedOrCurrent(
-                  Entities.require(
-                      locationRepository.findById(edit.locationId()), "error.location.not_found"),
-                  order.getLocation())));
+              RefineryOrderEdits.offeredOrCurrent(locationRepository, order, edit.locationId())));
     }
     if (edit.method() != null) {
       setMethod(order, edit.method());
     }
-    boolean runTimeChanged = false;
     RefineryExchangeEdit.Timer timer = edit.timer();
-    if (timer != null) {
-      runTimeChanged =
-          !Objects.equals(order.getStartedAt(), timer.startedAt())
-              || !Objects.equals(order.getDurationMinutes(), timer.durationMinutes());
-      order.setStartedAt(timer.startedAt());
-      order.setDurationMinutes(timer.durationMinutes());
-      if (runTimeChanged) {
-        order.setReadyNotifiedAt(null);
-      }
-    }
+    boolean runTimeChanged =
+        timer != null
+            && RefineryOrderEdits.setRunTime(order, timer.startedAt(), timer.durationMinutes());
     if (status != null) {
       order.setStatus(status);
     }
@@ -444,16 +420,15 @@ public class RefineryExchangeWrites implements RefineryExchangeWriter {
   }
 
   /**
-   * Sets the order's money fields, 0 stored as none.
+   * Sets the order's money fields.
    *
    * @param order the order
    * @param finances the values
    */
   private static void setFinances(
       @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit.Finances finances) {
-    order.setExpenses(RefineryOrderService.zeroToNull(finances.expenses()));
-    order.setOtherExpenses(RefineryOrderService.zeroToNull(finances.otherExpenses()));
-    order.setOreSales(RefineryOrderService.zeroToNull(finances.oreSales()));
+    RefineryOrderEdits.setFinances(
+        order, finances.expenses(), finances.otherExpenses(), finances.oreSales());
   }
 
   /**

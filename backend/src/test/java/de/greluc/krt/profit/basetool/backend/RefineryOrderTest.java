@@ -323,7 +323,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(saved.getId()).get().getStatus());
   }
 
@@ -431,7 +431,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(order.getId()).get().getStatus());
   }
 
@@ -614,7 +614,7 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.COMPLETED,
         stored.getStatus());
 
     java.util.List<InventoryItem> items =
@@ -738,7 +738,7 @@ class RefineryOrderTest {
         .andExpect(status().isNotFound());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
         refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
     assertTrue(
         inventoryItemRepository
@@ -757,7 +757,7 @@ class RefineryOrderTest {
     mockMvc.perform(storeRequest(order.getId(), ownOrder.getId())).andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.COMPLETED,
         refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
   }
 
@@ -797,7 +797,7 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
         stored.getStatus());
     assertEquals(100, stored.getGoods().iterator().next().getOutputQuantity().intValue());
     assertTrue(
@@ -820,8 +820,7 @@ class RefineryOrderTest {
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
-    order.setStatus(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN);
+    order.setStatus(de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN);
     RefineryGood good = new RefineryGood();
     good.setInputMaterial(quantanium);
     good.setInputQuantity(100);

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -95,7 +96,7 @@ public class RefineryExchangeReads implements RefineryExchangeReader {
     RefineryOrderProvenance provenance = order.getProvenance();
     return new RefineryExchangeOrder(
         order.getId(),
-        order.getStatus().name(),
+        order.getStatus(),
         Objects.requireNonNullElse(order.getGameDataVersion(), 0L),
         Objects.requireNonNullElse(order.getFinancesVersion(), 0L),
         provenance.getCreatedClient(),

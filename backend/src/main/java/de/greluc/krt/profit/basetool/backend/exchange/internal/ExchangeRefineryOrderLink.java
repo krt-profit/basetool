@@ -31,9 +31,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * The client key the creating client gave a refinery order (REQ-XCH-052): unique per member and
- * client, and at most one per order. The order id carries no foreign key, so the key outlives the
- * order for its tombstone and for the undo of a delete.
+ * The client key the creating client gave a refinery order (REQ-XCH-051, REQ-XCH-052): one link per
+ * order, the key unique per member and client among the links not retired. The order id carries no
+ * foreign key, so the key outlives the order for its tombstone and for the undo of a delete, also
+ * after a later create of the client took the key over.
  */
 @Entity
 @Table(name = "exchange_refinery_order_link")
@@ -67,4 +68,11 @@ public class ExchangeRefineryOrderLink {
   /** When the client created the order. */
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  /**
+   * When a later create of the client took the key over, or {@code null} while the key names this
+   * order.
+   */
+  @Column(name = "retired_at")
+  private Instant retiredAt;
 }

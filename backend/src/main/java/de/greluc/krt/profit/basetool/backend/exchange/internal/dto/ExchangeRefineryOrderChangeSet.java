@@ -30,6 +30,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -42,30 +43,6 @@ import org.jetbrains.annotations.Nullable;
 public record ExchangeRefineryOrderChangeSet(
     @NotNull @Size(min = 1, max = 500) List<@NotNull @Valid Op> ops, boolean dryRun) {
 
-  /** The op that creates an order. */
-  public static final String CREATE = "create";
-
-  /** The op that changes the fields it carries. */
-  public static final String UPDATE = "update";
-
-  /** The op that adds a good. */
-  public static final String GOOD_ADD = "good-add";
-
-  /** The op that changes a good. */
-  public static final String GOOD_UPDATE = "good-update";
-
-  /** The op that removes a good. */
-  public static final String GOOD_REMOVE = "good-remove";
-
-  /** The op that cancels an order. */
-  public static final String CANCEL = "cancel";
-
-  /** The op that removes an order with its goods. */
-  public static final String DELETE = "delete";
-
-  /** The op that closes an order as collected in the game, booking stock only with store lines. */
-  public static final String PICKUP = "pickup";
-
   /**
    * Whether an op of the set books stock: a pickup with store lines, which needs {@code
    * exchange.refinery.store} (REQ-XCH-053).
@@ -74,7 +51,7 @@ public record ExchangeRefineryOrderChangeSet(
    */
   public boolean storesStock() {
     return ops.stream()
-        .anyMatch(op -> PICKUP.equals(op.op()) && op.lines() != null && !op.lines().isEmpty());
+        .anyMatch(op -> op.kind() == Kind.PICKUP && op.lines() != null && !op.lines().isEmpty());
   }
 
   /**
@@ -131,7 +108,59 @@ public record ExchangeRefineryOrderChangeSet(
       @Nullable @Min(0) Integer inputQuantity,
       @Nullable @Min(1) Integer outputQuantity,
       @Nullable @QualityValue Integer quality,
-      @Nullable @Size(min = 1, max = 100) List<@NotNull @Valid StoreLine> lines) {}
+      @Nullable @Size(min = 1, max = 100) List<@NotNull @Valid StoreLine> lines) {
+
+    /**
+     * The op's kind.
+     *
+     * @return the kind {@link #op} names
+     * @throws IllegalArgumentException when it names none; the gateway's schema and the pattern
+     *     keep such an op from arriving
+     */
+    public @org.jetbrains.annotations.NotNull Kind kind() {
+      return Kind.of(op);
+    }
+  }
+
+  /** The kinds of refinery-order op, each with the name a client sends. */
+  @RequiredArgsConstructor
+  public enum Kind {
+    /** Creates an order. */
+    CREATE("create"),
+    /** Changes the fields it carries. */
+    UPDATE("update"),
+    /** Adds a good. */
+    GOOD_ADD("good-add"),
+    /** Changes a good. */
+    GOOD_UPDATE("good-update"),
+    /** Removes a good. */
+    GOOD_REMOVE("good-remove"),
+    /** Cancels an order. */
+    CANCEL("cancel"),
+    /** Removes an order with its goods. */
+    DELETE("delete"),
+    /** Closes an order as collected in the game, booking stock only with store lines. */
+    PICKUP("pickup");
+
+    /** The name a client sends in {@link Op#op}. */
+    private final String wire;
+
+    /**
+     * Reads a kind by the name a client sends.
+     *
+     * @param wire the name
+     * @return the kind
+     * @throws IllegalArgumentException when no kind has that name
+     */
+    public static @org.jetbrains.annotations.NotNull Kind of(@Nullable String wire) {
+      for (Kind kind : values()) {
+        if (kind.wire.equals(wire)) {
+          return kind;
+        }
+      }
+      throw new IllegalArgumentException("Unknown refinery-order op");
+    }
+  }
 
   /**
    * One store line of a pickup, as the web's store dialog has it (REQ-XCH-053).

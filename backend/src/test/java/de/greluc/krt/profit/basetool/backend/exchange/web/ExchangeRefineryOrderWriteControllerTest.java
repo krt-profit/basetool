@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -43,6 +44,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
@@ -63,6 +67,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -90,6 +95,7 @@ class ExchangeRefineryOrderWriteControllerTest {
   @Autowired private ExchangeUndoService undoService;
   @Autowired private ExchangeMassChangeService massChangeService;
   @Autowired private JdbcTemplate jdbc;
+  @MockitoSpyBean private LiveSyncPublisher publisher;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -335,6 +341,86 @@ class ExchangeRefineryOrderWriteControllerTest {
             jdbc.queryForObject(
                 "SELECT COUNT(*) FROM refinery_order WHERE owner_id = ?", Integer.class, member))
         .isZero();
+  }
+
+  @Test
+  void aDryRunAnswersACancelOrPickupOfAnOrderTheSetAlreadyClosedAsTheRealRunDoes()
+      throws Exception {
+    UUID twiceCanceled = ownOrder("IN_PROGRESS");
+    UUID canceledThenPickedUp = ownOrder("IN_PROGRESS");
+    UUID twicePickedUp = ownOrder("IN_PROGRESS");
+    String ops =
+        String.join(
+            ",",
+            cancel(twiceCanceled, 0),
+            cancel(twiceCanceled, 1),
+            cancel(canceledThenPickedUp, 0),
+            pickup("\"id\": \"" + canceledThenPickedUp + "\"", 1),
+            pickup("\"id\": \"" + twicePickedUp + "\"", 0),
+            pickup("\"id\": \"" + twicePickedUp + "\"", 1));
+
+    for (boolean dryRun : List.of(true, false)) {
+      changes(client, dryRun, ops)
+          .andExpect(jsonPath("$.dryRun").value(dryRun))
+          .andExpect(jsonPath("$.applied").value(3))
+          .andExpect(jsonPath("$.unchanged").value(2))
+          .andExpect(jsonPath("$.notApplied").value(1))
+          .andExpect(jsonPath("$.results[0].index").value(1))
+          .andExpect(jsonPath("$.results[0].result").value("unchanged"))
+          .andExpect(jsonPath("$.results[1].index").value(3))
+          .andExpect(jsonPath("$.results[1].reason").value("ORDER_CANCELED"))
+          .andExpect(jsonPath("$.results[2].index").value(5))
+          .andExpect(jsonPath("$.results[2].result").value("unchanged"));
+    }
+    assertThat(statusOf(twiceCanceled)).isEqualTo("CANCELED");
+    assertThat(statusOf(twicePickedUp)).isEqualTo("COMPLETED");
+  }
+
+  @Test
+  void aKeyACreateTakesOverAfterADeleteStillNamesTheDeletedOrdersTombstone() throws Exception {
+    String first = changes(client, create("vk-r")).andReturn().getResponse().getContentAsString();
+    UUID gone = UUID.fromString(JsonPath.read(first, "$.orders[0].id"));
+    String cursor =
+        JsonPath.read(
+            relayed(get(FEED), client).andReturn().getResponse().getContentAsString(),
+            "$.nextCursor");
+    changes(client, delete(gone)).andExpect(jsonPath("$.applied").value(1));
+
+    String second =
+        changes(client, create("vk-r"))
+            .andExpect(jsonPath("$.applied").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String next = JsonPath.read(second, "$.orders[0].id");
+
+    String feed =
+        relayed(get(FEED).param("cursor", cursor), client)
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(JsonPath.<List<String>>read(feed, "$.removed[?(@.key == '" + gone + "')].clientKey"))
+        .containsExactly("vk-r");
+    assertThat(JsonPath.<List<String>>read(feed, "$.items[?(@.id == '" + next + "')].clientKey"))
+        .containsExactly("vk-r");
+    changes(
+            client,
+            "{\"op\": \"update\", \"clientKey\": \"vk-r\", \"versions\": {\"finances\": 0},"
+                + " \"expenses\": 10}")
+        .andExpect(jsonPath("$.orders[0].id").value(next));
+  }
+
+  @Test
+  void anUndoThatRemovesACreatedOrderTellsItsDetailPageItIsGone() throws Exception {
+    Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
+    String created = changes(client, create("vk-g")).andReturn().getResponse().getContentAsString();
+    UUID id = UUID.fromString(JsonPath.read(created, "$.orders[0].id"));
+
+    undoService.undo(member, client, since);
+
+    verify(publisher)
+        .publishAfterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, id), List.of("deleted"));
   }
 
   @Test

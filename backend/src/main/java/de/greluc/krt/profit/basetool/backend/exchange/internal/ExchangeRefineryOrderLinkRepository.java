@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -35,14 +36,14 @@ public interface ExchangeRefineryOrderLinkRepository
     extends JpaRepository<ExchangeRefineryOrderLink, UUID> {
 
   /**
-   * Finds the order a client's key names for a member.
+   * Finds the order a client's key names for a member now.
    *
    * @param userId the member
    * @param clientId the client
    * @param clientKey the client's key
-   * @return the link, or empty when the client gave no order of the member that key
+   * @return the link not retired, or empty when the client gave no order of the member that key
    */
-  Optional<ExchangeRefineryOrderLink> findByUserIdAndClientIdAndClientKey(
+  Optional<ExchangeRefineryOrderLink> findByUserIdAndClientIdAndClientKeyAndRetiredAtIsNull(
       UUID userId, String clientId, String clientKey);
 
   /**
@@ -51,25 +52,28 @@ public interface ExchangeRefineryOrderLinkRepository
    * @param userId the member
    * @param clientId the client
    * @param orderIds the orders
-   * @return the links among them the client made for the member
+   * @return the links among them the client made for the member, retired ones included
    */
   List<ExchangeRefineryOrderLink> findByUserIdAndClientIdAndRefineryOrderIdIn(
       UUID userId, String clientId, Collection<UUID> orderIds);
 
   /**
-   * Removes the link of a key whose order no longer exists, freeing the key for a new create.
+   * Retires the link of a key whose order no longer exists, freeing the key for a new create while
+   * the old order's tombstone keeps naming it.
    *
    * @param userId the member
    * @param clientId the client
    * @param clientKey the client's key
-   * @return the number of links removed
+   * @param at when the new create takes the key over
+   * @return the number of links retired
    */
   @Modifying(flushAutomatically = true)
   @Query(
-      "DELETE FROM ExchangeRefineryOrderLink l WHERE l.userId = :userId AND l.clientId = :clientId"
-          + " AND l.clientKey = :clientKey")
-  int deleteKey(
+      "UPDATE ExchangeRefineryOrderLink l SET l.retiredAt = :at WHERE l.userId = :userId"
+          + " AND l.clientId = :clientId AND l.clientKey = :clientKey AND l.retiredAt IS NULL")
+  int retireKey(
       @Param("userId") UUID userId,
       @Param("clientId") String clientId,
-      @Param("clientKey") String clientKey);
+      @Param("clientKey") String clientKey,
+      @Param("at") Instant at);
 }

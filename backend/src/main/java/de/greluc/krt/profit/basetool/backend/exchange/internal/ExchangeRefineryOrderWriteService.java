@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderJournal.State;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeRefineryOrderReferences.Refs;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet.Kind;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet.Op;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -52,49 +54,20 @@ import org.springframework.transaction.annotation.Transactional;
  * Applies a client's writes to the member's own refinery orders (REQ-XCH-052, REQ-XCH-053,
  * REQ-XCH-055, REQ-XCH-056, ADR-0351): creates under the client's key, partial updates, goods ops,
  * cancels, deletes and pickups with or without store lines, each through the refinery module's own
- * writer, decided in order against the section counters the earlier ops left, and journaled for the
+ * writer, decided in order against the order as the earlier ops left it, and journaled for the
  * undo. The {@link ExchangeChangeSetRunner} runs the change set (ADR-0285); a delete counts for the
  * mass-change guard.
  *
  * <p>References resolve exactly in the plan; everything that depends on the order — its address, an
  * earlier refusal, the counters, the goods — is decided when the op runs, so a refusal of one op
- * refuses every later op on the same order ({@code PRECEDING_OP_REJECTED}).
+ * refuses every later op on the same order ({@code PRECEDING_OP_REJECTED}). A dry run decides every
+ * op against the {@link ExchangeRefineryOrderView} the earlier ops would leave and writes nothing.
  */
 @Service
 @RequiredArgsConstructor
 public class ExchangeRefineryOrderWriteService
     implements ExchangeChangeSetAdapter<
         ExchangeRefineryOrderChangeSet, ExchangeRefineryOrderWriteService.Change> {
-
-  /** The refusal of an order the member does not own or the client's key does not name. */
-  static final String ORDER_UNKNOWN = "ORDER_UNKNOWN";
-
-  /** The refusal of a good the order does not hold. */
-  static final String GOOD_UNKNOWN = "GOOD_UNKNOWN";
-
-  /** The refusal of a create whose key already names an order. */
-  static final String ALREADY_EXISTS = "ALREADY_EXISTS";
-
-  /** The refusal of a section counter the order no longer has. */
-  static final String VERSION_CONFLICT = "VERSION_CONFLICT";
-
-  /** The refusal of an op on an order an earlier op of the set was refused on. */
-  static final String PRECEDING_OP_REJECTED = "PRECEDING_OP_REJECTED";
-
-  /** The refusal of a status change on a stored order. */
-  static final String ORDER_STORED = "ORDER_STORED";
-
-  /** The refusal of a pickup of a cancelled order. */
-  static final String ORDER_CANCELED = "ORDER_CANCELED";
-
-  /** The status a create starts in when it names none. */
-  private static final String OPEN = "OPEN";
-
-  /** The status of a picked-up order. */
-  private static final String COMPLETED = "COMPLETED";
-
-  /** The status of a cancelled order. */
-  private static final String CANCELED = "CANCELED";
 
   private final ExchangeRefineryOrderReferences references;
   private final RefineryExchangeWriter writer;
@@ -167,9 +140,8 @@ public class ExchangeRefineryOrderWriteService
       @NotNull List<Planned<Change>> plan) {
     long removals =
         plan.stream()
-            .filter(p ->
-                p instanceof Write<Change>(Change change)
-                    && ExchangeRefineryOrderChangeSet.DELETE.equals(change.op().op()))
+            .filter(
+                p -> p instanceof Write<Change>(Change change) && change.op().kind() == Kind.DELETE)
             .count();
     return guard.requiresConfirmation(
         caller, ExchangeResource.REFINERY_ORDER, reader.count(caller.member()), removals);
@@ -228,19 +200,13 @@ public class ExchangeRefineryOrderWriteService
     boolean gameDataEcho = versions != null && versions.gameData() != null;
     boolean financesEcho = versions != null && versions.finances() != null;
     boolean complete =
-        switch (op.op()) {
-          case ExchangeRefineryOrderChangeSet.CREATE ->
-              op.clientKey() != null && op.orgUnit() != null && op.location() != null;
-          case ExchangeRefineryOrderChangeSet.UPDATE -> addressed && op.versions() != null;
-          case ExchangeRefineryOrderChangeSet.GOOD_ADD ->
-              addressed && gameDataEcho && op.good() != null;
-          case ExchangeRefineryOrderChangeSet.GOOD_UPDATE,
-              ExchangeRefineryOrderChangeSet.GOOD_REMOVE ->
-              addressed && gameDataEcho && op.goodId() != null;
-          case ExchangeRefineryOrderChangeSet.CANCEL -> addressed && gameDataEcho;
-          case ExchangeRefineryOrderChangeSet.DELETE -> addressed && gameDataEcho && financesEcho;
-          case ExchangeRefineryOrderChangeSet.PICKUP -> addressed && gameDataEcho;
-          default -> false;
+        switch (op.kind()) {
+          case CREATE -> op.clientKey() != null && op.orgUnit() != null && op.location() != null;
+          case UPDATE -> addressed && op.versions() != null;
+          case GOOD_ADD -> addressed && gameDataEcho && op.good() != null;
+          case GOOD_UPDATE, GOOD_REMOVE -> addressed && gameDataEcho && op.goodId() != null;
+          case CANCEL, PICKUP -> addressed && gameDataEcho;
+          case DELETE -> addressed && gameDataEcho && financesEcho;
         };
     boolean personalEarmark =
         op.lines() != null
@@ -269,26 +235,8 @@ public class ExchangeRefineryOrderWriteService
     return new RefineryExchangeEdit.Timer(endsAt.minus(Duration.ofMinutes(minutes)), minutes);
   }
 
-  /**
-   * The goods an order holds, as the rows an edit writes back.
-   *
-   * @param order the order
-   * @return its goods with their row ids
-   */
-  private static @NotNull List<RefineryExchangeEdit.Good> goodsOf(
-      @NotNull RefineryExchangeOrder order) {
-    return order.goods().stream()
-        .map(good ->
-            new RefineryExchangeEdit.Good(
-                good.id(),
-                good.inputMaterialId(),
-                good.inputQuantity(),
-                good.outputQuantity(),
-                good.quality()))
-        .toList();
-  }
-
   /** The decisions of one change set, op by op, against the orders as the earlier ops left them. */
+  @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
   private final class Run implements Execution<Change> {
 
     /** The caller. */
@@ -312,50 +260,38 @@ public class ExchangeRefineryOrderWriteService
     /** The orders the set wrote and kept. */
     private final Set<UUID> written = new LinkedHashSet<>();
 
+    /** The orders among them whose yield a pickup of the set booked into stock. */
+    private final Set<UUID> stored = new LinkedHashSet<>();
+
     /** The orders the set deleted. */
     private final Set<UUID> deleted = new LinkedHashSet<>();
-
-    /** Whether a pickup of the set booked stock. */
-    private boolean stockBooked;
-
-    /**
-     * Starts a run.
-     *
-     * @param caller the caller
-     * @param batch the change set's id
-     * @param dryRun whether nothing is written
-     */
-    private Run(@NotNull ExchangeCaller caller, @NotNull UUID batch, boolean dryRun) {
-      this.caller = caller;
-      this.batch = batch;
-      this.dryRun = dryRun;
-    }
 
     @Override
     public @NotNull Outcome run(@NotNull Change change) {
       Op op = change.op();
-      if (ExchangeRefineryOrderChangeSet.CREATE.equals(op.op())) {
+      Kind kind = op.kind();
+      if (kind == Kind.CREATE) {
         return create(change);
       }
       Slot slot = address(op);
       if (slot == null || slot.deleted) {
-        return Outcome.rejected(ORDER_UNKNOWN);
+        return Outcome.rejected(ExchangeRefineryReasons.ORDER_UNKNOWN);
       }
       if (slot.refused) {
-        return Outcome.rejected(PRECEDING_OP_REJECTED);
+        return Outcome.rejected(ExchangeRefineryReasons.PRECEDING_OP_REJECTED);
       }
       Outcome outcome = change.refs().refusal();
       if (outcome == null) {
         outcome =
-            switch (op.op()) {
-              case ExchangeRefineryOrderChangeSet.UPDATE -> update(slot, change);
-              case ExchangeRefineryOrderChangeSet.GOOD_ADD -> goodAdd(slot, change);
-              case ExchangeRefineryOrderChangeSet.GOOD_UPDATE -> goodUpdate(slot, change);
-              case ExchangeRefineryOrderChangeSet.GOOD_REMOVE -> goodRemove(slot, op);
-              case ExchangeRefineryOrderChangeSet.CANCEL -> cancel(slot, op);
-              case ExchangeRefineryOrderChangeSet.DELETE -> delete(slot, op);
-              case ExchangeRefineryOrderChangeSet.PICKUP -> pickup(slot, change);
-              default -> throw new BadRequestException("Unknown refinery-order op");
+            switch (kind) {
+              case CREATE -> throw new IllegalStateException("A create has no order to address");
+              case UPDATE -> update(slot, change);
+              case GOOD_ADD -> goodAdd(slot, change);
+              case GOOD_UPDATE -> goodUpdate(slot, change);
+              case GOOD_REMOVE -> goodRemove(slot, change);
+              case CANCEL -> cancel(slot, op);
+              case DELETE -> delete(slot, op);
+              case PICKUP -> pickup(slot, change);
             };
       }
       if (!ExchangeOps.APPLIED.equals(outcome.result())
@@ -372,8 +308,8 @@ public class ExchangeRefineryOrderWriteService
 
     @Override
     public void announce() {
-      liveSync.refineryOrdersChanged(written, deleted);
-      if (stockBooked) {
+      liveSync.refineryOrdersChanged(written, stored, deleted);
+      if (!stored.isEmpty()) {
         liveSync.stockChanged(false);
       }
     }
@@ -391,25 +327,20 @@ public class ExchangeRefineryOrderWriteService
       if (known == null) {
         known = linked(key);
       }
-      if (known != null && known.deleted) {
-        known = null;
-      }
-      if (known != null) {
+      if (known != null && !known.deleted) {
         known.refused = true;
         return new Outcome(
             ExchangeOps.REJECTED,
-            ALREADY_EXISTS,
+            ExchangeRefineryReasons.ALREADY_EXISTS,
             known.id == null ? null : new Written(known.id.toString(), null, null));
       }
       Refs refs = change.refs();
       Outcome refusal =
           refs.refusal() == null && !refs.locationOffered()
-              ? Outcome.rejected(ExchangeRefineryOrderReferences.NOT_A_REFINERY)
+              ? Outcome.rejected(ExchangeRefineryReasons.NOT_A_REFINERY)
               : refs.refusal();
       if (refusal != null) {
-        Slot refused = new Slot(null, null);
-        refused.refused = true;
-        byKey.put(key, refused);
+        byKey.put(key, Slot.refusedCreate());
         return refusal;
       }
       List<RefineryExchangeEdit.Good> goods = new ArrayList<>();
@@ -430,14 +361,17 @@ public class ExchangeRefineryOrderWriteService
               refs.location(),
               refs.method() == null ? null : new RefineryExchangeEdit.Method(refs.method()),
               op.endsAt() == null ? null : timer(op.endsAt(), op.durationMinutes(), now),
-              op.status() == null ? OPEN : op.status(),
+              op.status() == null
+                  ? RefineryOrderStatus.OPEN
+                  : RefineryOrderStatus.valueOf(op.status()),
               finances(op, null),
               List.copyOf(goods));
       if (dryRun) {
-        byKey.put(key, new Slot(null, null));
+        byKey.put(
+            key, Slot.simulated(ExchangeRefineryOrderView.created(edit, refs.outputs(), now)));
         return Outcome.APPLIED;
       }
-      linkRepository.deleteKey(caller.member(), caller.clientId(), key);
+      linkRepository.retireKey(caller.member(), caller.clientId(), key, now);
       RefineryExchangeOrder order =
           writer.create(
               caller.member(), caller.clientId(), Objects.requireNonNull(refs.orgUnit()), edit);
@@ -457,8 +391,8 @@ public class ExchangeRefineryOrderWriteService
           order.id().toString(),
           false,
           null,
-          State.of(order).toJournal());
-      Slot slot = new Slot(order.id(), order);
+          ExchangeRefineryOrderState.of(order).toJournal());
+      Slot slot = Slot.loaded(order);
       byKey.put(key, slot);
       byId.put(order.id(), slot);
       written.add(order.id());
@@ -475,44 +409,41 @@ public class ExchangeRefineryOrderWriteService
     private @NotNull Outcome update(@NotNull Slot slot, @NotNull Change change) {
       Op op = change.op();
       Refs refs = change.refs();
-      RefineryExchangeOrder current = slot.current;
+      ExchangeRefineryOrderView current = slot.view();
       RefineryExchangeEdit.Finances finances = finances(op, current);
       RefineryExchangeEdit.Timer timer =
           op.endsAt() == null ? null : timer(op.endsAt(), op.durationMinutes(), now);
+      RefineryOrderStatus status =
+          op.status() == null ? null : RefineryOrderStatus.valueOf(op.status());
       boolean gameData =
-          refs.location() != null || refs.method() != null || timer != null || op.status() != null;
+          refs.location() != null || refs.method() != null || timer != null || status != null;
       if (!gameData && finances == null) {
         return Outcome.UNCHANGED;
       }
       ExchangeRefineryOrderChangeSet.Versions versions = Objects.requireNonNull(op.versions());
       if ((gameData && !slot.gameDataIs(versions.gameData()))
           || (finances != null && !slot.financesAre(versions.finances()))) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
       UUID location = refs.location();
-      if (location != null
-          && !refs.locationOffered()
-          && (current == null || !location.equals(current.location().id()))) {
-        return Outcome.rejected(ExchangeRefineryOrderReferences.NOT_A_REFINERY);
+      if (location != null && !refs.locationOffered() && !location.equals(current.locationId())) {
+        return Outcome.rejected(ExchangeRefineryReasons.NOT_A_REFINERY);
       }
-      if (current != null
-          && current.storedAt() != null
-          && op.status() != null
-          && !op.status().equals(current.status())) {
-        return Outcome.rejected(ORDER_STORED);
+      if (current.stored() && status != null && status != current.status()) {
+        return Outcome.rejected(ExchangeRefineryReasons.ORDER_STORED);
       }
       RefineryExchangeEdit edit =
           new RefineryExchangeEdit(
               location,
               refs.method() == null ? null : new RefineryExchangeEdit.Method(refs.method()),
               timer,
-              op.status(),
+              status,
               finances,
               null);
-      if (current != null && unchanged(current, edit)) {
+      if (current.unchangedBy(edit)) {
         return Outcome.UNCHANGED;
       }
-      return write(slot, edit, ExchangeJournalAction.REFINERY_UPDATE, gameData, finances != null);
+      return write(slot, edit, refs, ExchangeJournalAction.REFINERY_UPDATE);
     }
 
     /**
@@ -525,11 +456,10 @@ public class ExchangeRefineryOrderWriteService
     private @NotNull Outcome goodAdd(@NotNull Slot slot, @NotNull Change change) {
       Op op = change.op();
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
       ExchangeRefineryOrderChangeSet.Good good = Objects.requireNonNull(op.good());
-      List<RefineryExchangeEdit.Good> goods =
-          new ArrayList<>(slot.current == null ? List.of() : goodsOf(slot.current));
+      List<RefineryExchangeEdit.Good> goods = new ArrayList<>(slot.view().editGoods());
       goods.add(
           new RefineryExchangeEdit.Good(
               null,
@@ -537,7 +467,7 @@ public class ExchangeRefineryOrderWriteService
               good.inputQuantity(),
               good.outputQuantity(),
               good.quality()));
-      return write(slot, goodsEdit(goods), ExchangeJournalAction.REFINERY_GOOD_ADD, true, false);
+      return write(slot, goodsEdit(goods), change.refs(), ExchangeJournalAction.REFINERY_GOOD_ADD);
     }
 
     /**
@@ -550,17 +480,16 @@ public class ExchangeRefineryOrderWriteService
     private @NotNull Outcome goodUpdate(@NotNull Slot slot, @NotNull Change change) {
       Op op = change.op();
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
-      UUID goodId = ExchangeRefineryOrderReferences.parse(Objects.requireNonNull(op.goodId()));
-      RefineryExchangeOrder current = slot.current;
-      if (goodId == null || current == null) {
-        return Outcome.rejected(GOOD_UNKNOWN);
+      UUID goodId = ExchangeIds.parse(op.goodId());
+      if (goodId == null) {
+        return Outcome.rejected(ExchangeRefineryReasons.GOOD_UNKNOWN);
       }
       List<RefineryExchangeEdit.Good> goods = new ArrayList<>();
       boolean found = false;
       boolean changes = false;
-      for (RefineryExchangeEdit.Good good : goodsOf(current)) {
+      for (RefineryExchangeEdit.Good good : slot.view().editGoods()) {
         if (!goodId.equals(good.id())) {
           goods.add(good);
           continue;
@@ -579,36 +508,36 @@ public class ExchangeRefineryOrderWriteService
         goods.add(next);
       }
       if (!found) {
-        return Outcome.rejected(GOOD_UNKNOWN);
+        return Outcome.rejected(ExchangeRefineryReasons.GOOD_UNKNOWN);
       }
       if (!changes) {
         return Outcome.UNCHANGED;
       }
-      return write(slot, goodsEdit(goods), ExchangeJournalAction.REFINERY_GOOD_UPDATE, true, false);
+      return write(
+          slot, goodsEdit(goods), change.refs(), ExchangeJournalAction.REFINERY_GOOD_UPDATE);
     }
 
     /**
      * Decides and writes a good-remove.
      *
      * @param slot the order
-     * @param op the good-remove
+     * @param change the planned good-remove
      * @return the outcome
      */
-    private @NotNull Outcome goodRemove(@NotNull Slot slot, @NotNull Op op) {
+    private @NotNull Outcome goodRemove(@NotNull Slot slot, @NotNull Change change) {
+      Op op = change.op();
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
-      UUID goodId = ExchangeRefineryOrderReferences.parse(Objects.requireNonNull(op.goodId()));
-      RefineryExchangeOrder current = slot.current;
-      if (goodId == null || current == null) {
-        return Outcome.rejected(GOOD_UNKNOWN);
-      }
+      UUID goodId = ExchangeIds.parse(op.goodId());
+      List<RefineryExchangeEdit.Good> held = slot.view().editGoods();
       List<RefineryExchangeEdit.Good> goods =
-          goodsOf(current).stream().filter(good -> !goodId.equals(good.id())).toList();
-      if (goods.size() == current.goods().size()) {
-        return Outcome.rejected(GOOD_UNKNOWN);
+          held.stream().filter(good -> !Objects.equals(goodId, good.id())).toList();
+      if (goodId == null || goods.size() == held.size()) {
+        return Outcome.rejected(ExchangeRefineryReasons.GOOD_UNKNOWN);
       }
-      return write(slot, goodsEdit(goods), ExchangeJournalAction.REFINERY_GOOD_REMOVE, true, false);
+      return write(
+          slot, goodsEdit(goods), change.refs(), ExchangeJournalAction.REFINERY_GOOD_REMOVE);
     }
 
     /**
@@ -620,29 +549,28 @@ public class ExchangeRefineryOrderWriteService
      */
     private @NotNull Outcome cancel(@NotNull Slot slot, @NotNull Op op) {
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
-      RefineryExchangeOrder current = slot.current;
-      if (current != null && CANCELED.equals(current.status())) {
+      if (slot.view().status() == RefineryOrderStatus.CANCELED) {
         return Outcome.UNCHANGED;
       }
-      if (dryRun || slot.id == null) {
-        slot.advance(true, false);
+      if (dryRun) {
+        slot.simulate(slot.view().canceled());
         return Outcome.APPLIED;
       }
-      RefineryExchangeOrder before = Objects.requireNonNull(current);
-      RefineryExchangeOrder after = writer.cancel(caller.member(), caller.clientId(), slot.id);
-      journal(slot.id, ExchangeJournalAction.REFINERY_CANCEL, before, after);
-      slot.current = after;
-      written.add(slot.id);
+      UUID id = slot.id();
+      RefineryExchangeOrder before = slot.order();
+      RefineryExchangeOrder after = writer.cancel(caller.member(), caller.clientId(), id);
+      journal(id, ExchangeJournalAction.REFINERY_CANCEL, before, after);
+      slot.record(after);
+      written.add(id);
       return applied(after, List.of());
     }
 
     /**
      * Decides and writes a pickup (REQ-XCH-053): an open or running order is closed whatever its
      * end, a completed one is left, a cancelled one is refused; store lines book the yield, all or
-     * nothing, and each must name an output material of the order's goods. An order a dry run would
-     * create has no goods to check them against yet.
+     * nothing, and each must name an output material of the order's goods.
      *
      * @param slot the order
      * @param change the planned pickup with its resolved store lines
@@ -650,33 +578,34 @@ public class ExchangeRefineryOrderWriteService
      */
     private @NotNull Outcome pickup(@NotNull Slot slot, @NotNull Change change) {
       Op op = change.op();
-      RefineryExchangeOrder current = slot.current;
-      String status = current == null ? null : current.status();
-      if (COMPLETED.equals(status)) {
+      ExchangeRefineryOrderView current = slot.view();
+      if (current.status() == RefineryOrderStatus.COMPLETED) {
         return Outcome.UNCHANGED;
       }
-      if (CANCELED.equals(status)) {
-        return Outcome.rejected(ORDER_CANCELED);
+      if (current.status() == RefineryOrderStatus.CANCELED) {
+        return Outcome.rejected(ExchangeRefineryReasons.ORDER_CANCELED);
       }
       if (!slot.gameDataIs(Objects.requireNonNull(op.versions()).gameData())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
       List<RefineryExchangeStoreLine> lines = change.refs().lines();
-      Outcome refusal =
-          current == null ? null : ExchangeRefineryStoreLines.refusalFor(current, lines);
+      Outcome refusal = ExchangeRefineryStoreLines.refusalFor(current, lines);
       if (refusal != null) {
         return refusal;
       }
-      if (dryRun || slot.id == null || current == null) {
-        slot.advance(true, false);
+      if (dryRun) {
+        slot.simulate(current.pickedUp(!lines.isEmpty()));
         return Outcome.APPLIED;
       }
-      RefineryExchangeOrder after =
-          writer.pickUp(caller.member(), caller.clientId(), slot.id, lines);
-      journal(slot.id, ExchangeJournalAction.REFINERY_PICKUP, current, after);
-      slot.current = after;
-      written.add(slot.id);
-      stockBooked |= !lines.isEmpty();
+      UUID id = slot.id();
+      RefineryExchangeOrder before = slot.order();
+      RefineryExchangeOrder after = writer.pickUp(caller.member(), caller.clientId(), id, lines);
+      journal(id, ExchangeJournalAction.REFINERY_PICKUP, before, after);
+      slot.record(after);
+      written.add(id);
+      if (!lines.isEmpty()) {
+        stored.add(id);
+      }
       return applied(after, List.of());
     }
 
@@ -691,30 +620,28 @@ public class ExchangeRefineryOrderWriteService
     private @NotNull Outcome delete(@NotNull Slot slot, @NotNull Op op) {
       ExchangeRefineryOrderChangeSet.Versions versions = Objects.requireNonNull(op.versions());
       if (!slot.gameDataIs(versions.gameData()) || !slot.financesAre(versions.finances())) {
-        return Outcome.rejected(VERSION_CONFLICT);
+        return Outcome.rejected(ExchangeRefineryReasons.VERSION_CONFLICT);
       }
-      RefineryExchangeOrder current = slot.current;
-      if (current != null && current.storedAt() != null) {
-        return Outcome.rejected(ORDER_STORED);
+      if (slot.view().stored()) {
+        return Outcome.rejected(ExchangeRefineryReasons.ORDER_STORED);
       }
       slot.deleted = true;
-      if (dryRun || slot.id == null) {
+      if (dryRun) {
         return Outcome.APPLIED;
       }
-      State removed =
-          State.of(Objects.requireNonNull(current))
-              .deleted(writer.delete(caller.member(), slot.id));
+      UUID id = slot.id();
+      ExchangeRefineryOrderState removed =
+          ExchangeRefineryOrderState.of(slot.order()).deleted(writer.delete(caller.member(), id));
       journalService.record(
           caller,
           batch,
           ExchangeJournalAction.REFINERY_DELETE,
-          slot.id.toString(),
+          id.toString(),
           true,
           removed.toJournal(),
           null);
-      slot.current = null;
-      written.remove(slot.id);
-      deleted.add(slot.id);
+      written.remove(id);
+      deleted.add(id);
       return Outcome.APPLIED;
     }
 
@@ -737,42 +664,41 @@ public class ExchangeRefineryOrderWriteService
           action,
           id.toString(),
           false,
-          State.of(before).toJournal(),
-          State.of(after).toJournal());
+          ExchangeRefineryOrderState.of(before).toJournal(),
+          ExchangeRefineryOrderState.of(after).toJournal());
     }
 
     /**
-     * Writes an edit through the refinery module, or in a dry run only advances the counters.
+     * Writes an edit through the refinery module, or in a dry run derives the order it would leave.
      *
      * @param slot the order
      * @param edit the edit
+     * @param refs the op's references, whose inputs name their outputs
      * @param action the journal action
-     * @param gameData whether the edit writes the game-data section
-     * @param finances whether the edit writes the finances section
      * @return the applied outcome
      */
     private @NotNull Outcome write(
         @NotNull Slot slot,
         @NotNull RefineryExchangeEdit edit,
-        @NotNull ExchangeJournalAction action,
-        boolean gameData,
-        boolean finances) {
-      if (dryRun || slot.id == null) {
-        slot.advance(gameData, finances);
+        @NotNull Refs refs,
+        @NotNull ExchangeJournalAction action) {
+      if (dryRun) {
+        slot.simulate(slot.view().edited(edit, refs.outputs()));
         return Outcome.APPLIED;
       }
-      RefineryExchangeOrder before = Objects.requireNonNull(slot.current);
-      RefineryExchangeOrder after = writer.edit(caller.member(), caller.clientId(), slot.id, edit);
-      journal(slot.id, action, before, after);
-      slot.current = after;
-      written.add(slot.id);
+      UUID id = slot.id();
+      RefineryExchangeOrder before = slot.order();
+      RefineryExchangeOrder after = writer.edit(caller.member(), caller.clientId(), id, edit);
+      journal(id, action, before, after);
+      slot.record(after);
+      written.add(id);
       Set<UUID> held = new LinkedHashSet<>();
       before.goods().forEach(good -> held.add(good.id()));
       return applied(
           after,
           after.goods().stream()
               .map(RefineryExchangeOrder.Good::id)
-              .filter(id -> !held.contains(id))
+              .filter(goodId -> !held.contains(goodId))
               .toList());
     }
 
@@ -785,21 +711,8 @@ public class ExchangeRefineryOrderWriteService
      */
     private @Nullable Slot address(@NotNull Op op) {
       if (op.id() != null) {
-        UUID id = ExchangeRefineryOrderReferences.parse(op.id());
-        if (id == null) {
-          return null;
-        }
-        Slot slot = byId.get(id);
-        if (slot != null) {
-          return slot;
-        }
-        Optional<RefineryExchangeOrder> order = writer.lockOwn(caller.member(), id);
-        if (order.isEmpty()) {
-          return null;
-        }
-        Slot loaded = new Slot(id, order.get());
-        byId.put(id, loaded);
-        return loaded;
+        UUID id = ExchangeIds.parse(op.id());
+        return id == null ? null : locked(id);
       }
       String key = Objects.requireNonNull(op.clientKey());
       Slot slot = byKey.get(key);
@@ -807,30 +720,40 @@ public class ExchangeRefineryOrderWriteService
     }
 
     /**
-     * Looks a client key up in the stored links and locks the order it names.
+     * Looks a client key up in the links that still name an order and locks the order.
      *
      * @param key the client's key
      * @return the order, or {@code null} when the key names none the member owns now
      */
     private @Nullable Slot linked(@NotNull String key) {
       Optional<ExchangeRefineryOrderLink> link =
-          linkRepository.findByUserIdAndClientIdAndClientKey(
+          linkRepository.findByUserIdAndClientIdAndClientKeyAndRetiredAtIsNull(
               caller.member(), caller.clientId(), key);
-      if (link.isEmpty()) {
+      Slot slot = link.isEmpty() ? null : locked(link.get().getRefineryOrderId());
+      if (slot != null) {
+        byKey.put(key, slot);
+      }
+      return slot;
+    }
+
+    /**
+     * Finds an order by id, locking it on first sight.
+     *
+     * @param id the order
+     * @return the order, or {@code null} when the member owns none of that id
+     */
+    private @Nullable Slot locked(@NotNull UUID id) {
+      Slot slot = byId.get(id);
+      if (slot != null) {
+        return slot;
+      }
+      Optional<RefineryExchangeOrder> order = writer.lockOwn(caller.member(), id);
+      if (order.isEmpty()) {
         return null;
       }
-      UUID id = link.get().getRefineryOrderId();
-      Slot slot = byId.get(id);
-      if (slot == null) {
-        Optional<RefineryExchangeOrder> order = writer.lockOwn(caller.member(), id);
-        if (order.isEmpty()) {
-          return null;
-        }
-        slot = new Slot(id, order.get());
-        byId.put(id, slot);
-      }
-      byKey.put(key, slot);
-      return slot;
+      Slot loaded = Slot.loaded(order.get());
+      byId.put(id, loaded);
+      return loaded;
     }
 
     /**
@@ -861,7 +784,7 @@ public class ExchangeRefineryOrderWriteService
    * @return the finances, or {@code null} when the op names none
    */
   private static @Nullable RefineryExchangeEdit.Finances finances(
-      @NotNull Op op, @Nullable RefineryExchangeOrder current) {
+      @NotNull Op op, @Nullable ExchangeRefineryOrderView current) {
     if (op.expenses() == null && op.otherExpenses() == null && op.oreSales() == null) {
       return null;
     }
@@ -885,49 +808,20 @@ public class ExchangeRefineryOrderWriteService
   }
 
   /**
-   * Whether an update would leave the order as it is.
-   *
-   * @param order the order
-   * @param edit the update
-   * @return {@code true} when every part it carries equals the order's
+   * One order as the earlier ops of the set left it. A slot a real run decides on always holds the
+   * order the refinery module last returned; a dry run's holds only its view.
    */
-  private static boolean unchanged(
-      @NotNull RefineryExchangeOrder order, @NotNull RefineryExchangeEdit edit) {
-    RefineryExchangeEdit.Finances finances = edit.finances();
-    RefineryExchangeEdit.Timer timer = edit.timer();
-    UUID method = order.method() == null ? null : order.method().id();
-    return (edit.locationId() == null || edit.locationId().equals(order.location().id()))
-        && (edit.method() == null || Objects.equals(edit.method().id(), method))
-        && (edit.status() == null || edit.status().equals(order.status()))
-        && (timer == null
-            || (Objects.equals(timer.startedAt(), order.startedAt())
-                && Objects.equals(timer.durationMinutes(), order.durationMinutes())))
-        && (finances == null
-            || (money(finances.expenses(), order.expenses())
-                && money(finances.otherExpenses(), order.otherExpenses())
-                && money(finances.oreSales(), order.oreSales())));
-  }
-
-  /**
-   * Whether a requested money value stores as the order's.
-   *
-   * @param requested the requested value, 0 and {@code null} meaning none
-   * @param stored the stored value
-   * @return {@code true} when both store the same
-   */
-  private static boolean money(@Nullable Double requested, @Nullable Double stored) {
-    Double normalised = requested == null || requested == 0.0 ? null : requested;
-    return Objects.equals(normalised, stored);
-  }
-
-  /** One order as the earlier ops of the set left it. */
+  @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
   private static final class Slot {
 
-    /** The order's id, or {@code null} for one a dry run would create or a refused create. */
+    /** The order's id, or {@code null} for one a dry run creates or a refused create. */
     private final @Nullable UUID id;
 
-    /** The order as last read or written, or {@code null} when {@link #id} is. */
-    private @Nullable RefineryExchangeOrder current;
+    /** The order as the refinery module last returned it, or {@code null} in a dry run's create. */
+    private @Nullable RefineryExchangeOrder order;
+
+    /** What the next op is decided against, or {@code null} for a refused create. */
+    private @Nullable ExchangeRefineryOrderView view;
 
     /** Whether an op on the order was refused. */
     private boolean refused;
@@ -935,21 +829,88 @@ public class ExchangeRefineryOrderWriteService
     /** Whether an op of the set deleted the order, or would in a dry run. */
     private boolean deleted;
 
-    /** The game-data counter a dry run advanced past the stored one. */
-    private long gameDataSteps;
-
-    /** The finances counter a dry run advanced past the stored one. */
-    private long financesSteps;
+    /**
+     * A slot of an order read or written.
+     *
+     * @param order the order
+     * @return the slot
+     */
+    static @NotNull Slot loaded(@NotNull RefineryExchangeOrder order) {
+      Slot slot = new Slot(order.id());
+      slot.record(order);
+      return slot;
+    }
 
     /**
-     * Creates a slot.
+     * A slot of an order a dry run creates.
      *
-     * @param id the order's id, or {@code null}
-     * @param current the order, or {@code null}
+     * @param view the created order
+     * @return the slot
      */
-    private Slot(@Nullable UUID id, @Nullable RefineryExchangeOrder current) {
-      this.id = id;
-      this.current = current;
+    static @NotNull Slot simulated(@NotNull ExchangeRefineryOrderView view) {
+      Slot slot = new Slot(null);
+      slot.view = view;
+      return slot;
+    }
+
+    /**
+     * A slot of a refused create, on which every later op is refused.
+     *
+     * @return the slot
+     */
+    static @NotNull Slot refusedCreate() {
+      Slot slot = new Slot(null);
+      slot.refused = true;
+      return slot;
+    }
+
+    /**
+     * Takes the order the refinery module returned after a write.
+     *
+     * @param written the order
+     */
+    void record(@NotNull RefineryExchangeOrder written) {
+      order = written;
+      view = ExchangeRefineryOrderView.of(written);
+    }
+
+    /**
+     * Takes the order a dry-run op would leave.
+     *
+     * @param next the order
+     */
+    void simulate(@NotNull ExchangeRefineryOrderView next) {
+      view = next;
+    }
+
+    /**
+     * What the next op is decided against.
+     *
+     * @return the view; never {@code null} for a slot that is not refused
+     */
+    @NotNull
+    ExchangeRefineryOrderView view() {
+      return Objects.requireNonNull(view, "view");
+    }
+
+    /**
+     * The id of an order a real run writes.
+     *
+     * @return the id
+     */
+    @NotNull
+    UUID id() {
+      return Objects.requireNonNull(id, "id");
+    }
+
+    /**
+     * The order a real run writes, as last returned.
+     *
+     * @return the order
+     */
+    @NotNull
+    RefineryExchangeOrder order() {
+      return Objects.requireNonNull(order, "order");
     }
 
     /**
@@ -958,9 +919,8 @@ public class ExchangeRefineryOrderWriteService
      * @param echoed the echo, or {@code null}
      * @return {@code true} when it matches
      */
-    private boolean gameDataIs(@Nullable Long echoed) {
-      long base = current == null ? 0L : current.gameDataVersion();
-      return echoed != null && echoed == base + gameDataSteps;
+    boolean gameDataIs(@Nullable Long echoed) {
+      return echoed != null && echoed == view().gameDataVersion();
     }
 
     /**
@@ -969,20 +929,8 @@ public class ExchangeRefineryOrderWriteService
      * @param echoed the echo, or {@code null}
      * @return {@code true} when it matches
      */
-    private boolean financesAre(@Nullable Long echoed) {
-      long base = current == null ? 0L : current.financesVersion();
-      return echoed != null && echoed == base + financesSteps;
-    }
-
-    /**
-     * Advances the counters a dry-run op would raise.
-     *
-     * @param gameData whether it raises game data
-     * @param finances whether it raises the finances
-     */
-    private void advance(boolean gameData, boolean finances) {
-      gameDataSteps += gameData ? 1 : 0;
-      financesSteps += finances ? 1 : 0;
+    boolean financesAre(@Nullable Long echoed) {
+      return echoed != null && echoed == view().financesVersion();
     }
   }
 

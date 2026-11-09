@@ -34,8 +34,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param locationId the refinery's location, or {@code null}
  * @param method the refining method, or {@code null}
  * @param timer the run's start and length, or {@code null}
- * @param status {@code OPEN}, {@code IN_PROGRESS}, {@code COMPLETED} or {@code CANCELED}, or {@code
- *     null}
+ * @param status the status, or {@code null}
  * @param finances the three money fields, or {@code null}
  * @param goods every good the order holds afterwards, or {@code null}: a good with an id the order
  *     has is changed, one with an id it lacks is inserted under that id, one without an id is
@@ -45,7 +44,7 @@ public record RefineryExchangeEdit(
     @Nullable UUID locationId,
     @Nullable Method method,
     @Nullable Timer timer,
-    @Nullable String status,
+    @Nullable RefineryOrderStatus status,
     @Nullable Finances finances,
     @Nullable @Unmodifiable List<Good> goods) {
 
