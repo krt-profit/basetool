@@ -359,7 +359,10 @@ final class BankWebAccessDriver {
    */
   @NotNull
   private String approve(@NotNull Case c, @NotNull UUID requestId) throws Exception {
-    return render(send(c, post(ORG + "/requests/" + requestId + "/owner-approval")), _ -> "");
+    Map<String, Object> payload = Map.of("version", versionOf(requestId));
+    return render(
+        send(c, post(ORG + "/requests/" + requestId + "/owner-approval").content(body(payload))),
+        _ -> "");
   }
 
   /**

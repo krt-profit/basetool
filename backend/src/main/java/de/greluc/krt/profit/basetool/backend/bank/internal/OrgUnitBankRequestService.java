@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.EnumSet;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -458,18 +460,24 @@ public class OrgUnitBankRequestService {
   }
 
   /**
-   * Grants the required approver's approval of an over-limit booking request (REQ-BANK-041).
+   * Grants the required approver's approval of an over-limit booking request as the approver read
+   * it (REQ-BANK-041, REQ-BANK-056).
    *
    * @param requestId the request to approve
+   * @param version the request's version as the approver read it
    * @return the updated request
    * @throws NotFoundException when the request does not exist
    * @throws AccessDeniedException when the caller may not approve the request
+   * @throws ObjectOptimisticLockingFailureException when the request changed since it was read
    * @throws BadRequestException when the request needs no approval or is no longer pending
    */
   @NotNull
   @Transactional
-  public BankBookingRequestDto grantOwnerApproval(@NotNull UUID requestId) {
-    return applyOwnerApproval(requestId, true);
+  public BankBookingRequestDto grantOwnerApproval(@NotNull UUID requestId, long version) {
+    BankBookingRequest request = lockForApproval(requestId);
+    OptimisticLock.checkRequired(
+        request.getVersion(), version, BankBookingRequest.class, request.getId());
+    return bankBookingRequestService.applyOwnerApprovalWithinTransaction(request, true);
   }
 
   /**
@@ -483,26 +491,26 @@ public class OrgUnitBankRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto revokeOwnerApproval(@NotNull UUID requestId) {
-    return applyOwnerApproval(requestId, false);
+    return bankBookingRequestService.applyOwnerApprovalWithinTransaction(
+        lockForApproval(requestId), false);
   }
 
   /**
-   * Loads and locks a request, authorizes the caller through the policy, and delegates the mutation
-   * and audit to {@link
-   * BankBookingRequestService#applyOwnerApprovalWithinTransaction(BankBookingRequest, boolean)}.
+   * Loads and locks a request and authorizes the caller as its approver through the policy.
    *
    * @param requestId the request
-   * @param granted {@code true} to grant, {@code false} to revoke the approval
-   * @return the updated request
+   * @return the locked request
+   * @throws NotFoundException when the request does not exist
+   * @throws AccessDeniedException when the caller may not approve the request
    */
   @NotNull
-  private BankBookingRequestDto applyOwnerApproval(@NotNull UUID requestId, boolean granted) {
+  private BankBookingRequest lockForApproval(@NotNull UUID requestId) {
     BankBookingRequest request =
         Entities.require(
             bankBookingRequestRepository.findByIdForUpdate(requestId), "Booking request not found");
     if (!policy.mayApprove(accessService.actor(), request)) {
       throw new AccessDeniedException("The caller may not approve this request");
     }
-    return bankBookingRequestService.applyOwnerApprovalWithinTransaction(request, granted);
+    return request;
   }
 }

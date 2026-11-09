@@ -2918,7 +2918,10 @@ routing for the new amount (`OrgUnitBankAccessServiceTest`, `updateOwnBookingReq
 **An already-approved request is frozen** (`BANK_REQUEST_ALREADY_APPROVED`, 409). The approval was
 granted for the amount and reason **as they stood**; allowing an edit afterwards would convert a
 small approved request into an arbitrarily large pre-approved one. The UI withholds the edit button
-in that state rather than offering a dead end.
+in that state rather than offering a dead end. For the same reason the approval itself echoes the
+version the approver read (`POST …/requests/{id}/owner-approval` with `{ version }`): a request
+corrected in the meantime, in the Basetool or through a connected application, answers `409` and
+stays unapproved (`OrgUnitBankAccessServiceTest`, `grantOwnerApproval_staleVersion_*`).
 
 The endpoint is `PUT /api/v1/bank/org-units/requests/{id}` with **PUT semantics** (an omitted field
 clears it), guarded under the row lock by: ownership (a foreign id is **404**, never 403 — the same

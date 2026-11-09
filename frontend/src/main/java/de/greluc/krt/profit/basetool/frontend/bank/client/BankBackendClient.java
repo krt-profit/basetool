@@ -760,7 +760,7 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @param body the browser's body, which the backend does not bind
+   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -796,7 +796,7 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether all members may view the account
-   * @param body the browser's body, which the backend does not bind
+   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -815,7 +815,7 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether the whole area cascade may view the account
-   * @param body the browser's body, which the backend does not bind
+   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -834,7 +834,7 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user to grant
-   * @param body the browser's body, which the backend does not bind
+   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -1003,7 +1003,7 @@ public class BankBackendClient {
    * Grants the responsible holder's in-app approval of an over-limit request (REQ-BANK-041).
    *
    * @param id the request
-   * @param body the browser's body, which the backend does not bind
+   * @param body the browser's body with the request's echoed {@code version}
    * @return the updated request, or {@code null} when the backend sent no body
    */
   @Nullable

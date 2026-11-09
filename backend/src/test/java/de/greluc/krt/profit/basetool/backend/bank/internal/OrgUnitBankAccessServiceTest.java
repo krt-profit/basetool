@@ -1563,11 +1563,12 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setAccount(account);
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.member(UUID.randomUUID()));
 
-    assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId));
+    assertThrows(AccessDeniedException.class, () -> requestService.grantOwnerApproval(requestId, 3L));
     verifyNoInteractions(bankBookingRequestService);
   }
 
@@ -1581,16 +1582,38 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setAccount(account);
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.member(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, orgUnitId));
 
-    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId, 3L);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
+  }
+
+  /** An approval of a request that changed since the approver read it is refused (REQ-BANK-056). */
+  @Test
+  void grantOwnerApproval_staleVersion_isAConflictAndApprovesNothing() {
+    UUID requestId = UUID.randomUUID();
+    UUID orgUnitId = UUID.randomUUID();
+    BankBookingRequest bookingRequest = new BankBookingRequest();
+    bookingRequest.setAccount(
+        account(UUID.randomUUID(), "KB-0001", squadron(orgUnitId, "Own", "OWN")));
+    bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
+    bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(4L);
+    when(bankBookingRequestRepository.findByIdForUpdate(requestId))
+        .thenReturn(Optional.of(bookingRequest));
+    actingAs(TestBankActor.member(UUID.randomUUID()).seat(orgUnitId, MembershipRole.STAFFELLEITER));
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> requestService.grantOwnerApproval(requestId, 3L));
+    verifyNoInteractions(bankBookingRequestService);
   }
 
   @Test
@@ -1605,13 +1628,14 @@ class OrgUnitBankAccessServiceTest {
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
     bookingRequest.setRequiredApprover(BankRequestApprover.BANK_MANAGEMENT);
+    bookingRequest.setVersion(3L);
     actingAs(TestBankActor.of(UUID.randomUUID()).admin());
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     when(bankBookingRequestService.applyOwnerApprovalWithinTransaction(bookingRequest, true))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
-    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId);
+    BankBookingRequestDto dto = requestService.grantOwnerApproval(requestId, 3L);
 
     assertThat(dto).isNotNull();
     verify(bankBookingRequestService).applyOwnerApprovalWithinTransaction(bookingRequest, true);
@@ -2389,6 +2413,7 @@ class OrgUnitBankAccessServiceTest {
         account(UUID.randomUUID(), "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN")));
     bookingRequest.setStatus(BankBookingRequestStatus.PENDING);
     bookingRequest.setRequiresOwnerApproval(true);
+    bookingRequest.setVersion(3L);
     when(bankBookingRequestRepository.findByIdForUpdate(requestId))
         .thenReturn(Optional.of(bookingRequest));
     actingAs(TestBankActor.of(UUID.randomUUID()).admin());

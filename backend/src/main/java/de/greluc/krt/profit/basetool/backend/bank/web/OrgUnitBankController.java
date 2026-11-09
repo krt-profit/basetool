@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestSta
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountDetailDto;
@@ -652,17 +654,20 @@ public class OrgUnitBankController {
   /**
    * Grants the responsible holder's in-app approval for an over-limit request (REQ-BANK-041), which
    * pre-fills the bank employee's confirmation checkbox. The seam authorizes the caller as the
-   * account's responsible holder (or admin).
+   * request's approver; a request that changed since the echoed version answers 409.
    *
    * @param id the request to approve
+   * @param request the version of the request as the approver read it
    * @return the updated request
    */
   @PostMapping("/requests/{id}/owner-approval")
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Grant the responsible holder's in-app approval for a booking request")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Approval granted")})
-  public BankBookingRequestDto grantOwnerApproval(@PathVariable @NotNull UUID id) {
-    return orgUnitBankRequestService.grantOwnerApproval(id);
+  public BankBookingRequestDto grantOwnerApproval(
+      @PathVariable @NotNull UUID id,
+      @NotNull @Valid @RequestBody GrantOwnerApprovalRequest request) {
+    return orgUnitBankRequestService.grantOwnerApproval(id, request.version());
   }
 
   /**

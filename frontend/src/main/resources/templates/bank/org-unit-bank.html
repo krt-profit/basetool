@@ -420,6 +420,7 @@
                                               class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                                               data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
                                             <input type="hidden" name="_id" th:value="${r.id()}">
+                                            <input type="hidden" name="version" th:value="${r.version()}">
                                             <button type="submit" class="btn btn-xs btn-success"
                                                     data-testid="org-unit-bank-grant-approval-btn"
                                                     th:text="#{bank.approvalLimit.grant}">Freigabe erteilen</button>
