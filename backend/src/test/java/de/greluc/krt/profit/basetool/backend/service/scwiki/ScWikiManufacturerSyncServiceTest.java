@@ -292,16 +292,18 @@ class ScWikiManufacturerSyncServiceTest {
   void duplicateSourceNamesCannotLinkTheFirstManufacturerByName() {
     UUID first = UUID.randomUUID();
     UUID second = UUID.randomUUID();
+    Manufacturer unclaimed = manufacturer("Aegis Dynamics", "AEGS");
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
         .thenReturn(
             ScWikiClient.FetchResult.of(
                 List.of(
                     dto(first, "Aegis Dynamics", "AEGS1"),
                     dto(second, " aegis dynamics ", "AEGS2"))));
+    when(manufacturerRepository.findByNameIgnoreCase(any())).thenReturn(Optional.of(unclaimed));
 
     assertEquals(0, service.syncManufacturers());
 
-    verify(manufacturerRepository, never()).findByNameIgnoreCase(any());
+    assertNull(unclaimed.getScwikiUuid());
     verify(manufacturerRepository, never()).save(any());
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(syncReportService, times(2))
@@ -316,16 +318,19 @@ class ScWikiManufacturerSyncServiceTest {
 
   @Test
   void duplicateSourceCodesCannotLinkTheFirstManufacturerByAbbreviation() {
+    Manufacturer unclaimed = manufacturer("Aegis Dynamics", "AEGS");
     when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
         .thenReturn(
             ScWikiClient.FetchResult.of(
                 List.of(
                     dto(UUID.randomUUID(), "Unknown One", "AEGS"),
                     dto(UUID.randomUUID(), "Unknown Two", " aegs "))));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase(any()))
+        .thenReturn(List.of(unclaimed));
 
     assertEquals(0, service.syncManufacturers());
 
-    verify(manufacturerRepository, never()).findByAbbreviationIgnoreCase(any());
+    assertNull(unclaimed.getScwikiUuid());
     verify(manufacturerRepository, never()).save(any());
     verify(manufacturerRepository, never()).markScwikiDeletedExcept(any(), any());
     verify(syncReportService, times(2))
@@ -336,6 +341,58 @@ class ScWikiManufacturerSyncServiceTest {
             any(),
             any(),
             any());
+  }
+
+  @Test
+  void aSharedCodeHeldBySiblingOrCarriedByNoLocalRowLeavesTheCensusComplete() {
+    UUID arcCorp = UUID.randomUUID();
+    UUID casaba = UUID.randomUUID();
+    UUID mirai = UUID.randomUUID();
+    UUID musashi = UUID.randomUUID();
+    Manufacturer linkedArcCorp = manufacturer("ArcCorp", "ARCC");
+    linkedArcCorp.setScwikiUuid(arcCorp);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    dto(arcCorp, "ArcCorp", "ARCC"),
+                    dto(casaba, "Casaba Outlet", "ARCC"),
+                    dto(mirai, "Mirai", "MIS"),
+                    dto(musashi, "Musashi Industrial & Starflight Concern", "MIS"))));
+    when(manufacturerRepository.findByScwikiUuid(arcCorp)).thenReturn(Optional.of(linkedArcCorp));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("ARCC"))
+        .thenReturn(List.of(linkedArcCorp));
+
+    assertEquals(1, service.syncManufacturers());
+
+    assertEquals(arcCorp, linkedArcCorp.getScwikiUuid());
+    verify(manufacturerRepository).save(linkedArcCorp);
+    verify(syncReportService, never())
+        .logScwikiEvent(
+            any(), eq(SyncEventType.MULTI_MATCH_AMBIGUOUS), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(manufacturerRepository).markScwikiDeletedExcept(any(), any());
+    verify(syncReportService).recordSweep(true);
+  }
+
+  @Test
+  void aSharedNameWhoseOnlyLocalRowIsLinkedToTheSiblingIsUnmatched() {
+    UUID curelife = UUID.randomUUID();
+    UUID cureLifeVariant = UUID.randomUUID();
+    Manufacturer linked = manufacturer("Curelife", "CUR");
+    linked.setP4kUuid(curelife);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(dto(curelife, "Curelife", "CUR"), dto(cureLifeVariant, "CureLife", "CRLF"))));
+    when(manufacturerRepository.findByP4kUuid(curelife)).thenReturn(Optional.of(linked));
+    when(manufacturerRepository.findByNameIgnoreCase("CureLife")).thenReturn(Optional.of(linked));
+
+    assertEquals(1, service.syncManufacturers());
+
+    assertEquals(curelife, linked.getScwikiUuid());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(syncReportService).recordSweep(true);
   }
 
   @Test

@@ -111,13 +111,14 @@ public class ScWikiManufacturerSyncService {
     if (valid.size() != rows.size() || seen.size() != rows.size()) {
       syncReportService.recordIncomplete();
     }
+    SourceKeys keys = new SourceKeys(names, codes, seen);
     var outcome =
         chunkWriter.write(
             valid,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk ->
                 chunk.stream()
-                    .map(dto -> reconcile(dto, runId, now, conflicts, names, codes))
+                    .map(dto -> reconcile(dto, runId, now, conflicts, keys))
                     .filter(id -> id != null)
                     .toList(),
             "Wiki manufacturer",
@@ -147,9 +148,8 @@ public class ScWikiManufacturerSyncService {
       UUID runId,
       Instant now,
       Set<UUID> conflicts,
-      Map<String, Long> names,
-      Map<String, Long> codes) {
-    ManufacturerMatch resolution = resolve(dto, names, codes);
+      SourceKeys keys) {
+    ManufacturerMatch resolution = resolve(dto, keys);
     Manufacturer manufacturer = resolution.manufacturer();
     if (manufacturer == null) {
       if (resolution.ambiguous()) {
@@ -220,13 +220,15 @@ public class ScWikiManufacturerSyncService {
    * Resolves a Wiki manufacturer to a local row by {@code p4k_uuid}, {@code scwiki_uuid}, then
    * case-insensitive name, then case-insensitive {@code abbreviation == code}.
    *
+   * <p>A name or code that several census rows share is ambiguous only while a local row carrying
+   * it is still unclaimed; a local row linked to another manufacturer of this census belongs to
+   * that sibling, and a key no local row carries leaves the Wiki row simply unmatched.
+   *
    * @param dto the Wiki manufacturer payload
-   * @param names current Wiki identities per normalized exact name
-   * @param codes current Wiki identities per normalized engine code
+   * @param keys the census's shared keys and identities
    * @return the matching local manufacturer, or {@code null}
    */
-  private ManufacturerMatch resolve(
-      @NotNull ScWikiManufacturerDto dto, Map<String, Long> names, Map<String, Long> codes) {
+  private ManufacturerMatch resolve(@NotNull ScWikiManufacturerDto dto, SourceKeys keys) {
     Optional<Manufacturer> byUuid =
         manufacturerRepository
             .findByP4kUuid(dto.uuid())
@@ -236,27 +238,25 @@ public class ScWikiManufacturerSyncService {
     }
     boolean ambiguous = false;
     if (StringUtils.hasText(dto.name())) {
-      long count = names.getOrDefault(sourceKey(dto.name()), 0L);
-      if (count == 1) {
-        var byName = manufacturerRepository.findByNameIgnoreCase(dto.name().strip());
+      var byName = manufacturerRepository.findByNameIgnoreCase(dto.name().strip());
+      if (keys.names().getOrDefault(sourceKey(dto.name()), 0L) == 1) {
         if (byName.isPresent()) {
           return new ManufacturerMatch(byName.get(), false);
         }
       } else {
-        ambiguous = true;
+        ambiguous = byName.filter(row -> !keys.heldBySibling(row, dto.uuid())).isPresent();
       }
     }
     if (StringUtils.hasText(dto.code())) {
-      long count = codes.getOrDefault(sourceKey(dto.code()), 0L);
-      if (count == 1) {
-        List<Manufacturer> byCode =
-            manufacturerRepository.findByAbbreviationIgnoreCase(dto.code().strip());
+      List<Manufacturer> byCode =
+          manufacturerRepository.findByAbbreviationIgnoreCase(dto.code().strip());
+      if (keys.codes().getOrDefault(sourceKey(dto.code()), 0L) == 1) {
         if (byCode.size() == 1) {
           return new ManufacturerMatch(byCode.getFirst(), false);
         }
         ambiguous |= byCode.size() > 1;
       } else {
-        ambiguous = true;
+        ambiguous |= byCode.stream().anyMatch(row -> !keys.heldBySibling(row, dto.uuid()));
       }
     }
     return new ManufacturerMatch(null, ambiguous);
@@ -264,6 +264,32 @@ public class ScWikiManufacturerSyncService {
 
   /** A local identity candidate with an explicit ambiguity outcome. */
   private record ManufacturerMatch(@Nullable Manufacturer manufacturer, boolean ambiguous) {}
+
+  /**
+   * One census's key counts and identities, used to tell a shared key apart from a contested one.
+   *
+   * @param names census rows per normalized exact name
+   * @param codes census rows per normalized engine code
+   * @param census Wiki UUIDs of every valid census row
+   */
+  private record SourceKeys(
+      Map<String, Long> names, Map<String, Long> codes, Set<UUID> census) {
+
+    /**
+     * Tells whether a local row is already linked to another manufacturer of this census.
+     *
+     * @param row local manufacturer carrying a shared key
+     * @param self Wiki UUID being resolved
+     * @return {@code true} when its P4K or Wiki UUID names a different census row
+     */
+    boolean heldBySibling(Manufacturer row, UUID self) {
+      return linkedElsewhere(row.getScwikiUuid(), self) || linkedElsewhere(row.getP4kUuid(), self);
+    }
+
+    private boolean linkedElsewhere(@Nullable UUID link, UUID self) {
+      return link != null && !link.equals(self) && census.contains(link);
+    }
+  }
 
   private static String sourceKey(@NotNull String value) {
     return value.strip().toLowerCase(Locale.ROOT);
