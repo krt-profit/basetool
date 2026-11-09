@@ -196,7 +196,6 @@ class UserReconciliationServiceTest {
         new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, null));
 
     assertEquals(Set.of(krtMember), existing.getRoles());
-    verify(roleRepository, never()).findAllWithPermissions();
     verify(seatNotifier, never()).onRolesChanged(any(), any());
   }
 
@@ -385,7 +384,6 @@ class UserReconciliationServiceTest {
 
       assertEquals(Set.of(krtMember), result.getRoles());
       verify(userRepository, never()).save(any(User.class));
-      verify(roleRepository, never()).findAllWithPermissions();
       verify(seatNotifier, never()).onRolesChanged(any(), any());
     }
 

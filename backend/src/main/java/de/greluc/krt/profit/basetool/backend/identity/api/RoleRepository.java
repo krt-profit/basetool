@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import jakarta.persistence.LockModeType;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -64,27 +62,6 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
    * @return the role, or empty when the catalogue knows no such code
    */
   Optional<Role> findByCodeIgnoreCase(String code);
-
-  /**
-   * The whole role catalogue with each role's {@code permissions} already loaded.
-   *
-   * <p>The roles outlive the reading transaction and their permissions are iterated on the
-   * authentication path, where a lazy load would fail on every login. {@code DISTINCT} because the
-   * join multiplies each role by its permission rows.
-   *
-   * @return every role, with its permission set initialised
-   */
-  @Query("SELECT DISTINCT r FROM Role r LEFT JOIN FETCH r.permissions")
-  List<Role> findAllWithPermissions();
-
-  /**
-   * Returns the {@code name} of every role in the local catalogue as a scalar projection; the
-   * Keycloak user sync fetches role memberships for exactly these names.
-   *
-   * @return the set of role names; never {@code null}, possibly empty
-   */
-  @Query("SELECT r.name FROM Role r")
-  Set<String> findAllNames();
 
   /**
    * Loads a role under a row lock held to the end of the transaction, so that checks against its
