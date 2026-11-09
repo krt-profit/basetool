@@ -45,7 +45,7 @@ worth reading even if you know the domain.
 | **Blueprints** | Crafting recipes a member has unlocked (**Meine Blueprints**), and who across the organisation can craft an item; **Standard-Blueprints** are granted to every account automatically. |
 | **Hangar** | Ship tracking, per member and per org unit. |
 | **Materialien** | The material catalogue everything points at, with its units and aliases; fed partly from UEX and the SC Wiki. |
-| **Buchungsantrag / Anträge** | An org unit's deposit or withdrawal request in the Kartellbank, confirmed or rejected by the bank officers. The **Org-Einheits-Bank** is a unit's own view of its account and requests. |
+| **Buchungsantrag / Anträge** | An org unit's deposit or withdrawal request in the Kartellbank, confirmed or rejected by the bank officers. The **Bank** tab of **Meine Einheit** (`/org-unit-bank`) is a unit's own view of its account and requests. |
 | **Benachrichtigungen** | A per-user inbox fed by admin-maintained **Benachrichtigungsregeln** and pushed live. |
 
 ## 12.3 Architecture and operations
