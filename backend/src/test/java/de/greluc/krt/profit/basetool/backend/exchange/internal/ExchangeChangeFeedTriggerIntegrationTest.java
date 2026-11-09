@@ -329,11 +329,13 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
     assertThat(changes(bob))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
   }
 
   @Test
@@ -349,7 +351,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
   }
 
   @Test
@@ -395,7 +398,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
     assertThat(changes(alice))
         .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
     assertThat(changes(bob)).isEmpty();
   }
 

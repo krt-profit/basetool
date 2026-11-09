@@ -134,7 +134,7 @@ class RefineryModuleContractTest {
             put(ORDERS + "/" + id)
                 .with(as(owner, MEMBER))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(created.get("version").asLong(), 120)))
+                .content(body(created.get("gameDataVersion").asLong(), 120)))
         .andExpect(status().isOk());
     assertThat(events(id)).containsExactly("REFINERY_ORDER_CREATED", "REFINERY_ORDER_UPDATED");
 
@@ -156,7 +156,7 @@ class RefineryModuleContractTest {
             put(order)
                 .with(caller)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(created.get("version").asLong(), 90)))
+                .content(body(created.get("gameDataVersion").asLong(), 90)))
         .andExpect(status().isForbidden());
     mockMvc.perform(delete(order).with(caller)).andExpect(status().isForbidden());
     mockMvc
@@ -185,7 +185,7 @@ class RefineryModuleContractTest {
             put(user + "/" + id)
                 .with(caller)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(created.get("version").asLong(), 90)))
+                .content(body(created.get("gameDataVersion").asLong(), 90)))
         .andExpect(status().isForbidden());
     mockMvc.perform(delete(user + "/" + id).with(caller)).andExpect(status().isForbidden());
   }
@@ -214,7 +214,7 @@ class RefineryModuleContractTest {
     return objectMapper.readTree(response);
   }
 
-  private String body(Long version, long durationMinutes) {
+  private String body(Long gameDataVersion, long durationMinutes) {
     return """
     {"location":{"id":"%s","name":"%s"},"durationMinutes":%d,%s
      "goods":[{"inputMaterial":{"id":"%s","name":"%s","type":"RAW"},
@@ -224,7 +224,9 @@ class RefineryModuleContractTest {
             refinery.getId(),
             refinery.getName(),
             durationMinutes,
-            version == null ? "" : "\"version\":" + version + ",",
+            gameDataVersion == null
+                ? ""
+                : "\"parts\":[\"GAME_DATA\"],\"gameDataVersion\":" + gameDataVersion + ",",
             ore.getId(),
             ore.getName());
   }

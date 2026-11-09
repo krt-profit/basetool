@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The exchange's part of the account merge: installations, ship links and refinery-order keys
@@ -81,6 +83,7 @@ public class ExchangeUserReassignment extends OwnedRowsReassignment {
    * @return one entry per table that had a row to move or to drop
    */
   @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull List<Moved> reassign(@NotNull UUID source, @NotNull UUID target) {
     keys.handOver(source, target);
     return super.reassign(source, target);

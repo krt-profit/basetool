@@ -613,7 +613,8 @@ class DualUseRequestBodyProofTest {
             "location", Map.of("id", station.getId()),
             "durationMinutes", 90,
             "goods", goods,
-            "version", own.getVersion()));
+            "parts", List.of("GAME_DATA"),
+            "gameDataVersion", own.getGameDataVersion()));
 
     RefineryOrder updated = refineryOrderRepository.findById(own.getId()).orElseThrow();
     assertThat(updated.getOwner().getId()).isEqualTo(member.getId());

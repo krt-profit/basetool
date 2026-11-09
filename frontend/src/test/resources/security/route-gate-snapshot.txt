@@ -623,6 +623,7 @@
 /refinery-orders/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#updateOrderAjax gate=method:isAuthenticated() layout=yes
 /refinery-orders/{id}/delete POST -> RefineryOrderWriteController#deleteOrder gate=method:isAuthenticated() layout=yes
 /refinery-orders/{id}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#deleteOrderAjax gate=method:isAuthenticated() layout=yes
+/refinery-orders/{id}/presence GET -> RefineryOrderPresenceController#presence gate=method:isAuthenticated() layout=no
 /refinery-orders/{id}/store POST -> RefineryOrderWriteController#storeOrder gate=method:isAuthenticated() layout=yes
 /refinery-orders/{id}/store POST headers=[X-Requested-With=XMLHttpRequest] -> RefineryOrderWriteController#storeOrderAjax gate=method:isAuthenticated() layout=yes
 /sc-links GET -> ScLinksPageController#showLinks gate=class:isAuthenticated() layout=yes
