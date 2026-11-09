@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +34,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeHolderRefs;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLiveSync;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLocationResolver;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoResultDto;
@@ -44,15 +46,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
@@ -102,7 +102,10 @@ class ExchangeRefineryStoreControllerTest {
   @Autowired private ExchangeHolderRefs holderRefs;
   @Autowired private ExchangeUndoService undoService;
   @Autowired private JdbcTemplate jdbc;
-  @MockitoSpyBean private LiveSyncPublisher publisher;
+  @MockitoSpyBean private ExchangeLiveSync liveSync;
+
+  /** Spied by the same name as in the other exchange write tests, so they share one context. */
+  @MockitoSpyBean private ExchangeLocationResolver locationResolver;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -394,15 +397,11 @@ class ExchangeRefineryStoreControllerTest {
                 + "\", \"versions\": {\"gameData\": 0}}")
         .andExpect(jsonPath("$.applied").value(2));
 
-    verify(publisher)
-        .publishAfterCommit(
-            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, stored), List.of("store"));
-    verify(publisher, never())
-        .publishAfterCommit(
-            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, plain), List.of("store"));
-    verify(publisher)
-        .publishAfterCommit(
-            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, plain), List.of("order"));
+    verify(liveSync)
+        .refineryOrdersChanged(
+            argThat(written -> written.containsAll(List.of(stored, plain))),
+            argThat(booked -> booked.contains(stored) && !booked.contains(plain)),
+            argThat(Collection::isEmpty));
   }
 
   @Test

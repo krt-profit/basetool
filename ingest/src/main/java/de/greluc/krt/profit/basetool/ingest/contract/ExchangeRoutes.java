@@ -62,6 +62,7 @@ public final class ExchangeRoutes {
 
   /** The change-set path below each of the member's feeds. */
   public static final String CHANGES = "/changes";
+
   /**
    * The root of the bank route family, which the bank switch gates (REQ-BXCH-006): every path at or
    * below it, whether a route serves it or not.

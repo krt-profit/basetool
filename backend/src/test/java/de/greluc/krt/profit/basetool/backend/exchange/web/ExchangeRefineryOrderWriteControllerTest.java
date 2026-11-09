@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapabilit
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLiveSync;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeLocationResolver;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMassChangeService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
@@ -44,9 +48,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
-import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
@@ -95,7 +96,10 @@ class ExchangeRefineryOrderWriteControllerTest {
   @Autowired private ExchangeUndoService undoService;
   @Autowired private ExchangeMassChangeService massChangeService;
   @Autowired private JdbcTemplate jdbc;
-  @MockitoSpyBean private LiveSyncPublisher publisher;
+  @MockitoSpyBean private ExchangeLiveSync liveSync;
+
+  /** Spied by the same name as in the other exchange write tests, so they share one context. */
+  @MockitoSpyBean private ExchangeLocationResolver locationResolver;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -418,9 +422,9 @@ class ExchangeRefineryOrderWriteControllerTest {
 
     undoService.undo(member, client, since);
 
-    verify(publisher)
-        .publishAfterCommit(
-            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, id), List.of("deleted"));
+    verify(liveSync)
+        .refineryOrdersChanged(
+            anyCollection(), anyCollection(), argThat(deleted -> deleted.contains(id)));
   }
 
   @Test

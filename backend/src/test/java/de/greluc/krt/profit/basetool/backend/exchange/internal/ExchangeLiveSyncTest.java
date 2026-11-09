@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -66,6 +67,39 @@ class ExchangeLiveSyncTest {
     verify(publisher)
         .publishAfterCommit(
             eq(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD)), eq(List.of("board")));
+  }
+
+  @Test
+  void aRefineryWriteRefreshesTheListEachWrittenOrderTheStoredOnesStoreAndTellsRemovedOnes() {
+    UUID written = UUID.fromString("1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d");
+    UUID stored = UUID.fromString("2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e");
+    UUID removed = UUID.fromString("3c4d5e6f-7a8b-4c9d-8e1f-2a3b4c5d6e7f");
+
+    liveSync.refineryOrdersChanged(List.of(written, stored), List.of(stored), List.of(removed));
+
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.global(LiveSyncTopicClass.REFINERY)), eq(List.of("queue")));
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, written)), eq(List.of("order")));
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, stored)), eq(List.of("store")));
+    verify(publisher, never())
+        .publishAfterCommit(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, written)), eq(List.of("store")));
+    verify(publisher)
+        .publishAfterCommit(
+            eq(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, removed)),
+            eq(List.of("deleted")));
+  }
+
+  @Test
+  void aRefineryWriteThatChangedNothingAnnouncesNothing() {
+    liveSync.refineryOrdersChanged(List.of(), List.of(), List.of());
+
+    verifyNoInteractions(publisher);
   }
 
   @Test
