@@ -13,6 +13,10 @@ stable, predictable surface.
 
 ### REQ-API-001 — Versioned URI paths
 
+> **Approved planned JobOrder amendment (not implemented):** The planned JobOrder DTO/capability/outcome changes and flag removal use this existing internal hard cut with the in-repo frontend/mirrors changed together. Keep frozen external relay shapes and reduced membership-scoped exchange data; no new Profit-wide gateway visibility follows. See [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 Paths are `/api/v1/...`. A breaking change is made by **hard cut** (ADR-0234): the operation
 moves or changes in place in one release, with no parallel old path, no deprecation alias and no
 sunset window. Two compatibility constraints stand outside that rule: the exchange relay operations
@@ -54,6 +58,10 @@ backend ship together. The exchange relay operations and the Keycloak SPI's
 
 ### REQ-API-002 — DTOs only at boundaries
 
+> **Approved planned JobOrder amendment (not implemented):** Expose the planned order-specific capability, scoped version, operation reference and outcome projections through typed DTOs. Persisted holder identity, linked account, display name, actual-payment fact, bank attempt and effective monetary result are distinct. Do not project private bank notes or unrelated custody into shared order data. Exact operation/schema names remain implementation work; see [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 Never expose JPA entities at controller boundaries (also ArchUnit-enforced — see
 [`security-and-access.md`](security-and-access.md) REQ-SEC-003). DTOs are records; write DTOs
 carry Jakarta validation (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct
@@ -79,6 +87,10 @@ unwritable. Mapping is MapStruct with `unmappedTargetPolicy = ERROR`, as above.
 `@Valid` on every `@RequestBody` for write operations (POST/PUT/PATCH). Enforced since REQ-API-015.
 
 ### REQ-API-004 — RFC 7807 error format
+
+> **Approved planned JobOrder amendment (not implemented):** JobOrder commands distinguish effective success, waiting bank coupling, unknown result and truthful error/conflict. HTTP correlation is not the stable monetary-operation identity. Identical safe replay returns the recorded outcome; incompatible reuse conflicts and a missing browser response is no proof of failure. Use registered problem codes and current access checks before version disclosure. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, a
 stable machine-readable `code`, and a per-request `correlationId`; validation errors add an

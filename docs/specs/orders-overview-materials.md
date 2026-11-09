@@ -26,6 +26,10 @@ item-order view); this spec adds the per-bucket stock that the overview progress
 
 ### REQ-ORDERS-017 — Item-order overview shows aggregated materials with collection progress
 
+> **Approved target — implementation pending:** For the approved target, the material collection column is MATERIAL/ITEM-specific; aUEC shows target, net handover and remaining under REQ-ORDERS-057. Requesters receive the same permitted collection/progress facts as other readers under orders-core.md; the old requester progress omission below is superseded for that target.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 The order-overview list's **Materialien** column MUST, for an `ITEM` order, render the order's
 **aggregated material list** — the materials derived and summed from the ordered items'
 blueprints, one row per material — with the same three columns a `MATERIAL` order shows:
@@ -59,6 +63,10 @@ progress column, because its rows carry no collection-progress fields
 `AggregatedMaterialDto.currentStock`, `templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
+
+> **Approved target — implementation pending:** For the approved target, only MATERIAL/ITEM accept these stock/material links. Apply the common current order-read/capability contract in orders-core.md to web allocation eligibility; aUEC monetary holders are not inventory allocations. The reduced external-exchange contract remains separate and is not widened by the web read rule.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 Because the order's material view (the `MATERIAL` requirement rows and the `ITEM` aggregated
 list, REQ-ORDERS-017) is built **solely from the order's requirements** with linked stock
@@ -152,6 +160,10 @@ two gates are parallel, not a replacement.
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
+> **Approved target — implementation pending:** For the approved target, common authorised order readers retain visibility of orphaned stock facts. Cancellation releases MATERIAL/ITEM purpose links, not physical stock or delivery/production history; see orders-core.md. This is separate from explicit aUEC residual-money settlement.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 To make pre-existing orphaned links (inventory linked before the REQ-ORDERS-018 gate, or via a
 future path) discoverable, the order **detail** page MUST surface every inventory item linked to
 the order whose material is **not** among the order's requirements, as a warning section listing
@@ -177,6 +189,10 @@ detail view.
 `templates/joborder/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side
+
+> **Approved target — implementation pending:** The approved common three-kind queue and all admitted reader relationships in orders-core.md apply to server-side pagination as well as details. Filtering/paging remains permission-scoped and in-place.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
@@ -216,6 +232,10 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
 
+> **Approved target — implementation pending:** The approved responsibility model in orders-core.md permits the unique Profit Bereich itself and its active subordinate Staffeln/SK. Display exactly one current responsible unit plus historical changes; the removed profit-eligibility flag is not a picker filter or authority source.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 The order-overview list's first cell (the one carrying the order id and the `MATERIAL`/`ITEM`
 kind badge) MUST also render the order's **responsible org unit** — the *processing* unit
 ("Bearbeitende Einheit", `JobOrderDto.responsibleOrgUnit`, the squadron or Spezialkommando
@@ -244,6 +264,10 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
+
+> **Approved target — implementation pending:** The approved overview supports MATERIAL, ITEM and aUEC kind filtering beside the existing useful filters; remember selection/return context. Do not render material collection widgets as aUEC fulfilment. See orders-core.md and orders-auec.md.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 Three order-overview affordances, all persisted **per browser** in `localStorage` — the same
 client-side persistence the Lager tree uses (REQ-INV-002, [`inventory-lager.md`](inventory-lager.md)), and not a server cookie. Note the one
@@ -310,6 +334,10 @@ query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/
 `JobOrderRepository.findScopedJobOrders`
 
 ### REQ-ORDERS-040 — Overview scope segment „Meine · Ich bearbeite · Zu bearbeiten · Alle"
+
+> **Approved target — implementation pending:** The approved scope contract is owned by orders-core.md: Meine uses requester units, Ich bearbeite personal Bearbeiter entries, Zu bearbeiten responsible or actively supporting own units, and Alle the current readable set including linked holders/payees. Remember view/filters, default to Alle when unset, and apply matching list/detail/live permission checks. The older narrower views below are implementation baseline only.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 A member chooses the scope of the overview with a segmented control (`scope`, REQ-UI-027), in this
 order. Which segments a member is offered follows from three capabilities: `canViewJobOrders` (the

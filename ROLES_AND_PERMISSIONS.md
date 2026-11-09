@@ -1,5 +1,7 @@
 # Role and Permission Matrix (Profit Basetool)
 
+> **Approved planned JobOrder contract, not implemented:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Existing runtime matrices and verification statements remain the implementation baseline. Planned acceptance remains unchecked; this documentation does not assert that the new permissions already exist.
+
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut
 > (ADR-0159, REQ-SEC-052/053), the delegated appointment ladder (ADR-0042), the data-protection
@@ -456,6 +458,40 @@ somebody's Art. 15 request than to the member themselves.
 > trails.
 
 ### 3.3 Inventory (Lager) & Job Orders
+
+#### Approved planned JobOrder rights (implementation pending)
+
+This target replaces the JobOrder-specific legacy flags, read reductions and write limits in the
+current matrix below. It does not widen unrelated Lager, blueprint, mission or Bank rights.
+A unit writer means its existing contextual Logistician/leadership authority; a grant in an
+unrelated unit is insufficient. Rights combine only through legitimate current relationships.
+
+| Actor or relationship | Planned permitted scope |
+| --- | --- |
+| Actual active Profit audience; requesting/responsible/supporting-unit members and relevant leadership | Read the complete relevant order across all kinds; no private Bank data, unreadable mission data or separate blueprint-owner-panel bypass. |
+| Writer of requesting or proposed responsible unit | Create any of the three exclusive order kinds. Responsibility must be the unique Profit Bereich or an eligible subordinate Staffel/SK. |
+| Current responsible-unit writer | General processing, eligible responsibility transfer and permitted coordination/correction of holdings, participation and contributions; underlying stock and Bank rights still apply. |
+| Requesting-unit writer | Need/comment changes with safe MATERIAL/ITEM bounds; aUEC target and payee designation, own requester handovers/returns, and the agreed cancellation/reopening. No arbitrary foreign holding or manual contribution changes. |
+| Supporting-Staffel writer | Own participation and promises; explicit material provision attribution only with the required stock rights. Support alone gives no general editing or private blueprint grant. |
+| Personal Bearbeiter without another grant | Full relevant read, own note and self-removal; no general processing or monetary authority. |
+| Correctly linked aUEC holder/payee | The agreed own holding/movement/handover/return and correction scope. Extra provision for somebody else needs unit authority. A genuine own outgoing transfer may create its receiving counterparty with exactly that credit; it cannot designate an unauthorised requester recipient. |
+| Any app-authorised full order reader | Explicit self-provision creates the own linked holder, without prior Bearbeiter enrolment or another approval. This does not authorise standalone balances for other people. |
+| Admin | Existing order/recovery authority under the same monetary, eligibility and history constraints. An order relationship creates no additional Bank right. |
+| Named person without a Basetool account | May be recorded as holder/recipient through an authorised action; a raw name creates no login, personal permission or Inbox. |
+
+Read-only linked holder/payee history survives a zero holding or order completion while the
+account remains authorised and correctly linked; correcting a false link removes the false access.
+One Staffel participation holds its kind-specific contributions, and a responsible Staffel is not
+its own supporter. No personal money commitment or second material-support registration exists.
+
+Both unit sides may cancel and deliberately reopen cancelled orders. Other MATERIAL/ITEM status actions, including
+early manual completion without fictional delivery, remain responsible-side; aUEC completion
+follows effective net handover. If responsibility is ineligible, only read and transfer remain,
+even on completed/cancelled orders: all other user changes and coupled financial results wait for
+valid responsibility. Mandatory automatic support ending remains required.
+
+The canonical detailed grants, historical relationships and acceptance criteria live in the three
+linked specifications. The following table and footnotes are the **current implementation baseline**.
 
 | Function (gate)                                                                                                                                                                                                                                                                                                                                                          | Member | Log. | MM  | Officer | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:---:|:-------:|:-----:|

@@ -127,6 +127,10 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 ### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
 
+> **Approved planned JobOrder amendment (not implemented):** Pin the planned JobOrder user, personal and narrow integration command gates together with the hierarchy/invalid-responsibility rules. Include outcome lookup/replay, linked-identity corrections and both-order reassignment authority; a static role or possession of an operation ID is not sufficient. See [the approved shared JobOrder contract](orders-core.md), [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 The gate of a backend operation can live in a `SecurityConfig` URL rule, a controller
 `@PreAuthorize` and a service `@PreAuthorize`; a move or re-cut can drop any of them while every
 other test stays green. The **authorization matrix**
@@ -611,6 +615,10 @@ no longer limited to a caller who may manage the mission.
 > the exemptions the rule keeps.
 
 ### REQ-SEC-009 — The member surface
+
+> **Approved planned JobOrder amendment (not implemented):** The approved shared JobOrder access replacement is [the approved shared JobOrder contract](orders-core.md): actual active Profit hierarchy, direct Profit-Bereich responsibility, full relevant order reads for the agreed unit/personal audiences, and contextual unit writers. Remove the independent Staffel/SK flag and requester redaction/freeze only in that planned scope. Invalid responsibility permits reading/transfer only; personal read relationships do not grant general writes, unrelated inventory, blueprint ownership, private bank data or Admin audit.
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Every caller of the tool is a **member**. There is no cohort below that: an anonymous caller reaches
 only the paths REQ-SEC-052 enumerates, and an authenticated token that maps to no application role is
@@ -3506,6 +3514,10 @@ unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second
 
 ### REQ-SEC-046 — Merging two accounts of one member is an admin decision, and it moves belongings only
 
+> **Approved planned JobOrder amendment (not implemented):** Extend the existing account-merge participants to the planned stable order-local holder/account links and financial attribution without rewriting monetary facts from present membership/name. Preserve history and correct a financial duplicate through its monetary correction, not by identity merge alone. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 A login whose subject matches no row must never adopt an account found by callsign (ADR-0142
 point 5, #1639). Removing that silent inheritance is right — but the outcome it produced was not
 always *wrong*, only unsafe because nobody chose it. Left without a remedy, a member who ends up
@@ -4726,6 +4738,10 @@ one event type.
 
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
+> **Approved planned JobOrder amendment (not implemented):** Include planned personal JobOrder holder/link/history data in the owning export projection while excluding unrelated parties and private bank data. The new participant-readable business history is not the admin audit export; see [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.
 
@@ -5171,6 +5187,10 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 
+> **Approved planned JobOrder amendment (not implemented):** Register new JobOrder holder/counterparty names and historical person references with the existing privacy-owned search coverage. Do not infer account identity from a raw name or leak shared order data through an unrestricted directory. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
 free-text surface of the application.
 
@@ -5394,6 +5414,10 @@ from a statute rather than from operational taste.
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
 ### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
+
+> **Approved planned JobOrder amendment (not implemented):** Extend the owning anonymisation/erasure contracts to planned surviving order-holder and history snapshots. Monetary traceability does not create a permanent privacy exemption; an audit retention/purge must not erase the separate effective balance basis. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 When an admin grants the member's wish, the member's handle MUST be replaced by a sentinel in
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
@@ -5945,6 +5969,10 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
 
 ### REQ-SEC-077 — A request body never carries what the server manages
+
+> **Approved planned JobOrder amendment (not implemented):** Planned JobOrder writes carry only action inputs, relevant versions and submitted operation identity/terms. Effective balances, authorisation results, completion and audit/history fields remain server-managed; safe combined provision is an explicit input, not permission to submit a fabricated balance. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Mass assignment is closed by structure, not by the care of each mapper:
 

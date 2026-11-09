@@ -250,6 +250,10 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 
+> **Approved planned JobOrder amendment (not implemented):** JobOrder causes carry stable cause/revision identity for idempotent, per-recipient grouping across relevant roles and bank/order outcomes. The current per-type, single-event recipient union is not that guarantee. Preserve necessary bank tasks and current mute/priority rules; add no durable messaging subsystem. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 Recipients are decided by admin-managed `notification_rule` rows, each owning a set of
 `notification_rule_selector` rows. Selector kinds: `SPECIFIC_USER` (a `sub`), `ROLE` (a global
 `role.code`), `ORG_RELATIVE_ROLE` (a role — `OFFICER` / `LEAD` / `LOGISTICIAN` /
@@ -313,6 +317,10 @@ frontend `notification/web/AdminNotificationRulePageController`,
 `templates/notification/admin/notification-rules.html`, `static/js/notification/notification-rules.js`
 
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
+
+> **Approved planned JobOrder amendment (not implemented):** Replace the global-Admin creation default with actually affected responsible/requesting unit writers under [the approved shared JobOrder contract](orders-core.md). A global Admin role alone is not an order-notice audience; an affected functional role may still qualify. This is an approved future change to the seeded default, not current runtime behavior.
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 When a job order is created, the seeded default rule resolves recipients from the **responsible
 org unit**: officers (the seat holders directly in that unit, `OrgRelativeRole.OFFICER`), leads
@@ -733,6 +741,10 @@ records the notification-engine consumer.
 
 ### REQ-NOTIF-017 — UC5: notify the processing unit on a requester edit
 
+> **Approved planned JobOrder amendment (not implemented):** Apply the agreed actual-effect audiences and grouping to requester need changes across all order kinds, including derived material-promise reductions. Do not retain a narrower legacy selector or notify all Profit readers. See [the approved shared JobOrder contract](orders-core.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 When the requesting owner (Auftraggeber) edits one of their own job orders (REQ-ORDERS-023 — change
 quantities, add/remove not-yet-delivered items or materials, edit the comment), the processing
 (responsible) org unit's **officers and leads** are notified through the engine (#1186). A
@@ -760,6 +772,10 @@ never the editing member's personal name (no PII in params).
 `db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
+
+> **Approved planned JobOrder amendment (not implemented):** Retire or replace obsolete JobOrder action hints after decisions and responsibility changes while preserving the separate business history. A bank decision must not duplicate an order-success notice for the same recipient/cause; distinct required bank tasks remain. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 An event may declare, via `NotificationEvent.resolvesNotificationTypes()`, notification **types it
 marks obsolete for its own entity**. When such an event is processed, the creation pipeline
@@ -1084,6 +1100,10 @@ ready, a mission that was never ended. They come from **one scheduled producer**
 
 ### REQ-NOTIF-027 — Members mute notification types
 
+> **Approved planned JobOrder amendment (not implemented):** Combining JobOrder causes must respect existing per-type muting and priority. A wrapper or another order-success type must not recreate a muted bank outcome. Already stored Inbox rows and durable business history remain separate. See [the approved shared JobOrder contract](orders-core.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 A member MUST be able to choose which notification types they receive. Muting a type is the
 member's own decision; it changes nothing for anybody else and nothing about what the rules resolve.
 
@@ -1248,6 +1268,10 @@ stored, and so does a value that is not a plain decimal. Lists the producer pre-
 `NotificationPageController#groupAmount` · **Related:** REQ-NOTIF-028, REQ-BANK-059
 
 ### REQ-NOTIF-032 — A click on a notification opens its subject and marks it read
+
+> **Approved planned JobOrder amendment (not implemented):** Shared JobOrder links must preserve current server-side order/field access, including linked holders/payees and corrected account links. Ordinary order readers receive no private bank target/data by notification. Accountless names have no Inbox identity. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Every notification row, in the bell dropdown and on the `/notifications` page, links to the subject
 it is about when the viewer can open it. `NotificationViewDto.href` is set by

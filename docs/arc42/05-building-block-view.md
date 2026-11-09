@@ -1,5 +1,7 @@
 # 5. Building block view
 
+> **Approved planned architecture, not implemented:** The [JobOrder core](../specs/orders-core.md), [money-operation contracts](../specs/orders-auec.md) and [optional bank contracts](../specs/orders-auec-bank.md) add a narrow adapter in existing application composition, synchronous owning-domain APIs and a configuration-owned fee policy. They add no deployable service or module cycle. The building blocks below describe current implementation.
+
 ## 5.1 Level 1 — the whitebox of the whole system
 
 ```

@@ -1,6 +1,6 @@
 # ADR-0254 — A bank booking request may carry an opaque purpose
 
-- **Status:** Accepted
+- **Status:** Accepted - amended by [ADR-0357](0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md) (accepted, implementation pending: scoped aUEC commands and outcomes)
 - **Date:** 2026-10-14
 - **Deciders:** @greluc
 - **Related:** spec [`bank.md`](../specs/bank.md) (REQ-BANK-061, REQ-BANK-063) ·

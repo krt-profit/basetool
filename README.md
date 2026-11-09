@@ -88,6 +88,8 @@ The tenant unit is the **OrgUnit** — a Staffel (`SQUADRON`), Spezialkommando (
 
 ## Documentation
 
+> **Approved design, implementation pending:** [Shared JobOrder behavior](docs/specs/orders-core.md), [aUEC procurement](docs/specs/orders-auec.md) and [optional bank coupling](docs/specs/orders-auec-bank.md) specify the next JobOrder contract. These documents are not a release announcement; the application overview and operating instructions describe the currently implemented system. Runtime acceptance of the planned changes remains unchecked.
+
 The README is the overview; everything else lives in dedicated, versioned docs:
 
 | Document                                                                                         | Purpose                                                                                                                                                                                                                                                         |

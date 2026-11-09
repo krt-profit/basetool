@@ -1,5 +1,7 @@
 # 8. Cross-cutting concepts
 
+> **Approved planned JobOrder contracts, not implemented:** [Shared access/hierarchy](../specs/orders-core.md), [scoped monetary edits and history](../specs/orders-auec.md) and [synchronous bank coordination](../specs/orders-auec-bank.md) extend the existing edit/API/privacy boundaries. Data-only live/notice causes are registered in the business transaction and delivered after commit; monetary effects and audit stay synchronous. Current mechanisms below are not claimed to provide the new operation deduplication or draft recovery.
+
 These rules hold across modules. Each names its authority; this section exists to make them
 findable from one place, not to restate them.
 

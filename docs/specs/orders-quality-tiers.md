@@ -1,5 +1,10 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS/DATA · **Related ADRs:** [ADR-0241](../adr/0241-quality-tiers-are-a-catalogue-table.md)
+
+> **Status:** Implemented baseline with accepted/planned shared-order amendments below.
+> The marked target is not implemented; new criteria are unchecked. Existing acceptance and
+> Enforced-by references establish baseline behavior only. Shared truth: [orders-core.md](orders-core.md)
+> and [orders-material-claims.md](orders-material-claims.md).
 
 # Quality tiers and quality-bucket allocation
 
@@ -19,6 +24,12 @@ of linked stock across an order's buckets that every reader uses.
 ## Requirements
 
 ### REQ-ORDERS-036 — Quality tiers are an administered catalogue
+
+> **Approved shared-order target - not implemented:** material/quality contribution lines belong
+> to the single Staffel participation/responsibility contract of REQ-ORDERS-024 and orders-core.
+> Keep quality-tier identity/floor invariants and historic references; ending participation or
+> promises preserves their history instead of deleting it. This adds neither a currency model to
+> ITEM/MATERIAL nor a new quality catalogue.
 
 Quality tiers MUST live in the table `quality_tier` (`code`, `min_quality`, `label_de`,
 `label_en`, `sort_order`, `active`), not in code. Material lines (`job_order_material`),
@@ -68,6 +79,23 @@ item-order material requirements (`job_order_item_material`) and material claims
 
 ### REQ-ORDERS-037 — Linked stock counts toward exactly one quality bucket
 
+> **Approved shared-order target - not implemented:** this distribution is current coverage,
+> never proof of a Staffel's historical provision. Keep true contribution attribution independently
+> through consumption, row merge/deletion, release, relinking and quality redistribution; none of
+> those re-credits the same provision or retracts past performance.
+>
+> Open promise capacity uses the qualifying uncovered MATERIAL remaining demand or ITEM
+> unmanufactured demand, across the material's overlapping quality buckets. The shared order-plus-
+> material invariant guard and REQ-ORDERS-024's credit-before-reduction/apportionment apply whenever
+> demand, allocation, attribution, promise or correction changes it, including an empty first set.
+> Do not double-use high-grade stock across buckets or serialize only a single Staffel/quality row.
+> Preserve the greedy current-coverage calculation and the separately frozen exchange scope.
+
+**Target acceptance**
+
+- [ ] Consumption or quality redistribution changes current coverage/capacity without erasing or repeating historical contribution.
+- [ ] Concurrent cross-quality first provision/promise changes cannot consume overlapping capacity twice.
+
 For every order and material, the linked stock MUST be distributed across that order's quality
 buckets by `QualityBucketAllocator`, and every reader of order-linked stock MUST use that
 distribution: the order detail (material lines and the aggregated item view), the
@@ -114,6 +142,13 @@ lists under each bucket only the rows it counts, with their counted share.
 
 ### REQ-ORDERS-038 — The member chooses which tier a handover counts toward
 
+> **Approved shared-order target - not implemented:** shared order action rights govern the
+> handover while its real inventory source retains inventory authority. Keep the actual chosen
+> quality/quantity and historical contribution attribution; a transfer does not silently attribute
+> a Staffel's performance from its membership. MATERIAL may also be manually completed early.
+> COMPLETED, REJECTED and CANCELLED release its order earmarks without deleting physical stock or
+> prior handovers; editing need does not automatically reopen manual completion/cancellation.
+
 In the game a member decides which grade goes into which delivery; the tool follows that choice
 and only suggests one. Each position of a **material** handover MAY name a tier code
 (`JobOrderHandoverItemCreateDto.qualityRequirement`).
@@ -151,6 +186,12 @@ integration tests · **Code:** `JobOrderHandoverService#bookAgainstLines`,
 `_loadHandoverTierSuggestions`)
 
 ### REQ-ORDERS-039 — A production run consumes only stock that meets the line's tier
+
+> **Approved shared-order target - not implemented:** production retains the existing quality
+> floor, exact-consumption and inventory-right checks. Its change to current demand/coverage
+> participates in REQ-ORDERS-024/-037's shared capacity contract without deleting historical
+> contribution credit. No production un-booking, physical stock restoration or additional
+> approval/settlement workflow is added.
 
 An item line asks each material at one tier. Every consumed entry of a production run MUST reach
 that tier's floor; an entry below it is a 400 (`error.job_order.quality_below_floor`) and nothing is

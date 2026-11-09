@@ -1,6 +1,6 @@
 # ADR-0092 — Material-claim no-overclaim invariant serialized by a pessimistic order-row lock
 
-- **Status:** Accepted
+- **Status:** Accepted — implemented baseline; amended by [ADR-0360](0360-material-promises-track-uncovered-demand-and-explicit-provision.md) (accepted planned, not implemented). The rationale below records the baseline decision.
 - **Date:** 2026-07-10
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`orders-material-claims.md`](../specs/orders-material-claims.md) `REQ-ORDERS-024` · `material_claim` table + `uq_material_claim_bucket_org_unit` (V131) · ADR-0080 (a sibling aggregate-concurrency decision, different mechanism) · issue #344 · the code-coverage concurrency audit

@@ -1,5 +1,7 @@
 # 10. Quality requirements
 
+> **Approved planned acceptance, not implemented:** The [shared JobOrder](../specs/orders-core.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) acceptance criteria cover concurrent scoped writes, exact monetary conservation, safe replay/unknown results, material credit-before-reduction, privacy and live/draft/notice behavior. They require future database, security, contract and browser evidence; existing scenarios/tests below are not evidence that the planned feature has shipped.
+
 ## 10.1 The quality tree
 
 ```

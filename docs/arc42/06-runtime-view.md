@@ -1,5 +1,7 @@
 # 6. Runtime view
 
+> **Approved planned runtime, not implemented:** [aUEC procurement](../specs/orders-auec.md) defines immediate bank-free effects and persistent operation/outcome identity; [optional bank coupling](../specs/orders-auec-bank.md) defines atomic final bank/order effects, pending unavailability and the different reversal cases. The scenarios below remain the current runtime baseline, not verification of those planned flows.
+
 Eight scenarios. They were chosen because each one exercises a rule that is invisible in the static
 view, and because each one before the exchange's (§6.8) has burned somebody at least once.
 

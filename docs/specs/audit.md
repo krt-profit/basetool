@@ -27,6 +27,10 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
+> **Approved planned JobOrder amendment (not implemented):** Extend same-transaction owning-domain audit coverage to the approved JobOrder mutations: provision/movement/correction and fees, target/lifecycle/responsibility, holder identity/link/merge, participation/promises and automatic reductions/endings, bank linkage/outcomes/clarification and cross-order effects. Add event filters and DE/EN labels together. Safe IDs/enums/amounts/counts replace names and free text in details; replay/no-op creates no second mutation audit. Participant history is a separate authorised contract in [the approved aUEC contract](orders-auec.md), not this admin-only trail.
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 > **Status: shipped** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions of the
 > amendment at the end of this requirement.
 
@@ -851,6 +855,10 @@ amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 **Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
 
 ### REQ-AUDIT-007 — Audit is never an event; listeners never read the request; observers join the transaction
+
+> **Approved planned JobOrder amendment (not implemented):** The JobOrder composition adapter and synchronous Bank/stock coordination join the owning business transaction and keep audit atomic. Data-only notification/live causes are published or registered within that transaction, with delivery after commit; financial effects and audit never move into those listeners. See [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 REQ-AUDIT-001 holds only while the audit row is written **inside the transaction of the mutation it
 records**: an audit-insert failure must roll the mutation back. Three rules keep a well-meant

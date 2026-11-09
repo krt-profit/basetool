@@ -1,6 +1,6 @@
 # ADR-0052 — Bank: the in-game transfer fee is added on top and borne by the debited account
 
-- **Status:** Accepted (owner-requested 2026-06-29)
+- **Status:** Accepted (owner-requested 2026-06-29); amended by [ADR-0358](0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md) (accepted, implementation pending: shared fee policy and scoped same-player withdrawal exemption)
 - **Date:** 2026-06-29
 - **Deciders:** Repository owner (@greluc)
 - **Related:** supersedes [ADR-0041](0041-bank-in-game-transfer-fee.md) (the carve-out model) ·

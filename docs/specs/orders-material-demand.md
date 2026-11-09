@@ -27,6 +27,10 @@ Tracked by [#1522](https://github.com/krt-profit/basetool/issues/1522).
 
 ### REQ-ORDERS-034 — Cross-order material demand, grouped by responsible org unit
 
+> **Approved target — implementation pending:** The approved target applies shared hierarchy-based responsibility and full permitted web reads from orders-core.md, including direct Profit-Bereich responsibility. Aggregate only active MATERIAL/ITEM material requirements, excluding cancelled and other terminal work; aUEC contributes no fictitious material rows. Outstanding physical demand minus suitable linked stock remains distinct from outstanding promises and historical credited provision. Use the uncovered-demand and credit-before-cut definitions of REQ-ORDERS-024, including ITEM material demand for unmanufactured items; the older claim/required arithmetic below is not the new promise rule. External exchange retains its reduced direct-membership contract.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 The order area MUST offer a **material-demand overview** at `/orders/material-demand`, reachable
 from its own entry in the navigation's `logistics` group, that aggregates the material still to be
 gathered across every job order the caller may see whose status is `OPEN` or `IN_PROGRESS`.

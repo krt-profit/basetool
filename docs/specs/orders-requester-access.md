@@ -3,6 +3,8 @@
 
 # Requesting-owner (Auftraggeber) job-order access
 
+> **Status of the amendment:** Owner-approved target, implementation pending. REQ-ORDERS-023 below states the planned replacement explicitly; the remaining implementation narrative records the current runtime. New runtime acceptance is defined in [orders-core.md](orders-core.md) and [orders-auec.md](orders-auec.md) and remains unchecked.
+
 ## Context & goal
 
 Before this feature a job order's **requesting** org unit (the Auftraggeber / customer that placed
@@ -24,6 +26,10 @@ creator column — a legacy of the anonymous request form it once had; there is 
 ## Requirements
 
 ### REQ-ORDERS-023 — Requesting-owner may view and edit their own order within limits
+
+> **Approved planned JobOrder amendment (not implemented):** Replace requester-only redaction and the whole-order delivery freeze with [the shared JobOrder contract](orders-core.md). Requester members read the complete relevant order; only authorised requesting-unit writers make unit-side changes. They may safely edit remaining MATERIAL need or ITEM need after partial delivery under the preserved manufactured/delivered bounds, without deleting actual history. They also have the agreed cancellation/reopening rights; other MATERIAL/ITEM status actions remain responsible-side. aUEC target, recipients, own handovers/returns and corrections follow [the money contract](orders-auec.md) and role matrix, with no arbitrary foreign holding edits. Invalid responsibility blocks even correction/settlement/reopening until transfer. The former restricted read, any-member edit, post-handover freeze and listed exclusions below do not govern that future scope.
+>
+> The following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance.
 
 A member of a job order's **requesting org unit** (Auftraggeber) MAY (both requester edits run through `JobOrderEditor` and require the order's `version`,
 [REQ-ORDERS-046](aggregate-edit-modules.md#req-orders-046--a-job-order-edit-that-carries-a-version-requires-it)):

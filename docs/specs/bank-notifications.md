@@ -1,5 +1,9 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BANK · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
+
+> **Status:** Implemented baseline. The optional aUEC target amendments below are accepted/planned,
+> not implemented; new criteria are unchecked and existing tests establish baseline behavior only.
+> **Approved target:** [orders-auec-bank.md](orders-auec-bank.md) (REQ-ORDERS-076), ADR-0357.
 
 # Bank notifications
 
@@ -14,6 +18,12 @@ and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 ## Requirements
 
 ### REQ-BANK-057 — An approved request is ready to confirm
+
+> **Approved aUEC target - not implemented:** extend readiness to accepted linked request types,
+> including authorisation without posting and holder-transfer requests. Account-owner approval
+> remains readiness for final Bank confirmation, not a monetary order effect. Retain required-
+> approver tasks and ADR-0353 attestation without an extra mandatory in-app approval. Clear/replace
+> stale prompts on decision or current responsibility/access change.
 
 `BankBookingRequestService#applyOwnerApprovalWithinTransaction` (reached by
 `OrgUnitBankRequestService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
@@ -34,6 +44,17 @@ notice replaces the grantee's earlier grant notices for that account (per-recipi
 REQ-NOTIF-025) and leaves every other grantee's alone.
 
 ### REQ-BANK-059 — A direct booking by bank staff tells the members it affects
+
+> **Approved aUEC target - not implemented:** linked direct outcomes publish through the owning
+> synchronous command's post-commit causes too, without relying solely on current controller
+> call sites. Request confirmation does not also emit a duplicate direct success. No-ledger
+> authorisation is not a payout/deposit and must not invent a payment notice. Keep existing deposit
+> suppression and actual direct-booking audiences.
+>
+> Group the same logical outcome/recipient across Bank/order roles, retaining necessary approval
+> tasks, mute and priority. Later staff decisions use that actor, not the applicant. Rollback,
+> replay and duplicate callbacks announce no extra mutation. Private notes and unrelated Bank data
+> do not enter order notices. REQ-ORDERS-073/-075/-076 owns the order meaning.
 
 `BankBookingController` (withdrawal, transfer, reversal) and `BankHolderController` (holder transfer)
 call `BankDirectBookingNotifier` after the ledger booked; the ledger itself publishes nothing, because
@@ -62,7 +83,14 @@ holder's handle and the balance. The notice goes when the holder is reactivated 
 - [x] A holder without money, a reactivated holder and an emptied holder have no standing notice.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
-**Enforced by:** `BankNoticeIntegrationTest`, `BankDirectBookingNotifierTest`,
+**Approved target acceptance - not implemented**
+
+- [ ] New linked requests retain necessary approval/readiness tasks and remove stale prompts under current access.
+- [ ] One logical Bank/order outcome reaches each recipient once across overlapping roles; a muted outcome is not recreated as order success.
+- [ ] Direct/requested/no-ledger/replay/rollback paths produce truthful, nonduplicated notices.
+- [ ] Staff decisions use their real actor and disclose no private approval/staff note through order notices.
+
+**Baseline enforced by:** `BankNoticeIntegrationTest`, `BankDirectBookingNotifierTest`,
 `BankBookingRequestServiceTest` (`applyOwnerApprovalWithinTransaction_…`), `BankGrantServiceTest`,
 `BankHolderReconciliationServiceTest`, `BankHolderServiceTest`, `BankPostingWriterNoticeTest`,
 `SeededNotificationRulesIntegrationTest`, `NotificationPageControllerTest` (`targetOf_…`) ·

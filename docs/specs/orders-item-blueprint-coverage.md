@@ -1,5 +1,10 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS · **Related ADRs:** none
+
+> **Status:** Implemented baseline with accepted/planned shared-order amendments below.
+> The marked target is not implemented; new criteria are unchecked. Existing acceptance and
+> Enforced-by references establish baseline behavior only. Shared truth: [orders-core.md](orders-core.md)
+> and [orders-material-claims.md](orders-material-claims.md).
 
 # Item-order blueprint coverage
 
@@ -23,6 +28,14 @@ required products and its responsible org unit.
 ## Requirements
 
 ### REQ-ORDERS-015 — Blueprint-coverage view for item orders
+
+> **Approved planned producer population (not implemented):** With the Profit Bereich directly responsible, include its own members and the members of its subordinate Staffeln/SK, together with already globally shared blueprint data. With a responsible Staffel/SK, retain its own members plus the existing global sharers. REQ-ORDERS-016 remains the independent viewer gate; mere support participation does not expose additional private blueprint data.
+
+> **Approved shared-order target - not implemented:** the responsible unit may also be the Profit
+> Bereich. Apply the existing responsible-unit producer scope and explicit global-sharing opt-in
+> through the authoritative unit projection. Do not infer producer ownership from shared queue
+> visibility, supporting participation or a matching name. Family/exact matching and unrelated
+> personal-blueprint privacy remain unchanged. MATERIAL and aUEC have no producer panel.
 
 The item-order detail page MUST show, for an `ITEM` order, who among the members of the
 order's **responsible (processing) org unit** owns the blueprint for each required item **or for
@@ -86,6 +99,18 @@ data exposed.
 
 ### REQ-ORDERS-016 — Coverage view is restricted to the responsible org unit's members
 
+> **Approved shared-order target - not implemented:** retain this separate producer-view gate for
+> every responsible kind, including the Profit Bereich. The broader common order read audience in
+> [orders-core.md](orders-core.md) does not grant the named producer view to requesters, helpers,
+> assignees or money holders who fail that independent gate. Global sharing still widens owners
+> counted inside an authorised view, not its viewers. The order's linked-stock read is a different
+> contract and cannot be used to bypass this one.
+
+**Target acceptance**
+
+- [ ] Direct Profit-Bereich responsibility supports the producer projection under its separate gate.
+- [ ] Queue/order/support/personal visibility alone does not reveal named blueprint owners.
+
 The blueprint-coverage view MUST be visible **only to members of the order's responsible
 squadron/SK** (and to admins, who hold system-wide oversight). This is **stricter** than the
 order's own visibility: an SK-responsible order is publicly readable by every profit-eligible
@@ -110,6 +135,13 @@ this gate — it changes only which owners are counted *inside* the view, never 
 **Code:** `JobOrderAccessPolicy.canSeeJobOrderBlueprintOwners` · **Issues:** —
 
 ### REQ-ORDERS-021 — Per-order toggle: count blueprint coverage with or without variants
+
+> **Approved shared-order target - not implemented:** toggle authority follows the applicable
+> shared order action capability, with the separate producer-view gate retained. Preserve its own
+> relevant edit/version scope rather than a screen-wide monetary or parent version. A stale
+> relevant version conflicts truthfully; a peer refresh preserves dirty input and updates the
+> shared panel in place. The strict invalid-responsibility gate blocks the mutation until transfer.
+> Do not widen blueprint ownership or inventory-write rights.
 
 An `ITEM` order MUST carry a per-order **variant-counting** flag (`countBlueprintsWithVariants`,
 default **true**) that governs how its blueprint-coverage view (`REQ-ORDERS-015`) matches blueprints:

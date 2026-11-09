@@ -30,8 +30,8 @@ worth reading even if you know the domain.
 | **Startseite / Dashboard** | The home page after login: a personalisable board of widgets such as the announcement, the next days, the next missions, favourites and unread notifications (see §12.6). |
 | **Einsatz / Mission** | A planned squadron mission members sign up to, check in and out of, and are paid for. Non-internal missions are visible to the whole organisation, not only to the owning unit. |
 | **Operation** | A grouping of missions with per-participant finances and a mark/clear payout gate. |
-| **Auftrag / Aufträge** | Job order(s) — the prioritised queue of material and item orders. |
-| **Eintragung** | A material claim: a Staffel signs up to deliver part of one material on a public SK job order. |
+| **Auftrag / Aufträge** | Current runtime: the material/item JobOrder queue. The approved, implementation-pending three-kind contract is defined in section 12.9; its canonical rules are [orders-core.md](../specs/orders-core.md). |
+| **Eintragung** | Current runtime: a Staffel material claim on an SK order. The approved, implementation-pending meaning is an outstanding material/quality contribution within one Staffel participation (section 12.9), separate from actual attributed provision. |
 | **Materialbedarf** | The cross-order demand overview: what each responsible unit still has to gather per material, with booked stock and signed-up claims side by side. |
 | **Qualitätsstufe** | A catalogue tier a material requirement is stated in — a code, a floor (0–1000) and two labels, maintained by an administrator. „Keine" (floor 0) accepts any stock, „Gut (650+)" only 650 and up. An order's linked stock counts toward exactly one of its tiers (REQ-ORDERS-036/037, ADR-0241). |
 | **Lager** | The warehouse — org-scoped, append-only stock: book in/out, **umbuchen** (transfer), earmark to orders and missions. |
@@ -164,3 +164,28 @@ These terms come with ADR-0335…0347 (map #2884); the rules are in
 | **Sync attempt** | One attempt to fetch and apply a source catalogue or one of its slices. It has an outcome even when it changes nothing or produces no anomaly. |
 | **Catalogue redirect** | A lasting equivalence from a retired duplicate's local id to its surviving game asset, with both original source states retained. It does not merge genuine variants. |
 | **Source enrichment** | Attributed supplemental facts, including their units and loading state, that do not replace another source's authoritative facts. |
+
+## 12.9 Approved planned JobOrder terminology (not implemented)
+
+These definitions name the owner-approved target, not current runtime behavior. Rules and unchecked
+acceptance live once in [orders-core.md](../specs/orders-core.md),
+[orders-auec.md](../specs/orders-auec.md), [orders-auec-bank.md](../specs/orders-auec-bank.md)
+and [material contributions](../specs/orders-material-claims.md).
+
+| Term | Planned meaning |
+| --- | --- |
+| **aUEC-Beschaffungsauftrag** | The third exclusive JobOrder kind, procuring a net requester amount; fully usable without Kartellbank. MATERIAL and ITEM receive no money workflow. |
+| **Profit-Einheit / responsible Profit unit** | The uniquely designated active Department.PROFIT Bereich or an eligible active subordinate Staffel/SK; eligibility follows actual hierarchy, not an independent flag or display name. |
+| **Auftraggeber / requesting unit** | The commissioning OrgUnit, distinct from current responsible unit, contact person and designated payment recipient. |
+| **Verantwortliche Einheit / responsible unit** | Exactly one current processing unit, with traceable commissioning/transfer history. Responsibility transfer moves no physical money or stock by itself. |
+| **Staffel-Teilnahme / participation** | One Staffel/order relationship, optionally without a quantity promise; its material or aUEC contributions are not a second enrolment. Personal Bearbeiter remain distinct. |
+| **Offene Materialzusage / outstanding material promise** | Still-promised material/quality quantity, bounded by remaining uncovered demand. Explicit suitable provision may fulfil it; a proportional capacity reduction is not fulfilment. |
+| **Zugerechnete Bereitstellung / credited provision** | An explicitly attributed real provision counted once. Owner, recorder, present membership or quality redistribution is not proof of the contributing unit. |
+| **Geldhalter / order holder** | Stable order-local identity for a player holding reported order-purpose money, optionally linked to an account. Neither the complete game wallet nor a global Bank custodian balance. |
+| **Zahlungsempfänger / requester recipient** | An explicitly designated person, or permitted Bank-account target under the integration rules, whose effective receipt counts toward requester handover. A contact name alone is no designation. |
+| **Auftragsbestand / booked holding; available holding** | Effective money assigned to one player/order; availability excludes the locally bound pending part. Pending new provision is not already effective stock. |
+| **Geldzusage / unit commitment** | A unit-level planned money contribution, separate from actual holdings and handover; explicit new provision credits it once. Material capacity/proration rules do not apply to money commitments. |
+| **Nettoübergabe / net handover** | Effective requester handovers less actual requester returns and applicable corrections; this is the aUEC target basis, excluding game fees. |
+| **Geldvorgang / logical operation** | Persistent identity for submitted monetary terms, linked corrections and stored outcomes. HTTP request correlation and separate Bank attempts are not another payment. |
+| **Bank-Warten / local binding** | Integration-dependent unavailability until the agreed final Bank outcome; neither a global Bank reservation nor a new order-transfer dispatch/receipt workflow. |
+| **Klärungsbedarf / clarification** | A visible discrepancy hint after the agreed real-payment Bank reversal, without a fictional game refund or a separate exception queue. |

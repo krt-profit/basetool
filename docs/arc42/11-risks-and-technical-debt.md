@@ -1,5 +1,7 @@
 # 11. Risks and technical debt
 
+> **Approved planned JobOrder limits, not implemented:** [aUEC holdings](../specs/orders-auec.md) remain manually reported order-purpose amounts, without technical verification of full game wallets or a common cross-order coverage pool. [Optional bank attribution](../specs/orders-auec-bank.md) is not a global bank reservation or protection against later independent dispositions. These explicit scope limits must remain visible in the planned contract; they are not a new recovery workflow or a promise to automate game transfers.
+
 Each item says what it costs and what closing it involves. Nothing here is a vague "could be
 cleaner" — an entry earns its place by naming a failure that can actually happen.
 
