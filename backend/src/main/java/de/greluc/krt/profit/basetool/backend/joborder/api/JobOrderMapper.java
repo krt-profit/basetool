@@ -21,16 +21,18 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.mapstruct.Context;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,16 +49,16 @@ import org.springframework.beans.factory.annotation.Autowired;
     })
 public abstract class JobOrderMapper {
 
-  protected StockViewerAccess stockAccess;
+  protected JobOrderAuthority orderAuthority;
 
   /**
-   * Receives the stock-viewer access seam from the container.
+   * Receives current responsibility and recovery authority for order projections.
    *
-   * @param access the container's {@link StockViewerAccess}
+   * @param authority the order module's current authority
    */
   @Autowired
-  void setStockAccess(StockViewerAccess access) {
-    this.stockAccess = access;
+  void setOrderAuthority(JobOrderAuthority authority) {
+    this.orderAuthority = authority;
   }
 
   /**
@@ -77,23 +79,11 @@ public abstract class JobOrderMapper {
   }
 
   /**
-   * Resolves the caller-dependent {@code canEdit} projection of one job order.
-   *
-   * @param jobOrder the order being mapped; {@code null} or id-less yields {@code false}.
-   * @return whether the current caller may edit it — role <em>and</em> scope, as the endpoint
-   *     gates.
-   */
-  protected boolean resolveCanEdit(JobOrder jobOrder) {
-    return jobOrder != null
-        && jobOrder.getId() != null
-        && stockAccess.mayEditJobOrder(jobOrder.getId());
-  }
-
-  /**
    * Maps a {@link JobOrder} entity to its outbound DTO, projecting the responsible and requesting
    * org units (Staffel or Spezialkommando) into {@code SquadronReferenceDto} slots.
    *
    * @param jobOrder the entity to project; {@code null} returns {@code null}
+   * @param authority current authority for this page
    * @return the outbound DTO
    */
   @Mapping(target = "responsibleOrgUnit", source = "responsibleOrgUnit")
@@ -102,12 +92,45 @@ public abstract class JobOrderMapper {
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)
   @Mapping(target = "redacted", ignore = true)
-  @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
+  @Mapping(
+      target = "responsibilityInvalid",
+      expression = "java(authority.get(jobOrder.getId()).responsibilityInvalid())")
+  @Mapping(
+      target = "originalProfitBoundaryUnknown",
+      expression = "java(jobOrder.getOriginalProfitOrgUnitId() == null)")
+  @Mapping(
+      target = "canTransferResponsibility",
+      expression = "java(authority.get(jobOrder.getId()).canTransferResponsibility())")
+  @Mapping(target = "canEdit", expression = "java(authority.get(jobOrder.getId()).canEdit())")
+  @Mapping(
+      target = "canEditAsRequester",
+      expression = "java(authority.get(jobOrder.getId()).canEditAsRequester())")
   @Mapping(target = "withAssignees", ignore = true)
   @Mapping(target = "withRedacted", ignore = true)
   @Mapping(target = "canManageAssignees", ignore = true)
   @Mapping(target = "withCanManageAssignees", ignore = true)
-  public abstract JobOrderDto toDto(JobOrder jobOrder);
+  public abstract JobOrderDto toDtoWithAuthority(
+      JobOrder jobOrder, @Context Map<UUID, JobOrderAuthorityFlags> authority);
+
+  /**
+   * Projects one order with its current authority.
+   *
+   * @param order the managed order
+   * @return its complete projection, or null for an absent order
+   */
+  public @Nullable JobOrderDto toDto(@Nullable JobOrder order) {
+    return order == null ? null : toDtoWithAuthority(order, authorityFor(List.of(order)));
+  }
+
+  /**
+   * Resolves current authority once for a page of orders.
+   *
+   * @param orders the concrete page
+   * @return current responsibility and writer flags by order identity
+   */
+  public Map<UUID, JobOrderAuthorityFlags> authorityFor(Collection<JobOrder> orders) {
+    return orderAuthority.authorityFor(orders);
+  }
 
   /**
    * Maps a {@link JobOrderMaterial} child to its DTO, leaving the service-owned {@code

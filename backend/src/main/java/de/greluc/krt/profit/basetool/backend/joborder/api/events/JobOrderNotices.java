@@ -220,4 +220,36 @@ public final class JobOrderNotices {
         .renderParams(params)
         .build();
   }
+
+  /**
+   * Groups eligibility-driven promise endings for the concretely affected unit writers.
+   *
+   * @param jobOrderId the order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param recipients current affected unit writers, already deduplicated
+   * @param materials the combined affected material names
+   * @param actor the hierarchy change actor
+   * @return the grouped cause under the existing automatic-promise preference
+   */
+  @NotNull
+  public static NoticeEvent promisesEnded(
+      @NotNull UUID jobOrderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Set<UUID> recipients,
+      @NotNull String materials,
+      @NotNull ActorRef actor) {
+    Map<String, String> params = params(displayId, handle);
+    params.put("material", materials);
+    params.put("reasonCode", "INELIGIBLE_UNIT");
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN)
+        .actorSub(actor.id())
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(jobOrderId)
+        .contextRecipientUserIds(recipients)
+        .renderParams(params)
+        .build();
+  }
 }

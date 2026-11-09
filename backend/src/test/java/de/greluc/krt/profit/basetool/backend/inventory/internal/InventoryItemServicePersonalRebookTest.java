@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -85,7 +85,7 @@ class InventoryItemServicePersonalRebookTest {
 
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService service;
+  private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -98,6 +98,23 @@ class InventoryItemServicePersonalRebookTest {
 
   @BeforeEach
   void setUpEntities() {
+    service =
+        new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            orgUnitStampingService,
+            auditService,
+            eventPublisher);
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");

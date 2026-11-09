@@ -95,6 +95,7 @@ class JobOrderScopeParityTest {
                     wired.gate(),
                     wired.authHelper(),
                     jobOrderRepository,
+                    org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
                     jobOrderHandoverRepository,
                     jobOrderItemHandoverRepository)
                 .canSeeJobOrder(id));

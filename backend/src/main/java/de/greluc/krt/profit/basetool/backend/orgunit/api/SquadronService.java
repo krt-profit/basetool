@@ -52,6 +52,8 @@ public class SquadronService {
 
   private final SquadronRepository squadronRepository;
   private final OrgStructureAuditor orgStructureAuditor;
+  private final ProfitHierarchyService profitHierarchy;
+  private final OrgUnitEligibilityMaintenance eligibilityMaintenance;
 
   /**
    * Unpaged squadron list for dropdowns.
@@ -149,6 +151,7 @@ public class SquadronService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public void deleteSquadron(@NotNull UUID id) {
+    profitHierarchy.lockForHierarchyChange();
     if (!squadronRepository.existsById(id)) {
       throw new NotFoundException("Squadron not found");
     }
@@ -156,6 +159,8 @@ public class SquadronService {
     boolean wasActive = squadron.isActive();
     squadron.setActive(false);
     orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
+    squadronRepository.flush();
+    eligibilityMaintenance.eligibilityChanged(squadron);
   }
 
   /**
@@ -166,31 +171,12 @@ public class SquadronService {
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public void activateSquadron(@NotNull UUID id) {
+    profitHierarchy.lockForHierarchyChange();
     Squadron squadron = getSquadronById(id);
     boolean wasActive = squadron.isActive();
     squadron.setActive(true);
     orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
-  }
-
-  /**
-   * Sets whether the squadron may be picked as the responsible (processing) org unit of a Job
-   * Order. Separate from {@link #updateSquadron(UUID, SquadronDto)}; existing Job Orders are not
-   * touched.
-   *
-   * @param id squadron primary key
-   * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the squadron
-   *     selectable as a Job-Order processor, {@code false} removes it from the responsible picker.
-   * @return the persisted squadron
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no matching row.
-   */
-  @Transactional
-  @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
-  public Squadron setProfitEligible(@NotNull UUID id, boolean eligible) {
-    Squadron squadron = getSquadronById(id);
-    boolean wasEligible = squadron.isProfitEligible();
-    squadron.setProfitEligible(eligible);
-    Squadron saved = squadronRepository.save(squadron);
-    orgStructureAuditor.profitEligibilityChanged(saved, wasEligible);
-    return saved;
+    squadronRepository.flush();
+    eligibilityMaintenance.eligibilityChanged(squadron);
   }
 }

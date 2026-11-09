@@ -17,14 +17,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.orgunit.model;
+package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
+import java.util.Set;
+import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * Body of the backend {@code PATCH /api/v1/special-commands/{id}/profit-eligible} toggle.
- *
- * @param eligible whether the Spezialkommando may process Job Orders
- */
-@DtoMirror
-public record SpecialCommandProfitEligibleToggleRequest(Boolean eligible) {}
+/** Maintains dependent eligibility within the transaction changing the organisational hierarchy. */
+@ObserverSpi
+public interface OrgUnitEligibilityObserver {
+
+  /**
+   * Ends ineligible active relationships while preserving history.
+   *
+   * @param affectedUnitIds the changed unit and its affected descendants
+   */
+  void onEligibilityChanged(@NotNull Set<UUID> affectedUnitIds);
+}

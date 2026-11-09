@@ -140,6 +140,10 @@ class DashboardOrderWidgetsMvcTest {
         1L,
         false,
         false,
+        false,
+        false,
+        false,
+        false,
         false);
   }
 

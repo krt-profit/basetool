@@ -189,7 +189,7 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain("data-trigger=\"od-open-production\"");
   }
 
-  /** The requester sees the demand only, without progress, handovers or assignees. */
+  /** An ordinary requester reads demand without processing data or edit controls. */
   @Test
   void requesterViewKeepsTheLimitedView() throws Exception {
     UUID orderId = UUID.randomUUID();
@@ -212,7 +212,7 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain("id=\"assignees-section\"")
         .doesNotContain("id=\"status-select\"")
         .doesNotContain("id=\"order-menu\"")
-        .contains("data-modal-id=\"edit-modal\"");
+        .doesNotContain("data-modal-id=\"edit-modal\"");
   }
 
   /**
@@ -303,7 +303,11 @@ class OrdersDetailPatternRenderTest {
         1L,
         !redacted,
         null,
-        redacted);
+        redacted,
+        false,
+        false,
+        !redacted,
+        false);
   }
 
   /**

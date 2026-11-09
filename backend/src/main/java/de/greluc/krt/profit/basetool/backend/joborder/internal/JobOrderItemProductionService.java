@@ -90,6 +90,7 @@ public class JobOrderItemProductionService {
   private static final double QUANTITY_EPSILON = 1e-4;
 
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
   private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
@@ -144,6 +145,7 @@ public class JobOrderItemProductionService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    responsibilityGuard.assertWritable(jobOrder);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");

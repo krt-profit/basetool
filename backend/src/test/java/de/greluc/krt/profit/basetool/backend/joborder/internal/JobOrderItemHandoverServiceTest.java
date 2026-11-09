@@ -36,11 +36,13 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
@@ -51,7 +53,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.time.Instant;
 import java.util.List;
@@ -60,7 +61,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -75,6 +75,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemHandoverServiceTest {
 
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
@@ -82,10 +84,9 @@ class JobOrderItemHandoverServiceTest {
   @Mock private StockChangeObserver offerRatchet;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderItemHandoverService service;
+  private JobOrderItemHandoverService service;
 
   private UUID orderId;
   private UUID lineId;
@@ -97,11 +98,29 @@ class JobOrderItemHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderItemHandoverService(
+            jobOrderRepository,
+            responsibilityGuard,
+            jobOrderItemHandoverRepository,
+            jobOrderItemHandoverMapper,
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                auditService,
+                null,
+                offerRatchet,
+                null),
+            jobOrderService,
+            userService,
+            null,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     gameItemId = UUID.randomUUID();

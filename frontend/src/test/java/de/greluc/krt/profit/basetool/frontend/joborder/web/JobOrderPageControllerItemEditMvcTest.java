@@ -95,6 +95,10 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         1L,
         null,
         null,
+        false,
+        false,
+        false,
+        null,
         false);
   }
 
@@ -144,17 +148,26 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
     when(reader.readItemEdit(id))
         .thenReturn(
-            JobOrderPageStubs.editable(
-                order,
+            new JobOrderPageReader.ItemEditPage(
+                JobOrderPageReader.ItemEditAccess.EDITABLE,
+                java.util.Optional.of(order),
+                List.of(),
+                true,
                 List.of(),
                 List.of(
                     new OrgUnitMembershipOptionDto(
-                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND", true),
+                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND"),
+                    new OrgUnitMembershipOptionDto(requestingId, "CERBERUS", "CER", "SQUADRON")),
+                List.of(
                     new OrgUnitMembershipOptionDto(
-                        requestingId, "CERBERUS", "CER", "SQUADRON", true))));
+                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND"))));
 
     String html =
         mockMvc
@@ -307,6 +320,10 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     when(reader.readItemEdit(id))

@@ -95,7 +95,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
             "FSK",
             "desc",
             true,
-            false,
             0L);
     return new PageResponse<>(List.of(sc), 0, 1000, 1L, 1, List.of());
   }
@@ -147,16 +146,14 @@ class AdminSpecialCommandsPageControllerMvcTest {
     assertThat(html.split("btn--cta", -1)).hasSize(3);
   }
 
-  /** Each active special command carries one profit switch in its row, sorted by name. */
+  /** Active special commands remain sorted with lifecycle actions and no eligibility switch. */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void list_rendersOneProfitTogglePerSpecialCommandSortedByName() throws Exception {
+  void list_rendersSpecialCommandsSortedByNameWithoutAnEligibilityToggle() throws Exception {
     UUID zuluId = UUID.randomUUID();
     UUID alphaId = UUID.randomUUID();
-    SpecialCommandDto zulu =
-        new SpecialCommandDto(zuluId, "Zulu-Kommando", "ZK", "", true, true, 3L);
-    SpecialCommandDto alpha =
-        new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, false, 1L);
+    SpecialCommandDto zulu = new SpecialCommandDto(zuluId, "Zulu-Kommando", "ZK", "", true, 3L);
+    SpecialCommandDto alpha = new SpecialCommandDto(alphaId, "Alpha-Kommando", "AK", "", true, 1L);
     when(backendApiClient.get(
             contains("/api/v1/special-commands"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(alpha, zulu), 0, 1000, 2, 1, List.of()));
@@ -169,15 +166,8 @@ class AdminSpecialCommandsPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    java.util.regex.Matcher toggles =
-        java.util.regex.Pattern.compile("<input[^>]*sk-profit-toggle[^>]*>").matcher(html);
-    assertThat(toggles.find()).as("first SK toggle").isTrue();
-    String first = toggles.group();
-    assertThat(toggles.find()).as("second SK toggle").isTrue();
-    String second = toggles.group();
-    assertThat(toggles.find()).as("exactly one toggle per SK").isFalse();
-    assertThat(first).contains("data-sk-id=\"" + alphaId + "\"").doesNotContain("checked");
-    assertThat(second).contains("data-sk-id=\"" + zuluId + "\"").contains("checked");
+    assertThat(html).contains("Alpha-Kommando", "Zulu-Kommando").doesNotContain("sk-profit-toggle");
+    assertThat(html.indexOf("Alpha-Kommando")).isLessThan(html.indexOf("Zulu-Kommando"));
   }
 
   /** An empty catalogue renders the empty state, not a bare text block. */

@@ -428,7 +428,7 @@ GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderMaterialControll
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderMaterialController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/priority | JobOrderController#updateJobOrderPriority | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester | pre=isAuthenticated() | url=anyRequest -> authenticated
-PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#getClaimBuckets | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
@@ -577,14 +577,12 @@ DELETE /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembership
 PATCH /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembershipController#patchFlags | pre=@specialCommandSecurityService.canManageMembers(#id, authentication) | url=anyRequest -> authenticated
 POST /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembershipController#addMember | pre=@specialCommandSecurityService.canManageMembers(#id, authentication) | url=anyRequest -> authenticated
 PATCH /api/v1/special-commands/{id}/members/{userId}/lead | SpecialCommandMembershipController#toggleLead | pre=hasRole('ADMIN') or (@orgRoleManagementSecurityService.canAppointSkLead(#id, authentication) and @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication)) | url=anyRequest -> authenticated
-PATCH /api/v1/special-commands/{id}/profit-eligible | SpecialCommandController#setProfitEligible | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/squadrons | SquadronController#getAllSquadrons | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/squadrons | SquadronController#createSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/squadrons/{id} | SquadronController#deleteSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PUT /api/v1/squadrons/{id} | SquadronController#updateSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/squadrons/{id}/activate | SquadronController#activateSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/squadrons/{id}/members/{userId} | SquadronMembershipController#patchFlags | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-PATCH /api/v1/squadrons/{id}/profit-eligible | SquadronController#setProfitEligible | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#create | pre=hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId, authentication) | url=anyRequest -> authenticated
 DELETE /api/v1/squadrons/{squadronId}/kommando-groups/{groupId} | KommandoGroupController#delete | pre=hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId, authentication) | url=anyRequest -> authenticated

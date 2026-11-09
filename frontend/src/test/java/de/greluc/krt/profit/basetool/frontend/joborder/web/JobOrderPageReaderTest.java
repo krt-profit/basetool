@@ -71,7 +71,10 @@ class JobOrderPageReaderTest {
   private final JobOrderBackendClient client = mock(JobOrderBackendClient.class);
 
   private final JobOrderPageReader reader =
-      new JobOrderPageReader(client, new ParallelPageLoader());
+      new JobOrderPageReader(
+          client,
+          mock(de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient.class),
+          new ParallelPageLoader());
 
   private final Logger log = (Logger) LoggerFactory.getLogger(JobOrderPageReader.class);
 
@@ -100,6 +103,15 @@ class JobOrderPageReaderTest {
 
   private static JobOrderDto order(
       String type, boolean redacted, List<JobOrderItemHandoverDto> handovers, boolean canEdit) {
+    return order(type, redacted, handovers, canEdit, false);
+  }
+
+  private static JobOrderDto order(
+      String type,
+      boolean redacted,
+      List<JobOrderItemHandoverDto> handovers,
+      boolean canEdit,
+      boolean canEditAsRequester) {
     return new JobOrderDto(
         ID,
         7,
@@ -121,7 +133,11 @@ class JobOrderPageReaderTest {
         1L,
         canEdit,
         null,
-        redacted);
+        redacted,
+        false,
+        false,
+        canEdit,
+        canEditAsRequester);
   }
 
   private static JobOrderPageReader.OrderCaller logistician() {
@@ -129,7 +145,7 @@ class JobOrderPageReaderTest {
   }
 
   private static SquadronDto squadron(String name, boolean active) {
-    return new SquadronDto(UUID.randomUUID(), name, name, null, active, true, 1L);
+    return new SquadronDto(UUID.randomUUID(), name, name, null, active, 1L);
   }
 
   private static MaterialDto material() {
@@ -151,8 +167,8 @@ class JobOrderPageReaderTest {
         1L);
   }
 
-  private static OrgUnitMembershipOptionDto option(boolean eligible) {
-    return new OrgUnitMembershipOptionDto(UUID.randomUUID(), "A", "A", "SQUADRON", eligible);
+  private static OrgUnitMembershipOptionDto option() {
+    return new OrgUnitMembershipOptionDto(UUID.randomUUID(), "A", "A", "SQUADRON");
   }
 
   private static <T> PageResponse<T> page(List<T> content) {
@@ -274,7 +290,7 @@ class JobOrderPageReaderTest {
     when(client.order(ID)).thenReturn(o);
     when(client.jobOrderMaterials()).thenReturn(List.of(material()));
     when(client.squadrons()).thenReturn(page(List.of(squadron("a", true))));
-    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option(true)));
+    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option()));
     when(client.currentUser()).thenReturn(mock(UserDto.class));
     when(client.settings()).thenReturn(new JobOrderSettingsDto(5, 6));
     when(client.itemBlueprintOwners(ID)).thenReturn(owners);
@@ -313,8 +329,8 @@ class JobOrderPageReaderTest {
   }
 
   @Test
-  void aRequesterReadsOnlyTheMaterialCatalogBesidesTheOrder() {
-    when(client.order(ID)).thenReturn(order("MATERIAL", true, List.of()));
+  void aRequesterWriterReadsOnlyItsEditMaterialCatalogBesidesTheOrder() {
+    when(client.order(ID)).thenReturn(order("MATERIAL", true, List.of(), false, true));
     when(client.jobOrderMaterials()).thenReturn(List.of(material()));
     when(client.settings()).thenReturn(new JobOrderSettingsDto(5, 6));
     when(client.orphanedInventory(ID)).thenReturn(List.of());
@@ -354,7 +370,7 @@ class JobOrderPageReaderTest {
     when(client.order(ID)).thenReturn(order("ITEM", false, List.of()));
     when(client.jobOrderMaterials()).thenReturn(List.of());
     when(client.squadrons()).thenReturn(page(List.of()));
-    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option(true)));
+    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option()));
 
     reader.readOrderDetail(ID, logistician(), null);
 
@@ -467,7 +483,7 @@ class JobOrderPageReaderTest {
     when(client.jobOrderMaterials()).thenReturn(List.of(material()));
     when(client.orderableItemProbe()).thenReturn(page(List.<InventoryGameItemReferenceDto>of()));
     when(client.squadrons()).thenReturn(page(List.of(squadron("a", true))));
-    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option(true)));
+    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option()));
 
     JobOrderPageReader.OrderCreatePage create = reader.readOrderCreate();
 
@@ -502,7 +518,7 @@ class JobOrderPageReaderTest {
     when(client.orderableItemProbe()).thenReturn(null);
     when(client.squadrons()).thenReturn(null);
     when(client.activeOrgUnitsAllKinds()).thenThrow(backendDown());
-    when(client.activeOrgUnits()).thenReturn(List.of(option(false)));
+    when(client.activeOrgUnits()).thenReturn(List.of(option()));
 
     JobOrderPageReader.OrderCreatePage create = reader.readOrderCreate();
 
@@ -526,7 +542,7 @@ class JobOrderPageReaderTest {
     when(client.jobOrderMaterials()).thenReturn(List.of(material()));
     when(client.orderableItemProbe()).thenReturn(null);
     when(client.squadrons()).thenReturn(page(List.of()));
-    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option(true)));
+    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option()));
 
     JobOrderPageReader.ItemEditPage edit = reader.readItemEdit(ID);
 
@@ -563,6 +579,14 @@ class JobOrderPageReaderTest {
 
     assertThat(reader.readItemEdit(ID).access())
         .isEqualTo(JobOrderPageReader.ItemEditAccess.NOT_AN_ITEM_ORDER);
+  }
+
+  @Test
+  void requesterPermissionDoesNotOpenTheItemProcessingEditor() {
+    when(client.order(ID)).thenReturn(order("ITEM", false, List.of(), false, true));
+
+    assertThatThrownBy(() -> reader.readItemEdit(ID))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
   }
 
   @Test

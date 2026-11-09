@@ -2006,31 +2006,57 @@ public final class BackendSeeder {
   }
 
   /**
-   * Sets a squadron's {@code is_profit_eligible} flag via {@code PATCH
-   * /api/v1/squadrons/{id}/profit-eligible}; throws on a non-2xx status.
+   * Attaches a synthetic fixture unit to the unique active Profit Bereich.
    *
-   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
+   * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
-   * @param squadronId the squadron OrgUnit id to toggle
-   * @param eligible the new {@code is_profit_eligible} value
+   * @param orgUnitId the fixture unit
    */
-  public void setSquadronProfitEligible(
-      String adminUser, String adminPassword, String squadronId, boolean eligible) {
+  public void moveOrgUnitToProfit(String adminUser, String adminPassword, String orgUnitId) {
     try {
       String token = passwordGrant(adminUser, adminPassword);
+      JsonArray nodes =
+          JsonParser.parseString(getBody(adminUser, adminPassword, "/api/v1/org-units"))
+              .getAsJsonArray();
+      String profitId = null;
+      long version = -1;
+      for (JsonElement element : nodes) {
+        JsonObject node = element.getAsJsonObject();
+        if (node.get("id").getAsString().equals(orgUnitId)) {
+          version = node.get("version").getAsLong();
+        }
+        if (node.has("department")
+            && !node.get("department").isJsonNull()
+            && "PROFIT".equals(node.get("department").getAsString())
+            && "BEREICH".equals(node.get("kind").getAsString())) {
+          if (profitId != null)
+            throw new IllegalStateException("Multiple Profit Bereiche in test hierarchy");
+          profitId = node.get("id").getAsString();
+        }
+      }
+      if (profitId == null) {
+        profitId =
+            seedEntity(
+                adminUser,
+                adminPassword,
+                "/api/v1/org-units/bereiche",
+                "{\"name\":\"E2E Profit"
+                    + " Bereich\",\"shorthand\":\"E2EP\",\"department\":\"PROFIT\"}");
+      }
+      if (version < 0)
+        throw new IllegalStateException("Fixture unit missing from active hierarchy");
       int status =
           patch(
               token,
-              "/api/v1/squadrons/" + squadronId + "/profit-eligible",
-              "{\"eligible\":" + eligible + "}");
+              "/api/v1/org-units/" + orgUnitId + "/parent",
+              "{\"parentOrgUnitId\":\"" + profitId + "\",\"version\":" + version + "}");
       if (status < 200 || status >= 300) {
-        throw new IllegalStateException(
-            "Profit-eligibility PATCH failed: HTTP " + status + " body=" + lastBodyForMessage());
+        throw new IllegalStateException("Fixture hierarchy PATCH failed: HTTP " + status);
       }
     } catch (IllegalStateException e) {
       throw e;
     } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.setSquadronProfitEligible failed", e);
+      throw new IllegalStateException("Cannot place fixture in Profit hierarchy", e);
     }
   }
 
@@ -2051,34 +2077,6 @@ public final class BackendSeeder {
         adminPassword,
         "/api/v1/special-commands",
         "{\"name\":\"" + name + "\",\"shorthand\":\"" + shorthand + "\"}");
-  }
-
-  /**
-   * Sets a Spezialkommando's {@code is_profit_eligible} flag via {@code PATCH
-   * /api/v1/special-commands/{id}/profit-eligible}; throws on a non-2xx status.
-   *
-   * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
-   * @param adminPassword the admin password
-   * @param specialCommandId the SK OrgUnit id to toggle
-   * @param eligible the new {@code is_profit_eligible} value
-   */
-  public void setSpecialCommandProfitEligible(
-      String adminUser, String adminPassword, String specialCommandId, boolean eligible) {
-    try {
-      String token = passwordGrant(adminUser, adminPassword);
-      int status =
-          patch(
-              token,
-              "/api/v1/special-commands/" + specialCommandId + "/profit-eligible",
-              "{\"eligible\":" + eligible + "}");
-      if (status < 200 || status >= 300) {
-        throw new IllegalStateException("SK profit-eligibility PATCH failed: HTTP " + status);
-      }
-    } catch (IllegalStateException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.setSpecialCommandProfitEligible failed", e);
-    }
   }
 
   /**

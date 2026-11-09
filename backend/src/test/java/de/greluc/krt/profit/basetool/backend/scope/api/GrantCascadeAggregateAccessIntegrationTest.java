@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -49,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -89,6 +92,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 @SpringBootTest
 class GrantCascadeAggregateAccessIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private MissionAccessPolicy missionAccessPolicy;
 
@@ -424,7 +429,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(true);
+    withinProfit(s, persistedProfitArea(orgUnitRepository));
     s.setParent(parent);
     return squadronRepository.save(s);
   }

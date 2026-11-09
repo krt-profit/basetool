@@ -1290,4 +1290,33 @@ public interface InventoryItemRepository
    */
   @EntityGraph(attributePaths = {"material"})
   List<InventoryItem> findWithMaterialByIdIn(Collection<UUID> ids);
+
+  /**
+   * Resolves order slices before a stock-row write.
+   *
+   * @param rowIds the affected entries
+   * @return distinct affected order ids
+   */
+  @Query(
+      "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a WHERE a.inventoryItem.id IN"
+          + " :rowIds")
+  List<UUID> findAllocatedOrderIds(@Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Resolves the order slices removed by a scoped nonpersonal wipe.
+   *
+   * @param adminAll whether all rows are in scope
+   * @param activeUnit the pinned unit
+   * @param memberUnits the scoped units
+   * @return distinct affected order ids
+   */
+  @Query(
+      "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i WHERE"
+          + " i.personal = false AND (:adminAll = true OR (:activeUnit IS NOT NULL AND"
+          + " i.owningOrgUnit.id = :activeUnit) OR (:activeUnit IS NULL AND i.owningOrgUnit.id IN"
+          + " :memberUnits))")
+  List<UUID> findAllocatedOrdersInWipeScope(
+      @Param("adminAll") boolean adminAll,
+      @Param("activeUnit") @Nullable UUID activeUnit,
+      @Param("memberUnits") Collection<UUID> memberUnits);
 }

@@ -89,11 +89,11 @@ class JobOrderTenancyE2eTest {
 
       String profitSkId =
           seeder.createSpecialCommand(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy SK", "ETSK");
-      seeder.setSpecialCommandProfitEligible(ADMIN_USER, ADMIN_PASSWORD, profitSkId, true);
+      seeder.moveOrgUnitToProfit(ADMIN_USER, ADMIN_PASSWORD, profitSkId);
 
       String squadronBId =
           seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy B", "ETNB");
-      seeder.setSquadronProfitEligible(ADMIN_USER, ADMIN_PASSWORD, squadronBId, true);
+      seeder.moveOrgUnitToProfit(ADMIN_USER, ADMIN_PASSWORD, squadronBId);
       seeder.assignStaffelleiterSeat(
           ADMIN_USER,
           ADMIN_PASSWORD,

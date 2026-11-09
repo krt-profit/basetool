@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -74,6 +77,8 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class JobOrderLinkedStockMissionAllocationIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String ORDERS = "/api/v1/orders/";
   private static final String MISSION_NAME = "Secret-Op-";
@@ -215,7 +220,7 @@ class JobOrderLinkedStockMissionAllocationIntegrationTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(true);
+    withinProfit(s, persistedProfitArea(orgUnitRepository));
     return squadronRepository.save(s);
   }
 

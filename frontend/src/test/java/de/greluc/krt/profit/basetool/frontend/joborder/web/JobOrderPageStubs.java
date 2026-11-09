@@ -203,7 +203,8 @@ final class JobOrderPageStubs {
           90,
           blueprintOwners,
           itemStock,
-          orphanedInventory);
+          orphanedInventory,
+          List.of());
     }
   }
 
@@ -226,7 +227,8 @@ final class JobOrderPageStubs {
         materials,
         true,
         List.of(),
-        requestingOptions);
+        requestingOptions,
+        List.of());
   }
 
   /**
@@ -240,7 +242,7 @@ final class JobOrderPageStubs {
   static JobOrderPageReader.ItemEditPage blocked(
       @NotNull JobOrderPageReader.ItemEditAccess access, @NotNull Optional<JobOrderDto> order) {
     return new JobOrderPageReader.ItemEditPage(
-        access, order, List.of(), true, List.of(), List.of());
+        access, order, List.of(), true, List.of(), List.of(), List.of());
   }
 
   /**
@@ -254,6 +256,24 @@ final class JobOrderPageStubs {
   static JobOrderPageReader.OrderCreatePage create(
       @NotNull List<MaterialDto> materials,
       @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
-    return new JobOrderPageReader.OrderCreatePage(materials, true, List.of(), requestingOptions);
+    return new JobOrderPageReader.OrderCreatePage(
+        materials, true, List.of(), requestingOptions, List.of());
+  }
+
+  /**
+   * A create page with independently supplied requester and current Profit options.
+   *
+   * @param materials the material catalog
+   * @param requestingOptions the requesting options
+   * @param responsibleOptions the current Profit hierarchy
+   * @return the create page
+   */
+  @NotNull
+  static JobOrderPageReader.OrderCreatePage create(
+      @NotNull List<MaterialDto> materials,
+      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions,
+      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {
+    return new JobOrderPageReader.OrderCreatePage(
+        materials, true, List.of(), requestingOptions, responsibleOptions);
   }
 }

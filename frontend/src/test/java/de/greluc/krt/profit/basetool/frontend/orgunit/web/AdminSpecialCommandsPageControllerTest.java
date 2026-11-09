@@ -98,6 +98,6 @@ class AdminSpecialCommandsPageControllerTest {
   }
 
   private static SpecialCommandDto named(String name) {
-    return new SpecialCommandDto(null, name, null, null, null, null, null);
+    return new SpecialCommandDto(null, name, null, null, null, null);
   }
 }

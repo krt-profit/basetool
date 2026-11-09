@@ -110,14 +110,6 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
   private boolean active = true;
 
   /**
-   * Whether this org unit may be picked as the responsible (processing) org unit of a job order.
-   * Defaults to {@code false} and is toggled only through the dedicated {@code profit-eligible}
-   * endpoints, never by a regular update.
-   */
-  @Column(name = "is_profit_eligible", nullable = false)
-  private boolean isProfitEligible = false;
-
-  /**
    * The Kartell department of a {@link Bereich}, driving its colour tint in the Leitung tree
    * (REQ-ROLE-004). {@code null} for every other kind and for a Bereich without an assigned
    * department.

@@ -317,7 +317,7 @@ class CatalogueBackendClientTest {
     }
     JobTypeDto jobType =
         new JobTypeDto(null, "Miner", "d", "MISSION", null, true, false, false, 0L);
-    SquadronDto squadron = new SquadronDto(null, "Alpha", "A", "d", true, false, 0L);
+    SquadronDto squadron = new SquadronDto(null, "Alpha", "A", "d", true, 0L);
     FrequencyTypeDto created = new FrequencyTypeDto(null, "Comms", "d", true, null, null);
     FrequencyTypeDto updated = new FrequencyTypeDto(null, "Comms", "d", false, null, 6L);
 

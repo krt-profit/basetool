@@ -137,10 +137,9 @@ class MemberHangarPageControllerTest {
             eq(MEMBER)))
         .thenReturn(
             List.of(
+                new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Alpha", "ALP", "SQUADRON"),
                 new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Alpha", "ALP", "SQUADRON", Boolean.FALSE),
-                new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
+                    UUID.randomUUID(), "Sondereinheit", "SE", "SPECIAL_COMMAND")));
 
     mockMvc
         .perform(get(BASE))
@@ -329,8 +328,7 @@ class MemberHangarPageControllerTest {
             eq(MEMBER)))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    unit, "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
+                new OrgUnitMembershipOptionDto(unit, "Sondereinheit", "SE", "SPECIAL_COMMAND")));
 
     mockMvc
         .perform(get(BASE))

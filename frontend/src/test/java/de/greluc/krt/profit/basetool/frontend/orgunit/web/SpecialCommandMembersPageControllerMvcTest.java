@@ -91,7 +91,7 @@ class SpecialCommandMembersPageControllerMvcTest {
 
   /** Stubs the backend SK read and a one-member roster as the client decodes them. */
   private void stubSpecialCommandWithOneMember() {
-    SpecialCommandDto sc = new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, false, 0L);
+    SpecialCommandDto sc = new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, 0L);
     OrgUnitMembershipDto member =
         new OrgUnitMembershipDto(
             memberId, "Pilot", skId, OrgUnitKind.SPECIAL_COMMAND, false, false, false, null, 3L);

@@ -42,5 +42,9 @@ public final class JobOrderMetricNames {
    */
   public static final String CATEGORY_ITEM_LINE_BLUEPRINT_DRIFT = "item_line_blueprint_drift";
 
+  /** Gauge of orders requiring a valid responsibility transfer, without identifying labels. */
+  public static final String JOB_ORDER_INVALID_RESPONSIBILITY =
+      "basetool.job.order.invalid.responsibility";
+
   private JobOrderMetricNames() {}
 }

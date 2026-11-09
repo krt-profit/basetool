@@ -52,6 +52,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InventoryRebookCommands implements RebookCommands {
 
+  private final InventoryOrderWrites orderWrites;
+
   private final InventoryItemRepository inventoryRepository;
   private final InventoryCheckoutService checkoutService;
   private final InventoryPoolChangeService poolChangeService;
@@ -62,6 +64,7 @@ public class InventoryRebookCommands implements RebookCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull RebookOutcome rebook(@NotNull Rebook rebook, boolean dryRun) {
+    orderWrites.lockEligibility();
     if (!(rebook.amount() > 0.0) || !Double.isFinite(rebook.amount())) {
       throw new BadRequestException("The amount must be positive");
     }

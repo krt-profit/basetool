@@ -37,6 +37,15 @@ groups:
           summary: "Discord identity held by two accounts: {{ $value }} skipped link write(s) in the last hour"
           description: "One Discord identity is reachable from two app_user rows, so the link could not be written to the second. One member has two accounts -- consolidate them from the member administration (the duplicate folds into the survivor, belongings and Discord identity move, the duplicate is removed). The alert repeats every run until then. The backend log names both account ids, never the snowflake."
 
+      - alert: JobOrderInvalidResponsibility
+        expr: basetool_job_order_invalid_responsibility > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job orders require valid responsibility: {{ $value }} order(s)"
+          description: "Current responsibility lies outside the active designated Profit hierarchy or verified original boundary. Authorised readers retain the order; a current responsible-unit writer must explicitly transfer it to an eligible unit before processing resumes. No stock or money is moved automatically."
+
       - alert: JobOrderItemBlueprintDrift
         expr: basetool_job_order_integrity_violations > 0
         for: 15m

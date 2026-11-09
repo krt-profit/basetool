@@ -89,6 +89,8 @@ public class MaterialCollectionPageController {
       log.warn("Could not load locations: {}", e.getMessage());
     }
 
+    var order = jobOrderClient.order(jobOrderId);
+    model.addAttribute("responsibilityInvalid", order == null || order.responsibilityInvalid());
     model.addAttribute("jobOrderId", jobOrderId);
     List<MaterialCollectionGroup> materialGroups =
         MaterialCollectionGroup.of(entries == null ? List.of() : entries);

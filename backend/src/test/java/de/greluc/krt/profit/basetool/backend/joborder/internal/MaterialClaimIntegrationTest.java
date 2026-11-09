@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -35,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -49,11 +52,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration tests of {@link MaterialClaimService} against Postgres: in-place upsert, overclaim
- * rejection, and claim withdrawal on {@link JobOrderService#reassignResponsibleOrgUnit}.
+ * rejection, and claim preservation across {@link JobOrderService#reassignResponsibleOrgUnit}.
  */
 @SpringBootTest
 @WithMockUser(roles = {"ADMIN"})
 class MaterialClaimIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private MaterialClaimService materialClaimService;
   @Autowired private JobOrderService jobOrderService;
@@ -74,19 +79,19 @@ class MaterialClaimIntegrationTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("Claim-SK-" + tag);
       sk.setShorthand("S" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
       Squadron sqA = new Squadron();
       sqA.setName("Claim-A-" + tag);
       sqA.setShorthand("A" + tag);
-      sqA.setProfitEligible(true);
+      withinProfit(sqA, persistedProfitArea(orgUnitRepository));
       sqA = squadronRepository.save(sqA);
 
       Squadron sqB = new Squadron();
       sqB.setName("Claim-B-" + tag);
       sqB.setShorthand("B" + tag);
-      sqB.setProfitEligible(true);
+      withinProfit(sqB, persistedProfitArea(orgUnitRepository));
       sqB = squadronRepository.save(sqB);
 
       Material mat = new Material();
@@ -163,15 +168,26 @@ class MaterialClaimIntegrationTest {
   }
 
   @Test
-  void deEscalationToSquadron_withdrawsAllClaims() {
+  void responsibilityTransfer_preservesTheOpenClaimAndItsFacts() {
     Fixture f = seed();
-    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 8.0));
-    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId()))
-        .isNotEmpty();
+    var created =
+        materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 8.0));
+    UUID originalResponsible =
+        jobOrderQueryService.getJobOrderById(f.orderId()).responsibleOrgUnit().id();
 
     jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
+    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), originalResponsible);
 
-    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId())).isEmpty();
+    assertThat(materialClaimService.getClaimBuckets(f.orderId()))
+        .singleElement()
+        .satisfies(bucket ->
+            assertThat(bucket.claims())
+                .singleElement()
+                .satisfies(retained -> {
+                  assertThat(retained.id()).isEqualTo(created.id());
+                  assertThat(retained.amount()).isEqualTo(8.0);
+                  assertThat(retained.claimingOrgUnit().id()).isEqualTo(f.squadronAId());
+                }));
   }
 
   @Test
@@ -208,17 +224,17 @@ class MaterialClaimIntegrationTest {
           SpecialCommand sk = new SpecialCommand();
           sk.setName("Orph-SK-" + tag);
           sk.setShorthand("O" + tag);
-          sk.setProfitEligible(true);
+          withinProfit(sk, persistedProfitArea(orgUnitRepository));
           sk = specialCommandRepository.save(sk);
           Squadron sqA = new Squadron();
           sqA.setName("Orph-A-" + tag);
           sqA.setShorthand("A" + tag);
-          sqA.setProfitEligible(true);
+          withinProfit(sqA, persistedProfitArea(orgUnitRepository));
           sqA = squadronRepository.save(sqA);
           Squadron sqB = new Squadron();
           sqB.setName("Orph-B-" + tag);
           sqB.setShorthand("B" + tag);
-          sqB.setProfitEligible(true);
+          withinProfit(sqB, persistedProfitArea(orgUnitRepository));
           sqB = squadronRepository.save(sqB);
           Material matA = new Material();
           matA.setName("OrphMatA-" + tag);

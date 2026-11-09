@@ -95,6 +95,10 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
         1L,
         null,
         null,
+        false,
+        false,
+        false,
+        null,
         false);
   }
 

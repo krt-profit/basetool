@@ -179,8 +179,7 @@ class UserProxyControllerTest {
                     UUID.fromString("6e5d4c3b-2a19-4f08-b7e6-d5c4b3a29180"),
                     "ALPHA",
                     "ALP",
-                    "SQUADRON",
-                    true)));
+                    "SQUADRON")));
 
     List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true);
 

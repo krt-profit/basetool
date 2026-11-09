@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -242,11 +243,11 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * only to that squadron and admins (see {@link
    * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}). The squadron filter matches
    * the responsible or requesting side and only narrows the scoped result. The processing filter
-   * keeps only orders whose profit-eligible responsible unit is in {@code processingOrgUnitIds}
-   * (REQ-ORDERS-040) and likewise only narrows. Without the processing filter the scope is widened
-   * by the assignee grant: an order on which {@code callerId} holds an assignee entry is visible
-   * too (REQ-ORDERS-047). Only the two org units are fetched; collections batch-load
-   * (REQ-DATA-003).
+   * keeps only orders whose active Profit-hierarchy responsible unit is in {@code
+   * processingOrgUnitIds} (REQ-ORDERS-040) and likewise only narrows. Without the processing filter
+   * the scope is widened by the assignee grant: an order on which {@code callerId} holds an
+   * assignee entry is visible too (REQ-ORDERS-047). Only the two org units are fetched; collections
+   * batch-load (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
@@ -275,7 +276,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
           + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
           + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
           + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"
-          + " o.responsibleOrgUnit.isProfitEligible = TRUE))")
+          + " o.responsibleOrgUnit.active = TRUE AND EXISTS (SELECT p.id FROM OrgUnit p WHERE"
+          + " TYPE(p) = Bereich AND p.active = TRUE AND p.department ="
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.Department.PROFIT AND"
+          + " (o.responsibleOrgUnit.id = p.id OR o.responsibleOrgUnit.parent.id = p.id))))")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
@@ -289,30 +293,33 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
-   * The orders on which {@code callerId} holds an assignee entry, narrowed by the status and the
-   * optional squadron display filter: the part of the "Alle" list a caller outside the profit gate
-   * keeps (REQ-ORDERS-047). The entry is the visibility grant, so no tenancy predicate applies.
+   * Lists only concrete responsible-unit recovery relationships and personal assignments.
    *
-   * @param statuses status values to keep; never empty.
-   * @param noSquadronFilter {@code true} to disable the squadron display filter.
-   * @param squadronIds the squadron ids to match on either side; never empty, pass a placeholder
-   *     when {@code noSquadronFilter} is {@code true}.
-   * @param callerId the caller's user id.
-   * @param pageable page request (carries the sort).
-   * @return paged job orders the caller is an assignee of, matching the filters.
+   * @param statuses the lifecycle filter
+   * @param noSquadronFilter whether the unit display filter is disabled
+   * @param squadronIds optional unit display identities
+   * @param isAdminAllScope whether the current scope is unrestricted administration
+   * @param activeOrgUnitId the current unit pin
+   * @param memberOrgUnitIds direct units and existing leadership reach
+   * @param callerId the personal assignee identity
+   * @param pageable the bounded result page
+   * @return concretely authorised rows without a general Profit queue grant
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      """
-      SELECT o FROM JobOrder o WHERE o.status IN :statuses
-      AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN :squadronIds
-           OR o.requestingOrgUnit.id IN :squadronIds)
-      AND EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :callerId)
-      """)
-  Page<JobOrder> findAssignedJobOrdersFiltered(
+      "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND"
+          + " (:noSquadronFilter = true OR o.responsibleOrgUnit.id IN :squadronIds"
+          + " OR o.requestingOrgUnit.id IN :squadronIds) AND ("
+          + JobOrderScope.CONCRETE_RESPONSIBLE_PREDICATE
+          + " OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
+          + " :callerId))")
+  Page<JobOrder> findConcreteRecoveryAndAssignedOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
       @Param("squadronIds") @Nullable Collection<UUID> squadronIds,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("callerId") UUID callerId,
       Pageable pageable);
 
@@ -356,7 +363,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       "SELECT o FROM JobOrder o WHERE CAST(o.displayId AS string) LIKE CONCAT(:numberPrefix, '%')"
           + " AND ((:scoped = TRUE AND "
           + JobOrderScope.PREDICATE
-          + ") OR EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
+          + ") OR "
+          + JobOrderScope.CONCRETE_RESPONSIBLE_PREDICATE
+          + " OR EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
           + " :callerId)) ORDER BY o.displayId ASC")
   List<JobOrder> findVisibleByNumberPrefix(
       @Param("numberPrefix") String numberPrefix,
@@ -413,6 +422,34 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       WHERE o.id = :id
       """)
   Optional<JobOrder> findByIdWithItemBlueprints(@Param("id") UUID id);
+
+  /**
+   * Loads affected order identities in stable pages before eligibility maintenance.
+   *
+   * @param unitIds the changed responsibility or claiming units
+   * @param pageable the bounded identity page
+   * @return affected identities in ascending order
+   */
+  @Query(
+      "SELECT o.id FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :unitIds OR EXISTS (SELECT c.id"
+          + " FROM MaterialClaim c WHERE c.jobOrder = o AND c.claimingOrgUnit.id IN :unitIds) ORDER"
+          + " BY o.id")
+  List<UUID> findIdsAffectedByUnits(@Param("unitIds") Collection<UUID> unitIds, Pageable pageable);
+
+  /**
+   * Counts every order whose current responsibility fails the active Profit hierarchy.
+   *
+   * @return the bounded clarification backlog across all lifecycle states
+   */
+  @Query(
+      "SELECT COUNT(o) FROM JobOrder o WHERE NOT EXISTS (SELECT p.id FROM OrgUnit p WHERE TYPE(p) ="
+          + " Bereich AND p.active = true AND p.department ="
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.Department.PROFIT AND"
+          + " (o.originalProfitOrgUnitId IS NULL OR o.originalProfitOrgUnitId = p.id) AND"
+          + " o.responsibleOrgUnit.active = true AND (o.responsibleOrgUnit.id = p.id OR"
+          + " (TYPE(o.responsibleOrgUnit) IN (Squadron, SpecialCommand) AND"
+          + " o.responsibleOrgUnit.parent.id = p.id)))")
+  long countInvalidResponsibilities();
 
   /**
    * Returns the highest priority across all job orders, used to assign a new order's priority;
@@ -474,6 +511,18 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
       """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
+
+  /**
+   * Finds orders with any material or item handover for batched requester-edit authority.
+   *
+   * @param ids the bounded candidate order identities
+   * @return candidates with at least one handover
+   */
+  @Query(
+      "SELECT o.id FROM JobOrder o WHERE o.id IN :ids AND"
+          + " (EXISTS (SELECT h.id FROM JobOrderHandover h WHERE h.jobOrder = o)"
+          + " OR EXISTS (SELECT h.id FROM JobOrderItemHandover h WHERE h.jobOrder = o))")
+  Set<UUID> findIdsWithAnyDelivery(@Param("ids") Collection<UUID> ids);
 
   /**
    * Loads what the Lager shows of the given job orders in one read (plan §7.5 P3-5d).

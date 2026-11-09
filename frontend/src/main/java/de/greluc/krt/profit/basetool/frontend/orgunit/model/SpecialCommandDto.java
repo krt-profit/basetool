@@ -30,15 +30,8 @@ import java.util.UUID;
  * @param shorthand short tag used on chips / badges.
  * @param description free-form text; nullable.
  * @param active soft-delete flag; {@code true} for the active reference data.
- * @param isProfitEligible whether the SK appears in the Job-Order responsible (processing) picker.
  * @param version optimistic-lock counter.
  */
 @DtoMirror
 public record SpecialCommandDto(
-    UUID id,
-    String name,
-    String shorthand,
-    String description,
-    Boolean active,
-    Boolean isProfitEligible,
-    Long version) {}
+    UUID id, String name, String shorthand, String description, Boolean active, Long version) {}

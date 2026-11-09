@@ -260,4 +260,23 @@ public interface OrgUnitMembershipRepository
       "SELECT COUNT(m) > 0 FROM OrgUnitMembership m WHERE m.id.userId = :userId AND m.role <>"
           + " de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER")
   boolean existsLeadershipSeat(@Param("userId") UUID userId);
+
+  /**
+   * Resolves active direct or covering functional writers for affected units.
+   *
+   * @param unitIds the units requiring coordination
+   * @return current writer identities without unrelated administrators
+   */
+  @Query(
+      "SELECT DISTINCT m.id.userId FROM OrgUnitMembership m, OrgUnit grantUnit, OrgUnit target"
+          + " WHERE target.id IN :unitIds AND grantUnit.id = m.id.orgUnitId AND"
+          + " m.user.approvalStatus ="
+          + " de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE AND"
+          + " m.user.inKeycloak = true AND m.user.enabledInKeycloak = true AND (m.isLogistician ="
+          + " true OR (m.role <>"
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER AND EXISTS"
+          + " (SELECT r.id FROM User u JOIN u.roles r WHERE u = m.user AND r.code = 'KRT_MEMBER')))"
+          + " AND (grantUnit.id = target.id OR TYPE(grantUnit) = Organisationsleitung OR"
+          + " (TYPE(grantUnit) = Bereich AND target.parent.id = grantUnit.id))")
+  Set<UUID> findCurrentWriterUserIdsForUnits(@Param("unitIds") Collection<UUID> unitIds);
 }

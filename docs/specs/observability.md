@@ -4256,3 +4256,16 @@ refusals by reason, the request writes, the gateway's switch refusals and the sw
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
 REQ-BXCH-006 · **Issues:** #3121, #3156
+
+The JobOrder hierarchy foundation adds the unlabelled gauge
+`basetool_job_order_invalid_responsibility`, counting every lifecycle status whose current
+responsibility fails active Profit hierarchy or a verified original boundary. Unknown legacy
+origin alone is not a violation. `JobOrderInvalidResponsibility` warns after 15 minutes and the
+operations dashboard shows the count. Existing HTTP, audit and live-sync observations cover the
+current target picker, recovery transfer and automatic promise endings; no identity or amount is
+a metric label and no public external gateway surface is added.
+
+Initial promise reconciliation runs before application readiness and uses the same audited state
+transition and live notifications. A failed reconciliation rolls back and prevents readiness; the
+existing backend availability/readiness probes expose that failure. It has no schedule, feature
+switch, user labels or separate external surface.

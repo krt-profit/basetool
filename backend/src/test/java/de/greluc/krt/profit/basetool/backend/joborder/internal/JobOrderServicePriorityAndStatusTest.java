@@ -37,8 +37,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -52,6 +54,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -78,6 +82,10 @@ import org.springframework.context.ApplicationEventPublisher;
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderServicePriorityAndStatusTest {
+
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
@@ -108,14 +116,32 @@ class JobOrderServicePriorityAndStatusTest {
   void stubMapper() {
     jobOrderPriorityService =
         new JobOrderPriorityService(
-            jobOrderRepository, auditService, jobOrderStockProjectionService);
+            jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
+            auditService,
+            jobOrderStockProjectionService);
     service =
         new JobOrderService(
             jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
             materialRepository,
             new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             new InventoryStockCommands(
-                inventoryItemRepository, null, null, null, null, null, null, null),
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             null,
             null,
             null,
@@ -127,17 +153,19 @@ class JobOrderServicePriorityAndStatusTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            null,
             actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
+                profitHierarchy,
+                responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
                 eventPublisher,
-                jobOrderStockProjectionService));
+                jobOrderStockProjectionService),
+            liveSyncPublisher);
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
-        .when(jobOrderMapper.toDto(any(JobOrder.class)))
+        .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
         .thenAnswer(inv -> {
           JobOrder o = inv.getArgument(0);
           return new JobOrderDto(
@@ -160,6 +188,10 @@ class JobOrderServicePriorityAndStatusTest {
               null,
               o.getVersion(),
               null,
+              null,
+              false,
+              false,
+              false,
               null,
               false);
         });
@@ -374,6 +406,7 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrder target = newOrder(JobOrderStatus.OPEN, 3, 1L);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(target));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of(target));
+      when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(target.getId()));
 
       service.updateJobOrderPriority(ORDER_ID, 3);
 
@@ -387,6 +420,8 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrder c = newOrderInstance(JobOrderStatus.OPEN, 3, "C");
       when(jobOrderRepository.findById(a.getId())).thenReturn(Optional.of(a));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(a, b, c)));
+      when(responsibilityGuard.validOrderIds(any()))
+          .thenReturn(java.util.Set.of(a.getId(), b.getId(), c.getId()));
 
       service.updateJobOrderPriority(a.getId(), 3);
 
@@ -402,6 +437,8 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrder c = newOrderInstance(JobOrderStatus.OPEN, 3, "C");
       when(jobOrderRepository.findById(c.getId())).thenReturn(Optional.of(c));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(a, b, c)));
+      when(responsibilityGuard.validOrderIds(any()))
+          .thenReturn(java.util.Set.of(a.getId(), b.getId(), c.getId()));
 
       service.updateJobOrderPriority(c.getId(), -5);
 
@@ -416,6 +453,8 @@ class JobOrderServicePriorityAndStatusTest {
       JobOrder b = newOrderInstance(JobOrderStatus.OPEN, 2, "B");
       when(jobOrderRepository.findById(a.getId())).thenReturn(Optional.of(a));
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(a, b)));
+      when(responsibilityGuard.validOrderIds(any()))
+          .thenReturn(java.util.Set.of(a.getId(), b.getId()));
 
       service.updateJobOrderPriority(a.getId(), 99);
 
@@ -638,6 +677,8 @@ class JobOrderServicePriorityAndStatusTest {
       later.setCreatedAt(Instant.parse("2026-07-10T00:00:30Z"));
 
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of(later, earlier));
+      when(responsibilityGuard.validOrderIds(any()))
+          .thenReturn(java.util.Set.of(later.getId(), earlier.getId()));
 
       jobOrderPriorityService.normalizePriorities();
 

@@ -102,11 +102,12 @@ member's assignment notice only (REQ-NOTIF-025).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
-`MaterialClaimService#withdrawOrphanedClaimsWithinTransaction` (an order edit removed the bucket) and
-`#withdrawAllForOrderWithinTransaction` (the order went back to a squadron) publish
-`JOB_ORDER_CLAIM_WITHDRAWN` once per claim whose `claimedByUser` is set; the default rule notifies that
-member with the order, the material and the coded reason (`ORDER_CHANGED`, `DE_ESCALATED`). A claim
-the member withdrew themselves (`withdrawClaim`) tells nobody.
+`MaterialClaimService#withdrawOrphanedClaimsWithinTransaction` (an order edit removed the bucket)
+publishes `JOB_ORDER_CLAIM_WITHDRAWN` once per claim whose `claimedByUser` is set; the default rule
+notifies that member with the order, the material and the coded reason `ORDER_CHANGED`. A claim the
+member withdrew themselves (`withdrawClaim`) tells nobody. Responsibility transfers preserve active
+claims and do not publish withdrawal notices. Existing `DE_ESCALATED` events remain readable as
+historical notices.
 
 **Acceptance**
 
@@ -121,3 +122,13 @@ the member withdrew themselves (`withdrawClaim`) tells nobody.
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `joborder/api/events/JobOrderNotices`,
 `joborder/internal/JobOrderService`, `joborder/internal/JobOrderAssigneeService`, `joborder/internal/MaterialClaimService`,
 `V274__seed_job_order_notification_rules.sql` · **Issues:** #2414
+
+The hierarchy foundation implements the grouped policy for the new automatic ineligibility trigger:
+all ended legacy promises of one hierarchy change are grouped by order and affected Staffel,
+then one cause per order carries the union of current affected-Staffel and responsible-unit writers.
+The owning orgunit directory includes actual covering contextual grants and leadership reach, never
+unrelated global administrators or only the last recorder. Existing preferences, actor exclusion and
+recipient deduplication stay in the notification engine; historical line-level audit remains intact.
+
+Initial automatic reconciliation uses the same grouped policy before application readiness, with a
+system actor. Already-ended promises produce no new cause on a repeated start.

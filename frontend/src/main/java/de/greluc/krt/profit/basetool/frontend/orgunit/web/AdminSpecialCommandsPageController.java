@@ -139,8 +139,7 @@ public class AdminSpecialCommandsPageController {
    * null}, so the list renders {@code false} and {@code 0} for them.
    *
    * @param sc the decoded Spezialkommando
-   * @return the Spezialkommando with {@code active}, {@code isProfitEligible} and {@code version}
-   *     never {@code null}
+   * @return the Spezialkommando with {@code active} and {@code version} never {@code null}
    */
   @NotNull
   private static SpecialCommandDto withDefaults(@NotNull SpecialCommandDto sc) {
@@ -150,7 +149,6 @@ public class AdminSpecialCommandsPageController {
         sc.shorthand(),
         sc.description(),
         Boolean.TRUE.equals(sc.active()),
-        Boolean.TRUE.equals(sc.isProfitEligible()),
         sc.version() == null ? 0L : sc.version());
   }
 
@@ -179,8 +177,7 @@ public class AdminSpecialCommandsPageController {
     }
     try {
       SpecialCommandDto body =
-          new SpecialCommandDto(
-              null, form.name(), form.shorthand(), form.description(), true, false, 0L);
+          new SpecialCommandDto(null, form.name(), form.shorthand(), form.description(), true, 0L);
       orgUnitClient.createSpecialCommand(body);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -224,7 +221,7 @@ public class AdminSpecialCommandsPageController {
     try {
       SpecialCommandDto body =
           new SpecialCommandDto(
-              id, form.name(), form.shorthand(), form.description(), true, false, form.version());
+              id, form.name(), form.shorthand(), form.description(), true, form.version());
       orgUnitClient.updateSpecialCommand(id, body);
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -370,8 +367,7 @@ public class AdminSpecialCommandsPageController {
     }
     return okOrRelay(() -> {
       orgUnitClient.createSpecialCommand(
-          new SpecialCommandDto(
-              null, form.name(), form.shorthand(), form.description(), true, false, 0L));
+          new SpecialCommandDto(null, form.name(), form.shorthand(), form.description(), true, 0L));
       evictOrgUnitCatalogueCache();
     });
   }
@@ -398,7 +394,7 @@ public class AdminSpecialCommandsPageController {
       orgUnitClient.updateSpecialCommand(
           id,
           new SpecialCommandDto(
-              id, form.name(), form.shorthand(), form.description(), true, false, form.version()));
+              id, form.name(), form.shorthand(), form.description(), true, form.version()));
       evictOrgUnitCatalogueCache();
     });
   }

@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
@@ -38,7 +37,6 @@ public class StockViewerAccessService implements StockViewerAccess {
 
   private final InventoryAccessPolicy inventoryAccessPolicy;
   private final AuthHelperService authHelperService;
-  private final EarmarkTargetPolicy earmarkTargetPolicy;
 
   /** {@inheritDoc} */
   @Override
@@ -46,12 +44,6 @@ public class StockViewerAccessService implements StockViewerAccess {
     return inventoryItemId != null
         && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
         && (isCaller(ownerId) || inventoryAccessPolicy.isLogisticianOfItem(inventoryItemId));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean mayEditJobOrder(UUID jobOrderId) {
-    return jobOrderId != null && earmarkTargetPolicy.mayEditJobOrderEarmarks(jobOrderId);
   }
 
   /**

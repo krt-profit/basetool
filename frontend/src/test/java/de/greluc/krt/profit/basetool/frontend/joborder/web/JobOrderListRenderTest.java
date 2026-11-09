@@ -134,6 +134,10 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
 
     when(reader.readOrderList(any()))
@@ -174,6 +178,10 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
 

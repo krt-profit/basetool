@@ -76,6 +76,7 @@ public class InventoryPoolChangeService {
   /** Name shown in a notification for a member or unit without one. */
   private static final String UNKNOWN_NAME = "—";
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -111,6 +112,7 @@ public class InventoryPoolChangeService {
   @Transactional
   public @NotNull InventoryItemDto changePool(
       @NotNull UUID itemId, @NotNull InventoryItemPoolChangeDto dto, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
@@ -191,6 +193,7 @@ public class InventoryPoolChangeService {
       @Nullable Double amount,
       boolean mergeStock,
       @NotNull UUID actorId) {
+    orderWrites.lockEligibility();
     OrgUnit source = requireSharedRow(item);
     if (source.getId().equals(targetId)) {
       return item;
@@ -238,6 +241,7 @@ public class InventoryPoolChangeService {
   @NotNull
   InventoryItem moveUnitlessRowIntoPool(
       @NotNull InventoryItem item, double amount, @NotNull OrgUnit target) {
+    orderWrites.lockEligibility();
     if (Boolean.TRUE.equals(item.getPersonal()) || item.getOwningOrgUnit() != null) {
       throw new BadRequestException("Only a shared row without an org unit can move this way");
     }
@@ -294,6 +298,7 @@ public class InventoryPoolChangeService {
       @NotNull InventoryItem item, @NotNull OrgUnit target) {
     InventoryDonationGuards.requireNoDonation(item);
     item.setOwningOrgUnit(target);
+    orderWrites.assertRow(item);
     return inventoryItemRepository.saveAndFlush(item);
   }
 

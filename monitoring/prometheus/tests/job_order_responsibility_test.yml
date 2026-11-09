@@ -1,0 +1,43 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: invalid responsibility waits for the bounded warning period
+    interval: 1m
+    input_series:
+      - series: 'basetool_job_order_invalid_responsibility'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: JobOrderInvalidResponsibility
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: JobOrderInvalidResponsibility
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'Job orders require valid responsibility: 1 order(s)'
+              description: 'Current responsibility lies outside the active designated Profit hierarchy or verified original boundary. Authorised readers retain the order; a current responsible-unit writer must explicitly transfer it to an eligible unit before processing resumes. No stock or money is moved automatically.'
+
+  - name: restored responsibility clears the warning
+    interval: 1m
+    input_series:
+      - series: 'basetool_job_order_invalid_responsibility'
+        values: '2x18 0x15'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: JobOrderInvalidResponsibility
+        exp_alerts: []
+
+  - name: valid responsibility remains silent
+    interval: 1m
+    input_series:
+      - series: 'basetool_job_order_invalid_responsibility'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: JobOrderInvalidResponsibility
+        exp_alerts: []

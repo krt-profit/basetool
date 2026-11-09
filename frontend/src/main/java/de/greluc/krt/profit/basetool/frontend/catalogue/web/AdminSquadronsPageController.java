@@ -125,7 +125,6 @@ public class AdminSquadronsPageController {
                     s.shorthand(),
                     s.description(),
                     Boolean.TRUE.equals(s.active()),
-                    Boolean.TRUE.equals(s.isProfitEligible()),
                     versionOrZero(s.version())))
             .collect(Collectors.toCollection(ArrayList::new));
     squadrons.sort(
@@ -157,7 +156,7 @@ public class AdminSquadronsPageController {
     }
     try {
       SquadronDto body =
-          new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, false, 0L);
+          new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, 0L);
       catalogueClient.createSquadron(body);
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -198,7 +197,7 @@ public class AdminSquadronsPageController {
     try {
       SquadronDto body =
           new SquadronDto(
-              id, form.name(), form.shorthand(), form.description(), true, false, form.version());
+              id, form.name(), form.shorthand(), form.description(), true, form.version());
       catalogueClient.updateSquadron(id, body);
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
@@ -278,8 +277,7 @@ public class AdminSquadronsPageController {
     }
     return okOrRelay(() ->
         catalogueClient.createSquadron(
-            new SquadronDto(
-                null, form.name(), form.shorthand(), form.description(), true, false, 0L)));
+            new SquadronDto(null, form.name(), form.shorthand(), form.description(), true, 0L)));
   }
 
   /**
@@ -304,13 +302,7 @@ public class AdminSquadronsPageController {
         catalogueClient.updateSquadron(
             id,
             new SquadronDto(
-                id,
-                form.name(),
-                form.shorthand(),
-                form.description(),
-                true,
-                false,
-                form.version())));
+                id, form.name(), form.shorthand(), form.description(), true, form.version())));
   }
 
   /**

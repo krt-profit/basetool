@@ -44,12 +44,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
@@ -73,7 +75,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -87,6 +88,8 @@ import org.springframework.security.access.AccessDeniedException;
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemProductionServiceTest {
+
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   private static final long LINE_VERSION = 3L;
   private static final long INVENTORY_VERSION = 7L;
@@ -104,7 +107,7 @@ class JobOrderItemProductionServiceTest {
   @Mock private BookInPolicy bookInPolicy;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private AuthHelperService authHelperService;
-  @InjectMocks private JobOrderItemProductionService service;
+  private JobOrderItemProductionService service;
 
   private UUID orderId;
   private UUID lineId;
@@ -117,18 +120,29 @@ class JobOrderItemProductionServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository,
-            userRepository,
-            inventoryCheckoutService,
-            null,
+    service =
+        new JobOrderItemProductionService(
+            jobOrderRepository,
+            responsibilityGuard,
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                userRepository,
+                inventoryCheckoutService,
+                null,
+                auditService,
+                bookInPolicy,
+                offerRatchet,
+                null),
+            jobOrderItemService,
             auditService,
-            bookInPolicy,
-            offerRatchet,
-            null));
+            userService,
+            userRepository,
+            locationRepository,
+            orgUnitStampingService,
+            authHelperService);
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();

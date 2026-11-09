@@ -914,3 +914,12 @@ Details contain canonical/retired ids and fixed tokens; duplicate stock-floor re
 also records numeric before/after minimum and target settings. No note or member free text is
 copied into details. Unchanged rows and rolled-back attempts emit no mutation event. These
 owner-domain events do not implement or replace the planned catalogue-admin audit domain.
+
+The hierarchy foundation records every automatic ending of an ineligible legacy material promise
+as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `INELIGIBLE_UNIT`.
+Responsibility transfer uses `JOB_ORDER_REASSIGNED`, preserving from/to identities and whether the
+original Profit boundary remains unknown, plus the observed valid `profitOrgUnit` identity.
+New creation records the verified root too; an unknown legacy original is never filled from it.
+Initial reconciliation uses a system actor through the same ending/audit path.
+`ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED` and its labels
+remain readable for historical audit rows; no runtime mutation emits that retired switch event.

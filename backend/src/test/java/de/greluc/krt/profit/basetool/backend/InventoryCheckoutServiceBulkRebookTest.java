@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -53,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckou
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -70,7 +72,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -96,12 +97,29 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Mock private AuditService auditService;
 
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService checkoutService;
+  private InventoryCheckoutService checkoutService;
 
   private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
   @BeforeEach
   void stubSaveEcho() {
+    checkoutService =
+        new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            orgUnitStampingService,
+            auditService,
+            eventPublisher);
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));

@@ -60,6 +60,7 @@ class JobOrderAccessPolicyTest {
   private JobOrderRepository jobOrderRepository;
 
   private JobOrderAccessPolicy policy;
+  private JobOrderResponsibilityGuard responsibilityGuard;
 
   private JobOrder order;
 
@@ -74,12 +75,14 @@ class JobOrderAccessPolicyTest {
     when(accessGateService.canEditSquadron(any())).thenReturn(false);
     when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
     when(authHelper.isLogisticianOrAbove()).thenReturn(true);
+    responsibilityGuard = mock(JobOrderResponsibilityGuard.class);
     policy =
         new JobOrderAccessPolicy(
             requestScopeResolver,
             accessGateService,
             authHelper,
             jobOrderRepository,
+            responsibilityGuard,
             mock(JobOrderHandoverRepository.class),
             mock(JobOrderItemHandoverRepository.class));
 
@@ -109,6 +112,7 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void assigneeGrant_opensNoWrite() {
+    when(responsibilityGuard.isValid(order)).thenReturn(true);
     assign(callerId);
 
     assertThat(policy.canEditJobOrder(order.getId())).isFalse();
@@ -157,6 +161,7 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void canManageAssignees_aLogisticianOfTheOrdersUnitMayManage() {
+    when(responsibilityGuard.isValid(order)).thenReturn(true);
     when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(accessGateService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(true);
 

@@ -73,22 +73,17 @@ class JobOrderMapperTest {
             handoverMapper,
             squadronMapper,
             Mappers.getMapper(QualityTierMapper.class));
-    ReflectionTestUtils.setField(mapper, "assigneeUserMapper", userMapper);
-    ReflectionTestUtils.setField(
-        mapper,
-        "stockAccess",
-        new de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess() {
-          @Override
-          public boolean mayEditInventoryItem(
-              java.util.UUID inventoryItemId, java.util.UUID ownerId) {
-            return true;
-          }
-
-          @Override
-          public boolean mayEditJobOrder(java.util.UUID jobOrderId) {
-            return true;
-          }
+    mapper.setAssigneeUserMapper(userMapper);
+    JobOrderAuthority authority = org.mockito.Mockito.mock(JobOrderAuthority.class);
+    org.mockito.Mockito.when(authority.authorityFor(org.mockito.ArgumentMatchers.anyCollection()))
+        .thenAnswer(invocation -> {
+          java.util.Collection<JobOrder> orders = invocation.getArgument(0);
+          return orders.stream()
+              .collect(
+                  java.util.stream.Collectors.toMap(
+                      JobOrder::getId, _ -> new JobOrderAuthorityFlags(false, true, true, false)));
         });
+    mapper.setOrderAuthority(authority);
   }
 
   @Test
@@ -143,6 +138,10 @@ class JobOrderMapperTest {
     assertEquals(JobOrderStatus.IN_PROGRESS, dto.status());
     assertEquals(createdAt, dto.createdAt());
     assertEquals(7L, dto.version());
+    assertEquals(Boolean.TRUE, dto.canEdit());
+    assertFalse(dto.responsibilityInvalid());
+    assertTrue(dto.originalProfitBoundaryUnknown());
+    assertEquals(Boolean.TRUE, dto.canTransferResponsibility());
 
     assertNotNull(dto.materials());
     assertEquals(1, dto.materials().size());

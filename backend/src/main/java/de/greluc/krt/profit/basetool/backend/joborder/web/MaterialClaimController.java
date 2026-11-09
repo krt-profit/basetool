@@ -94,10 +94,10 @@ public class MaterialClaimController {
   @Operation(
       summary = "Create or update a material claim",
       description =
-          "Signs a profit-eligible squadron up for a partial quantity of a material bucket on a"
-              + " Spezialkommando order, or updates its existing claim. Rejected on non-SK or"
+          "Signs a active Profit-hierarchy squadron up for a partial quantity of a material bucket"
+              + " on a Spezialkommando order, or updates its existing claim. Rejected on non-SK or"
               + " terminal orders, on overclaim, and when a new claim names a squadron that is not"
-              + " profit-eligible.")
+              + " active Profit-hierarchy.")
   @ApiResponses({
     @ApiResponse(responseCode = "201", description = "Claim created or updated"),
     @ApiResponse(

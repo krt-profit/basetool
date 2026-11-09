@@ -70,13 +70,11 @@ Two shapes, chosen by what the question is about:
    reaches through `OwnerScopeService`, so the flag and the gate that would refuse the write cannot
    drift apart.
 
-A row flag carries the endpoint's **whole** rule. `JobOrderController` gates writes on
-`hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; `mayEditJobOrder` answers with both halves,
-because the scope half alone would offer editing to a plain member whose own Staffel owns the order.
-
-The mappers reach the gate through `StockViewerAccess`, a leaf interface in `support` implemented in
-`service` — the ADR-0047 pattern, for the ADR-0047 reason: a `mapper → service` edge closes a
-package cycle, and ArchUnit forbids a mapper from touching `SecurityContextHolder`.
+A row flag carries the endpoint's **whole** rule. The owning access policy computes row authority,
+including contextual writer and current hierarchy checks for orders. `JobOrderAuthority` exposes
+batch-capable edit and transfer decisions to `JobOrderMapper`; `StockViewerAccess` exposes inventory
+row authority to `InventoryItemMapper`. A mapper depends on the owning domain's leaf interface and
+never reaches into the service layer or `SecurityContextHolder` (ADR-0047).
 
 `GET /api/v1/me/org-units` answers which org units the caller may pin, admin branch included, so
 neither client carries that fork.

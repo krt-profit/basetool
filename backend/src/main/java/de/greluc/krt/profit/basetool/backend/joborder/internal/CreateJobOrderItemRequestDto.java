@@ -31,7 +31,8 @@ import org.jetbrains.annotations.Nullable;
  * Create payload for an {@code ITEM} job order: finished-item lines whose required materials the
  * server derives from each line's blueprint.
  *
- * @param responsibleOrgUnitId the profit-eligible org unit that processes the order; required
+ * @param responsibleOrgUnitId the active Profit-hierarchy org unit that processes the order;
+ *     required
  * @param requestingOrgUnitId the customer org unit of any kind; mandatory
  * @param handle optional contact handle (≤ 200 chars)
  * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display

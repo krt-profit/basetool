@@ -71,6 +71,8 @@ function initOrdersDetail() {
         topicClass: 'ORDER',
         sections: {
             header: { container: '#order-header-results', fragmentValue: 'header' },
+            actions: { container: '#order-actions-results', fragmentValue: 'actions' },
+            dialogs: { container: '#order-dialogs-results', fragmentValue: 'dialogs' },
             kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
             materials: { container: '#order-materials-results', fragmentValue: 'materials' },
             aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
@@ -741,3 +743,13 @@ export function updateHandoverIndexes() {
         if (input) input.name = `items[${index}].amount`;
     });
 }
+
+document.addEventListener('krt:swapped', (event) => {
+    if (event.detail.container?.id !== 'order-header-results') return;
+    const invalid =
+        document.getElementById('order-head-meta')?.dataset.responsibilityInvalid === 'true';
+    if (!invalid) return;
+    document.querySelectorAll('#order-dialogs-results dialog[open]').forEach((dialog) => {
+        krtModal.close(/** @type {HTMLDialogElement} */ (dialog));
+    });
+});

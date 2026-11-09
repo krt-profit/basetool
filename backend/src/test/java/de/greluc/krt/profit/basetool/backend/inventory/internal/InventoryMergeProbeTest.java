@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
@@ -75,6 +76,8 @@ class InventoryMergeProbeTest {
 
   private InventoryItemService serviceWithStolenMarking(boolean enabled) {
     return new InventoryItemService(
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
         inventoryItemRepository,
         userRepository,
         null,
@@ -86,7 +89,20 @@ class InventoryMergeProbeTest {
         requestScopeResolver,
         orgUnitStampingService,
         inventoryAccessPolicy,
-        new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null, null),
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository
+                        .class),
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            null,
+            null,
+            null,
+            null,
+            null,
+            inventoryAccessPolicy,
+            null,
+            null),
         null,
         null,
         null,

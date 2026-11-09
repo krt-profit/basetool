@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,8 +39,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -53,11 +57,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
@@ -77,6 +83,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceTest {
 
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private LiveSyncPublisher liveSyncPublisher;
+
+  private final Bereich profitArea = profitArea();
+
   @Mock private JobOrderRepository jobOrderRepository;
 
   @Mock private MaterialRepository materialRepository;
@@ -89,7 +101,6 @@ class JobOrderServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
 
   @Mock private RequestScopeResolver requestScopeResolver;
-  @Mock private OrgUnitAccessPolicy orgUnitAccessPolicy;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private SystemSettings systemSettings;
@@ -118,7 +129,7 @@ class JobOrderServiceTest {
 
   @Mock private QualityTierService qualityTierService;
 
-  @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
+  private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderPriorityService jobOrderPriorityService;
 
@@ -137,16 +148,35 @@ class JobOrderServiceTest {
 
   @BeforeEach
   void setUp() {
+    jobOrderOrgUnitResolver = new JobOrderOrgUnitResolver(orgUnitRepository, profitHierarchy);
     jobOrderPriorityService =
         new JobOrderPriorityService(
-            jobOrderRepository, auditService, jobOrderStockProjectionService);
+            jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
+            auditService,
+            jobOrderStockProjectionService);
     jobOrderService =
         new JobOrderService(
             jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
             materialRepository,
             new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             new InventoryStockCommands(
-                inventoryItemRepository, null, null, null, null, null, null, null),
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             null,
             orgUnitRepository,
             jobOrderOrgUnitResolver,
@@ -158,14 +188,16 @@ class JobOrderServiceTest {
             jobOrderStockProjectionService,
             jobOrderPriorityService,
             qualityTierService,
-            orgUnitAccessPolicy,
             actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
+                profitHierarchy,
+                responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
                 eventPublisher,
-                jobOrderStockProjectionService));
+                jobOrderStockProjectionService),
+            liveSyncPublisher);
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     jobOrderQueryService =
         new JobOrderQueryService(
@@ -189,7 +221,7 @@ class JobOrderServiceTest {
     Squadron responsible = new Squadron();
     responsible.setId(responsibleOrgUnitId);
     responsible.setShorthand("RESP");
-    responsible.setProfitEligible(true);
+    withinProfit(responsible, profitArea);
     Squadron requesting = new Squadron();
     requesting.setId(requestingOrgUnitId);
     requesting.setShorthand("Alpha");
@@ -273,6 +305,10 @@ class JobOrderServiceTest {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
   }
 
@@ -299,6 +335,7 @@ class JobOrderServiceTest {
   }
 
   private JobOrder createAndCaptureSaved(List<CreateJobOrderMaterialDto> lines) {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(0));
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
@@ -308,7 +345,7 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
     jobOrderService.createJobOrder(
@@ -386,6 +423,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldCalculateStockAndReturnDto() {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -400,7 +438,7 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
     stubLinkedStock(700, 25.0);
 
@@ -426,6 +464,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_ShouldHonorMinQualityFromDto() {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -440,7 +479,7 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
     jobOrderService.createJobOrder(createDto);
@@ -458,6 +497,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_NullMinQuality_PersistsBaseTier() {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, null, 10.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -472,7 +512,7 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
     jobOrderService.createJobOrder(createDto);
@@ -486,6 +526,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_PersistsComment() {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 10.0);
 
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>());
@@ -497,7 +538,7 @@ class JobOrderServiceTest {
           saved.setId(orderId);
           return saved;
         });
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubTierResolution();
 
     jobOrderService.createJobOrder(
@@ -520,6 +561,7 @@ class JobOrderServiceTest {
 
   @Test
   void createJobOrder_MaterialNotFound_ShouldThrowException() {
+    when(jobOrderAccessPolicy.canCreate(any(), any())).thenReturn(true);
     CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
     CreateJobOrderDto createDto =
         new CreateJobOrderDto(
@@ -543,23 +585,6 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void createJobOrder_NonProfitEligibleResponsible_Throws() {
-    Squadron notEligible = new Squadron();
-    notEligible.setId(responsibleOrgUnitId);
-    notEligible.setShorthand("NOPE");
-    notEligible.setProfitEligible(false);
-    when(orgUnitRepository.findById(responsibleOrgUnitId)).thenReturn(Optional.of(notEligible));
-
-    CreateJobOrderMaterialDto createMat = new CreateJobOrderMaterialDto(materialId, 650, 5.0);
-    CreateJobOrderDto createDto =
-        new CreateJobOrderDto(
-            responsibleOrgUnitId, requestingOrgUnitId, "Tester", null, List.of(createMat), null);
-
-    assertThrows(BadRequestException.class, () -> jobOrderService.createJobOrder(createDto));
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
-  }
-
-  @Test
   void updateJobOrderPriority_ShouldReorderAndNormalize() {
     JobOrder otherJob = new JobOrder();
     otherJob.setId(UUID.randomUUID());
@@ -568,7 +593,9 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.lockAllJobOrders())
         .thenReturn(new ArrayList<>(List.of(jobOrder, otherJob)));
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(responsibilityGuard.validOrderIds(any()))
+        .thenReturn(java.util.Set.of(jobOrder.getId(), otherJob.getId()));
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     JobOrderDto result = jobOrderService.updateJobOrderPriority(orderId, 2);
@@ -586,7 +613,8 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
@@ -608,7 +636,8 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
@@ -629,7 +658,7 @@ class JobOrderServiceTest {
     jobOrder.setVersion(1L);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
@@ -650,7 +679,8 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findMaxPriority()).thenReturn(Optional.of(5));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     JobOrderDto result =
@@ -681,6 +711,7 @@ class JobOrderServiceTest {
     jobOrder.setPriority(3);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
 
     jobOrderService.deleteJobOrder(orderId);
 
@@ -731,7 +762,7 @@ class JobOrderServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrder(orderId, updateDto);
 
@@ -741,7 +772,7 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void reassignResponsibleOrgUnit_Admin_MovesToProfitEligibleTarget() {
+  void reassignResponsibleOrgUnit_currentWriter_movesToSpecialCommand() {
     Squadron current = new Squadron();
     current.setId(UUID.randomUUID());
     current.setShorthand("CUR");
@@ -751,35 +782,18 @@ class JobOrderServiceTest {
     SpecialCommand target = new SpecialCommand();
     target.setId(targetId);
     target.setShorthand("SK");
-    target.setProfitEligible(true);
+    withinProfit(target, profitArea);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-    when(authHelperService.isAdmin()).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
     jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
 
     assertSame(target, jobOrder.getResponsibleOrgUnit());
-  }
-
-  @Test
-  void reassignResponsibleOrgUnit_RejectsNonProfitEligibleTarget() {
-    UUID targetId = UUID.randomUUID();
-    Squadron target = new Squadron();
-    target.setId(targetId);
-    target.setProfitEligible(false);
-
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-
-    assertThrows(
-        BadRequestException.class,
-        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
   @Test
@@ -802,7 +816,7 @@ class JobOrderServiceTest {
     when(materialRepository.findById(newMaterialId)).thenReturn(Optional.of(newMaterial));
     stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrder(orderId, updateDto);
 
@@ -831,7 +845,7 @@ class JobOrderServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrder(orderId, updateDto);
 
@@ -849,7 +863,7 @@ class JobOrderServiceTest {
     when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
     stubTierResolution();
     when(jobOrderRepository.saveAndFlush(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
 
     jobOrderService.updateJobOrderAsRequester(orderId, updateDto);
 
@@ -981,7 +995,7 @@ class JobOrderServiceTest {
     when(jobOrderItemService.requiredMaterialIds(itemOrder))
         .thenReturn(java.util.Set.of(keptMaterial, removedMaterial))
         .thenReturn(java.util.Set.of(keptMaterial));
-    when(jobOrderMapper.toDto(itemOrder)).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(eq(itemOrder), any())).thenReturn(baseJobOrderDto);
     when(jobOrderItemService.toItemDtos(itemOrder)).thenReturn(List.of());
     when(jobOrderItemService.aggregateMaterials(itemOrder)).thenReturn(List.of());
 
@@ -1046,7 +1060,7 @@ class JobOrderServiceTest {
     when(jobOrderItemService.requiredGameItemIds(itemOrder))
         .thenReturn(java.util.Set.of(keptGameItem, removedGameItem))
         .thenReturn(java.util.Set.of(keptGameItem));
-    when(jobOrderMapper.toDto(itemOrder)).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(eq(itemOrder), any())).thenReturn(baseJobOrderDto);
     when(jobOrderItemService.toItemDtos(itemOrder)).thenReturn(List.of());
     when(jobOrderItemService.aggregateMaterials(itemOrder)).thenReturn(List.of());
 
@@ -1098,6 +1112,7 @@ class JobOrderServiceTest {
     jobOrder.setStatus(JobOrderStatus.OPEN);
     jobOrder.setPriority(1);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
 
     assertDoesNotThrow(() -> jobOrderService.completeJobOrderWithinTransaction(jobOrder));
 
@@ -1521,7 +1536,8 @@ class JobOrderServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderRepository.lockAllJobOrders()).thenReturn(new ArrayList<>(List.of(jobOrder)));
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(responsibilityGuard.validOrderIds(any())).thenReturn(java.util.Set.of(jobOrder.getId()));
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
@@ -1552,7 +1568,7 @@ class JobOrderServiceTest {
     jobOrder.setVersion(1L);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
@@ -1578,7 +1594,7 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void reassignResponsibleOrgUnit_NonAdmin_EscalatesOwnSquadronToSk_succeeds() {
+  void reassignResponsibleOrgUnit_currentWriter_escalatesSquadronToSk() {
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1589,14 +1605,12 @@ class JobOrderServiceTest {
     SpecialCommand target = new SpecialCommand();
     target.setId(targetId);
     target.setShorthand("SK");
-    target.setProfitEligible(true);
+    withinProfit(target, profitArea);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
-    when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
@@ -1607,7 +1621,7 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void reassignResponsibleOrgUnit_NonAdmin_ToAnotherSquadron_throwsAccessDenied() {
+  void reassignResponsibleOrgUnit_currentWriter_movesToAnotherSquadron() {
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1618,21 +1632,21 @@ class JobOrderServiceTest {
     Squadron target = new Squadron();
     target.setId(targetId);
     target.setShorthand("OTHER");
-    target.setProfitEligible(true);
+    withinProfit(target, profitArea);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
 
-    assertThrows(
-        org.springframework.security.access.AccessDeniedException.class,
-        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+
+    assertSame(target, jobOrder.getResponsibleOrgUnit());
   }
 
   @Test
-  void reassignResponsibleOrgUnit_NonAdmin_OnSkResponsibleOrder_throwsAccessDenied() {
+  void reassignResponsibleOrgUnit_currentWriter_movesFromSkToSk() {
     UUID currentId = UUID.randomUUID();
     SpecialCommand current = new SpecialCommand();
     current.setId(currentId);
@@ -1643,21 +1657,22 @@ class JobOrderServiceTest {
     SpecialCommand target = new SpecialCommand();
     target.setId(targetId);
     target.setShorthand("SK");
-    target.setProfitEligible(true);
+    withinProfit(target, profitArea);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
     when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(true);
 
-    assertThrows(
-        org.springframework.security.access.AccessDeniedException.class,
-        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
-    verify(jobOrderRepository, never()).save(any(JobOrder.class));
+    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
+    when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
+    when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class))).thenReturn(List.of());
+
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+
+    assertSame(target, jobOrder.getResponsibleOrgUnit());
   }
 
   @Test
-  void reassignResponsibleOrgUnit_NonAdmin_CannotEditCurrentSquadron_throwsAccessDenied() {
+  void reassignResponsibleOrgUnit_withoutCurrentWriter_isDenied() {
     UUID currentId = UUID.randomUUID();
     Squadron current = new Squadron();
     current.setId(currentId);
@@ -1665,15 +1680,9 @@ class JobOrderServiceTest {
     jobOrder.setResponsibleOrgUnit(current);
 
     UUID targetId = UUID.randomUUID();
-    SpecialCommand target = new SpecialCommand();
-    target.setId(targetId);
-    target.setShorthand("SK");
-    target.setProfitEligible(true);
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(orgUnitRepository.findById(targetId)).thenReturn(Optional.of(target));
-    when(authHelperService.isAdmin()).thenReturn(false);
-    when(orgUnitAccessPolicy.canEditOrgUnit(currentId)).thenReturn(false);
+    when(jobOrderAccessPolicy.canEdit(jobOrder, JobOrderGate.TRANSFER)).thenReturn(false);
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
@@ -1739,7 +1748,8 @@ class JobOrderServiceTest {
       JobOrder order = itemOrder();
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+      when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
+          .thenReturn(baseJobOrderDto);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
       when(jobOrderItemService.buildItemLine(any()))
@@ -1784,7 +1794,8 @@ class JobOrderServiceTest {
 
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
       when(jobOrderRepository.save(any(JobOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(baseJobOrderDto);
+      when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
+          .thenReturn(baseJobOrderDto);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
 
@@ -1913,8 +1924,12 @@ class JobOrderServiceTest {
               1L,
               null,
               null,
+              false,
+              false,
+              false,
+              null,
               false);
-      when(jobOrderMapper.toDto(any(JobOrder.class))).thenReturn(itemBase);
+      when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
           .thenReturn(
@@ -1962,7 +1977,7 @@ class JobOrderServiceTest {
       lenient().when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       lenient().when(jobOrderItemService.aggregateMaterials(any())).thenReturn(List.of());
       lenient()
-          .when(jobOrderMapper.toDto(any(JobOrder.class)))
+          .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
           .thenAnswer(inv -> {
             JobOrder o = inv.getArgument(0);
             return new JobOrderDto(
@@ -1985,6 +2000,10 @@ class JobOrderServiceTest {
                 Instant.now(),
                 o.getVersion(),
                 null,
+                null,
+                false,
+                false,
+                false,
                 null,
                 false);
           });

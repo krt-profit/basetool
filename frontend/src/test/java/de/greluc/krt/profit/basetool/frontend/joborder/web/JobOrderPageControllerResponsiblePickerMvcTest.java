@@ -43,14 +43,9 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Owner pickers of the job-order create form for an authenticated caller: the requesting picker
  * offers all org-unit kinds from {@code GET /api/v1/org-units/active-all-kinds}, while the
- * responsible picker offers only profit-eligible units, so Bereiche and the Organisationsleitung
- * appear only as requesters.
+ * responsible picker offers the current Profit Bereich, Staffeln and Spezialkommandos.
  */
 class JobOrderPageControllerResponsiblePickerMvcTest extends JobOrderPageMvcTestBase {
-
-  private static final String ACTIVE_URI = "/api/v1/org-units/active";
-  private static final String ALL_KINDS_URI = "/api/v1/org-units/active-all-kinds";
-  private static final String SK_CATALOG_URI = "/api/v1/special-commands?size=1000&sort=name,asc";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -113,23 +108,25 @@ class JobOrderPageControllerResponsiblePickerMvcTest extends JobOrderPageMvcTest
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void viewCreateForm_authenticated_requestingOffersBereichAndOl_responsibleStaysProfitStaffelSk()
+  void viewCreateForm_authenticated_requestingOffersEveryKind_responsibleIncludesProfitBereich()
       throws Exception {
     OrgUnitMembershipOptionDto profitStaffel =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Test Staffel", "TS", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Test Staffel", "TS", "SQUADRON");
     OrgUnitMembershipOptionDto profitSk =
         new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND", true);
+            UUID.randomUUID(), "Profit Spezialkommando", "PSK", "SPECIAL_COMMAND");
     OrgUnitMembershipOptionDto bereich =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Bereich Profit XYZ", "P", "BEREICH", false);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Bereich Profit XYZ", "P", "BEREICH");
     OrgUnitMembershipOptionDto ol =
         new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG", false);
+            UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG");
 
     when(reader.readOrderCreate())
         .thenReturn(
-            JobOrderPageStubs.create(List.of(), List.of(profitStaffel, profitSk, bereich, ol)));
+            JobOrderPageStubs.create(
+                List.of(),
+                List.of(profitStaffel, profitSk, bereich, ol),
+                List.of(bereich, profitStaffel, profitSk)));
 
     mockMvc
         .perform(get("/orders/create"))
@@ -144,12 +141,13 @@ class JobOrderPageControllerResponsiblePickerMvcTest extends JobOrderPageMvcTest
   @WithMockUser
   void viewCreateForm_populatesBothPickersFromTheReadersOptions() throws Exception {
     OrgUnitMembershipOptionDto profitStaffel =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit Staffel", "PS", "SQUADRON");
     OrgUnitMembershipOptionDto nonProfitSk =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND", false);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Combat SK", "CSK", "SPECIAL_COMMAND");
     when(reader.readOrderCreate())
-        .thenReturn(JobOrderPageStubs.create(List.of(), List.of(profitStaffel, nonProfitSk)));
+        .thenReturn(
+            JobOrderPageStubs.create(
+                List.of(), List.of(profitStaffel, nonProfitSk), List.of(profitStaffel)));
 
     mockMvc
         .perform(get("/orders/create"))

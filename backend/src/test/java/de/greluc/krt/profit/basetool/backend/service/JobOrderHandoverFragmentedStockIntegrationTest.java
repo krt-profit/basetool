@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,6 +44,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,6 +65,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 class JobOrderHandoverFragmentedStockIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final int STACKS_PER_MATERIAL = 12;
   private static final double ASLARITE_REQUIRED = 1.8;
@@ -91,6 +97,13 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
 
   private Fixture prepareFixture() {
     return transactionTemplate.execute(status -> {
+      Squadron processor = new Squadron();
+      String unitTag = UUID.randomUUID().toString().substring(0, 8);
+      processor.setName("Handover Processor " + unitTag);
+      processor.setShorthand("H" + unitTag);
+      withinProfit(processor, persistedProfitArea(orgUnitRepository));
+      processor = squadronRepository.save(processor);
+
       User user = new User();
       user.setId(UUID.randomUUID());
       user.setUsername("logistiker-" + UUID.randomUUID());
@@ -112,16 +125,8 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
 
       JobOrder jobOrder =
           JobOrder.builder()
-              .responsibleOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
-              .requestingOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
+              .responsibleOrgUnit(processor)
+              .requestingOrgUnit(processor)
               .handle("requester")
               .status(JobOrderStatus.OPEN)
               .build();
@@ -149,10 +154,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
       List<UUID> aslariteIds = new ArrayList<>();
       for (double a : aslariteAmounts) {
         InventoryItem inv = new InventoryItem();
-        inv.setOwningOrgUnit(
-            squadronRepository
-                .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                .orElseThrow());
+        inv.setOwningOrgUnit(processor);
         inv.setUser(user);
         inv.setLocation(location);
         inv.setMaterial(aslarite);
@@ -166,10 +168,7 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
       List<UUID> ouratiteIds = new ArrayList<>();
       for (double a : ouratiteAmounts) {
         InventoryItem inv = new InventoryItem();
-        inv.setOwningOrgUnit(
-            squadronRepository
-                .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                .orElseThrow());
+        inv.setOwningOrgUnit(processor);
         inv.setUser(user);
         inv.setLocation(location);
         inv.setMaterial(ouratite);

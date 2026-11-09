@@ -90,7 +90,7 @@ class QuickAccessSearchE2eTest {
       adminUserId = seeder.getUserId(USERNAME, PASSWORD);
       seeder.assignSecondStaffelleiterSeat(
           USERNAME, PASSWORD, adminUserId, IRIDIUM_SQUADRON_ID, squadronId);
-      seeder.setSquadronProfitEligible(USERNAME, PASSWORD, squadronId, true);
+      seeder.moveOrgUnitToProfit(USERNAME, PASSWORD, squadronId);
       jobOrderId =
           seeder.createJobOrder(
               USERNAME, PASSWORD, squadronId, TOKEN + " Order", materialId, 650, 10);

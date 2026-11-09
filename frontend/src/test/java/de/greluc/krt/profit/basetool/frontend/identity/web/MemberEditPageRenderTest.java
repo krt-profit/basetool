@@ -156,8 +156,7 @@ class MemberEditPageRenderTest {
             eq("/api/v1/org-units/members/{id}/memberships"), anyTypeRef(), eq(id)))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    SK_ID, "Sondereinheit", "SE", "SPECIAL_COMMAND", Boolean.FALSE)));
+                new OrgUnitMembershipOptionDto(SK_ID, "Sondereinheit", "SE", "SPECIAL_COMMAND")));
 
     String html = render(id, "members");
 

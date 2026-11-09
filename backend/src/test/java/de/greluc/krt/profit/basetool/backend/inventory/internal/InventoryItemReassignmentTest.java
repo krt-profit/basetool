@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReconciliationBusyException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -54,7 +55,13 @@ class InventoryItemReassignmentTest {
     UUID canonical = UUID.randomUUID();
     when(repository.stock(retired, canonical)).thenReturn(List.of(UUID.randomUUID()));
     var participant =
-        new InventoryItemReassignment(repository, inventoryRepository, audit, publisher);
+        new InventoryItemReassignment(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            repository,
+            inventoryRepository,
+            audit,
+            publisher);
 
     assertThat(participant.reassignGameItem(retired, canonical)).isEqualTo(1);
 
@@ -67,7 +74,13 @@ class InventoryItemReassignmentTest {
   @Test
   void unchangedReferencesAnnounceNothing() {
     var participant =
-        new InventoryItemReassignment(repository, inventoryRepository, audit, publisher);
+        new InventoryItemReassignment(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            repository,
+            inventoryRepository,
+            audit,
+            publisher);
 
     assertThat(participant.reassignGameItem(UUID.randomUUID(), UUID.randomUUID())).isZero();
 
@@ -102,7 +115,13 @@ class InventoryItemReassignmentTest {
     when(inventoryRepository.tryLockExchangeLot(org.mockito.ArgumentMatchers.anyLong()))
         .thenReturn(true);
     var participant =
-        new InventoryItemReassignment(repository, inventoryRepository, audit, publisher);
+        new InventoryItemReassignment(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            repository,
+            inventoryRepository,
+            audit,
+            publisher);
 
     participant.reassignGameItem(retired, canonical);
 
@@ -130,7 +149,13 @@ class InventoryItemReassignmentTest {
     when(inventoryRepository.tryLockExchangeLot(org.mockito.ArgumentMatchers.anyLong()))
         .thenReturn(true, false);
     var participant =
-        new InventoryItemReassignment(repository, inventoryRepository, audit, publisher);
+        new InventoryItemReassignment(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            repository,
+            inventoryRepository,
+            audit,
+            publisher);
 
     org.junit.jupiter.api.Assertions.assertThrows(
         GameItemReconciliationBusyException.class,

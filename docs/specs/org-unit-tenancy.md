@@ -967,3 +967,15 @@ can be retired once both rules are merged.
 
 **Enforced by:** `TenancyGuardTest`, `TenancyGuardRules`, `SpelScopeGate` · **Code:**
 `TenantScoped` · **Related:** REQ-ORG-002, REQ-ORG-003, REQ-ORG-006, REQ-SEC-077
+
+### JobOrder hierarchy foundation
+
+REQ-ORG-003/-004/-014/-016 use the unique `Department.PROFIT` area and its current active
+Staffel/SK children for JobOrder responsibility and general Profit capability. The independent
+processing switch and its internal projections/admin mutations are retired. Creation requires a
+current contextual writer of either proposed side. Invalid current responsibility retains concrete
+authorised reading and current-unit recovery transfer; all other order and coupled stock writes
+wait for valid responsibility. Legacy unknown original boundaries remain visible as unknown without
+requiring a transfer when current responsibility is valid. The shared/exclusive transaction protocol
+and preserved promise endings implement REQ-ORDERS-050/-053/-055; subsequent shared workflow
+amendments remain governed by [orders-core.md](orders-core.md).

@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -90,6 +91,8 @@ class InventoryStolenMarkServiceTest {
    */
   private InventoryStolenMarkService serviceWith(boolean enabled) {
     return new InventoryStolenMarkService(
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
         inventoryItemRepository,
         new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
         stockChangeObserver,

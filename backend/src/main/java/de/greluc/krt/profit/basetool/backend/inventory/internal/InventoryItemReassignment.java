@@ -45,6 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class InventoryItemReassignment implements GameItemReassignmentParticipant {
+
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemReassignmentRepository repository;
   private final InventoryItemRepository inventoryRepository;
   private final AuditRecorder auditRecorder;
@@ -53,6 +55,7 @@ public class InventoryItemReassignment implements GameItemReassignmentParticipan
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public int reassignGameItem(@NotNull UUID retiredId, @NotNull UUID survivorId) {
+    orderWrites.lockEligibility();
     Set<Long> locks = new TreeSet<>();
     for (var lot : repository.lots(retiredId, survivorId)) {
       locks.add(

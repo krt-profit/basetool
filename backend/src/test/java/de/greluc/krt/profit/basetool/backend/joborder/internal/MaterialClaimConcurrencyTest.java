@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -31,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -65,6 +68,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 @WithMockUser(roles = {"ADMIN"})
 class MaterialClaimConcurrencyTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final int THREADS = 2;
   private static final int START_TIMEOUT_SECONDS = 5;
@@ -213,13 +218,13 @@ class MaterialClaimConcurrencyTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("ClaimRace-SK-" + tag);
       sk.setShorthand("S" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
       Squadron sq = new Squadron();
       sq.setName("ClaimRace-A-" + tag);
       sq.setShorthand("A" + tag);
-      sq.setProfitEligible(true);
+      withinProfit(sq, persistedProfitArea(orgUnitRepository));
       sq = squadronRepository.save(sq);
 
       Material mat = new Material();
@@ -363,19 +368,19 @@ class MaterialClaimConcurrencyTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("ClaimRace-SK-" + tag);
       sk.setShorthand("S" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
       Squadron sqA = new Squadron();
       sqA.setName("ClaimRace-A-" + tag);
       sqA.setShorthand("A" + tag);
-      sqA.setProfitEligible(true);
+      withinProfit(sqA, persistedProfitArea(orgUnitRepository));
       sqA = squadronRepository.save(sqA);
 
       Squadron sqB = new Squadron();
       sqB.setName("ClaimRace-B-" + tag);
       sqB.setShorthand("B" + tag);
-      sqB.setProfitEligible(true);
+      withinProfit(sqB, persistedProfitArea(orgUnitRepository));
       sqB = squadronRepository.save(sqB);
 
       Material mat = new Material();

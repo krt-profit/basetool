@@ -96,7 +96,7 @@ public class JobOrderController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
       summary = "Create a new job order",
-      description = "Creates a job order. Requires an authenticated member (ADR-0149).")
+      description = "Creates a job order through a current writer of either proposed unit.")
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.createJobOrder(dto);
@@ -152,7 +152,11 @@ public class JobOrderController {
         dto.version(),
         dto.canEdit(),
         false,
-        true);
+        true,
+        dto.responsibilityInvalid(),
+        dto.originalProfitBoundaryUnknown(),
+        dto.canTransferResponsibility(),
+        dto.canEditAsRequester());
   }
 
   /**
@@ -206,10 +210,9 @@ public class JobOrderController {
       summary = "Get all job orders",
       description =
           "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
-              + " profit-eligible responsible unit is one of the caller's own units; orgUnitId"
-              + " narrows that to one of them."
-              + " assignedToMe=true lists the orders the caller is an assignee of; it combines with"
-              + " neither toProcess nor squadronId.")
+              + " active Profit-hierarchy responsible unit is one of the caller's own units;"
+              + " orgUnitId narrows that to one of them. assignedToMe=true lists the orders the"
+              + " caller is an assignee of; it combines with neither toProcess nor squadronId.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
@@ -508,9 +511,7 @@ public class JobOrderController {
   }
 
   /**
-   * Reassigns the responsible (processing) org unit of an order. Admins may reassign freely to any
-   * profit-eligible org unit; a squadron logistician/officer may only escalate their own squadron's
-   * order to a Spezialkommando. The detailed permission rule is enforced in the service.
+   * Transfers responsibility immediately through the current responsible-unit writer gate.
    *
    * @param id job-order id
    * @param body the target responsible org unit id
@@ -520,9 +521,9 @@ public class JobOrderController {
   @Operation(
       summary = "Reassign responsible org unit",
       description =
-          "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
-              + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+          "A current responsible-unit writer transfers immediately to an eligible Profit unit,"
+              + " including recovery from invalid responsibility, without moving stock.")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
@@ -531,7 +532,7 @@ public class JobOrderController {
   /**
    * Request body for the responsible-org-unit reassignment endpoint.
    *
-   * @param responsibleOrgUnitId the target profit-eligible org unit id (required)
+   * @param responsibleOrgUnitId the target active Profit-hierarchy org unit id (required)
    */
   public record ReassignResponsibleOrgUnitRequest(
       @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId) {}

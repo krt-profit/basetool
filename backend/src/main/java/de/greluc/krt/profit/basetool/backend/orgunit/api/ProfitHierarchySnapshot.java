@@ -17,14 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.orgunit.model;
+package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.Set;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of the backend {@code PATCH /api/v1/squadrons/{id}/profit-eligible} toggle.
+ * Current designated Profit identity and active eligible units from one hierarchy read.
  *
- * @param eligible whether the squadron may process Job Orders
+ * @param profitRootId the unique active root, or null when the prerequisite is absent
+ * @param eligibleUnitIds the active root and eligible active descendants
  */
-@DtoMirror
-public record SquadronProfitEligibleToggleRequest(Boolean eligible) {}
+public record ProfitHierarchySnapshot(@Nullable UUID profitRootId, Set<UUID> eligibleUnitIds) {
+
+  /** Copies eligible identities so a caller cannot change a transaction's authority snapshot. */
+  public ProfitHierarchySnapshot {
+    eligibleUnitIds = Set.copyOf(eligibleUnitIds);
+  }
+}

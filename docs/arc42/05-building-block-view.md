@@ -260,7 +260,7 @@ request and read DTOs. `inventory.api` publishes what other modules use: `StockC
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
 projection rows. The other modules see a Lager row as `StockRow`, a read-only live view of the managed row (getters, the two reservation sums and the order slice), and change it only through `StockCommands`, which take the row's id and act on the managed instance the caller already holds, so locks, the persistence context and the optimistic version are the row's own. The three entities (`InventoryItem`, which implements `StockRow`, and the two allocations) lie in `inventory.internal` with `InventoryAllocations` and `InventoryAuditLabels` (P4-1 part 3, option A2, confirmed by the owner 2026-10-12; `StockWriteOwnershipTest`, `StockRowViewCharacterisationTest`, `ExchangeStockWritePathCharacterisationTest`). Four more
-seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
+seams lie in `inventory.api` as well: `StockViewerAccess` (inventory row authority, read by `InventoryItemMapper`), `OrderLinkedStockRows` (the material rows
 the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 
 The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
@@ -533,3 +533,15 @@ outcomes separately from anomaly reports; the frontend's sync report reader join
 Typed API enrichment records keep source units and relationship loading state at the boundary.
 See [ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) and
 [REQ-DATA-032…038](../specs/data-persistence.md).
+
+The JobOrder hierarchy foundation uses `orgunit.api.ProfitHierarchyService` for actual eligibility
+and shared/exclusive transaction coordination. `OrgUnitEligibilityObserver` synchronously maintains
+promise eligibility under organisational changes. Inventory owns `OrderLinkedStockWriteObserver`;
+JobOrder supplies its responsibility prerequisite without moving stock ownership or granting order
+editing rights. [REQ-ORDERS-050/-053/-055](../specs/orders-core.md) and
+[ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md) own the rules.
+
+`joborder.internal.JobOrderEligibilityStartup` performs the initial pre-readiness reconciliation in
+bounded order-ID/claim pages through the same audited maintenance. Order projections expose distinct
+processing, requester-edit and recovery decisions through `JobOrderAuthority`; requester delivery
+restrictions are loaded in a batch.

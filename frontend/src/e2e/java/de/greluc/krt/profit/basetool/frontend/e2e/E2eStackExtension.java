@@ -293,7 +293,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
         E2E_ADMIN_PASSWORD,
         PICKER_MATERIAL_KEYBOARD_RAW,
         PICKER_MATERIAL_KEYBOARD_REFINED);
-    seeder.setSquadronProfitEligible(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
+    seeder.moveOrgUnitToProfit(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID);
     try {
       String ingredientMaterialId =
           seeder.ensureJobOrderMaterial(

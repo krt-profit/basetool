@@ -187,9 +187,8 @@ class HangarPagePatternRenderTest {
     when(backendApiClient.get(eq("/api/v1/org-units/me/memberships?allKinds=true"), anyTypeRef()))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(unitId, "Owner SK", "OSK", "SPECIAL_COMMAND", true),
-                new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Alpha", "ALP", "SQUADRON", true)));
+                new OrgUnitMembershipOptionDto(unitId, "Owner SK", "OSK", "SPECIAL_COMMAND"),
+                new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Alpha", "ALP", "SQUADRON")));
 
     String html = render("/hangar");
 

@@ -63,7 +63,7 @@ class LayoutMiscAdviceTest {
   void appTitle_squadronPin_appendsShorthand() {
     stubEchoMessages();
     OrgUnitMembershipOptionDto pin =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON");
 
     assertEquals("app.title.with.squadron:ALP", advice().appTitle(pin, false));
   }
@@ -73,7 +73,7 @@ class LayoutMiscAdviceTest {
     stubEchoMessages();
     OrgUnitMembershipOptionDto pin =
         new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Spezialkommando Alpha", "SK-A", "SPECIAL_COMMAND", true);
+            UUID.randomUUID(), "Spezialkommando Alpha", "SK-A", "SPECIAL_COMMAND");
 
     assertEquals("app.title.with.squadron:SK-A", advice().appTitle(pin, false));
   }
@@ -82,7 +82,7 @@ class LayoutMiscAdviceTest {
   void appTitle_pinWithoutShorthand_fallsBackToName() {
     stubEchoMessages();
     OrgUnitMembershipOptionDto pin =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Leadership", null, "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Leadership", null, "SQUADRON");
 
     assertEquals("app.title.with.squadron:Leadership", advice().appTitle(pin, false));
   }

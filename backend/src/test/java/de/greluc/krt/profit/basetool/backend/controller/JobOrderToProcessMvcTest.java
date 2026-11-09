@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -30,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -58,6 +61,8 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class JobOrderToProcessMvcTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   @Autowired private WebApplicationContext context;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
@@ -80,7 +85,7 @@ class JobOrderToProcessMvcTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("Proc-SK-" + tag);
       sk.setShorthand("PS" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       specialCommandRepository.save(sk);
       squadronAId = sqA.getId();
       orderRespA = newOrder(sqA, sqB).getId();
@@ -177,7 +182,7 @@ class JobOrderToProcessMvcTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(true);
+    withinProfit(s, persistedProfitArea(orgUnitRepository));
     return squadronRepository.save(s);
   }
 

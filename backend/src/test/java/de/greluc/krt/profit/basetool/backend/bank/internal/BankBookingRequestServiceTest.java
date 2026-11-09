@@ -380,8 +380,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
+                new OrgUnitMembershipOptionDto(orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON)));
     when(requestRepository.save(any(BankBookingRequest.class)))
         .thenAnswer(invocation -> {
           BankBookingRequest saved = invocation.getArgument(0);
@@ -1203,8 +1202,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
+                new OrgUnitMembershipOptionDto(orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON)));
 
     service.confirm(requestId, holderId, null, false, null, 0L);
 

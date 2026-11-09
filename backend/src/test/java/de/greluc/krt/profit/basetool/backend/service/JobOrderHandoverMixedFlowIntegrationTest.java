@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,6 +45,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
@@ -68,6 +72,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 class JobOrderHandoverMixedFlowIntegrationTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   @Autowired private JobOrderHandoverService jobOrderHandoverService;
 
   @Autowired private CityRepository cityRepository;
@@ -88,6 +94,13 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
   private Fixture prepareFixture() {
     return transactionTemplate.execute(status -> {
+      Squadron processor = new Squadron();
+      String unitTag = UUID.randomUUID().toString().substring(0, 8);
+      processor.setName("Handover Processor " + unitTag);
+      processor.setShorthand("H" + unitTag);
+      withinProfit(processor, persistedProfitArea(orgUnitRepository));
+      processor = squadronRepository.save(processor);
+
       User user = new User();
       user.setId(UUID.randomUUID());
       user.setUsername("logistiker-" + UUID.randomUUID());
@@ -109,16 +122,8 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
       JobOrder jobOrder =
           JobOrder.builder()
-              .responsibleOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
-              .requestingOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
+              .responsibleOrgUnit(processor)
+              .requestingOrgUnit(processor)
               .handle("requester")
               .status(JobOrderStatus.OPEN)
               .build();
@@ -134,10 +139,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
       InventoryItem inv1 = new InventoryItem();
 
-      inv1.setOwningOrgUnit(
-          squadronRepository
-              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-              .orElseThrow());
+      inv1.setOwningOrgUnit(processor);
       inv1.setUser(user);
       inv1.setLocation(location);
       inv1.setMaterial(aslarite);
@@ -148,10 +150,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
 
       InventoryItem inv2 = new InventoryItem();
 
-      inv2.setOwningOrgUnit(
-          squadronRepository
-              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-              .orElseThrow());
+      inv2.setOwningOrgUnit(processor);
       inv2.setUser(user);
       inv2.setLocation(location);
       inv2.setMaterial(ouratite);

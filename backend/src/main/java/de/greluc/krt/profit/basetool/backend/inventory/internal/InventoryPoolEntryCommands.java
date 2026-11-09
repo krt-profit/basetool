@@ -64,6 +64,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InventoryPoolEntryCommands implements PoolEntryCommands {
 
+  private final InventoryOrderWrites orderWrites;
+
   /** The tolerance of an amount comparison, which only absorbs floating-point noise. */
   private static final double EPSILON = AllocationReductions.REDUCTION_EPSILON;
 
@@ -84,6 +86,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull @Unmodifiable List<PoolRestoreResult> restore(
       @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores) {
+    orderWrites.lockEligibility();
     return restorer.restore(lots, restores);
   }
 
@@ -93,6 +96,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
       @NotNull Collection<PoolRelocation> relocations) {
+    orderWrites.lockEligibility();
     Set<Long> keys = new TreeSet<>();
     Set<UUID> rows = new TreeSet<>();
     holderLots.forEach((holder, lots) ->
@@ -171,6 +175,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome bookIn(@NotNull PoolBookIn bookIn, boolean dryRun) {
+    orderWrites.lockEligibility();
     StockLot lot = bookIn.lot();
     if (lot.stolen() && !inventoryProperties.stolenMarkingEnabled()) {
       return PoolOutcome.refused(PoolRefusal.STOLEN_MARKING_DISABLED);
@@ -210,12 +215,14 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome bookOut(@NotNull PoolBookOut bookOut, boolean dryRun) {
+    orderWrites.lockEligibility();
     return take(bookOut, dryRun, CheckoutType.DISCARD, null, null);
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome sell(@NotNull PoolSale sale, boolean dryRun) {
+    orderWrites.lockEligibility();
     return take(sale.take(), dryRun, CheckoutType.SELL, sale.terminal(), sale.proceeds());
   }
 
@@ -278,6 +285,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome move(@NotNull PoolMove move, boolean dryRun) {
+    orderWrites.lockEligibility();
     PoolBookOut take = move.take();
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
     if (locked.isEmpty()) {
@@ -347,6 +355,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun) {
+    orderWrites.lockEligibility();
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(move.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
@@ -402,6 +411,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome setNote(@NotNull PoolNote note, boolean dryRun) {
+    orderWrites.lockEligibility();
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(note.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
@@ -432,6 +442,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome markStolen(@NotNull PoolStolen stolen, boolean dryRun) {
+    orderWrites.lockEligibility();
     if (!inventoryProperties.stolenMarkingEnabled()) {
       return PoolOutcome.refused(PoolRefusal.STOLEN_MARKING_DISABLED);
     }
@@ -489,6 +500,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun) {
+    orderWrites.lockEligibility();
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(allocation.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);

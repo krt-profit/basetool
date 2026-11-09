@@ -92,6 +92,7 @@ public class JobOrderHandoverService {
   static final String ERROR_QUALITY_TIER_NOT_ON_ORDER = "error.job_order.quality_tier_not_on_order";
 
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final StockCommands stockCommands;
   private final JobOrderHandoverMapper jobOrderHandoverMapper;
@@ -225,6 +226,7 @@ public class JobOrderHandoverService {
   public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
+    responsibilityGuard.assertWritable(jobOrder);
 
     if (jobOrder.getType() == JobOrderType.ITEM) {
       throw new BadRequestException("Material handover is not available for item orders");
@@ -348,6 +350,7 @@ public class JobOrderHandoverService {
 
     JobOrder managedJobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
+    responsibilityGuard.assertWritable(managedJobOrder);
 
     boolean allFulfilled =
         managedJobOrder.getMaterials().stream()

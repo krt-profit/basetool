@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
@@ -156,7 +158,8 @@ final class BankAccessSeeder {
     Organisationsleitung ol = orgUnit(new Organisationsleitung(), "OL", null, null);
     Bereich ownBereich = orgUnit(new Bereich(), "Bereich", ol, Department.SUB_RADAR);
     Bereich foreignBereich = orgUnit(new Bereich(), "Fremdbereich", ol, Department.FORSCHUNG);
-    Bereich profitBereich = orgUnit(new Bereich(), "Profit", ol, Department.PROFIT);
+    Bereich profitBereich = persistedProfitArea(orgUnitRepository);
+    profitBereich.setParent(ol);
     Squadron ownStaffel = orgUnit(new Squadron(), "Staffel", ownBereich, null);
     SpecialCommand specialCommand = orgUnit(new SpecialCommand(), "SK", ownBereich, null);
     Squadron foreignStaffel = orgUnit(new Squadron(), "Fremdstaffel", foreignBereich, null);

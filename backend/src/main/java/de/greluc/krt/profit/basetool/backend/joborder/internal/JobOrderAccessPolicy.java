@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
@@ -30,6 +32,11 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -54,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service(JobOrderAccessPolicy.BEAN_NAME)
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibility {
+public class JobOrderAccessPolicy
+    implements EarmarkTargetPolicy, JobOrderVisibility, JobOrderAuthority {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "jobOrderAccessPolicy";
@@ -63,6 +71,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
 
@@ -85,7 +94,10 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * @return {@code true} iff the caller may read the order
    */
   public boolean canSeeJobOrder(@NotNull JobOrder order) {
-    return isAssigneeRow(order) || canSeeJobOrderInScope(order);
+    return isAssigneeRow(order)
+        || canSeeJobOrderInScope(order)
+        || (order.getResponsibleOrgUnit() != null
+            && accessGateService.canSeeSquadron(order.getResponsibleOrgUnit().getId()));
   }
 
   /**
@@ -143,9 +155,16 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * @return {@code true} iff the caller passes the gate
    */
   public boolean canEdit(@NotNull JobOrder order, @NotNull JobOrderGate gate) {
+    if (gate == JobOrderGate.TRANSFER) {
+      return canTransferResponsibility(order);
+    }
+    if (responsibilityInvalid(order)) {
+      return false;
+    }
     return switch (gate) {
+      case TRANSFER -> canTransferResponsibility(order);
       case EDIT -> canEditJobOrderRow(order);
-      case REQUESTER -> isOrderRequesterRow(order) && !orderHasAnyDelivery(order.getId());
+      case REQUESTER -> isRequesterWriter(order) && !orderHasAnyDelivery(order.getId());
     };
   }
 
@@ -203,6 +222,60 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
     return canEditJobOrder(jobOrderId);
   }
 
+  @Override
+  public Map<UUID, JobOrderAuthorityFlags> authorityFor(Collection<JobOrder> orders) {
+    if (orders.isEmpty()) {
+      return Map.of();
+    }
+    Set<UUID> validIds = responsibilityGuard.validOrderIds(orders);
+    Set<UUID> requesterWriters = new java.util.LinkedHashSet<>();
+    for (JobOrder order : orders) {
+      if (validIds.contains(order.getId()) && isRequesterWriter(order)) {
+        requesterWriters.add(order.getId());
+      }
+    }
+    Set<UUID> delivered =
+        requesterWriters.isEmpty()
+            ? Set.of()
+            : jobOrderRepository.findIdsWithAnyDelivery(requesterWriters);
+    Map<UUID, JobOrderAuthorityFlags> flags = new LinkedHashMap<>();
+    for (JobOrder order : orders) {
+      boolean mayTransfer = canTransferResponsibility(order);
+      boolean valid = validIds.contains(order.getId());
+      flags.put(
+          order.getId(),
+          new JobOrderAuthorityFlags(
+              !valid,
+              valid && mayTransfer,
+              mayTransfer,
+              requesterWriters.contains(order.getId()) && !delivered.contains(order.getId())));
+    }
+    return Collections.unmodifiableMap(flags);
+  }
+
+  @Override
+  public boolean responsibilityInvalid(JobOrder order) {
+    return !responsibilityGuard.isValid(order);
+  }
+
+  @Override
+  public boolean canTransferResponsibility(JobOrder order) {
+    return accessGateService.canActAsLogisticianInOwner(
+        OrgUnit.idOf(order.getResponsibleOrgUnit()));
+  }
+
+  /**
+   * Checks the current writer of either proposed side before creation.
+   *
+   * @param responsible the proposed responsible unit
+   * @param requesting the requesting unit
+   * @return whether the caller currently writes either side
+   */
+  public boolean canCreate(OrgUnit responsible, OrgUnit requesting) {
+    return accessGateService.canActAsLogisticianIn(responsible.getId())
+        || accessGateService.canActAsLogisticianIn(requesting.getId());
+  }
+
   private boolean isAssigneeRow(@NotNull JobOrder order) {
     return authHelper
         .currentUserId()
@@ -216,7 +289,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * The Logistician edit gate: a grant in the responsible unit, an order without one is admin's.
    */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
-    if (!requestScopeResolver.canViewJobOrders()) {
+    if (responsibilityInvalid(order)) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
@@ -228,6 +301,11 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
     OrgUnit requesting = order.getRequestingOrgUnit();
     return requesting != null
         && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
+  }
+
+  private boolean isRequesterWriter(@NotNull JobOrder order) {
+    OrgUnit requesting = order.getRequestingOrgUnit();
+    return requesting != null && accessGateService.canActAsLogisticianIn(requesting.getId());
   }
 
   private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {

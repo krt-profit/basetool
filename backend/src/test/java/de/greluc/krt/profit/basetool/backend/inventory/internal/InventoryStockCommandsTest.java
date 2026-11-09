@@ -39,15 +39,16 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -60,6 +61,22 @@ import org.springframework.security.access.AccessDeniedException;
 @ExtendWith(MockitoExtension.class)
 class InventoryStockCommandsTest {
 
+  @BeforeEach
+  void wireOrderWriteFixture() {
+    commands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryRepository,
+            userRepository,
+            checkoutService,
+            stolenMarkService,
+            auditRecorder,
+            bookInPolicy,
+            stockChangeObserver,
+            null);
+  }
+
   private static final UUID MEMBER = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
   @Mock private InventoryItemRepository inventoryRepository;
@@ -70,7 +87,7 @@ class InventoryStockCommandsTest {
   @Mock private BookInPolicy bookInPolicy;
   @Mock private StockChangeObserver stockChangeObserver;
 
-  @InjectMocks private InventoryStockCommands commands;
+  private InventoryStockCommands commands;
 
   @Test
   void theLockKeyIsTheFirstEightBytesOfTheSha256UnderTheLotPrefix() {

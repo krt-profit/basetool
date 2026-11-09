@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -177,7 +178,7 @@ class ExchangeDemandControllerTest {
         .perform(relayed(get(PATH), "exchange.demand.read"))
         .andExpect(jsonPath("$.materials.length()").value(1));
 
-    jdbc.update("UPDATE org_unit SET is_profit_eligible = FALSE WHERE id = ?", unit);
+    jdbc.update("UPDATE org_unit SET parent_org_unit_id = NULL WHERE id = ?", unit);
 
     mockMvc
         .perform(relayed(get(PATH), "exchange.demand.read"))
@@ -212,18 +213,18 @@ class ExchangeDemandControllerTest {
   /**
    * Seeds an active Staffel.
    *
-   * @param profitEligible whether it is profit-eligible
+   * @param insideProfit whether it is a direct child of the designated Profit area
    * @return its id
    */
-  private @NotNull UUID orgUnit(boolean profitEligible) {
+  private @NotNull UUID orgUnit(boolean insideProfit) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
+            + " parent_org_unit_id) VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
         id,
         "Unit " + id,
         "U" + id.toString().substring(0, 6),
-        profitEligible);
+        insideProfit ? persistedProfitArea(orgUnitRepository).getId() : null);
     orgUnits.add(id);
     return id;
   }

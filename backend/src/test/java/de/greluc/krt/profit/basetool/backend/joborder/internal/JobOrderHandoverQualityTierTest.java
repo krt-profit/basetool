@@ -34,10 +34,12 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
@@ -56,13 +58,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Booking a material handover against the chosen quality tier (REQ-ORDERS-038). */
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverQualityTierTest {
+
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
@@ -74,7 +77,7 @@ class JobOrderHandoverQualityTierTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderHandoverService service;
+  private JobOrderHandoverService service;
 
   private UUID orderId;
   private JobOrder order;
@@ -84,11 +87,29 @@ class JobOrderHandoverQualityTierTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderHandoverService(
+            jobOrderRepository,
+            responsibilityGuard,
+            jobOrderHandoverRepository,
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                auditService,
+                null,
+                offerRatchet,
+                null),
+            jobOrderHandoverMapper,
+            jobOrderService,
+            userService,
+            orgUnitMembershipQueryService,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);

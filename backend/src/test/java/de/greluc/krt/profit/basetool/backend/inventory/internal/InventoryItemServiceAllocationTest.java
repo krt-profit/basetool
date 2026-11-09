@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
@@ -57,12 +58,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
@@ -88,18 +87,37 @@ class InventoryItemServiceAllocationTest {
   @Mock private InventoryAggregationService inventoryAggregationService;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
 
-  @InjectMocks private InventoryItemService service;
+  private InventoryItemService service;
 
   /** Wires the job-order requirement lookup over the mocked order repository and item service. */
   @BeforeEach
   void wireJobOrders() {
+    service =
+        new InventoryItemService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            materialRepository,
+            null,
+            null,
+            locationRepository,
+            earmarkTargets,
+            inventoryItemMapper,
+            null,
+            null,
+            null,
+            null,
+            new JobOrderEarmarkTargets(
+                jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
+            auditService,
+            inventoryAggregationService,
+            inventoryCheckoutService,
+            null);
     lenient()
         .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
         .thenReturn(true);
-    ReflectionTestUtils.setField(
-        service,
-        "jobOrders",
-        new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy));
   }
 
   private final UUID itemId = UUID.randomUUID();

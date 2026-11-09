@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -62,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
 import java.io.IOException;
@@ -111,6 +113,8 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @SpringBootTest
 class ExchangeWireContractTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final Path FIXTURES = Path.of("../docs/exchange/examples/v1");
 
@@ -494,10 +498,11 @@ class ExchangeWireContractTest {
     UUID orgUnit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, TRUE)",
+            + " parent_org_unit_id) VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
         orgUnit,
         "Wire unit " + orgUnit,
-        "W" + orgUnit.toString().substring(0, 8));
+        "W" + orgUnit.toString().substring(0, 8),
+        persistedProfitArea(orgUnitRepository).getId());
     orgUnits.add(orgUnit);
     UUID jobOrder = UUID.randomUUID();
     jdbc.update(

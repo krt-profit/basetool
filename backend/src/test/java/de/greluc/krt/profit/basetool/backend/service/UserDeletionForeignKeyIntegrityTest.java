@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
@@ -49,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -58,11 +61,13 @@ import de.greluc.krt.profit.basetool.backend.personalinventory.internal.Personal
 import de.greluc.krt.profit.basetool.backend.privacy.api.UserDeletionService;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,6 +82,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @Transactional
 class UserDeletionForeignKeyIntegrityTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private UserDeletionService userDeletionService;
   @Autowired private MissionService missionService;
@@ -94,6 +101,7 @@ class UserDeletionForeignKeyIntegrityTest {
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private EntityManager entityManager;
+  @Autowired private JdbcTemplate jdbc;
 
   /**
    * Mocked so the fail-closed delete-time Keycloak existence check makes no HTTP call; its default
@@ -140,13 +148,13 @@ class UserDeletionForeignKeyIntegrityTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("FK-SK-" + tag);
     sk.setShorthand("S" + tag);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     sk = specialCommandRepository.save(sk);
 
     Squadron squadron = new Squadron();
     squadron.setName("FK-SQ-" + tag);
     squadron.setShorthand("Q" + tag);
-    squadron.setProfitEligible(true);
+    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
     squadron = squadronRepository.save(squadron);
 
     Material material = new Material();
@@ -177,6 +185,18 @@ class UserDeletionForeignKeyIntegrityTest {
             .build();
     claim = materialClaimRepository.save(claim);
     UUID claimId = claim.getId();
+    MaterialClaim historicalClaim =
+        materialClaimRepository.save(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(material)
+                .qualityTier(good)
+                .claimingOrgUnit(squadron)
+                .amount(3.0)
+                .claimedByUser(exMember)
+                .endedAt(Instant.parse("2026-01-01T00:00:00Z"))
+                .build());
+    UUID historicalClaimId = historicalClaim.getId();
     UUID exMemberId = exMember.getId();
 
     entityManager.flush();
@@ -188,6 +208,14 @@ class UserDeletionForeignKeyIntegrityTest {
     assertThat(materialClaimRepository.findById(claimId).orElseThrow().getClaimedByUser().getId())
         .isEqualTo(exMemberId);
     entityManager.clear();
+    assertThat(materialClaimRepository.findById(historicalClaimId)).isEmpty();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT claimed_by_user_id FROM material_claim WHERE id = ?",
+                UUID.class,
+                historicalClaimId))
+        .isEqualTo(exMemberId);
+    Map<String, Object> historyFacts = historicalClaimFacts(historicalClaimId);
 
     assertThatNoException()
         .isThrownBy(() -> {
@@ -214,6 +242,23 @@ class UserDeletionForeignKeyIntegrityTest {
     assertThat(reloadedClaim.getClaimedByUser())
         .as("the audit-only claim stamp is nulled, not reassigned, and the claim survives")
         .isNull();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT claimed_by_user_id FROM material_claim WHERE id = ?",
+                UUID.class,
+                historicalClaimId))
+        .isNull();
+    assertThat(historicalClaimFacts(historicalClaimId)).isEqualTo(historyFacts);
+  }
+
+  private Map<String, Object> historicalClaimFacts(UUID id) {
+    return jdbc.queryForMap(
+        """
+        SELECT id, job_order_id, material_id, quality_tier_id, claiming_org_unit_id,
+               amount, created_at, ended_at, version
+        FROM material_claim WHERE id = ?
+        """,
+        id);
   }
 
   /**
@@ -251,7 +296,7 @@ class UserDeletionForeignKeyIntegrityTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("MEM-SK-" + tag);
     sk.setShorthand("M" + tag);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     sk = specialCommandRepository.save(sk);
 
     OrgUnitMembership membership = new OrgUnitMembership();

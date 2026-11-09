@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
@@ -59,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -94,6 +97,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @Transactional
 class UserDeletionEndStateTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private UserDeletionService userDeletionService;
 
@@ -455,7 +460,7 @@ class UserDeletionEndStateTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("End-SK-" + tag + "-" + unique);
     sk.setShorthand("E" + unique);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     specialCommandRepository.save(sk);
     JobOrder order =
         JobOrder.builder()

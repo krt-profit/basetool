@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class DataExportMaterialClaimSectionIntegrationTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   private static final UUID GOOD_TIER = UUID.fromString("6b1f2e0a-3c1d-4f5e-9a10-000000000650");
 
   @Autowired private DataExportService dataExportService;
@@ -57,9 +61,10 @@ class DataExportMaterialClaimSectionIntegrationTest {
     UUID unit = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', 'Zzz Claim Staffel', ?, TRUE, TRUE)",
+            + " parent_org_unit_id) VALUES (?, 'SQUADRON', 'Zzz Claim Staffel', ?, TRUE, ?)",
         unit,
-        "C" + unit.toString().substring(0, 6));
+        "C" + unit.toString().substring(0, 6),
+        persistedProfitArea(orgUnitRepository).getId());
     UUID material = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material,"

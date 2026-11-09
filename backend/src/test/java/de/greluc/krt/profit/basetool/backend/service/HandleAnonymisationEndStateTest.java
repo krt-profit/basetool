@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
@@ -35,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -66,6 +69,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @Transactional
 class HandleAnonymisationEndStateTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String SENTINEL = HandleAnonymisation.SENTINEL;
 
@@ -360,7 +365,7 @@ class HandleAnonymisationEndStateTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Handle-SK-" + unique);
     sk.setShorthand("H" + unique);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     specialCommandRepository.save(sk);
     Material material = new Material();
     material.setName("Handle Ore " + unique);

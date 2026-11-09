@@ -53,11 +53,11 @@ class AdminSquadronsPageControllerTest {
           new CatalogueCacheEviction(backendApiClient));
 
   @Test
-  void listSquadrons_sortsByNameAndKeepsTheSwitchStates() {
+  void listSquadrons_sortsByName() {
     List<SquadronDto> squadrons = new ArrayList<>();
-    squadrons.add(squadron("Zulu", false));
-    squadrons.add(squadron("X-Ray", true));
-    squadrons.add(squadron("Yankee", true));
+    squadrons.add(squadron("Zulu"));
+    squadrons.add(squadron("X-Ray"));
+    squadrons.add(squadron("Yankee"));
     when(backendApiClient.get(eq(TEMPLATE), anyTypeRef(), eq(false), eq(0)))
         .thenReturn(new PageResponse<>(squadrons, 0, 1000, 3, 1, List.of("name,asc")));
     Model model = new ConcurrentModel();
@@ -69,8 +69,6 @@ class AdminSquadronsPageControllerTest {
     assertEquals("X-Ray", sorted.get(0).name());
     assertEquals("Yankee", sorted.get(1).name());
     assertEquals("Zulu", sorted.get(2).name());
-    assertEquals(Boolean.TRUE, sorted.get(1).isProfitEligible());
-    assertEquals(Boolean.FALSE, sorted.get(2).isProfitEligible());
     assertEquals(Boolean.FALSE, model.getAttribute("squadronsTruncated"));
   }
 
@@ -88,7 +86,7 @@ class AdminSquadronsPageControllerTest {
   void listSquadrons_capHitSetsTheTruncatedFlag() {
     int pages = CatalogPages.MAX_CATALOG_PAGES + 1;
     PageResponse<Object> endless =
-        new PageResponse<>(List.of(squadron("Row", true)), 0, 1000, pages, pages, List.of());
+        new PageResponse<>(List.of(squadron("Row")), 0, 1000, pages, pages, List.of());
     when(backendApiClient.get(
             org.mockito.ArgumentMatchers.startsWith("/api/v1/squadrons"),
             anyTypeRef(),
@@ -115,7 +113,7 @@ class AdminSquadronsPageControllerTest {
     assertEquals("error.admin.mission.data.load", model.getAttribute("error"));
   }
 
-  private static SquadronDto squadron(String name, boolean profit) {
-    return new SquadronDto(UUID.randomUUID(), name, null, null, true, profit, 0L);
+  private static SquadronDto squadron(String name) {
+    return new SquadronDto(UUID.randomUUID(), name, null, null, true, 0L);
   }
 }

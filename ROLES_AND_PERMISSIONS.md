@@ -500,7 +500,7 @@ linked specifications. The following table and footnotes are the **current imple
 | Mark Lager stock as „gestohlen“ or remove the marker, a whole row or a part (REQ-INV-053) — follows the row's **edit right**, no permission of its own: `canEditInventoryItem`, then owner or Logistician and above, like every per-row write; a selection only of your own rows. Refused while the server switch is off |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
 | Change the org unit of your **own personal** Lager rows — to one of your direct memberships or to „Keine Einheit", singly or for a selection (REQ-INV-052) (`isAuthenticated()` + `canEditInventoryItem`; the service refuses a shared or a foreign row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Move a **shared** Lager row, whole or a part of its free stock, into the pool of another org unit its holder directly belongs to — „Pool wechseln" in the Globales Lager (REQ-INV-059) (`isAuthenticated()` + `canEditInventoryItem`; the service requires the contextual Logistician authority of **both** units, `hasRoleInOrgUnit`, so the flat role alone is not enough; the holder is notified) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Create** job order (material & item order)                                                                                                                                                                                                                                                                                                                             |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| **Create** MATERIAL/ITEM through a current contextual writer of either proposed unit | ❌ | ✅ | ❌ | ✅ | ✅ |
 | Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + `canViewJobOrders`)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
@@ -524,27 +524,21 @@ personal aggregate (inventory entry `inventory_item.user`, ship `ship.owner`, re
 `owning_org_unit_id` stamp — even after an OrgUnit change or without any membership, as long as
 the object is still booked to an OrgUnit (REQ-ORG-011). A **non-**owner stays bound to the
 strict OrgUnit scope.
-² Admin unrestricted; Staffel logistician/officer only **escalation** of their own
-Staffel job order to an SK.
-³ **Only members of a profit-eligible org unit** (`is_profit_eligible`
-on Staffel or SK) are part of the job-order workflow: only they may **view** job orders
-(list/detail), **edit** them (status/priority/materials/handover,
-reassign) and set/withdraw **material claims** — the profit gate
-(`canViewJobOrders`) is folded into `canSeeJobOrder` and `canEditJobOrder` and
-also applies to the role-only claim endpoints. The status, blueprint-counting, full and requester
-edits, the reassignment and the material and stock unlinks are decided by `JobOrderEditor` on the
-loaded order (`canEditJobOrder` resp. the requester rule, REQ-SEC-085); their endpoints keep only
-the role, and an edit that carries a version requires it (REQ-ORDERS-046). Anyone who is exclusively in
-non-profit-eligible units cannot browse the order queue, but **can now view and
-edit their own placed orders within limits** — the requesting-owner escape
-(REQ-ORDERS-023, ADR-0091): they see the orders their own org unit requested under
-„Meine Aufträge", and may edit them (change quantities, add/remove not-yet-delivered
-items/materials, adjust min-quality, edit the comment) while the order is still fully
-undelivered, with the Bearbeiter section and the materials summary redacted. Admins
-always have full access (`canViewJobOrders` is always true for them). In the frontend
-a non-profit member with placed orders sees a „Meine Aufträge" link (otherwise
-„Auftrag anlegen"); the general order queue and the write/claim endpoints still return
-an empty list or `403` for them.
+² Current responsible-unit writers transfer immediately to any eligible Profit target, including
+recovery when the current unit is no longer eligible.
+³ General Profit access follows membership/reach in the unique active `Department.PROFIT`
+area or its active Staffel/SK children, independent of retired flags. Creating MATERIAL/ITEM
+requires a current contextual writer of the requesting **or** responsible unit. Responsible writers
+process and immediately transfer responsibility to any eligible target in the verified original
+boundary, without target acceptance or movement of stock. Concrete current-unit recovery authority
+survives loss of the general Profit capability. Invalid responsibility blocks every other order
+mutation and coupled linked-stock write in every status, including own assignee notes/removal;
+automatic eligibility maintenance ends ineligible promises with history retained. `canEditAsRequester` separately
+exposes current requester-writer permission under the existing delivery freeze; `canEdit` always
+means responsible processing, including in redacted responses. Unknown original
+legacy provenance alone does not invalidate a currently eligible responsible unit. Requester
+reading retains its existing view; requester edits require its current writer and the existing
+undelivered prerequisite until the full shared-workflow change.
 ⁴ Stricter than `canSeeJobOrder` — **no** SK-public escape: the coverage view
 names members by name together with their blueprints and is therefore limited to members
 of the **responsible** org unit. Anyone who sees the SK job order only
@@ -720,9 +714,9 @@ participants (REQ-SEC-042).
 | Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Switch the active OrgUnit context (sidebar switcher)                                                                                                                |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
-| Staffel lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Staffel lifecycle (create/rename/delete/activate) (`hasRole('ADMIN')`)                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| SK lifecycle (create/rename/delete/activate) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
 | Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
 | Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-units/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |

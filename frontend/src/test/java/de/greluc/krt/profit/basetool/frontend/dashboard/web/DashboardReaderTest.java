@@ -155,7 +155,7 @@ class DashboardReaderTest {
         .thenReturn(
             stored(true, widget(DashboardWidgetType.UPCOMING_DAYS, DashboardColumn.WIDE, alpha)));
     List<OrgUnitMembershipOptionDto> units =
-        List.of(new OrgUnitMembershipOptionDto(alpha, "Alpha", "ALF", "SQUADRON", true));
+        List.of(new OrgUnitMembershipOptionDto(alpha, "Alpha", "ALF", "SQUADRON"));
 
     DashboardView inBeta = read(MEMBER, beta, units);
     DashboardView inAlpha = read(MEMBER, alpha, units);

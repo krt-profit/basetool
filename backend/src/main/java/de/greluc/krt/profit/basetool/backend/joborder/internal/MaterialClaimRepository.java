@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -83,12 +85,58 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       UUID jobOrderId, UUID materialId, UUID qualityTierId);
 
   /**
+   * Loads one bounded page of active promises of the affected ineligible units.
+   *
+   * @param unitIds the ineligible claiming units
+   * @param pageable the bounded page
+   * @return active promises with notice facts fetched
+   */
+  @EntityGraph(
+      attributePaths = {"jobOrder", "material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  List<MaterialClaim> findByClaimingOrgUnitIdInOrderById(
+      Collection<UUID> unitIds, Pageable pageable);
+
+  /**
+   * Lists a bounded keyset page of orders with active promises for initial reconciliation.
+   *
+   * @param afterOrderId the last order inspected, or null for the first page
+   * @param pageable the bounded page
+   * @return distinct order identities in identity order
+   */
+  @Query(
+      "SELECT DISTINCT c.jobOrder.id FROM MaterialClaim c WHERE"
+          + " (:afterOrderId IS NULL OR c.jobOrder.id > :afterOrderId) ORDER BY c.jobOrder.id")
+  List<UUID> findActivePromiseOrderIdsAfter(
+      @Param("afterOrderId") @Nullable UUID afterOrderId, Pageable pageable);
+
+  /**
+   * Loads a bounded page of one order's active promises outside current eligible units.
+   *
+   * @param orderId the order being reconciled
+   * @param eligibleIds the current eligible unit identities
+   * @param pageable the bounded page
+   * @return ineligible active promises with audit and notice facts fetched
+   */
+  @EntityGraph(
+      attributePaths = {"jobOrder", "material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  @Query(
+      "SELECT c FROM MaterialClaim c WHERE c.jobOrder.id = :orderId"
+          + " AND c.claimingOrgUnit.id NOT IN :eligibleIds ORDER BY c.id")
+  List<MaterialClaim> findIneligibleActivePromisesByOrder(
+      @Param("orderId") UUID orderId,
+      @Param("eligibleIds") Collection<UUID> eligibleIds,
+      Pageable pageable);
+
+  /**
    * Clears the {@code claimedByUser} audit reference on every claim stamped by the given user, so
    * the user can be deleted without an FK violation; the claims themselves remain.
    *
    * @param userId the user whose audit stamp is cleared from every claim
    */
   @Modifying
-  @Query("UPDATE MaterialClaim mc SET mc.claimedByUser = null WHERE mc.claimedByUser.id = :userId")
+  @Query(
+      value =
+          "UPDATE material_claim SET claimed_by_user_id = null WHERE claimed_by_user_id = :userId",
+      nativeQuery = true)
   void unlinkClaimedByUser(@Param("userId") UUID userId);
 }

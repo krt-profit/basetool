@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
@@ -45,11 +46,11 @@ import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -63,6 +64,27 @@ import org.springframework.context.ApplicationEventPublisher;
 @ExtendWith(MockitoExtension.class)
 class InventoryCheckoutServiceAuditTest {
 
+  @BeforeEach
+  void wireOrderWriteFixture() {
+    service =
+        new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            earmarkTargets,
+            null,
+            offerRatchet,
+            inventoryItemMapper,
+            requestScopeResolver,
+            null,
+            auditService,
+            eventPublisher);
+  }
+
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
   @Mock private LocationRepository locationRepository;
@@ -75,7 +97,7 @@ class InventoryCheckoutServiceAuditTest {
 
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private InventoryEarmarkLookup earmarkTargets;
-  @InjectMocks private InventoryCheckoutService service;
+  private InventoryCheckoutService service;
 
   @Test
   void updateDelivered_recordsDeliveryToggledAudit() {

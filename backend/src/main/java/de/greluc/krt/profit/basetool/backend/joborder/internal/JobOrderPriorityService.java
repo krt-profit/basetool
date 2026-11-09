@@ -29,17 +29,21 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the job-order priority queue: drag-and-drop reorder and normalisation to a contiguous {@code
- * 1..n} sequence.
+ * Owns the job-order priority queue while preserving slots of orders with invalid responsibility.
  *
  * <p>Both operations take a pessimistic write lock over the whole sequence via {@link
  * JobOrderRepository#lockAllJobOrders}.
@@ -50,6 +54,10 @@ public class JobOrderPriorityService {
 
   /** Loads/locks the priority sequence and persists the reordered rows. */
   private final JobOrderRepository jobOrderRepository;
+
+  private final ProfitHierarchyService profitHierarchy;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
 
   /** Records the priority-change audit event (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
@@ -68,8 +76,13 @@ public class JobOrderPriorityService {
    */
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
+    profitHierarchy.lockForOrderWrite();
     JobOrder targetOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    if (!jobOrderAccessPolicy.canEdit(targetOrder, JobOrderGate.EDIT)) {
+      throw new AccessDeniedException("Caller may not reorder this job order");
+    }
+    responsibilityGuard.assertWritable(targetOrder);
 
     Integer oldPriority = targetOrder.getPriority();
     if (oldPriority == null) {
@@ -81,11 +94,12 @@ public class JobOrderPriorityService {
     }
 
     List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
+    Set<UUID> validIds = responsibilityGuard.validOrderIds(allOrders);
 
     List<JobOrder> activeOrders =
         new ArrayList<>(
             allOrders.stream()
-                .filter(o -> o.getPriority() != null)
+                .filter(o -> o.getPriority() != null && validIds.contains(o.getId()))
                 .sorted(
                     Comparator.comparing(JobOrder::getPriority)
                         .thenComparing(JobOrder::getCreatedAt))
@@ -98,10 +112,7 @@ public class JobOrderPriorityService {
 
     activeOrders.add(newIndex, targetOrder);
 
-    int currentPrio = 1;
-    for (JobOrder o : activeOrders) {
-      o.setPriority(currentPrio++);
-    }
+    assignAvailablePriorities(activeOrders, allOrders, validIds);
 
     auditRecorder.record(
         AuditEventType.JOB_ORDER_PRIORITY_CHANGED,
@@ -113,26 +124,41 @@ public class JobOrderPriorityService {
   }
 
   /**
-   * Re-packs the active orders' priorities to a contiguous {@code 1..n} sequence, stable by current
-   * priority then creation time, under a pessimistic lock on the whole sequence.
+   * Packs valid active orders around reserved invalid slots, stable by priority then creation time,
+   * under a pessimistic lock on the whole sequence.
    *
    * <p>Runs in the caller's transaction; a caller holding a pending {@code @Version} bump must
    * flush it first.
    */
   public void normalizePriorities() {
+    List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
+    Set<UUID> validIds = responsibilityGuard.validOrderIds(allOrders);
     List<JobOrder> activeOrders =
-        jobOrderRepository.lockAllJobOrders().stream()
-            .filter(o -> o.getPriority() != null)
+        allOrders.stream()
+            .filter(o -> o.getPriority() != null && validIds.contains(o.getId()))
             .sorted(
                 Comparator.comparing(JobOrder::getPriority).thenComparing(JobOrder::getCreatedAt))
             .toList();
+    assignAvailablePriorities(activeOrders, allOrders, validIds);
+  }
 
-    int currentPriority = 1;
+  private static void assignAvailablePriorities(
+      List<JobOrder> activeOrders, List<JobOrder> allOrders, Set<UUID> validIds) {
+    Set<Integer> reserved =
+        allOrders.stream()
+            .filter(order -> !validIds.contains(order.getId()))
+            .map(JobOrder::getPriority)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    int priority = 1;
     for (JobOrder order : activeOrders) {
-      if (order.getPriority() == null || !order.getPriority().equals(currentPriority)) {
-        order.setPriority(currentPriority);
+      while (reserved.contains(priority)) {
+        priority++;
       }
-      currentPriority++;
+      if (!Objects.equals(order.getPriority(), priority)) {
+        order.setPriority(priority);
+      }
+      priority++;
     }
   }
 }

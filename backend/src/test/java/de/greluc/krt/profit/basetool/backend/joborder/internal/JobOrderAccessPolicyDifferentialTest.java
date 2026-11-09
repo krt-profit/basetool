@@ -54,20 +54,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * The differential verdict test of the job-order access policy (plan §5.4, ADR-0236): over one
- * fixture matrix of callers and orders, {@link JobOrderAccessPolicy} returns exactly the verdict of
- * the scope hub's former job-order read gates; the edit gates moved to the per-unit Logistician
- * rule ({@code LogisticianPerUnitSurfacesTest}).
- *
- * <p>{@link ScopeHubJobOrderGates} restates those gates as {@link AccessGateService} decided them
- * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
- *
- * <p>The matrix covers an admin unpinned and pinned to either unit, members of zero, one and two
- * units, a member pinned to an own and to a foreign unit, a Bereich lead reaching a child Staffel,
- * each with and without the profit eligibility that opens the queue and with and without the
- * logistician role; orders of either unit, of the child unit, of a Spezialkommando (the SK-queue
- * escape) and without a responsible unit, each placed by either unit (the requester escape) with
- * and without a delivery, and an unknown order.
+ * Checks concrete job-order read visibility across contextual callers and requester relationships.
  */
 class JobOrderAccessPolicyDifferentialTest {
 
@@ -176,21 +163,13 @@ class JobOrderAccessPolicyDifferentialTest {
   private static List<Gate> gates() {
     return List.of(
         new Gate(
-            "canSeeJobOrder",
-            ScopeHubJobOrderGates::canSeeJobOrder,
-            JobOrderAccessPolicy::canSeeJobOrder),
-        new Gate(
             "canSeeJobOrderBlueprintOwners",
             ScopeHubJobOrderGates::canSeeJobOrderBlueprintOwners,
             JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners),
         new Gate(
             "canSeeJobOrderAsRequester",
             ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
-            JobOrderAccessPolicy::canSeeJobOrderAsRequester),
-        new Gate(
-            "canEditJobOrderAsRequester",
-            ScopeHubJobOrderGates::canEditJobOrderAsRequester,
-            JobOrderAccessPolicy::canEditJobOrderAsRequester));
+            JobOrderAccessPolicy::canSeeJobOrderAsRequester));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
@@ -237,7 +216,7 @@ class JobOrderAccessPolicyDifferentialTest {
             return ids;
           });
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
-      when(orgUnits.countProfitEligibleByIdIn(anyCollection()))
+      when(orgUnits.countInActiveProfitHierarchyByIdIn(anyCollection()))
           .thenReturn(caller.profitEligible() ? 1L : 0L);
 
       JobOrderRepository repository = mock(JobOrderRepository.class);
@@ -287,7 +266,13 @@ class JobOrderAccessPolicyDifferentialTest {
               accessGateService, resolver, repository, handovers, itemHandovers);
       policy =
           new JobOrderAccessPolicy(
-              resolver, accessGateService, authHelper, repository, handovers, itemHandovers);
+              resolver,
+              accessGateService,
+              authHelper,
+              repository,
+              org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
+              handovers,
+              itemHandovers);
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {

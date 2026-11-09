@@ -80,6 +80,7 @@ public class InventoryStockCommands implements StockCommands {
   /** The rest below which a taken row counts as depleted. */
   private static final double QUANTITY_EPSILON = 1e-4;
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryRepository;
   private final UserRepository userRepository;
   private final InventoryCheckoutService checkoutService;
@@ -92,6 +93,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockLots(@NotNull UUID member, @NotNull Collection<String> lotKeys) {
+    orderWrites.lockEligibility();
     Set<Long> keys = new TreeSet<>();
     for (String lotKey : lotKeys) {
       keys.add(lotLockKey(member, lotKey));
@@ -149,6 +151,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot) {
+    orderWrites.lockEligibility();
     List<InventoryItem> rows =
         new ArrayList<>(
             lot.material() != null
@@ -174,6 +177,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
+    orderWrites.lockEligibility();
     return inventoryRepository.findByIdForUpdate(rowId).map(StockRow.class::cast);
   }
 
@@ -196,6 +200,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
+    orderWrites.lockEligibility();
     User user = userRepository.findById(member).orElseThrow();
     InventoryItem item = new InventoryItem();
     item.setUser(user);
@@ -207,6 +212,7 @@ public class InventoryStockCommands implements StockCommands {
     item.setAmount(ScuAmounts.roundToScuScale(amount));
     item.setPersonal(true);
     item.setStolen(lot.stolen());
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryRepository.save(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
@@ -223,6 +229,7 @@ public class InventoryStockCommands implements StockCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull StockChangeEffects bookOutRow(
       @NotNull UUID member, @NotNull UUID rowId, double amount) {
+    orderWrites.lockEligibility();
     InventoryItem row = managedRow(rowId);
     return checkoutService.bookOutForClient(
         row.getId(),
@@ -245,6 +252,7 @@ public class InventoryStockCommands implements StockCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public void markStolen(
       @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount) {
+    orderWrites.lockEligibility();
     InventoryItem row = managedRow(rowId);
     stolenMarkService.mark(
         row.getId(),
@@ -285,11 +293,14 @@ public class InventoryStockCommands implements StockCommands {
       double amount,
       @Nullable List<AllocationReductionDto> missionReductions,
       @NotNull StockChangeReason reason) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     InventoryItem row = managedRow(rowId);
     final double remainingAmount = row.getAmount() - amount;
     if (remainingAmount <= QUANTITY_EPSILON) {
       InventoryDonationGuards.requireNoDonation(row);
       stockChangeObserver.beforeDelete(List.of(row.getId()), reason);
+      orderWrites.assertRow(row);
       inventoryRepository.delete(row);
       return true;
     }
@@ -299,6 +310,7 @@ public class InventoryStockCommands implements StockCommands {
     AllocationReductions.applyPlan(row, missionPlan, false);
     row.setAmount(remainingAmount);
     InventoryDonationGuards.requireDonationFits(row);
+    orderWrites.assertRow(row);
     inventoryRepository.save(row);
     return false;
   }
@@ -310,6 +322,8 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull UUID gameItemId,
       double amount,
       @NotNull StockChangeReason reason) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     final List<StockConsumption> consumed = new ArrayList<>();
     double remainingToConsume = amount;
     if (remainingToConsume <= QUANTITY_EPSILON) {
@@ -344,10 +358,12 @@ public class InventoryStockCommands implements StockCommands {
       if (depleted) {
         InventoryDonationGuards.requireNoDonation(row);
         stockChangeObserver.beforeDelete(List.of(row.getId()), reason);
+        orderWrites.assertRow(row);
         inventoryRepository.delete(row);
       } else {
         row.setAmount(rowRemaining);
         InventoryDonationGuards.requireDonationFits(row);
+        orderWrites.assertRow(row);
         inventoryRepository.save(row);
       }
       remainingToConsume -= take;
@@ -363,10 +379,12 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull StockLot lot,
       double amount,
       @NotNull StockBookingReason reason) {
+    orderWrites.lockEligibility();
     requirePositive(amount);
     User user = userRepository.findById(holder).orElseThrow();
     InventoryItem item = poolRow(user, poolUnit, lot, amount);
     requireWholeUnits(item);
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryRepository.save(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
@@ -390,6 +408,7 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull UUID holder,
       @NotNull Location location,
       @NotNull StockBookingReason reason) {
+    orderWrites.lockEligibility();
     requirePositive(amount);
     InventoryItem source = managedRow(sourceRowId);
     double moved = ScuAmounts.roundToScuScale(amount);
@@ -425,6 +444,7 @@ public class InventoryStockCommands implements StockCommands {
                 remaining,
                 StockChangeReason.TRANSFER)
             .depleted();
+    orderWrites.assertRow(target);
     InventoryItem saved = inventoryRepository.save(target);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_TRANSFERRED,
@@ -492,6 +512,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void earmarkForDonation(@NotNull UUID rowId, @NotNull UUID donationId, double amount) {
+    orderWrites.lockEligibility();
     requirePositive(amount);
     InventoryItem row = managedRow(rowId);
     if (Boolean.TRUE.equals(row.getStolen())) {
@@ -501,6 +522,7 @@ public class InventoryStockCommands implements StockCommands {
     if (!InventoryAllocations.fits(row)) {
       throw new OverAllocationException();
     }
+    orderWrites.assertRow(row);
     inventoryRepository.saveAndFlush(row);
     auditRecorder.record(
         AuditEventType.INVENTORY_ALLOCATION_ADDED,
@@ -515,11 +537,13 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseDonationEarmark(@NotNull UUID donationId) {
+    orderWrites.lockEligibility();
     for (InventoryDonationAllocation slice :
         donationAllocationRepository.findByDonationId(donationId)) {
       InventoryItem row = slice.getInventoryItem();
       double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
       row.removeDonationAllocation(slice);
+      orderWrites.assertRow(row);
       inventoryRepository.saveAndFlush(row);
       auditRecorder.record(
           AuditEventType.INVENTORY_ALLOCATION_REMOVED,
@@ -533,30 +557,39 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void lowered(@NotNull UUID rowId, double remaining, @NotNull StockChangeReason reason) {
+    orderWrites.lockEligibility();
     stockChangeObserver.lower(rowId, remaining, reason);
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseJobOrderEarmarks(@NotNull UUID jobOrderId) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     inventoryRepository.deleteJobOrderAllocationsByJobOrder(jobOrderId);
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseJobOrderEarmark(@NotNull UUID rowId, @NotNull UUID jobOrderId) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     managedRow(rowId).getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseJobOrderMaterialEarmarks(@NotNull UUID jobOrderId, @NotNull UUID materialId) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     inventoryRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
   }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseJobOrderGameItemEarmarks(@NotNull UUID jobOrderId, @NotNull UUID gameItemId) {
+    orderWrites.lockEligibility();
+    orderWrites.assertOrders(List.of(jobOrderId));
     inventoryRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(jobOrderId, gameItemId);
   }
 
@@ -572,6 +605,7 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull Location location,
       boolean personal,
       boolean earmark) {
+    orderWrites.lockEligibility();
     InventoryItem stockRow = new InventoryItem();
     stockRow.setUser(owner);
     stockRow.setOwningOrgUnit(owningOrgUnit);
@@ -580,8 +614,10 @@ public class InventoryStockCommands implements StockCommands {
     stockRow.setAmount((double) amount);
     stockRow.setPersonal(personal);
     if (earmark) {
+      orderWrites.assertOrders(List.of(orderId));
       InventoryAllocations.addJobOrder(stockRow, orderId, (double) amount, false);
     }
+    orderWrites.assertRow(stockRow);
     InventoryItem saved = inventoryRepository.save(stockRow);
     InventoryItem merged = checkoutService.mergeStockIfRequested(saved, false);
     auditRecorder.record(
@@ -610,6 +646,7 @@ public class InventoryStockCommands implements StockCommands {
       @Nullable UUID jobOrderId,
       @Nullable Integer jobOrderDisplayId,
       @Nullable UUID missionId) {
+    orderWrites.lockEligibility();
     InventoryItem item = new InventoryItem();
     item.setUser(assignee);
     item.setOwningOrgUnit(owningOrgUnit);
@@ -620,11 +657,14 @@ public class InventoryStockCommands implements StockCommands {
     item.setNote(note);
     item.setPersonal(personal);
     if (jobOrderId != null) {
+      orderWrites.assertOrders(List.of(jobOrderId));
       InventoryAllocations.addJobOrder(item, jobOrderId, item.getAmount(), false);
     }
     if (!personal && missionId != null) {
       InventoryAllocations.addMission(item, missionId, item.getAmount());
     }
+
+    orderWrites.assertRow(item);
 
     inventoryRepository.save(item);
     auditRecorder.record(

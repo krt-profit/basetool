@@ -36,13 +36,16 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A squadron's claim ("Eintragung") for part of one material bucket {@code (jobOrder, material,
@@ -59,6 +62,7 @@ import org.jetbrains.annotations.NotNull;
 @AllArgsConstructor
 @Builder
 @Table(name = "material_claim")
+@SQLRestriction("ended_at IS NULL")
 public class MaterialClaim extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -89,6 +93,11 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "claiming_org_unit_id", nullable = false)
   private OrgUnit claimingOrgUnit;
+
+  /** End of the active promise; historical quantity and attribution remain unchanged. */
+  @Column(name = "ended_at")
+  @Nullable
+  private Instant endedAt;
 
   /** The claimed partial quantity, in the material's own unit (SCU fractional vs PIECE whole). */
   @Column(name = "amount", nullable = false)

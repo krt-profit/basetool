@@ -51,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
 
+  private final InventoryOrderWrites orderWrites;
+
   private final InventoryItemRepository inventoryItemRepository;
   private final AuditRecorder auditRecorder;
 
@@ -64,6 +66,7 @@ public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserGainedFirstOrgUnit(@NotNull UUID userId, @NotNull OrgUnit firstOrgUnit) {
+    orderWrites.lockEligibility();
     int restamped = restamp(userId, firstOrgUnit, false);
     if (restamped > 0) {
       auditRecorder.record(
@@ -86,6 +89,7 @@ public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserLostLastOrgUnit(@NotNull UUID userId) {
+    orderWrites.lockEligibility();
     int restamped = restamp(userId, null, true);
     if (restamped > 0) {
       auditRecorder.record(

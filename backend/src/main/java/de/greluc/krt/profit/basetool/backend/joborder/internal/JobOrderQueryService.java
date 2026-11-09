@@ -124,11 +124,11 @@ public class JobOrderQueryService {
    * Paged list with optional status, squadron and processing filters, always constrained to the
    * caller's visibility scope.
    *
-   * <p>With {@code toProcess} only orders whose profit-eligible responsible unit is one of the
-   * caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned org
-   * unit when one is active, otherwise the caller's direct memberships. The filter only narrows the
-   * scoped result; a caller with no processing unit gets an empty page. Without it the scope also
-   * holds the orders the caller is an assignee of (REQ-ORDERS-047).
+   * <p>With {@code toProcess} only orders whose active Profit-hierarchy responsible unit is one of
+   * the caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned
+   * org unit when one is active, otherwise the caller's direct memberships. The filter only narrows
+   * the scoped result; a caller with no processing unit gets an empty page. Without it the scope
+   * also holds the orders the caller is an assignee of (REQ-ORDERS-047).
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -210,8 +210,10 @@ public class JobOrderQueryService {
   }
 
   /**
-   * The "Alle" list of a caller outside the order workflow: only the orders they hold an assignee
-   * entry on (REQ-ORDERS-047), narrowed by the display filter.
+   * The concrete recovery and assignment list outside general Profit access.
+   *
+   * <p>Current unit/leadership readers retain their own responsible orders; unrelated queue and
+   * reduced external exchange authority are unchanged.
    *
    * @param statuses the status filter, never empty
    * @param squadronIds optional display filter; null/empty means no restriction
@@ -225,11 +227,15 @@ public class JobOrderQueryService {
       return Page.empty(pageable);
     }
     boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     return jobOrderStockProjectionService.mapPageWithStock(
-        jobOrderRepository.findAssignedJobOrdersFiltered(
+        jobOrderRepository.findConcreteRecoveryAndAssignedOrders(
             statuses,
             noSquadronFilter,
             noSquadronFilter ? Set.of(NIL_ID) : squadronIds,
+            scope.adminAllScope(),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
             callerId,
             pageable));
   }

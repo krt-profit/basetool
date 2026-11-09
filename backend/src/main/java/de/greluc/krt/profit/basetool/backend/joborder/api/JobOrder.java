@@ -76,7 +76,7 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Integer displayId;
 
   /**
-   * The profit-eligible squadron or Spezialkommando that processes this order. It governs
+   * The active Profit-hierarchy squadron or Spezialkommando that processes this order. It governs
    * visibility: a squadron-responsible order is private to that squadron and admins, an
    * SK-responsible order is public. Changed only via {@code PATCH
    * /api/v1/orders/{id}/responsible-org-unit}.
@@ -92,6 +92,11 @@ public class JobOrder extends AbstractEntity<UUID> {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)
   private OrgUnit requestingOrgUnit;
+
+  /** Verified Profit boundary at creation; null preserves unknown legacy provenance. */
+  @Column(name = "original_profit_org_unit_id")
+  @Nullable
+  private UUID originalProfitOrgUnitId;
 
   @Column private String handle;
 

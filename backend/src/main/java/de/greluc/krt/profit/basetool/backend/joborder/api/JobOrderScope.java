@@ -34,11 +34,13 @@ public final class JobOrderScope {
   /** Non-instantiable constant holder. */
   private JobOrderScope() {}
 
-  /**
-   * JobOrder's scope predicate (alias {@code o}): the triple against {@code responsibleOrgUnit},
-   * plus the SK-public-queue escape that shows orders of a {@code SpecialCommand} to every squadron
-   * (REQ-ORG-003).
-   */
+  /** Concrete current responsible-unit scope without a general queue grant. */
+  public static final String CONCRETE_RESPONSIBLE_PREDICATE =
+      "(:isAdminAllScope = true OR (:activeOrgUnitId IS NOT NULL AND"
+          + " o.responsibleOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND"
+          + " o.responsibleOrgUnit.id IN :memberOrgUnitIds))";
+
+  /** Queue scope including its existing eligible-reader SK escape. */
   public static final String PREDICATE =
       """
       (

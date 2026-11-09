@@ -89,6 +89,10 @@ class JobOrderControllerTest {
         1L,
         null,
         null,
+        false,
+        false,
+        false,
+        null,
         false);
   }
 
@@ -328,7 +332,11 @@ class JobOrderControllerTest {
             9L,
             null,
             null,
-            true);
+            true,
+            false,
+            false,
+            null,
+            false);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);
 
     JobOrderDto result = controller.getJobOrderById(id);

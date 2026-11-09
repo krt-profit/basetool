@@ -72,9 +72,8 @@ public enum OrderListScope {
   /**
    * The segments a caller may choose from, in display order.
    *
-   * <p>Whoever sees the queue gets „Ich bearbeite", „Zu bearbeiten" and „Alle"; an assignee without
-   * queue access gets „Ich bearbeite" alone; „Meine" joins whenever the caller also has a second
-   * list to switch to. A requester-only caller has no choice.
+   * <p>The concrete ALL view is available with any existing order-list capability. It grants no
+   * queue-only processing scope and changes no backend or external capability.
    *
    * @param canViewQueue whether the caller may enter the Job-Order area
    * @param canViewOwn whether the caller may view the orders their own units requested
@@ -117,9 +116,10 @@ public enum OrderListScope {
 
   private boolean isOffered(boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned) {
     return switch (this) {
-      case MINE -> canViewOwn && (canViewQueue || canViewAssigned);
+      case MINE -> canViewOwn;
       case ASSIGNED -> canViewQueue || canViewAssigned;
-      case TO_PROCESS, ALL -> canViewQueue;
+      case TO_PROCESS -> canViewQueue;
+      case ALL -> canViewQueue || canViewOwn || canViewAssigned;
     };
   }
 }

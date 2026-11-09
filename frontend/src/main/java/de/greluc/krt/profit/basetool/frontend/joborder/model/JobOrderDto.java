@@ -57,7 +57,11 @@ public record JobOrderDto(
     Long version,
     Boolean canEdit,
     Boolean canManageAssignees,
-    boolean redacted) {
+    boolean redacted,
+    boolean responsibilityInvalid,
+    boolean originalProfitBoundaryUnknown,
+    Boolean canTransferResponsibility,
+    Boolean canEditAsRequester) {
 
   /**
    * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is
@@ -66,7 +70,16 @@ public record JobOrderDto(
    * @return {@code true} iff {@code canEdit} is {@code true}
    */
   public boolean callerMayEdit() {
-    return Boolean.TRUE.equals(canEdit);
+    return !responsibilityInvalid && Boolean.TRUE.equals(canEdit);
+  }
+
+  /**
+   * Whether the backend permits the caller's restricted requesting-unit edit.
+   *
+   * @return true only for an explicitly permitted requester edit with valid responsibility
+   */
+  public boolean callerMayEditAsRequester() {
+    return !responsibilityInvalid && Boolean.TRUE.equals(canEditAsRequester);
   }
 
   /**
@@ -76,6 +89,6 @@ public record JobOrderDto(
    * @return {@code true} iff {@code canManageAssignees} is {@code true}
    */
   public boolean callerMayManageAssignees() {
-    return Boolean.TRUE.equals(canManageAssignees);
+    return !responsibilityInvalid && Boolean.TRUE.equals(canManageAssignees);
   }
 }

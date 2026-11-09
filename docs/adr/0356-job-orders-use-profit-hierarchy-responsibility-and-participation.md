@@ -54,3 +54,18 @@ new runtime acceptance stays unchecked until implementation.
 - Require a target to accept reassignment: rejected; authorized transfer is immediate.
 - Add separate helper and claim registrations: rejected; one Staffel participation carries both.
 - Give every reader/assignee arbitrary financial rights: rejected; personal and unit write scopes remain explicit.
+
+## Hierarchy write coordination
+
+Order and linked-stock transactions acquire the shared PostgreSQL transaction lock before any
+Inventory lot/row lock. Hierarchy changes acquire its exclusive counterpart and synchronously end
+ineligible promises. A private transaction-synchronization marker avoids reacquiring the same lock
+inside nested commands and permits one hierarchy snapshot while the shared lock keeps it stable.
+Independent transactions, including `REQUIRES_NEW`, have independent markers; there is no request or
+cross-transaction eligibility cache. An exclusive hierarchy change invalidates the shared snapshot
+and reads its changed hierarchy afresh. Every affected order and current actor grant is still checked.
+
+Before application readiness, initial reconciliation takes the exclusive lock and keyset-pages
+orders with active promises. The same bounded claim-ending implementation preserves audit/history
+and groups one coordination cause per order across every claim page. The application cannot become
+ready after a failed reconciliation; repeated starts do not revive or re-end historical promises.

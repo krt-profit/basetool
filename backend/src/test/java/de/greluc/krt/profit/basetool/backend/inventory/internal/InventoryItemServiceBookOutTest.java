@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -122,6 +123,9 @@ class InventoryItemServiceBookOutTest {
   void setUpEntities() {
     service =
         new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             locationRepository,

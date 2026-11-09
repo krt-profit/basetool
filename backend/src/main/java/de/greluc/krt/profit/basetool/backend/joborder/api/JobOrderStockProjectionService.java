@@ -76,7 +76,8 @@ public class JobOrderStockProjectionService {
     return assembleDto(
         jobOrder,
         loadOrderLinkedStockIndex(List.of(jobOrder.getId())),
-        claimBucketSource::getClaimBucketsForOrder);
+        claimBucketSource::getClaimBucketsForOrder,
+        jobOrderMapper.authorityFor(List.of(jobOrder)));
   }
 
   /**
@@ -97,7 +98,8 @@ public class JobOrderStockProjectionService {
                 .toList());
     ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
     jobOrderMapper.primeAssignees(orders);
-    return page.map(o -> assembleDto(o, stockIndex, claimResolver));
+    Map<UUID, JobOrderAuthorityFlags> authority = jobOrderMapper.authorityFor(orders);
+    return page.map(o -> assembleDto(o, stockIndex, claimResolver, authority));
   }
 
   /**
@@ -180,12 +182,16 @@ public class JobOrderStockProjectionService {
    * @param jobOrder the managed order to project
    * @param stockIndex the order-linked stock of at least this order
    * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK)
+   * @param authority the page authority from one current hierarchy snapshot
    * @return the order DTO with per-bucket stock and, for SK orders, claims
    */
   @NotNull
   private JobOrderDto assembleDto(
-      JobOrder jobOrder, OrderLinkedStockIndex stockIndex, ClaimResolver claimResolver) {
-    JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
+      JobOrder jobOrder,
+      OrderLinkedStockIndex stockIndex,
+      ClaimResolver claimResolver,
+      Map<UUID, JobOrderAuthorityFlags> authority) {
+    JobOrderDto baseDto = jobOrderMapper.toDtoWithAuthority(jobOrder, authority);
 
     Map<String, ClaimBucketDto> claimByBucket =
         isSpecialCommandResponsible(jobOrder)
@@ -252,7 +258,11 @@ public class JobOrderStockProjectionService {
         baseDto.version(),
         baseDto.canEdit(),
         baseDto.canManageAssignees(),
-        false);
+        false,
+        baseDto.responsibilityInvalid(),
+        baseDto.originalProfitBoundaryUnknown(),
+        baseDto.canTransferResponsibility(),
+        baseDto.canEditAsRequester());
   }
 
   /**

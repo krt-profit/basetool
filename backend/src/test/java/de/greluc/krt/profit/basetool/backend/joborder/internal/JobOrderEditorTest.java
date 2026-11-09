@@ -39,6 +39,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,6 +59,10 @@ import org.springframework.security.access.AccessDeniedException;
 /** The job-order edit recipe, tested once for every order edit. */
 @ExtendWith(MockitoExtension.class)
 class JobOrderEditorTest {
+
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
@@ -77,6 +83,8 @@ class JobOrderEditorTest {
     editor =
         new JobOrderEditor(
             jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
             jobOrderAccessPolicy,
             auditRecorder,
             eventPublisher,

@@ -227,6 +227,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
 
     stubDetail(orderId, userId, order);
@@ -343,6 +347,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -427,6 +435,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -509,6 +521,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -609,6 +625,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
 
     stubDetail(orderId, userId, order);
@@ -699,6 +719,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -755,6 +779,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -821,6 +849,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -901,6 +933,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         Instant.now(),
         1L,
         null,
+        null,
+        false,
+        false,
+        false,
         null,
         false);
   }
@@ -1392,6 +1428,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
+            false,
+            false,
+            false,
+            null,
             false);
     stubDetail(orderId, userId, order);
 
@@ -1461,6 +1501,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -1537,6 +1581,10 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             Instant.now(),
             1L,
             null,
+            null,
+            false,
+            false,
+            false,
             null,
             false);
     stubDetail(orderId, userId, order);

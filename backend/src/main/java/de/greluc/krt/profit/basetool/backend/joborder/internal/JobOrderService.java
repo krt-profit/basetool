@@ -48,14 +48,16 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdated
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitAccessPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -90,6 +92,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderService {
 
   private final JobOrderRepository jobOrderRepository;
+  private final ProfitHierarchyService profitHierarchy;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final MaterialRepository materialRepository;
   private final StockReads stockReads;
   private final StockCommands stockCommands;
@@ -104,12 +109,13 @@ public class JobOrderService {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
   private final QualityTierService qualityTierService;
-  private final OrgUnitAccessPolicy orgUnitAccessPolicy;
 
   private final UserService userService;
 
   /** Runs the load, gate, version check, audit, notices and projection of every order edit. */
   private final JobOrderEditor jobOrderEditor;
+
+  private final LiveSyncPublisher liveSyncPublisher;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -122,6 +128,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto createJobOrder(CreateJobOrderDto createDto) {
+    profitHierarchy.lockForOrderWrite();
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
@@ -130,11 +137,16 @@ public class JobOrderService {
     OrgUnit requesting =
         jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
+    if (!jobOrderAccessPolicy.canCreate(responsible, requesting)) {
+      throw new AccessDeniedException(
+          "A current writer of the requesting or responsible unit is required.");
+    }
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
             .comment(StringNormalization.trimToNull(createDto.comment()))
             .priority(newPriority)
+            .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requesting)
             .build();
@@ -156,6 +168,7 @@ public class JobOrderService {
             .with("materials", jobOrder.getMaterials().size())
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
+            .with("profitOrgUnit", jobOrder.getOriginalProfitOrgUnitId())
             .with("priority", jobOrder.getPriority()));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
@@ -174,6 +187,7 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto createItemJobOrder(CreateJobOrderItemRequestDto createDto) {
+    profitHierarchy.lockForOrderWrite();
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
@@ -182,12 +196,17 @@ public class JobOrderService {
     OrgUnit requesting =
         jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
 
+    if (!jobOrderAccessPolicy.canCreate(responsible, requesting)) {
+      throw new AccessDeniedException(
+          "A current writer of the requesting or responsible unit is required.");
+    }
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
             .comment(StringNormalization.trimToNull(createDto.comment()))
             .priority(newPriority)
             .type(JobOrderType.ITEM)
+            .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requesting)
             .build();
@@ -207,6 +226,7 @@ public class JobOrderService {
             .with("lines", jobOrder.getItems().size())
             .with("responsibleOrgUnit", orgUnitRef(responsible))
             .with("requestingOrgUnit", orgUnitRef(requesting))
+            .with("profitOrgUnit", jobOrder.getOriginalProfitOrgUnitId())
             .with("priority", jobOrder.getPriority()));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
@@ -314,6 +334,7 @@ public class JobOrderService {
     if (isTerminal && !wasTerminal && jobOrder.getPriority() != null) {
       jobOrder.setPriority(null);
     } else if (!isTerminal && wasTerminal) {
+      profitHierarchy.lockForOrderWrite();
       jobOrderRepository.lockAllJobOrders();
       Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
       jobOrder.setPriority(newPriority);
@@ -857,10 +878,12 @@ public class JobOrderService {
    */
   @Transactional
   public void deleteJobOrder(UUID id) {
+    profitHierarchy.lockForOrderWrite();
     jobOrderRepository.lockAllJobOrders();
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
+    responsibilityGuard.assertWritable(jobOrder);
     final Integer priority = jobOrder.getPriority();
     final UUID deletedId = jobOrder.getId();
     final String deletedLabel = JobOrderAuditLabel.of(jobOrder);
@@ -1007,6 +1030,7 @@ public class JobOrderService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void completeJobOrderWithinTransaction(@NotNull JobOrder jobOrder) {
+    responsibilityGuard.assertWritable(jobOrder);
     boolean wasTerminal =
         (jobOrder.getStatus() == JobOrderStatus.COMPLETED
             || jobOrder.getStatus() == JobOrderStatus.REJECTED);
@@ -1033,27 +1057,18 @@ public class JobOrderService {
   }
 
   /**
-   * Reassigns the responsible org unit of an order; the target must be profit-eligible.
+   * Transfers responsibility immediately to an eligible unit inside the verified Profit boundary.
    *
-   * <ul>
-   *   <li>Admins may reassign to any profit-eligible squadron or SK, in any direction.
-   *   <li>A non-admin Logistician/Officer may only escalate a squadron-responsible order to an SK,
-   *       and only if they may edit its current squadron ({@link
-   *       OrgUnitAccessPolicy#canEditOrgUnit}).
-   * </ul>
-   *
-   * @param id job order id
-   * @param newResponsibleOrgUnitId the target responsible org unit id
-   * @return the updated order DTO
-   * @throws NotFoundException when the order does not exist
-   * @throws BadRequestException when the target is unknown or not profit-eligible
-   * @throws org.springframework.security.access.AccessDeniedException when the caller may not
-   *     perform the reassignment
+   * @param id the order to transfer
+   * @param newResponsibleOrgUnitId the active Profit target
+   * @return the order with unchanged requester, facts and original provenance
+   * @throws BadRequestException when the target is ineligible or outside the original boundary
+   * @throws AccessDeniedException when the caller is not a current responsible-unit writer
    */
   @Transactional
   public JobOrderDto reassignResponsibleOrgUnit(UUID id, UUID newResponsibleOrgUnitId) {
     return jobOrderEditor.editUnversioned(
-        id, JobOrderGate.EDIT, jobOrder -> reassign(jobOrder, newResponsibleOrgUnitId));
+        id, JobOrderGate.TRANSFER, jobOrder -> reassign(jobOrder, newResponsibleOrgUnitId));
   }
 
   private JobOrderEdit reassign(@NotNull JobOrder jobOrder, @NotNull UUID newResponsibleOrgUnitId) {
@@ -1064,27 +1079,17 @@ public class JobOrderService {
                 new BadRequestException(
                     "responsibleOrgUnitId does not resolve to a known org unit: "
                         + newResponsibleOrgUnitId));
-    if (!target.isProfitEligible()) {
-      throw new BadRequestException(
-          "The selected responsible org unit is not profit-eligible and cannot process orders: "
-              + newResponsibleOrgUnitId);
-    }
-
-    if (!authHelperService.isAdmin()) {
-      OrgUnit current = jobOrder.getResponsibleOrgUnit();
-      boolean currentIsSquadron = current != null && current.getKind() == OrgUnitKind.SQUADRON;
-      boolean targetIsSpecialCommand = target.getKind() == OrgUnitKind.SPECIAL_COMMAND;
-      boolean mayEditCurrent =
-          current != null && orgUnitAccessPolicy.canEditOrgUnit(current.getId());
-      if (!(currentIsSquadron && targetIsSpecialCommand && mayEditCurrent)) {
-        throw new AccessDeniedException(
-            "Only an admin may reassign freely; a squadron logistician/officer may only escalate"
-                + " their own squadron's order to a Spezialkommando.");
-      }
+    UUID root = profitHierarchy.requireEligible(target.getId());
+    if (jobOrder.getOriginalProfitOrgUnitId() != null
+        && !root.equals(jobOrder.getOriginalProfitOrgUnitId())) {
+      throw new BadRequestException("orders.responsibility.boundary.invalid");
     }
 
     OrgUnit previous = jobOrder.getResponsibleOrgUnit();
     jobOrder.setResponsibleOrgUnit(target);
+    liveSyncPublisher.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, jobOrder.getId()),
+        List.of("header", "actions", "dialogs", "materials", "aggregated", "items", "assignees"));
     jobOrder = jobOrderRepository.save(jobOrder);
     log.info(
         "Job order {} responsible org unit reassigned: {} ({}) → {} ({})",
@@ -1104,16 +1109,14 @@ public class JobOrderService {
             target.getShorthand(),
             userService.currentActor());
 
-    int claimsWithdrawn = 0;
-    if (target.getKind() == OrgUnitKind.SQUADRON) {
-      claimsWithdrawn = materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);
-    }
     return JobOrderEdit.audited(
             jobOrder,
             AuditEventType.JOB_ORDER_REASSIGNED,
             AuditDetails.of("fromOrgUnit", orgUnitRef(previous))
                 .with("toOrgUnit", orgUnitRef(target))
-                .with("claimsWithdrawn", claimsWithdrawn))
+                .with("profitOrgUnit", root)
+                .with(
+                    "originalProfitBoundaryUnknown", jobOrder.getOriginalProfitOrgUnitId() == null))
         .notifying(List.of(reassignedNotice));
   }
 

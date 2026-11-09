@@ -73,7 +73,7 @@ class UserMeMembershipsTest {
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(
-                    UUID.randomUUID(), "Staffel 1", "S1", OrgUnitKind.SQUADRON, true)));
+                    UUID.randomUUID(), "Staffel 1", "S1", OrgUnitKind.SQUADRON)));
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(any(UUID.class)))
         .thenReturn(List.of());
   }

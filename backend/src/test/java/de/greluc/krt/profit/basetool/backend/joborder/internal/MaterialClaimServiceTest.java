@@ -19,7 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,8 +57,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
@@ -86,6 +92,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialClaimServiceTest {
+
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private JobOrderEligibilityNotices eligibilityNotices;
+  @Mock private ProfitHierarchyService profitHierarchy;
+
+  private final Bereich profitArea = profitArea();
 
   @Mock private MaterialClaimRepository materialClaimRepository;
   @Mock private JobOrderRepository jobOrderRepository;
@@ -134,16 +146,17 @@ class MaterialClaimServiceTest {
     responsibleSk = new SpecialCommand();
     responsibleSk.setId(SK_ID);
     responsibleSk.setShorthand("SKX");
+    withinProfit(responsibleSk, profitArea);
 
     squadronA = new Squadron();
     squadronA.setId(SQUADRON_A);
     squadronA.setShorthand("ALF");
-    squadronA.setProfitEligible(true);
+    withinProfit(squadronA, profitArea);
 
     squadronB = new Squadron();
     squadronB.setId(SQUADRON_B);
     squadronB.setShorthand("BRV");
-    squadronB.setProfitEligible(true);
+    withinProfit(squadronB, profitArea);
   }
 
   @Nested
@@ -231,6 +244,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void unknownBucket_rejected() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
@@ -242,6 +257,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void tierCodeNotUsedByOrder_rejected() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
@@ -265,6 +282,7 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -278,6 +296,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void overclaim_rejected() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
@@ -303,6 +323,7 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -316,14 +337,6 @@ class MaterialClaimServiceTest {
     void nonProfitEligibleSquadron_rejected() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
       Squadron nonProfit = new Squadron();
       nonProfit.setId(SQUADRON_A);
       nonProfit.setShorthand("NPF");
@@ -336,6 +349,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void editOwnClaimUpwardExcludesOwnAmountFromCeiling() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim ownExisting = claim(order, GOOD, squadronA, 8.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -371,7 +386,7 @@ class MaterialClaimServiceTest {
     }
 
     @Test
-    void noExistingClaim_inserts() {
+    void noExistingClaim_returnsTheRequestedQuantity() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
@@ -383,18 +398,23 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
+      ClaimDto created = service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
 
-      verify(orgUnitRepository).findById(SQUADRON_A);
+      assertEquals(4.0, created.amount());
+      assertNull(created.claimedByUserId());
+
       verify(materialClaimRepository).save(any(MaterialClaim.class));
     }
 
     @Test
     void existingClaim_updatesAmountInPlace() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -413,7 +433,6 @@ class MaterialClaimServiceTest {
       service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 6.0));
 
       assertEquals(6.0, existing.getAmount(), "existing claim's amount is updated in place");
-      verify(orgUnitRepository, never()).findById(any());
       verify(materialClaimRepository).save(existing);
     }
   }
@@ -439,6 +458,7 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -462,6 +482,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void update_recordsUpsertEvent_withModeUpdated() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
       existing.setId(UUID.randomUUID());
@@ -504,6 +526,8 @@ class MaterialClaimServiceTest {
 
     @Test
     void neitherOwnSquadronNorSkAuthority_forbidden() {
+      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
@@ -531,6 +555,7 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -554,6 +579,7 @@ class MaterialClaimServiceTest {
                   ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
           .thenReturn(Optional.empty());
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
+      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
       when(authHelperService.currentUserId()).thenReturn(Optional.empty());
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -644,7 +670,7 @@ class MaterialClaimServiceTest {
     }
 
     @Test
-    void withdrawClaim_happyPath_deletes() {
+    void withdrawClaim_happyPath_preservesEndedHistory() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim claim = claim(order, GOOD, squadronA, 3.0);
       UUID claimId = UUID.randomUUID();
@@ -655,7 +681,7 @@ class MaterialClaimServiceTest {
 
       service.withdrawClaim(ORDER_ID, claimId);
 
-      verify(materialClaimRepository).delete(claim);
+      assertNotNull(claim.getEndedAt());
     }
 
     @Test
@@ -685,54 +711,12 @@ class MaterialClaimServiceTest {
           "the withdrawal audit carries the squadron id, never its name");
     }
 
-    @Test
-    void withdrawAllForOrder_deletesEveryClaim() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      List<MaterialClaim> claims =
-          List.of(claim(order, GOOD, squadronA, 3.0), claim(order, GOOD, squadronB, 2.0));
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(claims);
-
-      service.withdrawAllForOrderWithinTransaction(order);
-
-      verify(materialClaimRepository).deleteAll(claims);
-    }
-
     private de.greluc.krt.profit.basetool.backend.identity.api.User member(String name) {
       de.greluc.krt.profit.basetool.backend.identity.api.User member =
           new de.greluc.krt.profit.basetool.backend.identity.api.User();
       member.setId(UUID.randomUUID());
       member.setUsername(name);
       return member;
-    }
-
-    @Test
-    void withdrawAllForOrder_tellsEachClaimantThatTheOrderWasDeEscalated() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      de.greluc.krt.profit.basetool.backend.identity.api.User ada = member("ada");
-      MaterialClaim byAda = claim(order, GOOD, squadronA, 3.0);
-      byAda.setClaimedByUser(ada);
-      MaterialClaim anonymous = claim(order, GOOD, squadronB, 2.0);
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(List.of(byAda, anonymous));
-      when(userService.currentActor())
-          .thenReturn(
-              new de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef(
-                  UUID.randomUUID(), "Officer"));
-
-      service.withdrawAllForOrderWithinTransaction(order);
-
-      org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
-      verify(eventPublisher).publishEvent(captor.capture());
-      var event =
-          (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
-              captor.getValue();
-      assertEquals(
-          de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType
-              .JOB_ORDER_CLAIM_WITHDRAWN,
-          event.eventType());
-      assertEquals(ada.getId(), event.contextRecipientUserId());
-      assertEquals("DE_ESCALATED", event.renderParams().get("reasonCode"));
     }
 
     @Test
@@ -761,7 +745,7 @@ class MaterialClaimServiceTest {
     }
 
     @Test
-    void withdrawOrphanedClaims_deletesOnlyClaimsWhoseBucketIsGone() {
+    void withdrawOrphanedClaims_endsOnlyClaimsWhoseBucketIsGone() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
       MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
@@ -770,7 +754,8 @@ class MaterialClaimServiceTest {
 
       service.withdrawOrphanedClaimsWithinTransaction(order);
 
-      verify(materialClaimRepository).deleteAll(List.of(orphan));
+      assertNotNull(orphan.getEndedAt());
+      assertNull(live.getEndedAt());
     }
 
     @Test
@@ -790,7 +775,8 @@ class MaterialClaimServiceTest {
 
       service.withdrawOrphanedClaimsWithinTransaction(order);
 
-      verify(materialClaimRepository).deleteAll(List.of(orphan));
+      assertNotNull(orphan.getEndedAt());
+      assertNull(live.getEndedAt());
     }
   }
 

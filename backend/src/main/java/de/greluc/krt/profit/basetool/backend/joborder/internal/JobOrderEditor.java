@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderEditor {
 
   private final JobOrderRepository jobOrderRepository;
+  private final ProfitHierarchyService profitHierarchy;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
@@ -125,8 +128,12 @@ public class JobOrderEditor {
       boolean versioned,
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
+    profitHierarchy.lockForOrderWrite();
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    if (gate != JobOrderGate.TRANSFER) {
+      responsibilityGuard.assertWritable(order);
+    }
     if (!jobOrderAccessPolicy.canEdit(order, gate)) {
       throw new AccessDeniedException("Caller may not edit job order " + id);
     }

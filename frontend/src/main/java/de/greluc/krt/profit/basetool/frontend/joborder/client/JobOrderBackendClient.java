@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionE
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -127,6 +128,20 @@ public class JobOrderBackendClient {
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Transfers responsibility to a currently eligible unit, including invalid-order recovery.
+   *
+   * @param id the order
+   * @param request the target unit
+   * @return the updated order, or null when no response body was sent
+   */
+  @Nullable
+  public JobOrderDto transferResponsibility(
+      @NotNull UUID id, @NotNull ReassignResponsibleOrgUnitRequest request) {
+    return backendApiClient.patch(
+        "/api/v1/orders/{id}/responsible-org-unit", request, JobOrderDto.class, id);
+  }
 
   /**
    * Reads one page of the order list, sorted by priority.
@@ -394,7 +409,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads the cached active Staffeln and Spezialkommandos with their profit-eligibility flag.
+   * Reads the cached active Staffeln and Spezialkommandos for the requesting picker.
    *
    * @return the options, or {@code null} when the backend sent no body
    */
@@ -405,7 +420,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads the cached active org units of all four kinds with their profit-eligibility flag.
+   * Reads the cached active org units of all four kinds for the requesting picker.
    *
    * @return the options, or {@code null} when the backend sent no body
    */

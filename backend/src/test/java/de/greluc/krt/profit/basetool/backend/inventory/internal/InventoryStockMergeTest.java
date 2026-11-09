@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -46,10 +47,10 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepo
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -66,6 +67,27 @@ import org.springframework.context.ApplicationEventPublisher;
 @ExtendWith(MockitoExtension.class)
 class InventoryStockMergeTest {
 
+  @BeforeEach
+  void wireOrderWriteFixture() {
+    service =
+        new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            null,
+            auditService,
+            eventPublisher);
+  }
+
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
   @Mock private LocationRepository locationRepository;
@@ -76,7 +98,7 @@ class InventoryStockMergeTest {
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService service;
+  private InventoryCheckoutService service;
 
   private static final UUID USER_ID = UUID.randomUUID();
   private static final UUID MATERIAL_ID = UUID.randomUUID();

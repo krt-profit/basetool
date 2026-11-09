@@ -70,6 +70,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderItemHandoverService {
 
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final StockCommands stockCommands;
@@ -116,6 +117,7 @@ public class JobOrderItemHandoverService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    responsibilityGuard.assertWritable(jobOrder);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");

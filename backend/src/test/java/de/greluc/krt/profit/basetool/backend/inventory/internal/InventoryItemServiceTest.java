@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -136,6 +137,9 @@ class InventoryItemServiceTest {
             stockLevelService);
     realCheckoutService =
         new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -151,6 +155,9 @@ class InventoryItemServiceTest {
             eventPublisher);
     inventoryItemService =
         new InventoryItemService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -163,7 +170,19 @@ class InventoryItemServiceTest {
             orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                inventoryAccessPolicy,
+                null,
+                null),
             new JobOrderEarmarkTargets(
                 jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,
@@ -706,6 +725,9 @@ class InventoryItemServiceTest {
   void createInventoryItem_stolenIsStoredWhenTheMarkerIsSwitchedOn() {
     InventoryItemService switchedOn =
         new InventoryItemService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -718,7 +740,19 @@ class InventoryItemServiceTest {
             orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                inventoryAccessPolicy,
+                null,
+                null),
             new JobOrderEarmarkTargets(
                 jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,

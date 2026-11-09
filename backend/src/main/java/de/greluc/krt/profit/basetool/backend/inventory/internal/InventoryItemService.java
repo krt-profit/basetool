@@ -86,6 +86,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class InventoryItemService {
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final MaterialRepository materialRepository;
@@ -346,6 +347,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto createInventoryItem(
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
+    orderWrites.lockEligibility();
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
     stockCommands.requireBookIn(
         targetUserId,
@@ -369,6 +371,7 @@ public class InventoryItemService {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   InventoryItem createInPool(@NotNull InventoryItemCreateDto dto, @Nullable String note) {
+    orderWrites.lockEligibility();
     GameItem gameItem =
         dto.gameItemId() != null
             ? Entities.require(gameItemRepository.findById(dto.gameItemId()), "GameItem not found")
@@ -478,6 +481,8 @@ public class InventoryItemService {
       throw new OverAllocationException();
     }
 
+    orderWrites.assertRow(item);
+
     InventoryItem saved = inventoryItemRepository.save(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_CREATED,
@@ -523,6 +528,7 @@ public class InventoryItemService {
       boolean personal,
       boolean stolen,
       UUID owningOrgUnitId) {
+    orderWrites.lockEligibility();
     UUID targetUserId = userId != null ? userId : currentUserId;
     boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
     if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
@@ -585,8 +591,10 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto addAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     addAllocationTo(item, dto);
+    orderWrites.assertRow(item);
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
@@ -609,6 +617,7 @@ public class InventoryItemService {
       @NotNull InventoryItem item,
       @NotNull InventoryAllocationWriteDto dto,
       @NotNull PoolEntryCommands.EarmarkChange change) {
+    orderWrites.lockEligibility();
     switch (change) {
       case ADD -> addAllocationTo(item, dto);
       case CHANGE -> changeAllocationOf(item, dto);
@@ -616,6 +625,7 @@ public class InventoryItemService {
       case null -> throw new NullPointerException("earmark change");
     }
     item.setUpdatedAt(Instant.now());
+    orderWrites.assertRow(item);
     inventoryItemRepository.saveAndFlush(item);
   }
 
@@ -633,6 +643,10 @@ public class InventoryItemService {
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
+    orderWrites.assertRow(item);
+    if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
+      orderWrites.assertOrders(List.of(dto.targetId()));
+    }
     switch (dto.field()) {
       case JOB_ORDER -> {
         if (item.getGameItem() != null) {
@@ -697,8 +711,10 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto changeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     changeAllocationOf(item, dto);
+    orderWrites.assertRow(item);
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
@@ -715,6 +731,10 @@ public class InventoryItemService {
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
     assertNotPersonal(item);
     double amount = requireWriteAmount(dto, item);
+    orderWrites.assertRow(item);
+    if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
+      orderWrites.assertOrders(List.of(dto.targetId()));
+    }
     switch (dto.field()) {
       case JOB_ORDER -> {
         InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
@@ -766,8 +786,10 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto removeAllocation(
       UUID id, InventoryAllocationWriteDto dto, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     InventoryItem item = loadForAllocationWrite(id, dto, currentUserId, isLogistician);
     removeAllocationFrom(item, dto);
+    orderWrites.assertRow(item);
     return mapWithForcedVersion(inventoryItemRepository.saveAndFlush(item));
   }
 
@@ -780,6 +802,10 @@ public class InventoryItemService {
    */
   private void removeAllocationFrom(
       @NotNull InventoryItem item, @NotNull InventoryAllocationWriteDto dto) {
+    orderWrites.assertRow(item);
+    if (dto.field() == InventoryAllocationDimension.JOB_ORDER) {
+      orderWrites.assertOrders(List.of(dto.targetId()));
+    }
     switch (dto.field()) {
       case JOB_ORDER -> {
         InventoryJobOrderAllocation slice = findJobOrderSlice(item, dto.targetId());
@@ -1119,6 +1145,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto updateNote(
       UUID id, InventoryItemNoteUpdateRequest request, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
@@ -1133,6 +1160,8 @@ public class InventoryItemService {
 
     String normalizedNote = StringNormalization.trimToNull(request.note());
     item.setNote(normalizedNote);
+
+    orderWrites.assertRow(item);
 
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
@@ -1163,6 +1192,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
+    orderWrites.lockEligibility();
     return inventoryCheckoutService.bookOutInventoryItem(id, dto, currentUserId, isAdmin);
   }
 
@@ -1181,6 +1211,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto rebookPersonal(
       UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
+    orderWrites.lockEligibility();
     return inventoryCheckoutService.rebookPersonal(id, dto, currentUserId, isAdmin);
   }
 
@@ -1192,6 +1223,7 @@ public class InventoryItemService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
+    orderWrites.lockEligibility();
     return inventoryCheckoutService.deleteAllGlobalInventory();
   }
 
@@ -1204,6 +1236,7 @@ public class InventoryItemService {
    */
   @Transactional
   public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     inventoryCheckoutService.bulkCheckout(request, currentUserId);
   }
 
@@ -1218,6 +1251,7 @@ public class InventoryItemService {
    */
   @Transactional
   public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     return inventoryCheckoutService.bulkRebook(request, currentUserId);
   }
 
@@ -1235,6 +1269,7 @@ public class InventoryItemService {
   @Transactional
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     return inventoryCheckoutService.updateDelivered(id, request, currentUserId, isLogistician);
   }
 }

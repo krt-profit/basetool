@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -219,12 +220,15 @@ class LogisticianPerUnitSurfacesTest {
   void jobOrdersOfAUnitNeedALogisticianGrantInTheResponsibleUnit(Caller caller) {
     JobOrderRepository orders = mock(JobOrderRepository.class);
     Chain chain = new Chain(caller);
+    var responsibilityGuard = org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class);
+    when(responsibilityGuard.isValid(org.mockito.ArgumentMatchers.any())).thenReturn(true);
     JobOrderAccessPolicy policy =
         new JobOrderAccessPolicy(
             chain.requestScopeResolver,
             chain.accessGateService,
             chain.authHelper,
             orders,
+            responsibilityGuard,
             mock(JobOrderHandoverRepository.class),
             mock(JobOrderItemHandoverRepository.class));
 

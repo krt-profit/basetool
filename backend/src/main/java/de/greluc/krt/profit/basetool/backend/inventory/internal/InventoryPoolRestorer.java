@@ -74,6 +74,7 @@ class InventoryPoolRestorer {
   /** The separator of a stock lot key's parts. */
   private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryRepository;
   private final UserRepository userRepository;
   private final OrgUnitRepository orgUnitRepository;
@@ -98,6 +99,7 @@ class InventoryPoolRestorer {
   @Unmodifiable
   List<PoolRestoreResult> restore(
       @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores) {
+    orderWrites.lockEligibility();
     lock(lots, restores);
     if (restores.isEmpty()) {
       return List.of();
@@ -340,6 +342,7 @@ class InventoryPoolRestorer {
     final UUID holder = row.getUser().getId();
     UUID id = row.getId();
     stockChangeObserver.beforeDelete(List.of(id), StockChangeReason.STOCK);
+    orderWrites.assertRow(row);
     inventoryRepository.delete(row);
     inventoryRepository.flush();
     audit(id, label, holder, 0.0, true);
@@ -367,6 +370,7 @@ class InventoryPoolRestorer {
             .findById(target.id())
             .orElseThrow(() -> new IllegalStateException("The recreated entry is missing"));
     syncEarmarks(row, target);
+    orderWrites.assertRow(row);
     inventoryRepository.saveAndFlush(row);
     audit(row.getId(), InventoryAuditLabels.label(row), target.holder(), target.amount(), false);
   }
@@ -395,6 +399,7 @@ class InventoryPoolRestorer {
     row.setStolen(resolved.stolen());
     row.setAmount(amount);
     syncEarmarks(row, target);
+    orderWrites.assertRow(row);
     inventoryRepository.saveAndFlush(row);
     if (amount + EPSILON < previous) {
       stockChangeObserver.lower(row.getId(), amount, StockChangeReason.STOCK);
@@ -409,7 +414,9 @@ class InventoryPoolRestorer {
    * @param row the entry
    * @param target the state to restore
    */
-  private static void syncEarmarks(@NotNull InventoryItem row, @NotNull PoolEntryState target) {
+  private void syncEarmarks(@NotNull InventoryItem row, @NotNull PoolEntryState target) {
+    orderWrites.assertRow(row);
+    orderWrites.assertOrders(target.jobOrders().keySet());
     Map<UUID, Double> orders = new HashMap<>(target.jobOrders());
     row.getJobOrderAllocations().removeIf(slice -> !orders.containsKey(slice.getJobOrderId()));
     for (InventoryJobOrderAllocation slice : row.getJobOrderAllocations()) {

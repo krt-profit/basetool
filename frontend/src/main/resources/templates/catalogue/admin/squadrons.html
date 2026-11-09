@@ -39,7 +39,6 @@
                             <th th:text="#{admin.squadron.name}">Name</th>
                             <th th:text="#{admin.squadron.shorthand}">K&uuml;rzel</th>
                             <th th:text="#{admin.squadron.description}">Beschreibung</th>
-                            <th th:text="#{admin.settings.squadron.column.profit}">Auftragsbearbeitung</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Aktion</span></th>
                         </tr>
                     </thead>
@@ -50,15 +49,6 @@
                             </td>
                             <td th:attr="data-label=#{admin.squadron.shorthand}" th:text="${sq.shorthand}">K&uuml;rzel</td>
                             <td class="md-desc" th:text="${sq.description}">Desc</td>
-                            <td th:attr="data-label=#{admin.settings.squadron.column.profit}">
-                                <label class="krt-switch">
-                                    <input type="checkbox" role="switch" class="squadron-profit-toggle"
-                                           th:attr="data-squadron-id=${sq.id}"
-                                           th:aria-label="|#{admin.settings.squadron.column.profit}: ${sq.shorthand}|"
-                                           th:checked="${sq.isProfitEligible}" th:disabled="${!sq.active}">
-                                    <span class="toggle-state-text" th:text="${sq.isProfitEligible} ? #{admin.settings.squadron.profit.enabled} : #{admin.settings.squadron.profit.disabled}">berechtigt</span>
-                                </label>
-                            </td>
                             <td class="cell-actions">
                                 <button type="button" class="btn btn-ghost btn-icon edit-squadron-btn"
                                         th:data-action="@{/admin/org-structure/squadrons/{id}/update(id=${sq.id})}"
@@ -136,11 +126,7 @@
         deleted: /*[[#{notification.success.delete}]]*/ '',
         error:   /*[[#{notification.error.save}]]*/ '',
         createTitle: /*[[#{admin.squadron.create}]]*/ '',
-        editTitle:   /*[[#{admin.edit}]]*/ '',
-        profitOn:  /*[[#{admin.settings.squadron.profit.enabled}]]*/ '',
-        profitOff: /*[[#{admin.settings.squadron.profit.disabled}]]*/ '',
-        profitSaved: /*[[#{admin.settings.squadron.profit.saved}]]*/ '',
-        profitError: /*[[#{admin.settings.squadron.profit.error}]]*/ ''
+        editTitle:   /*[[#{admin.edit}]]*/ ''
     };
     var SQUADRON_CONFLICT = {
         title:                /*[[#{frontend.ajax.conflict.title}]]*/ '',

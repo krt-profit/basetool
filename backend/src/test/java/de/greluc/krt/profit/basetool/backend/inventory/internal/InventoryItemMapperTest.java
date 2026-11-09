@@ -43,7 +43,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class InventoryItemMapperTest {
 
@@ -52,11 +51,6 @@ class InventoryItemMapperTest {
       new StockViewerAccess() {
         @Override
         public boolean mayEditInventoryItem(java.util.UUID inventoryItemId, UUID ownerId) {
-          return true;
-        }
-
-        @Override
-        public boolean mayEditJobOrder(java.util.UUID jobOrderId) {
           return true;
         }
       };
@@ -68,7 +62,7 @@ class InventoryItemMapperTest {
     mapper =
         new InventoryItemMapperImpl(
             Mappers.getMapper(UserMapper.class), Mappers.getMapper(SquadronMapper.class));
-    ReflectionTestUtils.setField(mapper, "stockAccess", ALWAYS_ALLOWED);
+    mapper.setStockAccess(ALWAYS_ALLOWED);
   }
 
   @Test
@@ -143,7 +137,7 @@ class InventoryItemMapperTest {
             return id.equals(jobOrderId) ? new JobOrderEarmark(jobOrderId, 42) : null;
           }
         };
-    ReflectionTestUtils.setField(mapper, "earmarkTargets", targets);
+    mapper.setEarmarkTargets(targets);
 
     InventoryItemDto dto = mapper.toDto(item);
 
@@ -210,20 +204,13 @@ class InventoryItemMapperTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID[] asked = new UUID[2];
-    ReflectionTestUtils.setField(
-        mapper,
-        "stockAccess",
+    mapper.setStockAccess(
         new StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(UUID inventoryItemId, UUID rowOwnerId) {
             asked[0] = inventoryItemId;
             asked[1] = rowOwnerId;
             return false;
-          }
-
-          @Override
-          public boolean mayEditJobOrder(UUID jobOrderId) {
-            return true;
           }
         });
     User owner = new User();
@@ -245,18 +232,11 @@ class InventoryItemMapperTest {
 
   @Test
   void toDto_canEdit_shouldBeFalseForAnUnsavedRowWithoutAskingTheGate() {
-    ReflectionTestUtils.setField(
-        mapper,
-        "stockAccess",
+    mapper.setStockAccess(
         new StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
             throw new AssertionError("an id-less row must not reach the gate");
-          }
-
-          @Override
-          public boolean mayEditJobOrder(UUID jobOrderId) {
-            return true;
           }
         });
     InventoryItem item = new InventoryItem();

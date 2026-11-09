@@ -245,8 +245,6 @@
 /api/proxy/purchasing/pause/resume POST -> PurchasingProxyController#resume gate=class:isAuthenticated() layout=no
 /api/proxy/purchasing/report/export GET -> PurchasingProxyController#exportReport gate=class:isAuthenticated() layout=no
 /api/proxy/purchasing/report/forum-text GET -> PurchasingProxyController#forumText gate=class:isAuthenticated() layout=no
-/api/proxy/special-commands/{id}/profit-eligible PATCH -> SpecialCommandAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
-/api/proxy/squadrons/{id}/profit-eligible PATCH -> SquadronAdminProxyController#setProfitEligible gate=method:hasRole('ADMIN') layout=no
 /api/proxy/supply/admin/settings PUT -> SupplyProxyController#updateSettings gate=method:hasRole('ADMIN') layout=no
 /api/proxy/supply/admin/units/{orgUnitId} PUT -> SupplyProxyController#updateUnit gate=method:hasRole('ADMIN') layout=no
 /api/proxy/supply/donations POST -> SupplyProxyController#pledge gate=class:isAuthenticated() layout=no
@@ -536,6 +534,7 @@
 /orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAsRequesterAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/responsible-org-unit PATCH -> JobOrderWriteController#transferResponsibility gate=class:isAuthenticated() layout=yes
 /orders/{id}/status POST -> JobOrderWriteController#updateStatus gate=class:isAuthenticated() layout=yes
 /orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:@logisticianGate.isGranted() layout=yes

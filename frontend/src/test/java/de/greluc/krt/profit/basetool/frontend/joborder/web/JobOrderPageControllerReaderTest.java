@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
@@ -88,11 +89,15 @@ class JobOrderPageControllerReaderTest {
         1L,
         null,
         null,
-        redacted);
+        redacted,
+        false,
+        false,
+        null,
+        false);
   }
 
-  private static OrgUnitMembershipOptionDto option(boolean eligible) {
-    return new OrgUnitMembershipOptionDto(UUID.randomUUID(), "A", "A", "SQUADRON", eligible);
+  private static OrgUnitMembershipOptionDto option() {
+    return new OrgUnitMembershipOptionDto(UUID.randomUUID(), "A", "A", "SQUADRON");
   }
 
   private String viewList(Model model) {
@@ -119,6 +124,48 @@ class JobOrderPageControllerReaderTest {
   }
 
   @Test
+  void aConcreteRecoveryReaderCanChooseAllWithoutGeneralQueueCapabilities() {
+    JobOrderDto recoverable = order("MATERIAL", false);
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            new JobOrderPageReader.OrderListPage(
+                true, List.of(recoverable), Optional.empty(), 30, 90, List.of()));
+    Model model = new ExtendedModelMap();
+
+    controller.viewOrders(null, null, "ALL", false, true, false, null, null, null, model);
+
+    assertThat(model.asMap())
+        .containsEntry("scope", "ALL")
+        .containsEntry("requesterView", false)
+        .containsEntry("squadronFilterAvailable", false)
+        .containsEntry("orders", List.of(recoverable));
+    assertThat(OrderListScope.offered(false, true, false))
+        .containsExactly(OrderListScope.MINE, OrderListScope.ALL);
+    verify(reader)
+        .readOrderList(
+            new JobOrderPageReader.OrderListQuery(
+                OrderListScope.ALL, 0, 100, List.of("OPEN", "IN_PROGRESS"), List.of(), false));
+  }
+
+  @Test
+  void offeringConcreteRecoveryKeepsTheCurrentRequesterDefaultAndPresentation() {
+    when(reader.readOrderList(any()))
+        .thenReturn(
+            new JobOrderPageReader.OrderListPage(
+                true, List.of(order("MATERIAL", true)), Optional.empty(), 30, 90, List.of()));
+    Model model = new ExtendedModelMap();
+
+    controller.viewOrders(null, null, null, false, true, false, null, null, null, model);
+
+    assertThat(model.asMap())
+        .containsEntry("scope", "MINE")
+        .containsEntry("requesterView", true)
+        .containsEntry("squadronFilterAvailable", false);
+    assertThat(OrderListScope.offered(false, false, true))
+        .containsExactly(OrderListScope.ASSIGNED, OrderListScope.ALL);
+  }
+
+  @Test
   void anUnavailableListShowsTheLoadErrorWithTheReadersDefaults() {
     when(reader.readOrderList(any()))
         .thenReturn(
@@ -139,7 +186,7 @@ class JobOrderPageControllerReaderTest {
   @Test
   void theDetailModelCarriesTheReadersOptionalParts() {
     JobOrderDto o = order("MATERIAL", false);
-    List<OrgUnitMembershipOptionDto> options = List.of(option(true), option(false));
+    List<OrgUnitMembershipOptionDto> options = List.of(option(), option());
     when(reader.readOrderDetail(any(), any(), any()))
         .thenReturn(
             new JobOrderPageReader.OrderDetailPage(
@@ -154,7 +201,8 @@ class JobOrderPageControllerReaderTest {
                 6,
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
-                JobOrderPageReader.Part.of(null)));
+                JobOrderPageReader.Part.of(null),
+                List.of(options.getFirst())));
     Model model = new ExtendedModelMap();
 
     assertThat(controller.viewOrderDetail(ID, model, null, null))
@@ -205,7 +253,8 @@ class JobOrderPageControllerReaderTest {
                 6,
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
-                JobOrderPageReader.Part.absent()));
+                JobOrderPageReader.Part.absent(),
+                List.of()));
 
     assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))
         .isEqualTo("joborder/orders-detail :: itemsSection");
@@ -231,9 +280,11 @@ class JobOrderPageControllerReaderTest {
 
   @Test
   void theCreateModelCarriesTheReadersCatalogs() {
-    List<OrgUnitMembershipOptionDto> options = List.of(option(true));
+    List<OrgUnitMembershipOptionDto> options = List.of(option());
     when(reader.readOrderCreate())
-        .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), false, List.of(), options));
+        .thenReturn(
+            new JobOrderPageReader.OrderCreatePage(
+                List.of(), false, List.of(), options, List.of()));
     Model model = new ExtendedModelMap();
 
     assertThat(
@@ -250,7 +301,9 @@ class JobOrderPageControllerReaderTest {
   @Test
   void aCreateFormWithDefaultedCatalogsStillCarriesEveryAttribute() {
     when(reader.readOrderCreate())
-        .thenReturn(new JobOrderPageReader.OrderCreatePage(List.of(), true, List.of(), List.of()));
+        .thenReturn(
+            new JobOrderPageReader.OrderCreatePage(
+                List.of(), true, List.of(), List.of(), List.of()));
     Model model = new ExtendedModelMap();
 
     controller.viewCreateForm(null, new JobOrderPrefill(null, null, null, null, null, null), model);
@@ -284,7 +337,7 @@ class JobOrderPageControllerReaderTest {
     when(reader.readItemEdit(ID))
         .thenReturn(
             new JobOrderPageReader.ItemEditPage(
-                access, Optional.empty(), List.of(), true, List.of(), List.of()));
+                access, Optional.empty(), List.of(), true, List.of(), List.of(), List.of()));
     RedirectAttributesModelMap flash = new RedirectAttributesModelMap();
 
     assertThat(controller.viewEditItemForm(ID, new ExtendedModelMap(), flash)).isEqualTo(redirect);
@@ -301,6 +354,7 @@ class JobOrderPageControllerReaderTest {
                 Optional.of(o),
                 List.of(),
                 true,
+                List.of(),
                 List.of(),
                 List.of()));
     Model model = new ExtendedModelMap();

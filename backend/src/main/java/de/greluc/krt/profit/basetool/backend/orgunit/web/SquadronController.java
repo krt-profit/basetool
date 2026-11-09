@@ -39,7 +39,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -137,30 +136,4 @@ public class SquadronController {
   public void activateSquadron(@PathVariable @NotNull UUID id) {
     squadronService.activateSquadron(id);
   }
-
-  /**
-   * Per-squadron profit-eligibility toggle. Admins flip the flag to opt a squadron in or out of the
-   * Job-Order responsible (processing) picker without losing any data. ADMIN-only and isolated from
-   * the regular {@code PUT /api/v1/squadrons/{id}} update path so an accidental description edit
-   * cannot change a squadron's eligibility.
-   *
-   * @param id squadron id
-   * @param body request payload {@code { "eligible": true|false }}
-   * @return the updated squadron DTO with the new flag value
-   */
-  @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  public SquadronDto setProfitEligible(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {
-    return squadronMapper.toDto(squadronService.setProfitEligible(id, body.eligible()));
-  }
-
-  /**
-   * Request body for the per-squadron profit-eligibility toggle endpoint. Carries a single boolean
-   * so a future expansion can be added without breaking the wire format.
-   *
-   * @param eligible new value of {@code Squadron.isProfitEligible}
-   */
-  public record SquadronProfitEligibleToggleRequest(boolean eligible) {}
 }

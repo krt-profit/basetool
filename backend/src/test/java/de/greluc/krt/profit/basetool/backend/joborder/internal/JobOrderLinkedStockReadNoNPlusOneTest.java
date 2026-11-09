@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -39,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -69,6 +72,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  */
 @SpringBootTest
 class JobOrderLinkedStockReadNoNPlusOneTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final int FEW = 3;
 
@@ -109,7 +114,7 @@ class JobOrderLinkedStockReadNoNPlusOneTest {
     Squadron squadron = new Squadron();
     squadron.setName("Linked Unit " + tag);
     squadron.setShorthand("L" + tag);
-    squadron.setProfitEligible(true);
+    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
     unit = squadronRepository.save(squadron);
     SecurityContextHolder.getContext()
         .setAuthentication(

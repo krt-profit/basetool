@@ -647,7 +647,6 @@ class CachedCatalogueEntityInvariantTest {
                           "R" + tag.substring(0, 4),
                           "changed",
                           true,
-                          false,
                           versionOf(squadronService.getAllSquadrons(true), id))));
         });
     cases.put(
@@ -665,14 +664,6 @@ class CachedCatalogueEntityInvariantTest {
           return new Case(
               () -> squadronService.getAllSquadrons(true),
               () -> squadronService.activateSquadron(id));
-        });
-    cases.put(
-        "SquadronService#setProfitEligible",
-        () -> {
-          UUID id = squadron();
-          return new Case(
-              () -> squadronService.getAllSquadrons(true),
-              () -> squadronService.setProfitEligible(id, true));
         });
   }
 

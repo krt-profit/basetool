@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -55,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood;
@@ -84,6 +87,8 @@ import tools.jackson.databind.node.ObjectNode;
 @SpringBootTest
 @Transactional
 class RefineryOrderTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private SquadronRepository squadronRepository;
 
@@ -738,7 +743,7 @@ class RefineryOrderTest {
     Squadron foreign = new Squadron();
     foreign.setName("Refinery-Foreign");
     foreign.setShorthand("RFX");
-    foreign.setProfitEligible(true);
+    withinProfit(foreign, persistedProfitArea(orgUnitRepository));
     foreign = squadronRepository.save(foreign);
     JobOrder foreignOrder = openJobOrderNeeding(foreign, quantanium);
     RefineryOrder order = storableOrder();
@@ -819,7 +824,7 @@ class RefineryOrderTest {
 
   /** Makes Iridium profit-eligible, so its members reach the job-order queue (REQ-ORG-003). */
   private void letIridiumReachTheJobOrderQueue() {
-    iridium.setProfitEligible(true);
+    withinProfit(iridium, persistedProfitArea(orgUnitRepository));
     iridium = squadronRepository.save(iridium);
   }
 

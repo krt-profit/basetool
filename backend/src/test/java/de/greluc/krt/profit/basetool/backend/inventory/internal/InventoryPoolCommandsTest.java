@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -74,7 +74,7 @@ class InventoryPoolCommandsTest {
   @Mock private AuditRecorder auditRecorder;
   @Mock private StockChangeObserver stockChangeObserver;
 
-  @InjectMocks private InventoryStockCommands commands;
+  private InventoryStockCommands commands;
 
   private Material material;
   private Location location;
@@ -84,6 +84,18 @@ class InventoryPoolCommandsTest {
 
   @BeforeEach
   void setUp() {
+    commands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryRepository,
+            userRepository,
+            checkoutService,
+            stolenMarkService,
+            auditRecorder,
+            null,
+            stockChangeObserver,
+            donationAllocationRepository);
     material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");

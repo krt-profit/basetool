@@ -35,19 +35,45 @@ import org.springframework.stereotype.Repository;
 public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
-   * Counts how many of the given org units are flagged {@code is_profit_eligible}; drives {@code
+   * Loads the designated active Profit identities without any display-name fallback.
+   *
+   * @return every active Profit root id
+   */
+  @Query(
+      "SELECT o.id FROM OrgUnit o WHERE TYPE(o) = Bereich AND o.active = true AND o.department ="
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.Department.PROFIT")
+  List<UUID> findActiveProfitRootIds();
+
+  /**
+   * Loads active eligible unit identities under the designated area.
+   *
+   * @param rootId the active Profit root
+   * @return the area's own identity and its active Staffel/SK children
+   */
+  @Query(
+      "SELECT o.id FROM OrgUnit o WHERE o.active = true AND (o.id = :rootId OR"
+          + " (TYPE(o) IN (Squadron, SpecialCommand) AND o.parent.id = :rootId))")
+  List<UUID> findActiveProfitUnitIds(@Param("rootId") UUID rootId);
+
+  /**
+   * Counts active members of the actual Profit hierarchy; drives {@code
    * RequestScopeResolver.canViewJobOrders()}.
    *
    * @param ids the org-unit ids to inspect (the caller's membership ids); must be non-empty.
-   * @return the number of those ids whose org unit is profit-eligible; {@code 0} when none.
+   * @return the number of those ids whose org unit belongs to active Profit; {@code 0} when none.
    */
-  @Query("SELECT COUNT(o) FROM OrgUnit o WHERE o.id IN :ids AND o.isProfitEligible = true")
-  long countProfitEligibleByIdIn(@Param("ids") Collection<UUID> ids);
+  @Query(
+      "SELECT COUNT(o) FROM OrgUnit o WHERE o.id IN :ids AND o.active = true AND EXISTS      "
+          + " (SELECT p.id FROM OrgUnit p WHERE TYPE(p) = Bereich AND p.active = true        AND"
+          + " p.department = de.greluc.krt.profit.basetool.backend.orgunit.api.Department.PROFIT   "
+          + "     AND (o.id = p.id OR (TYPE(o) IN (Squadron, SpecialCommand) AND o.parent.id ="
+          + " p.id)))")
+  long countInActiveProfitHierarchyByIdIn(@Param("ids") Collection<UUID> ids);
 
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron Squadron}
    * and {@link de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand SpecialCommand},
-   * regardless of {@code is_profit_eligible}, for the Leitung view (REQ-ROLE-004).
+   * for the Leitung view (REQ-ROLE-004).
    *
    * @return the active Staffeln + SKs in arbitrary order; never {@code null}, possibly empty.
    */

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — accepted/planned, not implemented. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec — hierarchy foundation implemented; remaining workflows accepted/planned. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0356, ADR-0359, ADR-0360
 
 # Shared JobOrder model
@@ -10,7 +10,7 @@ organisation, participation, access and lifecycle contract. Accepted Wayfinder d
 [responsibility](https://github.com/krt-profit/basetool/issues/3193),
 [access](https://github.com/krt-profit/basetool/issues/3197) and
 [shared scope](https://github.com/krt-profit/basetool/issues/3200) replace conflicting legacy
-rules. This package authorizes specification work; it does not claim runtime implementation.
+rules. The implemented hierarchy foundation is identified below; other shared workflows remain planned.
 
 Kind-specific homes remain [production](orders-item-production.md),
 [material promises](orders-material-claims.md), [money](orders-auec.md) and
@@ -32,6 +32,21 @@ navigation and invalid-hierarchy handling apply to all three kinds.
 **Enforced by:** Pending implementation · **Issues:** #3200, #3203
 
 ### REQ-ORDERS-050 — Responsibility follows the actual Profit hierarchy
+
+**Implemented foundation:** MATERIAL and ITEM resolve responsibility from the active designated
+Profit area and its active Staffel/SK children. Current writers of either proposed side may create;
+current responsible-unit writers may transfer directly, including recovery after hierarchy changes.
+Unknown legacy original boundaries remain unknown and do not alone invalidate current eligibility.
+Before application readiness, automatic maintenance ends existing ineligible active promises with
+retained quantities, attribution and history, normal audit records and grouped current-writer notices.
+It also runs atomically on later hierarchy changes; restarting does not repeat ended promises.
+The complete participation, common-view and aUEC workflows below remain separate implementation work.
+`JobOrderDto.canEdit` remains responsible-side processing authority in every projection;
+`canEditAsRequester` separately exposes the current requesting-unit writer and existing delivery
+freeze. The existing MATERIAL requester editor uses that explicit capability independently of
+redaction. The ITEM processing editor retains its responsible-side gate; completion of the shared
+requester write workflows belongs to the subsequent requester/lifecycle implementation. List
+projections resolve the requester delivery restriction in one bounded ID query.
 
 The Kartell has exactly one Profit Bereich, identified by the organisational domain identity
 Department.PROFIT, not a display name or an independent eligibility flag. Enforce that there
@@ -155,6 +170,13 @@ show unmet quantities; the UI must not imply full physical delivery.
 **Enforced by:** Pending implementation · **Issues:** #3195, #3200, #3201
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
+
+The hierarchy foundation applies this prerequisite inside existing order and Inventory-owned
+linked-stock writes. All Inventory write transactions acquire the shared hierarchy lock before
+lot/row locks; organisational changes acquire its exclusive counterpart before the change and
+synchronous promise maintenance. Priority maintenance leaves invalid orders' stored slots unchanged.
+Ended legacy promises retain quantity and attribution with an ending instant; reactivation does not
+revive them. The obsolete ordinary eligibility column remains during the required phase-one soak.
 
 If the responsible unit ceases to satisfy the fixed original Profit boundary and active hierarchy,
 retain the order and history, flag clarification, and permit only existing authorized reading

@@ -53,7 +53,12 @@ class JobOrderPageControllerReauthMvcTest {
         ReauthPageMvc.standalone(
             new JobOrderPageController(
                 client,
-                new JobOrderPageReader(client, mock(ParallelPageLoader.class)),
+                new JobOrderPageReader(
+                    client,
+                    mock(
+                        de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient
+                            .class),
+                    mock(ParallelPageLoader.class)),
                 mock(LogisticianGate.class),
                 mock(QualityTierCatalog.class),
                 mock(JobOrderItemLines.class)));

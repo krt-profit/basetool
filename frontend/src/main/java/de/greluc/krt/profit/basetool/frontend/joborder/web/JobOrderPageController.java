@@ -154,7 +154,8 @@ public class JobOrderPageController {
             canViewJobOrders,
             canViewOwnJobOrders,
             canViewAssignedJobOrders);
-    boolean requesterView = offeredScopes.isEmpty();
+    boolean requesterView =
+        effectiveScope == OrderListScope.MINE && !canViewJobOrders && !canViewAssignedJobOrders;
     boolean ownScope = effectiveScope == OrderListScope.MINE;
     model.addAttribute("requesterView", requesterView);
     model.addAttribute("scopeOptions", scopeOptions(offeredScopes));
@@ -277,6 +278,8 @@ public class JobOrderPageController {
         case "materials" -> "joborder/orders-detail :: materialsSection";
         case "aggregated" -> "joborder/orders-detail :: aggregatedSection";
         case "header" -> "joborder/orders-detail :: orderHeader";
+        case "actions" -> "joborder/orders-detail :: orderActions";
+        case "dialogs" -> "joborder/orders-detail :: orderDialogs";
         case "kpi" -> "joborder/orders-detail :: kpiSection";
         case "handovers" -> "joborder/orders-detail :: materialHandoverSection";
         case "items" -> "joborder/orders-detail :: itemsSection";
@@ -312,17 +315,25 @@ public class JobOrderPageController {
     model.addAttribute("currentUserId", detail.currentUserId().orElse(null));
     model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
-    boolean canAssign = detail.canAssign();
+    boolean canAssign = !order.responsibilityInvalid() && detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
+    boolean canEditAsRequester = order.callerMayEditAsRequester();
+    model.addAttribute("canEditAsRequester", canEditAsRequester);
+    model.addAttribute("requesterEditMode", canEditAsRequester && !canAssign);
+    model.addAttribute(
+        "canTransferResponsibility", Boolean.TRUE.equals(order.canTransferResponsibility()));
+    model.addAttribute("responsibleOptions", detail.responsibleOptions());
     model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
-    if (requesterView || canAssign) {
+    if (canEditAsRequester || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }
     detail.materials().ifPresent(materials -> model.addAttribute("materials", materials));
     detail.squadrons().ifPresent(squadrons -> model.addAttribute("squadrons", squadrons));
-    detail.requestingOptions().ifPresent(options -> applyOwnerPickerOptions(model, options));
+    detail
+        .requestingOptions()
+        .ifPresent(options -> applyOwnerPickerOptions(model, options, detail.responsibleOptions()));
 
-    if ((requesterView || canAssign) && !model.containsAttribute("jobOrderForm")) {
+    if ((canEditAsRequester || canAssign) && !model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = JobOrderForm.forEdit(order);
       if (canAssign) {
         form.setRequestingOrgUnitId(
@@ -421,7 +432,7 @@ public class JobOrderPageController {
     model.addAttribute("hasOrderableItems", create.hasOrderableItems());
     model.addAttribute("squadrons", create.squadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
-    applyOwnerPickerOptions(model, create.requestingOptions());
+    applyOwnerPickerOptions(model, create.requestingOptions(), create.responsibleOptions());
     return "joborder/orders-create";
   }
 
@@ -450,6 +461,10 @@ public class JobOrderPageController {
           }
           case NOT_AN_ITEM_ORDER -> {
             redirectAttributes.addFlashAttribute("errorToast", "error.joborder.item.edit.notItem");
+            yield "redirect:/orders/" + id;
+          }
+          case RESPONSIBILITY_INVALID -> {
+            redirectAttributes.addFlashAttribute("errorToast", "orders.responsibility.invalid");
             yield "redirect:/orders/" + id;
           }
           case HAS_ITEM_HANDOVERS -> {
@@ -486,7 +501,7 @@ public class JobOrderPageController {
     model.addAttribute("hasOrderableItems", edit.hasOrderableItems());
     model.addAttribute("squadrons", edit.squadrons());
     model.addAttribute("qualityTiers", qualityTierCatalog.all());
-    applyOwnerPickerOptions(model, edit.requestingOptions());
+    applyOwnerPickerOptions(model, edit.requestingOptions(), edit.responsibleOptions());
     return "joborder/orders-create";
   }
 
@@ -501,25 +516,6 @@ public class JobOrderPageController {
   @ResponseBody
   public List<BlueprintReferenceDto> itemBlueprints(@PathVariable UUID gameItemId) {
     return pageReader.readItemBlueprints(gameItemId);
-  }
-
-  /**
-   * Returns {@code true} iff the option list contains a Spezialkommando entry; computed here for
-   * the template.
-   *
-   * @param options the active-org-unit list, may be {@code null}
-   * @return {@code true} when at least one row's {@code kind} is {@code SPECIAL_COMMAND}
-   */
-  private static boolean containsSpecialCommand(List<OrgUnitMembershipOptionDto> options) {
-    if (options == null) {
-      return false;
-    }
-    for (OrgUnitMembershipOptionDto o : options) {
-      if ("SPECIAL_COMMAND".equals(o.kind())) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
@@ -812,16 +808,14 @@ public class JobOrderPageController {
    * Populates the two owner-picker model attributes from an already-fetched requesting-option list.
    *
    * @param model the Thymeleaf model to populate
-   * @param requestingOptions the requesting options, from which the profit-eligible {@code
-   *     responsibleOptions} are derived
+   * @param requestingOptions the requesting options
+   * @param responsibleOptions the currently eligible units in the Profit hierarchy
    */
   private void applyOwnerPickerOptions(
-      Model model, @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
-    List<OrgUnitMembershipOptionDto> responsibleOptions =
-        requestingOptions.stream().filter(o -> Boolean.TRUE.equals(o.isProfitEligible())).toList();
+      Model model,
+      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions,
+      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {
     model.addAttribute("responsibleOptions", responsibleOptions);
-    model.addAttribute("responsibleHasSpecialCommand", containsSpecialCommand(responsibleOptions));
     model.addAttribute("requestingOptions", requestingOptions);
-    model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
   }
 }

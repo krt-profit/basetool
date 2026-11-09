@@ -555,9 +555,9 @@ class PurchasingPageControllerTest {
     QualityTierDto retired =
         new QualityTierDto(UUID.randomUUID(), "OLD", 100, "Alt", "Old", 2, false, 1L);
     OrgUnitMembershipOptionDto area =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit", "PRF", "BEREICH", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit", "PRF", "BEREICH");
     OrgUnitMembershipOptionDto squadron =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ARGON", "ARG", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ARGON", "ARG", "SQUADRON");
     RiskClassDto riskClass = new RiskClassDto("A", 100_000L, 50, false, false, 1L);
     when(purchasingClient.settings()).thenReturn(settings);
     when(qualityTierCatalog.all()).thenReturn(List.of(active, retired));

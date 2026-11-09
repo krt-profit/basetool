@@ -48,6 +48,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @ExtendWith(MockitoExtension.class)
 class OrgHierarchyServiceTest {
 
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private OrgUnitEligibilityMaintenance eligibilityMaintenance;
+
   @Mock private BereichRepository bereichRepository;
   @Mock private OrganisationsleitungRepository organisationsleitungRepository;
   @Mock private OrgUnitRepository orgUnitRepository;

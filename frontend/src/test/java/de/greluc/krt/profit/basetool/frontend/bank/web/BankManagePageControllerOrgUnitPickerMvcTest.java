@@ -74,7 +74,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
   void manage_orgUnitOption_rendersNameAndIdNotNull() throws Exception {
     UUID orgUnitId = UUID.randomUUID();
     OrgUnitMembershipOptionDto staffel =
-        new OrgUnitMembershipOptionDto(orgUnitId, "Staffel ALPHA", "ALP", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(orgUnitId, "Staffel ALPHA", "ALP", "SQUADRON");
 
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))

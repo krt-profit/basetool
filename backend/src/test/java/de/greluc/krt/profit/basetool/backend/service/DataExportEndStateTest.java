@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
@@ -53,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -91,6 +94,8 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest
 @Transactional
 class DataExportEndStateTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String GOLDEN = "/privacy/personal-data-export-end-state.json";
 
@@ -558,7 +563,7 @@ class DataExportEndStateTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Export-SK-" + unique);
     sk.setShorthand("X" + unique);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     specialCommandRepository.save(sk);
     JobOrder order =
         JobOrder.builder()

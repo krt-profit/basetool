@@ -72,7 +72,7 @@ class LayoutContextLoaderTest {
         .thenReturn(
             new MeLayoutResponse(
                 home,
-                List.of(new OrgUnitMembershipOptionDto(home, "ALPHA", "ALP", "SQUADRON", true)),
+                List.of(new OrgUnitMembershipOptionDto(home, "ALPHA", "ALP", "SQUADRON")),
                 LayoutResponses.caps(true, true, false, false),
                 3L));
     LayoutContextLoader loader = loader();

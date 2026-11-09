@@ -28,11 +28,13 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
@@ -40,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverMapper;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -49,12 +50,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverServiceTest {
+
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
@@ -63,13 +65,12 @@ class JobOrderHandoverServiceTest {
   @Mock private JobOrderHandoverMapper jobOrderHandoverMapper;
   @Mock private JobOrderService jobOrderService;
   @Mock private UserService userService;
-  @Mock private OrgUnitMembershipService orgUnitMembershipService;
 
   @Mock
   private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderHandoverService service;
+  private JobOrderHandoverService service;
 
   private UUID orderId;
   private UUID inventoryId;
@@ -81,11 +82,29 @@ class JobOrderHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderHandoverService(
+            jobOrderRepository,
+            responsibilityGuard,
+            jobOrderHandoverRepository,
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                auditService,
+                null,
+                offerRatchet,
+                null),
+            jobOrderHandoverMapper,
+            jobOrderService,
+            userService,
+            null,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
     materialId = UUID.randomUUID();

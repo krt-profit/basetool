@@ -49,6 +49,8 @@ public class SpecialCommandService {
 
   private final SpecialCommandRepository specialCommandRepository;
   private final OrgStructureAuditor orgStructureAuditor;
+  private final ProfitHierarchyService profitHierarchy;
+  private final OrgUnitEligibilityMaintenance eligibilityMaintenance;
 
   /**
    * Unpaged Spezialkommando list for dropdowns and the owner picker. Soft-deleted rows are excluded
@@ -150,10 +152,13 @@ public class SpecialCommandService {
    */
   @Transactional
   public void deleteSpecialCommand(@NotNull UUID id) {
+    profitHierarchy.lockForHierarchyChange();
     SpecialCommand sc = getSpecialCommandById(id);
     boolean wasActive = sc.isActive();
     sc.setActive(false);
     orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
+    specialCommandRepository.flush();
+    eligibilityMaintenance.eligibilityChanged(sc);
   }
 
   /**
@@ -164,30 +169,12 @@ public class SpecialCommandService {
    */
   @Transactional
   public void activateSpecialCommand(@NotNull UUID id) {
+    profitHierarchy.lockForHierarchyChange();
     SpecialCommand sc = getSpecialCommandById(id);
     boolean wasActive = sc.isActive();
     sc.setActive(true);
     orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
-  }
-
-  /**
-   * Sets whether this Spezialkommando may be picked as the responsible (processing) org unit of a
-   * Job Order. Separate from {@link #updateSpecialCommand(UUID, SpecialCommandDto)}; existing Job
-   * Orders are not touched.
-   *
-   * @param id Spezialkommando primary key.
-   * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the SK selectable
-   *     as a Job-Order processor, {@code false} removes it from the responsible picker.
-   * @return the persisted entity.
-   * @throws NotFoundException if no SK matches the given id.
-   */
-  @Transactional
-  public SpecialCommand setProfitEligible(@NotNull UUID id, boolean eligible) {
-    SpecialCommand sc = getSpecialCommandById(id);
-    boolean wasEligible = sc.isProfitEligible();
-    sc.setProfitEligible(eligible);
-    SpecialCommand saved = specialCommandRepository.save(sc);
-    orgStructureAuditor.profitEligibilityChanged(saved, wasEligible);
-    return saved;
+    specialCommandRepository.flush();
+    eligibilityMaintenance.eligibilityChanged(sc);
   }
 }

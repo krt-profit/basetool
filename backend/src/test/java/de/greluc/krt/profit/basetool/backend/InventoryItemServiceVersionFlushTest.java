@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMap
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
@@ -89,6 +91,9 @@ class InventoryItemServiceVersionFlushTest {
   void wireCheckoutDelegate() {
     realCheckoutService =
         new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -105,6 +110,9 @@ class InventoryItemServiceVersionFlushTest {
             eventPublisher);
     inventoryItemService =
         new InventoryItemService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -116,7 +124,20 @@ class InventoryItemServiceVersionFlushTest {
             requestScopeResolver,
             orgUnitStampingService,
             null,
-            new InventoryStockCommands(null, null, null, null, null, null, null, null),
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             null,
             auditService,
             null,

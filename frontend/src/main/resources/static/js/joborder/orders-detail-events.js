@@ -46,6 +46,7 @@ import {
     toggleInventory,
 } from '/js/joborder/orders-detail-reports.js';
 import {
+    _publishOrdersQueue,
     _odControlById,
     _odElementById,
     addHandoverItemRow,
@@ -305,4 +306,38 @@ krtEvents.on('click', 'oa-save-note', () => {
 });
 krtEvents.on('click', 'oa-delete-note', (el) => {
     oaDeleteNote(el);
+});
+
+krtEvents.on('submit', 'od-transfer-responsibility', async (el, event) => {
+    event.preventDefault();
+    const form = /** @type {HTMLFormElement} */ (el);
+    const target = /** @type {HTMLSelectElement | null} */ (
+        form.querySelector('[name="responsibleOrgUnitId"]')
+    );
+    const id = form.dataset.orderId;
+    if (!id || !target || !target.value || !joborderHooks.writeOrder) return;
+    await joborderHooks.writeOrder({
+        method: 'PATCH',
+        url: `/orders/${encodeURIComponent(id)}/responsible-org-unit`,
+        payload: { responsibleOrgUnitId: target.value },
+        sectionKey: 'header',
+        refresh: [
+            'header',
+            'actions',
+            'dialogs',
+            'kpi',
+            'materials',
+            'aggregated',
+            'items',
+            'handovers',
+            'item-handovers',
+            'blueprint-owners',
+            'assignees',
+        ],
+        toast: false,
+        errorMessage: form.dataset.error || '',
+        onSuccess() {
+            _publishOrdersQueue();
+        },
+    });
 });

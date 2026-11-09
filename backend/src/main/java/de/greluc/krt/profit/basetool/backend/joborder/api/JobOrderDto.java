@@ -52,6 +52,10 @@ import org.jetbrains.annotations.NotNull;
  * @param canEdit whether the caller may edit the order, role and scope (REQ-SEC-047)
  * @param canManageAssignees whether the caller may change other users' assignee entries, a
  *     Logistician of the order's unit (REQ-ORDERS-014); {@code null} where it is not resolved
+ * @param responsibilityInvalid whether only reading and valid responsibility transfer are allowed
+ * @param originalProfitBoundaryUnknown whether the original Profit boundary is unverifiable
+ * @param canTransferResponsibility whether current-unit recovery authority permits a transfer
+ * @param canEditAsRequester whether the current requesting-unit writer may edit requested need
  * @param redacted {@code true} when this is the requesting-owner view with processing-side data
  *     stripped (REQ-ORDERS-023)
  */
@@ -76,7 +80,11 @@ public record JobOrderDto(
     Long version,
     Boolean canEdit,
     Boolean canManageAssignees,
-    boolean redacted) {
+    boolean redacted,
+    boolean responsibilityInvalid,
+    boolean originalProfitBoundaryUnknown,
+    Boolean canTransferResponsibility,
+    Boolean canEditAsRequester) {
 
   /**
    * Returns a copy of this DTO with the assignee rows replaced.
@@ -107,7 +115,11 @@ public record JobOrderDto(
         version,
         canEdit,
         canManageAssignees,
-        redacted);
+        redacted,
+        responsibilityInvalid,
+        originalProfitBoundaryUnknown,
+        canTransferResponsibility,
+        canEditAsRequester);
   }
 
   /**
@@ -139,7 +151,11 @@ public record JobOrderDto(
         version,
         canEdit,
         canManageAssignees,
-        value);
+        value,
+        responsibilityInvalid,
+        originalProfitBoundaryUnknown,
+        canTransferResponsibility,
+        canEditAsRequester);
   }
 
   /**
@@ -171,6 +187,10 @@ public record JobOrderDto(
         version,
         canEdit,
         value,
-        redacted);
+        redacted,
+        responsibilityInvalid,
+        originalProfitBoundaryUnknown,
+        canTransferResponsibility,
+        canEditAsRequester);
   }
 }

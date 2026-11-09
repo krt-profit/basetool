@@ -33,8 +33,6 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentUpdateR
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -66,6 +64,22 @@ class OrgUnitBackendClientTest {
   @AfterEach
   void tearDown() {
     backend.close();
+  }
+
+  @Test
+  void responsibleOptionsReflectCurrentHierarchyIncludingTheProfitBereich() {
+    backend.answerJson(
+        "[{\"orgUnitId\":\""
+            + UNIT
+            + "\",\"orgUnitName\":\"Profit\",\"orgUnitShorthand\":\"P\",\"kind\":\"BEREICH\"}]");
+    backend.answerJson("[]");
+
+    assertThat(client.profitResponsibleOrgUnits())
+        .extracting(option -> option.kind())
+        .containsExactly("BEREICH");
+    assertThat(client.profitResponsibleOrgUnits()).isEmpty();
+    backend.expect("GET", "/api/v1/org-units/profit-responsible");
+    backend.expect("GET", "/api/v1/org-units/profit-responsible");
   }
 
   @Test
@@ -127,7 +141,7 @@ class OrgUnitBackendClientTest {
     backend.answerEmpty();
     backend.answerEmpty();
     backend.answerEmpty();
-    SpecialCommandDto body = new SpecialCommandDto(SK, "Bergung", "BRG", null, true, false, 4L);
+    SpecialCommandDto body = new SpecialCommandDto(SK, "Bergung", "BRG", null, true, 4L);
 
     client.specialCommandPage(true, 2);
     client.createSpecialCommand(body);
@@ -140,7 +154,7 @@ class OrgUnitBackendClientTest {
         "{\"id\":\""
             + SK
             + "\",\"name\":\"Bergung\",\"shorthand\":\"BRG\",\"description\":null,"
-            + "\"active\":true,\"isProfitEligible\":false,\"version\":4}";
+            + "\"active\":true,\"version\":4}";
     backend.expect(
         "GET", "/api/v1/special-commands?size=1000&sort=name,asc&includeInactive=true&page=2");
     backend.expect("POST", "/api/v1/special-commands", json);
@@ -159,7 +173,7 @@ class OrgUnitBackendClientTest {
         "{\"id\":\""
             + SK
             + "\",\"name\":\"Bergung\",\"shorthand\":\"BRG\",\"description\":null,"
-            + "\"active\":true,\"isProfitEligible\":null,\"version\":4}");
+            + "\"active\":true,\"version\":4}");
     backend.answerJson(
         "[{\"userId\":\""
             + USER
@@ -189,7 +203,7 @@ class OrgUnitBackendClientTest {
     client.patchSpecialCommandMemberFlags(
         SK, USER, new MembershipFlagsPatchRequest(true, false, 7L));
 
-    assertThat(sc).isEqualTo(new SpecialCommandDto(SK, "Bergung", "BRG", null, true, null, 4L));
+    assertThat(sc).isEqualTo(new SpecialCommandDto(SK, "Bergung", "BRG", null, true, 4L));
     backend.expect("GET", "/api/v1/special-commands/" + SK);
     backend.expect("GET", "/api/v1/special-commands/" + SK + "/members");
     backend.expect("POST", "/api/v1/special-commands/" + SK + "/members/" + USER, null);
@@ -198,19 +212,5 @@ class OrgUnitBackendClientTest {
         "PATCH",
         "/api/v1/special-commands/" + SK + "/members/" + USER,
         "{\"isLogistician\":true,\"isMissionManager\":false,\"version\":7}");
-  }
-
-  @Test
-  void adminToggles() {
-    backend.answerEmpty();
-    backend.answerEmpty();
-
-    client.setSpecialCommandProfitEligible(SK, new SpecialCommandProfitEligibleToggleRequest(true));
-    client.setSquadronProfitEligible(UNIT, new SquadronProfitEligibleToggleRequest(true));
-
-    backend.expect(
-        "PATCH", "/api/v1/special-commands/" + SK + "/profit-eligible", "{\"eligible\":true}");
-    backend.expect(
-        "PATCH", "/api/v1/squadrons/" + UNIT + "/profit-eligible", "{\"eligible\":true}");
   }
 }

@@ -316,7 +316,7 @@ public class RequestScopeResolver {
 
   /**
    * Whether the caller may see the job-order list and details: admins always, others only as a
-   * member of at least one profit-eligible org unit. Memoised per request.
+   * member of at least one active Profit-hierarchy org unit. Memoised per request.
    *
    * @return {@code true} iff the caller may view job orders.
    */
@@ -326,11 +326,11 @@ public class RequestScopeResolver {
 
   /**
    * Computes the {@link #canViewJobOrders()} verdict without the request-scoped memo — the admin
-   * short-circuit, the empty-membership rejection, and the profit-eligibility count. Split out so
-   * the public method only owns the caching.
+   * short-circuit, the empty-membership rejection, and the active-hierarchy count. Split out so the
+   * public method only owns the caching.
    *
-   * @return {@code true} iff the caller is an admin or a member of at least one profit-eligible org
-   *     unit.
+   * @return {@code true} iff the caller is an admin or a member of at least one active
+   *     Profit-hierarchy org unit.
    */
   private boolean resolveCanViewJobOrders() {
     if (authHelper.isAdmin()) {
@@ -340,7 +340,7 @@ public class RequestScopeResolver {
     if (memberOrgUnitIds.isEmpty()) {
       return false;
     }
-    return orgUnitRepository.countProfitEligibleByIdIn(memberOrgUnitIds) > 0;
+    return orgUnitRepository.countInActiveProfitHierarchyByIdIn(memberOrgUnitIds) > 0;
   }
 
   /**

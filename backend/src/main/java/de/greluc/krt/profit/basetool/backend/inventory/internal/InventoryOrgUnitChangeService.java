@@ -53,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class InventoryOrgUnitChangeService {
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -79,6 +80,7 @@ public class InventoryOrgUnitChangeService {
   @Transactional
   public @NotNull InventoryItemDto changeOrgUnit(
       @NotNull UUID itemId, @NotNull InventoryItemOrgUnitChangeDto dto, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
@@ -92,6 +94,7 @@ public class InventoryOrgUnitChangeService {
     }
     OrgUnit previous = item.getOwningOrgUnit();
     item.setOwningOrgUnit(target);
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ORG_UNIT_CHANGED,
@@ -123,6 +126,7 @@ public class InventoryOrgUnitChangeService {
   @Transactional
   public @NotNull BulkOrgUnitChangeResultDto bulkChangeOrgUnit(
       @NotNull BulkOrgUnitChangeRequest request, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -142,6 +146,7 @@ public class InventoryOrgUnitChangeService {
         continue;
       }
       row.setOwningOrgUnit(target);
+      orderWrites.assertRow(row);
       InventoryItem saved = inventoryItemRepository.saveAndFlush(row);
       inventoryCheckoutService.mergeStockIfRequested(saved, mergeStock);
       changed++;

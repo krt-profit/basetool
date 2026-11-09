@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -151,28 +153,30 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   @Test
-  void countProfitEligibleByIdIn_countsProfitEligibleAcrossBothKinds() {
+  void countInActiveProfitHierarchyByIdIn_countsProfitEligibleAcrossBothKinds() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron profit = new Squadron();
     profit.setName("Profit-" + tag);
     profit.setShorthand("P" + tag);
-    profit.setProfitEligible(true);
+    withinProfit(profit, persistedProfitArea(orgUnitRepository));
     Squadron nonProfit = new Squadron();
     nonProfit.setName("NonProfit-" + tag);
     nonProfit.setShorthand("N" + tag);
     SpecialCommand profitSk = new SpecialCommand();
     profitSk.setName("ProfitSK-" + tag);
     profitSk.setShorthand("X" + tag);
-    profitSk.setProfitEligible(true);
+    withinProfit(profitSk, persistedProfitArea(orgUnitRepository));
     UUID profitId = squadronRepository.save(profit).getId();
     UUID nonProfitId = squadronRepository.save(nonProfit).getId();
     UUID profitSkId = specialCommandRepository.save(profitSk).getId();
 
     assertThat(
-            orgUnitRepository.countProfitEligibleByIdIn(Set.of(profitId, nonProfitId, profitSkId)))
+            orgUnitRepository.countInActiveProfitHierarchyByIdIn(
+                Set.of(profitId, nonProfitId, profitSkId)))
         .isEqualTo(2L);
-    assertThat(orgUnitRepository.countProfitEligibleByIdIn(Set.of(nonProfitId))).isZero();
-    assertThat(orgUnitRepository.countProfitEligibleByIdIn(Set.of(profitSkId))).isEqualTo(1L);
+    assertThat(orgUnitRepository.countInActiveProfitHierarchyByIdIn(Set.of(nonProfitId))).isZero();
+    assertThat(orgUnitRepository.countInActiveProfitHierarchyByIdIn(Set.of(profitSkId)))
+        .isEqualTo(1L);
   }
 
   @Test
@@ -208,7 +212,7 @@ class JobOrderScopeQueryIntegrationTest {
     transactionTemplate.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
       Squadron nonProfit = newSquadron("Scope-N-" + tag, "N" + tag);
-      nonProfit.setProfitEligible(false);
+      nonProfit.setParent(null);
       squadronRepository.save(nonProfit);
       ids[0] = nonProfit.getId();
       ids[1] = newOrder(nonProfit, nonProfit).getId();
@@ -457,7 +461,7 @@ class JobOrderScopeQueryIntegrationTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(true);
+    withinProfit(s, persistedProfitArea(orgUnitRepository));
     return squadronRepository.save(s);
   }
 
@@ -465,7 +469,7 @@ class JobOrderScopeQueryIntegrationTest {
     SpecialCommand sc = new SpecialCommand();
     sc.setName(name);
     sc.setShorthand(shorthand);
-    sc.setProfitEligible(true);
+    withinProfit(sc, persistedProfitArea(orgUnitRepository));
     return specialCommandRepository.save(sc);
   }
 

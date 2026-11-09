@@ -4871,6 +4871,49 @@
         }
       ],
       "description": "Roles assigned and withdrawn in the Basetool, the bootstrap grant included (REQ-SEC-088)."
+    },
+    {
+      "id": 102,
+      "type": "stat",
+      "title": "Job orders: invalid responsibility",
+      "description": "All statuses; explicit valid responsibility transfer restores processing. Unknown legacy origins alone are not invalid.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 360
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "basetool_job_order_invalid_responsibility",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
     }
   ]
 }

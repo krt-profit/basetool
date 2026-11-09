@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.is;
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
@@ -79,6 +81,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @SpringBootTest
 class ExchangeOrgStockWriteControllerTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
   private static final String MEMBERS = "/api/v1/exchange/org-stock/members";
@@ -1616,13 +1620,15 @@ class ExchangeOrgStockWriteControllerTest {
   }
 
   /**
-   * Makes a unit profit-eligible, so its members reach the job-order queue and see its orders
-   * (REQ-ORG-003).
+   * Parents a unit to the designated Profit area for the job-order queue (REQ-ORG-003).
    *
    * @param unit the unit
    */
   private void reachesTheJobOrderQueue(@NotNull UUID unit) {
-    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", unit);
+    jdbc.update(
+        "UPDATE org_unit SET parent_org_unit_id = ? WHERE id = ?",
+        persistedProfitArea(orgUnitRepository).getId(),
+        unit);
   }
 
   /**

@@ -45,8 +45,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -63,7 +65,9 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -94,6 +98,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceAssigneeAndListTest {
+
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MaterialRepository materialRepository;
@@ -128,6 +136,7 @@ class JobOrderServiceAssigneeAndListTest {
     jobOrderAssigneeService =
         new JobOrderAssigneeService(
             jobOrderRepository,
+            responsibilityGuard,
             userRepository,
             orgUnitMembershipRepository,
             auditService,
@@ -137,10 +146,23 @@ class JobOrderServiceAssigneeAndListTest {
     service =
         new JobOrderService(
             jobOrderRepository,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
             materialRepository,
             new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
             new InventoryStockCommands(
-                inventoryItemRepository, null, null, null, null, null, null, null),
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             jobOrderAssigneeService,
             null,
             null,
@@ -152,15 +174,17 @@ class JobOrderServiceAssigneeAndListTest {
             jobOrderStockProjectionService,
             null,
             null,
-            null,
             actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
+                profitHierarchy,
+                responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
                 org.mockito.Mockito.mock(
                     org.springframework.context.ApplicationEventPublisher.class),
-                jobOrderStockProjectionService));
+                jobOrderStockProjectionService),
+            liveSyncPublisher);
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     queryService =
         new JobOrderQueryService(
@@ -177,7 +201,7 @@ class JobOrderServiceAssigneeAndListTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     lenient()
-        .when(jobOrderMapper.toDto(any(JobOrder.class)))
+        .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
         .thenAnswer(inv -> {
           JobOrder o = inv.getArgument(0);
           return new JobOrderDto(
@@ -200,6 +224,10 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               o.getVersion(),
               null,
+              null,
+              false,
+              false,
+              false,
               null,
               false);
         });
@@ -603,7 +631,7 @@ class JobOrderServiceAssigneeAndListTest {
               new UUID(0L, 0L),
               pageable))
           .thenReturn(new PageImpl<>(List.of(order)));
-      when(jobOrderMapper.toDto(order))
+      when(jobOrderMapper.toDtoWithAuthority(eq(order), any()))
           .thenReturn(
               jobOrderDtoWithMaterials(
                   order,
@@ -1087,6 +1115,10 @@ class JobOrderServiceAssigneeAndListTest {
         null,
         order.getVersion(),
         null,
+        null,
+        false,
+        false,
+        false,
         null,
         false);
   }

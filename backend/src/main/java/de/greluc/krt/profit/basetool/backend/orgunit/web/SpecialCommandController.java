@@ -43,7 +43,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -236,38 +235,4 @@ public class SpecialCommandController {
   public void activateSpecialCommand(@PathVariable @NotNull UUID id) {
     specialCommandService.activateSpecialCommand(id);
   }
-
-  /**
-   * Toggles whether a Spezialkommando appears in the Job-Order responsible (processing) picker.
-   * ADMIN-only and separate from the regular update path.
-   *
-   * @param id Spezialkommando id.
-   * @param body request payload {@code { "eligible": true|false }}.
-   * @return the updated DTO with the new flag value.
-   */
-  @PatchMapping("/{id}/profit-eligible")
-  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
-  @Operation(
-      summary = "Toggle Spezialkommando profit-eligibility",
-      description =
-          "Sets whether the Spezialkommando may be selected as the responsible (processing) org"
-              + " unit of a Job Order. ADMIN-only.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Updated."),
-    @ApiResponse(responseCode = "403", description = "Caller does not hold ROLE_ADMIN."),
-    @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
-  })
-  public SpecialCommandDto setProfitEligible(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @Valid SpecialCommandProfitEligibleToggleRequest body) {
-    return specialCommandMapper.toDto(specialCommandService.setProfitEligible(id, body.eligible()));
-  }
-
-  /**
-   * Request body for the per-SK profit-eligibility toggle endpoint. Carries a single boolean so a
-   * future expansion can be added without breaking the wire format.
-   *
-   * @param eligible new value of {@code SpecialCommand.isProfitEligible}.
-   */
-  public record SpecialCommandProfitEligibleToggleRequest(boolean eligible) {}
 }

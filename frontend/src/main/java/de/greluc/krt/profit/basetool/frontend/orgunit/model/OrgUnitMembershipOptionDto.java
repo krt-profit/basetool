@@ -32,13 +32,10 @@ import java.util.UUID;
  * @param orgUnitShorthand Abbreviated badge text; may be {@code null}.
  * @param kind Discriminator string ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
  *     {@code ORGANISATIONSLEITUNG}); the membership picker only ever sees the first two.
- * @param isProfitEligible Whether the org unit may be the responsible unit of a Job Order; {@code
- *     null} counts as not eligible.
  */
 @DtoMirror
 public record OrgUnitMembershipOptionDto(
     UUID orgUnitId,
     String orgUnitName,
     String orgUnitShorthand,
-    @BackendEnumAsString String kind,
-    Boolean isProfitEligible) {}
+    @BackendEnumAsString String kind) {}

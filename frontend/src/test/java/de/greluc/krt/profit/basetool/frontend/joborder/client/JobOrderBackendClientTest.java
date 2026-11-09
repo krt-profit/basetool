@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
@@ -75,6 +76,29 @@ class JobOrderBackendClientTest {
   @AfterEach
   void tearDown() {
     backend.close();
+  }
+
+  @Test
+  void responsibilityTransferRetainsTheRecoveredOrderAndCurrentAuthority() {
+    backend.answerJson(
+        "{\"id\":\""
+            + ORDER
+            + "\",\"displayId\":77,"
+            + "\"responsibilityInvalid\":false,\"originalProfitBoundaryUnknown\":true,"
+            + "\"canEdit\":false,\"canTransferResponsibility\":true}");
+
+    var result =
+        client.transferResponsibility(ORDER, new ReassignResponsibleOrgUnitRequest(SQUADRON));
+
+    assertThat(result.id()).isEqualTo(ORDER);
+    assertThat(result.displayId()).isEqualTo(77);
+    assertThat(result.responsibilityInvalid()).isFalse();
+    assertThat(result.originalProfitBoundaryUnknown()).isTrue();
+    assertThat(result.canTransferResponsibility()).isTrue();
+    backend.expect(
+        "PATCH",
+        "/api/v1/orders/" + ORDER + "/responsible-org-unit",
+        "{\"responsibleOrgUnitId\":\"" + SQUADRON + "\"}");
   }
 
   @Test

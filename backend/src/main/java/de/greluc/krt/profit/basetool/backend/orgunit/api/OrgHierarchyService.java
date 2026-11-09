@@ -52,6 +52,8 @@ public class OrgHierarchyService {
   private final OrganisationsleitungRepository organisationsleitungRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgStructureAuditor orgStructureAuditor;
+  private final ProfitHierarchyService profitHierarchy;
+  private final OrgUnitEligibilityMaintenance eligibilityMaintenance;
 
   /**
    * Lists Bereiche for the admin overview.
@@ -106,6 +108,10 @@ public class OrgHierarchyService {
       @Nullable String description,
       @Nullable UUID parentOrgUnitId,
       @Nullable Department department) {
+    profitHierarchy.lockForHierarchyChange();
+    if (department == Department.PROFIT && !orgUnitRepository.findActiveProfitRootIds().isEmpty()) {
+      throw new DuplicateEntityException("orgUnit.profit.alreadyDesignated");
+    }
     if (bereichRepository.existsByNameIgnoreCase(name)) {
       throw new DuplicateEntityException("A Bereich with the name '" + name + "' already exists.");
     }
@@ -166,6 +172,7 @@ public class OrgHierarchyService {
   @CacheEvict(cacheNames = CacheConfig.SQUADRONS_CACHE, allEntries = true)
   public OrgUnit setParent(
       @NotNull UUID orgUnitId, @Nullable UUID parentOrgUnitId, @Nullable Long version) {
+    profitHierarchy.lockForHierarchyChange();
     OrgUnit child = Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     OrgUnit previousParent = child.getParent();
@@ -180,6 +187,7 @@ public class OrgHierarchyService {
     }
     OrgUnit saved = orgUnitRepository.saveAndFlush(child);
     orgStructureAuditor.parentChanged(saved, previousParent);
+    eligibilityMaintenance.eligibilityChanged(saved);
     return saved;
   }
 

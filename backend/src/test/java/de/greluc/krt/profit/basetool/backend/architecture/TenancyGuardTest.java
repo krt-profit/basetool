@@ -131,6 +131,9 @@ class TenancyGuardTest {
               "the customer unit; it grants no queue visibility, the responsible unit scopes the"
                   + " order (REQ-ORG-003)"),
           Map.entry(
+              key(JobOrder.class, "originalProfitOrgUnitId"),
+              "verified original Profit boundary provenance, independent of current tenancy"),
+          Map.entry(
               key(JobOrderHandover.class, "executingSquadron"),
               "a part of its JobOrder, scoped through the order; records the executing unit"),
           Map.entry(

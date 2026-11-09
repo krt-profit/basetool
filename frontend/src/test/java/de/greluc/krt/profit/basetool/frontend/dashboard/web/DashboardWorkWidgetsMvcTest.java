@@ -132,6 +132,10 @@ class DashboardWorkWidgetsMvcTest {
         1L,
         false,
         false,
+        false,
+        false,
+        false,
+        false,
         false);
   }
 

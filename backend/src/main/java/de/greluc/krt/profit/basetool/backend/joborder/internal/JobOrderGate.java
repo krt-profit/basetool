@@ -29,5 +29,8 @@ public enum JobOrderGate {
   EDIT,
 
   /** The caller belongs to the requesting unit and nothing has been delivered (REQ-ORDERS-023). */
-  REQUESTER
+  REQUESTER,
+
+  /** Current responsible-unit authority permits recovery despite ineligible responsibility. */
+  TRANSFER
 }

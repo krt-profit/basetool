@@ -25,11 +25,11 @@
                       th:text="#{__${'status.' + order.status}__}">In Bearbeitung</span>
             </div>
         </div>
-        <div class="page-actions">
-            <button th:if="${(isLogistician or requesterView) and !isItemOrder}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
+        <div id="order-actions-results" class="page-actions"><th:block th:fragment="orderActions" th:with="isItemOrder=${order.type == 'ITEM'}">
+            <button th:if="${!order.responsibilityInvalid and (isLogistician or canEditAsRequester) and !isItemOrder}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
             <a th:if="${isLogistician and isItemOrder and (order.itemHandovers == null or order.itemHandovers.isEmpty())}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+            <th:block th:if="${!order.responsibilityInvalid}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
                     <th:block th:ref="order-menu-items">
                         <form id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
@@ -38,16 +38,24 @@
                     </th:block>
                 </th:block>
             </th:block>
-        </div>
+        </th:block></div>
     </div>
 
     <section id="order-header-results" class="card card--flush od-summary"><th:block th:fragment="orderHeader">
         <span id="order-head-meta" hidden
+              th:data-responsibility-invalid="${order.responsibilityInvalid}"
               th:data-status="${order.status}"
               th:data-status-label="#{__${'status.' + order.status}__}"
               th:data-status-class="${order.status == 'OPEN' ? 'status-planned' : (order.status == 'IN_PROGRESS' ? 'status-active' : (order.status == 'COMPLETED' ? 'status-completed' : 'status-cancelled'))}"></span>
         <span id="order-display-id" hidden
               th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}">#1</span>
+        <p th:if="${order.responsibilityInvalid}" class="alert alert-warning" data-testid="responsibility-invalid" th:text="#{orders.responsibility.invalid}"></p>
+        <p th:if="${order.originalProfitBoundaryUnknown}" class="alert alert-info" data-testid="responsibility-origin-unknown" th:text="#{orders.responsibility.originUnknown}"></p>
+        <form th:if="${canTransferResponsibility}" id="responsibility-transfer-form" class="krt-form" data-trigger="od-transfer-responsibility"
+              th:data-order-id="${order.id}" th:data-error="#{orders.responsibility.transfer.error}">
+            <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('transfer-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, null, 'orders.responsibility.transfer.target', true)}"></div>
+            <button type="submit" class="btn btn-ghost" th:text="#{orders.responsibility.transfer}"></button>
+        </form>
         <div class="facts-bar">
             <span>
                 <span class="fact-k" th:text="#{orders.detail.createdAt}">Erstellt am</span>
@@ -529,7 +537,7 @@
         <div class="od-assignees" id="assignees-section" th:fragment="assigneesSection" th:data-order-id="${order.id}" th:unless="${requesterView}">
             <span hidden data-od-tab-count="assignees" th:text="${order.assignees != null ? order.assignees.size() : 0}">0</span>
             <div class="od-pane-actions">
-                <button th:if="${currentUserId != null and (order.assignees == null or !#lists.contains(order.assignees.![user.id], currentUserId))}"
+                <button th:if="${!order.responsibilityInvalid and currentUserId != null and (order.assignees == null or !#lists.contains(order.assignees.![user.id], currentUserId))}"
                         type="button" class="btn btn--cta"
                         data-trigger="oa-add-me" th:data-user-id="${currentUserId}"
                         th:text="#{orders.detail.assignees.addMe}">Mich eintragen</button>
@@ -545,7 +553,7 @@
             <th:block th:if="${order.assignees == null or order.assignees.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.assignees.empty.title', textKey='orders.detail.assignees.empty')}"></th:block></th:block>
             <ul class="od-assignee-list" th:unless="${order.assignees == null or order.assignees.isEmpty()}">
                 <li class="od-assignee" th:each="assignee : ${order.assignees}"
-                    th:with="canEdit=${(currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or canManageAssignees}">
+                    th:with="canEdit=${!order.responsibilityInvalid and ((currentUserId != null and assignee.user != null and currentUserId.equals(assignee.user.id)) or canManageAssignees)}">
                     <div class="split od-assignee__head">
                         <span class="od-assignee__name" th:text="${assignee.user.effectiveName}">Name</span>
                         <div class="cluster gap-1">
@@ -776,36 +784,18 @@
     </div>
 </main>
 
-<th:block th:if="${isLogistician or requesterView}">
+<div id="order-dialogs-results"><th:block th:fragment="orderDialogs">
+<th:block th:if="${!order.responsibilityInvalid}">
+<th:block th:if="${!order.responsibilityInvalid and (isLogistician or canEditAsRequester)}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='edit-modal', titleKey='orders.detail.edit', variant='krt-modal--xwide', body=~{::edit-modal-body})}">
     <th:block th:ref="edit-modal-body">
-        <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-view="${requesterView}" th:action="${requesterView} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
+        <form id="edit-order-form" th:data-order-id="${order.id}" th:data-requester-view="${requesterEditMode}" th:action="${requesterEditMode} ? @{/orders/{id}/requested-update(id=${order.id})} : @{/orders/{id}/update(id=${order.id})}" method="post" th:object="${jobOrderForm}" class="krt-form">
         <div class="krt-modal-body">
             <input type="hidden" th:field="*{version}">
 
-            <div class="form-group mb-1" th:unless="${requesterView}">
-                <label for="requestingOrgUnitId" th:text="#{orders.detail.requesting}" class="form-label">Auftraggeber</label>
-                <select id="requestingOrgUnitId" th:field="*{requestingOrgUnitId}" required class="w-full">
-                    <option value="" disabled selected th:text="#{orders.create.select}">-- Bitte wählen --</option>
-                    <optgroup th:if="${requestingHasSpecialCommand}" th:label="#{ownerPicker.staffel}">
-                        <option th:each="o : ${requestingOptions}"
-                                th:if="${o.kind() == 'SQUADRON'}"
-                                th:value="${o.orgUnitId()}"
-                                th:text="${o.orgUnitName()}">Staffel</option>
-                    </optgroup>
-                    <optgroup th:if="${requestingHasSpecialCommand}" th:label="#{ownerPicker.specialCommand}">
-                        <option th:each="o : ${requestingOptions}"
-                                th:if="${o.kind() == 'SPECIAL_COMMAND'}"
-                                th:value="${o.orgUnitId()}"
-                                th:text="${o.orgUnitName()}">Spezialkommando</option>
-                    </optgroup>
-                    <th:block th:unless="${requestingHasSpecialCommand}">
-                        <option th:each="o : ${requestingOptions}"
-                                th:value="${o.orgUnitId()}"
-                                th:text="${o.orgUnitName()}">Org Unit</option>
-                    </th:block>
-                </select>
-            </div>
+            <th:block th:unless="${requesterEditMode}">
+                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('requestingOrgUnitId', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.detail.requesting', true)}"></div>
+            </th:block>
 
             <div class="form-group mb-1" th:if="${order.responsibleOrgUnit != null}">
                 <label th:text="#{orders.detail.responsible}" class="form-label">Bearbeitende Einheit</label>
@@ -816,7 +806,7 @@
                       th:text="#{orders.detail.responsible.readonly_hint}">(nur über Umschreiben)</span>
             </div>
 
-            <div class="form-group mb-1" th:unless="${requesterView}">
+            <div class="form-group mb-1" th:unless="${requesterEditMode}">
                 <label for="handle" th:text="#{orders.detail.handle}" class="form-label">Handle (Ingame-Name)</label>
                 <input type="text" id="handle" th:field="*{handle}" class="w-full">
             </div>
@@ -933,7 +923,7 @@
             <label for="claim-squadron" class="form-label" th:text="#{orders.claim.squadron}">Staffel</label>
             <select class="w-full" id="claim-squadron">
                 <option value="" th:text="#{orders.claim.squadron.choose}">Bitte wählen…</option>
-                <option th:each="s : ${squadrons}" th:if="${s.isProfitEligible}" th:value="${s.id}" th:text="${s.name}"></option>
+                <option th:each="s : ${responsibleOptions}" th:if="${s.kind == 'SQUADRON'}" th:value="${s.orgUnitId}" th:text="${s.orgUnitName}"></option>
             </select>
         </div>
         <div class="form-group mb-2">
@@ -973,7 +963,6 @@
     </th:block>
 </th:block>
 </th:block>
-<th:block th:fragment="pageTail">
 <th:block th:if="${isLogistician}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='handover-modal', titleKey='orders.detail.handover.record', variant='krt-modal--wide', body=~{::handover-modal-body})}">
     <th:block th:ref="handover-modal-body">
@@ -1131,6 +1120,9 @@
 </th:block>
 </th:block>
 
+</th:block></div>
+</th:block>
+<th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MSG_HANDOVER_SUCCESS = /*[[#{success.joborder.handover}]]*/ '\u00dcbergabe erfolgreich protokolliert.';
     const MSG_HANDOVER_FAILED = /*[[#{error.joborder.handover.failed}]]*/ 'Fehler beim Protokollieren der \u00dcbergabe.';

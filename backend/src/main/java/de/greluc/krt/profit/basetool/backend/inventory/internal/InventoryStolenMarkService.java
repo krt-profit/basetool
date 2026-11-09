@@ -60,6 +60,7 @@ public class InventoryStolenMarkService {
   /** Amounts closer than this count as equal. */
   private static final double QUANTITY_EPSILON = 1e-9;
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
@@ -95,6 +96,7 @@ public class InventoryStolenMarkService {
       @NotNull InventoryItemStolenMarkDto dto,
       @NotNull UUID callerId,
       boolean isLogistician) {
+    orderWrites.lockEligibility();
     requireEnabled();
     InventoryItem item =
         Entities.require(
@@ -133,6 +135,7 @@ public class InventoryStolenMarkService {
   @Transactional
   public @NotNull BulkStolenMarkResultDto bulkMark(
       @NotNull BulkStolenMarkRequest request, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
     requireEnabled();
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
@@ -154,6 +157,7 @@ public class InventoryStolenMarkService {
         continue;
       }
       row.setStolen(target);
+      orderWrites.assertRow(row);
       InventoryItem saved = inventoryItemRepository.saveAndFlush(row);
       inventoryCheckoutService.mergeStockIfRequested(saved, false);
       changed++;
@@ -188,6 +192,7 @@ public class InventoryStolenMarkService {
   private @NotNull InventoryItem markWholeRow(
       @NotNull InventoryItem item, boolean target, @NotNull UUID callerId) {
     item.setStolen(target);
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,

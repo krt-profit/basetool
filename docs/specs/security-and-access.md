@@ -3646,10 +3646,11 @@ client did exactly that and hid the Lager write actions, the Auftrag write actio
 Operation's payout confirmation from admins and officers the server would have permitted — a
 defect no server test could see, because the server was answering correctly the whole time.
 
-**A row flag carries the endpoint's whole rule, not half of it.** `JobOrderController`'s writes gate
-on `hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; a flag built on the scope half alone would
-offer editing to a plain member whose own Staffel owns the order, which the endpoint refuses.
-`StockViewerAccess#mayEditJobOrder` therefore answers with both halves.
+**A row flag carries the endpoint's whole rule.** `JobOrderAuthority` computes each order's edit,
+requester-edit and responsibility-transfer flags from the current contextual writer authority and
+actual Profit hierarchy. An invalid responsibility disables ordinary edits while preserving a valid
+transfer by the current responsible writer. `JobOrderMapper` reads that batch-capable leaf interface;
+`InventoryItemMapper` reads `StockViewerAccess#mayEditInventoryItem` for inventory rows.
 
 > [!note] Amended 2026-10-04 — the Lager row flag answers both gates too
 > `InventoryItemDto.canEdit` was built on `canEditInventoryItem` alone, the scope half: a plain
@@ -3662,18 +3663,18 @@ offer editing to a plain member whose own Staffel owns the order, which the endp
 > row's owner or `isLogisticianOrAbove()`. The web read the flag only where both already held, so it
 > renders unchanged.
 
-**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `mapper`,
-implemented by the Lager's `inventory.internal.StockViewerAccessService`; in `inventory.api` until P4-1 and in `support` until P1-9 split that package on 2026-10-04), for the ADR-0047 reason `MissionViewerAccess` already exists: a
-`mapper → service` edge would close a package cycle, and mappers may touch neither
-`SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
-layer directly.
+**Mappers reach the gate through domain-owned leaf interfaces:** `JobOrderAuthority` in
+`joborder.api`, `StockViewerAccess` in `inventory.api` and `MissionViewerAccess` for missions. Their
+owning access policies compute the flags without a mapper reaching the service layer or
+`SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`). Order list
+projections resolve authority in a batch.
 
 **Acceptance**
 
 - [x] The three capability flags resolve through the hierarchy, so an admin reads `true` for all
   three and an officer for the first two (`MeControllerTest`).
-- [x] The job-order row flag is false for a caller who passes the scope check but holds no
-  Logistician-or-above role.
+- [x] The job-order row flag is false without the current contextual writer authority or with invalid
+  responsibility; the separate transfer flag permits authorised recovery.
 - [x] The Lager row flag is false for a caller who passes the scope check on another member's row
   but holds no Logistician-or-above role, and true for that row's owner and for a Logistician in
   scope.
@@ -3682,7 +3683,7 @@ layer directly.
 
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
-`EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
+`JobOrderAuthority` (implemented by `JobOrderAccessPolicy`),
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 

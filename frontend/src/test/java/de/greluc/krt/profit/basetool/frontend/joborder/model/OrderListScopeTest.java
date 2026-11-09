@@ -43,18 +43,18 @@ class OrderListScopeTest {
   }
 
   @Test
-  void anAssigneeWithoutQueueAccessHasOnlyTheAssignedSegment() {
-    assertThat(OrderListScope.offered(false, false, true)).containsExactly(ASSIGNED);
+  void anAssigneeWithoutQueueAccessCanChooseAssignedAndConcreteAll() {
+    assertThat(OrderListScope.offered(false, false, true)).containsExactly(ASSIGNED, ALL);
   }
 
   @Test
-  void aRequesterWhoIsAlsoAnAssigneeChoosesBetweenMineAndAssigned() {
-    assertThat(OrderListScope.offered(false, true, true)).containsExactly(MINE, ASSIGNED);
+  void aRequesterWhoIsAlsoAnAssigneeCanChooseConcreteAll() {
+    assertThat(OrderListScope.offered(false, true, true)).containsExactly(MINE, ASSIGNED, ALL);
   }
 
   @Test
-  void aRequesterOnlyHasNothingToChoose() {
-    assertThat(OrderListScope.offered(false, true, false)).isEmpty();
+  void aRequesterCanChooseMineAndConcreteAllWithoutProcessingScope() {
+    assertThat(OrderListScope.offered(false, true, false)).containsExactly(MINE, ALL);
     assertThat(OrderListScope.offered(false, false, false)).isEmpty();
   }
 
@@ -67,10 +67,10 @@ class OrderListScopeTest {
 
   @Test
   void aScopeParameterNeverMovesACallerOntoAListTheyCannotChoose() {
-    assertThat(OrderListScope.resolve(ALL, false, false, true)).isEqualTo(ASSIGNED);
+    assertThat(OrderListScope.resolve(ALL, false, false, true)).isEqualTo(ALL);
     assertThat(OrderListScope.resolve(TO_PROCESS, false, false, true)).isEqualTo(ASSIGNED);
     assertThat(OrderListScope.resolve(MINE, false, false, true)).isEqualTo(ASSIGNED);
-    assertThat(OrderListScope.resolve(ALL, false, true, false)).isEqualTo(MINE);
+    assertThat(OrderListScope.resolve(ALL, false, true, false)).isEqualTo(ALL);
     assertThat(OrderListScope.resolve(ASSIGNED, false, true, false)).isEqualTo(MINE);
   }
 

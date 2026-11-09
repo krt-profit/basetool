@@ -262,7 +262,7 @@ public class MeController {
    * @param canSeeBlueprintOverview whether the caller may open the org-unit blueprint overview
    *     (admin, officer or Spezialkommando lead)
    * @param canViewJobOrders whether the caller may enter the Job-Order area (admin or member of a
-   *     profit-eligible org unit)
+   *     active Profit-hierarchy org unit)
    * @param canViewOwnJobOrders whether the caller may view orders their own org unit requested
    *     (admin or any org-unit member; REQ-ORDERS-023)
    * @param canViewAssignedJobOrders whether the caller holds an assignee entry on at least one

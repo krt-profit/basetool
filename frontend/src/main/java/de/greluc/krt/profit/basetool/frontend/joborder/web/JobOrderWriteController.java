@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -75,6 +77,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -486,6 +489,27 @@ public class JobOrderWriteController {
         () -> {
           JobOrderDto result = jobOrderClient.updatePriority(id, priority);
           return ResponseEntity.ok(result);
+        });
+  }
+
+  /**
+   * Relays a responsibility transfer under the backend's current writer or recovery authority.
+   *
+   * @param id the order
+   * @param request the valid target unit
+   * @return the updated order or the backend error
+   */
+  @PatchMapping("/{id}/responsible-org-unit")
+  @ResponseBody
+  public ResponseEntity<Object> transferResponsibility(
+      @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest request) {
+    return relay(
+        log,
+        "transfer order responsibility",
+        () -> {
+          JobOrderDto order = jobOrderClient.transferResponsibility(id, request);
+          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
+          return ResponseEntity.ok(order);
         });
   }
 

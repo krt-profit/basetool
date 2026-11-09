@@ -136,6 +136,10 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         version,
         canEdit,
         canManageAssignees,
+        false,
+        false,
+        false,
+        canEdit,
         false);
   }
 

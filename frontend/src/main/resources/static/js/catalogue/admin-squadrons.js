@@ -23,7 +23,6 @@ import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
-import { wireInstantToggle } from '/js/kernel/krt-instant-toggle.js';
 
 const SQUADRON_FILTER_PREF_KEY = 'admin_squadrons_filter';
 
@@ -189,18 +188,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
-
-    wireInstantToggle({
-        selector: '.squadron-profit-toggle',
-        idAttribute: 'data-squadron-id',
-        urlFor: (id) => `/api/proxy/squadrons/${encodeURIComponent(id)}/profit-eligible`,
-        bodyFor: (checked) => ({ eligible: checked }),
-        labels: {
-            on: SQUADRON_MSG.profitOn,
-            off: SQUADRON_MSG.profitOff,
-            saved: SQUADRON_MSG.profitSaved,
-            error: SQUADRON_MSG.profitError,
-        },
-        conflict: SQUADRON_CONFLICT,
-    });
 });

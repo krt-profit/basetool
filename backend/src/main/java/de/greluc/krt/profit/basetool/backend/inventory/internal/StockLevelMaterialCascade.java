@@ -38,12 +38,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class StockLevelMaterialCascade implements MaterialDeletionObserver {
 
+  private final InventoryOrderWrites orderWrites;
+
   private final StockLevelRepository stockLevelRepository;
   private final AuditRecorder auditRecorder;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public int beforeMaterialDelete(@NotNull UUID materialId) {
+    orderWrites.lockEligibility();
     List<StockLevel> levels = stockLevelRepository.findByMaterial(materialId);
     for (StockLevel level : levels) {
       auditRecorder.record(

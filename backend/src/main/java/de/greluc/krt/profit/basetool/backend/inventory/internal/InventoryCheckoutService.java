@@ -104,6 +104,7 @@ public class InventoryCheckoutService {
   /** Name shown in a transfer notification for a member without one. */
   private static final String UNKNOWN_NAME = "—";
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
@@ -134,6 +135,7 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
+    orderWrites.lockEligibility();
     return bookOut(id, dto, currentUserId, isAdmin, null, null).item();
   }
 
@@ -152,6 +154,7 @@ public class InventoryCheckoutService {
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   public StockChangeEffects bookOutForClient(UUID id, InventoryItemBookOutDto dto, UUID memberId) {
+    orderWrites.lockEligibility();
     return bookOut(id, dto, memberId, false, StockChangeReason.STOCK, null).offers();
   }
 
@@ -167,6 +170,7 @@ public class InventoryCheckoutService {
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
   StockChangeEffects bookOutForPool(UUID id, InventoryItemBookOutDto dto, UUID actorId) {
+    orderWrites.lockEligibility();
     return bookOut(id, dto, actorId, true, null, null).offers();
   }
 
@@ -185,6 +189,7 @@ public class InventoryCheckoutService {
   @Transactional(propagation = Propagation.MANDATORY)
   PoolTransfer transferForPool(
       UUID id, InventoryItemBookOutDto dto, UUID actorId, @NotNull OrgUnit targetPool) {
+    orderWrites.lockEligibility();
     BookOut done = bookOut(id, dto, actorId, true, null, targetPool);
     return new PoolTransfer(Objects.requireNonNull(done.item()).id(), done.offers());
   }
@@ -213,6 +218,7 @@ public class InventoryCheckoutService {
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
+    orderWrites.assertRow(item);
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
     if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
@@ -401,6 +407,7 @@ public class InventoryCheckoutService {
         AllocationReductions.resolveReductionPlan(
             item, dto.missionReductions(), dto.amount(), false);
     applyTransferInherit(item, newItem, orderReductions, missionReductions);
+    orderWrites.assertRow(newItem);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     AllocationReductions.applyPlan(item, orderReductions, true);
     AllocationReductions.applyPlan(item, missionReductions, false);
@@ -624,9 +631,11 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto rebookPersonal(
       UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
+    orderWrites.lockEligibility();
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
 
+    orderWrites.assertRow(item);
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
 
     if (!item.getUser().getId().equals(currentUserId) && !isAdmin) {
@@ -678,6 +687,7 @@ public class InventoryCheckoutService {
       boolean targetPersonal,
       @Nullable OrgUnit targetOwningOrgUnit,
       boolean mergeStock) {
+    orderWrites.lockEligibility();
     final double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - amount);
     final boolean depleted = remainingAmount <= QUANTITY_EPSILON;
 
@@ -693,6 +703,7 @@ public class InventoryCheckoutService {
             LotRows.Placement.of(item)
                 .withOwningOrgUnit(targetOwningOrgUnit)
                 .withPersonal(targetPersonal));
+    orderWrites.assertRow(newItem);
     InventoryItem savedNew = inventoryItemRepository.save(newItem);
     LotRows.lower(
         inventoryItemRepository,
@@ -733,6 +744,7 @@ public class InventoryCheckoutService {
   @Transactional(propagation = Propagation.MANDATORY)
   public InventoryItem mergeStockIfRequested(
       @NotNull InventoryItem row, boolean clientRequestedMerge) {
+    orderWrites.lockEligibility();
     final Material material = row.getMaterial();
     final boolean gameItemRow = row.getGameItem() != null;
     if (material == null && !gameItemRow) {
@@ -765,6 +777,8 @@ public class InventoryCheckoutService {
                 row.getStolen(),
                 row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
+    orderWrites.assertRow(row);
+    group.forEach(orderWrites::assertRow);
     final List<InventoryItem> victims =
         group.stream().filter(candidate -> !candidate.getId().equals(row.getId())).toList();
     if (victims.isEmpty()) {
@@ -786,6 +800,7 @@ public class InventoryCheckoutService {
     }
 
     inventoryItemRepository.deleteAll(victims);
+    orderWrites.assertRow(row);
     inventoryItemRepository.saveAndFlush(row);
 
     auditRecorder.record(
@@ -838,12 +853,15 @@ public class InventoryCheckoutService {
    */
   @Transactional
   public int deleteAllGlobalInventory() {
+    orderWrites.lockEligibility();
     ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     log.info(
         "Bulk delete of global inventory requested (adminAll={}, active={}, members={})",
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds().size());
+    orderWrites.assertWipe(
+        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     stockChangeObserver.beforeWipe(
         scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
     int removed =
@@ -874,6 +892,7 @@ public class InventoryCheckoutService {
    */
   @Transactional
   public void bulkCheckout(@NotNull BulkCheckoutRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
@@ -898,6 +917,7 @@ public class InventoryCheckoutService {
       toDelete.add(itemId);
     }
 
+    orderWrites.assertRows(toDelete);
     stockChangeObserver.beforeDelete(toDelete, StockChangeReason.BULK_CHECKOUT);
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
@@ -930,6 +950,7 @@ public class InventoryCheckoutService {
   @NotNull
   @Transactional
   public BulkRebookResultDto bulkRebook(@NotNull BulkRebookRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     log.info(
         "Bulk rebook ({}) requested by user {} for {} items",
         request.mode(),
@@ -1273,8 +1294,10 @@ public class InventoryCheckoutService {
     Map<UUID, Double> missionReductions =
         AllocationReductions.resolveReductionPlan(source, null, amount, false);
     applyTransferInherit(source, newItem, orderReductions, missionReductions);
+    orderWrites.assertRow(newItem);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     stockChangeObserver.beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
+    orderWrites.assertRow(source);
     inventoryItemRepository.delete(source);
 
     mergeStockIfRequested(savedNew, mergeStock);
@@ -1294,6 +1317,7 @@ public class InventoryCheckoutService {
   @Transactional
   public InventoryItemDto updateDelivered(
       UUID id, UpdateDeliveredRequest request, UUID currentUserId, boolean isLogistician) {
+    orderWrites.lockEligibility();
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForAllocationWrite(id), "Inventory item not found");
@@ -1311,6 +1335,7 @@ public class InventoryCheckoutService {
                 .findFirst(),
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,

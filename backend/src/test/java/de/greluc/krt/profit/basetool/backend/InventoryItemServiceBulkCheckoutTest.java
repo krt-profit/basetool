@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckou
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -51,11 +53,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -64,6 +66,27 @@ import org.springframework.security.access.AccessDeniedException;
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceBulkCheckoutTest {
+
+  @BeforeEach
+  void wireOrderWriteFixture() {
+    inventoryItemService =
+        new InventoryCheckoutService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            null,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            null,
+            auditService,
+            eventPublisher);
+  }
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
@@ -79,7 +102,7 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService inventoryItemService;
+  private InventoryCheckoutService inventoryItemService;
 
   private User userWithId(UUID id) {
     User u = new User();
