@@ -39,6 +39,9 @@ krt:
     commodity-sync-enabled: false
 
 app:
+  bootstrap:
+    # The one subject BootstrapAdminLoginIntegrationTest signs in as; no other test uses it.
+    admin-subs: 11111111-2222-4333-8444-555555555555
   security:
     ingest-gateway:
       client-ids: test-ingest-gateway

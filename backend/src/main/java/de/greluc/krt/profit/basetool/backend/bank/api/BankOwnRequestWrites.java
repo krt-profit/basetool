@@ -43,10 +43,17 @@ public interface BankOwnRequestWrites {
    * @param request what to raise
    * @param clientId the registry id of the connected application the gate admitted, recorded on the
    *     request
-   * @return the pending request
+   * @param idempotencyKey the client's key of the write, recorded on the request, or {@code null}
+   *     without one; a raise under a key the client already raised a request of this member with
+   *     answers that request and raises nothing
+   * @return the pending request, or the one raised earlier under the same key
    */
   @NotNull
-  Written raise(@NotNull BankActor actor, @NotNull NewRequest request, @NotNull String clientId);
+  Written raise(
+      @NotNull BankActor actor,
+      @NotNull NewRequest request,
+      @NotNull String clientId,
+      @Nullable String idempotencyKey);
 
   /**
    * Corrects one of the actor's pending, not yet approved requests (REQ-BANK-056); the counterparty

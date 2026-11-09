@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccessService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankAccountSettingsDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankBalanceDto;
@@ -269,10 +270,10 @@ class OrgUnitBankControllerTest {
   void grantOwnerApproval_delegatesToService() {
     UUID id = UUID.randomUUID();
     BankBookingRequestDto dto = requestDto();
-    when(orgUnitBankRequestService.grantOwnerApproval(id)).thenReturn(dto);
+    when(orgUnitBankRequestService.grantOwnerApproval(id, 2L)).thenReturn(dto);
 
-    assertSame(dto, controller.grantOwnerApproval(id));
-    verify(orgUnitBankRequestService).grantOwnerApproval(id);
+    assertSame(dto, controller.grantOwnerApproval(id, new GrantOwnerApprovalRequest(2L)));
+    verify(orgUnitBankRequestService).grantOwnerApproval(id, 2L);
   }
 
   @Test

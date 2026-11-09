@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ingest.profit-base.online/exchange/v1/schemas/bank-account.schema.json",
   "title": "Bank account",
-  "description": "One active Kartellbank account the member may view in the Basetool, with its balance, target and 30-day trend, and the two facts about the member: whether they may raise a withdrawal or transfer here and their own limit. No holders, custody, limit tables or ceilings. Foreign bank data: a client keeps it in memory only, for at most 7 days.",
+  "description": "One active Kartellbank account the member may view in the Basetool, with its balance, target and 30-day trend, and the three facts about the member: whether they may raise a withdrawal or transfer here, their own limit, and whether they are exempt from approval. No holders, custody, limit tables or ceilings. Foreign bank data: a client keeps it in memory only, for at most 7 days.",
   "type": "object",
   "properties": {
     "accountId": {
@@ -76,7 +76,11 @@
         "integer",
         "null"
       ],
-      "description": "The member's limit in whole aUEC above which a request needs an approval; null when none applies."
+      "description": "The member's limit in whole aUEC above which a request needs an approval; null when the member is exempt (approvalExempt) or every request needs one."
+    },
+    "approvalExempt": {
+      "type": "boolean",
+      "description": "Whether the member raises requests here without any approver's sign-off, as the account's responsible holder. Additive: the server always sends it; a reader that does not know it treats a null ownLimit as unknown."
     }
   },
   "required": [

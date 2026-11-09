@@ -34,10 +34,9 @@ public final class IdentityMetricNames {
   public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
 
   /**
-   * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
-   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because a
-   * bootstrap subject earned Admin at its first login (REQ-SEC-017, REQ-SEC-088). Normally zero
-   * (REQ-OBS-011).
+   * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped on every
+   * login at which a bootstrap subject earns Admin, for a new or an existing account (REQ-SEC-017,
+   * REQ-SEC-088). Normally zero (REQ-OBS-011).
    */
   public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
       "basetool.admin.registration.auto.activated";

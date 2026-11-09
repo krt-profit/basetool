@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,6 +55,16 @@ public class BankCaller {
   @NotNull
   public BankActor actor() {
     return authHelperService.currentUserId().map(this::actorOf).orElse(BankActor.NOBODY);
+  }
+
+  /**
+   * The member id of the current request, for a decision that needs no more than who calls.
+   *
+   * @return the authenticated member's id, or {@code null} without one
+   */
+  @Nullable
+  public UUID userId() {
+    return authHelperService.currentUserId().orElse(null);
   }
 
   /**

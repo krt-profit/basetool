@@ -36,6 +36,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -327,6 +328,42 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    * Basetool. Immutable.
    */
   @Nullable
-  @Column(name = "client_id", length = 60, updatable = false)
+  @Column(name = "client_id", length = 63, updatable = false)
   private String clientId;
+
+  /**
+   * The client's {@code Idempotency-Key} of the raise (REQ-BXCH-004), unique per client and
+   * requester, so a retry after a lost answer finds this request; {@code null} for a request raised
+   * without one. Immutable.
+   */
+  @Nullable
+  @Column(name = "idempotency_key", length = 128, updatable = false)
+  private String idempotencyKey;
+
+  /**
+   * Stamps a resolved counterparty snapshot onto the request, clearing all four counterparty
+   * columns when it is {@code null}.
+   *
+   * @param counterparty the resolved snapshot, or {@code null} to clear
+   */
+  void applyCounterparty(@Nullable CounterpartySnapshot counterparty) {
+    setCounterpartyUserId(counterparty == null ? null : counterparty.userId());
+    setCounterpartyHandle(counterparty == null ? null : counterparty.handle());
+    setCounterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId());
+    setCounterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName());
+  }
+
+  /**
+   * Tells whether the request already names this counterparty in this org unit; a correction that
+   * names it again keeps the stored snapshot, even after the counterparty left that unit
+   * (REQ-BANK-056, REQ-BXCH-004).
+   *
+   * @param userId the counterparty a correction names, or {@code null}
+   * @param orgUnitId that counterparty's org unit, or {@code null}
+   * @return {@code true} when both equal the stored ones
+   */
+  boolean namesCounterparty(@Nullable UUID userId, @Nullable UUID orgUnitId) {
+    return Objects.equals(getCounterpartyUserId(), userId)
+        && Objects.equals(getCounterpartyOrgUnitId(), orgUnitId);
+  }
 }

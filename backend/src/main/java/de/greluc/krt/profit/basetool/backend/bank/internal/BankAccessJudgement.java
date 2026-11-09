@@ -60,6 +60,12 @@ final class BankAccessJudgement {
   private final boolean admin;
 
   /**
+   * Whether the actor's seats confer anything: only while the actor holds {@code KRT Member}
+   * (REQ-SEC-015); a retained seat then grants no oversight, holder, approver or tier right.
+   */
+  private final boolean seatsConfer;
+
+  /**
    * The org units whose accounts the actor views by oversight: the officer reach of a {@code KRT
    * Member}, narrowed to the pin alone when the pin lies in it (REQ-BANK-021).
    */
@@ -91,7 +97,8 @@ final class BankAccessJudgement {
     this.bereichRepository = bereichRepository;
     this.orgUnitRepository = orgUnitRepository;
     this.admin = staffRights.admin();
-    Set<UUID> oversight = actor.holds(Roles.KRT_MEMBER) ? actor.officerReach() : Set.of();
+    this.seatsConfer = seatsConfer(actor);
+    Set<UUID> oversight = seatsConfer ? actor.officerReach() : Set.of();
     this.viewScope = pin != null && oversight.contains(pin) ? Set.of(pin) : oversight;
   }
 
@@ -148,7 +155,7 @@ final class BankAccessJudgement {
     if (rights.isEmpty()) {
       return BankAccountAccess.Hidden.INSTANCE;
     }
-    BigDecimal approvalLimit = request && !holder ? applicableLimit(account, limits.get()) : null;
+    BigDecimal approvalLimit = request && !holder ? applicableLimit(account, limits) : null;
     return new BankAccountAccess.Visible(accountId, rights, approvalLimit);
   }
 
@@ -175,8 +182,8 @@ final class BankAccessJudgement {
       case CARTEL -> (owner != null && viewScope.contains(owner)) || isMemberOrAbove();
       case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL ->
-          actor.holdsSeat(MembershipRole.OL_MEMBER)
-              || actor.holdsSeat(MembershipRole.BEREICHSLEITER)
+          holdsSeat(MembershipRole.OL_MEMBER)
+              || holdsSeat(MembershipRole.BEREICHSLEITER)
               || matchesSpecialGrant(viewGrants.get());
     };
   }
@@ -201,10 +208,10 @@ final class BankAccessJudgement {
             Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
                 ? MembershipRole.SK_LEAD
                 : MembershipRole.STAFFELLEITER;
-        yield actor.holdsSeatOn(owner, holderRole);
+        yield holdsSeatOn(owner, holderRole);
       }
-      case AREA -> owner != null && actor.holdsSeatOn(owner, MembershipRole.BEREICHSLEITER);
-      case CARTEL -> actor.holdsSeat(MembershipRole.OL_MEMBER);
+      case AREA -> owner != null && holdsSeatOn(owner, MembershipRole.BEREICHSLEITER);
+      case CARTEL -> holdsSeat(MembershipRole.OL_MEMBER);
       case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> false;
     };
@@ -228,15 +235,16 @@ final class BankAccessJudgement {
    * tier, where the all-members tier matches only members of the owning unit.
    *
    * @param account the account
-   * @param limits the account's approval-limit rows
+   * @param limitRows the account's approval-limit rows, read only off the KRT account
    * @return the limit, or {@code null} when no tier matches
    */
   @Nullable
   BigDecimal applicableLimit(
-      @NotNull BankAccount account, @NotNull List<BankAccountApprovalLimit> limits) {
+      @NotNull BankAccount account, @NotNull Supplier<List<BankAccountApprovalLimit>> limitRows) {
     if (account.getType() == BankAccountType.CARTEL) {
       return account.getEmployeeApprovalCeiling();
     }
+    List<BankAccountApprovalLimit> limits = limitRows.get();
     for (BankAccountApprovalLimit limit : limits) {
       if (limit.getGranteeKind() == BankAccountViewGranteeKind.USER
           && actor.is(limit.getGranteeUserId())) {
@@ -296,7 +304,7 @@ final class BankAccessJudgement {
     }
     return switch (account.getType()) {
       case ORG_UNIT, AREA -> holder;
-      case SPECIAL -> actor.holdsSeat(MembershipRole.OL_MEMBER) || staffRights.management();
+      case SPECIAL -> holdsSeat(MembershipRole.OL_MEMBER) || staffRights.management();
       case CARTEL, CARTEL_BANK -> false;
     };
   }
@@ -393,7 +401,40 @@ final class BankAccessJudgement {
    */
   private boolean holdsSeatOn(@NotNull UUID orgUnitId, @Nullable String roleCode) {
     MembershipRole role = parseMembershipRole(roleCode);
-    return role != null && actor.holdsSeatOn(orgUnitId, role);
+    return role != null && holdsSeatOn(orgUnitId, role);
+  }
+
+  /**
+   * Whether the actor holds the seat on the org unit and the seat confers anything, which it does
+   * only while its holder holds {@code KRT Member} (REQ-SEC-015).
+   *
+   * @param orgUnitId the org unit
+   * @param role the seat
+   * @return {@code true} iff the actor holds the seat there as a {@code KRT Member}
+   */
+  private boolean holdsSeatOn(@NotNull UUID orgUnitId, @NotNull MembershipRole role) {
+    return seatsConfer && actor.holdsSeatOn(orgUnitId, role);
+  }
+
+  /**
+   * Whether the actor holds the seat on any org unit and the seat confers anything (REQ-SEC-015).
+   *
+   * @param role the seat
+   * @return {@code true} iff the actor holds the seat as a {@code KRT Member}
+   */
+  private boolean holdsSeat(@NotNull MembershipRole role) {
+    return seatsConfer && actor.holdsSeat(role);
+  }
+
+  /**
+   * Whether the actor's seats confer any bank right: only while the actor holds {@code KRT Member};
+   * a seat retained after losing it confers nothing (REQ-SEC-015).
+   *
+   * @param actor the actor
+   * @return {@code true} iff the actor's seats count
+   */
+  static boolean seatsConfer(@NotNull BankActor actor) {
+    return actor.holds(Roles.KRT_MEMBER);
   }
 
   /**
@@ -405,10 +446,10 @@ final class BankAccessJudgement {
   private boolean isProfitBereichsleiter() {
     if (profitBereichsleiter == null) {
       profitBereichsleiter =
-          actor.holdsSeat(MembershipRole.BEREICHSLEITER)
+          holdsSeat(MembershipRole.BEREICHSLEITER)
               && bereichRepository.findByDepartment(Department.PROFIT).stream()
                   .map(Bereich::getId)
-                  .anyMatch(id -> actor.holdsSeatOn(id, MembershipRole.BEREICHSLEITER));
+                  .anyMatch(id -> holdsSeatOn(id, MembershipRole.BEREICHSLEITER));
     }
     return profitBereichsleiter;
   }

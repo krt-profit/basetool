@@ -661,18 +661,20 @@ BACKEND_RELAY_FAILED`.* The backend's Redis user already holds `GET` on
   CLIENT_REVOKED` on the next request, and the first call of a new device login with
   `offline_access` is answered.*
 - [x] A departed member is refused on the next request. *The backend half is in (WP 3.1): the roster
-  sync and the login sync publish `MemberDepartedEvent` when an active member is disabled, loses
-  every role or disappears from Keycloak, and `ExchangeDepartureService` then — after the sync's
-  commit, only while the registry holds a client — removes the member's consent for each client and
+  sync publishes `MemberDepartedEvent` when an active member is disabled in or disappears from
+  Keycloak, and the role write publishes it when an admin withdraws KRT Member in the Basetool
+  (REQ-SEC-088); `ExchangeDepartureService` then — after that commit, only while the registry holds
+  a client — removes the member's consent for each client and
   logs them out of every session, and only then reads the time and writes a revocation for every
   client (mirror and database), also when a Keycloak step failed, so no token refreshed meanwhile
   carries a later `iat`; it audits `EXCHANGE_MEMBER_DEPARTED`. A failed step is counted and alerts
-  (`ExchangeDepartureIncomplete`) instead of failing the sync (`ExchangeDepartureServiceTest`,
-  `ExchangeDepartureIntegrationTest`, `UserReconciliationServiceTest`).
+  (`ExchangeDepartureIncomplete`) instead of failing the sync or the role write
+  (`ExchangeDepartureServiceTest`, `ExchangeDepartureIntegrationTest`,
+  `UserReconciliationServiceTest`, `UserRoleControllerIntegrationTest`).
   The gateway refuses the member through the per-client revocations those steps write
-  (`ExchangeGateTest`). End to end: `ExchangeDepartureE2eTest` — the member loses every realm role
-  in Keycloak, their next sign-in reconciles the departure through the login sync, and the
-  client's next request is refused `401 CLIENT_REVOKED`. The roster sync's trigger is covered by
+  (`ExchangeGateTest`). End to end: `ExchangeDepartureE2eTest` — an admin withdraws the member's
+  KRT Member role in the Basetool, the departure follows from that write, and the client's next
+  request is refused `401 CLIENT_REVOKED`. The roster sync's trigger is covered by
   `UserReconciliationServiceTest`; the E2E run leaves it alone because it reconciles every account
   of the shared stack.*
 
@@ -2257,6 +2259,14 @@ topic the browser did not subscribe to stay allowed, since all that is left of t
 re-fetches (ADR-0094). A later frame of the order, after the member's undo, re-renders the order
 and the store section together and lifts the lock. A client learns of a web change only from the feed
 (REQ-XCH-051); no push channel to clients exists.
+
+The bank family takes part too (REQ-BXCH-004): every applied raise, correction and cancel of a
+booking request announces `bank/requestQueue` and `orgunit-bank/orgUnitBank`, exactly what the
+web's request forms announce, so the staff queue, „Anträge an unsere Konten" and the request page
+(REQ-BANK-068) update in place; a refused write announces nothing.
+
+- [x] An applied bank write announces both rooms, a refused one neither (`ExchangeLiveSyncTest`,
+  `ExchangeBankRequestWriteLiveSyncTest`, `LiveSyncTopicRegistryParityTest`).
 
 **Status:** built for the web pages — `ExchangeLiveSync`, the frames of REQ-XCH-013 — WP 3.3
 (#2083), WP 4.1 (#2084), WP 4.2 (#2085), WP 4.4 (#2086); the refinery-order frames built for the

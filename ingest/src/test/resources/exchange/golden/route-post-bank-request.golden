@@ -18,6 +18,7 @@ x-correlation-id: <correlation-id>
 x-exchange-capabilities: exchange.bank.queue,exchange.bank.read,exchange.bank.request,exchange.blueprints.read,exchange.blueprints.write,exchange.connect,exchange.demand.details,exchange.demand.read,exchange.drafts.blueprints,exchange.drafts.refinery,exchange.hangar.read,exchange.hangar.write,exchange.orgstock.details,exchange.orgstock.read,exchange.orgstock.write,exchange.orgunits.read,exchange.refinery.read,exchange.refinery.store,exchange.refinery.write,exchange.stock.read,exchange.stock.write
 x-exchange-client: versekit
 x-exchange-connected-at: <connected-at>
+x-exchange-idempotency-key: <idempotency-key>
 x-exchange-installation: <thumbprint>
 x-ingest-on-behalf-of: 6f1c2e7a-3b4d-4c5e-8f60-718293a4b5c6
 {"type":"WITHDRAWAL","sourceAccountId":"11111111-2222-4333-8444-555555555555","amount":15000,"note":"Refuel at Port Olisar","justification":"Fuel for the Friday op"}

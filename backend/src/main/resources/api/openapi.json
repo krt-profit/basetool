@@ -8869,6 +8869,16 @@
             "format" : "uuid"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrantOwnerApprovalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -84928,6 +84938,16 @@
         },
         "required" : [ "userId" ]
       },
+      "GrantOwnerApprovalRequest" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        },
+        "required" : [ "version" ]
+      },
       "GroupedInventoryDto" : {
         "type" : "object",
         "properties" : {
@@ -96844,7 +96864,7 @@
             "format" : "int64"
           }
         },
-        "required" : [ "version" ]
+        "required" : [ "assigned", "version" ]
       },
       "UserRoleHolderDto" : {
         "type" : "object",

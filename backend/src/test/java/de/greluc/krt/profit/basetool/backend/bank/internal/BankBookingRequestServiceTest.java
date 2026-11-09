@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
@@ -56,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -105,7 +107,7 @@ class BankBookingRequestServiceTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
-  @Mock private BankRequestClientNames clientNames;
+  @Mock private ClientDirectory clientDirectory;
 
   private BankAccessRules policy;
   private BankBookingRequestService service;
@@ -134,7 +136,7 @@ class BankBookingRequestServiceTest {
             orgUnitMembershipQueryService,
             eventPublisher,
             purposeObservers,
-            clientNames);
+            new BankRequestClientNames(clientDirectory));
   }
 
   @Test
@@ -713,7 +715,7 @@ class BankBookingRequestServiceTest {
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     BankActor actor = TestBankActor.of(requester).build();
 
-    BankBookingRequestDto dto = service.cancelOwn(actor, requestId, 0L);
+    BankBookingRequestDto dto = service.cancelOwn(actor.userId(), requestId, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CANCELLED);
     verify(bankAuditService)
@@ -750,7 +752,7 @@ class BankBookingRequestServiceTest {
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     BankActor actor = TestBankActor.of(UUID.randomUUID()).build();
 
-    assertThrows(NotFoundException.class, () -> service.cancelOwn(actor, requestId, 0L));
+    assertThrows(NotFoundException.class, () -> service.cancelOwn(actor.userId(), requestId, 0L));
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
   }
 
@@ -766,7 +768,8 @@ class BankBookingRequestServiceTest {
     BankActor actor = TestBankActor.of(requester).build();
 
     BankConflictException ex =
-        assertThrows(BankConflictException.class, () -> service.cancelOwn(actor, requestId, 1L));
+        assertThrows(
+            BankConflictException.class, () -> service.cancelOwn(actor.userId(), requestId, 1L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
   }
 
@@ -853,6 +856,83 @@ class BankBookingRequestServiceTest {
 
     assertThat(request.isRequiresOwnerApproval()).isTrue();
     assertThat(request.getRequiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);
+  }
+
+  /**
+   * A purpose-bound request keeps the amount and recipient its purpose checked: a correction that
+   * changes either is refused and changes nothing (REQ-BANK-056, REQ-BANK-061).
+   */
+  @Test
+  void updateOwn_purposeBoundAmountOrRecipientChange_isRefused() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    UUID recipient = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setPurposeKind(BankPurposeKind.PURCHASING_DEAL);
+    request.setCounterpartyUserId(recipient);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    BankActor actor = TestBankActor.of(requester).build();
+
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.updateOwn(
+                actor,
+                requestId,
+                new UpdateBankBookingRequest(
+                    new BigDecimal("900000"), null, "reason", null, recipient, null, 0L),
+                false,
+                null,
+                null));
+    assertThrows(
+        BadRequestException.class,
+        () ->
+            service.updateOwn(
+                actor,
+                requestId,
+                new UpdateBankBookingRequest(
+                    new BigDecimal("500"), null, "reason", null, UUID.randomUUID(), null, 0L),
+                false,
+                null,
+                null));
+
+    assertThat(request.getAmount()).isEqualByComparingTo(new BigDecimal("500"));
+    assertThat(request.getCounterpartyUserId()).isEqualTo(recipient);
+    verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  /** A purpose-bound request still takes a corrected note and Begr&uuml;ndung (REQ-BANK-056). */
+  @Test
+  void updateOwn_purposeBoundNoteOnly_isApplied() {
+    UUID requestId = UUID.randomUUID();
+    UUID requester = UUID.randomUUID();
+    BankBookingRequest request =
+        pending(
+            requestId,
+            account(UUID.randomUUID()),
+            BankBookingRequestType.WITHDRAWAL,
+            requester,
+            0L);
+    request.setPurposeKind(BankPurposeKind.PURCHASING_DEAL);
+    when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
+    BankActor actor = TestBankActor.of(requester).build();
+
+    service.updateOwn(
+        actor,
+        requestId,
+        new UpdateBankBookingRequest(
+            new BigDecimal("500"), "fixed typo", "reason", null, null, null, 0L),
+        false,
+        null,
+        null);
+
+    assertThat(request.getNote()).isEqualTo("fixed typo");
   }
 
   /** A request whose over-limit approval was already granted cannot be edited (REQ-BANK-056). */

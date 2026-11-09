@@ -367,6 +367,10 @@ with `manage-clients` alone the client-policy endpoints answer **403**, with `ma
 client endpoints answer **403**. The service account deliberately cannot edit its own role mappings
 (that needs `manage-users`), so it cannot widen its own reach.
 
+The role rollback (`scripts/restore-keycloak-realm-roles.py`, ADR-0355) reads and writes user role
+mappings and therefore also needs **`view-users`** and **`manage-users`**; assign them only for that
+run and withdraw them right after it.
+
 The credential is short-lived in use, too: the service-account token carries the realm's 300 s
 access-token lifespan and there is no refresh token on the client-credentials grant, so a step run
 after a long pause may need step 2 again.
@@ -378,8 +382,8 @@ script needs a session.
 ## Open findings (hardening, tracked separately)
 
 - **`fullScopeAllowed: true` on `basetool-frontend`** would grant the member's realm roles into the
-  web client's tokens; the client withholds the `roles` scope, and no application role is a realm
-  role any more (ADR-0355). Deliberately not a hardening step: narrowing it belongs to ADR-0001's
+  web client's tokens; the client withholds the `roles` scope, and the only application role left
+  in the realm is `Admin`, the admin-OTP marker the Basetool never reads (ADR-0355 *Amendment 3*). Deliberately not a hardening step: narrowing it belongs to ADR-0001's
   confidential-client migration.
 - **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
   true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The

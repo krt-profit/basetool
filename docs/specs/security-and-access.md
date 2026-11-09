@@ -1234,9 +1234,12 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
   flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
   units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
-  blueprint overview and the org-unit bank balances, and the Leitung page.
+  blueprint overview and the org-unit bank balances, the Leitung page, and every seat-derived bank
+  right on the web and the exchange (REQ-BANK-034): the responsible holder with its approval
+  exemption and configuration rights, the OL's KRT-account and Sonderkonto rights and top-band
+  approval, and the seat-bucket view grants and approval tiers.
   **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
-  `CustomJwtGrantedAuthoritiesConverterTest`.
+  `CustomJwtGrantedAuthoritiesConverterTest`, `BankAccessRulesTest` (`*WithoutKrtMember*`).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
 **Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
@@ -3522,10 +3525,11 @@ would not repair an identity, it would falsify history.
 | Stock, hangar, refinery orders, personal inventory and blueprints                                   | The audit trail, in both its forms                                                                                    |
 | Org-unit memberships and the Grand-Admiral office                                                   | Who granted, requested, decided, initiated, executed, paid out                                                        |
 | Missions owned, party-lead and unit responsibility, manager and participant rows, order assignments | The account's own approval history, and who decided it                                                                |
-| Materialbörse offers, requests and interest                                                         | `user_roles` — assigned in the Basetool, guarded by `roles_version` (REQ-SEC-088)                                  |
-| Bank grants, view grants, approval limits, the holder row                                           | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
-| Notifications, rule selectors                                                                       | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
-| Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
+| Materialbörse offers, requests and interest                                                         | `terms_acceptance` — consent is recorded per account; the member is asked once more rather than having one back-dated |
+| Bank grants, view grants, approval limits, the holder row                                           | The exchange's client revocations, change sequence and write journal (REQ-XCH-008, REQ-XCH-013, REQ-XCH-022)          |
+| Notifications, rule selectors                                                                       | The admin bulk-undo runs (who requested them) and their per-member skips (REQ-XCH-034)                                |
+| Connected-application installations and their ship links (REQ-XCH-007, REQ-XCH-017)                 |                                                                                                                       |
+| Roles (`user_roles`), joined with the target's; both role-set counters move (REQ-SEC-088)           |                                                                                                                       |
 
 **The merge is an orchestrator over participants** (plan §7.6, `platform.api`). Each module that
 holds member columns declares them in its `UserReassignmentParticipant` — the columns that follow
@@ -4433,11 +4437,16 @@ gateway's acting-member path (ADR-0129), which installs an authentication withou
 `Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
 `PendingApprovalAccessFilter` is the only reader.
 
-**Approving a registration grants `KRT Member`** (REQ-SEC-088), so every approved account is a
-member. **There is therefore no account holding only a bank role, or only any other role**
-(confirmed by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a
-gate on the member surface. An account whose KRT Member an admin withdraws has departed
-(`MemberDepartedEvent`) and is refused `NO_ROLE` unless it still holds another role.
+**Approving a registration grants `KRT Member`** (REQ-SEC-088), so every approved account starts as
+a member. Two shapes hold a role without `KRT Member`, and `isMemberOrAbove()` stays a safe gate on
+the member surface for both:
+
+- **A bootstrap subject's account holds `Admin` alone** (REQ-SEC-088). `Admin` is one of
+  `Roles.MEMBER_OR_ABOVE`, so it passes the member gates as every admin does.
+- **A departed member who keeps a bank role**: an admin withdrew KRT Member, which is a departure
+  (`MemberDepartedEvent`). Neither bank role is in `Roles.MEMBER_OR_ABOVE` nor reaches one through
+  the role hierarchy, so the member gates refuse that account; it keeps only what the bank role
+  grants. An account left with no role is refused `NO_ROLE`.
 
 **The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
@@ -5338,9 +5347,9 @@ not create it.
 > manual: delete that account in Keycloak.
 >
 > The carve-out itself stays — the first admin must never be lockable out by the
-> approval gate — but it no longer fires silently: a brand-new row that is `ACTIVE` on
-> arrival bumps `basetool_admin_registration_auto_activated_total` on whichever path inserts
-> it, and `AdminAccountAutoActivated` alerts on any occurrence.
+> approval gate — but it does not fire silently: every bootstrap Admin grant at login, to a new
+> or an existing account, bumps `basetool_admin_registration_auto_activated_total`, and
+> `AdminAccountAutoActivated` alerts on any occurrence.
 
 **The history checkbox is a wish, not an instruction** (REQ-SEC-062). The member may additionally
 ask for the handle snapshots that survive a deletion to be anonymised. Nothing acts on that
@@ -6126,6 +6135,12 @@ dry run by default, with a rollback file, never deleting.
   access* step is load-bearing: Keycloak fails a flow whose only entry is a conditional sub-flow
   that does not apply, which would refuse every Discord login of a member with *invalid username
   or password*, and an *alternative* beside the block is ignored.
+- **The realm role `Admin` is the OTP marker only** ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)
+  *Amendment 3*). The Basetool authorises from `user_roles` and never reads it; the realm keeps the
+  role, the provisioner never deletes it and lists a realm without it as a manual step, and its
+  assignments are kept in step with the Basetool's `Admin` by hand
+  ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)).
+  An account holding the Basetool's `Admin` without the realm role is not asked for a second factor.
 - **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
   that cannot be answered with a mail is not offered. The reset page (`login-reset-password.ftl`)
   asks for the e-mail address or the username and tells a Discord-registered user that the username
@@ -6159,6 +6174,8 @@ dry run by default, with a rollback file, never deleting.
   of Keycloak's flow evaluation lets a member's brokered login through and asks an admin for the
   code (`harden-keycloak-realm.py --selftest`; the flow's shape on a real Keycloak:
   `harden-keycloak-realm.integration.py`).
+- [x] The provisioner keeps the realm role `Admin` and names a realm without it as a manual step
+  (`provision-keycloak-realm.test.sh`, sections 4c and 4d).
 - [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
   realm has no real Discord provider, only a disabled stand-in the bind is exercised on); the owner checks it at the production run
   ([`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md) § 7).
@@ -6254,12 +6271,14 @@ surface.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).
-Keycloak holds none of them and no token carries them.
+No token the Basetool reads carries them. Keycloak keeps only the realm role `Admin`, as the
+condition of the admin OTP (REQ-SEC-082); the Basetool never reads it.
 
 - **Read from the database only.** `CustomJwtGrantedAuthoritiesConverter` assembles the
   authorities from the stored roles and ignores a `realm_access` claim. A committed role change
   publishes `UserRolesChangedEvent`, which evicts every cached authority set of the member, so the
-  backend applies it on the member's next request. The frontend maps no role from the OIDC token;
+  backend applies it on the member's next request; an assembly that overlapped a role change does
+  not cache its result, so it cannot put the old roles back for the cache's TTL. The frontend maps no role from the OIDC token;
   `BackendRoleSyncFilter` takes the roles from `/api/v1/users/me` on the first request of a
   session and every 60 seconds after (ADR-0122).
 - **Never written by login or sync.** The login (`UserReconciliationService#syncUser(Jwt)`) and the
@@ -6274,7 +6293,11 @@ Keycloak holds none of them and no token carries them.
   bank management assigns and withdraws Bank Employee in the bank grant management (*Bank-Mitarbeiter*)
   and sees only that role of a role set; anyone else gets `403`
   (`PUT /api/v1/users/{id}/roles/{role}`, `GET /api/v1/users/{id}/roles`,
-  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place.
+  `GET /api/v1/users/role-holders?role=…`). Both surfaces update in place. The role tab is the
+  `roles` section of the member's live-sync room `member:{userId}` (REQ-FE-015), so another admin's
+  open tab follows a change with the new counter. Either surface's change also refreshes the other
+  one: the role tab pokes the bank staff's `grants` and `manage` sections, and the
+  *Bank-Mitarbeiter* forms poke the member's room.
 - **Its own counter.** `app_user.roles_version` guards a user's role set (V362) and is echoed on every
   change; a stale counter answers `409 OPTIMISTIC_LOCK`. The row `@Version` does not move with a
   role change, so a role change and an edit of the user record never collide. A change that leaves
@@ -6282,27 +6305,39 @@ Keycloak holds none of them and no token carries them.
 - **The last admin.** Withdrawing Admin while no other active account (approved, present and enabled
   in Keycloak) holds it answers `409 LAST_ADMIN`; the Admin role row is locked first, so two
   withdrawals are checked one after the other.
+- **The account merge.** Merging two accounts of one member (REQ-SEC-046) joins the source's roles
+  to the target's, bumps both counters and evicts both accounts' cached authorities, so the
+  emptied account holds no role and no longer counts for the last-admin rule.
 - **The departure.** Withdrawing KRT Member publishes `MemberDepartedEvent` with the reason
   `member_role_withdrawn`, so the exchange revocations and the unit notices follow (REQ-XCH-008).
+  On the role tab this withdrawal, and an admin's withdrawal of their own Admin role, goes through
+  the danger confirm (`showKrtConfirm`, `ui-design-system.md` rule 3) that names the consequences; a declined confirm
+  leaves the toggle and the role set as they were.
 - **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
   Keycloak subjects, empty by default; a value that is not a UUID fails the start) lists subjects
   that receive Admin at login while no other active admin exists; the account is approved with it
-  and the same request is authorised as Admin.
+  and the same request is authorised as Admin. A bootstrap subject's logins take the Admin role row
+  lock before they read the account, so concurrent first requests grant it once.
 - **Traces.** Every change, the bootstrap grant included, records `USER_ROLE_ASSIGNED` /
   `USER_ROLE_WITHDRAWN` (subject and target the member, details the `role` code and, for the
   bootstrap grant, `source=bootstrap`; REQ-AUDIT-001), counts
   `basetool_user_role_changes_total{role,action}`, tells the member through `USER_ROLE_CHANGED`
   (not mutable, V363) and calls the `RolesChangedObserver`s.
 
-The provisioner deletes the four realm roles (with KRT Member's place in `default-roles-<realm>`)
-and withholds the `roles` client scope from `basetool-frontend`; the e2e and sandbox realms carry
-neither. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
+The provisioner deletes the realm roles KRT Member, Bank Employee and Bank Management (with KRT
+Member's place in `default-roles-<realm>`), keeps `Admin` and withholds the `roles` client scope
+from `basetool-frontend`; the e2e and sandbox realms carry none of the four roles and no `roles`
+scope. The frontend therefore requests only `openid, profile, email`, since Keycloak refuses a
+scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
 final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
 
-**Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
+**Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `BootstrapAdminLoginIntegrationTest`,
+`CustomJwtGrantedAuthoritiesConverterTest`,
 `UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`, `UserRegistrationServiceTest`,
 `BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`, `BankGrantsPageControllerTest`,
-`SecurityConfigTest` (frontend), `provision-keycloak-realm.test.sh` (section 4c),
+`MemberEditPageRenderTest`, `member-roles.test.mjs` (`testMemberRolesJs`),
+`SecurityConfigTest` (frontend), `FrontendRequestedScopesParityTest`,
+`provision-keycloak-realm.test.sh` (sections 4c and 4d), `UserAccountMergeEndStateTest`,
 `build-sandbox-realm.py --selftest`, `restore-keycloak-realm-roles.py --selftest` ·
 **Code:** `identity/internal/UserRoleAssignmentService`, `RoleAssignmentPolicy`,
 `RoleChangeRecorder`, `BootstrapAdminGrant`, `ApprovalMemberGrant`, `identity/web/UserRoleController`,
@@ -6314,14 +6349,25 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] The bank management changes Bank Employee and is refused every other role.
 - [x] The last active admin keeps Admin (`409 LAST_ADMIN`).
 - [x] Withdrawing KRT Member publishes the departure.
+- [x] The role tab confirms withdrawing KRT Member, and an admin's own Admin role, naming the
+  consequences.
 - [x] Each change is audited, counted and announced; an unchanged role set leaves no trace.
 - [x] A bootstrap subject receives Admin at login only while no other active admin exists.
+- [x] With `APP_BOOTSTRAP_ADMIN_SUBS` set, the granting request itself is authorised as Admin, and
+  concurrent first requests all succeed with one stored grant.
 - [x] A token's realm roles grant nothing; the stored roles authorise, and a login writes none.
 - [x] A role assigned in the Basetool applies on the member's next request of the same session.
 - [x] Approving a registration grants KRT Member.
+- [x] An account merge moves the source's roles onto the target and bumps both role-set counters
+  (`UserAccountMergeEndStateTest`).
 - [x] The roster sync writes no role.
 - [x] The frontend maps no role from the OIDC token.
-- [x] The provisioner deletes the four realm roles and the web login's role claim.
+- [x] The provisioner deletes the three retired realm roles and the web login's role claim, and
+  keeps the admin-OTP marker `Admin`.
+- [x] The frontend requests no scope its client is not offered in the e2e and sandbox realms.
+- [x] The rollback gives every exported role back, takes the default role and KRT Member from an
+  account that departed in the Basetool, stops on a refused read, and exits `1` on an empty export
+  or a skipped account (`restore-keycloak-realm-roles.py --selftest`).
 
 ## Out of scope
 

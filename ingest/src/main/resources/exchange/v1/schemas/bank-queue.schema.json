@@ -207,8 +207,8 @@
             "string",
             "null"
           ],
-          "maxLength": 128,
-          "description": "The connected application that raised the request; null when it was raised in the Basetool or the origin is not recorded."
+          "maxLength": 63,
+          "description": "The registry id of the connected application that raised the request; null when it was raised in the Basetool or the origin is not recorded."
         },
         "link": {
           "type": "string",

@@ -341,7 +341,7 @@ class MemberManagementControllerTest {
               eq("/api/v1/users/{id}/rsi-handle"), eq(UserRsiHandleResponse.class), eq(id)))
           .thenReturn(new UserRsiHandleResponse("Alice_RSI"));
 
-      controller.editMember(id, null, model, redirectAttributes);
+      controller.editMember(id, null, null, model, redirectAttributes);
 
       assertEquals("Alice_RSI", model.getAttribute("memberRsiHandle"));
     }
@@ -356,7 +356,7 @@ class MemberManagementControllerTest {
               eq("/api/v1/users/{id}/rsi-handle"), eq(UserRsiHandleResponse.class), eq(id)))
           .thenThrow(new IllegalStateException("backend down"));
 
-      String view = controller.editMember(id, null, model, redirectAttributes);
+      String view = controller.editMember(id, null, null, model, redirectAttributes);
 
       assertEquals("identity/member-edit", view);
       assertNull(model.getAttribute("memberRsiHandle"));
@@ -370,7 +370,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(user);
 
-      String view = controller.editMember(id, null, model, redirectAttributes);
+      String view = controller.editMember(id, null, null, model, redirectAttributes);
 
       assertEquals("identity/member-edit", view);
       assertSame(user, model.getAttribute("user"));
@@ -395,7 +395,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(user);
 
-      controller.editMember(id, "profile", model, redirectAttributes);
+      controller.editMember(id, "profile", null, model, redirectAttributes);
 
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
       assertEquals(
@@ -430,7 +430,7 @@ class MemberManagementControllerTest {
       when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(id)))
           .thenReturn(user);
 
-      controller.editMember(id, "different-source", model, redirectAttributes);
+      controller.editMember(id, "different-source", null, model, redirectAttributes);
 
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
       assertSame(existingForm, form, "existing form with non-null source must NOT be replaced");
@@ -444,7 +444,7 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .get(anyString(), anyClass(), any(Object[].class));
 
-      String view = controller.editMember(id, null, model, redirectAttributes);
+      String view = controller.editMember(id, null, null, model, redirectAttributes);
 
       assertEquals("redirect:/members", view);
       assertEquals(
@@ -465,7 +465,7 @@ class MemberManagementControllerTest {
               eq(MembershipDeltaResponse.class),
               eq(id));
 
-      String view = controller.editMember(id, null, model, redirectAttributes);
+      String view = controller.editMember(id, null, null, model, redirectAttributes);
 
       assertEquals("identity/member-edit", view);
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
@@ -506,7 +506,7 @@ class MemberManagementControllerTest {
               eq(id)))
           .thenReturn(detail);
 
-      controller.editMember(id, null, model, redirectAttributes);
+      controller.editMember(id, null, null, model, redirectAttributes);
 
       MemberEditForm form = (MemberEditForm) model.getAttribute("memberEditForm");
       assertNotNull(form);
@@ -535,7 +535,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(true);
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals(
           "identity/member-edit", view, "validation errors must re-render directly, NOT redirect");
@@ -556,7 +556,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals("redirect:/members", view);
       ArgumentCaptor<UserAttributesUpdateDto> body =
@@ -581,7 +581,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals(
           "redirect:/profile",
@@ -602,7 +602,7 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .put(anyString(), any(), any(), any(Object[].class));
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals("redirect:/members/" + id + "/edit", view);
       assertEquals(
@@ -622,7 +622,7 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .put(anyString(), any(), any(), any(Object[].class));
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals(
           "redirect:/members/" + id + "/edit?source=profile",
@@ -641,7 +641,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      controller.updateMember(id, form, br, model, redirectAttributes);
+      controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       verify(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
@@ -659,7 +659,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      controller.updateMember(id, form, br, model, redirectAttributes);
+      controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       verify(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
@@ -680,7 +680,7 @@ class MemberManagementControllerTest {
           .when(backendApiClient)
           .put(eq("/api/v1/users/{id}/attributes"), any(), eq(Void.class), eq(id));
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals("redirect:/members/" + id + "/edit", view);
       assertEquals(
@@ -698,7 +698,7 @@ class MemberManagementControllerTest {
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      String view = controller.updateMember(id, form, br, model, redirectAttributes);
+      String view = controller.updateMember(id, form, br, null, model, redirectAttributes);
 
       assertEquals("redirect:/members", view);
       ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);

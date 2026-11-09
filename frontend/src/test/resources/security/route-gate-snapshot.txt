@@ -402,6 +402,7 @@
 /members/{id}/consolidate POST -> MemberManagementController#consolidateMemberAjax gate=method:hasRole('ADMIN') layout=yes
 /members/{id}/delete POST -> MemberManagementController#deleteMember gate=method:hasRole('ADMIN') layout=yes
 /members/{id}/edit GET -> MemberManagementController#editMember gate=class:hasRole('ADMIN') layout=yes
+/members/{id}/edit GET params=[fragment=memberRoles] -> MemberManagementController#memberRolesFragment gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/edit POST -> MemberManagementController#updateMember gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/edit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberManagementController#updateMemberAjax gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/export GET -> MemberManagementController#memberExport gate=class:hasRole('ADMIN') layout=yes

@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -116,13 +117,25 @@ class ExchangeBankRequestWriteRouteTest {
 
   @Test
   void aRaisedRequestIsRelayedAndAnsweredWithCreated() throws Exception {
-    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any()))
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), anyString()))
         .thenReturn(ok(example("bank-request-write--written/valid/pending.json")));
 
     call(HttpMethod.POST, ROUTE, example("bank-request-write--raise/valid/withdrawal.json"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.status").value("PENDING"))
         .andExpect(jsonPath("$.amount").value(15000));
+  }
+
+  @Test
+  void aRaiseRelaysTheClientsIdempotencyKeySoARetryFindsItsRequest() throws Exception {
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), anyString()))
+        .thenReturn(ok(example("bank-request-write--written/valid/pending.json")));
+
+    call(HttpMethod.POST, ROUTE, example("bank-request-write--raise/valid/withdrawal.json"))
+        .andExpect(status().isCreated());
+
+    verify(relay)
+        .forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), startsWith("test-"));
   }
 
   @Test
@@ -169,11 +182,12 @@ class ExchangeBankRequestWriteRouteTest {
         .andExpect(jsonPath("$.errors[0].pointer").value("/id"));
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any(), any());
   }
 
   @Test
   void theBanksRefusalReachesTheClientWithItsCode() throws Exception {
-    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any()))
+    when(relay.forward(eq(HttpMethod.POST), eq(BACKEND), any(), any(), any(), anyString()))
         .thenReturn(
             new ExchangeRelay.Result(
                 409,

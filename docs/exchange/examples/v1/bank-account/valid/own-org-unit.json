@@ -45,5 +45,6 @@
     1250000
   ],
   "requestable": true,
-  "ownLimit": 1000
+  "ownLimit": 1000,
+  "approvalExempt": false
 }

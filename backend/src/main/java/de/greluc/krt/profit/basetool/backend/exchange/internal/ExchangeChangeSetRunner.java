@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Execution;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Outcome;
@@ -28,11 +27,9 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSet
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Write;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Written;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
-import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -139,15 +136,6 @@ public class ExchangeChangeSetRunner {
    */
   private void count(
       @NotNull ExchangeCaller caller, @NotNull ExchangeResource resource, @NotNull String outcome) {
-    meterRegistry
-        .counter(
-            ExchangeMetricNames.EXCHANGE_WRITES,
-            MetricNames.TAG_CLIENT_ID,
-            caller.clientId(),
-            ExchangeMetricNames.TAG_RESOURCE,
-            resource.name().toLowerCase(Locale.ROOT),
-            MetricNames.TAG_OUTCOME,
-            outcome)
-        .increment();
+    ExchangeWrites.count(meterRegistry, caller.clientId(), resource.feed(), outcome);
   }
 }

@@ -164,15 +164,115 @@ class BankAccessRulesTest {
   }
 
   @Test
-  void accessTo_seatsWithoutKrtMember_overseeNothing() {
+  void accessTo_seatsWithoutKrtMember_overseeAndHoldNothing() {
     stubFind(staffelAccount);
     BankActor formerMember =
-        TestBankActor.of(UUID.randomUUID()).seat(staffelId, MembershipRole.STAFFELLEITER).build();
+        TestBankActor.of(UUID.randomUUID())
+            .roles("BANK_EMPLOYEE")
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .reach(staffelId)
+            .build();
 
-    BankAccountAccess access = policy.accessTo(formerMember, staffelAccount.getId(), null);
+    assertThat(policy.accessTo(formerMember, staffelAccount.getId(), null))
+        .isSameAs(BankAccountAccess.Hidden.INSTANCE);
+  }
 
-    assertThat(access.has(BankAccountRight.VIEW)).isFalse();
-    assertThat(access.has(BankAccountRight.RESPONSIBLE_HOLDER)).isTrue();
+  @Test
+  void accessTo_olSeatWithoutKrtMember_holdsNeitherTheKrtAccountNorASonderkonto() {
+    BankAccount special = account(BankAccountType.SPECIAL, null, BankAccountStatus.ACTIVE);
+    BankActor formerOl =
+        TestBankActor.of(UUID.randomUUID())
+            .roles("BANK_EMPLOYEE")
+            .seat(staffelId, MembershipRole.OL_MEMBER)
+            .build();
+
+    stubFind(cartelAccount);
+    assertThat(policy.accessTo(formerOl, cartelAccount.getId(), null))
+        .isSameAs(BankAccountAccess.Hidden.INSTANCE);
+    stubFind(special);
+    assertThat(policy.accessTo(formerOl, special.getId(), null))
+        .isSameAs(BankAccountAccess.Hidden.INSTANCE);
+  }
+
+  @Test
+  void staffRights_olSeatWithoutKrtMember_approvesNoTopBandRequest() {
+    BankActor formerOl =
+        TestBankActor.of(UUID.randomUUID())
+            .roles("BANK_EMPLOYEE")
+            .seat(staffelId, MembershipRole.OL_MEMBER)
+            .build();
+
+    BankStaffRights rights = policy.staffRights(formerOl);
+
+    assertThat(rights.mayApprove(BankRequestApprover.ORGANISATIONSLEITUNG, false)).isFalse();
+  }
+
+  @Test
+  void admit_seatWithoutKrtMember_isNoApprovalExemptHolder() {
+    BankActor formerLead =
+        TestBankActor.of(UUID.randomUUID())
+            .roles("BANK_EMPLOYEE")
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .build();
+
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(staffelAccount);
+    request.setType(BankBookingRequestType.WITHDRAWAL);
+
+    BankAdmission.Admitted routing =
+        policy.routeCorrection(formerLead, request, new BigDecimal("50"));
+
+    assertThat(routing.requiresApproval()).isTrue();
+    assertThat(routing.requiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);
+  }
+
+  @Test
+  void approves_decidesForTheRequestsAccountWithoutReadingEveryAccount() {
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(staffelAccount);
+    request.setRequestedBy(UUID.randomUUID());
+    request.setRequiredApprover(BankRequestApprover.RESPONSIBLE_HOLDER);
+    BankActor lead =
+        TestBankActor.member(UUID.randomUUID())
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .build();
+    BankActor member = TestBankActor.member(UUID.randomUUID()).build();
+
+    assertThat(policy.approves(lead, request)).isTrue();
+    assertThat(policy.approves(member, request)).isFalse();
+    assertThat(
+            policy.approves(
+                TestBankActor.member(request.getRequestedBy())
+                    .seat(staffelId, MembershipRole.STAFFELLEITER)
+                    .build(),
+                request))
+        .isFalse();
+    verify(accountRepository, never()).findAllByOrderByAccountNoAsc();
+  }
+
+  @Test
+  void accessTo_krtAccount_readsNoApprovalLimitRows() {
+    stubFind(cartelAccount);
+
+    policy.accessTo(TestBankActor.member(UUID.randomUUID()).build(), cartelAccount.getId(), null);
+
+    verify(approvalLimitRepository, never()).findByAccountId(any());
+  }
+
+  @Test
+  void canView_readsTheViewRuleOnlyAndNoApprovalLimitRows() {
+    BankActor member =
+        TestBankActor.member(UUID.randomUUID()).seat(staffelId, MembershipRole.MEMBER).build();
+    BankAccountViewGrant allMembers = new BankAccountViewGrant();
+    allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    when(viewGrantRepository.findByAccountId(staffelAccount.getId()))
+        .thenReturn(List.of(allMembers));
+
+    assertThat(policy.canView(member, staffelAccount, null)).isTrue();
+    assertThat(
+            policy.canView(TestBankActor.member(UUID.randomUUID()).build(), staffelAccount, null))
+        .isFalse();
+    verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
   @Test

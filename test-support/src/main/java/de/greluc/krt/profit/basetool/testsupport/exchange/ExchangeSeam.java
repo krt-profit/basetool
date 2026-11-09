@@ -329,6 +329,9 @@ public final class ExchangeSeam {
   /** The relay header carrying the connection time in epoch seconds. */
   public static final String CONNECTED_AT_HEADER = "X-Exchange-Connected-At";
 
+  /** The header relaying the client's idempotency key of a bank raise; sent on that route only. */
+  public static final String IDEMPOTENCY_KEY_HEADER = "X-Exchange-Idempotency-Key";
+
   /** The five relay headers, in the order above. */
   public static final @Unmodifiable List<String> RELAY_HEADERS =
       List.of(

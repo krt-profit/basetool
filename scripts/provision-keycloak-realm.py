@@ -33,8 +33,11 @@ def _load_kcadm():
 kcadm = _load_kcadm()
 KcadmError = kcadm.KcadmError
 
-RETIRED_APPLICATION_ROLES = ["KRT Member", "Bank Employee", "Bank Management", "Admin"]
+RETIRED_APPLICATION_ROLES = ["KRT Member", "Bank Employee", "Bank Management"]
 RETIRED_APPLICATION_ROLES_REASON = "held in the Basetool's user_roles, ADR-0355"
+# The admin-OTP sub-flows (harden-keycloak-realm.py) condition on this realm role; the Basetool
+# never reads it, and its assignments are kept in step with user_roles by hand (REQ-SEC-082).
+ADMIN_OTP_ROLE = "Admin"
 ROLES_SCOPE = "roles"
 
 GRAFANA_ADMIN_ROLE = "grafana-admin"
@@ -1450,14 +1453,19 @@ class Planner:
                                        f"realm role '{RETIRED_REALM_ROLE}' deleted")))
 
     def plan_retired_application_roles(self) -> None:
-        """Delete the four application realm roles, ADR-0355.
+        """Delete the three retired application realm roles, ADR-0355, and keep `Admin`.
 
         Keycloak drops each role's user mappings and its place in the default-role composite, so
         no token carries it and a new account no longer holds KRT Member. The runbook's final
         roster sync must have run first; the rollback script recreates them from `user_roles`.
+        The realm role `Admin` stays as the admin-OTP marker; a realm without it is a manual step.
         """
         changes = self.section("retired — the application realm roles (ADR-0355)")
         present = {role.get("name"): role for role in (self.kc.get("roles") or [])}
+        if ADMIN_OTP_ROLE not in present:
+            self.manual.append(
+                f"realm role '{ADMIN_OTP_ROLE}' is missing: create it and map every Basetool admin "
+                f"to it by hand, the admin OTP is conditioned on it (REQ-SEC-082)")
         default_role = self.default_role_name()
         for name in RETIRED_APPLICATION_ROLES:
             if name in present:

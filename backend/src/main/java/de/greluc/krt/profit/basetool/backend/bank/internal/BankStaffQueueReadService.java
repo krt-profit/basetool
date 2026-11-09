@@ -66,6 +66,9 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       int limit) {
     BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
     BankStaffRights rights = scope.rights();
+    if (!servesAnything(scope)) {
+      return Optional.empty();
+    }
     List<BankBookingRequest> pending =
         requestRepository.findAllByStatus(BankBookingRequestStatus.PENDING).stream()
             .sorted(Comparator.comparing(BankStaffQueueReadService::key, ORDER))
@@ -74,7 +77,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
         pending.stream().filter(request -> inStaffQueue(request, rights)).toList();
     List<BankBookingRequest> toApprove =
         pending.stream().filter(request -> awaitsApprovalBy(request, scope)).toList();
-    if (!rights.staff() && rights.grantedAccountIds().isEmpty() && toApprove.isEmpty()) {
+    if (!servesStaff(rights) && toApprove.isEmpty()) {
       return Optional.empty();
     }
     List<BankBookingRequest> openPage = after(open, openAfter, limit + 1);
@@ -91,6 +94,27 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
                 .map(BankBookingRequest::getCreatedAt)
                 .min(Comparator.naturalOrder())
                 .orElse(null)));
+  }
+
+  /**
+   * Whether the queue can hold anything for the actor at all: bank staff, a grant, or an account
+   * whose requests the actor may approve. Decided before any request is read.
+   *
+   * @param scope the actor's foreign-request scope
+   * @return {@code false} iff the queue is refused without a read
+   */
+  private static boolean servesAnything(@NotNull BankAccessRules.ForeignRequestScope scope) {
+    return servesStaff(scope.rights()) || !scope.candidateAccountIds().isEmpty();
+  }
+
+  /**
+   * Whether the actor has a staff queue: a bank role or a grant row.
+   *
+   * @param rights the actor's staff rights
+   * @return {@code true} iff the {@code open} section exists for the actor
+   */
+  private static boolean servesStaff(@NotNull BankStaffRights rights) {
+    return rights.staff() || !rights.grantedAccountIds().isEmpty();
   }
 
   /**
@@ -118,9 +142,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       @NotNull BankBookingRequest request, @NotNull BankAccessRules.ForeignRequestScope scope) {
     return request.isRequiresOwnerApproval()
         && !request.isOwnerApprovalGranted()
-        && !scope.rights().boundByFourEyes(request.getRequestedBy())
-        && scope.candidateAccountIds().contains(request.getAccount().getId())
-        && scope.shows(request.getRequiredApprover(), request.getAccount().getId());
+        && scope.approves(request);
   }
 
   /**
@@ -232,8 +254,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
         request.isRequiresOwnerApproval(),
         request.getRequiredApprover(),
         request.isOwnerApprovalGranted(),
-        rights.canBook(request.getType(), account.getId())
-            && !rights.boundByFourEyes(request.getRequestedBy()),
+        BankBookingRequestDtos.callerMayConfirm(request, rights),
         balances.get(account.getId()),
         request.getClientId());
   }

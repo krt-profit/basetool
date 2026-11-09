@@ -738,8 +738,17 @@
         "x-domain" : "exchange"
       },
       "post" : {
-        "description" : "Gateway-only. A deposit, withdrawal or transfer with the web's validation and approval routing; a deposit may target any active account. An unknown, closed or hidden account answers 404 NOT_FOUND; 20 pending requests answer 409 BANK_OPEN_REQUEST_CAP. Books nothing.",
+        "description" : "Gateway-only. A deposit, withdrawal or transfer with the web's validation and approval routing; a deposit may target any active account. An unknown, closed or hidden account answers 404 NOT_FOUND; 20 pending requests answer 409 BANK_OPEN_REQUEST_CAP. A raise under an idempotency key the client already raised a request of the member with answers that request. Books nothing.",
         "operationId" : "raise",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Exchange-Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "[A-Za-z0-9._~-]{8,128}"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -4160,6 +4169,9 @@
           },
           "accountNo" : {
             "type" : "string"
+          },
+          "approvalExempt" : {
+            "type" : "boolean"
           },
           "balance" : {
             "type" : "integer",

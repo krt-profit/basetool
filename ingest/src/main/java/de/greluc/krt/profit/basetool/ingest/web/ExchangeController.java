@@ -413,68 +413,6 @@ public class ExchangeController {
   }
 
   /**
-   * Lists the members a refinery pickup's store lines may book onto.
-   *
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the receivers or a problem
-   */
-  @GetMapping("/me/store-choices/receivers")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> storeChoiceReceivers(
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    ExchangeRequestContext context = ExchangeRequestContext.of(request);
-    if (context == null) {
-      return responses.failed();
-    }
-    return responses.relayed(
-        relay.forward(
-            HttpMethod.GET, BACKEND + "/me/store-choices/receivers", null, context, acceptLanguage),
-        "store-choice-receivers.schema.json",
-        List.of(),
-        context,
-        request);
-  }
-
-  /**
-   * Lists the active job orders the member sees that need a material, for a store line's earmark.
-   *
-   * @param material the material's id
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the job orders or a problem
-   */
-  @GetMapping("/me/store-choices/job-orders")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> storeChoiceJobOrders(
-      @Nullable @RequestParam(required = false) String material,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    ExchangeRequestContext context = ExchangeRequestContext.of(request);
-    if (context == null) {
-      return responses.failed();
-    }
-    if (material == null || !UUID_SHAPE.matcher(material).matches()) {
-      return responses.schemaInvalid(
-          List.of(new ExchangeSchemas.Violation("/material", "must be a material id")));
-    }
-    return responses.relayed(
-        relay.forward(
-            HttpMethod.GET,
-            BACKEND + "/me/store-choices/job-orders?material=" + material.toLowerCase(Locale.ROOT),
-            null,
-            context,
-            acceptLanguage),
-        "store-choice-job-orders.schema.json",
-        List.of(),
-        context,
-        request);
-  }
-
-  /**
    * Returns a snapshot page of the shared stock of the member's direct units.
    *
    * @param cursor the cursor of the last page, or {@code null} for a new snapshot

@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -36,17 +38,16 @@ import org.jetbrains.annotations.NotNull;
  * are the reachable codes, so a Bankleitung lists {@code BANK_EMPLOYEE} too (use {@link
  * #bankManagement()}).
  */
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 final class TestBankActor {
 
+  /** The member's id. */
   private final UUID userId;
+
   private final Set<String> roles = new LinkedHashSet<>();
   private final List<BankActor.Seat> seats = new ArrayList<>();
   private final Set<UUID> officerReach = new LinkedHashSet<>();
   private final Map<UUID, BankActor.Grant> grants = new LinkedHashMap<>();
-
-  private TestBankActor(@NotNull UUID userId) {
-    this.userId = userId;
-  }
 
   /**
    * Starts an actor without roles, seats or grants.

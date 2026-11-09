@@ -197,6 +197,20 @@ class UserRoleControllerIntegrationTest {
   }
 
   @Test
+  @DisplayName("a body without assigned is refused and withdraws nothing")
+  void aBodyWithoutAssignedIsRefused() throws Exception {
+    mockMvc
+        .perform(
+            put(url(member) + "/" + Roles.KRT_MEMBER)
+                .with(asAdmin(admin))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}"))
+        .andExpect(status().isBadRequest());
+
+    assertThat(events.stream(MemberDepartedEvent.class)).isEmpty();
+  }
+
+  @Test
   @DisplayName("the bank management assigns and withdraws Bank Employee and nothing else")
   void bankManagementAssignsOnlyBankEmployee() throws Exception {
     User manager = saveUser("role-bank-manager", Roles.BANK_MANAGEMENT);

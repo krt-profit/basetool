@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -147,8 +148,7 @@ public class BankBookingRequestService {
     request.setAmount(draft.amount());
     request.setNote(draft.note());
     request.setJustification(draft.justification());
-    applyCounterparty(
-        request,
+    request.applyCounterparty(
         resolveRequestCounterparty(
             type, draft.counterpartyUserId(), draft.counterpartyOrgUnitId()));
     request.setStatus(BankBookingRequestStatus.PENDING);
@@ -166,7 +166,9 @@ public class BankBookingRequestService {
     BankPurpose purpose = draft.purpose();
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
-    request.setClientId(draft.clientId());
+    BankRequestOrigin origin = draft.origin();
+    request.setClientId(origin == null ? null : origin.clientId());
+    request.setIdempotencyKey(origin == null ? null : origin.idempotencyKey());
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(
@@ -264,21 +266,6 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Writes a resolved counterparty snapshot onto the request, clearing all four counterparty
-   * columns when it is {@code null}.
-   *
-   * @param request the request to stamp
-   * @param counterparty the resolved snapshot, or {@code null} to clear
-   */
-  private static void applyCounterparty(
-      @NotNull BankBookingRequest request, @Nullable CounterpartySnapshot counterparty) {
-    request.setCounterpartyUserId(counterparty == null ? null : counterparty.userId());
-    request.setCounterpartyHandle(counterparty == null ? null : counterparty.handle());
-    request.setCounterpartyOrgUnitId(counterparty == null ? null : counterparty.orgUnitId());
-    request.setCounterpartyOrgUnitName(counterparty == null ? null : counterparty.orgUnitName());
-  }
-
-  /**
    * Pages the current caller's own booking requests in the given states (REQ-BANK-022). Per-user
    * isolation: it reads strictly the caller's {@code sub}, never a foreign request.
    *
@@ -291,10 +278,7 @@ public class BankBookingRequestService {
       @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     return authHelperService
         .currentUserId()
-        .map(sub ->
-            requestRepository
-                .findByRequestedByAndStatusIn(sub, statuses, pageable)
-                .map(this::toDto))
+        .map(sub -> toDtos(requestRepository.findByRequestedByAndStatusIn(sub, statuses, pageable)))
         .orElseGet(() -> Page.empty(pageable));
   }
 
@@ -314,8 +298,9 @@ public class BankBookingRequestService {
    * @throws NotFoundException when the request does not exist or belongs to another user
    * @throws BankConflictException {@code BANK_REQUEST_NOT_PENDING} when already decided, {@code
    *     BANK_REQUEST_ALREADY_APPROVED} when the responsible holder already signed off
-   * @throws BadRequestException on an inconsistent destination account or counterparty, or a
-   *     missing Begr&uuml;ndung on a mandating account
+   * @throws BadRequestException on an inconsistent destination account or counterparty, a missing
+   *     Begr&uuml;ndung on a mandating account, or a changed amount, destination or recipient of a
+   *     purpose-bound request
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
   @NotNull
@@ -338,15 +323,17 @@ public class BankBookingRequestService {
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
           "An approved request can no longer be edited; cancel it and raise a new one");
     }
+    PurposeBoundCorrections.requireTermsKept(request, update);
     BankBookingRequestType type = request.getType();
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
     }
     applyTargetAccount(request, type, update.targetAccountId());
-    applyCounterparty(
-        request,
-        resolveRequestCounterparty(
-            type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    UUID counterpartyId = update.counterpartyUserId();
+    UUID counterpartyUnit = update.counterpartyOrgUnitId();
+    if (!request.namesCounterparty(counterpartyId, counterpartyUnit)) {
+      request.applyCounterparty(resolveRequestCounterparty(type, counterpartyId, counterpartyUnit));
+    }
     request.setAmount(update.amount());
     request.setNote(update.note());
     request.setJustification(update.justification());
@@ -433,12 +420,16 @@ public class BankBookingRequestService {
     if (scope.candidateAccountIds().isEmpty()) {
       return List.of();
     }
-    return requestRepository
-        .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
-        .stream()
-        .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
-        .filter(request -> scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
-        .map(this::toDto)
+    List<BankBookingRequest> shown =
+        requestRepository
+            .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
+            .stream()
+            .filter(scope::approves)
+            .toList();
+
+    Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
+    return shown.stream()
+        .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
         .toList();
   }
 
@@ -447,7 +438,7 @@ public class BankBookingRequestService {
    * decided one a 409. Fires {@link BankBookingRequestCancelledEvent}, which clears the staff's
    * stale "new booking request" notifications (REQ-NOTIF-018).
    *
-   * @param actor the requester the ownership is checked for
+   * @param requester the member the ownership is checked for, or {@code null} for none
    * @param requestId the request to cancel
    * @param version the echoed optimistic-locking version
    * @return the cancelled request
@@ -458,9 +449,9 @@ public class BankBookingRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto cancelOwn(
-      @NotNull BankActor actor, @NotNull UUID requestId, long version) {
+      @Nullable UUID requester, @NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(actor, request)) {
+    if (!policy.ownsRequest(requester, request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);
@@ -551,12 +542,13 @@ public class BankBookingRequestService {
       return Page.empty(pageable);
     }
     BankStaffRights rights = staffRights();
-    return pageQueue(statuses, pageable, rights)
-        .map(request ->
-            BankBookingRequestDtos.of(
-                request,
-                clientNames.nameOf(request),
-                BankBookingRequestDtos.callerMayConfirm(request, rights)));
+    Page<BankBookingRequest> page = pageQueue(statuses, pageable, rights);
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request ->
+        BankBookingRequestDtos.of(
+            request,
+            names.apply(request),
+            BankBookingRequestDtos.callerMayConfirm(request, rights)));
   }
 
   /**
@@ -961,6 +953,19 @@ public class BankBookingRequestService {
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
     return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
+  }
+
+  /**
+   * Maps a page of request entities as {@link #toDto(BankBookingRequest)} does, naming every row's
+   * client from one registry read.
+   *
+   * @param page the page of request entities
+   * @return the page of wire DTOs
+   */
+  @NotNull
+  private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
   }
 
   /**

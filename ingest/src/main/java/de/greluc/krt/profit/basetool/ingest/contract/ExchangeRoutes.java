@@ -115,6 +115,10 @@ public final class ExchangeRoutes {
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/correction", "exchange.bank.request"),
           write(HttpMethod.POST, BANK_PATH + "/requests/{id}/cancel", "exchange.bank.request"));
 
+  /** The bank route family as a pattern, matched against the decoded path segments. */
+  private static final PathPattern BANK_FAMILY =
+      PathPatternParser.defaultInstance.parse(BANK_PATH + "/**");
+
   /** Not instantiable. */
   private ExchangeRoutes() {}
 
@@ -133,13 +137,14 @@ public final class ExchangeRoutes {
   }
 
   /**
-   * Tells whether a request path belongs to the bank route family.
+   * Tells whether a request path belongs to the bank route family, judged on the decoded segments
+   * as {@link #find} matches them, so a percent-encoded spelling is in the family too.
    *
-   * @param path the request path
+   * @param path the raw request path
    * @return {@code true} for {@link #BANK_PATH} and every path below it
    */
   public static boolean isBank(@NotNull String path) {
-    return path.equals(BANK_PATH) || path.startsWith(BANK_PATH + "/");
+    return BANK_FAMILY.matches(PathContainer.parsePath(path));
   }
 
   /**

@@ -94,9 +94,10 @@ class UserReassignmentOrderTest {
               + "exchange_bulk_undo_skip.user_id,exchange_name_withholding.user_id",
           "160:AuditUserReassignment||audit_event.actor_user_id,audit_event.target_user_id",
           "170:OperationUserReassignment||operation_payout_status.paid_out_by_user_id",
-          "180:IdentityUserReassignment||app_user.approved_by_id,user_approval_event.user_id,"
+          "180:IdentityUserReassignment|user_roles.user_id[role_id]"
+              + "|app_user.approved_by_id,user_approval_event.user_id,"
               + "user_approval_event.decided_by_id,deletion_request.user_id,"
-              + "deletion_request.decided_by_id,user_roles.user_id,terms_acceptance.user_id",
+              + "deletion_request.decided_by_id,terms_acceptance.user_id",
           "190:SupplyUserReassignment|supply_donation.donor_user_id,supply_donation.received_by,"
               + "supply_need.created_by|",
           "200:PurchasingUserReassignment|purchasing_delegate.user_id,"

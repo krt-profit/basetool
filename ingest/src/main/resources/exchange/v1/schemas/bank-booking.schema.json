@@ -23,6 +23,7 @@
         "DEPOSIT",
         "WITHDRAWAL",
         "TRANSFER",
+        "HOLDER_TRANSFER",
         "WIPE_RESET",
         "REVERSAL"
       ]

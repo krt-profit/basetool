@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.LastAdminException;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -52,7 +51,7 @@ public class UserRoleAssignmentService {
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final RoleAssignmentPolicy policy;
-  private final RoleChangeRecorder recorder;
+  private final RoleSetWriter writer;
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
 
@@ -96,22 +95,14 @@ public class UserRoleAssignmentService {
     policy.requireMayAssign(role);
     User user = requireUser(userId);
     OptimisticLock.checkRequired(user.getRolesVersion(), expectedVersion, User.class, userId);
-    if (holds(user, role) == assigned) {
+    if (RoleSetWriter.holds(user, role) == assigned) {
       return toDto(user, policy.assignableRoles(), expectedVersion);
     }
     if (!assigned && role == AssignableRole.ADMIN) {
       requireAnotherActiveAdmin(userId);
     }
-    if (userRepository.bumpRolesVersionIfMatches(userId, expectedVersion) == 0) {
-      throw new ObjectOptimisticLockingFailureException(User.class, userId);
-    }
-    user.setRolesVersion(expectedVersion + 1);
-    if (assigned) {
-      user.getRoles().add(requireRole(role));
-    } else {
-      user.getRoles().removeIf(held -> role.getCode().equals(held.getCode()));
-    }
-    recorder.changed(user, role, assigned, authHelperService.currentUserId().orElse(null));
+    writer.write(
+        user, role, assigned, expectedVersion, authHelperService.currentUserId().orElse(null));
     if (!assigned && role == AssignableRole.KRT_MEMBER) {
       eventPublisher.publishEvent(
           new MemberDepartedEvent(userId, MemberDepartedEvent.REASON_MEMBER_ROLE_WITHDRAWN));
@@ -154,17 +145,10 @@ public class UserRoleAssignmentService {
     return Entities.require(userRepository.findById(userId), "User not found");
   }
 
-  private Role requireRole(AssignableRole role) {
-    return Entities.require(roleRepository.findByCode(role.getCode()), "Role not found");
-  }
-
-  private static boolean holds(User user, AssignableRole role) {
-    return user.getRoles().stream().anyMatch(held -> role.getCode().equals(held.getCode()));
-  }
-
   private static UserRoleSetDto toDto(
       User user, List<AssignableRole> assignable, long rolesVersion) {
-    List<AssignableRole> held = assignable.stream().filter(role -> holds(user, role)).toList();
+    List<AssignableRole> held =
+        assignable.stream().filter(role -> RoleSetWriter.holds(user, role)).toList();
     return new UserRoleSetDto(user.getId(), held, assignable, rolesVersion);
   }
 }

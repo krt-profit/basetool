@@ -63,6 +63,12 @@ public class ExchangeLiveSync {
   /** The section of a refinery order's detail room that announces the order's deletion. */
   static final String REFINERY_ORDER_DELETED = "deleted";
 
+  /** The section of the bank-staff room's request queue. */
+  static final String REQUEST_QUEUE = "requestQueue";
+
+  /** The section of the org-unit bank room, which the request page joins as well. */
+  static final String ORG_UNIT_BANK = "orgUnitBank";
+
   private final LiveSyncPublisher publisher;
 
   /**
@@ -119,6 +125,16 @@ public class ExchangeLiveSync {
     deleted.forEach(order ->
         afterCommit(
             LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER_DELETED));
+  }
+
+  /**
+   * Refreshes the bank pages a booking request appears on after the commit, as the web's request
+   * forms announce it (REQ-XCH-030, REQ-BANK-068): the staff queue, the org-unit bank and the
+   * request page; each viewer re-reads its own view.
+   */
+  public void bankRequestsChanged() {
+    afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.BANK_STAFF), REQUEST_QUEUE);
+    afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.ORGUNIT_BANK), ORG_UNIT_BANK);
   }
 
   /**

@@ -53,8 +53,9 @@ import org.jetbrains.annotations.Nullable;
  *     {@code null} to derive the requester at confirmation
  * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
  * @param purpose what another module raised the request for (REQ-BANK-061), or {@code null}
- * @param clientId the connected application that raised it through the exchange (REQ-BANK-067), or
- *     {@code null} for a request raised in the Basetool
+ * @param origin the connected application that raised it through the exchange, with the client's
+ *     idempotency key (REQ-BANK-067, REQ-BXCH-004), or {@code null} for a request raised in the
+ *     Basetool
  */
 public record BankBookingRequestDraft(
     @NotNull BankActor requester,
@@ -70,4 +71,4 @@ public record BankBookingRequestDraft(
     @Nullable UUID counterpartyUserId,
     @Nullable UUID counterpartyOrgUnitId,
     @Nullable BankPurpose purpose,
-    @Nullable String clientId) {}
+    @Nullable BankRequestOrigin origin) {}

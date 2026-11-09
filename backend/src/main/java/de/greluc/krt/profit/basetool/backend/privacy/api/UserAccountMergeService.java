@@ -94,9 +94,8 @@ public class UserAccountMergeService {
    * Returns every user column that records an act rather than a belonging, and therefore stays with
    * the source account.
    *
-   * <p>Includes the audit columns (REQ-AUDIT-001), the requester of a bank booking request, {@code
-   * user_roles} (re-derived on every login, REQ-SEC-013) and {@code terms_acceptance} (consent is
-   * per account).
+   * <p>Includes the audit columns (REQ-AUDIT-001), the requester of a bank booking request and
+   * {@code terms_acceptance} (consent is per account).
    *
    * @return one qualified column name per staying column, in participant order
    */

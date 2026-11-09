@@ -107,6 +107,20 @@ public final class BackendClientHarness implements AutoCloseable {
             .setBody(json));
   }
 
+  /**
+   * Queues an RFC 7807 problem answer.
+   *
+   * @param status the error status
+   * @param code the problem's {@code code}
+   */
+  public void answerProblem(int status, @NotNull String code) {
+    server.enqueue(
+        new MockResponse()
+            .setResponseCode(status)
+            .setHeader("Content-Type", "application/problem+json")
+            .setBody("{\"status\":" + status + ",\"code\":\"" + code + "\"}"));
+  }
+
   /** Queues a bodiless {@code 204} answer. */
   public void answerEmpty() {
     server.enqueue(new MockResponse().setResponseCode(204));

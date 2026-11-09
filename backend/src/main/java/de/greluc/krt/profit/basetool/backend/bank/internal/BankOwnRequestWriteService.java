@@ -27,17 +27,20 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Serves {@link BankOwnRequestWrites} through the web's request services (REQ-BXCH-004): the
  * payload passes the web's bean validation, the policy admits and routes for the given actor, and a
- * raised request records the connected application the gate admitted (REQ-BANK-067).
+ * raised request records the connected application the gate admitted (REQ-BANK-067) and the
+ * client's idempotency key, so a retry after a lost answer answers the request it raised.
  *
  * <p>What the exchange adds is only its refusals: an unknown, closed or hidden account and another
  * member's request answer the same {@link NotFoundException}, and a member who holds {@link
@@ -60,8 +63,11 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   @NotNull
   @Transactional
   public Written raise(
-      @NotNull BankActor actor, @NotNull NewRequest request, @NotNull String clientId) {
-    CreateBankBookingRequest payload =
+      @NotNull BankActor actor,
+      @NotNull NewRequest request,
+      @NotNull String clientId,
+      @Nullable String idempotencyKey) {
+    final CreateBankBookingRequest payload =
         valid(
             new CreateBankBookingRequest(
                 request.sourceAccountId(),
@@ -74,14 +80,27 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
                 request.splitPercent(),
                 null,
                 null));
-    requireBelowCap(actor);
+    UUID requester = lockOpenRequests(actor);
+    if (idempotencyKey != null) {
+      Optional<BankBookingRequest> earlier =
+          requestRepository.findByClientIdAndRequestedByAndIdempotencyKey(
+              clientId, requester, idempotencyKey);
+      if (earlier.isPresent()) {
+        return written(earlier.get().getId());
+      }
+    }
+    requireBelowCap(requester);
     BankAccount account = activeAccount(request.sourceAccountId());
     if (request.targetAccountId() != null) {
       activeAccount(request.targetAccountId());
     }
     BankBookingRequestDto raised =
         requestService.raiseForClient(
-            actor, account, payload, BankOwnRequestWriteService::notFound, clientId);
+            actor,
+            account,
+            payload,
+            BankOwnRequestWriteService::notFound,
+            new BankRequestOrigin(clientId, idempotencyKey));
     return written(raised.id());
   }
 
@@ -113,21 +132,33 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   @Transactional
   public Written cancel(@NotNull BankActor actor, @NotNull UUID requestId, long version) {
     ownRequest(actor, requestId);
-    bookingRequestService.cancelOwn(actor, requestId, version);
+    bookingRequestService.cancelOwn(actor.userId(), requestId, version);
     return written(requestId);
   }
 
   /**
-   * Refuses a request once the member holds the cap of pending requests, whichever channel raised
-   * them. The member's cap lock, held until the raise's transaction ends, makes a concurrent raise
-   * count only after this one committed or rolled back.
+   * Takes the member's open-request lock, held until the raise's transaction ends, so a concurrent
+   * raise of the same member counts the cap and looks up its idempotency key only after this one
+   * committed or rolled back.
    *
    * @param actor the requester
-   * @throws BankOpenRequestCapException at or over the cap
+   * @return the requester's id
    */
-  private void requireBelowCap(@NotNull BankActor actor) {
+  @NotNull
+  private UUID lockOpenRequests(@NotNull BankActor actor) {
     UUID requester = Objects.requireNonNull(actor.userId(), "An exchange actor names its member");
     requestRepository.lockOpenRequestCap(requester);
+    return requester;
+  }
+
+  /**
+   * Refuses a request once the member holds the cap of pending requests, whichever channel raised
+   * them; the caller holds the member's open-request lock.
+   *
+   * @param requester the requester's id
+   * @throws BankOpenRequestCapException at or over the cap
+   */
+  private void requireBelowCap(@NotNull UUID requester) {
     if (requestRepository.countByRequestedByAndStatus(requester, BankBookingRequestStatus.PENDING)
         >= properties.openRequestCap()) {
       throw new BankOpenRequestCapException();

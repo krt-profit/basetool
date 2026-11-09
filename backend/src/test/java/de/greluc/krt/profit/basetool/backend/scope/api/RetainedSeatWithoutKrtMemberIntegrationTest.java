@@ -191,7 +191,7 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     User view = new User();
     view.setId(holder.getId());
     view.setApprovalStatus(holder.getApprovalStatus());
-    view.setRoles(krtMember ? Set.of(namedRole("KRT Member")) : Set.of());
+    view.setRoles(krtMember ? Set.of(codeRole(Roles.KRT_MEMBER)) : Set.of());
     List<GrantedAuthority> authorities = new ArrayList<>(converter.assembleFor(view));
     SecurityContextHolder.getContext()
         .setAuthentication(
@@ -223,9 +223,10 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     return user;
   }
 
-  private static Role namedRole(String name) {
+  private static Role codeRole(String code) {
     Role role = new Role();
-    role.setName(name);
+    role.setCode(code);
+    role.setName(code);
     role.setPermissions(Set.of());
     return role;
   }

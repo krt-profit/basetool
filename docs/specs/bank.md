@@ -840,6 +840,13 @@ org-unit-blind.
 > „Details" button any more, the table view keeps „Details & Verlauf" / „Details & Verwaltung". Below
 > the account list the Konten tab shows **„Laufende Anträge"** — the caller's own and the
 > to-be-approved pending requests with their approval path (REQ-BANK-041).
+>
+> **Amendment (unit naming):** the page is named after the unit, not the code term „Org-Einheit",
+> because its menu link opens a tab bar that also carries „Leitung" (REQ-UI-026). The drawer link
+> in the „Staffel" group reads **„Meine Einheit"** (`nav.bank.myOrgUnit`, EN „My unit"), this
+> page's tab **„Bank"** (`nav.tab.unitBank`) and its title **„Bank meiner Einheit"**
+> (`bank.orgUnit.title`, EN „My unit's bank"). The entry key `orgunitbank.overview` and the URL
+> `/org-unit-bank` stay, so favourites, start pages and phone-tab slots keep working.
 
 **Acceptance**
 
@@ -1503,6 +1510,11 @@ view it (REQ-BANK-035). Resolution stays inside the `OrgUnitBankAccessService` s
 the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the code calls this
 *responsible* (never "holder"/"Halter"), to avoid colliding with the aUEC-custody `BankHolder`
 (ADR-0039); the German UI uses "Kontoverantwortliche/r".
+
+A seat confers the holder's rights only while its holder holds `KRT Member` (REQ-SEC-015): a
+Staffelleiter, SK lead, Bereichsleiter or OL member who loses it keeps the seat row but holds no
+account, is no longer approval-exempt, may approve nothing and configures nothing, on the web and on
+the exchange (`BankAccessRulesTest`, `*WithoutKrtMember*`).
 
 > **Amended by REQ-BANK-047 (middle band corrected to the Bankleitung by ADR-0109):** for **request
 > approval** the KRT account (`CARTEL`) no longer routes to the OL collegium alone — the amount-tiered
@@ -2406,7 +2418,7 @@ action „Schwellen speichern". Bar, scale and example follow the fields as you 
 primary action in the page head (Halter: „+ Umbuchung", with „+ Halter registrieren" as a ghost
 button for the Bankleitung; Konten: „+ Konto anlegen" / „+ Sonderkonto anlegen").
 
-**Approval surface & confirmation.** The two non-staff approvers act in **Org-Einheits-Bank → „Anträge
+**Approval surface & confirmation.** The two non-staff approvers act in **Meine Einheit → Bank → „Anträge
 an unsere Konten"** („Fremde Anträge" until 2026-10-03), band-routed: the Bankleitung sees only the `BANK_MANAGEMENT`-band requests, the OL only the
 `ORGANISATIONSLEITUNG`-band ones (an admin sees **and approves all three bands** — `canApprove` /
 `BankStaffRights#mayApprove` short-circuit for an administrator before the band check); their in-app grant records
@@ -2809,7 +2821,7 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 
-A **withdrawal request** raised from the Org-Einheits-Bank page carries an optional
+A **withdrawal request** raised from the unit bank page (`/org-unit-bank`) carries an optional
 **Empfänger** — the member who receives the payout — pre-filled with the requester.
 
 Before this, only the bank employee's Kontobewegung modal could record a counterparty (REQ-BANK-044,
@@ -2894,16 +2906,29 @@ against it at all; the type decides the whole field shape. Changing either makes
 click, on the same row. Keeping them out also keeps this endpoint off the eligibility-resolution
 path, where a mistake would be an authorization defect rather than a bad edit.
 
+**A purpose-bound request keeps its amount, destination and recipient** (REQ-BANK-061). Its
+purpose module checked them when it raised the request — a purchasing tranche against the deal
+total, the advance share and the limits — and books against them on confirmation, so a correction
+that changes any of them is refused with `400` and changes nothing; note and Begründung stay
+correctable. The edit form shows amount and recipient of such a request fixed. To change them, the
+member cancels the request and raises it anew in its module (`BankBookingRequestServiceTest`,
+`updateOwn_purposeBound*`).
+
 **The approval snapshot is re-derived from the new amount.** This is the security-critical half:
 without it a requester could file 100 aUEC under a 1000 ceiling and then edit it to 100 000, arriving
-at the bank employee still carrying the original "no approval needed" snapshot. The seam resolves it
-through the *same* `resolveApprovalRouting` the create path uses — extracted precisely so the two
-cannot drift apart.
+at the bank employee still carrying the original "no approval needed" snapshot. The correction is
+routed exactly as its raise was (`BankAccessRules#routeCorrection`): a deposit stays unrouted
+(REQ-BANK-042), a purpose-bound request keeps the routing of its raise (the KRT ladder for a KRT
+withdrawal, none otherwise, REQ-BANK-061), and every other withdrawal or transfer runs the raise's
+routing for the new amount (`OrgUnitBankAccessServiceTest`, `updateOwnBookingRequest_*`).
 
 **An already-approved request is frozen** (`BANK_REQUEST_ALREADY_APPROVED`, 409). The approval was
 granted for the amount and reason **as they stood**; allowing an edit afterwards would convert a
 small approved request into an arbitrarily large pre-approved one. The UI withholds the edit button
-in that state rather than offering a dead end.
+in that state rather than offering a dead end. For the same reason the approval itself echoes the
+version the approver read (`POST …/requests/{id}/owner-approval` with `{ version }`): a request
+corrected in the meantime, in the Basetool or through a connected application, answers `409` and
+stays unapproved (`OrgUnitBankAccessServiceTest`, `grantOwnerApproval_staleVersion_*`).
 
 The endpoint is `PUT /api/v1/bank/org-units/requests/{id}` with **PUT semantics** (an omitted field
 clears it), guarded under the row lock by: ownership (a foreign id is **404**, never 403 — the same
@@ -3190,22 +3215,27 @@ and the backend decides what it shows.
   (REQ-BANK-022), the bank staff who see the request's account (REQ-BANK-009, REQ-BANK-023) and its
   approvers (REQ-BANK-041, REQ-BANK-046); four-eyes keeps the requester out of the approvers
   (REQ-BANK-062). Anyone else and an unknown id get the same `404`, and the page shows "Antrag nicht
-  gefunden".
+  gefunden". A requester who is neither staff nor approver reads it without the staff note
+  (REQ-BANK-054), as in their own list.
 - **Where to act.** The page decides nothing itself. While the request is pending it leads bank staff
   into the staff queue (`/bank/requests?focus={id}`), an approver to "Anträge an unsere Konten"
   (`/org-unit-bank?focus={id}#tab=fremde`) and the requester to their own requests; the one primary
   button is the action the caller can take now.
 - **Live.** A decision, an approval, a correction or a cancellation by anyone re-renders the detail
-  card in place through the org-unit bank room (REQ-FE-015).
+  card in place (REQ-FE-015): a member listens in the org-unit bank room, a bank-staff account
+  without a membership role in the bank-staff room, since every request write publishes to both
+  (`BankRequestPageControllerMvcTest`), a write through a connected application included: the
+  backend announces those itself (REQ-XCH-030).
 
 **Acceptance**
 
 - [x] The requester, a granted employee (with `callerMayConfirm`) and an approver read the request;
-  a foreign member, an employee without a grant on the account and an unknown id get `404`
-  (`BankRequestViewTest`).
+  a foreign member, an employee without a grant on the account and an unknown id get `404`; the
+  staff note reaches staff and approvers, never the requester (`BankRequestViewTest`).
 - [x] The page renders the details and the right way to act for staff, approvers and the requester,
   its `requestDetail` fragment resolves, and a hidden request shows the empty state
-  (`BankRequestPageControllerMvcTest`).
+  (`BankRequestPageControllerMvcTest`); the client reads the backend's `404` as no request and
+  still fails on every other error (`OrgUnitBankRequestsBackendClientTest`).
 
 **Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankRequestService#viewRequest`,
 `OrgUnitBankController#getRequest` (backend) ·

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderTransferRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
@@ -59,7 +60,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * The bank reads on the exchange (REQ-BXCH-002, REQ-BXCH-007): the accounts the member views with
- * the two facts about the member, the redacted bookings and the daily balance series, their
+ * the three facts about the member, the redacted bookings and the daily balance series, their
  * allow-lists, paging and refusals, against a seeded {@link BankAccessWorld}.
  */
 @SpringBootTest
@@ -78,7 +79,8 @@ class ExchangeBankReadsTest {
           "delta30d",
           "sparkline",
           "requestable",
-          "ownLimit");
+          "ownLimit",
+          "approvalExempt");
 
   private static final Set<String> BOOKING_FIELDS =
       Set.of(
@@ -131,6 +133,7 @@ class ExchangeBankReadsTest {
     assertThat(own.path("balanceTarget").isNull()).isTrue();
     assertThat(own.path("requestable").asBoolean()).isTrue();
     assertThat(own.path("ownLimit").asLong()).isEqualTo(1_000L);
+    assertThat(own.path("approvalExempt").asBoolean()).isFalse();
     assertThat(fields(own.path("orgUnit")))
         .containsExactlyInAnyOrder("id", "shorthand", "name", "kind");
     assertThat(own.path("orgUnit").path("kind").asString()).isEqualTo("SQUADRON");
@@ -138,6 +141,16 @@ class ExchangeBankReadsTest {
     assertThat(shared.path("orgUnit").isNull()).isTrue();
     assertThat(shared.path("requestable").asBoolean()).isFalse();
     assertThat(shared.path("ownLimit").isNull()).isTrue();
+    assertThat(shared.path("approvalExempt").asBoolean()).isFalse();
+  }
+
+  @Test
+  void theResponsibleHoldersNullLimitIsToldApartAsAnExemption() throws Exception {
+    JsonNode own = item(ok(accounts(Actor.STAFFELLEITER, Map.of())), Account.OWN_ORG_UNIT);
+
+    assertThat(own.path("requestable").asBoolean()).isTrue();
+    assertThat(own.path("ownLimit").isNull()).isTrue();
+    assertThat(own.path("approvalExempt").asBoolean()).isTrue();
   }
 
   @Test
@@ -305,6 +318,22 @@ class ExchangeBankReadsTest {
   }
 
   @Test
+  void theKrtAccountListsAHolderTransferFeeLegWithinItsPublishedSchema() throws Exception {
+    holderTransfer(new BigDecimal("10000"));
+
+    MockHttpServletResponse answer = bookings(Actor.MEMBER, Account.CARTEL, Map.of());
+
+    JsonNode fee = ok(answer).path("items").get(0);
+    assertThat(fee.path("type").asString()).isEqualTo("HOLDER_TRANSFER");
+    assertThat(fee.path("amount").asLong()).isEqualTo(-50L);
+    assertThat(fee.path("transferFee").asLong()).isEqualTo(50L);
+    ExchangePublishedSchemas.assertMatches(
+        "page.schema.json#/$defs/bankBookingPage",
+        answer.getContentAsString(),
+        "KRT bookings with a holder-transfer fee");
+  }
+
+  @Test
   void anAdministratorActsOnlyThroughTheirBankRolesGrantsAndMemberships() throws Exception {
     JsonNode page = ok(accounts(Actor.ADMIN, Map.of()));
 
@@ -441,6 +470,39 @@ class ExchangeBankReadsTest {
    */
   private void deposit(
       @NotNull UUID accountId, @NotNull BigDecimal amount, @Nullable UUID counterparty) {
+    asAdmin(() ->
+        ledgerService.bookDeposit(
+            new BankDepositRequest(
+                accountId,
+                world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+                amount,
+                null,
+                counterparty,
+                null)));
+  }
+
+  /**
+   * Books a custody handover between the two seeded holders as the seeded administrator; its fee
+   * leg lands on the KRT account.
+   *
+   * @param amount the amount handed over
+   */
+  private void holderTransfer(@NotNull BigDecimal amount) {
+    asAdmin(() ->
+        ledgerService.bookHolderTransfer(
+            new BankHolderTransferRequest(
+                world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+                world.holder(Holder.MANAGEMENT_HOLDER),
+                amount,
+                "Custody handover")));
+  }
+
+  /**
+   * Runs a ledger booking as the seeded administrator, flushed before and after.
+   *
+   * @param booking the booking
+   */
+  private void asAdmin(@NotNull Runnable booking) {
     entityManager.flush();
     SecurityContextHolder.getContext()
         .setAuthentication(
@@ -451,14 +513,7 @@ class ExchangeBankReadsTest {
                     .build(),
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     try {
-      ledgerService.bookDeposit(
-          new BankDepositRequest(
-              accountId,
-              world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
-              amount,
-              null,
-              counterparty,
-              null));
+      booking.run();
     } finally {
       SecurityContextHolder.clearContext();
     }

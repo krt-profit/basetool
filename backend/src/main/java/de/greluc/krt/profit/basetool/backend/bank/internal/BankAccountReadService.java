@@ -111,7 +111,7 @@ public class BankAccountReadService implements BankAccountReads {
             Pageable.ofSize(limit + 1));
     boolean hasMore = rows.size() > limit;
     List<BankBookingRow> page = hasMore ? rows.subList(0, limit) : rows;
-    List<BankBookingDto> dtos = accountService.toBookingDtos(page);
+    List<BankBookingDto> dtos = accountService.toBookingDtosWithoutHolders(page);
     List<Booking> items = new ArrayList<>(page.size());
     for (int i = 0; i < page.size(); i++) {
       items.add(toBooking(dtos.get(i), page.get(i).counterpartyUserId()));
@@ -155,7 +155,7 @@ public class BankAccountReadService implements BankAccountReads {
     return accountRepository
         .findById(accountId)
         .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
-        .filter(account -> policy.accessTo(actor, account, null).has(BankAccountRight.VIEW));
+        .filter(account -> policy.canView(actor, account, null));
   }
 
   /**
@@ -205,7 +205,8 @@ public class BankAccountReadService implements BankAccountReads {
         delta,
         List.copyOf(BankTrendCalculator.sparkline(balance, delta, slices)),
         access.has(BankAccountRight.REQUEST),
-        access.approvalLimit());
+        access.approvalLimit(),
+        access.approvalExempt());
   }
 
   /**

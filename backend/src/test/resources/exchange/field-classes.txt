@@ -2,6 +2,7 @@ account-check-request.schema.json#/properties/handle IDENTIFIER
 account-check-response.schema.json#/properties/result FACT_VALUE
 bank-account.schema.json#/properties/accountId IDENTIFIER
 bank-account.schema.json#/properties/accountNo IDENTIFIER
+bank-account.schema.json#/properties/approvalExempt FACT_VALUE
 bank-account.schema.json#/properties/balance FACT_VALUE
 bank-account.schema.json#/properties/balanceTarget FACT_VALUE
 bank-account.schema.json#/properties/delta30d FACT_VALUE

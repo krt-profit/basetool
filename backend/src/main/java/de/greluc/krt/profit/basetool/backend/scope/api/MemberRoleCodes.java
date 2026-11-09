@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import java.util.Collection;
 import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -65,14 +64,15 @@ public final class MemberRoleCodes {
   }
 
   /**
-   * The code a stored role grants as an authority: its name upper-cased, spaces as underscores.
+   * The code a stored role grants as an authority: its stable {@link Role#getCode() code}, so a
+   * renamed display label changes no authority.
    *
    * @param role the stored role
    * @return the role code without the {@code ROLE_} prefix
    */
   @NotNull
   static String codeOf(@NotNull Role role) {
-    return role.getName().toUpperCase(Locale.ROOT).replace(" ", "_");
+    return role.getCode();
   }
 
   /**
