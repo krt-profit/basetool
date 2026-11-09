@@ -21,12 +21,6 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
 /**
- * The role set the backend answers a role change with.
- *
- * @typedef {{ roles?: string[], version?: number }} MemberRoleSet
- */
-
-/**
  * Wires the role toggles of the member page (REQ-SEC-088): each toggle assigns or withdraws one
  * role in place, guarded by the role-set counter in `data-roles-version`, and the member's room
  * re-renders the toggles when another admin changes the role set (REQ-FE-015). Toggles run one
@@ -64,7 +58,7 @@ function bindRoleToggles() {
     /**
      * Shows the roles of an answered role set on the toggles and stores its counter.
      *
-     * @param {MemberRoleSet | null | undefined} answered the backend's answer
+     * @param {ApiDto<'UserRoleSetDto'> | null | undefined} answered the backend's answer
      */
     function apply(answered) {
         const target = roleSet();
@@ -77,7 +71,7 @@ function bindRoleToggles() {
         const held = answered.roles || [];
         target.querySelectorAll('input[data-role-toggle]').forEach((element) => {
             const toggle = /** @type {HTMLInputElement} */ (element);
-            toggle.checked = held.indexOf(toggle.value) >= 0;
+            toggle.checked = held.some((role) => role === toggle.value);
         });
     }
 
@@ -128,7 +122,7 @@ function bindRoleToggles() {
             successMessage: panel.getAttribute('data-saved') || undefined,
             errorMessage: panel.getAttribute('data-error') || undefined,
             onSuccess(body) {
-                apply(/** @type {MemberRoleSet | null} */ (body));
+                apply(/** @type {ApiDto<'UserRoleSetDto'> | null} */ (body));
                 roles.notify('roles');
                 krtPageSections.publish('bank', ['grants', 'manage']);
             },
