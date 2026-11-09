@@ -310,7 +310,7 @@ public class BankAccessRules implements BankAccessPolicy {
         actor.holds(Roles.BANK_EMPLOYEE),
         actor.holds(Roles.BANK_MANAGEMENT),
         actor.holds(Roles.ADMIN),
-        actor.holdsSeat(MembershipRole.OL_MEMBER),
+        BankAccessJudgement.seatsConfer(actor) && actor.holdsSeat(MembershipRole.OL_MEMBER),
         actor.grants());
   }
 

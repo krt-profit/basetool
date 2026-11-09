@@ -1504,6 +1504,11 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 *responsible* (never "holder"/"Halter"), to avoid colliding with the aUEC-custody `BankHolder`
 (ADR-0039); the German UI uses "Kontoverantwortliche/r".
 
+A seat confers the holder's rights only while its holder holds `KRT Member` (REQ-SEC-015): a
+Staffelleiter, SK lead, Bereichsleiter or OL member who loses it keeps the seat row but holds no
+account, is no longer approval-exempt, may approve nothing and configures nothing, on the web and on
+the exchange (`BankAccessRulesTest`, `*WithoutKrtMember*`).
+
 > **Amended by REQ-BANK-047 (middle band corrected to the Bankleitung by ADR-0109):** for **request
 > approval** the KRT account (`CARTEL`) no longer routes to the OL collegium alone — the amount-tiered
 > ladder inserts the **Bankleitung** (`BANK_MANAGEMENT`) as the middle band's approver between the bank

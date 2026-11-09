@@ -1234,9 +1234,12 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
   flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
   units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
-  blueprint overview and the org-unit bank balances, and the Leitung page.
+  blueprint overview and the org-unit bank balances, the Leitung page, and every seat-derived bank
+  right on the web and the exchange (REQ-BANK-034): the responsible holder with its approval
+  exemption and configuration rights, the OL's KRT-account and Sonderkonto rights and top-band
+  approval, and the seat-bucket view grants and approval tiers.
   **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
-  `CustomJwtGrantedAuthoritiesConverterTest`.
+  `CustomJwtGrantedAuthoritiesConverterTest`, `BankAccessRulesTest` (`*WithoutKrtMember*`).
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
 **Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
