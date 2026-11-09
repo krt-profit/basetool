@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -45,7 +44,6 @@ public class ProfitHierarchyService {
   private static final long ELIGIBILITY_LOCK = 16842769L;
 
   private final OrgUnitRepository orgUnitRepository;
-  private final EntityManager entityManager;
 
   /**
    * Returns the unique active designated Profit area, refusing contradictory or missing roots.
@@ -130,10 +128,7 @@ public class ProfitHierarchyService {
     if (coordination() != null) {
       return;
     }
-    entityManager
-        .createNativeQuery("SELECT pg_advisory_xact_lock_shared(:key)")
-        .setParameter("key", ELIGIBILITY_LOCK)
-        .getSingleResult();
+    orgUnitRepository.lockProfitHierarchyShared(ELIGIBILITY_LOCK);
     TransactionSynchronizationManager.registerSynchronization(
         new EligibilityCoordination(false, null));
   }
@@ -145,10 +140,7 @@ public class ProfitHierarchyService {
     if (current != null && current.exclusive) {
       return;
     }
-    entityManager
-        .createNativeQuery("SELECT pg_advisory_xact_lock(:key)")
-        .setParameter("key", ELIGIBILITY_LOCK)
-        .getSingleResult();
+    orgUnitRepository.lockProfitHierarchyExclusive(ELIGIBILITY_LOCK);
     if (current == null) {
       TransactionSynchronizationManager.registerSynchronization(
           new EligibilityCoordination(true, null));
