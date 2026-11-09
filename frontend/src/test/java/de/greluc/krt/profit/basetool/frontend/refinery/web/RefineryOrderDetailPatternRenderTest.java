@@ -347,4 +347,23 @@ class RefineryOrderDetailPatternRenderTest {
         .contains("Erstellt von Web")
         .contains("Zuletzt ge\u00e4ndert: VerseKit,");
   }
+
+  /**
+   * A picked-up order the member reopened reads by its run again, without \u201evia <client>"
+   * (REQ-REFINERY-028).
+   */
+  @Test
+  void aReopenedPickupDropsTheViaClient() throws Exception {
+    Instant pickup = Instant.now().minus(20, ChronoUnit.MINUTES);
+    String html =
+        render(
+            RefineryOrderStatus.IN_PROGRESS,
+            Instant.now().minus(10, ChronoUnit.MINUTES),
+            120L,
+            new RefineryOrderProvenanceDto("VerseKit", null, pickup, pickup, "VerseKit", null));
+
+    assertThat(html)
+        .containsPattern("class=\"status-badge status-planned\"[^>]*>L\u00e4uft<")
+        .doesNotContain("refinery-picked-up-via");
+  }
 }

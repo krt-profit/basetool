@@ -353,6 +353,34 @@ class RefineryOrdersListPatternRenderTest {
   }
 
   /**
+   * A picked-up order the member reopened or canceled reads by its status again, without „via
+   * <client>" (REQ-REFINERY-028).
+   */
+  @Test
+  void aReopenedOrCanceledPickupDropsTheViaClient() throws Exception {
+    Instant at = Instant.now().minus(30, ChronoUnit.MINUTES);
+    RefineryOrderProvenanceDto pickedUp =
+        new RefineryOrderProvenanceDto("VerseKit", null, at, at, "VerseKit", null);
+    PageResponse<RefineryOrderListDto> page =
+        new PageResponse<>(
+            List.of(
+                closedOrder(
+                    UUID.fromString("00000000-0000-0000-0000-00000000b0c1"), "OPEN", pickedUp),
+                closedOrder(
+                    UUID.fromString("00000000-0000-0000-0000-00000000b0c2"), "CANCELED", pickedUp)),
+            0,
+            50,
+            2L,
+            1,
+            List.of());
+
+    String html = render(page, "view=ALL");
+
+    assertThat(row(html, "#b0c1")).doesNotContain("refinery-picked-up-via");
+    assertThat(row(html, "#b0c2")).doesNotContain("refinery-picked-up-via");
+  }
+
+  /**
    * Cuts the table row that holds {@code marker} out of the page.
    *
    * @param html the rendered page

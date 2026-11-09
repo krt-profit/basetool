@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryYieldBonusD
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -140,9 +141,8 @@ class RefineryBackendClientTest {
             null,
             RefineryOrderStatus.OPEN,
             List.of(),
+            Set.of(),
             3L,
-            null,
-            null,
             null);
 
     client.create(created);
@@ -165,8 +165,8 @@ class RefineryBackendClientTest {
     String updatedJson =
         "{\"location\":null,\"mission\":null,\"startedAt\":null,\"durationMinutes\":null,"
             + "\"expenses\":null,\"otherExpenses\":null,\"oreSales\":null,"
-            + "\"refiningMethod\":null,\"status\":\"OPEN\",\"goods\":[],\"version\":3,"
-            + "\"parts\":null,\"gameDataVersion\":null,\"financesVersion\":null}";
+            + "\"refiningMethod\":null,\"status\":\"OPEN\",\"goods\":[],"
+            + "\"parts\":[],\"gameDataVersion\":3,\"financesVersion\":null}";
     assertThat(body(backend.expect("POST", "/api/v1/refinery-orders"))).isEqualTo(createdJson);
     assertThat(body(backend.expect("POST", "/api/v1/refinery-orders/users/" + USER)))
         .isEqualTo(createdJson);

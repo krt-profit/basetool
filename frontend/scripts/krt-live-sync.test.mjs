@@ -18,8 +18,9 @@
  */
 
 /**
- * Regression tests for the live-sync socket's re-subscribe of topics denied as indeterminate
- * (REQ-FE-015, ADR-0094): the script is run in a vm context with a fake WebSocket and fake timers.
+ * Regression tests for the live-sync socket's re-subscribe of topics denied as indeterminate and
+ * for the receiver's signal sections (REQ-FE-015, ADR-0094): the script is run in a vm context with
+ * a fake WebSocket, fake timers and a fake page.
  */
 
 import assert from 'node:assert/strict';
@@ -41,8 +42,8 @@ function test(name, fn) {
     }
 }
 
-/** Builds a fresh script context with a controllable socket, clock and random source. */
-function harness(randomValue = 0.5) {
+/** Builds a fresh script context with a controllable socket, clock, random source and page. */
+function harness(randomValue = 0.5, page = {}) {
     const sockets = [];
     const timers = [];
     class FakeSocket {
@@ -81,8 +82,9 @@ function harness(randomValue = 0.5) {
     const context = {
         Math: math,
         WebSocket: FakeSocket,
-        document: { querySelectorAll: () => [], addEventListener() {} },
+        document: Object.assign({ querySelectorAll: () => [], addEventListener() {} }, page),
         console,
+        getComputedStyle: () => ({ display: 'flex' }),
     };
     context.window = context;
     context.location = { protocol: 'https:', host: 'example.test' };
@@ -214,6 +216,79 @@ test('a retry does nothing once the topic was unsubscribed', () => {
         h.fire(timer);
     }
     assert.equal(ws.sent.length, 0);
+});
+
+/**
+ * A page with an order section and a signal section, a toggleable open modal and a capturing pill.
+ *
+ * @returns {{page: object, modal: {open: boolean}, pills: object[]}} the fake page and its state
+ */
+function sectionPage() {
+    const modal = { open: false };
+    const pills = [];
+    const containers = {
+        '#order': { contains: () => false },
+        '#deleted': { contains: () => false },
+    };
+    const page = {
+        querySelectorAll: (sel) => (sel === '.krt-modal-overlay' && modal.open ? [{}] : []),
+        querySelector: (sel) => containers[sel] || null,
+        getElementById: () => null,
+        createElement: () => {
+            const pill = { listeners: {}, remove() {} };
+            pill.addEventListener = (type, fn) => {
+                pill.listeners[type] = fn;
+            };
+            return pill;
+        },
+        body: { appendChild: (el) => pills.push(el) },
+        activeElement: null,
+    };
+    return { page, modal, pills };
+}
+
+/** Builds a receiver on `refinery-order:1` over {@link sectionPage} that records its refreshes. */
+function signalReceiver() {
+    const fake = sectionPage();
+    const h = harness(0.5, fake.page);
+    const refreshed = [];
+    h.sync.createReceiver({
+        topic: 'refinery-order:1',
+        sections: {
+            order: { container: '#order' },
+            deleted: { container: '#deleted', signal: true },
+        },
+        refresh: (keys) => refreshed.push(Array.from(keys)),
+    });
+    const ws = h.sockets[0];
+    ws.open();
+    ws.message({ type: 'subscribed', topic: 'refinery-order:1' });
+    const flush = () => h.live().forEach((timer) => h.fire(timer));
+    return { h, ws, fake, refreshed, flush };
+}
+
+test('a resync refreshes every section except a signal section', () => {
+    const r = signalReceiver();
+    r.ws.message({ type: 'subscribed', topic: 'refinery-order:1' });
+    r.flush();
+    assert.deepEqual(r.refreshed, [['order']]);
+});
+
+test('a signal section is applied while a modal defers the others', () => {
+    const r = signalReceiver();
+    r.fake.modal.open = true;
+    r.ws.message({ type: 'changed', topic: 'refinery-order:1', sections: ['deleted', 'order'] });
+    r.flush();
+    assert.deepEqual(r.refreshed, [['deleted']]);
+    assert.equal(r.fake.pills.length, 1);
+});
+
+test('a subscribe denial and its pill never refresh a signal section', () => {
+    const r = signalReceiver();
+    r.ws.message({ type: 'denied', topic: 'refinery-order:1', reason: 'forbidden' });
+    assert.equal(r.fake.pills.length, 1);
+    r.fake.pills[0].listeners.click();
+    assert.deepEqual(r.refreshed, [['order']]);
 });
 
 if (failures > 0) {

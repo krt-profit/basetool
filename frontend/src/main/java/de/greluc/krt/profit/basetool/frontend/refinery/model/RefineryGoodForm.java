@@ -34,6 +34,12 @@ import lombok.Data;
  */
 @Data
 public class RefineryGoodForm {
+  /**
+   * The id of the stored good this row edits, so a save changes that good in place and keeps its
+   * id; {@code null} for a row the user added.
+   */
+  private UUID id;
+
   private UUID inputMaterialId;
 
   @Min(0)

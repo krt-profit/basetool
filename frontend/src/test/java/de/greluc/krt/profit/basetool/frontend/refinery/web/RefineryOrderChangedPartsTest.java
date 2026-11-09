@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderPart;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderUpdateRequest;
@@ -85,7 +86,23 @@ class RefineryOrderChangedPartsTest {
     assertThat(sent.parts()).containsExactly(RefineryOrderPart.FINANCES);
     assertThat(sent.gameDataVersion()).isEqualTo(4L);
     assertThat(sent.financesVersion()).isEqualTo(7L);
-    assertThat(sent.version()).isNull();
+  }
+
+  @Test
+  void aGoodsRowKeepsTheIdOfTheStoredGoodItEditsAndAnAddedRowSendsNone() throws Exception {
+    UUID heldGood = UUID.randomUUID();
+    mockMvc
+        .perform(
+            edit()
+                .param("goods[0].id", heldGood.toString())
+                .param("goods[1].id", "")
+                .param("goods[1].inputMaterialId", UUID.randomUUID().toString())
+                .param("goods[1].outputQuantity", "10"))
+        .andExpect(status().is3xxRedirection());
+
+    assertThat(sentRequest().goods())
+        .extracting(RefineryGoodDto::id)
+        .containsExactly(heldGood, null);
   }
 
   @Test

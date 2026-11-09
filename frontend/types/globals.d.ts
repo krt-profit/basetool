@@ -299,9 +299,10 @@ interface KrtPageSectionsConfig {
     topicClass?: string;
     /**
      * Maps a section key to its swap container and Thymeleaf fragment value; a key the server did
-     * not render for `topicClass` is reported and dropped.
+     * not render for `topicClass` is reported and dropped. A `signal` section is one the page acts
+     * on itself: it is never deferred and never part of a refresh of every section.
      */
-    sections?: Record<string, { container: string; fragmentValue?: string }>;
+    sections?: Record<string, KrtPageSection>;
     /**
      * Late-bound accessor for the URL the section fragments are fetched from. Null while the
      * entity has no id; `refresh()` then resolves false instead of fetching.
@@ -366,7 +367,7 @@ interface KrtPageSections {
     /** The receiver of a peer's change, or null when the page declared none or has no topic. */
     receiver: KrtReceiver | null;
     /** The declared sections, without any key the server did not allow. */
-    sections: Record<string, { container: string; fragmentValue?: string }>;
+    sections: Record<string, KrtPageSection>;
     /** The section keys the server allows for `topicClass`, or null without a topic class. */
     allowedKeys: string[] | null;
 }
@@ -481,8 +482,18 @@ interface KrtLiveSyncHandlers {
     onDenied?: () => void;
 }
 
-/** A section's container: a CSS selector, or an object naming it. */
-type KrtSectionContainer = string | { container?: string | null };
+/** A page section: its swap container, its fragment value and whether it is a signal. */
+interface KrtPageSection {
+    container: string;
+    fragmentValue?: string;
+    signal?: boolean;
+}
+
+/**
+ * A section's container: a CSS selector, or an object naming it; a `signal` section is never
+ * deferred and never part of a refresh of every section.
+ */
+type KrtSectionContainer = string | { container?: string | null; signal?: boolean };
 
 /** The configuration of a receiver built by `krtLiveSync.createReceiver`. */
 interface KrtReceiverConfig {
