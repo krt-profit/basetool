@@ -1,6 +1,6 @@
 # ADR-0358 - One configured transfer-fee policy serves Bank and orders
 
-- **Status:** Accepted - implementation pending
+- **Status:** Accepted - shared configured policy implemented; coupled order consumers pending
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Amends:** ADR-0052 (shared calculation home and true same-player withdrawal exemption)
@@ -12,9 +12,10 @@
 
 Bank and aUEC orders need the same centrally configured whole-aUEC transfer-fee calculation.
 Submitted coupled operations must preserve the rate and fee through waiting and retries; current
-configuration cannot silently reprice them. The calculator and rate parsing currently live in
-bank.internal, which JobOrder may not import. Kernel/platform must not acquire Bank or JobOrder
-business policy, and unrelated existing financial flows must retain their semantics.
+configuration cannot silently reprice them. The calculator and rate parsing belong to the
+configuration-owning admin module, which both consumers may use downward. Kernel/platform must not
+acquire Bank or JobOrder business policy, and unrelated existing financial flows must retain their
+semantics.
 
 The existing admin module owns runtime system settings and sits below both consumers. The setting
 operation.transfer_fee_rate remains the central source; its source default of 0.005 is not a claim
@@ -48,8 +49,14 @@ must describe the same fee once rather than charging it twice.
   internals, changing ranks or creating another policy owner.
 - Rate resolution/validation and whole-aUEC fee calculation have one implementation and contract;
   the two domains retain their different custody and cost-payer rules.
-- New acceptance evidence covers rate changes while pending, replay, historical correction,
-  KRT-funded reconciliation and genuine no-transfer exemption. No implementation is asserted here.
+- `admin.api.TransferFeePolicy` publishes an immutable, numerically normalized `RateSnapshot` and
+  exact `feeOn(amount, basis)` calculation; `admin.internal.ConfiguredTransferFeePolicy` alone parses
+  the existing setting. Bank resolves one basis per booking; Operations reuses the rate while
+  retaining its two-decimal fee and whole-aUEC final payout rounding.
+- `TransferFeePolicyTest` covers shared arithmetic, a restored historical basis after a setting
+  change, normalization and fallback behavior. Existing Bank fee-mode/KRT tests and Operations
+  payout regressions remain the accounting guards. Coupled pending/replay, historical corrections
+  and genuine no-transfer exemption still require their owning-domain implementation and evidence.
 
 ## Alternatives considered
 

@@ -1516,11 +1516,15 @@ Buchungen". Behaviour and gate unchanged.
 
 ### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
 
-> **Approved aUEC target - not implemented (ADR-0358):** central rate resolution/validation and exact
+> **Shared policy implemented (ADR-0358):** central rate resolution/validation and exact
 > whole-aUEC HALF_UP calculation have one narrow policy in the existing configuration-owning admin
 > module. It returns an immutable rate snapshot and computes from that snapshot. It owns no
 > custody, approval or payer decision. Preserve the setting/default, validation and unrelated
-> input/fee-mode semantics below.
+> input/fee-mode semantics below. `admin.api.TransferFeePolicy` publishes `snapshot()` and
+> `feeOn(amount, basis)`; `RateSnapshot` normalizes numerically equivalent rates. Bank resolves
+> the basis once for each fee-bearing booking, including its gross debit.
+>
+> **Approved aUEC coupling target - not implemented:**
 >
 > Coupled submissions retain rate/fee through waiting and ordinary replay. Bank and order use the
 > same basis. Historical correction uses its historical basis; a genuinely new payment uses its
@@ -1568,10 +1572,9 @@ superseding the carve-out model of ADR-0041):
 - **Ledger consequence (amends REQ-BANK-020):** a fee-bearing holder-changing `TRANSFER` no longer
   nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the game), so
   the integrity sweep expects `SUM(legs) = −transfer_fee` for it (source `−(amount + fee)`,
-  destination `+amount`). The fee-free `HOLDER_TRANSFER` carries `transfer_fee = 0` and nets to zero
-  as before — the same `SUM(legs) = −transfer_fee` check holds with a zero fee, so no integrity
-  change is needed. The `REVERSAL` mirror invariant is unchanged (a reversal negates the actual
-  recorded legs, restoring the gross to the source).
+  destination `+amount`). A `HOLDER_TRANSFER` records the KRT-funded `-fee` account leg and
+  holder legs totalling `-fee`, so the same invariant holds. The `REVERSAL` mirror invariant is
+  unchanged (a reversal negates the actual recorded legs, restoring the gross to the source).
 
 > **Amended (2026-07-05, #999) — two fee modes (on-top vs. fee-inclusive):** a fee-bearing booking
 > (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag, **default `false`**. In
@@ -1608,9 +1611,9 @@ superseding the carve-out model of ADR-0041):
   gross `A + fee`, and is refused when the account cannot cover `A + fee`; the recipient effectively
   receives the full `A` and the holder is not out of pocket.
 - [x] A holder-changing account transfer credits the destination the full `A` and debits the source
-  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer, a
-  deposit and an internal holder→holder Umbuchung record no fee and net to zero / move the full
-  amount.
+  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer and a
+  deposit record no fee and net to zero / move the full amount. A holder→holder Umbuchung
+  retains its KRT-funded fee (REQ-BANK-031).
 - [x] The booking modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited)
   as the amount is typed; the rate is the shared `operation.transfer_fee_rate`.
 - [x] A **fee-inclusive** (`feeInclusive = true`) withdrawal/transfer (#999) debits the source the
@@ -1619,7 +1622,7 @@ superseding the carve-out model of ADR-0041):
   `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
   the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
 
-**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `bank/internal/BankTransferFeeService` (`feeOn` + `totalDebit`), `bank/internal/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `bank/internal/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `bank/internal/BankTransaction#transferFee`, `bank/web/BankBookingController#getTransferFeeRate`, `bank/internal/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `bank/web/BankPageController` / `BankManagePageController`, `static/js/bank/bank.js`, `templates/bank/fragments/bank-movement-modal.html`, `templates/bank/bank-account-detail.html` / `bank/bank-manage.html` / `bank/bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
+**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder fee exemption, legs net to −fee), `TransferFeePolicyTest` (rate resolution, exact whole-aUEC rounding, normalized snapshots and retained historical basis after a setting change), `BankHolderTransferFeeTest` (KRT fee ownership), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `admin/api/TransferFeePolicy` (`snapshot` + explicit-basis `feeOn`), `admin/internal/ConfiguredTransferFeePolicy`, `bank/internal/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `bank/internal/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `bank/internal/BankTransaction#transferFee`, `bank/web/BankBookingController#getTransferFeeRate`, `bank/internal/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `bank/web/BankPageController` / `BankManagePageController`, `static/js/bank/bank.js`, `templates/bank/fragments/bank-movement-modal.html`, `templates/bank/bank-account-detail.html` / `bank/bank-manage.html` / `bank/bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 
@@ -3331,7 +3334,7 @@ A depositor pays the in-game transfer fee on top of what arrives (REQ-BANK-033).
 knows straight away how much to send for the requested amount to land on the account, every place
 that states a deposit amount to be transferred shows a small line **„Mit Gebühr: X aUEC"** beneath
 it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the backend's
-`BankTransferFeeService.totalDebit` formula — and the separators of the page language
+`amount + TransferFeePolicy.feeOn(amount, basis)` formula — and the separators of the page language
 (`3.015.000` in German, `3,015,000` in English), like the amount above it.
 
 - **Request queue** (`/bank/requests`): under the amount of every **pending** deposit request.

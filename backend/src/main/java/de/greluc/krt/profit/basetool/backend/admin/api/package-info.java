@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/** The admin module's published API: read and write access to the system settings (plan §5.2). */
+/** Publishes system-setting access and the configured transfer-fee snapshot policy. */
 @NamedInterface("api")
 package de.greluc.krt.profit.basetool.backend.admin.api;
 

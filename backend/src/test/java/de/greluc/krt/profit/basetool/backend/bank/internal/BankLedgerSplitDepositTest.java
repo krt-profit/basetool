@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -69,7 +70,7 @@ class BankLedgerSplitDepositTest {
   @Mock private BankPostingRepository postingRepository;
   @Mock private BankHolderPostingRepository holderPostingRepository;
   @Mock private BankAuditService bankAuditService;
-  @Mock private BankTransferFeeService transferFeeService;
+  @Mock private TransferFeePolicy transferFeePolicy;
   @Mock private AuthHelperService authHelperService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserRepository userRepository;
@@ -102,7 +103,7 @@ class BankLedgerSplitDepositTest {
             postingRepository,
             holderPostingRepository,
             bankAuditService,
-            transferFeeService,
+            transferFeePolicy,
             userRepository,
             orgUnitMembershipQueryService,
             writer,
