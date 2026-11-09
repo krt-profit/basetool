@@ -55,9 +55,10 @@ client is granted a bank scope until its approval amendment (REQ-BXCH-007).
   their memberships and grants. An administrator acts through a client only by their bank roles,
   grants and memberships (REQ-XCH-009); seeing the whole bank needs Bank Management;
 - the exchange passes no active-org-unit pin;
-- exchange code reaches the bank only through `BankAccessPolicy` and its decision types,
-  `BankActors`, `BankAccountReads`, `BankOwnRequestReads` and `BankStaffQueueReads` with their value
-  types
+- exchange code reaches the bank only through `BankActors` with `BankActor`, the ports
+  `BankAccountReads`, `BankOwnRequestReads`, `BankStaffQueueReads` and `BankOwnRequestWrites` with
+  their value types, the `BankBookingRequestType` and `BankRequestApprover` they answer, and the
+  refusal `BankOpenRequestCapException`; each port asks the policy itself
   (`BankAccessPolicyRulesTest.theExchangeReachesTheBankOnlyThroughThePolicy`).
 
 No money moves through a client and no bank-staff action is taken through one (ADR-0354).
@@ -70,8 +71,8 @@ No money moves through a client and no bank-staff action is taken through one (A
 - [x] Every read of REQ-BXCH-002 answers as the web's characterisation matrix recorded it, with
   the Admin role stripped as the one expected difference for administrators and a closed account
   hidden (`BankExchangeParityTest`).
-- [x] Exchange code using a bank type outside the policy, the actor adapter and the reads fails the
-  build (`BankAccessPolicyRulesTest`).
+- [x] Exchange code using a bank type outside the actor adapter, the ports and their values fails
+  the build (`BankAccessPolicyRulesTest`).
 
 **Enforced by:** `ExchangeCapability`, `ExchangeBankReadService`, `BankActors#forExchange`,
 `BankAccessPolicyRulesTest` · V364 · **Related:** REQ-XCH-005, REQ-XCH-009 · **Issues:** #3113,
@@ -161,6 +162,10 @@ it — the web's requests too — as a snapshot followed by the change feed of R
   `splitPercent`, each `null` where it does not apply. Money and the split percent
   are JSON integers. No staff note, no staff identities (requester, decider or approver handles), no
   counterparty, no purpose and no `callerMayConfirm`.
+- **The cap.** Every page, snapshot and feed alike, carries `openRequestCap`, the configured
+  `app.bank.exchange.open-request-cap` (REQ-BXCH-004); the client counts the `PENDING` items
+  itself. The field is additive and not required by the schema, so a tolerant reader ignores it;
+  the server always sends it.
 - **Retention.** The member's own data: a client may persist it (REQ-BXCH-007).
 - **Counted.** Every page served counts `basetool_exchange_bank_reads_total{client_id,
   route="requests"}` (REQ-OBS-024).
@@ -173,6 +178,8 @@ it — the web's requests too — as a snapshot followed by the change feed of R
 - [x] A request raised, decided or removed after the snapshot follows in the feed, a removal as a
   tombstone; another member's request never does; a cursor past the horizon is `410`
   (`ExchangeBankRequestFeedTest`).
+- [x] Snapshot and feed pages carry `openRequestCap` as the configured cap
+  (`ExchangeBankRequestsTest`, `ExchangeBankRequestFeedTest`).
 - [x] Every write of a request, a renamed account and a new unit shorthand are sequenced under the
   requester (`ExchangeChangeFeedTriggerIntegrationTest`).
 - [x] Every answer validates against `page.schema.json#/$defs/bankRequestPage`; the route, schema,
@@ -208,7 +215,13 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   A correction keeps the counterparty a web request names. No counterparty, no purpose-bound and no
   KRT direct-booking request is raised through a client.
 - **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
-  requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise.
+  requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise;
+  the own requests answer the cap as `openRequestCap` (REQ-BXCH-003), so a client can tell first.
+  The raise counts under a per-member transaction lock (`pg_advisory_xact_lock`), so two concurrent
+  raises of one member never take them past the cap.
+- **The explicit actor.** Correction and cancel check ownership for the actor the exchange built,
+  down every call; neither reads who calls from the security context
+  (`BankAccessPolicyRulesTest.theExchangeOwnRequestWritesDecideForTheExplicitActor`).
 - **Origin.** A raised request records the registry client the exchange gate admitted in
   `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
   (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
@@ -235,6 +248,10 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   answer the same counted `404` (`ExchangeBankRequestWritesTest`).
 - [x] The bank's refusals, the bean rules, a stale version and the cap at 20 pending requests answer
   as listed (`ExchangeBankRequestWritesTest`).
+- [x] A raise racing the member's last free slot waits for the other raise and is refused with the
+  cap (`BankOpenRequestCapConcurrencyTest`).
+- [x] A correction or cancel path that reaches the security context fails the build
+  (`BankAccessPolicyRulesTest`).
 - [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,
   with `201` for a raise and the shared `404` for a refusal (`BankExchangeParityTest`).
 - [x] The gateway checks the body and the request id before the relay, answers `201`, passes the

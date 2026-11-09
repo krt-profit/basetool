@@ -84,8 +84,9 @@ public class ExchangeBankRequestController {
           "Gateway-only. Every booking request the member raised, in the Basetool or through any"
               + " client, with status, amount, accounts, approval need, rejection reason and"
               + " split; no staff note, staff identities, counterparty or purpose. A snapshot"
-              + " followed by the change feed of REQ-XCH-013. The member's own data: the client"
-              + " may persist it.")
+              + " followed by the change feed of REQ-XCH-013; every page carries openRequestCap,"
+              + " the most pending requests the member may hold. The member's own data: the"
+              + " client may persist it.")
   @ApiResponse(responseCode = "200", description = "The page")
   @ApiResponse(responseCode = "410", description = "The cursor has expired (CURSOR_EXPIRED)")
   public ResponseEntity<ExchangeBankRequestPageDto> requests(

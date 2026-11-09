@@ -114,16 +114,17 @@ public class ExchangeBankController {
     return responses.page(
         BANK_ACCOUNTS + "/" + query.accountId() + "/bookings",
         "page.schema.json#/$defs/bankBookingPage",
-        query.bounds(),
+        query.bounds()::addTo,
         cursor,
         limit,
+        ExchangeController.PAGE_MAX_LIMIT,
         request,
         acceptLanguage);
   }
 
   /**
-   * Returns the daily balance series of a bank account the member views over at most 365 days
-   * (REQ-BXCH-002).
+   * Returns the daily balance series of a bank account the member views over at most {@value
+   * BankQuery#MAX_SERIES_DAYS} days (REQ-BXCH-002).
    *
    * @param id the account's id
    * @param from the inclusive start of the period
@@ -152,14 +153,8 @@ public class ExchangeBankController {
     return responses.relayed(
         relay.forward(
             HttpMethod.GET,
-            ExchangeController.BACKEND
-                + BANK_ACCOUNTS
-                + "/"
-                + query.accountId()
-                + "/balance-series?from="
-                + query.bounds().get(BankQuery.FROM)
-                + "&to="
-                + query.bounds().get(BankQuery.TO),
+            ExchangeRelayResponses.backendTarget(
+                BANK_ACCOUNTS + "/" + query.accountId() + "/balance-series", query.bounds()::addTo),
             null,
             context,
             acceptLanguage),

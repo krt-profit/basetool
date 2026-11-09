@@ -124,7 +124,8 @@ public class ExchangeBankController {
    *
    * @param id the account
    * @param from inclusive period start
-   * @param to inclusive period end, at most 365 days after {@code from}
+   * @param to inclusive period end, at most {@value ExchangeBankReadService#MAX_SERIES_DAYS} days
+   *     after {@code from}
    * @param authentication the relayed acting member the gate admitted
    * @return the series
    */
@@ -134,7 +135,9 @@ public class ExchangeBankController {
   @Operation(
       summary = "Exchange: the balance series of an account I view",
       description =
-          "Gateway-only. One end-of-day balance per UTC day of [from, to], at most 365 days. A"
+          "Gateway-only. One end-of-day balance per UTC day of [from, to], at most "
+              + ExchangeBankReadService.MAX_SERIES_DAYS
+              + " days. A"
               + " hidden, closed or unknown account answers 404 NOT_FOUND. Foreign bank data:"
               + " memory only, at most 7 days.")
   @ApiResponse(responseCode = "200", description = "The series")

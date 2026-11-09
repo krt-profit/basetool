@@ -25,27 +25,26 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * The checked parameters of a bank read on one account (REQ-BXCH-002): the account id and the
  * {@code from} / {@code to} bounds, normalised to UTC instants so the relayed query carries only
- * characters that need no encoding. A balance series needs both bounds and spans at most {@link
- * #MAX_SERIES_SPAN}.
+ * characters that need no encoding. A balance series needs both bounds and spans at most {@value
+ * #MAX_SERIES_DAYS} days.
  *
  * @param accountId the account id in lower case, or {@code null} when it is malformed
- * @param bounds the bounds that were given, by query name, as ISO-8601 instants
+ * @param bounds the bounds that were given and well-formed
  * @param violations what is wrong with the parameters; empty when they may be relayed
  */
 record BankQuery(
     @Nullable String accountId,
-    @NotNull @Unmodifiable Map<String, String> bounds,
+    @NotNull Bounds bounds,
     @NotNull @Unmodifiable List<ExchangeSchemas.Violation> violations) {
 
   /** The query name of the lower bound. */
@@ -54,8 +53,11 @@ record BankQuery(
   /** The query name of the upper bound. */
   static final String TO = "to";
 
-  /** The longest period a balance series covers. */
-  static final Duration MAX_SERIES_SPAN = Duration.ofDays(365);
+  /** The most days a balance series covers. */
+  static final int MAX_SERIES_DAYS = 365;
+
+  /** The longest period a balance series covers, {@value #MAX_SERIES_DAYS} days. */
+  static final Duration MAX_SERIES_SPAN = Duration.ofDays(MAX_SERIES_DAYS);
 
   /**
    * Checks the parameters of a bank read.
@@ -81,17 +83,12 @@ record BankQuery(
       if (lower.isAfter(upper)) {
         violations.add(new ExchangeSchemas.Violation("/" + FROM, "must not lie after to"));
       } else if (Duration.between(lower, upper).compareTo(MAX_SERIES_SPAN) > 0) {
-        violations.add(new ExchangeSchemas.Violation("/" + TO, "must lie within 365 days of from"));
+        violations.add(
+            new ExchangeSchemas.Violation(
+                "/" + TO, "must lie within " + MAX_SERIES_DAYS + " days of from"));
       }
     }
-    Map<String, String> bounds = new LinkedHashMap<>();
-    if (lower != null) {
-      bounds.put(FROM, lower.toString());
-    }
-    if (upper != null) {
-      bounds.put(TO, upper.toString());
-    }
-    return new BankQuery(accountId, Map.copyOf(bounds), List.copyOf(violations));
+    return new BankQuery(accountId, new Bounds(lower, upper), List.copyOf(violations));
   }
 
   /**
@@ -119,6 +116,31 @@ record BankQuery(
     } catch (DateTimeParseException _) {
       violations.add(new ExchangeSchemas.Violation("/" + name, "must be a date-time"));
       return null;
+    }
+  }
+
+  /**
+   * The {@code from} / {@code to} bounds of a bank read as UTC instants, each absent when it was
+   * not given or malformed.
+   *
+   * @param from the inclusive lower bound, or {@code null}
+   * @param to the inclusive upper bound, or {@code null}
+   */
+  record Bounds(@Nullable Instant from, @Nullable Instant to) {
+
+    /**
+     * Adds the given bounds to a relayed target as ISO-8601 instants, whose characters need no
+     * encoding in a query.
+     *
+     * @param target the relayed target
+     */
+    void addTo(@NotNull UriComponentsBuilder target) {
+      if (from != null) {
+        target.queryParam(FROM, from);
+      }
+      if (to != null) {
+        target.queryParam(TO, to);
+      }
     }
   }
 }

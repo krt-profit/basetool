@@ -399,6 +399,7 @@ org-unit.schema.json#/properties/kind FACT_VALUE
 org-unit.schema.json#/properties/logistician FACT_VALUE
 org-unit.schema.json#/properties/name SHORT_NAME
 org-unit.schema.json#/properties/shorthand SHORT_NAME
+page.schema.json#/$defs/bankRequestPage/properties/openRequestCap FACT_VALUE
 page.schema.json#/properties/hasMore FACT_VALUE
 page.schema.json#/properties/nextCursor IDENTIFIER
 problem.schema.json#/properties/code IDENTIFIER

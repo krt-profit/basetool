@@ -127,6 +127,7 @@ class ExchangeBankRequestFeedTest {
     }
     assertThat(page.path("removed")).hasSize(1);
     assertThat(page.path("removed").get(0).path("key").asString()).isEqualTo(removed.toString());
+    assertThat(page.path("openRequestCap").asInt()).as("the configured cap").isEqualTo(20);
     assertThat(page.path("hasMore").asBoolean()).isFalse();
     assertThat(page.path("nextCursor").asString()).startsWith("f1.");
     ExchangePublishedSchemas.assertMatches(

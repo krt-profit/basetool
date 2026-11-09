@@ -28,6 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +40,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -53,6 +55,9 @@ class ExchangeRelayResponses {
   private static final Pattern CURSOR = Pattern.compile("^[A-Za-z0-9._:-]{1,128}$");
 
   private static final Pattern LIMIT = Pattern.compile("^[0-9]{1,4}$");
+
+  /** Adds no query parameter beyond the paging ones. */
+  static final Consumer<UriComponentsBuilder> NO_QUERY = _ -> {};
 
   private final ExchangeRelay relay;
   private final ExchangeAnswers answers;
@@ -78,7 +83,15 @@ class ExchangeRelayResponses {
       @Nullable String limit,
       @NotNull HttpServletRequest request,
       @Nullable String acceptLanguage) {
-    return page(path, responseSchema, Map.of(), cursor, limit, request, acceptLanguage);
+    return page(
+        path,
+        responseSchema,
+        NO_QUERY,
+        cursor,
+        limit,
+        ExchangeController.PAGE_MAX_LIMIT,
+        request,
+        acceptLanguage);
   }
 
   /**
@@ -87,7 +100,8 @@ class ExchangeRelayResponses {
    *
    * @param path the route below {@code /exchange/v1}
    * @param responseSchema the page's schema
-   * @param query further query parameters, already checked and safe to append
+   * @param query further query parameters by name, already checked and safe to relay, added in name
+   *     order
    * @param cursor the cursor, or {@code null}
    * @param limit the page size, or {@code null}
    * @param request the admitted request
@@ -103,15 +117,49 @@ class ExchangeRelayResponses {
       @Nullable String limit,
       @NotNull HttpServletRequest request,
       @Nullable String acceptLanguage) {
+    return page(
+        path,
+        responseSchema,
+        builder -> new TreeMap<>(query).forEach(builder::queryParam),
+        cursor,
+        limit,
+        ExchangeController.PAGE_MAX_LIMIT,
+        request,
+        acceptLanguage);
+  }
+
+  /**
+   * Checks the paging parameters against a route's largest page, relays a page request with the
+   * route's further checked query parameters and checks the answer.
+   *
+   * @param path the route below {@code /exchange/v1}
+   * @param responseSchema the page's schema
+   * @param query adds the route's further query parameters, already checked, to the relayed target
+   * @param cursor the cursor, or {@code null}
+   * @param limit the page size, or {@code null}
+   * @param maxLimit the route's largest page size
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @return the page or a problem
+   */
+  @NotNull
+  ResponseEntity<?> page(
+      @NotNull String path,
+      @NotNull String responseSchema,
+      @NotNull Consumer<UriComponentsBuilder> query,
+      @Nullable String cursor,
+      @Nullable String limit,
+      int maxLimit,
+      @NotNull HttpServletRequest request,
+      @Nullable String acceptLanguage) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
       return failed();
     }
-    if (limit != null && !validLimit(limit)) {
+    if (limit != null && !validLimit(limit, maxLimit)) {
       return schemaInvalid(
           List.of(
-              new ExchangeSchemas.Violation(
-                  "/limit", "must be an integer from 1 to " + ExchangeController.PAGE_MAX_LIMIT)));
+              new ExchangeSchemas.Violation("/limit", "must be an integer from 1 to " + maxLimit)));
     }
     if (cursor != null && !CURSOR.matcher(cursor).matches()) {
       return problem(
@@ -119,25 +167,38 @@ class ExchangeRelayResponses {
           ExchangeController.CURSOR_EXPIRED,
           "The cursor is not one the server issued.");
     }
-    StringBuilder target = new StringBuilder(ExchangeController.BACKEND).append(path);
-    char separator = '?';
-    for (Map.Entry<String, String> parameter : new TreeMap<>(query).entrySet()) {
-      target.append(separator).append(parameter.getKey()).append('=').append(parameter.getValue());
-      separator = '&';
-    }
-    if (cursor != null) {
-      target.append(separator).append("cursor=").append(cursor);
-      separator = '&';
-    }
-    if (limit != null) {
-      target.append(separator).append("limit=").append(Integer.parseInt(limit));
-    }
+    String target =
+        backendTarget(
+            path,
+            query.andThen(builder -> {
+              if (cursor != null) {
+                builder.queryParam("cursor", cursor);
+              }
+              if (limit != null) {
+                builder.queryParam("limit", Integer.parseInt(limit));
+              }
+            }));
     return relayed(
-        relay.forward(HttpMethod.GET, target.toString(), null, context, acceptLanguage),
+        relay.forward(HttpMethod.GET, target, null, context, acceptLanguage),
         responseSchema,
         List.of(),
         context,
         request);
+  }
+
+  /**
+   * The backend target of a relayed read: the route below the relay prefix with the given query
+   * parameters, which the caller has checked, so the target needs no encoding.
+   *
+   * @param path the route below {@code /exchange/v1}
+   * @param query adds the query parameters
+   * @return the target path with its query
+   */
+  @NotNull
+  static String backendTarget(@NotNull String path, @NotNull Consumer<UriComponentsBuilder> query) {
+    UriComponentsBuilder builder = UriComponentsBuilder.fromPath(ExchangeController.BACKEND + path);
+    query.accept(builder);
+    return builder.build().toUriString();
   }
 
   /**
@@ -233,17 +294,28 @@ class ExchangeRelayResponses {
   }
 
   /**
-   * Whether a page size lies within the contract.
+   * Whether a page size lies within the default contract.
    *
    * @param limit the raw value
    * @return {@code true} for an integer from 1 to {@value ExchangeController#PAGE_MAX_LIMIT}
    */
   static boolean validLimit(@NotNull String limit) {
+    return validLimit(limit, ExchangeController.PAGE_MAX_LIMIT);
+  }
+
+  /**
+   * Whether a page size lies within a route's contract.
+   *
+   * @param limit the raw value
+   * @param maxLimit the route's largest page size
+   * @return {@code true} for an integer from 1 to {@code maxLimit}
+   */
+  static boolean validLimit(@NotNull String limit, int maxLimit) {
     if (!LIMIT.matcher(limit).matches()) {
       return false;
     }
     int value = Integer.parseInt(limit);
-    return value >= 1 && value <= ExchangeController.PAGE_MAX_LIMIT;
+    return value >= 1 && value <= maxLimit;
   }
 
   /**

@@ -167,7 +167,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
         refuseRoutelessBankPath(jwt, response);
         return;
       }
-      context = admit(jwt, route.get(), request, response);
+      context = admit(jwt, route.get(), bank, request, response);
     } catch (ExchangeUnavailableException _) {
       response.setHeader(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS);
       refuse(
@@ -191,6 +191,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
    *
    * @param jwt the token
    * @param route the route
+   * @param bank whether the route is a bank route, which the bank switch also gates
    * @param request the request
    * @param response the response a refusal is written to
    * @return the context, or {@code null} when the request was refused
@@ -200,6 +201,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
   private @Nullable ExchangeRequestContext admit(
       @NotNull Jwt jwt,
       @NotNull ExchangeRoutes.Route route,
+      boolean bank,
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response)
       throws IOException {
@@ -207,8 +209,7 @@ public class ExchangeGateFilter extends OncePerRequestFilter {
     String clientId = jwt.getClaimAsString("azp");
     String label = ExchangeRefusals.clientLabel(clientId, registry);
     ExchangeLogContext.client(label);
-    if (refusedBySwitch(
-        registry, label, ExchangeRoutes.isBank(request.getRequestURI()), response)) {
+    if (refusedBySwitch(registry, label, bank, response)) {
       return null;
     }
     ExchangeRegistry.Client client = clientId == null ? null : registry.clients().get(clientId);

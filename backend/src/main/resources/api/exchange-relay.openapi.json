@@ -600,7 +600,7 @@
     },
     "/api/v1/exchange/bank/requests" : {
       "get" : {
-        "description" : "Gateway-only. Every booking request the member raised, in the Basetool or through any client, with status, amount, accounts, approval need, rejection reason and split; no staff note, staff identities, counterparty or purpose. A snapshot followed by the change feed of REQ-XCH-013. The member's own data: the client may persist it.",
+        "description" : "Gateway-only. Every booking request the member raised, in the Basetool or through any client, with status, amount, accounts, approval need, rejection reason and split; no staff note, staff identities, counterparty or purpose. A snapshot followed by the change feed of REQ-XCH-013; every page carries openRequestCap, the most pending requests the member may hold. The member's own data: the client may persist it.",
         "operationId" : "requests",
         "parameters" : [ {
           "in" : "query",
@@ -4589,6 +4589,10 @@
           },
           "nextCursor" : {
             "type" : "string"
+          },
+          "openRequestCap" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "removed" : {
             "type" : "array",

@@ -87,55 +87,55 @@ class BankSecurityServiceTest {
             .grant(accountId, true, true, true)
             .build());
 
-    assertFalse(bankSecurityService.canSee(accountId, null));
+    assertFalse(bankSecurityService.canSee(accountId));
   }
 
   @Test
   void canSee_allowsManagementWithoutAnyGrantRow() {
     callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canSee(accountId, null));
+    assertTrue(bankSecurityService.canSee(accountId));
   }
 
   @Test
   void canSee_allowsEmployeeWithViewOnlyGrantRow() {
     callerIs(employeeWithGrant(false, false, false));
 
-    assertTrue(bankSecurityService.canSee(accountId, null));
+    assertTrue(bankSecurityService.canSee(accountId));
   }
 
   @Test
   void canSee_deniesEmployeeWithoutGrantRow() {
     callerIs(employeeWithoutGrant());
 
-    assertFalse(bankSecurityService.canSee(accountId, null));
+    assertFalse(bankSecurityService.canSee(accountId));
   }
 
   @Test
   void capabilityFlags_gateExactlyTheirBooking() {
     callerIs(employeeWithGrant(true, false, false));
 
-    assertTrue(bankSecurityService.canDeposit(accountId, null));
-    assertFalse(bankSecurityService.canWithdraw(accountId, null));
-    assertFalse(bankSecurityService.canTransfer(accountId, null));
+    assertTrue(bankSecurityService.canDeposit(accountId));
+    assertFalse(bankSecurityService.canWithdraw(accountId));
+    assertFalse(bankSecurityService.canTransfer(accountId));
   }
 
   @Test
   void canWithdraw_and_canTransfer_followTheirFlags() {
     callerIs(employeeWithGrant(false, true, true));
 
-    assertFalse(bankSecurityService.canDeposit(accountId, null));
-    assertTrue(bankSecurityService.canWithdraw(accountId, null));
-    assertTrue(bankSecurityService.canTransfer(accountId, null));
+    assertFalse(bankSecurityService.canDeposit(accountId));
+    assertTrue(bankSecurityService.canWithdraw(accountId));
+    assertTrue(bankSecurityService.canTransfer(accountId));
   }
 
   @Test
   void capabilities_allowManagementUnrestricted() {
     callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canDeposit(accountId, null));
-    assertTrue(bankSecurityService.canWithdraw(accountId, null));
-    assertTrue(bankSecurityService.canTransfer(accountId, null));
+    assertTrue(bankSecurityService.canDeposit(accountId));
+    assertTrue(bankSecurityService.canWithdraw(accountId));
+    assertTrue(bankSecurityService.canTransfer(accountId));
   }
 
   /** REQ-BANK-023: confirming a request needs the grant flag of its type. */
@@ -202,7 +202,7 @@ class BankSecurityServiceTest {
   void canSee_deniesTheUnauthenticatedCaller() {
     callerIs(BankActor.NOBODY);
 
-    assertFalse(bankSecurityService.canSee(accountId, null));
+    assertFalse(bankSecurityService.canSee(accountId));
   }
 
   /**
@@ -239,7 +239,7 @@ class BankSecurityServiceTest {
   void canSeeHolder_allowsManagementForAnyHolder() {
     callerIs(TestBankActor.of(userId).bankManagement().build());
 
-    assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
+    assertTrue(bankSecurityService.canSeeHolder(UUID.randomUUID()));
   }
 
   @Test
@@ -248,7 +248,7 @@ class BankSecurityServiceTest {
     callerIs(employeeWithoutGrant());
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
 
-    assertTrue(bankSecurityService.canSeeHolder(holderId, null));
+    assertTrue(bankSecurityService.canSeeHolder(holderId));
   }
 
   @Test
@@ -258,7 +258,7 @@ class BankSecurityServiceTest {
     when(holderRepository.findById(holderId))
         .thenReturn(Optional.of(holderLinkedTo(UUID.randomUUID())));
 
-    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
+    assertFalse(bankSecurityService.canSeeHolder(holderId));
   }
 
   @Test
@@ -267,7 +267,7 @@ class BankSecurityServiceTest {
     callerIs(employeeWithoutGrant());
     when(holderRepository.findById(holderId)).thenReturn(Optional.empty());
 
-    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
+    assertFalse(bankSecurityService.canSeeHolder(holderId));
   }
 
   @Test
@@ -276,14 +276,14 @@ class BankSecurityServiceTest {
     callerIs(TestBankActor.member(userId).build());
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holderLinkedTo(userId)));
 
-    assertFalse(bankSecurityService.canSeeHolder(holderId, null));
+    assertFalse(bankSecurityService.canSeeHolder(holderId));
   }
 
   @Test
   void canSeeHolder_deniesTheUnauthenticatedCaller() {
     callerIs(BankActor.NOBODY);
 
-    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID(), null));
+    assertFalse(bankSecurityService.canSeeHolder(UUID.randomUUID()));
   }
 
   @Test
