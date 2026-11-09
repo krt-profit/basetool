@@ -6,5 +6,8 @@ CREATE UNIQUE INDEX uk_exchange_refinery_order_link_live_key
     ON exchange_refinery_order_link (user_id, client_id, client_key)
     WHERE retired_at IS NULL;
 
+CREATE INDEX ix_exchange_refinery_order_link_member_order
+    ON exchange_refinery_order_link (user_id, client_id, refinery_order_id);
+
 COMMENT ON COLUMN exchange_refinery_order_link.retired_at IS
     'When a later create of the client took the key over; a retired link still names the key for its order''s tombstone (REQ-XCH-051).';
