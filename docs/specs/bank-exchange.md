@@ -227,7 +227,8 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   re-routing on correction. The exchange adds no rule of its own. A deposit may target any active
   account (REQ-BANK-042); a withdrawal or transfer needs an account the policy admits.
 - **Which requests.** Correction and cancel act on every own pending request, the web's included.
-  A correction keeps the counterparty a web request names. No counterparty, no purpose-bound and no
+  A correction keeps the counterparty a web request names, with its stored org unit, even after the
+  counterparty left that unit. No counterparty, no purpose-bound and no
   KRT direct-booking request is raised through a client.
 - **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
   requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise;
@@ -266,6 +267,8 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   answer the same counted `404` (`ExchangeBankRequestWritesTest`).
 - [x] The bank's refusals, the bean rules, a stale version and the cap at 20 pending requests answer
   as listed (`ExchangeBankRequestWritesTest`).
+- [x] A correction keeps the stored counterparty and its org unit after the counterparty left the
+  unit (`ExchangeBankRequestWritesTest`).
 - [x] A raise racing the member's last free slot waits for the other raise and is refused with the
   cap (`BankOpenRequestCapConcurrencyTest`).
 - [x] A raise, correction or cancel path that reaches the security context fails the build

@@ -343,10 +343,12 @@ public class BankBookingRequestService {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
     }
     applyTargetAccount(request, type, update.targetAccountId());
-    applyCounterparty(
-        request,
-        resolveRequestCounterparty(
-            type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    if (!keepsCounterparty(request, update)) {
+      applyCounterparty(
+          request,
+          resolveRequestCounterparty(
+              type, update.counterpartyUserId(), update.counterpartyOrgUnitId()));
+    }
     request.setAmount(update.amount());
     request.setNote(update.note());
     request.setJustification(update.justification());
@@ -378,6 +380,21 @@ public class BankBookingRequestService {
             orgUnit == null ? null : orgUnit.getShorthand(),
             request.getRequestedBy()));
     return toDto(request);
+  }
+
+  /**
+   * Tells whether a correction names the counterparty the request already stores, which then stays
+   * as recorded, its snapshot included, even after the counterparty left that org unit
+   * (REQ-BANK-056, REQ-BXCH-004); a changed counterparty is resolved and checked anew.
+   *
+   * @param request the request being edited
+   * @param update the correction
+   * @return {@code true} when both the counterparty and its org unit are unchanged
+   */
+  private static boolean keepsCounterparty(
+      @NotNull BankBookingRequest request, @NotNull UpdateBankBookingRequest update) {
+    return Objects.equals(request.getCounterpartyUserId(), update.counterpartyUserId())
+        && Objects.equals(request.getCounterpartyOrgUnitId(), update.counterpartyOrgUnitId());
   }
 
   /**

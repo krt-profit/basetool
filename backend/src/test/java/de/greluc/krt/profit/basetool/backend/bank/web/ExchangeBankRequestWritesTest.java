@@ -227,6 +227,42 @@ class ExchangeBankRequestWritesTest {
   }
 
   @Test
+  void aCorrectionKeepsTheStoredRecipientAfterTheyLeftTheirUnit() throws Exception {
+    UUID id = world.request(Request.CORRECT_OWN);
+    UUID recipient = world.user(Actor.STAFFELLEITER);
+    UUID formerUnit =
+        jdbc.queryForObject(
+            "SELECT org_unit_id FROM bank_account WHERE id = ?",
+            UUID.class,
+            world.account(Account.FOREIGN_ORG_UNIT));
+    entityManager.flush();
+    jdbc.update(
+        "UPDATE bank_booking_request SET counterparty_user_id = ?, counterparty_handle = ?,"
+            + " counterparty_org_unit_id = ?, counterparty_org_unit_name = ? WHERE id = ?",
+        recipient,
+        "Stored Handle",
+        formerUnit,
+        "Former Unit",
+        id);
+    entityManager.clear();
+
+    body(correct(Actor.MEMBER, id, 700, version(id)), 200);
+    entityManager.flush();
+
+    Map<String, Object> stored =
+        jdbc.queryForMap(
+            "SELECT counterparty_user_id, counterparty_handle, counterparty_org_unit_id,"
+                + " counterparty_org_unit_name, amount FROM bank_booking_request WHERE id = ?",
+            id);
+    assertThat(stored)
+        .containsEntry("counterparty_user_id", recipient)
+        .containsEntry("counterparty_handle", "Stored Handle")
+        .containsEntry("counterparty_org_unit_id", formerUnit)
+        .containsEntry("counterparty_org_unit_name", "Former Unit");
+    assertThat(((Number) stored.get("amount")).longValue()).isEqualTo(700L);
+  }
+
+  @Test
   void aStaleVersionConflictsAndAnApprovedRequestStaysAsItIs() throws Exception {
     UUID id = world.request(Request.CORRECT_OWN);
     long version = version(id);
