@@ -271,7 +271,7 @@ class ExchangeGateTest {
   void aBankPathWithoutARouteIsNotFoundWhileTheBankSwitchIsOn() throws Exception {
     bankRegistry(true, true);
 
-    call(HttpMethod.GET, "/exchange/v1/bank/accounts")
+    call(HttpMethod.GET, "/exchange/v1/bank/no-such-route")
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("NOT_FOUND"));
   }

@@ -52,3 +52,7 @@ bulk.
   as off, so the gateway fails closed until the backend has written the new format.
 - Monitoring gains the bank counters and alerts (REQ-OBS-024); the open-request cap of 20 pending
   requests per member brakes request spam on top of the daily write quota.
+- Exchange code reaches the bank only through the policy, `BankActors` and the bank's published
+  reads with their value types; an architecture rule fails the build otherwise (REQ-BXCH-001).
+- A relayed path may carry a whole `{id}` segment, as the account reads do; the frozen seam still
+  lists every path one by one, never a wildcard.

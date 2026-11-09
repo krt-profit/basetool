@@ -42,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
@@ -149,10 +150,24 @@ public class BankAccountService {
       @Nullable Instant to) {
     requireAccount(accountId);
     Page<BankBookingRow> rows = postingRepository.findBookings(accountId, from, to, pageable);
-    List<UUID> txIds =
-        rows.getContent().stream().map(BankBookingRow::transactionId).distinct().toList();
+    return new PageImpl<>(toBookingDtos(rows.getContent()), pageable, rows.getTotalElements());
+  }
+
+  /**
+   * Maps booking rows to their DTOs, with counter-accounts and holder annotations resolved in batch
+   * (REQ-BANK-018, REQ-DATA-003).
+   *
+   * @param rows the projected booking rows
+   * @return one DTO per row, in row order
+   */
+  @NotNull
+  List<BankBookingDto> toBookingDtos(@NotNull List<BankBookingRow> rows) {
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
     List<UUID> transferTxIds =
-        rows.getContent().stream()
+        rows.stream()
             .filter(r -> r.type() == BankTransactionType.TRANSFER)
             .map(BankBookingRow::transactionId)
             .distinct()
@@ -163,11 +178,9 @@ public class BankAccountService {
             : postingRepository.findLegsByTransactionIds(transferTxIds).stream()
                 .collect(Collectors.groupingBy(BankCounterLeg::transactionId));
     Map<UUID, List<BankHolderLeg>> holderLegsByTx =
-        txIds.isEmpty()
-            ? Map.of()
-            : holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
-                .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    return rows.map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx));
+        holderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
+            .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
+    return rows.stream().map(row -> toBookingDto(row, accountLegsByTx, holderLegsByTx)).toList();
   }
 
   /**

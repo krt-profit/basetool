@@ -1283,6 +1283,240 @@
           }
         }
       }
+    },
+    "/exchange/v1/bank/accounts": {
+      "get": {
+        "operationId": "bank_accounts",
+        "summary": "The active Kartellbank accounts the member may view, the KRT account first and the rest by account number: a snapshot.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankAccountPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Each account carries its balance, target and 30-day trend, whether the member may raise a withdrawal or transfer there and the member's own limit. No holders, custody or limit tables. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page of the same snapshot. A cursor the server did not issue, or whose account the member no longer views, answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/bank/accounts/{id}/bookings": {
+      "get": {
+        "operationId": "bank_bookings",
+        "summary": "The bookings of one account the member views, newest first: a snapshot, optionally bounded in time.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/bankBookingPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Redacted as on the member's account page: no holders and no staff note; the counterparty's handle is null when they withhold their name from connected applications. A hidden, closed or unknown account answers 404 NOT_FOUND. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The account's accountId.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive lower bound on the booking time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Inclusive upper bound on the booking time.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position from a previous page. A cursor the server did not issue answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/bank/accounts/{id}/balance-series": {
+      "get": {
+        "operationId": "bank_balance_series",
+        "summary": "The end-of-day balances of one account the member views, one per UTC day of the period.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-balance-series.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "from and to are required and span at most 365 days; otherwise 400 SCHEMA_INVALID. A hidden, closed or unknown account answers 404 NOT_FOUND. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The account's accountId.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive start of the period.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "Inclusive end of the period, at most 365 days after from.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

@@ -72,7 +72,10 @@ public final class ExchangeRoutes {
           write(
               HttpMethod.POST,
               "/exchange/v1/me/drafts/refinery-orders",
-              "exchange.drafts.refinery"));
+              "exchange.drafts.refinery"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/bookings", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/balance-series", "exchange.bank.read"));
 
   /** Not instantiable. */
   private ExchangeRoutes() {}

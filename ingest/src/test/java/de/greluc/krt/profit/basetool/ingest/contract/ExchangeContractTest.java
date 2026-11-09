@@ -87,7 +87,10 @@ class ExchangeContractTest {
           "/exchange/v1/org-stock/members",
           "/exchange/v1/org-stock/targets",
           "/exchange/v1/me/drafts/blueprints",
-          "/exchange/v1/me/drafts/refinery-orders");
+          "/exchange/v1/me/drafts/refinery-orders",
+          "/exchange/v1/bank/accounts",
+          "/exchange/v1/bank/accounts/{id}/bookings",
+          "/exchange/v1/bank/accounts/{id}/balance-series");
 
   /**
    * Narrowings within v1 the owner accepted as corrections, each with the reason: the schema now

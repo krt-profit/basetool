@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 19 relay operations on 18 backend paths, each with the gateway route that relays it, the
+   * The 22 relay operations on 21 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -213,7 +213,31 @@ public final class ExchangeSeam {
               "exchange.drafts.refinery",
               false,
               "refinery-draft.schema.json",
-              null));
+              null),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts",
+              "/bank/accounts",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankAccountPage"),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts/{id}/bookings",
+              "/bank/accounts/{id}/bookings",
+              "exchange.bank.read",
+              true,
+              null,
+              "page.schema.json#/$defs/bankBookingPage"),
+          new RelayOperation(
+              "GET",
+              "/bank/accounts/{id}/balance-series",
+              "/bank/accounts/{id}/balance-series",
+              "exchange.bank.read",
+              false,
+              null,
+              "bank-balance-series.schema.json"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -242,7 +266,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The fifteen capability scopes. */
+  /** The eighteen capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -259,7 +283,10 @@ public final class ExchangeSeam {
           "exchange.orgstock.details",
           "exchange.orgstock.write",
           "exchange.drafts.blueprints",
-          "exchange.drafts.refinery");
+          "exchange.drafts.refinery",
+          "exchange.bank.read",
+          "exchange.bank.request",
+          "exchange.bank.queue");
 
   /**
    * The capability scopes that gate no route of their own and add to the answer of another route's
@@ -267,6 +294,13 @@ public final class ExchangeSeam {
    */
   public static final @Unmodifiable Set<String> ADDITIVE_SCOPES =
       Set.of("exchange.orgstock.details", "exchange.demand.details");
+
+  /**
+   * The capability scopes the registry, the realm and the consent screen know although no route
+   * serves them yet; a client granted one is refused nothing and given nothing (REQ-BXCH-001).
+   */
+  public static final @Unmodifiable Set<String> UNROUTED_SCOPES =
+      Set.of("exchange.bank.request", "exchange.bank.queue");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
@@ -290,6 +324,7 @@ public final class ExchangeSeam {
           "NO_ROLE",
           "ACTING_MEMBER_REFUSED",
           "NOT_PERMITTED",
+          "NOT_FOUND",
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
           "CURSOR_EXPIRED",

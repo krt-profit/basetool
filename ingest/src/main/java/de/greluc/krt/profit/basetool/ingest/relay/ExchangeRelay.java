@@ -170,6 +170,9 @@ public class ExchangeRelay {
           Map.entry(
               "ACTING_MEMBER_REFUSED", "The Basetool refused the member this request acts for."),
           Map.entry("NOT_PERMITTED", "The member may not do this."),
+          Map.entry(
+              ExchangeRefusals.NOT_FOUND,
+              "No such resource, or the member may not see it; both answer alike."),
           Map.entry("SCHEMA_INVALID", "The Basetool refused the request's content as malformed."),
           Map.entry(
               "VERSION_CONFLICT", "The entry changed since it was read; pull, merge and retry."),
