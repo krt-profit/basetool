@@ -1965,6 +1965,121 @@ scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
   rm -rf "${tmp}"
 }
 
+write_copying_env_renderer() {
+  cat > "${T_FAKE_BIN}/render-env-d.py" <<'REND'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'render-env-d %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+templates="" out="" prev=""
+for a in "$@"; do
+  [[ "${prev}" == "--templates" ]] && templates="$a"
+  [[ "${prev}" == "--out" ]] && out="$a"
+  prev="$a"
+done
+[[ -n "${templates}" && -n "${out}" ]] || exit 2
+mkdir -p "${out}"
+for t in "${templates}"/*.env.tmpl; do
+  [[ -f "${t}" ]] || continue
+  name="$(basename "${t}" .env.tmpl)"
+  cp "${t}" "${out}/${name}.env"
+done
+REND
+  chmod +x "${T_FAKE_BIN}/render-env-d.py"
+}
+
+ENV_D_BUNDLE_UNITS=(backend frontend ingest grafana loki)
+
+# The mirror's rsync quick check compares size and mtime, so a changed value must change the
+# template's length when the bundle is rewritten within the same second.
+write_env_d_bundle() {
+  local b="$1" backend="$2" grafana="$3" svc
+  rm -rf "${b}"
+  mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
+  echo "# promoted compose" > "${b}/docker-compose.yml"
+  for svc in "${ENV_D_BUNDLE_UNITS[@]}"; do
+    cp "${T_UNIT_DIR}/${svc}.container" "${b}/quadlet/systemd/${svc}.container"
+  done
+  printf 'BACKEND_SETTING=%s\n' "${backend}" > "${b}/quadlet/env.d/backend.env.tmpl"
+  printf 'FRONTEND_SETTING=same\n'          > "${b}/quadlet/env.d/frontend.env.tmpl"
+  printf 'INGEST_SETTING=same\n'            > "${b}/quadlet/env.d/ingest.env.tmpl"
+  printf 'GF_ROLE_PATH=%s\n' "${grafana}"   > "${b}/quadlet/env.d/grafana.env.tmpl"
+  printf 'LOKI_SETTING=same\n'              > "${b}/quadlet/env.d/loki.env.tmpl"
+}
+
+env_d_host() {
+  local tmp="$1" svc
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  for svc in grafana loki; do
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+  done
+  write_copying_env_renderer
+  ENV_D_BUNDLE="${tmp}/bundle"
+  write_env_d_bundle "${ENV_D_BUNDLE}" old old
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t ENV_D_RUN < <(podman_env; podman_converged_env; printf '%s\n' \
+    "BASETOOL_MONITORING_ENABLED=true" \
+    "FAKE_CONFIG_BUNDLE=${ENV_D_BUNDLE}" \
+    "BASETOOL_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "BASETOOL_ENV_D_DIR=${T_CONFIG_DIR}/env.d")
+  run_deploy -- "${ENV_D_RUN[@]}" >/dev/null 2>&1 || true
+  if grep -qx 'BACKEND_SETTING=old' "${T_CONFIG_DIR}/env.d/backend.env" 2>/dev/null; then
+    record 1 "env.d: the first release renders the old environment"
+  else
+    record 0 "env.d: the first release renders the old environment"
+  fi
+  : > "${T_DOCKER_LOG}"
+}
+
+assert_env_d_says() {
+  local svc="$1" line="$2" desc="$3"
+  if grep -qx -- "${line}" "${T_CONFIG_DIR}/env.d/${svc}.env" 2>/dev/null; then
+    record 1 "${desc}"
+  else
+    record 0 "${desc} (${svc}.env: $(cat "${T_CONFIG_DIR}/env.d/${svc}.env" 2>/dev/null || echo '<absent>'))"
+  fi
+}
+
+scenario_podman_env_d_only_change_restarts_the_unit() {
+  echo "Scenario: a release whose only change for a unit is its rendered env.d file restarts that unit"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  env_d_host "${tmp}"
+  write_env_d_bundle "${ENV_D_BUNDLE}" updated updated
+  run_deploy -- "${ENV_D_RUN[@]}" "FAKE_REMOTE_CONFIG=$(hexdig c0ff2)" || rc=$?
+  assert_exit 0 "$rc" "env.d: the release deploys"
+  assert_env_d_says backend 'BACKEND_SETTING=updated' "env.d: the new backend environment is rendered"
+  assert_contains "env.d: backend.env differs from the one it replaced" "env.d: the changed app env file is named in the log"
+  assert_contains "env.d: grafana.env differs from the one it replaced" "env.d: the changed monitoring env file is named in the log"
+  assert_excludes "env.d: frontend.env" "env.d: an unchanged env file is not reported"
+  assert_excludes "env.d: loki.env" "env.d: ...nor an unchanged monitoring one"
+  assert_contains "unit definitions [backend grafana]" "env.d: both units count as re-defined in the release parts"
+  assert_docker "systemctl --user stop backend.service" "env.d: the app unit is stopped in the gated restart window"
+  assert_no_docker "stop frontend.service" "env.d: a unit whose env file did not change is not stopped"
+  assert_count '^systemctl --user restart grafana\.service$' 1 "env.d: the monitoring unit is restarted once by the monitoring apply"
+  assert_no_docker "restart loki.service" "env.d: an unchanged monitoring unit is only started"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_env_d_change_is_rolled_back_with_the_config_tree() {
+  echo "Scenario: a failed release puts the previous env.d back together with the previous config tree"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  env_d_host "${tmp}"
+  write_env_d_bundle "${ENV_D_BUNDLE}" updated updated
+  run_deploy -- "${ENV_D_RUN[@]}" "FAKE_REMOTE_CONFIG=$(hexdig c0ff2)" \
+    "FAKE_REMOTE_BACKEND=${PDIG_BACKEND_NEW}" \
+    "FAKE_UNHEALTHY_DIGEST=${PDIG_BACKEND_NEW}" || rc=$?
+  assert_exit 1 "$rc" "env.d: the failing release exits non-zero"
+  assert_contains "restoring previous host config" "env.d: the previous config tree is restored"
+  assert_contains "rolled back to previous digest pin successfully" "env.d: the rollback reaches health"
+  assert_env_d_says backend 'BACKEND_SETTING=old' "env.d: the previous backend environment is rendered again"
+  assert_env_d_says grafana 'GF_ROLE_PATH=old' "env.d: ...and the previous monitoring environment"
+  assert_count '^systemctl --user stop backend\.service' 2 "env.d: backend is stopped for the release and again for the rollback"
+  assert_no_docker "restart grafana.service" "env.d: a monitoring unit is not restarted for a release that was rolled back"
+  rm -rf "${tmp}"
+}
+
 scenario_podman_acme_is_part_of_the_stack() {
   echo "Scenario: acme is started with the stack, like every other prod-profile service"
   local tmp rc=0
@@ -3323,6 +3438,8 @@ scenario_podman_retired_unit_is_stopped_then_removed
 scenario_podman_first_deploy_fills_an_empty_unit_dir
 scenario_podman_runs_without_a_compose_file
 scenario_podman_changed_monitoring_and_acme_units_are_restarted
+scenario_podman_env_d_only_change_restarts_the_unit
+scenario_podman_env_d_change_is_rolled_back_with_the_config_tree
 scenario_podman_acme_is_part_of_the_stack
 scenario_podman_keystore_checked_where_the_unit_mounts_it
 scenario_podman_missing_mounted_keystore_refuses
