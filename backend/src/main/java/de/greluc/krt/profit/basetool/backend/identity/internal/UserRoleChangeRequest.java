@@ -24,7 +24,7 @@ import jakarta.validation.constraints.NotNull;
 /**
  * Assigns or withdraws one role of a user (REQ-SEC-088).
  *
- * @param assigned {@code true} to assign the role, {@code false} to withdraw it
+ * @param assigned {@code true} to assign the role, {@code false} to withdraw it; required
  * @param version the user's role-set counter the caller last saw; required
  */
-public record UserRoleChangeRequest(boolean assigned, @NotNull Long version) {}
+public record UserRoleChangeRequest(@NotNull Boolean assigned, @NotNull Long version) {}

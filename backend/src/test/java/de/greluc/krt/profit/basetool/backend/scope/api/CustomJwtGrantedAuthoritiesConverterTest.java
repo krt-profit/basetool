@@ -183,7 +183,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void assembleForAUserAloneStillReadsTheStoredRoles() {
     User user = userWithNoRoles();
-    user.setRoles(Set.of(namedRole("Admin")));
+    user.setRoles(Set.of(codeRole(Roles.ADMIN)));
 
     Collection<String> authorities =
         converter.assembleFor(user).stream().map(GrantedAuthority::getAuthority).toList();
@@ -192,14 +192,15 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   /**
-   * A role with only a name, which is all the authority mapping reads.
+   * A role with its code, which is all the authority mapping reads.
    *
-   * @param name the role's display name
+   * @param code the role's stable code
    * @return the role, with no permissions attached
    */
-  private static Role namedRole(String name) {
+  private static Role codeRole(String code) {
     Role role = new Role();
-    role.setName(name);
+    role.setCode(code);
+    role.setName(code);
     role.setPermissions(Set.of());
     return role;
   }
@@ -212,7 +213,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   private User krtMember() {
     User user = userWithNoRoles();
-    user.setRoles(Set.of(namedRole("KRT Member")));
+    user.setRoles(Set.of(codeRole(Roles.KRT_MEMBER)));
     return user;
   }
 
@@ -284,7 +285,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void convert_afterTheMembersRolesChanged_reassemblesFromTheStoredRoles() {
     User admin = userWithNoRoles();
-    admin.setRoles(Set.of(namedRole("Admin"), namedRole("KRT Member")));
+    admin.setRoles(Set.of(codeRole(Roles.ADMIN), codeRole(Roles.KRT_MEMBER)));
     Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
     when(userReconciliationService.syncUser(jwt)).thenReturn(admin, krtMember());
     when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
@@ -297,6 +298,31 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
     assertTrue(before.contains("ROLE_ADMIN"));
     assertFalse(after.contains("ROLE_ADMIN"), "a withdrawn role must bite on the next request");
+    verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
+  /**
+   * An assembly that read the roles before a role change committed does not cache its result, so
+   * the eviction that ran while it was assembling is not undone for the cache's TTL.
+   */
+  @Test
+  void convert_whenTheRolesChangeWhileAssembling_doesNotCacheTheStaleResult() {
+    User admin = userWithNoRoles();
+    admin.setRoles(Set.of(codeRole(Roles.ADMIN), codeRole(Roles.KRT_MEMBER)));
+    Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
+    when(userReconciliationService.syncUser(jwt))
+        .thenAnswer(_ -> {
+          converter.onRolesChanged(new UserRolesChangedEvent(USER_ID));
+          return admin;
+        })
+        .thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(jwt);
+    Collection<String> after =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertFalse(after.contains("ROLE_ADMIN"), "the withdrawn role must not be served from cache");
     verify(userReconciliationService, times(2)).syncUser(jwt);
   }
 

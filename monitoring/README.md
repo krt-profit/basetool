@@ -60,7 +60,7 @@ probes), plus the app data networks the exporters bridge into. `net-docker-proxy
 compose file.
 
 **Grafana is the only UI**, published by the native edge (`docker/edge/conf.d/40-grafana.conf.template`)
-behind Keycloak OIDC and restricted to the realm role `Admin` (REQ-OBS-008).
+behind Keycloak OIDC and restricted to the client role `grafana-admin` of the `grafana` client (REQ-OBS-008).
 
 | Component | Runs as | Defined in |
 | --- | --- | --- |
@@ -193,7 +193,7 @@ sudo systemctl restart alloy.service            # the host-native shipper
 - **Loki is excluded from backups**, so its retention window cannot be extended by restoring an old
   snapshot.
 - **Traces — 14d.**
-- **Grafana is admin-only** (Keycloak realm role `Admin`).
+- **Grafana is admin-only** (Keycloak client role `grafana-admin` of the `grafana` client).
 
 ## Alert-response runbook (alert → first actions)
 
@@ -347,7 +347,7 @@ section above.
 | **RegistrationApprovalOverdue / BankBookingApprovalOverdue** | An approval queue is aging past SLA. Notify the approvers; clear the backlog. |
 | **DeletionRequestOverdue** | A member's Art. 17 erasure request has been pending more than 14 days. Art. 12(3) gives one month, so this is a warning with headroom: decide it in Administration -> Löschanträge. A refusal needs a written reason (REQ-SEC-061). |
 | **UserDeletionUnfinished** | An account has been gone from Keycloak for more than 7 days while its local row is still there. Finish it in Administration -> Mitglieder (REQ-SEC-059). Service-account rows (`service-account-%`) are excluded. |
-| **AccountErasureKeycloakDeleteFailed / AdminAccountAutoActivated** | An erasure deleted the local data and not the Keycloak account, or a new account earned `Admin` as a bootstrap subject and skipped the approval queue. The remedy is manual; the paired audit row carries the account id the Keycloak console needs. |
+| **AccountErasureKeycloakDeleteFailed / AdminAccountAutoActivated** | An erasure deleted the local data and not the Keycloak account, or an account earned `Admin` at login as a bootstrap subject, with no admin's decision behind it. The remedy is manual; the paired audit row carries the account id the Keycloak console needs. |
 | **P4kImportStuck / P4kImportRunningStuck / P4kImportFailed** | A P4K import has been PENDING > 6h (the worker is wedged), RUNNING > 3h (the worker is wedged or the job's end could not be recorded; a restart marks it FAILED), or reached FAILED in the last 24h. Check the backend log and the job list. |
 | **JobOrderStale / RefineryOrderStale / OperationStale** | A work-queue item has been open past its baseline (job order > 180d, refinery order / operation > 90d). Close, reassign or cancel it. |
 | **MailDeliveryFailing** | Outgoing SMTP mail is failing (>2/h). Check the relay and the backend log. |
@@ -598,7 +598,7 @@ grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/lib/basetool/textf
 python3 scripts/check-conformance.py --ssh <host>   # from a workstation; covers scrape-targets-up, container-metrics, log-streams
 ```
 
-In Grafana, confirm the Keycloak login lets an `Admin` in and refuses anyone else, and that
+In Grafana, confirm the Keycloak login lets a holder of `grafana-admin` in and refuses anyone else, and that
 Explore shows one trace in Tempo, one `{app="edge"}` line and one `{app="host-auth"}` line in Loki.
 healthchecks.io must go green within minutes (the `Watchdog` heartbeat).
 

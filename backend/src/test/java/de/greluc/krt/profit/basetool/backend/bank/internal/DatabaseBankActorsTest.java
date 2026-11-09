@@ -75,7 +75,7 @@ class DatabaseBankActorsTest {
 
   @Test
   void webActor_ofAnAdmin_reachesTheBankRolesThroughTheHierarchy() {
-    storeUser(ApprovalStatus.ACTIVE, "Admin", "KRT Member");
+    storeUser(ApprovalStatus.ACTIVE, Roles.ADMIN, Roles.KRT_MEMBER);
 
     BankActor actor = actors.of(userId);
 
@@ -85,7 +85,7 @@ class DatabaseBankActorsTest {
 
   @Test
   void exchangeActor_ofAnAdmin_holdsNoAdminAndNoBankRoleItImplied() {
-    storeUser(ApprovalStatus.ACTIVE, "Admin", "KRT Member");
+    storeUser(ApprovalStatus.ACTIVE, Roles.ADMIN, Roles.KRT_MEMBER);
 
     BankActor actor = actors.forExchange(userId);
 
@@ -94,7 +94,7 @@ class DatabaseBankActorsTest {
 
   @Test
   void exchangeActor_ofAnAdminWhoIsBankleitung_keepsTheStoredBankRole() {
-    storeUser(ApprovalStatus.ACTIVE, "Admin", "Bank Management");
+    storeUser(ApprovalStatus.ACTIVE, Roles.ADMIN, Roles.BANK_MANAGEMENT);
 
     BankActor actor = actors.forExchange(userId);
 
@@ -103,7 +103,7 @@ class DatabaseBankActorsTest {
 
   @Test
   void actor_ofAPendingRegistration_holdsNoRole() {
-    storeUser(ApprovalStatus.PENDING, "Bank Employee");
+    storeUser(ApprovalStatus.PENDING, Roles.BANK_EMPLOYEE);
 
     assertThat(actors.of(userId).roles()).isEmpty();
   }
@@ -114,14 +114,15 @@ class DatabaseBankActorsTest {
     verifyNoInteractions(userRepository, membershipRepository, grantRepository);
   }
 
-  private void storeUser(ApprovalStatus status, String... roleNames) {
+  private void storeUser(ApprovalStatus status, String... roleCodes) {
     User user = new User();
     user.setId(userId);
     user.setApprovalStatus(status);
-    for (String name : roleNames) {
+    for (String code : roleCodes) {
       Role role = new Role();
       role.setId((long) user.getRoles().size() + 1);
-      role.setName(name);
+      role.setCode(code);
+      role.setName(code);
       user.getRoles().add(role);
     }
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));

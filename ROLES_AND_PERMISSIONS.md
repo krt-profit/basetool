@@ -235,7 +235,9 @@ counter (`roles_version`), separate from the user record's version. The last act
 `APP_BOOTSTRAP_ADMIN_SUBS` receive `Admin` at login while no active admin exists. Every change is
 audited (`USER_ROLE_ASSIGNED` / `USER_ROLE_WITHDRAWN`) and announced to the member. Approving a
 registration grants `KRT Member`. A change applies in the backend on the member's next request and
-in the web UI within a minute; neither the login nor the roster sync writes a role.
+in the web UI within a minute; neither the login nor the roster sync writes a role. Keycloak keeps
+only the realm role `Admin`, as the condition of the admin OTP (REQ-SEC-082): whoever gives or
+withdraws the Basetool's `Admin` maps or unmaps it there by hand; the Basetool never reads it.
 
 ### Role hierarchy (backend + frontend identical)
 
