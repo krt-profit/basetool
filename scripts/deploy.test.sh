@@ -1989,6 +1989,8 @@ REND
 
 ENV_D_BUNDLE_UNITS=(backend frontend ingest grafana loki)
 
+# The mirror's rsync quick check compares size and mtime, so a changed value must change the
+# template's length when the bundle is rewritten within the same second.
 write_env_d_bundle() {
   local b="$1" backend="$2" grafana="$3" svc
   rm -rf "${b}"
@@ -2043,10 +2045,10 @@ scenario_podman_env_d_only_change_restarts_the_unit() {
   local tmp rc=0
   tmp="$(mktmp)"
   env_d_host "${tmp}"
-  write_env_d_bundle "${ENV_D_BUNDLE}" new new
+  write_env_d_bundle "${ENV_D_BUNDLE}" updated updated
   run_deploy -- "${ENV_D_RUN[@]}" "FAKE_REMOTE_CONFIG=$(hexdig c0ff2)" || rc=$?
   assert_exit 0 "$rc" "env.d: the release deploys"
-  assert_env_d_says backend 'BACKEND_SETTING=new' "env.d: the new backend environment is rendered"
+  assert_env_d_says backend 'BACKEND_SETTING=updated' "env.d: the new backend environment is rendered"
   assert_contains "env.d: backend.env differs from the one it replaced" "env.d: the changed app env file is named in the log"
   assert_contains "env.d: grafana.env differs from the one it replaced" "env.d: the changed monitoring env file is named in the log"
   assert_excludes "env.d: frontend.env" "env.d: an unchanged env file is not reported"
@@ -2064,7 +2066,7 @@ scenario_podman_env_d_change_is_rolled_back_with_the_config_tree() {
   local tmp rc=0
   tmp="$(mktmp)"
   env_d_host "${tmp}"
-  write_env_d_bundle "${ENV_D_BUNDLE}" new new
+  write_env_d_bundle "${ENV_D_BUNDLE}" updated updated
   run_deploy -- "${ENV_D_RUN[@]}" "FAKE_REMOTE_CONFIG=$(hexdig c0ff2)" \
     "FAKE_REMOTE_BACKEND=${PDIG_BACKEND_NEW}" \
     "FAKE_UNHEALTHY_DIGEST=${PDIG_BACKEND_NEW}" || rc=$?
