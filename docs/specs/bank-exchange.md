@@ -244,6 +244,12 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067). The column, the
   trail's `bank_audit_event.client_id` and both schemas' `client` hold up to 63 characters, the
   longest id the registry admits.
+- **A retried raise raises nothing twice.** The gateway relays a raise's `Idempotency-Key` as
+  `X-Exchange-Idempotency-Key`, and the request keeps it in `bank_booking_request.idempotency_key`
+  (V366), unique per client, member and key. A raise under a key the client already raised a
+  request of this member with answers that request with `201` and its current state, even when the
+  gateway's answer cache missed it (a `5xx` after the commit is never cached) and even at the cap.
+  The lookup runs under the member's open-request lock, so two retries never both insert.
 - **No exchange journal and no undo.** A request books nothing; a client cancels it instead. The
   trail is `bank_audit_event` with its `client_id` (ADR-0153).
 - **Refusals.** `404 NOT_FOUND` for an unknown, closed or hidden account and for another member's
@@ -271,6 +277,9 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   unit (`ExchangeBankRequestWritesTest`).
 - [x] A raise racing the member's last free slot waits for the other raise and is refused with the
   cap (`BankOpenRequestCapConcurrencyTest`).
+- [x] A raise retried under the same idempotency key answers the request raised first, also at the
+  cap, and a new key raises a new request (`ExchangeBankRequestWritesTest`); the gateway relays the
+  key on the raise only (`ExchangeBankRequestWriteRouteTest`, `ExchangeGoldenAnswerTest`).
 - [x] A raise, correction or cancel path that reaches the security context fails the build
   (`BankAccessPolicyRulesTest`).
 - [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,

@@ -679,7 +679,9 @@ class ExchangeGoldenAnswerTest {
     if (nonce != null && !nonce.isBlank()) {
       out = out.replace(nonce, "<dpop-nonce>");
     }
-    out = out.replaceAll("(?m)^(idempotency-key): test-[0-9a-f-]{36}$", "$1: <idempotency-key>");
+    out =
+        out.replaceAll(
+            "(?m)^((?:x-exchange-)?idempotency-key): test-[0-9a-f-]{36}$", "$1: <idempotency-key>");
     out =
         out.replaceAll(
             "(?m)^(ratelimit: limit=\\d+), remaining=\\d+, reset=\\d+$",

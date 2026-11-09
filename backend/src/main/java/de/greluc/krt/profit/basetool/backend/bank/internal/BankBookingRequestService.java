@@ -166,7 +166,9 @@ public class BankBookingRequestService {
     BankPurpose purpose = draft.purpose();
     request.setPurposeKind(purpose == null ? null : purpose.kind());
     request.setPurposeRef(purpose == null ? null : purpose.ref());
-    request.setClientId(draft.clientId());
+    BankRequestOrigin origin = draft.origin();
+    request.setClientId(origin == null ? null : origin.clientId());
+    request.setIdempotencyKey(origin == null ? null : origin.idempotencyKey());
     BankBookingRequest saved = requestRepository.save(request);
 
     bankAuditService.record(

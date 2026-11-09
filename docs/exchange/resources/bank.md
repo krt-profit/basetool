@@ -192,6 +192,9 @@ one unit of the daily write quota ([limits](../sync-guide.md#rate-limits-quota-a
 Basetool applies the same validation and approval routing as in its own pages; nothing is booked
 until the bank confirms the request there.
 
+A raise keeps its `Idempotency-Key`: when its answer was lost, retry with the same key and the same
+body, and you get the request it raised, with `201` and its current state, never a second one.
+
 `POST /exchange/v1/bank/requests` raises a request:
 
 ```json

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.web;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.contract.ExchangeSchemas;
 import de.greluc.krt.profit.basetool.ingest.gate.ExchangeRequestContext;
+import de.greluc.krt.profit.basetool.ingest.idempotency.ExchangeIdempotencyFilter;
 import de.greluc.krt.profit.basetool.ingest.problem.Problems;
 import de.greluc.krt.profit.basetool.ingest.relay.ExchangeRelay;
 import jakarta.servlet.http.HttpServletRequest;
@@ -249,6 +250,72 @@ class ExchangeRelayResponses {
       @NotNull HttpStatus success,
       @NotNull HttpServletRequest request,
       @Nullable String acceptLanguage) {
+    return checkedBody(
+        method, body, requestSchema, path, responseSchema, success, request, acceptLanguage, null);
+  }
+
+  /**
+   * Checks a body, relays it with the client's {@code Idempotency-Key} and checks the answer, which
+   * reaches the client with the given status; the backend keeps the key with what the write
+   * created, so a retry after a lost answer finds it (REQ-BXCH-004).
+   *
+   * @param method the method on both sides
+   * @param body the request body
+   * @param requestSchema the body's schema
+   * @param path the route below {@code /exchange/v1}
+   * @param responseSchema the answer's schema
+   * @param success the status a usable answer reaches the client with
+   * @param request the admitted request, whose key the idempotency filter checked
+   * @param acceptLanguage the caller's language
+   * @return the answer or a problem
+   */
+  @NotNull
+  ResponseEntity<?> keyedBody(
+      @NotNull HttpMethod method,
+      @NotNull JsonNode body,
+      @NotNull String requestSchema,
+      @NotNull String path,
+      @NotNull String responseSchema,
+      @NotNull HttpStatus success,
+      @NotNull HttpServletRequest request,
+      @Nullable String acceptLanguage) {
+    return checkedBody(
+        method,
+        body,
+        requestSchema,
+        path,
+        responseSchema,
+        success,
+        request,
+        acceptLanguage,
+        request.getHeader(ExchangeIdempotencyFilter.IDEMPOTENCY_KEY));
+  }
+
+  /**
+   * Checks a body, relays it, with the client's key when one is given, and checks the answer.
+   *
+   * @param method the method on both sides
+   * @param body the request body
+   * @param requestSchema the body's schema
+   * @param path the route below {@code /exchange/v1}
+   * @param responseSchema the answer's schema
+   * @param success the status a usable answer reaches the client with
+   * @param request the admitted request
+   * @param acceptLanguage the caller's language
+   * @param idempotencyKey the client's key to relay, or {@code null} to relay none
+   * @return the answer or a problem
+   */
+  @NotNull
+  private ResponseEntity<?> checkedBody(
+      @NotNull HttpMethod method,
+      @NotNull JsonNode body,
+      @NotNull String requestSchema,
+      @NotNull String path,
+      @NotNull String responseSchema,
+      @NotNull HttpStatus success,
+      @NotNull HttpServletRequest request,
+      @Nullable String acceptLanguage,
+      @Nullable String idempotencyKey) {
     ExchangeRequestContext context = ExchangeRequestContext.of(request);
     if (context == null) {
       return failed();
@@ -262,8 +329,11 @@ class ExchangeRelayResponses {
     if (unreportable != null) {
       return unreportable;
     }
+    String target = ExchangeController.BACKEND + path;
     return relayed(
-        relay.forward(method, ExchangeController.BACKEND + path, body, context, acceptLanguage),
+        idempotencyKey == null
+            ? relay.forward(method, target, body, context, acceptLanguage)
+            : relay.forward(method, target, body, context, acceptLanguage, idempotencyKey),
         responseSchema,
         unknown,
         success,

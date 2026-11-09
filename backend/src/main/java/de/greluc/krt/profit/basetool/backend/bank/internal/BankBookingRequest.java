@@ -329,4 +329,13 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "client_id", length = 63, updatable = false)
   private String clientId;
+
+  /**
+   * The client's {@code Idempotency-Key} of the raise (REQ-BXCH-004), unique per client and
+   * requester, so a retry after a lost answer finds this request; {@code null} for a request raised
+   * without one. Immutable.
+   */
+  @Nullable
+  @Column(name = "idempotency_key", length = 128, updatable = false)
+  private String idempotencyKey;
 }

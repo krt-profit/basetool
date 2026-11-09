@@ -106,7 +106,7 @@ public class ExchangeBankRequestController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return responses.body(
+    return responses.keyedBody(
         HttpMethod.POST,
         body,
         WRITE_SCHEMA + "raise",

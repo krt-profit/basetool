@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -56,6 +57,8 @@ public class ExchangeBankRequestWriteService {
    *
    * @param caller the acting member and the client the request is recorded for
    * @param body the type, accounts, amount, texts and the split of a deposit
+   * @param idempotencyKey the client's key of the raise the gateway relayed, or {@code null}; a
+   *     retry under the same key answers the request raised first
    * @return the new request's id, {@code PENDING} status, version and amount
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException for an unknown, closed
    *     or hidden account
@@ -63,7 +66,9 @@ public class ExchangeBankRequestWriteService {
    */
   @NotNull
   public ExchangeBankRequestWrittenDto raise(
-      @NotNull ExchangeCaller caller, @NotNull ExchangeBankRequestCreateDto body) {
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeBankRequestCreateDto body,
+      @Nullable String idempotencyKey) {
     return counted(
         caller,
         () ->
@@ -79,7 +84,8 @@ public class ExchangeBankRequestWriteService {
                         body.justification(),
                         body.splitEnabled(),
                         body.splitPercent()),
-                    caller.clientId())));
+                    caller.clientId(),
+                    idempotencyKey)));
   }
 
   /**

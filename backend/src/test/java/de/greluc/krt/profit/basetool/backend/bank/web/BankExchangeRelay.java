@@ -63,6 +63,7 @@ final class BankExchangeRelay {
 
   private final MockMvc mockMvc;
   private final JsonMapper json = JsonMapper.builder().build();
+
   /** A registry client id of the longest length the registry admits, 63 characters. */
   private final String client =
       "bank-" + UUID.randomUUID().toString().substring(0, 8) + "-" + "c".repeat(49);
@@ -142,11 +143,55 @@ final class BankExchangeRelay {
       @NotNull String path,
       @NotNull Map<String, ?> body)
       throws Exception {
-    MockHttpServletRequestBuilder call =
-        relayed(request(method, BANK + path), member)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(json.writeValueAsString(body));
-    return mockMvc.perform(call).andReturn().getResponse();
+    return mockMvc.perform(writing(method, member, path, body)).andReturn().getResponse();
+  }
+
+  /**
+   * Sends one relayed write with a JSON body below {@link #BANK} and the client's idempotency key,
+   * as the gateway relays a raise.
+   *
+   * @param method the HTTP method
+   * @param member the acting member
+   * @param path the path below {@link #BANK}
+   * @param body the body, serialised as JSON
+   * @param idempotencyKey the key the client sent the write with
+   * @return the response
+   * @throws Exception when MockMvc fails to dispatch
+   */
+  @NotNull
+  MockHttpServletResponse write(
+      @NotNull HttpMethod method,
+      @NotNull UUID member,
+      @NotNull String path,
+      @NotNull Map<String, ?> body,
+      @NotNull String idempotencyKey)
+      throws Exception {
+    return mockMvc
+        .perform(
+            writing(method, member, path, body)
+                .header(ActingMemberHeader.EXCHANGE_IDEMPOTENCY_KEY_HEADER, idempotencyKey))
+        .andReturn()
+        .getResponse();
+  }
+
+  /**
+   * Builds one relayed write with a JSON body below {@link #BANK}.
+   *
+   * @param method the HTTP method
+   * @param member the acting member
+   * @param path the path below {@link #BANK}
+   * @param body the body, serialised as JSON
+   * @return the request
+   */
+  @NotNull
+  private MockHttpServletRequestBuilder writing(
+      @NotNull HttpMethod method,
+      @NotNull UUID member,
+      @NotNull String path,
+      @NotNull Map<String, ?> body) {
+    return relayed(request(method, BANK + path), member)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(body));
   }
 
   /**

@@ -98,7 +98,7 @@ class BankOpenRequestCapConcurrencyTest {
     seed();
     BankActor actor = actors.forExchange(member);
     for (int held = 1; held < properties.openRequestCap(); held++) {
-      asMember(() -> writes.raise(actor, deposit(), CLIENT));
+      asMember(() -> writes.raise(actor, deposit(), CLIENT, null));
     }
     CountDownLatch firstRaised = new CountDownLatch(1);
     CountDownLatch releaseFirst = new CountDownLatch(1);
@@ -108,7 +108,7 @@ class BankOpenRequestCapConcurrencyTest {
           pool.submit(() ->
               asMember(() ->
                   transactionTemplate.execute(_ -> {
-                    writes.raise(actor, deposit(), CLIENT);
+                    writes.raise(actor, deposit(), CLIENT, null);
                     firstRaised.countDown();
                     return await(releaseFirst);
                   })));
@@ -182,7 +182,7 @@ class BankOpenRequestCapConcurrencyTest {
   @Nullable
   private Throwable refusal(@NotNull BankActor actor) {
     try {
-      writes.raise(actor, deposit(), CLIENT);
+      writes.raise(actor, deposit(), CLIENT, null);
       return null;
     } catch (RuntimeException refused) {
       return refused;
