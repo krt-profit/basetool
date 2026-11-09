@@ -151,6 +151,11 @@ class DialogA11yE2eTest {
       SEEDED_DETAILS.add("/orders/" + itemOrderId);
       String specialCommandId =
           seeder.createSpecialCommand(USERNAME, PASSWORD, "E2E Dialog SK", "EDSK");
+      seeder.moveOrgUnitToProfit(USERNAME, PASSWORD, specialCommandId);
+      String skOrderId =
+          seeder.createJobOrder(
+              USERNAME, PASSWORD, specialCommandId, "E2E Dialog SK Order", jobMaterial, 650, 100.0);
+      SEEDED_DETAILS.add("/orders/" + skOrderId);
       SEEDED_DETAILS.add("/organisation/special-commands/" + specialCommandId);
       String orgUnitAccountId =
           seeder.ensureOrgUnitBankAccount(USERNAME, PASSWORD, "E2E Dialog OU Account", IRIDIUM_ID);
