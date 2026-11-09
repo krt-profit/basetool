@@ -1,6 +1,3 @@
--- The two optimistic-lock counters of a refinery order (REQ-REFINERY-029): game data (location,
--- method, timer, status, goods, pickup and store markers) and finances (expenses, other expenses,
--- ore sales). Plain business counters beside the row version, raised by the order services.
 ALTER TABLE refinery_order
     ADD COLUMN game_data_version BIGINT NOT NULL DEFAULT 0,
     ADD COLUMN finances_version BIGINT NOT NULL DEFAULT 0;
