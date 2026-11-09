@@ -299,6 +299,19 @@ class ExchangeRegistryMirrorIntegrationTest {
   }
 
   @Test
+  void theBankSwitchKeepsItsOwnTimeAndLeavesTheGlobalSwitchsTimeAlone() {
+    ExchangeSettings start = registryService.getSettings();
+
+    registryService.updateBankSwitch(!start.isBankEnabled(), start.getBankVersion());
+
+    ExchangeSettings after = registryService.getSettings();
+    assertThat(after.getUpdatedAt())
+        .as("the global switch's time")
+        .isEqualTo(start.getUpdatedAt());
+    assertThat(after.getBankUpdatedAt()).isNotNull().isNotEqualTo(start.getBankUpdatedAt());
+  }
+
+  @Test
   void switchingTheBankOffReachesTheMirrorBeforeTheCommitAndIsAudited() {
     ExchangeSettings on =
         registryService.updateBankSwitch(true, registryService.getSettings().getBankVersion());

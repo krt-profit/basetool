@@ -363,7 +363,9 @@ switch (REQ-XCH-003), with its own version counter `bank_version`, independent o
 - It is **off by default**; the bank family goes live only when an admin switches it on.
 - **Admins only** flip it, on the „Verbundene Apps" admin page, through
   `PUT /api/v1/connected-apps/admin/settings/bank {enabled, version}`; `GET` on the same path reads
-  it. A stale `version` answers `409`. Flipping either switch never makes the other's version stale.
+  it. A stale `version` answers `409`. Flipping either switch never makes the other's version stale,
+  and each keeps its own change time: the bank switch's in `bank_updated_at`, the global switch's in
+  the row's `updated_at`, which a bank flip leaves alone.
 - Switching off reaches the gateway's registry mirror **before** the commit or not at all, as the
   global switch does; switching on reaches it after the commit. The gateway reads the mirror through
   its five-second cache. A mirror document without the bank switch reads as off.
@@ -411,8 +413,8 @@ or closed account answers the same `404`.
 **Acceptance**
 
 - [x] The switch starts off, is set by an admin only and has its own version; a stale version is
-  `409`, and neither switch stales the other (`AdminExchangeRegistryControllerTest`,
-  `ExchangeRegistryMirrorIntegrationTest`).
+  `409`, and neither switch stales the other nor moves its change time
+  (`AdminExchangeRegistryControllerTest`, `ExchangeRegistryMirrorIntegrationTest`).
 - [x] Switching the bank off reaches the mirror before the commit, switching on only after it
   (`ExchangeRegistryMirrorIntegrationTest`, `ExchangeRegistrySnapshotTest`).
 - [x] While it is off, every bank path answers `503 BANK_EXCHANGE_DISABLED` with `Retry-After: 300`
