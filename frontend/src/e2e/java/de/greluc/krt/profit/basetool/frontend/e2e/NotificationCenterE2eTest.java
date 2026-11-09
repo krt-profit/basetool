@@ -203,8 +203,17 @@ class NotificationCenterE2eTest {
    * @return the new order's id
    */
   private static String seedOrder(BackendSeeder seeder, String materialId, String title) {
-    return seeder.createJobOrder(
-        MEMBER_USER, MEMBER_PASSWORD, IRIDIUM_SQUADRON_ID, title, materialId, 650, 100.0);
+    return new ContextualOrderCreator(seeder)
+        .create(
+            ADMIN_USER,
+            ADMIN_PASSWORD,
+            MEMBER_USER,
+            MEMBER_PASSWORD,
+            IRIDIUM_SQUADRON_ID,
+            title,
+            materialId,
+            650,
+            100.0);
   }
 
   /**

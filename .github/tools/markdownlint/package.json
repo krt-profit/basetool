@@ -6,8 +6,8 @@
     "markdownlint-cli": "0.50.0"
   },
   "overrides": {
-    "katex": "0.18.2",
-    "minimatch": "11.0.3",
+    "katex": "0.19.1",
+    "minimatch": "11.0.5",
     "re2js": "2.9.1"
   }
 }

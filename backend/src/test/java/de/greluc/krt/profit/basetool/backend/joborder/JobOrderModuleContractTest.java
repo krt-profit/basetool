@@ -66,8 +66,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the job-order module's externally visible contract: the order commands record their audit
- * events in the command's transaction (REQ-AUDIT-001), and a member of another profit-eligible org
- * unit is refused on every per-order read and write entry point (REQ-ORDERS-*, REQ-ORG-003).
+ * events in the command's transaction (REQ-AUDIT-001), and an unrelated member outside Profit is
+ * refused on every per-order read and write entry point (REQ-ORDERS-*, REQ-ORG-003).
  */
 @SpringBootTest
 @Transactional
@@ -109,6 +109,8 @@ class JobOrderModuleContractTest {
     home = squadron("JobHome-" + tag, "J" + tag);
     insider = member("job-insider", home);
     foreign = squadron("JobForeign-" + tag, "K" + tag);
+    foreign.setParent(null);
+    foreign = squadronRepository.save(foreign);
     outsider = member("job-outsider", foreign);
     ore = new Material();
     ore.setName("Job Ore " + tag);
@@ -133,7 +135,8 @@ class JobOrderModuleContractTest {
 
     mockMvc
         .perform(
-            post(ORDERS + "/" + id + "/assignees/" + insider.getId()).with(as(insider, MEMBER)))
+            post(ORDERS + "/" + id + "/assignees/" + insider.getId())
+                .with(asLogistician(insider, home)))
         .andExpect(status().is2xxSuccessful());
     assertThat(events(id)).contains("JOB_ORDER_ASSIGNEE_ADDED");
 
@@ -202,7 +205,7 @@ class JobOrderModuleContractTest {
         mockMvc
             .perform(
                 post(ORDERS)
-                    .with(as(insider, MEMBER))
+                    .with(asLogistician(insider, home))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body))
             .andExpect(status().is2xxSuccessful())

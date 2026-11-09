@@ -915,6 +915,23 @@ public final class BackendSeeder {
   }
 
   /**
+   * Sends a PATCH through the test backend transport and returns its status.
+   *
+   * @param username the acting test user
+   * @param password the test password
+   * @param path the backend path
+   * @param jsonBody the request document
+   * @return the backend HTTP status
+   */
+  public int patchForStatus(String username, String password, String path, String jsonBody) {
+    try {
+      return patch(passwordGrant(username, password), path, jsonBody);
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.patchForStatus failed", e);
+    }
+  }
+
+  /**
    * Issues an authenticated {@code PUT} as the given user and returns only the HTTP status (the
    * {@code PUT} counterpart of {@link #postForStatus}), so the role-appointment matrix can assert a
    * delegated squadron-rank {@code @PreAuthorize} verdict (2xx allowed / 403 denied) on {@code PUT
@@ -1331,8 +1348,17 @@ public final class BackendSeeder {
       String materialName) {
     getUserId(recipient, recipientPassword);
     String materialId = ensureJobOrderMaterial(recipient, recipientPassword, materialName);
-    createJobOrder(
-        creator, creatorPassword, IRIDIUM_SQUADRON_ID, materialName, materialId, 650, 100.0);
+    new ContextualOrderCreator(this)
+        .create(
+            recipient,
+            recipientPassword,
+            creator,
+            creatorPassword,
+            IRIDIUM_SQUADRON_ID,
+            materialName,
+            materialId,
+            650,
+            100.0);
   }
 
   /**

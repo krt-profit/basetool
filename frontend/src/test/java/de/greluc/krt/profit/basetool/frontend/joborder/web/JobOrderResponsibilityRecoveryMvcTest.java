@@ -36,7 +36,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
@@ -65,7 +64,6 @@ import org.springframework.web.context.WebApplicationContext;
 class JobOrderResponsibilityRecoveryMvcTest {
 
   @MockitoBean private BackendApiClient backendApiClient;
-  @MockitoBean private LiveSyncLocalBus liveSyncLocalBus;
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;

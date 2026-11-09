@@ -35,6 +35,24 @@ import org.springframework.stereotype.Repository;
 public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
+   * Acquires shared transaction coordination for a Profit-dependent write.
+   *
+   * @param key the shared hierarchy lock namespace
+   * @return always one
+   */
+  @Query(value = "SELECT 1 FROM pg_advisory_xact_lock_shared(:key)", nativeQuery = true)
+  int lockProfitHierarchyShared(@Param("key") long key);
+
+  /**
+   * Acquires exclusive transaction coordination before a Profit hierarchy change.
+   *
+   * @param key the shared hierarchy lock namespace
+   * @return always one
+   */
+  @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(:key)", nativeQuery = true)
+  int lockProfitHierarchyExclusive(@Param("key") long key);
+
+  /**
    * Loads the designated active Profit identities without any display-name fallback.
    *
    * @return every active Profit root id

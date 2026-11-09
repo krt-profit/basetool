@@ -204,7 +204,9 @@ show unmet quantities; the UI must not imply full physical delivery.
 The hierarchy foundation applies this prerequisite inside existing order and Inventory-owned
 linked-stock writes. All Inventory write transactions acquire the shared hierarchy lock before
 lot/row locks; organisational changes acquire its exclusive counterpart before the change and
-synchronous promise maintenance. Priority maintenance leaves invalid orders' stored slots unchanged.
+synchronous promise maintenance. Both coordination statements are declared on the owning
+`OrgUnitRepository`; `TableOwnershipTest` verifies their repository boundary. Priority maintenance
+leaves invalid orders' stored slots unchanged.
 Ended legacy promises retain quantity and attribution with an ending instant; reactivation does not
 revive them. The obsolete ordinary eligibility column remains during the required phase-one soak.
 
@@ -231,6 +233,7 @@ where authorized; historical names alone do not create access.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `InventoryJobOrderScopeIntegrationTest`,
+`StockRowViewCharacterisationTest`, `JobOrderModuleContractTest`,
 `JobOrderAssigneeGrantIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
 `ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest` cover current
 MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. Future participation
