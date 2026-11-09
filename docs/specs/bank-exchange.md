@@ -57,7 +57,7 @@ REQ-BXCH-003…005 exist, `exchange.bank.request` and `exchange.bank.queue` serv
   grants and memberships (REQ-XCH-009); seeing the whole bank needs Bank Management;
 - the exchange passes no active-org-unit pin;
 - exchange code reaches the bank only through `BankAccessPolicy` and its decision types,
-  `BankActors` and `BankAccountReads` with their value types
+  `BankActors`, `BankAccountReads` and `BankOwnRequestReads` with their value types
   (`BankAccessPolicyRulesTest.theExchangeReachesTheBankOnlyThroughThePolicy`).
 
 No money moves through a client and no bank-staff action is taken through one (ADR-0354).
@@ -137,6 +137,51 @@ it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` a
 `page.schema.json#/$defs/bankAccountPage|bankBookingPage` · **Related:** REQ-BANK-038, REQ-BANK-049,
 REQ-BANK-064, REQ-BANK-066, REQ-XCH-013 · **Issues:** #3118, #3157
 
+### REQ-BXCH-003 — The member's own requests and their change feed
+
+> [!note] Implemented (#3158). `client` stays `null` until the request writes add the origin
+> column (REQ-BXCH-004).
+
+`GET /exchange/v1/bank/requests` under `exchange.bank.read`, relayed to
+`/api/v1/exchange/bank/requests`: every booking request the member raised, whichever channel raised
+it — the web's requests too — as a snapshot followed by the change feed of REQ-XCH-013.
+
+- **Snapshot.** `cursor` + `limit` (1…1000, default 500), in request-id order; the last page hands
+  over a feed cursor at the position the snapshot was taken.
+- **Feed.** A new `ExchangeResource` `BANK_REQUEST`, keyed by the requester, with the request id as
+  its key. The `bank_booking_request` trigger sequences every insert, update and delete; a change
+  of an account's number, name or owning unit, and of the owning unit's shorthand, re-announces the
+  requests on and to that account. A feed page answers each changed request once with its current
+  state, and a request that no longer exists as a tombstone in `removed`. A cursor past the horizon
+  or not issued by the server answers `410 CURSOR_EXPIRED`.
+- **Allow-list.** `id`, `version`, `status`, `createdAt`, `decidedAt`, `type`, `amount`, `note`,
+  `justification`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no }`,
+  `requiresOwnerApproval`, `requiredApprover`, `ownerApprovalGranted`, `rejectReason`, `client`,
+  `splitEnabled`, `splitPercent`, each `null` where it does not apply. Money and the split percent
+  are JSON integers. No staff note, no staff identities (requester, decider or approver handles), no
+  counterparty, no purpose and no `callerMayConfirm`.
+- **Retention.** The member's own data: a client may persist it (REQ-BXCH-007).
+- **Counted.** Every page served counts `basetool_exchange_bank_reads_total{client_id,
+  route="requests"}` (REQ-OBS-024).
+
+**Acceptance**
+
+- [x] The snapshot lists every own request, the web-raised ones too, with exactly the allow-listed
+  fields, and no other member's; it pages with an opaque cursor that ends at the feed; a foreign
+  cursor is `410` (`ExchangeBankRequestsTest`).
+- [x] A request raised, decided or removed after the snapshot follows in the feed, a removal as a
+  tombstone; another member's request never does; a cursor past the horizon is `410`
+  (`ExchangeBankRequestFeedTest`).
+- [x] Every write of a request, a renamed account and a new unit shorthand are sequenced under the
+  requester (`ExchangeChangeFeedTriggerIntegrationTest`).
+- [x] Every answer validates against `page.schema.json#/$defs/bankRequestPage`; the route, schema,
+  fixtures and golden are part of the frozen contract (`ExchangeBankRequestsTest`,
+  `ExchangeBankRequestRouteTest`, `ExchangeGoldenAnswerTest`, `ExchangeContractTest`).
+
+**Enforced by:** `ExchangeBankRequestController`, `ExchangeBankRequestService`,
+`BankOwnRequestReadService` (backend) · `ExchangeBankRequestController`, `ExchangeRoutes`
+(gateway) · `bank-request.schema.json`, `page.schema.json#/$defs/bankRequestPage` · V365 ·
+**Related:** REQ-BANK-022, REQ-XCH-013, REQ-BXCH-007 · **Issues:** #3118, #3119, #3158
 ### REQ-BXCH-006 — The bank switch, the limits and the refusal codes
 
 > [!note] Implemented (#3156; ADR-0354). The bank routes themselves come with REQ-BXCH-002…005.
@@ -210,8 +255,8 @@ REQ-XCH-025, REQ-AUDIT-001, REQ-OBS-024 · **Issues:** #3121, #3156
 
 ### REQ-BXCH-007 — Retention classes, the onboarding criterion and name withholding
 
-> [!note] Implemented for the reads of REQ-BXCH-002 (#3157). The own requests and the staff queue
-> take their class with REQ-BXCH-003 and REQ-BXCH-005.
+> [!note] Implemented for the reads of REQ-BXCH-002 (#3157) and the own requests of REQ-BXCH-003
+> (#3158). The staff queue takes its class with REQ-BXCH-005.
 
 **Retention classes.** Every bank route names its class in the gateway's OpenAPI document and in
 [`docs/exchange/resources/bank.md`](../exchange/resources/bank.md):
@@ -242,4 +287,4 @@ client and its legal bases, the DPIA threshold assessment is reassessed, and the
 - [x] The onboarding criterion is part of `docs/exchange/onboarding.md`; A11, the DPIA threshold
   assessment and the privacy notice name the bank data.
 
-**Related:** REQ-XCH-044, REQ-BXCH-002 · **Issues:** #3122, #3157
+**Related:** REQ-XCH-044, REQ-BXCH-002, REQ-BXCH-003 · **Issues:** #3122, #3157, #3158

@@ -143,6 +143,7 @@ POST /api/v1/connected-apps/{clientId}/undo | ConnectedAppsController#undo | pre
 GET /api/v1/exchange/bank/accounts | ExchangeBankController#accounts | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/accounts/{id}/balance-series | ExchangeBankController#balanceSeries | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/accounts/{id}/bookings | ExchangeBankController#bookings | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/requests | ExchangeBankRequestController#requests | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/catalog/resolve | ExchangeCatalogController#resolve | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/account-check | ExchangeAccountCheckController#check | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
