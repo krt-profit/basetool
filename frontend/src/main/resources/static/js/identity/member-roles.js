@@ -18,7 +18,7 @@
  */
 
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
-import { showKrtConfirm } from '/js/kernel/toast.js';
+import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 
 /**
  * The role set the backend answers a role change with.
@@ -94,6 +94,24 @@ function bindRoleToggles() {
             toggle.checked = !assigned;
             return false;
         }
+
+        /**
+         * Undoes the toggle and shows the frontend's localized refusal, which its error handler
+         * sends as `message` (`LAST_ADMIN` among them).
+         *
+         * @param {unknown} body the refusal body
+         * @returns {boolean} true when the refusal's message was shown
+         */
+        function refuse(body) {
+            revert();
+            const message =
+                body && typeof body === 'object' && 'message' in body ? body.message : null;
+            if (typeof message !== 'string' || !message) {
+                return false;
+            }
+            showFrontendErrorToast(message);
+            return true;
+        }
         roles.write({
             method: 'PUT',
             url: `/api/proxy/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(
@@ -114,8 +132,13 @@ function bindRoleToggles() {
                 roles.notify('roles');
                 krtPageSections.publish('bank', ['grants', 'manage']);
             },
-            onError: revert,
-            onConflict: revert,
+            onError(_status, body) {
+                return refuse(body);
+            },
+            onConflict(body) {
+                const code = body && typeof body === 'object' && 'code' in body ? body.code : null;
+                return code === 'OPTIMISTIC_LOCK' ? revert() : refuse(body);
+            },
             onNetworkError: revert,
         });
     }

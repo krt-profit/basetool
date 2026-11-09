@@ -169,6 +169,36 @@ await test('a withdrawal without consequences and any assignment write at once',
     assert.equal(ui.writes[1].payload().assigned, true);
 });
 
+await test('a refused withdrawal shows the localized refusal and keeps the role', async () => {
+    const { ui, toggles, change } = load();
+    ui.answer = true;
+    await change(toggles.ADMIN);
+    const handled = ui.writes[0].onConflict({
+        code: 'LAST_ADMIN',
+        message: 'The last active admin keeps Admin.',
+    });
+    assert.ok(handled, 'the refusal is handled, not shown as a generic failure');
+    assert.deepEqual(ui.errors, ['The last active admin keeps Admin.']);
+    assert.equal(toggles.ADMIN.checked, true);
+});
+
+await test('a stale counter falls through to the conflict dialog', async () => {
+    const { ui, toggles, change } = load();
+    await change(toggles.BANK_EMPLOYEE);
+    const handled = ui.writes[0].onConflict({ code: 'OPTIMISTIC_LOCK', message: 'Changed.' });
+    assert.equal(handled, false);
+    assert.deepEqual(ui.errors, []);
+    assert.equal(toggles.BANK_EMPLOYEE.checked, true);
+});
+
+await test('any other refusal shows its localized message', async () => {
+    const { ui, toggles, change } = load();
+    await change(toggles.BANK_EMPLOYEE);
+    assert.ok(ui.writes[0].onError(403, { code: 'FORBIDDEN', message: 'Not allowed.' }));
+    assert.deepEqual(ui.errors, ['Not allowed.']);
+    assert.equal(ui.writes[0].onError(500, null), false, 'no message: the generic error shows');
+});
+
 if (failures) {
     process.exitCode = 1;
 } else {
