@@ -103,7 +103,8 @@ or `null`. No holders, custody, limit tables, ceilings, `version` or staff capab
 `transactionId`, `type`, `amount` (this account's signed leg), `createdAt`, `note`, `justification`,
 `reversedTransactionId`, `counterAccount { no, name }`, `intraAccount`, `transferFee`,
 `counterpartyHandle` and `counterpartyOrgUnitName`, each `null` where it does not apply. No holder
-handles and no staff note.
+handles and no staff note. `type` is any ledger type, `HOLDER_TRANSFER` included: the KRT account
+carries the fee leg of every custody handover that bears a fee.
 
 **The balance series** is `points [{ date, balance }]` and `balanceTarget` or `null`.
 
@@ -124,6 +125,8 @@ it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` a
   member, and page with an opaque cursor; a foreign cursor is `410` (`ExchangeBankReadsTest`).
 - [x] The bookings come newest first with the redaction, page and are bounded by `from` / `to`
   (`ExchangeBankReadsTest`).
+- [x] The KRT account's holder-transfer fee leg is served as `HOLDER_TRANSFER` within the published
+  schema and relayed by the gateway (`ExchangeBankReadsTest`, `ExchangeGoldenAnswerTest`).
 - [x] The balance series has one point per day and refuses a missing bound, an inverted period and
   more than 365 days (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
 - [x] A hidden, a closed and an unknown account answer the same `404 NOT_FOUND`, counted

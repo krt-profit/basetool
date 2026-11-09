@@ -94,6 +94,10 @@ Basetool: no holder and no staff note.
 }
 ```
 
+- `type` is `DEPOSIT`, `WITHDRAWAL`, `TRANSFER`, `HOLDER_TRANSFER`, `WIPE_RESET` or `REVERSAL`.
+  `HOLDER_TRANSFER` appears on the KRT account only: it is the fee leg of a custody handover between
+  two holders, with the fee as a negative `amount` and as `transferFee`. Treat a value you do not
+  know as a booking of an unknown type ([versioning](../versioning.md)).
 - `amount` is this account's signed leg: negative for money leaving the account.
 - `counterAccount { no, name }` names the other account of a transfer; `transferFee` is the fee the
   debited account bore, or `null`.

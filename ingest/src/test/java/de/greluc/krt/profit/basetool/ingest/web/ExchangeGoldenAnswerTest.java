@@ -333,6 +333,20 @@ class ExchangeGoldenAnswerTest {
   }
 
   @Test
+  void theKrtAccountsHolderTransferFeeLegRelaysAsRecorded() throws Exception {
+    OVERRIDES.put(
+        "GET /api/v1/exchange/bank/accounts/{id}/bookings",
+        json(200, fixture("page--bankBookingPage/valid/holder-transfer-fee.json")));
+
+    assertThat(
+            matches(
+                "route-get-bank-bookings-holder-transfer-fee",
+                record(get("/bank/accounts/11111111-2222-4333-8444-555555555500/bookings"))))
+        .as("golden differs; see " + OBSERVED)
+        .isTrue();
+  }
+
+  @Test
   void aDeclaredFreeFormMapPassesVerbatim() throws Exception {
     double passedBefore = relayOutcomes("ok");
     OVERRIDES.put(
