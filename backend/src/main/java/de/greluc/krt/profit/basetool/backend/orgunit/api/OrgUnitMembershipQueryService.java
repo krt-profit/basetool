@@ -336,28 +336,9 @@ public class OrgUnitMembershipQueryService {
   @NotNull
   public Map<UUID, OrgUnitMembershipOptionDto> findPrimaryDirectMembershipOptions(
       @NotNull Collection<UUID> userIds) {
-    if (userIds.isEmpty()) {
-      return Map.of();
-    }
-    List<OrgUnitMembership> rows =
-        membershipRepository.findAllByIdUserIdInAndKindIn(
-            userIds, EnumSet.allOf(OrgUnitKind.class));
-    Map<UUID, OrgUnit> units =
-        orgUnitRepository
-            .findAllById(rows.stream().map(r -> r.getId().getOrgUnitId()).distinct().toList())
-            .stream()
-            .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
-    Comparator<OrgUnitMembershipOptionDto> order = pickerOrder();
     Map<UUID, OrgUnitMembershipOptionDto> primary = new HashMap<>();
-    for (OrgUnitMembership row : rows) {
-      OrgUnit unit = units.get(row.getId().getOrgUnitId());
-      if (unit != null) {
-        primary.merge(
-            row.getId().getUserId(),
-            toOption(unit),
-            (current, candidate) -> order.compare(candidate, current) < 0 ? candidate : current);
-      }
-    }
+    listDirectMembershipOptionsByUser(userIds)
+        .forEach((user, options) -> primary.put(user, options.getFirst()));
     return primary;
   }
 
