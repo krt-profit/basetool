@@ -19,9 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
-import de.greluc.krt.profit.basetool.ingest.contract.ExchangeSchemas;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -66,15 +64,14 @@ public class ExchangeBankQueueController {
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    if (limit != null
-        && !(ExchangeRelayResponses.validLimit(limit)
-            && Integer.parseInt(limit) <= QUEUE_MAX_LIMIT)) {
-      return responses.schemaInvalid(
-          List.of(
-              new ExchangeSchemas.Violation(
-                  "/limit", "must be an integer from 1 to " + QUEUE_MAX_LIMIT)));
-    }
     return responses.page(
-        "/bank/queue", "bank-queue.schema.json", cursor, limit, request, acceptLanguage);
+        "/bank/queue",
+        "bank-queue.schema.json",
+        ExchangeRelayResponses.NO_QUERY,
+        cursor,
+        limit,
+        QUEUE_MAX_LIMIT,
+        request,
+        acceptLanguage);
   }
 }
