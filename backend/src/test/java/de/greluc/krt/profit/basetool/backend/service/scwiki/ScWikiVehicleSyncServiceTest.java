@@ -391,7 +391,7 @@ class ScWikiVehicleSyncServiceTest {
   }
 
   @Test
-  void aVariantWhoseSharedNameIsAlreadyStoredIsReportedInsteadOfInserted() {
+  void aVariantWhoseSharedNameASiblingHoldsIsCoveredAndTheSweepRuns() {
     UUID baseUuid = UUID.randomUUID();
     UUID variantUuid = UUID.randomUUID();
     ShipType base = new ShipType();
@@ -427,7 +427,37 @@ class ScWikiVehicleSyncServiceTest {
             eq("ship_type"),
             eq(variantUuid),
             eq("Hammerhead"),
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(syncReportService, never()).recordIncomplete();
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(baseUuid, variantUuid)), any());
+  }
+
+  @Test
+  void aSharedNameHeldByARowOutsideTheCensusStaysAConflictAndBlocksTheSweep() {
+    UUID foreignUuid = UUID.randomUUID();
+    UUID firstUuid = UUID.randomUUID();
+    UUID secondUuid = UUID.randomUUID();
+    ShipType holder = new ShipType();
+    holder.setName("Polaris");
+    holder.setExternalUuid(foreignUuid);
+    var firstDto = ScWikiVehicleDto.builder().uuid(firstUuid).name("Polaris").build();
+    var secondDto = ScWikiVehicleDto.builder().uuid(secondUuid).name("Polaris").build();
+    when(scWikiClient.fetchAllPagesResult(any(), any(), eq("vehicles"), any(), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(firstDto, secondDto)));
+    when(shipTypeRepository.findByNameIgnoreCase("Polaris")).thenReturn(Optional.of(holder));
+
+    assertEquals(0, service.syncVehicles());
+
+    verify(shipTypeRepository, never()).save(any());
+    verify(syncReportService, times(2))
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.SOURCE_IDENTITY_CONFLICT),
+            eq("ship_type"),
+            any(),
+            eq("Polaris"),
             eq("Name is shared by several Wiki vehicles."));
+    verify(syncReportService, times(2)).recordIncomplete();
     verify(shipTypeRepository, never()).markScwikiDeletedExcept(any(), any());
   }
 
@@ -460,7 +490,8 @@ class ScWikiVehicleSyncServiceTest {
             eq("ship_type"),
             eq(second),
             eq("Skylark"),
-            any());
+            eq("Name is held by a sibling Wiki vehicle of this census."));
+    verify(shipTypeRepository).markScwikiDeletedExcept(eq(Set.of(first, second)), any());
   }
 
   @Test
