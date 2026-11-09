@@ -120,7 +120,7 @@ class ExchangeBankRequestRouteTest {
     call("/exchange/v1/bank/requests?cursor=f1.2245871.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[0].splitPercent").value(20))
-        .andExpect(jsonPath("$.removed[0].key").value("7f3e2d1c-0b9a-4876-9543-210fedcba987"));
+        .andExpect(jsonPath("$.removed[0].key").value("11111111-2222-4333-8444-555555555555"));
   }
 
   @Test
