@@ -42,7 +42,8 @@ REALM = "/auth/realms/basetool"
 SCOPES = ("offline_access exchange.connect exchange.blueprints.read exchange.blueprints.write "
           "exchange.stock.read exchange.stock.write exchange.hangar.read exchange.hangar.write "
           "exchange.demand.read exchange.orgunits.read exchange.orgstock.read "
-          "exchange.orgstock.details exchange.orgstock.write exchange.demand.details")
+          "exchange.orgstock.details exchange.orgstock.write exchange.demand.details "
+          "exchange.bank.read exchange.bank.request exchange.bank.queue")
 DEFAULT_CA = ROOT / "docker" / "test-tls" / "basetool-test-ca.crt"
 USER_AGENT = "BasetoolSandboxClient/1.0.0 (+https://krt-profit.github.io/basetool/)"
 

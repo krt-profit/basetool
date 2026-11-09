@@ -63,6 +63,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -153,6 +154,10 @@ class ExchangeGoldenAnswerTest {
 
   private static final Set<String> RELAYED_OPERATIONS = new TreeSet<>();
 
+  /** A path segment holding an id, which the seam writes as {@code {id}}. */
+  private static final Pattern ID_SEGMENT =
+      Pattern.compile("/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/");
+
   @Autowired private WebApplicationContext context;
   @Autowired private MeterRegistry meterRegistry;
 
@@ -236,7 +241,7 @@ class ExchangeGoldenAnswerTest {
                 String.join(" ", new TreeSet<>(SCOPES)),
                 issuedAt));
     when(registryReader.current())
-        .thenReturn(ExchangeTestSupport.registryWithLimits(SCOPES, "2.0.0", 1000));
+        .thenReturn(ExchangeTestSupport.registryWithLimits(SCOPES, "2.0.0", 1000, true));
     when(revocationReader.isDenied(anyString())).thenReturn(false);
     when(tokenProvider.currentToken()).thenReturn(GATEWAY_TOKEN);
     when(quotas.countWrite(anyString(), anyString()))
@@ -487,6 +492,17 @@ class ExchangeGoldenAnswerTest {
     routes.put(
         "route-post-refinery-draft",
         post("/me/drafts/refinery-orders", fixture("refinery-draft/valid/one-order.json")));
+    routes.put("route-get-bank-accounts", get("/bank/accounts?limit=2"));
+    routes.put(
+        "route-get-bank-bookings",
+        get(
+            "/bank/accounts/5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f/bookings"
+                + "?from=2026-11-01T00:00:00-01:00&limit=2"));
+    routes.put(
+        "route-get-bank-balance-series",
+        get(
+            "/bank/accounts/5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f/balance-series"
+                + "?from=2026-11-06T00:00:00Z&to=2026-11-08T23:59:59Z"));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -525,6 +541,12 @@ class ExchangeGoldenAnswerTest {
             "{\"dryRun\":false,\"applied\":1,\"unchanged\":0,\"notApplied\":1,"
                 + "\"results\":[{\"index\":1,\"result\":\"unmatched\"}],"
                 + "\"offersReduced\":0,\"offersRemoved\":0}";
+        case "GET /api/v1/exchange/bank/accounts" ->
+            fixture("page--bankAccountPage/valid/snapshot.json");
+        case "GET /api/v1/exchange/bank/accounts/{id}/bookings" ->
+            fixture("page--bankBookingPage/valid/first-page.json");
+        case "GET /api/v1/exchange/bank/accounts/{id}/balance-series" ->
+            fixture("bank-balance-series/valid/three-days.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";
@@ -689,15 +711,15 @@ class ExchangeGoldenAnswerTest {
   }
 
   /**
-   * Returns a recorded request's path without its query.
+   * Returns a recorded request's path without its query, an id segment as the seam's {@code {id}}.
    *
    * @param request the request the stub received
-   * @return the path
+   * @return the path template
    */
   private static @NotNull String pathOf(@NotNull RecordedRequest request) {
     String path = request.getPath() == null ? "" : request.getPath();
     int query = path.indexOf('?');
-    return query < 0 ? path : path.substring(0, query);
+    return ID_SEGMENT.matcher(query < 0 ? path : path.substring(0, query)).replaceAll("/{id}/");
   }
 
   /**

@@ -80,7 +80,10 @@ public class AdminExchangeClientsPageController {
           "exchange.orgstock.details",
           "exchange.orgstock.write",
           "exchange.drafts.blueprints",
-          "exchange.drafts.refinery");
+          "exchange.drafts.refinery",
+          "exchange.bank.read",
+          "exchange.bank.request",
+          "exchange.bank.queue");
 
   /** Talks to the backend. */
   private final ExchangeBackendClient exchangeClient;

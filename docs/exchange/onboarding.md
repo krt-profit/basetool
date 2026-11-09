@@ -29,6 +29,10 @@ is public, case by case, and for the capabilities a client actually needs.
   and a link to that release's `manifest.json` in the application; the gateway and the sign-in
   admit exactly those origins. The id may come from a `key` in the manifest or from a store; a
   store listing, publication and code signing are not required.
+- For a bank scope (`exchange.bank.read`, `exchange.bank.request`, `exchange.bank.queue`):
+  other people's bank data (accounts, bookings, balance series and the staff queue) is kept in
+  memory only, for at most 7 days; the member's own requests may persist
+  ([bank](resources/bank.md#retention)). The approval names this criterion.
 - Code signing of releases is recommended, not required.
 - Trying the client against the [sandbox](sandbox.md) before applying is recommended, not required.
 

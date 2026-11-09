@@ -44,6 +44,8 @@
       path: resources/org-stock.md
     - title: Drafts
       path: resources/drafts.md
+    - title: Bank
+      path: resources/bank.md
 - section: Reference
   items:
     - title: OpenAPI reference

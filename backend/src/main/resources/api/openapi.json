@@ -84356,7 +84356,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             },
             "minItems" : 1,
             "uniqueItems" : true
@@ -84404,7 +84404,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             }
           },
           "clientId" : {
@@ -84467,7 +84467,7 @@
             "type" : "array",
             "items" : {
               "type" : "string",
-              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery" ]
+              "enum" : [ "exchange.connect", "exchange.blueprints.read", "exchange.blueprints.write", "exchange.stock.read", "exchange.stock.write", "exchange.hangar.read", "exchange.hangar.write", "exchange.demand.read", "exchange.demand.details", "exchange.orgunits.read", "exchange.orgstock.read", "exchange.orgstock.details", "exchange.orgstock.write", "exchange.drafts.blueprints", "exchange.drafts.refinery", "exchange.bank.read", "exchange.bank.request", "exchange.bank.queue" ]
             },
             "minItems" : 1,
             "uniqueItems" : true

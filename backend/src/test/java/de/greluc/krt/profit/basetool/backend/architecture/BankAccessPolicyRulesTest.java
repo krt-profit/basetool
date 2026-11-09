@@ -44,11 +44,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * The two rules of the one bank access policy (ADR-0352): the policy and everything it calls never
- * read who calls from the security context, and no bank class outside the policy reads the caller's
- * roles or seats, which is what every bank rule needs.
+ * The three rules of the one bank access policy (ADR-0352): the policy and everything it calls
+ * never read who calls from the security context, no bank class outside the policy reads the
+ * caller's roles or seats, which is what every bank rule needs, and the exchange reaches the bank
+ * only through the policy, the actor adapter and the reads (REQ-BXCH-001).
  *
- * <p>Both rules are proven able to fail on {@link BankAccessPolicyFixtures}.
+ * <p>Every rule is proven able to fail on {@link BankAccessPolicyFixtures}.
  */
 class BankAccessPolicyRulesTest {
 
@@ -93,6 +94,26 @@ class BankAccessPolicyRulesTest {
   /** The one {@link RequestScopeResolver} read a bank adapter may make: the pin as sent. */
   private static final Set<String> PIN_READS = Set.of("readActiveSquadronFromHeader");
 
+  /** The exchange module, which reaches the bank on behalf of a connected application. */
+  private static final String EXCHANGE = ROOT + ".exchange";
+
+  /**
+   * What the exchange may use of the bank (REQ-BXCH-001): the policy with its decision types, the
+   * actor adapter and the reads, with their value types.
+   */
+  private static final Set<String> EXCHANGE_SURFACE =
+      Set.of(
+          BANK + ".api.BankAccessPolicy",
+          BANK + ".api.BankAccountAccess",
+          BANK + ".api.BankAccountRight",
+          BANK + ".api.BankActor",
+          BANK + ".api.BankActors",
+          BANK + ".api.BankAdmission",
+          BANK + ".api.BankRequestApprover",
+          BANK + ".api.BankStaffRights",
+          BANK + ".api.BankBookingRequestType",
+          BANK + ".api.BankAccountReads");
+
   @Test
   @DisplayName("the bank access policy never reads the security context, directly or by a call")
   void thePolicyNeverReadsTheSecurityContext() {
@@ -123,6 +144,27 @@ class BankAccessPolicyRulesTest {
             BankCaller and ask BankAccessRules instead (ADR-0352).\
             """)
         .isEmpty();
+  }
+
+  @Test
+  @DisplayName("exchange code reaches the bank only through the policy, the reads and their values")
+  void theExchangeReachesTheBankOnlyThroughThePolicy() {
+    assertThat(bankReaches(PRODUCTION, c -> c.getPackageName().startsWith(EXCHANGE)))
+        .as(
+            """
+            Exchange classes that use a bank type outside the policy, BankActors and \
+            BankAccountReads. Every bank decision of the exchange goes through the policy \
+            (REQ-BXCH-001, ADR-0352).\
+            """)
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("proof: an exchange class using a bank internal is reported, the reads are not")
+  void plantedExchangeReaderIsReported() {
+    String reader = BankAccessPolicyFixtures.PlantedExchangeReader.class.getName();
+    assertThat(bankReaches(FIXTURES, c -> c.getName().equals(reader)))
+        .containsExactly(reader + " -> " + BANK + ".internal.BankAccountRepository");
   }
 
   @Test
@@ -223,6 +265,29 @@ class BankAccessPolicyRulesTest {
       }
     }
     return readers;
+  }
+
+  /**
+   * Reports every bank type outside {@link #EXCHANGE_SURFACE} the selected classes depend on.
+   *
+   * @param classes the imported classes
+   * @param scope the classes to check
+   * @return {@code origin -> bank type} per offending class and top-level bank type
+   */
+  @NotNull
+  private static Set<String> bankReaches(
+      @NotNull JavaClasses classes, @NotNull Predicate<JavaClass> scope) {
+    Set<String> reaches = new TreeSet<>();
+    for (JavaClass javaClass : classes) {
+      if (!scope.test(javaClass)) {
+        continue;
+      }
+      javaClass.getDirectDependenciesFromSelf().stream()
+          .map(dependency -> topLevel(dependency.getTargetClass()).getName())
+          .filter(target -> target.startsWith(BANK + ".") && !EXCHANGE_SURFACE.contains(target))
+          .forEach(target -> reaches.add(javaClass.getName() + " -> " + target));
+    }
+    return reaches;
   }
 
   /**

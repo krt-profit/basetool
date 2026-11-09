@@ -96,7 +96,7 @@ class OpenApiGeneratorTest {
     assertThat(OpenApiDocumentAssertions.relayProblems(split.relay()))
         .as(
             "the generated exchange relay document is wrong and is not written (REQ-XCH-039):"
-                + " exactly the 19 relay operations, all exchange, all T0, complete schemas")
+                + " exactly the 22 relay operations, all exchange, all T0, complete schemas")
         .isEmpty();
     assertThat(ExposedTypes.collisions(ExposedTypes.bySchemaName(ExposedTypes.controllers())))
         .as(

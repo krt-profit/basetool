@@ -163,7 +163,7 @@ class ExchangeRelaySeamParityTest {
     Map<String, String> expected = new TreeMap<>();
     ExchangeSeam.OPERATIONS.forEach(
         operation -> expected.put(operation.relayed(), operation.capability()));
-    assertThat(expected).as("the seam lists 19 relay operations").hasSize(19);
+    assertThat(expected).as("the seam lists 22 relay operations").hasSize(22);
     return expected;
   }
 
@@ -206,7 +206,7 @@ class ExchangeRelaySeamParityTest {
         }
       }
     }
-    assertThat(owners).as("the exchange controllers").hasSize(10);
+    assertThat(owners).as("the exchange controllers").hasSize(11);
     assertThat(served).isEqualTo(expected);
   }
 
@@ -250,15 +250,16 @@ class ExchangeRelaySeamParityTest {
 
   /**
    * Asserts that {@code ActingMemberFilter} admits an acting member on exactly the given paths,
-   * each listed once and as an exact path, never a wildcard.
+   * each listed once, never a wildcard; a variable is only ever the whole {@code {id}} segment.
    *
    * @param expected the backend paths
    */
   private static void assertActingMemberPaths(@NotNull Set<String> expected) {
     List<?> patterns = (List<?>) staticField(ActingMemberFilter.class, "EXCHANGE_PATHS");
     List<String> listed = patterns.stream().map(p -> ((PathPattern) p).getPatternString()).toList();
-    assertThat(listed).as("18 exact paths").hasSize(18).doesNotHaveDuplicates();
-    assertThat(listed).allSatisfy(path -> assertThat(path).doesNotContain("*", "{"));
+    assertThat(listed).as("21 paths").hasSize(21).doesNotHaveDuplicates();
+    assertThat(listed)
+        .allSatisfy(path -> assertThat(path.replace("/{id}/", "/")).doesNotContain("*", "{"));
     assertThat(new TreeSet<>(listed)).isEqualTo(new TreeSet<>(expected));
   }
 
@@ -288,7 +289,7 @@ class ExchangeRelaySeamParityTest {
         Arrays.stream(ExchangeCapability.values())
             .map(ExchangeCapability::getScope)
             .collect(Collectors.toCollection(TreeSet::new));
-    assertThat(scopes).hasSize(15).isEqualTo(new TreeSet<>(expected));
+    assertThat(scopes).hasSize(18).isEqualTo(new TreeSet<>(expected));
   }
 
   /**

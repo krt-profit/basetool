@@ -99,6 +99,36 @@
       "required": [
         "units"
       ]
+    },
+    "bankAccountPage": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "description": "A snapshot page of the bank accounts the member views; removed is always empty, the bank has no change feed.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "bank-account.schema.json"
+          }
+        }
+      }
+    },
+    "bankBookingPage": {
+      "allOf": [
+        {
+          "$ref": "#"
+        }
+      ],
+      "description": "A snapshot page of an account's bookings, newest first; removed is always empty, the bank has no change feed.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "bank-booking.schema.json"
+          }
+        }
+      }
     }
   }
 }

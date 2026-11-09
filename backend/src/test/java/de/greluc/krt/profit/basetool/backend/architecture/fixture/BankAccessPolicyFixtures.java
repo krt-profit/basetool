@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.architecture.fixture;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountReads;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.Optional;
@@ -27,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Planted breaches of the bank access policy rules (ADR-0352), so both rules are proven able to
+ * Planted breaches of the bank access policy rules (ADR-0352), so every rule is proven able to
  * fail. None of these types is a Spring bean.
  */
 public final class BankAccessPolicyFixtures {
@@ -91,6 +94,36 @@ public final class BankAccessPolicyFixtures {
      */
     public boolean checksTheSeat() {
       return requestScopeResolver.currentUserIsOlMember();
+    }
+  }
+
+  /** An exchange reader that reaches past the policy into the bank's internals. */
+  @RequiredArgsConstructor
+  public static final class PlantedExchangeReader {
+
+    /** The bank's internal repository the planted reader uses. */
+    private final BankAccountRepository accountRepository;
+
+    /** The bank reads the rule allows. */
+    private final BankAccountReads reads;
+
+    /**
+     * Counts the accounts behind the policy's back.
+     *
+     * @return the number of stored accounts
+     */
+    public long countsTheAccounts() {
+      return accountRepository.count();
+    }
+
+    /**
+     * Reads the accounts through the allowed port.
+     *
+     * @param actor the actor
+     * @return whether a page is served
+     */
+    public boolean readsThroughThePort(BankActor actor) {
+      return reads.viewableAccounts(actor, null, 1).isPresent();
     }
   }
 

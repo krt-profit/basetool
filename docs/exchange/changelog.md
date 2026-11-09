@@ -3,6 +3,20 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-09
+
+- **New: the bank reads.** `GET /exchange/v1/bank/accounts`, `…/accounts/{id}/bookings` and
+  `…/accounts/{id}/balance-series` under the new scope `exchange.bank.read`: the accounts the
+  member views with balance, target, 30-day trend, whether they may raise a request and their
+  own limit, the redacted bookings newest first, and a daily balance series of at most 365
+  days ([bank](resources/bank.md)). New schemas `bank-account`, `bank-booking` and
+  `bank-balance-series`, and the page definitions `bankAccountPage` and `bankBookingPage`.
+  The answers are foreign bank data: memory only, for at most 7 days.
+- **New: scopes `exchange.bank.request` and `exchange.bank.queue`.** They exist in the
+  registry and on the consent screen; their routes follow.
+- **Changed: `NOT_FOUND` comes from the backend too.** A bank account that does not exist, is
+  closed or is hidden from the member answers `404 NOT_FOUND` ([errors](errors.md)).
+
 ## 2026-11-08
 
 - **New: error code `BANK_EXCHANGE_DISABLED`.** The bank area of the exchange, every path below

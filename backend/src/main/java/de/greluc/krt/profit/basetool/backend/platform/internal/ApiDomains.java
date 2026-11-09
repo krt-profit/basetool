@@ -80,6 +80,7 @@ public final class ApiDomains {
           Map.entry("DiscordRegistrationAdminController", "identity"),
           Map.entry("DiscordRegistrationMergeController", "identity"),
           Map.entry("ExchangeAccountCheckController", "exchange"),
+          Map.entry("ExchangeBankController", "exchange"),
           Map.entry("ExchangeBlueprintController", "exchange"),
           Map.entry("ExchangeCatalogController", "exchange"),
           Map.entry("ExchangeDemandController", "exchange"),

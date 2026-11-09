@@ -122,6 +122,9 @@ EXCHANGE_SCOPES: list[tuple[str, str]] = [
     ("exchange.orgstock.details", "xchConsentOrgStockDetails"),
     ("exchange.demand.details", "xchConsentDemandDetails"),
     ("exchange.orgstock.write", "xchConsentOrgStockWrite"),
+    ("exchange.bank.read", "xchConsentBankRead"),
+    ("exchange.bank.request", "xchConsentBankRequest"),
+    ("exchange.bank.queue", "xchConsentBankQueue"),
 ]
 EXCHANGE_SCOPE_NAMES = [name for name, _ in EXCHANGE_SCOPES]
 

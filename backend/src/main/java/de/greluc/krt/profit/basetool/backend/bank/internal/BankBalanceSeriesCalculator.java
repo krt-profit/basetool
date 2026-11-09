@@ -65,6 +65,24 @@ public final class BankBalanceSeriesCalculator {
       @NotNull List<BankPostingSlice> slices,
       @NotNull Instant from,
       @NotNull Instant to) {
+    return downsample(daily(opening, slices, from, to));
+  }
+
+  /**
+   * Builds the end-of-day balance series over {@code [from, to]} with one point per UTC day.
+   *
+   * @param opening the account balance immediately before {@code from}
+   * @param slices the account's posting slices inside {@code [from, to]}, any order
+   * @param from the inclusive period start
+   * @param to the inclusive period end; an inverted period yields an empty series
+   * @return one end-of-day balance per day, oldest first, each dated at the start of its day
+   */
+  @NotNull
+  public static List<BankBalancePointDto> daily(
+      @NotNull BigDecimal opening,
+      @NotNull List<BankPostingSlice> slices,
+      @NotNull Instant from,
+      @NotNull Instant to) {
     if (from.isAfter(to)) {
       return List.of();
     }
@@ -83,7 +101,7 @@ public final class BankBalanceSeriesCalculator {
       running = running.add(dailyNet.getOrDefault(day, BigDecimal.ZERO));
       full.add(new BankBalancePointDto(day.atStartOfDay(ZoneOffset.UTC).toInstant(), running));
     }
-    return downsample(full);
+    return full;
   }
 
   /**

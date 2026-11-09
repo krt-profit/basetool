@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-08.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BXCH · **Related ADRs:** [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md),
 > [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > ADR-0352 (one explicit bank access policy)
@@ -29,6 +29,113 @@ The guiding rules:
   in the Basetool.
 
 ## Requirements
+
+### REQ-BXCH-001 — The bank scopes, their consent and the one decision point
+
+> [!note] Implemented (#3157; ADR-0354, ADR-0352). The routes of `exchange.bank.request` and
+> `exchange.bank.queue` come with REQ-BXCH-003…005.
+
+**Three capabilities.** The bank has three scopes of its own (`ExchangeCapability`, the
+`ck_exchange_client_capability` check, the provisioner's `EXCHANGE_SCOPES`, the sandbox and E2E
+realms, the admin client page and the client application form):
+
+| Scope | What a client may do | Consent line (DE) |
+|---|---|---|
+| `exchange.bank.read` | read the accounts the member may see in the Basetool, their bookings and balance series, and the member's own requests | „Die Bankkonten lesen, die du im Basetool sehen darfst, samt Verlauf, und deine eigenen Buchungsanträge" |
+| `exchange.bank.request` | raise, correct and cancel the member's own booking requests | „Eigene Buchungsanträge stellen, korrigieren und stornieren; gebucht wird erst, wenn die Bank sie im Basetool bestätigt" |
+| `exchange.bank.queue` | read, as bank staff, the open requests the member may confirm or approve | „Als Bankmitarbeiter die offenen Buchungsanträge lesen, die du bestätigen oder freigeben darfst, mit dem Handle des Antragstellers" |
+
+The queue has a scope of its own, so a staff member's ordinary login carries no staff view. No
+client is granted a bank scope until its approval amendment (REQ-BXCH-007); until the routes of
+REQ-BXCH-003…005 exist, `exchange.bank.request` and `exchange.bank.queue` serve no route.
+
+**One decision point.** Every bank decision of the exchange is made by the bank access policy
+(ADR-0352), never by exchange code:
+
+- the actor is `BankActors.forExchange(member)`: the member's stored roles **without Admin**,
+  their memberships and grants. An administrator acts through a client only by their bank roles,
+  grants and memberships (REQ-XCH-009); seeing the whole bank needs Bank Management;
+- the exchange passes no active-org-unit pin;
+- exchange code reaches the bank only through `BankAccessPolicy` and its decision types,
+  `BankActors` and `BankAccountReads` with their value types
+  (`BankAccessPolicyRulesTest.theExchangeReachesTheBankOnlyThroughThePolicy`).
+
+No money moves through a client and no bank-staff action is taken through one (ADR-0354).
+
+**Acceptance**
+
+- [x] The three scopes exist in the registry, the realm, the consent screen (DE/EN), the admin
+  client page and the application form; no client is granted them (`ExchangeRelaySeamParityTest`
+  in backend and gateway, `provision-keycloak-realm.test.sh` section 13).
+- [x] Every read of REQ-BXCH-002 answers as the web's characterisation matrix recorded it, with
+  the Admin role stripped as the one expected difference for administrators and a closed account
+  hidden (`BankExchangeParityTest`).
+- [x] Exchange code using a bank type outside the policy, the actor adapter and the reads fails the
+  build (`BankAccessPolicyRulesTest`).
+
+**Enforced by:** `ExchangeCapability`, `ExchangeBankReadService`, `BankActors#forExchange`,
+`BankAccessPolicyRulesTest` · V364 · **Related:** REQ-XCH-005, REQ-XCH-009 · **Issues:** #3113,
+#3114, #3122, #3157
+
+### REQ-BXCH-002 — Accounts, bookings and balance series
+
+> [!note] Implemented (#3157).
+
+Three snapshot routes under `exchange.bank.read`, relayed from `/exchange/v1/bank/…` to
+`/api/v1/exchange/bank/…`. No `since`, no ledger delta feed and no ETag: every call is decided anew,
+so a withdrawn grant hides everything at once.
+
+| Route | Paging and parameters |
+|---|---|
+| `GET /exchange/v1/bank/accounts` | `cursor` + `limit` (1…1000, default 500); the KRT account first, then the rest by account number |
+| `GET /exchange/v1/bank/accounts/{id}/bookings` | newest first; `cursor` + `limit`; optional inclusive `from` / `to` (`date-time`) |
+| `GET /exchange/v1/bank/accounts/{id}/balance-series` | not paged; `from` and `to` required, `from ≤ to`, at most 365 days, otherwise `400 SCHEMA_INVALID`; one point per UTC day |
+
+**The accounts** are the active accounts the member views (REQ-BANK-064), each with `accountId`,
+`accountNo`, `name`, `type`, `orgUnit { id, name, shorthand, kind }` or `null`, `balance`,
+`balanceTarget` or `null`, `delta30d`, `sparkline` (30 end-of-day balances, oldest first, ending with
+the current balance) and two facts about the member from the policy: `requestable` (may raise a
+withdrawal or transfer here) and `ownLimit` (the applicable limit above which an approval is needed)
+or `null`. No holders, custody, limit tables, ceilings, `version` or staff capabilities.
+
+**The bookings** carry the member detail page's redaction (REQ-BANK-038): `postingId`,
+`transactionId`, `type`, `amount` (this account's signed leg), `createdAt`, `note`, `justification`,
+`reversedTransactionId`, `counterAccount { no, name }`, `intraAccount`, `transferFee`,
+`counterpartyHandle` and `counterpartyOrgUnitName`, each `null` where it does not apply. No holder
+handles and no staff note.
+
+**The balance series** is `points [{ date, balance }]` and `balanceTarget` or `null`.
+
+Money is a JSON integer of whole aUEC; the enumerations are UPPER_SNAKE. A page carries `removed: []`.
+A cursor the server did not issue, or an account cursor whose account the member no longer views,
+answers `410 CURSOR_EXPIRED`.
+
+**The shared `404`.** An unknown account, an account the member may not view and a closed account
+answer the same `404 NOT_FOUND`, on the bookings and the balance series alike; the gateway passes
+it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` at the gateway.
+
+**Counted.** Every read served counts `basetool_exchange_bank_reads_total{client_id, route}`, every
+`404` `basetool_exchange_bank_refused_total{reason="not_found"}` (REQ-OBS-024).
+
+**Acceptance**
+
+- [x] The accounts come KRT first, carry exactly the allow-listed fields with the two facts about the
+  member, and page with an opaque cursor; a foreign cursor is `410` (`ExchangeBankReadsTest`).
+- [x] The bookings come newest first with the redaction, page and are bounded by `from` / `to`
+  (`ExchangeBankReadsTest`).
+- [x] The balance series has one point per day and refuses a missing bound, an inverted period and
+  more than 365 days (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
+- [x] A hidden, a closed and an unknown account answer the same `404 NOT_FOUND`, counted
+  (`ExchangeBankReadsTest`, `ExchangeBankRouteTest`).
+- [x] Every answer validates against its published schema; the routes, schemas, fixtures and goldens
+  are part of the frozen contract (`ExchangeBankReadsTest`, `ExchangeWireContractTest`,
+  `ExchangeGoldenAnswerTest`, `ExchangeContractTest`).
+
+**Enforced by:** `ExchangeBankController`, `ExchangeBankReadService`, `BankExchangeCursor`,
+`BankAccountReadService` (backend) · `ExchangeBankController`, `BankQuery`,
+`ExchangeRelayResponses`, `ExchangeRoutes` (gateway) · `bank-account`, `bank-booking`, `bank-balance-series` and
+`page.schema.json#/$defs/bankAccountPage|bankBookingPage` · **Related:** REQ-BANK-038, REQ-BANK-049,
+REQ-BANK-064, REQ-BANK-066, REQ-XCH-013 · **Issues:** #3118, #3157
 
 ### REQ-BXCH-006 — The bank switch, the limits and the refusal codes
 
@@ -100,3 +207,39 @@ or closed account answers the same `404`.
 `ExchangeRoutes#isBank`, `ExchangeRelay` (gateway) · `ExchangeSeam.BANK_PATH`,
 `ExchangeSeam.GATE_STATUSES` (shared seam) · V361 · **Related:** REQ-XCH-003, REQ-XCH-023,
 REQ-XCH-025, REQ-AUDIT-001, REQ-OBS-024 · **Issues:** #3121, #3156
+
+### REQ-BXCH-007 — Retention classes, the onboarding criterion and name withholding
+
+> [!note] Implemented for the reads of REQ-BXCH-002 (#3157). The own requests and the staff queue
+> take their class with REQ-BXCH-003 and REQ-BXCH-005.
+
+**Retention classes.** Every bank route names its class in the gateway's OpenAPI document and in
+[`docs/exchange/resources/bank.md`](../exchange/resources/bank.md):
+
+- **Foreign bank data** — the accounts, bookings and balance series, and the staff queue: a client
+  keeps it in memory only, for at most 7 days.
+- **The member's own data** — the member's own requests: a client may persist them.
+
+**Onboarding criterion.** A client that asks for a bank scope is approved only if it keeps foreign
+bank data in memory only, for at most 7 days ([`docs/exchange/onboarding.md`](../exchange/onboarding.md)).
+The approval names the criterion in `docs/legal/approved-clients.md`; that amendment is its own pull
+request, after the bank switch, the cap and the monitoring.
+
+**Name withholding.** A member who withholds their name from connected applications (REQ-XCH-044)
+is left out of the bank answers: `counterpartyHandle` in a booking is `null`; the booking itself
+stays.
+
+**Privacy.** A11 „Connected applications" of the records of processing names the bank data on a
+client and its legal bases, the DPIA threshold assessment is reassessed, and the privacy notice
+„Verbundene Anwendungen" names the bank scopes.
+
+**Acceptance**
+
+- [x] The gateway's OpenAPI document and the client page name the retention class of every bank
+  read route.
+- [x] A counterparty who withholds their name has no handle in a booking, and the booking is still
+  listed (`ExchangeBankReadsTest`).
+- [x] The onboarding criterion is part of `docs/exchange/onboarding.md`; A11, the DPIA threshold
+  assessment and the privacy notice name the bank data.
+
+**Related:** REQ-XCH-044, REQ-BXCH-002 · **Issues:** #3122, #3157

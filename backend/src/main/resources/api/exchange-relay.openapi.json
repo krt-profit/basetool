@@ -16,6 +16,448 @@
     "name" : "exchange"
   } ],
   "paths" : {
+    "/api/v1/exchange/bank/accounts" : {
+      "get" : {
+        "description" : "Gateway-only. The active accounts the member views, the KRT account first and the rest by account number, with balance, target, 30-day trend and whether the member may raise a request and up to which limit. No holders. Foreign bank data: memory only, at most 7 days.",
+        "operationId" : "accounts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankAccountPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankAccountPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the bank accounts I view",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/bank/accounts/{id}/balance-series" : {
+      "get" : {
+        "description" : "Gateway-only. One end-of-day balance per UTC day of [from, to], at most 365 days. A hidden, closed or unknown account answers 404 NOT_FOUND. Foreign bank data: memory only, at most 7 days.",
+        "operationId" : "balanceSeries",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankBalanceSeriesDto"
+                }
+              }
+            },
+            "description" : "The series",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the balance series of an account I view",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/bank/accounts/{id}/bookings" : {
+      "get" : {
+        "description" : "Gateway-only. The member detail page's redaction: no holders and no staff note; the counterparty's handle is null when they withhold their name. A hidden, closed or unknown account answers 404 NOT_FOUND. Foreign bank data: memory only, at most 7 days.",
+        "operationId" : "bookings",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankBookingPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeBankBookingPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the bookings of an account I view",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/catalog/locations" : {
       "get" : {
         "description" : "Gateway-only. The non-hidden locations with their UEX city or space station, for any exchange capability.",
@@ -2549,6 +2991,175 @@
         },
         "required" : [ "handle" ]
       },
+      "ExchangeBankAccountDto" : {
+        "type" : "object",
+        "properties" : {
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accountNo" : {
+            "type" : "string"
+          },
+          "balance" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "balanceTarget" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "delta30d" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+          },
+          "ownLimit" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "requestable" : {
+            "type" : "boolean"
+          },
+          "sparkline" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "type" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeBankAccountPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeBankAccountDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
+      "ExchangeBankBalanceSeriesDto" : {
+        "type" : "object",
+        "properties" : {
+          "balanceTarget" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "points" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Point"
+            }
+          }
+        }
+      },
+      "ExchangeBankBookingDto" : {
+        "type" : "object",
+        "properties" : {
+          "amount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "counterAccount" : {
+            "$ref" : "#/components/schemas/ExchangeBankCounterAccountDto"
+          },
+          "counterpartyHandle" : {
+            "type" : "string"
+          },
+          "counterpartyOrgUnitName" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "intraAccount" : {
+            "type" : "boolean"
+          },
+          "justification" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "postingId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "reversedTransactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "transactionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "transferFee" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeBankBookingPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeBankBookingDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
+      "ExchangeBankCounterAccountDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "no" : {
+            "type" : "string"
+          }
+        }
+      },
       "ExchangeBlueprintChangeSet" : {
         "type" : "object",
         "properties" : {
@@ -4360,6 +4971,19 @@
           },
           "status" : {
             "type" : "string"
+          }
+        }
+      },
+      "Point" : {
+        "type" : "object",
+        "properties" : {
+          "balance" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "date" : {
+            "type" : "string",
+            "format" : "date"
           }
         }
       },

@@ -70,6 +70,8 @@ the registry grants it to the client.
 - [Org stock](resources/org-stock.md) — the shared warehouse stock of the member's units, and
   booking it in and out as a Logistician.
 - [Drafts](resources/drafts.md) — blueprint and refinery drafts reviewed in the browser.
+- [Bank](resources/bank.md) — the Kartellbank accounts the member views, their bookings and
+  balance series.
 
 ## Support
 

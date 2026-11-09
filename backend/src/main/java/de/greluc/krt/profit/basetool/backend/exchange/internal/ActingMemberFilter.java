@@ -98,6 +98,9 @@ public class ActingMemberFilter extends OncePerRequestFilter {
    */
   public static final List<String> ACTING_PATHS =
       List.of(
+          "/api/v1/exchange/bank/accounts",
+          "/api/v1/exchange/bank/accounts/{id}/balance-series",
+          "/api/v1/exchange/bank/accounts/{id}/bookings",
           "/api/v1/exchange/catalog/locations",
           "/api/v1/exchange/catalog/resolve",
           "/api/v1/exchange/me/account-check",
