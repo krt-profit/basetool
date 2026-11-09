@@ -885,6 +885,38 @@ val testBoardSyncJs =
     outputs.upToDateWhen { false }
   }
 
+val testBankLiveSyncJs =
+  tasks.register<NodeTask>("testBankLiveSyncJs") {
+    group = "verification"
+    description =
+      "Regression tests for the bank forms' live-sync publish matrix and its placeholder topics."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/bank-livesync.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/bank-livesync.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/bank/bank-livesync.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
+val testMemberRolesJs =
+  tasks.register<NodeTask>("testMemberRolesJs") {
+    group = "verification"
+    description =
+      "Regression tests for the member page's role tab: confirm, write, revert and refusal message."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/member-roles.test.mjs").asFile)
+    ignoreExitValue.set(false)
+    inputs.file(layout.projectDirectory.file("scripts/member-roles.test.mjs"))
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/identity/member-roles.js"),
+    )
+    outputs.upToDateWhen { false }
+  }
+
 val testShortcutsJs =
   tasks.register<NodeTask>("testShortcutsJs") {
     group = "verification"
@@ -1149,6 +1181,8 @@ tasks.named("check").configure {
     testNavRailJs,
     testFavouriteOrderJs,
     testBoardSyncJs,
+    testBankLiveSyncJs,
+    testMemberRolesJs,
     testSearchJs,
     testNumberFormatJs,
     testNotificationBellLabelJs,
