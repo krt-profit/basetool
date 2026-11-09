@@ -28,6 +28,11 @@ bank/bank-manage.html head-fixed e522dd5be0f71386
 bank/bank-manage.html head-own <title>Bank-Verwaltung - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/bank/bank.css"><link rel="stylesheet" href="/css/pages/bank/bank-manage.css">
 bank/bank-manage.html body <body data-nav-mode="drawer">
 bank/bank-manage.html parts chrome:23d1a1a237a6336c x-content toast:a1359ecc4bd4b21d x-tail
+bank/bank-request.html html <html lang="de">
+bank/bank-request.html head-fixed e522dd5be0f71386
+bank/bank-request.html head-own <title>Buchungsantrag - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/bank/bank.css">
+bank/bank-request.html body <body data-nav-mode="drawer">
+bank/bank-request.html parts chrome:23d1a1a237a6336c x-content toast:a1359ecc4bd4b21d x-tail
 bank/bank-requests.html html <html lang="de">
 bank/bank-requests.html head-fixed e522dd5be0f71386
 bank/bank-requests.html head-own <title>Buchungsanträge - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/bank/bank.css"><link rel="stylesheet" href="/css/pages/bank/bank-requests.css">

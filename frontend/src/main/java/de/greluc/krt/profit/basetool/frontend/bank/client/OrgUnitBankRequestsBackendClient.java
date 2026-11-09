@@ -96,6 +96,6 @@ public class OrgUnitBankRequestsBackendClient {
    */
   @Nullable
   public BankBookingRequestViewDto view(@NotNull UUID id) {
-    return backendApiClient.get(REQUESTS + "/" + id, BankBookingRequestViewDto.class);
+    return backendApiClient.get(REQUESTS + "/{id}", BankBookingRequestViewDto.class, id);
   }
 }
