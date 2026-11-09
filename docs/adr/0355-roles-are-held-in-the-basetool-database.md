@@ -1,6 +1,7 @@
 # ADR-0355 — Roles are held in the Basetool database
 
-- **Status:** Accepted; the cutover (#3151) is *Amendment 1*, its follow-ups *Amendment 2*
+- **Status:** Accepted; the cutover (#3151) is *Amendment 1*, its follow-ups *Amendment 2*, the
+  admin-OTP marker *Amendment 3*
 - **Date:** 2026-11-08
 - **Deciders:** @greluc
 - **Related:** spec [`security-and-access.md`](../specs/security-and-access.md) (REQ-SEC-088) ·
@@ -60,7 +61,8 @@ Basetool.
    `KeycloakService` no longer reads realm roles.
 4. **Approval grants KRT Member** (`ApprovalRoleGrant`), recorded as the approving admin's
    assignment. A bootstrap subject's Admin authorises the very login that earns it.
-5. **Keycloak holds none of the four roles.** The provisioner deletes them and withholds the
+5. **Keycloak holds none of the four roles** (Admin stays as the OTP marker, *Amendment 3*). The
+   provisioner deletes them and withholds the
    `roles` scope from `basetool-frontend` (ADR-0202 *Amendment 9*); the e2e and sandbox realms
    carry neither, and the e2e accounts get their roles in `user_roles` at stack start.
 6. **The partial-role-scope guard is deleted** (ADR-0141, REQ-SEC-036).
@@ -79,3 +81,17 @@ Basetool.
    stays as the repair path.
 3. **`backend-service` gives `view-realm` back**, because no Basetool call reads the realm any
    more (ADR-0202 *Amendment 10*).
+
+## Amendment 3 — the realm role `Admin` stays as the admin-OTP marker (#3151)
+
+Keycloak's admin OTP (REQ-SEC-082) is conditioned on the realm role `Admin`
+(`conditional-user-role`), and a condition on a role that does not exist matches nobody, so
+deleting it would switch the second factor off for every admin.
+
+1. **Keycloak keeps the realm role `Admin`**, used only as that condition. The provisioner retires
+   KRT Member, Bank Employee and Bank Management and lists a realm without `Admin` as a manual step;
+   the test realms hold none of the four, and the hardening integration test creates `Admin` itself.
+2. **The Basetool never reads it.** Authorisation comes from `user_roles` alone (Amendment 1).
+3. **Its assignments are kept in step by hand**: whoever gives or withdraws the Basetool's Admin also
+   maps or unmaps the realm role, as the runbook's step says. An account with the Basetool's Admin and
+   no realm role is not asked for a second factor.

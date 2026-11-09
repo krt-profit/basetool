@@ -1710,7 +1710,8 @@ switch. Every write below needs @greluc's explicit approval for this host.
 
    The dry run lists `- default scope 'roles' withheld (…)` for `basetool-frontend`,
    `- realm role '<name>' deleted with its user mappings and its place in 'default-roles-basetool'
-   (…)` for each of the four roles, for `grafana` `+ mapper 'client roles' -> …` and
+   (…)` for `KRT Member`, `Bank Employee` and `Bank Management` (never for `Admin`, the admin-OTP
+   marker of REQ-SEC-082), for `grafana` `+ mapper 'client roles' -> …` and
    `- grafana: mapper 'realm roles' (…) removed (…)`, and for `backend-service`
    `- service-account roles realm-management:view-realm withdrawn (…)`, and exits `2`. When the
    provisioning identity cannot read or change that service account (it holds no `manage-users`),
@@ -1718,6 +1719,13 @@ switch. Every write below needs @greluc's explicit approval for this host.
    `backend-service` → Service account roles* by hand. Then sign in to Grafana as one of its admins
    to confirm the gate. The rollback's previous provisioner grants `view-realm` again and restores
    Grafana's realm-role mapper.
+7. **Keep the two Admin assignments in step, from now on.** The realm role `Admin` stays in
+   Keycloak only as the condition of the admin OTP (REQ-SEC-082, ADR-0355 *Amendment 3*); the
+   Basetool never reads it. Whoever gives an account the Basetool's `Admin` on the member page also
+   maps the realm role (*Users → <user> → Role mapping → Assign role → `Admin`*), and whoever
+   withdraws it unmaps the realm role; an admin without the realm role is not asked for a second
+   factor. Compare both lists after the promotion: the read-only count of step 2 against *Realm
+   roles → `Admin` → Users in role*.
 
 **Rollback.** Redeploy the previous release, run **its** provisioner (it creates the four realm
 roles again and gives `basetool-frontend` the `roles` scope back), then write the assignments back

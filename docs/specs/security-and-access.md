@@ -6100,6 +6100,12 @@ dry run by default, with a rollback file, never deleting.
   access* step is load-bearing: Keycloak fails a flow whose only entry is a conditional sub-flow
   that does not apply, which would refuse every Discord login of a member with *invalid username
   or password*, and an *alternative* beside the block is ignored.
+- **The realm role `Admin` is the OTP marker only** ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)
+  *Amendment 3*). The Basetool authorises from `user_roles` and never reads it; the realm keeps the
+  role, the provisioner never deletes it and lists a realm without it as a manual step, and its
+  assignments are kept in step with the Basetool's `Admin` by hand
+  ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)).
+  An account holding the Basetool's `Admin` without the realm role is not asked for a second factor.
 - **Forgot password (step 2).** The switch and the realm's own SMTP sender are one decision: a link
   that cannot be answered with a mail is not offered. The reset page (`login-reset-password.ftl`)
   asks for the e-mail address or the username and tells a Discord-registered user that the username
@@ -6133,6 +6139,8 @@ dry run by default, with a rollback file, never deleting.
   of Keycloak's flow evaluation lets a member's brokered login through and asks an admin for the
   code (`harden-keycloak-realm.py --selftest`; the flow's shape on a real Keycloak:
   `harden-keycloak-realm.integration.py`).
+- [x] The provisioner keeps the realm role `Admin` and names a realm without it as a manual step
+  (`provision-keycloak-realm.test.sh`, sections 4c and 4d).
 - [ ] A login that comes in through Discord is gated: **not testable in the repository** (the test
   realm has no real Discord provider, only a disabled stand-in the bind is exercised on); the owner checks it at the production run
   ([`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md) § 7).
@@ -6228,7 +6236,8 @@ surface.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).
-Keycloak holds none of them and no token carries them.
+No token the Basetool reads carries them. Keycloak keeps only the realm role `Admin`, as the
+condition of the admin OTP (REQ-SEC-082); the Basetool never reads it.
 
 - **Read from the database only.** `CustomJwtGrantedAuthoritiesConverter` assembles the
   authorities from the stored roles and ignores a `realm_access` claim. A committed role change
@@ -6268,9 +6277,10 @@ Keycloak holds none of them and no token carries them.
   `basetool_user_role_changes_total{role,action}`, tells the member through `USER_ROLE_CHANGED`
   (not mutable, V363) and calls the `RolesChangedObserver`s.
 
-The provisioner deletes the four realm roles (with KRT Member's place in `default-roles-<realm>`)
-and withholds the `roles` client scope from `basetool-frontend`; the e2e and sandbox realms carry
-neither. The frontend therefore requests only `openid, profile, email`, since Keycloak refuses a
+The provisioner deletes the realm roles KRT Member, Bank Employee and Bank Management (with KRT
+Member's place in `default-roles-<realm>`), keeps `Admin` and withholds the `roles` client scope
+from `basetool-frontend`; the e2e and sandbox realms carry none of the four roles and no `roles`
+scope. The frontend therefore requests only `openid, profile, email`, since Keycloak refuses a
 scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
 final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
 
@@ -6297,7 +6307,8 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] Approving a registration grants KRT Member.
 - [x] The roster sync writes no role.
 - [x] The frontend maps no role from the OIDC token.
-- [x] The provisioner deletes the four realm roles and the web login's role claim.
+- [x] The provisioner deletes the three retired realm roles and the web login's role claim, and
+  keeps the admin-OTP marker `Admin`.
 - [x] The frontend requests no scope its client is not offered in the e2e and sandbox realms.
 
 ## Out of scope

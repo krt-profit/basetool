@@ -378,8 +378,8 @@ script needs a session.
 ## Open findings (hardening, tracked separately)
 
 - **`fullScopeAllowed: true` on `basetool-frontend`** would grant the member's realm roles into the
-  web client's tokens; the client withholds the `roles` scope, and no application role is a realm
-  role any more (ADR-0355). Deliberately not a hardening step: narrowing it belongs to ADR-0001's
+  web client's tokens; the client withholds the `roles` scope, and the only application role left
+  in the realm is `Admin`, the admin-OTP marker the Basetool never reads (ADR-0355 *Amendment 3*). Deliberately not a hardening step: narrowing it belongs to ADR-0001's
   confidential-client migration.
 - **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
   true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The
