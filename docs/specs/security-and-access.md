@@ -6310,6 +6310,9 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] The provisioner deletes the three retired realm roles and the web login's role claim, and
   keeps the admin-OTP marker `Admin`.
 - [x] The frontend requests no scope its client is not offered in the e2e and sandbox realms.
+- [x] The rollback gives every exported role back, takes the default role and KRT Member from an
+  account that departed in the Basetool, stops on a refused read, and exits `1` on an empty export
+  or a skipped account (`restore-keycloak-realm-roles.py --selftest`).
 
 ## Out of scope
 

@@ -1736,10 +1736,18 @@ python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-
 python3 scripts/restore-keycloak-realm-roles.py --assignments roles.tsv --kcadm-command '<kcadm invocation>' --apply
 ```
 
-It maps each account to the roles the export lists, puts `KRT Member` back into
-`default-roles-basetool`, adds and never removes, reports accounts Keycloak no longer has, and
-refuses to run while a realm role is missing. A role assigned in the Basetool after the export is
-not in it: export again right before the rollback if the release ran for a while.
+It maps each account to the roles the export lists and puts `KRT Member` back into
+`default-roles-basetool`. Because that composite gives `KRT Member` to every account, each account
+the export lists as `DEPARTED` (approved, present in Keycloak, without `KRT Member` in the
+Basetool) loses its own mapping of `default-roles-basetool` and of `KRT Member`, so the previous
+release's login and roster sync do not make it a member again; nothing else is removed. It refuses
+to run while a realm role is missing, refuses an empty export, stops before writing when Keycloak
+refuses a role-mapping read, and exits `1` after reporting an account Keycloak no longer has (drop
+that line from the export once checked). The kcadm session needs the `realm-management` roles
+`view-users`, `manage-users` and `manage-realm`: give `basetool-provisioner`
+([`keycloak/README.md`](keycloak/README.md)) `view-users` and `manage-users` for the rollback and
+take them away afterwards. A role assigned in the Basetool after the export is not in it: export
+again right before the rollback if the release ran for a while.
 
 ### Updating the operational scripts and units
 

@@ -367,6 +367,10 @@ with `manage-clients` alone the client-policy endpoints answer **403**, with `ma
 client endpoints answer **403**. The service account deliberately cannot edit its own role mappings
 (that needs `manage-users`), so it cannot widen its own reach.
 
+The role rollback (`scripts/restore-keycloak-realm-roles.py`, ADR-0355) reads and writes user role
+mappings and therefore also needs **`view-users`** and **`manage-users`**; assign them only for that
+run and withdraw them right after it.
+
 The credential is short-lived in use, too: the service-account token carries the realm's 300 s
 access-token lifespan and there is no refresh token on the client-credentials grant, so a step run
 after a long pause may need step 2 again.
