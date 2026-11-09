@@ -42,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObserver {
 
   private final JobOrderRepository orders;
+  private final MaterialPromiseCoordinator materialPromises;
+  private final MaterialProvisionCredits provisionCredits;
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
 
@@ -60,5 +62,34 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
     if (responsibilityGuard.validOrderIds(affected).size() != ids.size()) {
       throw new BadRequestException("orders.responsibility.invalid");
     }
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void beforeOrderLinkedMaterialWrite(
+      Collection<de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope> scopes) {
+    materialPromises.lock(scopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void assertOrderLinkedMaterialWrite(
+      Collection<de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope> scopes) {
+    beforeOrderLinkedStockWrite(
+        scopes.stream()
+            .map(de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope::orderId)
+            .toList());
+    materialPromises.requireLocked(scopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void recordMaterialProvision(
+      de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvision provision) {
+    assertOrderLinkedMaterialWrite(
+        List.of(
+            new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+                provision.orderId(), provision.materialId())));
+    provisionCredits.record(provision);
   }
 }

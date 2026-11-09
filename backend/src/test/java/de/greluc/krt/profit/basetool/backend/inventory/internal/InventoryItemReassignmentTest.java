@@ -42,7 +42,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /** Verifies that reference changes refresh the owning surface only after transaction commit. */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemReassignmentTest {
   @Mock private InventoryItemReassignmentRepository repository;
   @Mock private AuditRecorder audit;

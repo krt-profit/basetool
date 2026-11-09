@@ -58,7 +58,10 @@ import org.springframework.security.access.AccessDeniedException;
  * unchanged by its move out of the exchange, the locks go in ascending key order, once per lot, and
  * a book-in records its audit event.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryStockCommandsTest {
 
   @BeforeEach

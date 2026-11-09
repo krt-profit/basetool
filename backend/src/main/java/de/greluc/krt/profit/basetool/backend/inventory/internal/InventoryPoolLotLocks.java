@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 class InventoryPoolLotLocks {
 
   private final InventoryItemRepository inventoryRepository;
+  private final InventoryOrderWrites orderWrites;
 
   /**
    * Locks source and destination lots in key order, then their rows in id order (ADR-0229). The
@@ -52,12 +55,16 @@ class InventoryPoolLotLocks {
    * @param holderLots further lots the command changes
    * @param entryIds the named source entries
    * @param relocations the destination changes of named entries
+   * @param requestedScopes material scopes introduced by book-ins
+   * @param allocationTargets new order allocations of current rows
    */
   @Transactional(propagation = Propagation.MANDATORY)
   void lockLots(
       @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
-      @NotNull Collection<PoolRelocation> relocations) {
+      @NotNull Collection<PoolRelocation> relocations,
+      @NotNull Collection<OrderMaterialScope> requestedScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets) {
     Set<Long> keys = new TreeSet<>();
     Set<UUID> rows = new TreeSet<>();
     holderLots.forEach((holder, lots) ->
@@ -78,6 +85,14 @@ class InventoryPoolLotLocks {
         keys.add(InventoryStockCommands.lotLockKey(row.getHolderId(), lot));
         rows.add(row.getId());
         byId.put(row.getId(), row);
+        targets.add(
+            new TargetLot(
+                row.getHolderId(),
+                row.getMaterialId(),
+                row.getGameItemId(),
+                row.getLocationId(),
+                row.getQuality(),
+                Boolean.TRUE.equals(row.getStolen())));
       }
       for (PoolRelocation relocation : relocations) {
         InventoryItemRepository.RowLot row = byId.get(relocation.entryId());
@@ -88,12 +103,16 @@ class InventoryPoolLotLocks {
         }
       }
     }
+    holderLots.forEach((holder, lots) -> lots.forEach(lot -> rows.addAll(lotRowIds(holder, lot))));
+    targets.forEach(target -> rows.addAll(lotRowIds(target)));
+    orderWrites.lockRowsAndTargets(rows, requestedScopes, allocationTargets);
     InventoryStockCommands.lockInOrder(inventoryRepository, keys);
     holderLots.forEach((holder, lots) -> lots.forEach(lot -> rows.addAll(lotRowIds(holder, lot))));
     targets.forEach(target -> rows.addAll(lotRowIds(target)));
     if (!rows.isEmpty()) {
       inventoryRepository.lockAllByIdOrderById(rows);
     }
+    orderWrites.validateRows(rows);
   }
 
   /**

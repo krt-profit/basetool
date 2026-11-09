@@ -82,7 +82,10 @@ import org.springframework.security.access.AccessDeniedException;
  * rows already at the target are skipped and counted, while an unknown id, a foreign row or a
  * blocking earmark aborts the whole action.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryCheckoutServiceBulkRebookTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;

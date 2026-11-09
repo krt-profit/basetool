@@ -85,6 +85,17 @@ class RefineryOrderStoreBooking {
         lines.stream()
             .map(line -> requireOutputGood(order, line.material().getId(), line.quality()))
             .toList();
+    stockCommands.lockBookInScopes(
+        lines.stream()
+            .map(line -> {
+              JobOrder linkedOrder = line.jobOrder();
+              return new StockCommands.StockBookInScope(
+                  line.receiver().getId(),
+                  new de.greluc.krt.profit.basetool.backend.inventory.api.StockLot(
+                      line.material(), null, line.location(), line.quality(), false),
+                  linkedOrder == null ? List.of() : List.of(linkedOrder.getId()));
+            })
+            .toList());
     final Set<UUID> bookedOnto = new LinkedHashSet<>();
     final IdentityHashMap<RefineryGood, Double> storedPerGood = new IdentityHashMap<>();
     for (int index = 0; index < lines.size(); index++) {

@@ -146,6 +146,7 @@ class ProfitHierarchyNoticeIntegrationTest {
       throws Exception {
     List<Map<String, Object>> history = claimHistory();
     assertThat(history).hasSize(2);
+    assertThat(history).allSatisfy(row -> assertThat(row.get("ended_at")).isNull());
     assertThat(history)
         .extracting(row -> ((Number) row.get("amount")).doubleValue())
         .containsExactlyInAnyOrder(4.0, 7.0);
@@ -157,7 +158,10 @@ class ProfitHierarchyNoticeIntegrationTest {
     moveClaimingUnit(fixture.outside());
 
     assertActivePromises(0.0, 0.0);
-    assertThat(claimHistory()).containsExactlyInAnyOrderElementsOf(history);
+    List<Map<String, Object>> endedHistory = claimHistory();
+    assertThat(endedHistory).allSatisfy(row -> assertThat(row.get("ended_at")).isNotNull());
+    assertThat(withoutEndingTimestamps(endedHistory))
+        .containsExactlyInAnyOrderElementsOf(withoutEndingTimestamps(history));
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> {
@@ -174,7 +178,7 @@ class ProfitHierarchyNoticeIntegrationTest {
     moveClaimingUnit(fixture.profit());
 
     assertActivePromises(0.0, 0.0);
-    assertThat(claimHistory()).containsExactlyInAnyOrderElementsOf(history);
+    assertThat(claimHistory()).containsExactlyInAnyOrderElementsOf(endedHistory);
     await()
         .during(Duration.ofMillis(400))
         .atMost(Duration.ofSeconds(5))
@@ -351,6 +355,16 @@ class ProfitHierarchyNoticeIntegrationTest {
                 json, "$[?(@.material.name == 'Notice titanium')].claimedAmount"))
         .as("titanium claim in %s", json)
         .containsExactly(titanium);
+  }
+
+  private static List<Map<String, Object>> withoutEndingTimestamps(List<Map<String, Object>> rows) {
+    return rows.stream()
+        .map(row -> {
+          Map<String, Object> facts = new java.util.HashMap<>(row);
+          facts.remove("ended_at");
+          return facts;
+        })
+        .toList();
   }
 
   private List<Map<String, Object>> claimHistory() {

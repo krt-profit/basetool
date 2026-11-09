@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -98,10 +99,13 @@ public class InventoryStolenMarkService {
       boolean isLogistician) {
     orderWrites.lockEligibility();
     requireEnabled();
+    orderWrites.lockTransformRows(
+        List.of(itemId), List.of(new PoolRelocation(itemId, null, null, dto.stolen())));
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
             () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
     if (!isOwner && !isLogistician) {
       throw new AccessDeniedException("You are not allowed to mark this inventory item: " + itemId);
@@ -137,6 +141,11 @@ public class InventoryStolenMarkService {
       @NotNull BulkStolenMarkRequest request, @NotNull UUID callerId) {
     orderWrites.lockEligibility();
     requireEnabled();
+    orderWrites.lockTransformRows(
+        request.itemIds(),
+        request.itemIds().stream()
+            .map(id -> new PoolRelocation(id, null, null, request.stolen()))
+            .toList());
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -144,6 +153,7 @@ public class InventoryStolenMarkService {
           Entities.require(
               inventoryItemRepository.findByIdForRebook(itemId),
               () -> "Inventory item not found: " + itemId);
+      orderWrites.validateRows(List.of(itemId));
       if (item.getUser() == null || !callerId.equals(item.getUser().getId())) {
         throw new AccessDeniedException(
             "Only the owner can mark a selection of inventory items: " + itemId);
@@ -221,9 +231,9 @@ public class InventoryStolenMarkService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    final InventoryItem savedPart =
-        inventoryItemRepository.save(
-            LotRows.split(item, amount, LotRows.Placement.of(item).withStolen(target)));
+    InventoryItem part = LotRows.split(item, amount, LotRows.Placement.of(item).withStolen(target));
+    orderWrites.assertRow(part);
+    final InventoryItem savedPart = inventoryItemRepository.save(part);
     LotRows.lower(
         inventoryItemRepository,
         stockChangeObserver,

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvisionSelection;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -32,9 +34,11 @@ import org.jetbrains.annotations.Nullable;
  * @param amount the slice amount in the material's unit; required and positive for add/change,
  *     ignored for delete
  * @param version the owning entry's optimistic-lock version, shared by both splits
+ * @param provision an explicitly selected matching unit promise, or null for unattributed stock
  */
 public record InventoryAllocationWriteDto(
     @NotNull InventoryAllocationDimension field,
     @NotNull UUID targetId,
     @Nullable Double amount,
-    Long version) {}
+    Long version,
+    @Valid @Nullable MaterialProvisionSelection provision) {}

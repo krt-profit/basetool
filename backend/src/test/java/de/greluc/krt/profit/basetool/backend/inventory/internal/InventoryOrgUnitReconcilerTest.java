@@ -52,7 +52,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * view collapses same-identity rows for display), amounts are never touched and nothing is ever
  * deleted.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryOrgUnitReconcilerTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;

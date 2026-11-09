@@ -37,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
@@ -45,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -100,6 +98,13 @@ public class MaterialClaimService implements ClaimBucketSource {
   private static final int CLAIM_BATCH_SIZE = 200;
 
   private final MaterialClaimRepository materialClaimRepository;
+  private final MaterialClaimAuthority claimAuthority;
+  private final JobOrderParticipationRepository participations;
+  private final MaterialPromiseCoordinator promiseCoordinator;
+  private final MaterialPromiseCapacity materialCapacity;
+  private final de.greluc.krt.profit.basetool.backend.joborder.api
+          .JobOrderMaterialRequirementResolver
+      materialRequirements;
   private final JobOrderRepository jobOrderRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final ProfitHierarchyService profitHierarchy;
@@ -124,12 +129,6 @@ public class MaterialClaimService implements ClaimBucketSource {
   private final ApplicationEventPublisher eventPublisher;
 
   private final UserService userService;
-
-  /**
-   * Total attempts {@link #upsertClaim} makes against a concurrent same-bucket writer before the
-   * conflict surfaces as a 409.
-   */
-  private static final int MAX_UPSERT_ATTEMPTS = 5;
 
   /**
    * Identity of one aggregated material bucket — a material at a single quality tier. Shared key
@@ -204,6 +203,13 @@ public class MaterialClaimService implements ClaimBucketSource {
   @NotNull
   public List<ClaimBucketDto> getClaimBucketsForOrder(
       JobOrder order, @NotNull List<MaterialClaim> orderClaims) {
+    return getClaimBucketsForOrder(order, orderClaims, materialCapacity.ofOrder(order));
+  }
+
+  private List<ClaimBucketDto> getClaimBucketsForOrder(
+      JobOrder order,
+      List<MaterialClaim> orderClaims,
+      Map<MaterialPromiseCapacity.Bucket, MaterialPromiseCapacity.Capacity> capacities) {
     Map<Bucket, Double> required = requiredByBucket(order);
     Map<UUID, Material> materials = materialsByBucket(order);
     Map<UUID, QualityTier> tiers = tiersOf(order);
@@ -223,7 +229,12 @@ public class MaterialClaimService implements ClaimBucketSource {
       double requiredAmount = round3(entry.getValue());
       List<MaterialClaim> claims = claimsByBucket.getOrDefault(bucket, List.of());
       double claimedAmount = round3(claims.stream().mapToDouble(MaterialClaim::getAmount).sum());
-      double openRemaining = round3(Math.max(0.0, requiredAmount - claimedAmount));
+      var current =
+          Objects.requireNonNull(
+              capacities.get(
+                  new MaterialPromiseCapacity.Bucket(bucket.materialId(), bucket.tierId())));
+      double openRemaining =
+          round3(Math.max(0.0, current.availableQuanta() / 1000.0 - claimedAmount));
       QualityTier tier = Objects.requireNonNull(tiers.get(bucket.tierId()));
       buckets.add(
           new ClaimBucketDto(
@@ -256,11 +267,15 @@ public class MaterialClaimService implements ClaimBucketSource {
     Map<UUID, List<MaterialClaim>> claimsByOrder =
         materialClaimRepository.findByJobOrderIdInOrderByCreatedAtDesc(orderIds).stream()
             .collect(Collectors.groupingBy(claim -> claim.getJobOrder().getId()));
+    var capacities = materialCapacity.ofOrders(orders);
     Map<UUID, List<ClaimBucketDto>> result = new HashMap<>();
     for (JobOrder order : orders) {
       result.put(
           order.getId(),
-          getClaimBucketsForOrder(order, claimsByOrder.getOrDefault(order.getId(), List.of())));
+          getClaimBucketsForOrder(
+              order,
+              claimsByOrder.getOrDefault(order.getId(), List.of()),
+              Objects.requireNonNull(capacities.get(order.getId()))));
     }
     return result;
   }
@@ -271,8 +286,7 @@ public class MaterialClaimService implements ClaimBucketSource {
    * <p>The order must be a non-terminal SK order, the caller must act for the claiming squadron,
    * the bucket must exist, the total must not exceed the required amount, and a new claim's
    * squadron must be active Profit-hierarchy. Non-transactional orchestrator: each attempt runs in
-   * its own transaction and is retried up to {@link #MAX_UPSERT_ATTEMPTS} times on a
-   * concurrent-write conflict (REQ-ORDERS-024, ADR-0092).
+   * its own transaction; meaningful edits require the version the caller observed.
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.
@@ -281,25 +295,11 @@ public class MaterialClaimService implements ClaimBucketSource {
    * @throws BadRequestException when the order is not an open SK order, the bucket does not exist,
    *     the amount would overclaim, or a new claim names a outside-Profit squadron.
    * @throws AccessDeniedException when the caller may not act for the claiming squadron.
-   * @throws ObjectOptimisticLockingFailureException if every attempt loses the race (a 409).
+   * @throws ObjectOptimisticLockingFailureException when an existing promise version is missing or
+   *     stale.
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public ClaimDto upsertClaim(@NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
-    for (int attempt = 1; attempt < MAX_UPSERT_ATTEMPTS; attempt++) {
-      try {
-        return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
-      } catch (DataIntegrityViolationException | ObjectOptimisticLockingFailureException race) {
-        log.debug(
-            "Concurrent material-claim upsert race (attempt {}/{}) for order {} material {} quality"
-                + " {} claimingOrgUnit {} — retrying",
-            attempt,
-            MAX_UPSERT_ATTEMPTS,
-            jobOrderId,
-            dto.materialId(),
-            dto.qualityRequirement(),
-            dto.claimingOrgUnitId());
-      }
-    }
     return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
   }
 
@@ -322,6 +322,10 @@ public class MaterialClaimService implements ClaimBucketSource {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public ClaimDto upsertClaimWithinTransaction(
       @NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
+    promiseCoordinator.lock(
+        List.of(
+            new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+                jobOrderId, dto.materialId())));
     JobOrder order = loadOrder(jobOrderId);
     responsibilityGuard.assertWritable(order);
     assertClaimable(order);
@@ -340,7 +344,20 @@ public class MaterialClaimService implements ClaimBucketSource {
               + tier.getCode());
     }
 
-    jobOrderRepository.lockForClaimUpsert(jobOrderId);
+    var existingClaim =
+        materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
+            jobOrderId, dto.materialId(), tier.getId(), dto.claimingOrgUnitId());
+    de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock.check(
+        existingClaim.map(MaterialClaim::getVersion).orElse(dto.version()),
+        existingClaim.isPresent() ? dto.version() : null,
+        MaterialClaim.class,
+        existingClaim.map(MaterialClaim::getId).orElse(null));
+    var bucketCapacity =
+        Objects.requireNonNull(
+            materialCapacity
+                .ofOrder(order)
+                .get(new MaterialPromiseCapacity.Bucket(dto.materialId(), tier.getId())));
+    requiredAmount = bucketCapacity.availableQuanta() / 1000.0;
 
     double amount = dto.amount();
     double claimedByOthers =
@@ -363,25 +380,47 @@ public class MaterialClaimService implements ClaimBucketSource {
     }
 
     MaterialClaim claim =
-        materialClaimRepository
-            .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                jobOrderId, dto.materialId(), tier.getId(), dto.claimingOrgUnitId())
+        existingClaim.orElseGet(() -> {
+          MaterialClaim fresh = new MaterialClaim();
+          fresh.setJobOrder(order);
+          fresh.setMaterial(resolveMaterial(order, dto.materialId()));
+          fresh.setQualityTier(tier);
+          fresh.setClaimingOrgUnit(claimingUnit);
+          return fresh;
+        });
+    de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock.check(
+        claim.getId() == null ? dto.version() : claim.getVersion(),
+        claim.getId() == null ? null : dto.version(),
+        MaterialClaim.class,
+        claim.getId());
+    promiseCoordinator.lockParticipation(jobOrderId, claimingUnit.getId());
+    var participation =
+        participations
+            .findByJobOrderIdAndClaimingOrgUnitId(jobOrderId, claimingUnit.getId())
             .orElseGet(() -> {
-              MaterialClaim fresh = new MaterialClaim();
+              var fresh =
+                  new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation();
               fresh.setJobOrder(order);
-              fresh.setMaterial(resolveMaterial(order, dto.materialId()));
-              fresh.setQualityTier(tier);
               fresh.setClaimingOrgUnit(claimingUnit);
               return fresh;
             });
+    participation.setActive(true);
+    claim.setParticipation(participations.save(participation));
+    double previousAmount = claim.getAmount() == null ? 0.0 : claim.getAmount();
     claim.setAmount(amount);
     authHelperService
         .currentUserId()
         .flatMap(userRepository::findById)
         .ifPresent(claim::setClaimedByUser);
 
-    boolean isNew = claim.getId() == null;
     MaterialClaim saved = materialClaimRepository.save(claim);
+    promiseCoordinator.record(
+        saved,
+        de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
+            .PROMISE_CHANGED,
+        previousAmount,
+        0.0);
+    materialClaimRepository.flush();
     log.info(
         "Material claim upserted: order={} material={} quality={} claimingOrgUnit={} amount={}",
         order.getId(),
@@ -389,17 +428,6 @@ public class MaterialClaimService implements ClaimBucketSource {
         tier.getCode(),
         dto.claimingOrgUnitId(),
         amount);
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
-        order.getId(),
-        JobOrderAuditLabel.of(order),
-        null,
-        AuditDetails.of("claim", saved.getId())
-            .with("material", dto.materialId())
-            .with("quality", tier.getCode())
-            .with("claimingOrgUnit", dto.claimingOrgUnitId())
-            .with("amount", amount)
-            .with("mode", isNew ? "created" : "updated"));
     return toClaimDto(saved);
   }
 
@@ -493,6 +521,7 @@ public class MaterialClaimService implements ClaimBucketSource {
       }
       for (MaterialClaim claim : batch) {
         claim.setEndedAt(Instant.now());
+        claim.getParticipation().setActive(false);
         affected
             .computeIfAbsent(claim.getJobOrder(), _ -> new LinkedHashMap<>())
             .computeIfAbsent(
@@ -598,22 +627,11 @@ public class MaterialClaimService implements ClaimBucketSource {
   @NotNull
   private Map<Bucket, Double> requiredByBucket(JobOrder order) {
     Map<Bucket, Double> required = new LinkedHashMap<>();
-    if (order.getType() == JobOrderType.ITEM) {
-      for (JobOrderItem item : order.getItems()) {
-        for (JobOrderItemMaterial req : item.getMaterials()) {
-          required.merge(
-              new Bucket(req.getMaterial().getId(), req.getQualityTier().getId()),
-              req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity(),
-              Double::sum);
-        }
-      }
-    } else {
-      for (JobOrderMaterial mat : order.getMaterials()) {
-        required.merge(
-            new Bucket(mat.getMaterial().getId(), mat.getQualityTier().getId()),
-            mat.getAmount() == null ? 0.0 : mat.getAmount(),
-            Double::sum);
-      }
+    for (var requirement : materialRequirements.requirementsOf(order)) {
+      required.merge(
+          new Bucket(requirement.material().id(), requirement.tier().id()),
+          requirement.requiredAmount(),
+          Double::sum);
     }
     return required;
   }
@@ -690,18 +708,7 @@ public class MaterialClaimService implements ClaimBucketSource {
    * @throws BadRequestException when the order is not a claimable SK order.
    */
   private void assertClaimable(@NotNull JobOrder order) {
-    if (claimable(order)) {
-      return;
-    }
-    OrgUnit responsible = order.getResponsibleOrgUnit();
-    if (responsible == null || responsible.getKind() != OrgUnitKind.SPECIAL_COMMAND) {
-      throw new BadRequestException(
-          "Material claims are only allowed on Spezialkommando orders; order "
-              + order.getId()
-              + " is not responsible to an SK.");
-    }
-    throw new BadRequestException(
-        "Order " + order.getId() + " is in a terminal status; its claims are frozen.");
+    claimAuthority.assertClaimable(order);
   }
 
   /**
@@ -715,25 +722,15 @@ public class MaterialClaimService implements ClaimBucketSource {
    *     SK nor Logistician of this squadron.
    */
   private void assertCanManage(JobOrder order, UUID claimingOrgUnitId) {
-    if (!canManage(order, claimingOrgUnitId)) {
-      throw new AccessDeniedException(
-          "You may only manage claims for your own squadron, or any claim as a logistician or lead"
-              + " of the responsible Spezialkommando.");
-    }
+    claimAuthority.assertCanManage(order, claimingOrgUnitId);
   }
 
   private boolean canManage(@NotNull JobOrder order, @NotNull UUID claimingOrgUnitId) {
-    return authHelperService.isAdmin()
-        || accessGateService.hasRoleInOrgUnit(
-            order.getResponsibleOrgUnit().getId(), Roles.LOGISTICIAN)
-        || accessGateService.canActAsLogisticianIn(claimingOrgUnitId);
+    return claimAuthority.canManage(order, claimingOrgUnitId);
   }
 
-  private static boolean claimable(@NotNull JobOrder order) {
-    return order.getResponsibleOrgUnit() != null
-        && order.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND
-        && order.getStatus() != JobOrderStatus.COMPLETED
-        && order.getStatus() != JobOrderStatus.REJECTED;
+  private boolean claimable(@NotNull JobOrder order) {
+    return claimAuthority.claimable(order);
   }
 
   /**

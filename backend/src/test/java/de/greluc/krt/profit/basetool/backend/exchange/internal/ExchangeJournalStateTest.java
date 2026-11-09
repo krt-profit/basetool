@@ -493,7 +493,8 @@ class ExchangeJournalStateTest {
               4.0,
               7L,
               Map.of(UUID.randomUUID(), 1.0),
-              Map.of());
+              Map.of(),
+              null);
 
       assertThat(journal.read(mapper.writeValueAsString(state))).isEqualTo(state);
       assertThat(journal.read(null)).isNull();
@@ -520,7 +521,15 @@ class ExchangeJournalStateTest {
       assertThat(journal.read(stored))
           .isEqualTo(
               new PoolEntryCommands.PoolEntryState(
-                  id, holder, pool, "m:x|l:y|q:0|s:0", 4.5, 3L, Map.of(jobOrder, 1.0), Map.of()));
+                  id,
+                  holder,
+                  pool,
+                  "m:x|l:y|q:0|s:0",
+                  4.5,
+                  3L,
+                  Map.of(jobOrder, 1.0),
+                  Map.of(),
+                  null));
     }
   }
 }

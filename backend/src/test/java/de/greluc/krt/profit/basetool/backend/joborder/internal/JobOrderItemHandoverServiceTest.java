@@ -72,7 +72,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * (free rest / sibling order untouched), the per-game-item aggregation across lines, and the
  * stock-backed Materialbörse item-offer ratchet on a reduced row (REQ-MARKET-013/014).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderItemHandoverServiceTest {
 
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
@@ -101,6 +104,7 @@ class JobOrderItemHandoverServiceTest {
     service =
         new JobOrderItemHandoverService(
             jobOrderRepository,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             jobOrderItemHandoverRepository,
             jobOrderItemHandoverMapper,

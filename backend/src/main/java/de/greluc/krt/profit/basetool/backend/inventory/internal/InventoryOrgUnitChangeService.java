@@ -81,10 +81,12 @@ public class InventoryOrgUnitChangeService {
   public @NotNull InventoryItemDto changeOrgUnit(
       @NotNull UUID itemId, @NotNull InventoryItemOrgUnitChangeDto dto, @NotNull UUID callerId) {
     orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
             () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     requireOwnPersonalRow(item, callerId);
@@ -127,6 +129,7 @@ public class InventoryOrgUnitChangeService {
   public @NotNull BulkOrgUnitChangeResultDto bulkChangeOrgUnit(
       @NotNull BulkOrgUnitChangeRequest request, @NotNull UUID callerId) {
     orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(request.itemIds(), List.of());
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -134,6 +137,7 @@ public class InventoryOrgUnitChangeService {
           Entities.require(
               inventoryItemRepository.findByIdForRebook(itemId),
               () -> "Inventory item not found: " + itemId);
+      orderWrites.validateRows(List.of(itemId));
       requireOwnPersonalRow(item, callerId);
       rows.add(item);
     }

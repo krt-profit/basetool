@@ -64,7 +64,10 @@ import org.springframework.security.access.AccessDeniedException;
  * of the identity, a split never undercuts a Materialbörse offer or the earmarks, a single row is
  * marked only by its owner or a logistician, and a selection takes only the caller's own rows.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryStolenMarkServiceTest {
 
   private static final UUID CALLER = UUID.randomUUID();

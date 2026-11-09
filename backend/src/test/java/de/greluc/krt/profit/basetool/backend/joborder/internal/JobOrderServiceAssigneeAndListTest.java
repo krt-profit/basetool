@@ -96,7 +96,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * Unit tests for the list, page and reference getters of {@link JobOrderService} and for {@code
  * addAssignee} / {@code removeAssignee}.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderServiceAssigneeAndListTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
@@ -184,6 +187,7 @@ class JobOrderServiceAssigneeAndListTest {
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
+                org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,

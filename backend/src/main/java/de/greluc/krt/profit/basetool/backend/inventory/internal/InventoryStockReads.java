@@ -33,9 +33,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStock
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -61,13 +65,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
+public class InventoryStockReads
+    implements StockReads, OrderLinkedStockRows, StockQuantityProvenance {
 
   private final InventoryItemRepository inventoryRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryStockSplitRepository splitRepository;
   private final InventoryDonationSourceRepository donationSourceRepository;
   private final StockViewerAccess stockViewerAccess;
+
+  @Override
+  public @NotNull List<StockQuantityFragment> quantityOf(@NotNull UUID rowId) {
+    return Entities.require(inventoryRepository.findById(rowId), "Inventory item not found")
+        .getQuantityProvenance();
+  }
 
   @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
@@ -204,6 +215,14 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   public @NotNull List<JobOrderMaterialStockRow> materialStockOfOrders(
       @NotNull Collection<UUID> jobOrderIds) {
     return inventoryRepository.findMaterialStockRowsByJobOrderIds(jobOrderIds);
+  }
+
+  @Override
+  public @NotNull List<OrderMaterialScope> materialScopesSharingRowsWithOrders(
+      @NotNull Collection<UUID> jobOrderIds) {
+    return jobOrderIds.isEmpty()
+        ? List.of()
+        : inventoryRepository.findMaterialScopesSharingRowsWithOrders(jobOrderIds);
   }
 
   @Override

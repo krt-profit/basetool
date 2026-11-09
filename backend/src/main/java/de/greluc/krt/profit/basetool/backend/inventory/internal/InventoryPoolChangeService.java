@@ -113,10 +113,12 @@ public class InventoryPoolChangeService {
   public @NotNull InventoryItemDto changePool(
       @NotNull UUID itemId, @NotNull InventoryItemPoolChangeDto dto, @NotNull UUID callerId) {
     orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.findByIdForRebook(itemId),
             () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     OrgUnit source = requireSharedRow(item);
@@ -323,12 +325,11 @@ public class InventoryPoolChangeService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    final InventoryItem savedPart =
-        inventoryItemRepository.save(
-            LotRows.split(
-                item,
-                amount,
-                LotRows.Placement.of(item).withOwningOrgUnit(target).withPersonal(false)));
+    InventoryItem part =
+        LotRows.split(
+            item, amount, LotRows.Placement.of(item).withOwningOrgUnit(target).withPersonal(false));
+    orderWrites.assertRow(part);
+    final InventoryItem savedPart = inventoryItemRepository.save(part);
     LotRows.lower(
         inventoryItemRepository,
         stockChangeObserver,

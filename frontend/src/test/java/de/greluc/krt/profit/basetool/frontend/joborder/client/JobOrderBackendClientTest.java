@@ -360,7 +360,7 @@ class JobOrderBackendClientTest {
     backend.answerJson("{}");
     backend.answerJson("{}");
 
-    client.upsertClaim(ORDER, new CreateClaimDto(MATERIAL, "B", SQUADRON, 4.0));
+    client.upsertClaim(ORDER, new CreateClaimDto(MATERIAL, "B", SQUADRON, 4.0, null));
     client.withdrawClaim(ORDER, OTHER);
     client.addAssignee(ORDER, OTHER);
     client.removeAssignee(ORDER, OTHER);
@@ -375,7 +375,7 @@ class JobOrderBackendClientTest {
             + MATERIAL
             + "\",\"qualityRequirement\":\"B\",\"claimingOrgUnitId\":\""
             + SQUADRON
-            + "\",\"amount\":4.0}");
+            + "\",\"amount\":4.0,\"version\":null}");
     backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/claims/" + OTHER, null);
     backend.expect("POST", "/api/v1/orders/" + ORDER + "/assignees/" + OTHER, null);
     backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/assignees/" + OTHER, null);

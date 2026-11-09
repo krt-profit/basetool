@@ -84,6 +84,7 @@ class JobOrderEditorTest {
         new JobOrderEditor(
             jobOrderRepository,
             profitHierarchy,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             jobOrderAccessPolicy,
             auditRecorder,

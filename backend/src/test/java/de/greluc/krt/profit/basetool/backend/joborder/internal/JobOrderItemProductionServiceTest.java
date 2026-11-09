@@ -86,7 +86,10 @@ import org.springframework.security.access.AccessDeniedException;
  * guards; the stale-version 409; the depleted-row delete; and a material marked "nicht ausbuchen".
  * Every payload carries the required {@code bookIn} block (REQ-INV-032).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderItemProductionServiceTest {
 
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
@@ -123,6 +126,7 @@ class JobOrderItemProductionServiceTest {
     service =
         new JobOrderItemProductionService(
             jobOrderRepository,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             new InventoryStockCommands(
                 new InventoryOrderWrites(

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -90,16 +91,6 @@ public class InventoryCheckoutService {
    * floating-point noise, since quantities carry at most three decimals.
    */
   private static final double QUANTITY_EPSILON = 1e-4;
-
-  /**
-   * Max length of the {@code inventory_item.note} column (V61 {@code VARCHAR(1000)}). A stock merge
-   * concatenates the distinct notes of the folded rows and truncates the result to this length so
-   * the write can never overflow the column.
-   */
-  private static final int NOTE_MAX_LENGTH = 1000;
-
-  /** Separator used when a stock merge concatenates the distinct notes of the folded rows. */
-  private static final String NOTE_MERGE_SEPARATOR = "\n";
 
   /** Name shown in a transfer notification for a member without one. */
   private static final String UNKNOWN_NAME = "—";
@@ -215,8 +206,12 @@ public class InventoryCheckoutService {
       boolean isAdmin,
       @Nullable StockChangeReason offerReason,
       @Nullable OrgUnit targetPool) {
+    orderWrites.lockTransformRows(
+        List.of(id),
+        List.of(new PoolRelocation(id, dto.targetUserId(), dto.targetLocationId(), null)));
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
+    orderWrites.validateRows(List.of(id));
 
     orderWrites.assertRow(item);
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
@@ -632,8 +627,10 @@ public class InventoryCheckoutService {
   public InventoryItemDto rebookPersonal(
       UUID id, InventoryItemPersonalRebookDto dto, UUID currentUserId, boolean isAdmin) {
     orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(id), List.of());
     InventoryItem item =
         Entities.require(inventoryItemRepository.findById(id), "Inventory item not found");
+    orderWrites.validateRows(List.of(id));
 
     orderWrites.assertRow(item);
     OptimisticLock.checkOptionalClient(item.getVersion(), dto.version(), InventoryItem.class, id);
@@ -777,6 +774,11 @@ public class InventoryCheckoutService {
                 row.getStolen(),
                 row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
+    orderWrites.validateRows(
+        group.stream()
+            .filter(candidate -> !candidate.getId().equals(row.getId()))
+            .map(InventoryItem::getId)
+            .toList());
     orderWrites.assertRow(row);
     group.forEach(orderWrites::assertRow);
     final List<InventoryItem> victims =
@@ -787,14 +789,15 @@ public class InventoryCheckoutService {
 
     double total = row.getAmount() != null ? row.getAmount() : 0.0;
     final Set<String> notes = new LinkedHashSet<>();
-    collectNote(notes, row.getNote());
+    InventoryStockMergeNotes.collect(notes, row.getNote());
     for (InventoryItem victim : victims) {
       total += victim.getAmount() != null ? victim.getAmount() : 0.0;
-      collectNote(notes, victim.getNote());
+      InventoryStockMergeNotes.collect(notes, victim.getNote());
+      row.mergeQuantityFrom(victim);
     }
 
     row.setAmount(ScuAmounts.roundToScuScale(total));
-    row.setNote(mergeNotes(notes));
+    row.setNote(InventoryStockMergeNotes.combined(notes));
     for (InventoryItem victim : victims) {
       InventoryAllocations.unionInto(row, victim);
     }
@@ -813,36 +816,6 @@ public class InventoryCheckoutService {
             .with("q", row.getQuality())
             .with("trigger", row.countsWholeUnits() ? "auto" : "manual"));
     return row;
-  }
-
-  /**
-   * Adds a note to the merge accumulator, trimmed to {@code null} and skipped when blank, so the
-   * merged note carries only the distinct non-empty contributions in first-seen order.
-   *
-   * @param notes the ordered accumulator of distinct notes.
-   * @param note the raw note of one folded row, possibly {@code null} or blank.
-   */
-  private static void collectNote(Set<String> notes, @Nullable String note) {
-    final String normalized = StringNormalization.trimToNull(note);
-    if (normalized != null) {
-      notes.add(normalized);
-    }
-  }
-
-  /**
-   * Joins the distinct merged notes with {@link #NOTE_MERGE_SEPARATOR}, truncating to {@link
-   * #NOTE_MAX_LENGTH} so the write never overflows the {@code inventory_item.note} column.
-   *
-   * @param notes the ordered accumulator of distinct notes.
-   * @return the combined note, or {@code null} when no folded row carried a note.
-   */
-  @Nullable
-  private static String mergeNotes(Set<String> notes) {
-    if (notes.isEmpty()) {
-      return null;
-    }
-    final String joined = String.join(NOTE_MERGE_SEPARATOR, notes);
-    return joined.length() > NOTE_MAX_LENGTH ? joined.substring(0, NOTE_MAX_LENGTH) : joined;
   }
 
   /**
@@ -896,6 +869,7 @@ public class InventoryCheckoutService {
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
+    orderWrites.lockRows(request.itemIds());
     List<UUID> toDelete = new ArrayList<>();
 
     for (UUID itemId : request.itemIds()) {
@@ -957,6 +931,12 @@ public class InventoryCheckoutService {
         currentUserId,
         request.itemIds().size());
 
+    orderWrites.lockTransformRows(
+        request.itemIds(),
+        request.itemIds().stream()
+            .map(id ->
+                new PoolRelocation(id, request.targetUserId(), request.targetLocationId(), null))
+            .toList());
     final List<InventoryItem> rows = loadOwnRowsForRebook(request.itemIds(), currentUserId);
     final User owner = rows.getFirst().getUser();
 
@@ -1017,6 +997,7 @@ public class InventoryCheckoutService {
       }
       rows.add(item);
     }
+    orderWrites.validateRows(orderedIds);
     return rows;
   }
 
@@ -1288,6 +1269,7 @@ public class InventoryCheckoutService {
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(source.getStolen());
     newItem.setNote(source.getNote());
+    newItem.replaceQuantityProvenance(source.getQuantityProvenance());
 
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(source, null, amount, true);
@@ -1335,7 +1317,10 @@ public class InventoryCheckoutService {
                 .findFirst(),
             "Job-order allocation not found for this inventory item");
     slice.setDelivered(request.delivered());
-    orderWrites.assertRow(item);
+    orderWrites.assertOrders(
+        item.getJobOrderAllocations().stream()
+            .map(InventoryJobOrderAllocation::getJobOrderId)
+            .toList());
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ITEM_DELIVERY_TOGGLED,

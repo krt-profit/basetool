@@ -60,6 +60,18 @@ class MaterialClaimIntegrationTest {
 
   @Autowired private OrgUnitRepository orgUnitRepository;
 
+  @Autowired private org.springframework.web.context.WebApplicationContext context;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands stockCommands;
+
+  @Autowired private de.greluc.krt.profit.basetool.backend.inventory.api.StockReads stockReads;
+  @Autowired private de.greluc.krt.profit.basetool.backend.identity.api.UserRepository users;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository locations;
+
+  @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
   @Autowired private MaterialClaimService materialClaimService;
   @Autowired private JobOrderService jobOrderService;
   @Autowired private JobOrderQueryService jobOrderQueryService;
@@ -135,6 +147,135 @@ class MaterialClaimIntegrationTest {
     assertThat(afterUpdate.openRemaining()).isEqualTo(2.0);
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(f.orderId()))
         .hasSize(1);
+  }
+
+  @Test
+  void meaningfulEditWithoutObservedVersionConflicts() {
+    Fixture f = seed();
+    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 4.0));
+
+    assertThatThrownBy(() ->
+            materialClaimService.upsertClaim(
+                f.orderId(), claim(f.materialId(), f.squadronAId(), 6.0)))
+        .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+    assertThat(onlyBucket(f.orderId()).claimedAmount()).isEqualTo(4.0);
+  }
+
+  @Test
+  void reducedDemandProportionallyCancelsOnlyNoLongerNeededPromises() {
+    Fixture f = seed();
+    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 4.0));
+    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronBId(), 6.0));
+    JobOrderDto observed = jobOrderQueryService.getJobOrderById(f.orderId());
+
+    jobOrderService.updateJobOrder(
+        f.orderId(),
+        new CreateJobOrderDto(
+            null,
+            null,
+            observed.handle(),
+            null,
+            List.of(new CreateJobOrderMaterialDto(f.materialId(), 650, 6.0)),
+            observed.version()));
+
+    assertThat(onlyBucket(f.orderId()).claims())
+        .filteredOn(c -> c.claimingOrgUnit().id().equals(f.squadronAId()))
+        .singleElement()
+        .extracting(c -> c.amount())
+        .isEqualTo(2.4);
+    assertThat(onlyBucket(f.orderId()).claims())
+        .filteredOn(c -> c.claimingOrgUnit().id().equals(f.squadronBId()))
+        .singleElement()
+        .extracting(c -> c.amount())
+        .isEqualTo(3.6);
+  }
+
+  @Test
+  void explicitlyProvidedThreeCreditsTheSelectedPromiseBeforeAnyCapacityReduction()
+      throws Exception {
+    Fixture f = seed();
+    var a =
+        materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronAId(), 4.0));
+    materialClaimService.upsertClaim(f.orderId(), claim(f.materialId(), f.squadronBId(), 6.0));
+    assertThat(onlyBucket(f.orderId()).claims())
+        .filteredOn(c -> c.id().equals(a.id()))
+        .singleElement()
+        .extracting(c -> c.version())
+        .isEqualTo(a.version());
+    StockFixture stock = stock(f, 3.0);
+    Long rowVersion = stockReads.findRow(stock.rowId()).orElseThrow().getVersion();
+    var mvc =
+        org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(context)
+            .apply(
+                org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
+                    .springSecurity())
+            .build();
+
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/inventory/{id}/allocation", stock.rowId())
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(
+                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_ADMIN")))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"field\":\"JOB_ORDER\",\"targetId\":\""
+                        + f.orderId()
+                        + "\",\"amount\":3,\"version\":"
+                        + rowVersion
+                        + ",\"provision\":{\"claimId\":\""
+                        + a.id()
+                        + "\",\"claimVersion\":"
+                        + a.version()
+                        + "}}"))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+
+    assertThat(onlyBucket(f.orderId()).claims())
+        .filteredOn(c -> c.claimingOrgUnit().id().equals(f.squadronAId()))
+        .singleElement()
+        .extracting(c -> c.amount())
+        .isEqualTo(1.0);
+    assertThat(onlyBucket(f.orderId()).claims())
+        .filteredOn(c -> c.claimingOrgUnit().id().equals(f.squadronBId()))
+        .singleElement()
+        .extracting(c -> c.amount())
+        .isEqualTo(6.0);
+  }
+
+  private record StockFixture(UUID rowId, UUID holderId) {}
+
+  private StockFixture stock(Fixture fixture, double amount) {
+    return transactionTemplate.execute(_ -> {
+      var holder = new de.greluc.krt.profit.basetool.backend.identity.api.User();
+      holder.setId(UUID.randomUUID());
+      holder.setUsername("provision-" + UUID.randomUUID());
+      holder.setDisplayName("Provision holder");
+      holder = users.saveAndFlush(holder);
+      UUID locationId = UUID.randomUUID();
+      de.greluc.krt.profit.basetool.backend.support.TestPlaces.insertLocation(
+          jdbc, locationId, "Provision " + locationId);
+      jdbc.update("UPDATE location SET version = 0 WHERE id = ?", locationId);
+      var location = locations.findById(locationId).orElseThrow();
+      var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();
+      UUID rowId =
+          stockCommands.bookIntoPool(
+              holder.getId(),
+              order.getResponsibleOrgUnit(),
+              new de.greluc.krt.profit.basetool.backend.inventory.api.StockLot(
+                  materialRepository.getReferenceById(fixture.materialId()),
+                  null,
+                  location,
+                  650,
+                  false),
+              amount,
+              de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason.PURCHASE);
+      return new StockFixture(rowId, holder.getId());
+    });
   }
 
   @Test
@@ -261,9 +402,9 @@ class MaterialClaimIntegrationTest {
         });
 
     materialClaimService.upsertClaim(
-        s.orderId(), new CreateClaimDto(s.matA(), "GOOD", s.sqA(), 5.0));
+        s.orderId(), new CreateClaimDto(s.matA(), "GOOD", s.sqA(), 5.0, null));
     materialClaimService.upsertClaim(
-        s.orderId(), new CreateClaimDto(s.matB(), "GOOD", s.sqB(), 4.0));
+        s.orderId(), new CreateClaimDto(s.matB(), "GOOD", s.sqB(), 4.0, null));
     assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(s.orderId()))
         .hasSize(2);
 
@@ -290,6 +431,6 @@ class MaterialClaimIntegrationTest {
   }
 
   private CreateClaimDto claim(UUID materialId, UUID claimingOrgUnitId, double amount) {
-    return new CreateClaimDto(materialId, "GOOD", claimingOrgUnitId, amount);
+    return new CreateClaimDto(materialId, "GOOD", claimingOrgUnitId, amount, null);
   }
 }

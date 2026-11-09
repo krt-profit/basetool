@@ -64,7 +64,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * {@link InventoryJobOrderAllocation} and mission slices, summing per target and OR-combining the
  * delivered marker.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryStockMergeTest {
 
   @BeforeEach

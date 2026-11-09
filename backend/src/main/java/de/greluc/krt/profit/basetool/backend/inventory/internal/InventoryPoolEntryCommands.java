@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
@@ -94,9 +95,11 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   public void lockLots(
       @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
-      @NotNull Collection<PoolRelocation> relocations) {
+      @NotNull Collection<PoolRelocation> relocations,
+      @NotNull Collection<OrderMaterialScope> requestedScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets) {
     orderWrites.lockEligibility();
-    lotLocks.lockLots(holderLots, entryIds, relocations);
+    lotLocks.lockLots(holderLots, entryIds, relocations, requestedScopes, allocationTargets);
   }
 
   @Override
@@ -104,6 +107,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   public @NotNull PoolOutcome bookIn(@NotNull PoolBookIn bookIn, boolean dryRun) {
     orderWrites.lockEligibility();
     StockLot lot = bookIn.lot();
+    orderWrites.lockBookIn(
+        bookIn.holder(), lot, bookIn.jobOrders().stream().map(PoolEarmark::targetId).toList());
     if (lot.stolen() && !inventoryProperties.stolenMarkingEnabled()) {
       return PoolOutcome.refused(PoolRefusal.STOLEN_MARKING_DISABLED);
     }
@@ -169,11 +174,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @NotNull CheckoutType type,
       @Nullable String terminal,
       @Nullable BigDecimal proceeds) {
+    orderWrites.lockRows(List.of(take.entryId()));
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, take.poolUnitId(), take.version());
     if (refusal == null) {
       refusal = checkTake(row, take);
@@ -214,11 +221,20 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   public @NotNull PoolOutcome move(@NotNull PoolMove move, boolean dryRun) {
     orderWrites.lockEligibility();
     PoolBookOut take = move.take();
+    orderWrites.lockTransformRows(
+        List.of(take.entryId()),
+        List.of(
+            new PoolRelocation(
+                take.entryId(),
+                move.targetHolder(),
+                move.targetLocation() == null ? null : move.targetLocation().getId(),
+                null)));
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, take.poolUnitId(), take.version());
     if (refusal != null) {
       return PoolOutcome.refused(refusal);
@@ -283,11 +299,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun) {
     orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(move.entryId()), List.of());
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(move.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, move.poolUnitId(), move.version());
     if (refusal != null) {
       return PoolOutcome.refused(refusal);
@@ -339,11 +357,13 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome setNote(@NotNull PoolNote note, boolean dryRun) {
     orderWrites.lockEligibility();
+    orderWrites.lockRows(List.of(note.entryId()));
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(note.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, note.poolUnitId(), note.version());
     if (refusal != null) {
       return PoolOutcome.refused(refusal);
@@ -373,11 +393,15 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     if (!inventoryProperties.stolenMarkingEnabled()) {
       return PoolOutcome.refused(PoolRefusal.STOLEN_MARKING_DISABLED);
     }
+    orderWrites.lockTransformRows(
+        List.of(stolen.entryId()),
+        List.of(new PoolRelocation(stolen.entryId(), null, null, stolen.stolen())));
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(stolen.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, stolen.poolUnitId(), stolen.version());
     if (refusal != null) {
       return PoolOutcome.refused(refusal);
@@ -428,11 +452,15 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun) {
     orderWrites.lockEligibility();
+    orderWrites.lockAllocation(
+        allocation.entryId(),
+        allocation.dimension() == EarmarkDimension.JOB_ORDER ? allocation.targetId() : null);
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(allocation.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
     InventoryItem row = locked.get();
+    orderWrites.validateRows(List.of(row.getId()));
     PoolRefusal refusal = checkEntry(row, allocation.poolUnitId(), allocation.version());
     if (refusal != null) {
       return PoolOutcome.refused(refusal);
@@ -467,7 +495,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
                 : InventoryAllocationDimension.MISSION,
             allocation.targetId(),
             allocation.amount(),
-            row.getVersion());
+            row.getVersion(),
+            null);
     itemService.writeAllocationForPool(row, write, allocation.change());
     return PoolOutcome.applied(
         List.of(new PoolEntryChange(before, stateOf(row))), StockChangeEffects.NONE);
@@ -649,6 +678,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
    */
   private @Nullable PoolRefusal checkBookInEarmarks(@NotNull PoolBookIn bookIn) {
     StockLot lot = bookIn.lot();
+    orderWrites.lockBookIn(
+        bookIn.holder(), lot, bookIn.jobOrders().stream().map(PoolEarmark::targetId).toList());
     if (lot.gameItem() != null && !bookIn.missions().isEmpty()) {
       return PoolRefusal.EARMARK_TARGET_INVALID;
     }
@@ -838,7 +869,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
         held(row),
         row.getVersion() == null ? 0L : row.getVersion(),
         InventoryAllocations.jobOrderEarmarks(row),
-        InventoryAllocations.missionEarmarks(row));
+        InventoryAllocations.missionEarmarks(row),
+        row.getQuantityProvenance());
   }
 
   /**
@@ -890,7 +922,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   private static @NotNull List<InventoryAllocationInput> inputs(
       @NotNull List<PoolEarmark> earmarks) {
     return earmarks.stream()
-        .map(earmark -> new InventoryAllocationInput(earmark.targetId(), earmark.amount()))
+        .map(earmark -> new InventoryAllocationInput(earmark.targetId(), earmark.amount(), null))
         .toList();
   }
 

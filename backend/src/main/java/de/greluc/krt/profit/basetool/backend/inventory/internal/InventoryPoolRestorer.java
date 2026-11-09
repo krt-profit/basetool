@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEntryState;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestore;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestoreResult;
@@ -128,6 +129,8 @@ class InventoryPoolRestorer {
     Set<UUID> ids = new TreeSet<>();
     restores.forEach(restore -> ids.add(restore.entryId()));
     Set<UUID> present = new TreeSet<>();
+    List<OrderMaterialScope> requestedScopes = new ArrayList<>();
+    Set<UUID> targetOrders = new TreeSet<>();
     List<InventoryItemRepository.RowLot> rows =
         ids.isEmpty() ? List.of() : inventoryRepository.findRowLots(ids);
     for (InventoryItemRepository.RowLot row : rows) {
@@ -146,12 +149,30 @@ class InventoryPoolRestorer {
       PoolEntryState target = restore.target();
       if (target != null) {
         keys.add(InventoryStockCommands.lotLockKey(target.holder(), target.lotKey()));
+        targetOrders.addAll(target.jobOrders().keySet());
+        ParsedLot targetLot = parse(target.lotKey());
+        if (targetLot != null && targetLot.materialId() != null) {
+          target
+              .jobOrders()
+              .keySet()
+              .forEach(order ->
+                  requestedScopes.add(new OrderMaterialScope(order, targetLot.materialId())));
+        }
       }
     }
+    Set<UUID> affected = new TreeSet<>(ids);
+    lots.forEach((holder, lotKeys) -> {
+      if (!lotKeys.isEmpty()) {
+        affected.addAll(inventoryRepository.findRowsInHolderLots(holder, lotKeys));
+      }
+    });
+    orderWrites.assertOrders(targetOrders);
+    orderWrites.lockRowsAndTargets(affected, requestedScopes, List.of());
     InventoryStockCommands.lockInOrder(inventoryRepository, keys);
     if (!present.isEmpty()) {
       inventoryRepository.lockAllByIdOrderById(present);
     }
+    orderWrites.validateRows(ids);
   }
 
   /**
@@ -230,7 +251,8 @@ class InventoryPoolRestorer {
         && left.lotKey().equals(right.lotKey())
         && Math.abs(left.amount() - right.amount()) <= EPSILON
         && sameAmounts(left.jobOrders(), right.jobOrders())
-        && sameAmounts(left.missions(), right.missions());
+        && sameAmounts(left.missions(), right.missions())
+        && left.quantityProvenance().equals(right.quantityProvenance());
   }
 
   /**
@@ -369,6 +391,7 @@ class InventoryPoolRestorer {
         inventoryRepository
             .findById(target.id())
             .orElseThrow(() -> new IllegalStateException("The recreated entry is missing"));
+    row.replaceQuantityProvenance(target.quantityProvenance());
     syncEarmarks(row, target);
     orderWrites.assertRow(row);
     inventoryRepository.saveAndFlush(row);
@@ -398,6 +421,7 @@ class InventoryPoolRestorer {
     row.setQuality(resolved.quality());
     row.setStolen(resolved.stolen());
     row.setAmount(amount);
+    row.replaceQuantityProvenance(target.quantityProvenance());
     syncEarmarks(row, target);
     orderWrites.assertRow(row);
     inventoryRepository.saveAndFlush(row);

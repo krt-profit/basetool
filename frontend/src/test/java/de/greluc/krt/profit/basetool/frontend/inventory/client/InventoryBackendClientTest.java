@@ -459,7 +459,8 @@ class InventoryBackendClientTest {
       backend.answerJson("{}");
     }
     InventoryAllocationWriteDto allocation =
-        new InventoryAllocationWriteDto(InventoryAllocationDimension.JOB_ORDER, JOB_ORDER, 2.5, 7L);
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, JOB_ORDER, 2.5, 7L, null);
 
     client.addAllocation(ID, allocation);
     client.changeAllocation(ID, allocation);
@@ -468,7 +469,9 @@ class InventoryBackendClientTest {
     client.updateDelivered(ID, new UpdateDeliveredRequest(true, JOB_ORDER, 2L));
 
     String allocationBody =
-        "{\"field\":\"JOB_ORDER\",\"targetId\":\"" + JOB_ORDER + "\",\"amount\":2.5,\"version\":7}";
+        "{\"field\":\"JOB_ORDER\",\"targetId\":\""
+            + JOB_ORDER
+            + "\",\"amount\":2.5,\"version\":7,\"provision\":null}";
     String path = "/api/v1/inventory/" + ID;
     backend.expect("POST", path + "/allocation", allocationBody);
     backend.expect("PATCH", path + "/allocation", allocationBody);

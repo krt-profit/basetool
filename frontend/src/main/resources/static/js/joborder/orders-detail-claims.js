@@ -45,6 +45,7 @@ import { krtModal } from '/js/kernel/krt-modal.js';
  * @property {string} [claimId] the claim being edited
  * @property {string} [squadronId] the claiming squadron of the claim being edited
  * @property {string} [amount] the claimed amount of the claim being edited
+ * @property {string} [version] the observed version of the claim being edited
  * @property {boolean} edit whether an existing claim is edited
  */
 
@@ -57,6 +58,7 @@ function _openClaimModal(opts) {
     _odControlById('claim-material-id').value = opts.materialId || '';
     _odControlById('claim-quality').value = opts.quality || '';
     _odControlById('claim-id').value = opts.claimId || '';
+    _odControlById('claim-version').value = opts.version || '';
     const sel = _odControlById('claim-squadron');
     const amountInput = _odControlById('claim-amount');
     const open = parseFloat(opts.open || '0') || 0;
@@ -119,6 +121,7 @@ export function openClaimEdit(el) {
         claimId: el.dataset.claimId,
         squadronId: el.dataset.squadronId,
         amount: el.dataset.amount,
+        version: el.dataset.version,
         edit: true,
     });
 }
@@ -152,6 +155,8 @@ export function submitClaim() {
             materialId,
             qualityRequirement: quality,
             claimingOrgUnitId: squadronId,
+            version: _odControlById('claim-version').value
+                ? Number(_odControlById('claim-version').value) : null,
             amount,
         },
         toast: false,

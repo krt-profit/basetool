@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,117 @@ interface InventoryOrderAllocationQueries extends Repository<InventoryItem, UUID
       "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a WHERE a.inventoryItem.id IN"
           + " :rowIds")
   List<UUID> findAllocatedOrderIds(@Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Resolves the cross-quality capacity scopes of the affected stock entries in one query.
+   *
+   * @param rowIds the entries about to change
+   * @return distinct order and material scopes
+   */
+  @Query(
+      """
+      SELECT DISTINCT new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+          a.jobOrderId, a.inventoryItem.material.id)
+      FROM InventoryJobOrderAllocation a WHERE a.inventoryItem.id IN :rowIds
+        AND a.inventoryItem.material IS NOT NULL
+      """)
+  List<OrderMaterialScope> findAllocatedMaterialScopes(@Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Reads all material scopes on rows also earmarked to any selected order.
+   *
+   * @param orderIds orders whose linked physical rows may change
+   * @return all current neighboring capacity scopes
+   */
+  @Query(
+      """
+      SELECT DISTINCT new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+          a.jobOrderId, i.material.id)
+      FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i
+      WHERE i.material IS NOT NULL AND EXISTS (
+          SELECT b.id FROM InventoryJobOrderAllocation b
+          WHERE b.inventoryItem = i AND b.jobOrderId IN :orderIds)
+      """)
+  List<OrderMaterialScope> findMaterialScopesSharingRowsWithOrders(
+      @Param("orderIds") Collection<UUID> orderIds);
+
+  /** One current job-order slice used to validate a stock write plan. */
+  interface OrderAllocationFact {
+    /**
+     * Returns the physical stock row.
+     *
+     * @return the row identity
+     */
+    UUID getRowId();
+
+    /**
+     * Returns the allocated job order.
+     *
+     * @return the target order identity
+     */
+    UUID getOrderId();
+
+    /**
+     * Returns the current allocation quantity.
+     *
+     * @return the earmarked amount
+     */
+    Double getAmount();
+  }
+
+  /**
+   * Reads current allocation quantities independently of the managed persistence context.
+   *
+   * @param rowIds the physical rows
+   * @return their current job-order slices
+   */
+  @Query(
+      """
+      SELECT a.inventoryItem.id AS rowId, a.jobOrderId AS orderId, a.amount AS amount
+      FROM InventoryJobOrderAllocation a WHERE a.inventoryItem.id IN :rowIds
+      """)
+  List<OrderAllocationFact> findOrderAllocationFacts(@Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Reads the stock rows of holder lots before acquiring their advisory locks.
+   *
+   * @param holder the stock holder
+   * @param lotKeys the affected lot keys
+   * @return the current row identities
+   */
+  @Query(
+      value =
+          """
+          SELECT i.id FROM inventory_item i WHERE i.user_id = :holder
+            AND exchange_stock_lot_key(i.material_id, i.game_item_id, i.location_id,
+                                       i.quality, i.stolen) IN (:lotKeys)
+          ORDER BY i.id
+          """,
+      nativeQuery = true)
+  List<UUID> findRowsInHolderLots(
+      @Param("holder") UUID holder, @Param("lotKeys") Collection<String> lotKeys);
+
+  /**
+   * Resolves material scopes removed by a scoped nonpersonal wipe before any stock row lock.
+   *
+   * @param adminAll whether all shared rows are in scope
+   * @param activeUnit the pinned unit
+   * @param memberUnits the caller's scoped units
+   * @return the affected cross-quality scopes
+   */
+  @Query(
+      """
+      SELECT DISTINCT new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+          a.jobOrderId, i.material.id)
+      FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i
+      WHERE i.material IS NOT NULL AND i.personal = false
+        AND (:adminAll = true OR (:activeUnit IS NOT NULL AND i.owningOrgUnit.id = :activeUnit)
+          OR (:activeUnit IS NULL AND i.owningOrgUnit.id IN :memberUnits))
+      """)
+  List<OrderMaterialScope> findAllocatedMaterialScopesInWipeScope(
+      @Param("adminAll") boolean adminAll,
+      @Param("activeUnit") @Nullable UUID activeUnit,
+      @Param("memberUnits") Collection<UUID> memberUnits);
 
   /**
    * Resolves the order slices removed by a scoped nonpersonal wipe.

@@ -1086,6 +1086,36 @@ public interface InventoryItemRepository
      * @return whether the row is marked stolen
      */
     Boolean getStolen();
+
+    /**
+     * Returns the physical row personal marker.
+     *
+     * @return whether the stock is personal
+     */
+    Boolean getPersonal();
+
+    /**
+     * Returns the owning pool of the stock.
+     *
+     * @return the pool identity, or null for unassigned stock
+     */
+    @Nullable
+    UUID getOwningOrgUnitId();
+
+    /**
+     * Returns the physical stock quantity.
+     *
+     * @return the row amount
+     */
+    Double getAmount();
+
+    /**
+     * Returns the current physical row version.
+     *
+     * @return the row version
+     */
+    @Nullable
+    Long getVersion();
   }
 
   /**
@@ -1098,9 +1128,10 @@ public interface InventoryItemRepository
   @Query(
       """
       SELECT i.id AS id, u.id AS holderId, m.id AS materialId, g.id AS gameItemId,
-             l.id AS locationId, i.quality AS quality, i.stolen AS stolen
+             l.id AS locationId, i.quality AS quality, i.stolen AS stolen,
+             i.personal AS personal, o.id AS owningOrgUnitId, i.amount AS amount, i.version AS version
         FROM InventoryItem i JOIN i.user u JOIN i.location l
-        LEFT JOIN i.material m LEFT JOIN i.gameItem g
+        LEFT JOIN i.material m LEFT JOIN i.gameItem g LEFT JOIN i.owningOrgUnit o
        WHERE i.id IN :ids
       """)
   List<RowLot> findRowLots(@Param("ids") Collection<UUID> ids);

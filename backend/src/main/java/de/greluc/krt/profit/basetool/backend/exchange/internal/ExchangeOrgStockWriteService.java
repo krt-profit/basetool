@@ -33,10 +33,12 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookIn;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookOut;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolChange;
@@ -53,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -808,17 +809,13 @@ public class ExchangeOrgStockWriteService
    * @param plan the plan
    */
   private void lock(@NotNull List<Planned<PoolWrite>> plan) {
-    Locks locks = new Locks(new HashMap<>(), new HashSet<>(), new ArrayList<>());
+    List<ExchangeOrgStockLocks.Contributor> contributors = new ArrayList<>();
     for (Planned<PoolWrite> planned : plan) {
       if (planned instanceof Write<PoolWrite>(PoolWrite write)) {
-        write.lockInto(locks);
+        contributors.add(write);
       }
     }
-    if (!locks.holderLots().isEmpty()
-        || !locks.entries().isEmpty()
-        || !locks.relocations().isEmpty()) {
-      poolEntryCommands.lockLots(locks.holderLots(), locks.entries(), locks.relocations());
-    }
+    ExchangeOrgStockLocks.lock(poolEntryCommands, contributors);
   }
 
   /**
@@ -935,14 +932,8 @@ public class ExchangeOrgStockWriteService
   }
 
   /** An op the Lager decides: what it locks, runs and journals. */
-  sealed interface PoolWrite permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
-
-    /**
-     * Adds the lots and entries this op touches to the batch's locks.
-     *
-     * @param locks the batch's locks
-     */
-    void lockInto(@NotNull Locks locks);
+  sealed interface PoolWrite extends ExchangeOrgStockLocks.Contributor
+      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
 
     /**
      * Hands this op to the Lager.
@@ -973,18 +964,6 @@ public class ExchangeOrgStockWriteService
   }
 
   /**
-   * The lots, entries and relocations a batch locks before any op runs (ADR-0229).
-   *
-   * @param holderLots the lots the book-ins book into, by holder
-   * @param entries the entries the ops write
-   * @param relocations the lots moves and markings land in
-   */
-  record Locks(
-      @NotNull Map<UUID, List<StockLot>> holderLots,
-      @NotNull Set<UUID> entries,
-      @NotNull List<PoolRelocation> relocations) {}
-
-  /**
    * A book-in the Lager decides.
    *
    * @param request the book-in
@@ -992,11 +971,21 @@ public class ExchangeOrgStockWriteService
   private record BookIn(@NotNull PoolBookIn request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks
           .holderLots()
           .computeIfAbsent(request.holder(), _ -> new ArrayList<>())
           .add(request.lot());
+      if (request.lot().material() != null) {
+        request
+            .jobOrders()
+            .forEach(target ->
+                locks
+                    .requestedScopes()
+                    .add(
+                        new OrderMaterialScope(
+                            target.targetId(), request.lot().material().getId())));
+      }
     }
 
     @Override
@@ -1023,7 +1012,7 @@ public class ExchangeOrgStockWriteService
   private record BookOut(@NotNull PoolBookOut request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -1051,7 +1040,7 @@ public class ExchangeOrgStockWriteService
   private record Sell(@NotNull PoolSale request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.take().entryId());
     }
 
@@ -1081,7 +1070,7 @@ public class ExchangeOrgStockWriteService
       implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks
           .relocations()
           .add(
@@ -1113,7 +1102,7 @@ public class ExchangeOrgStockWriteService
   private record Note(@NotNull PoolNote request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -1141,7 +1130,7 @@ public class ExchangeOrgStockWriteService
   private record MovePool(@NotNull PoolChange request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -1169,7 +1158,7 @@ public class ExchangeOrgStockWriteService
   private record Stolen(@NotNull PoolStolen request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.relocations().add(new PoolRelocation(request.entryId(), null, null, request.stolen()));
     }
 
@@ -1197,8 +1186,13 @@ public class ExchangeOrgStockWriteService
   private record Allocate(@NotNull PoolAllocation request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
+      if (request.dimension() == EarmarkDimension.JOB_ORDER) {
+        locks
+            .allocationTargets()
+            .add(new PoolAllocationTarget(request.entryId(), request.targetId()));
+      }
     }
 
     @Override
