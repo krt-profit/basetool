@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -37,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -71,6 +74,7 @@ class StockRowViewCharacterisationTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private SquadronRepository squadronRepository;
+  @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private MissionRepository missionRepository;
@@ -90,6 +94,8 @@ class StockRowViewCharacterisationTest {
     owner.setUsername("row-view-" + UUID.randomUUID());
     userRepository.saveAndFlush(owner);
     unit = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    withinProfit(unit, persistedProfitArea(orgUnitRepository));
+    unit = squadronRepository.saveAndFlush(unit);
     material = new Material();
     material.setName("row-view-" + UUID.randomUUID());
     material.setType(MaterialType.RAW);

@@ -618,7 +618,7 @@ grep -n '\${' /etc/basetool/monitoring/secrets/alertmanager.yml.new | grep -v '^
 chown "$(own 65534):$(own 65534)" /etc/basetool/monitoring/secrets/alertmanager.yml.new
 chmod 600 /etc/basetool/monitoring/secrets/alertmanager.yml.new
 ${PODMAN} run --rm -v /etc/basetool/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
-  --entrypoint amtool quay.io/prometheus/alertmanager:v0.34.2 check-config /cfg.yml
+  --entrypoint amtool quay.io/prometheus/alertmanager:v0.35.0 check-config /cfg.yml
 mv /etc/basetool/monitoring/secrets/alertmanager.yml.new /etc/basetool/monitoring/secrets/alertmanager.yml
 restorecon -F /etc/basetool/monitoring/secrets/alertmanager.yml
 ${SYSTEMCTL} restart alertmanager.service       # a single-file mount: restart, never reload
@@ -955,7 +955,7 @@ docker run --rm --entrypoint promtool \
 scripts/check-loki-rules.sh
 
 # Alertmanager — check a RENDERED alertmanager.yml, not the .tmpl, from the directory holding it.
-docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.34.2 \
+docker run --rm --entrypoint amtool -v "$PWD:/cfg" quay.io/prometheus/alertmanager:v0.35.0 \
   check-config /cfg/alertmanager.yml
 
 # Blackbox — no `check-config` subcommand, so start it on the config and assert it logs

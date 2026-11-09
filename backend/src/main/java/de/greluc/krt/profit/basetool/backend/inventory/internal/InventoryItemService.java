@@ -532,7 +532,6 @@ public class InventoryItemService {
       boolean personal,
       boolean stolen,
       UUID owningOrgUnitId) {
-    orderWrites.lockEligibility();
     UUID targetUserId = userId != null ? userId : currentUserId;
     boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
     if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {

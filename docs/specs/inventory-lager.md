@@ -426,7 +426,9 @@ row to merge with exists, asking `GET /api/v1/inventory/merge-candidates` (relay
 exactly as the create does (auto-stamp, active-context pin), counts with the merge key and offer
 exclusion below, takes no lock, answers `false` where the booking itself would be refused, and
 needs the on-behalf scope of REQ-SEC-005 to probe another member. Hiding the checkbox unticks it; a
-probe that fails shows it, so the opt-in is never lost to an outage.
+probe that fails shows it, so the opt-in is never lost to an outage. This read remains usable outside
+a stock-write transaction and does not acquire the order-write prerequisite; the public endpoint is
+covered by `InventoryJobOrderScopeIntegrationTest.mergePreviewAnswersBeforeAnyStockBooking`.
 
 The **merge identity** is the **physical** stack key (Variante C, REQ-INV-027): owner · material ·
 location · quality · `personal` · owning org-unit pool (a `NULL` pool matches `NULL`) · `stolen`;

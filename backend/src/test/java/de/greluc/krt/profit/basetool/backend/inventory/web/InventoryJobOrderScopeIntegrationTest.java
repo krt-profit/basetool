@@ -154,6 +154,19 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   @Test
+  void mergePreviewAnswersBeforeAnyStockBooking() throws Exception {
+    mockMvc
+        .perform(
+            get(PATH + "/merge-candidates")
+                .with(asMember())
+                .param("materialId", material.getId().toString())
+                .param("locationId", location.getId().toString())
+                .param("quality", Integer.toString(QUALITY)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").value(false));
+  }
+
+  @Test
   void createRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
     JobOrder foreignOrder = openJobOrderNeeding(foreign);
 
