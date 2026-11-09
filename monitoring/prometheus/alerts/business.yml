@@ -549,11 +549,11 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "A new account was activated as admin without an approval"
+          summary: "An account earned Admin at login as a bootstrap subject"
           description: >-
-            A brand-new account earned Admin at its first login as a bootstrap subject of
-            APP_BOOTSTRAP_ADMIN_SUBS and was activated without passing the approval queue
-            (REQ-SEC-017, REQ-SEC-088). Expected for the first admin and for a deliberate emergency
+            An account, new or existing, earned Admin at login as a bootstrap subject of
+            APP_BOOTSTRAP_ADMIN_SUBS, without an admin's decision and, for a registration,
+            without passing the approval queue (REQ-SEC-017, REQ-SEC-088). Expected for the first admin and for a deliberate emergency
             access; otherwise remove the subject from APP_BOOTSTRAP_ADMIN_SUBS and check
             Administration -> Protokoll (Rollen tab) for the bootstrap grant.
 

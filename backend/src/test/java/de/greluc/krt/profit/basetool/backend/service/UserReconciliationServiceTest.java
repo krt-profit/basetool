@@ -955,6 +955,21 @@ class UserReconciliationServiceTest {
       verify(roleChangeRecorder).bootstrapGranted(member);
     }
 
+    /** The emergency grant to an account that already exists is counted like a new one. */
+    @Test
+    void anEmergencyGrantToAnExistingAccountIsCounted() {
+      bootstrapSubjects.add(USER_ID);
+      when(roleRepository.lockByCode("ADMIN")).thenReturn(Optional.of(admin));
+      when(userRepository.countOtherActiveHolders("ADMIN", USER_ID)).thenReturn(0L);
+
+      loginOfAnExistingMember();
+
+      assertEquals(
+          1.0,
+          meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
+          "AdminAccountAutoActivated must fire for the usual emergency grant too");
+    }
+
     @Test
     void aBootstrapSubjectReceivesNothingWhileAnotherActiveAdminExists() {
       bootstrapSubjects.add(USER_ID);

@@ -159,7 +159,7 @@ public class UserReconciliationService {
       user.setApprovedAt(Instant.now());
       changed = true;
     }
-    if (created && isAdmin) {
+    if (bootstrapAdmin) {
       meterRegistry.counter(IdentityMetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 

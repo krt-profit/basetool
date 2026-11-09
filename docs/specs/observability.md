@@ -1688,12 +1688,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
   the account id the Keycloak console needs (added 2026-09-17).
 - `basetool_admin_registration_auto_activated_total` counter (untagged,
-  `UserReconciliationService`, the login path) counts a brand-new row that is `ACTIVE` on
-  arrival because a bootstrap subject earned Admin at its first login (REQ-SEC-088) — the REQ-SEC-017
-  bootstrap carve-out, which is the one way an account gains full authority with no admin
-  decision behind it and which used to leave no trace. Counted on whichever path inserts the
-  row (`created` is true exactly once per account); the roster sync creates no admin, because it
-  writes no role. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
+  `UserReconciliationService`, the login path) counts every bootstrap Admin grant at login
+  (REQ-SEC-088), to a brand-new row as to an existing account — the REQ-SEC-017 bootstrap
+  carve-out, which is the one way an account gains full authority with no admin decision behind
+  it. The roster sync grants nothing, because it writes no role. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
 - `basetool_user_role_changes_total{role,action}` counter (`RoleChangeRecorder`, `role` bounded by the
