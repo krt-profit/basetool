@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -106,7 +107,7 @@ class BankBookingRequestServiceTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
-  @Mock private BankRequestClientNames clientNames;
+  @Mock private ClientDirectory clientDirectory;
 
   private BankAccessRules policy;
   private BankBookingRequestService service;
@@ -135,7 +136,7 @@ class BankBookingRequestServiceTest {
             orgUnitMembershipQueryService,
             eventPublisher,
             purposeObservers,
-            clientNames);
+            new BankRequestClientNames(clientDirectory));
   }
 
   @Test

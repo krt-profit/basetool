@@ -56,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -291,10 +292,7 @@ public class BankBookingRequestService {
       @NotNull Set<BankBookingRequestStatus> statuses, @NotNull Pageable pageable) {
     return authHelperService
         .currentUserId()
-        .map(sub ->
-            requestRepository
-                .findByRequestedByAndStatusIn(sub, statuses, pageable)
-                .map(this::toDto))
+        .map(sub -> toDtos(requestRepository.findByRequestedByAndStatusIn(sub, statuses, pageable)))
         .orElseGet(() -> Page.empty(pageable));
   }
 
@@ -463,12 +461,15 @@ public class BankBookingRequestService {
     if (scope.candidateAccountIds().isEmpty()) {
       return List.of();
     }
-    return requestRepository
-        .findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds())
-        .stream()
-        .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
-        .filter(request -> scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
-        .map(this::toDto)
+    List<BankBookingRequest> shown =
+        requestRepository.findByAccountIdInOrderByCreatedAtDesc(scope.candidateAccountIds()).stream()
+            .filter(request -> !scope.rights().boundByFourEyes(request.getRequestedBy()))
+            .filter(request ->
+                scope.shows(request.getRequiredApprover(), request.getAccount().getId()))
+            .toList();
+    Function<BankBookingRequest, String> names = clientNames.forRequests(shown);
+    return shown.stream()
+        .map(request -> BankBookingRequestDtos.of(request, names.apply(request), null))
         .toList();
   }
 
@@ -581,12 +582,13 @@ public class BankBookingRequestService {
       return Page.empty(pageable);
     }
     BankStaffRights rights = staffRights();
-    return pageQueue(statuses, pageable, rights)
-        .map(request ->
-            BankBookingRequestDtos.of(
-                request,
-                clientNames.nameOf(request),
-                BankBookingRequestDtos.callerMayConfirm(request, rights)));
+    Page<BankBookingRequest> page = pageQueue(statuses, pageable, rights);
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request ->
+        BankBookingRequestDtos.of(
+            request,
+            names.apply(request),
+            BankBookingRequestDtos.callerMayConfirm(request, rights)));
   }
 
   /**
@@ -991,6 +993,19 @@ public class BankBookingRequestService {
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
     return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
+  }
+
+  /**
+   * Maps a page of request entities as {@link #toDto(BankBookingRequest)} does, naming every
+   * row's client from one registry read.
+   *
+   * @param page the page of request entities
+   * @return the page of wire DTOs
+   */
+  @NotNull
+  private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
+    Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
+    return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
   }
 
   /**
