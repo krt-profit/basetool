@@ -55,7 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 class BankRequestPageControllerMvcTest {
 
   private static final UUID ID = UUID.fromString("7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d");
-  private static final String URI = "/api/v1/bank/org-units/requests/" + ID;
+  private static final String URI = "/api/v1/bank/org-units/requests/{id}";
 
   @Autowired private WebApplicationContext context;
   private MockMvc mockMvc;
@@ -132,7 +132,8 @@ class BankRequestPageControllerMvcTest {
    * @param view the backend's answer, or {@code null}
    */
   private void stub(BankBookingRequestViewDto view) {
-    when(backendApiClient.get(eq(URI), eq(BankBookingRequestViewDto.class))).thenReturn(view);
+    when(backendApiClient.get(eq(URI), eq(BankBookingRequestViewDto.class), eq(ID)))
+        .thenReturn(view);
   }
 
   /**
