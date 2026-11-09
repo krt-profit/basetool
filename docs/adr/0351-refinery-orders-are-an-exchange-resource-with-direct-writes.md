@@ -47,11 +47,15 @@ store rule (`BookInPolicy.mayBookInFor`, REQ-SEC-039) cannot answer on one.
    `update`, `good-add`, `good-update`, `good-remove`, `pickup`, `cancel` and `delete`, run through
    the shared runner (ADR-0285) and decided in order with one result per op. Cancel and delete are
    ops, not `DELETE` routes. An op names its order by `id` or by the client's own `clientKey`.
-   References resolve exactly, never fuzzily, because no member reviews the write.
+   References resolve exactly, never fuzzily, because no member reviews the write. An order keeps at
+   least one good, as the web's form requires: a create without goods and a removal of the last good
+   are refused `GOODS_REQUIRED`. A set locks every order it names up front, in ascending id order,
+   and never an order of another member.
 5. **Client key and client marker.** A `create` carries a `clientKey`, unique per owner and client;
-   a second create with a known key is refused `ALREADY_EXISTS` and names the existing order. The
-   order records the client that created it and the source and time of its last change, and the web
-   shows the client's name as a chip, generically for every approved client.
+   a second create with a known key is refused `ALREADY_EXISTS` and names the existing order;
+   concurrent creates under one key are serialised by a transaction lock on member, client and key.
+   The order records the client that created it and the source and time of its last change, and the
+   web shows the client's name as a chip, generically for every approved client.
 6. **Two section counters.** An order's optimistic lock splits into **game data** (location, method,
    timer, status, goods) and **finances** (`expenses`, `otherExpenses`, `oreSales`). An exchange op
    echoes the counter of each section it touches, the web's edit form uses the same counters, and a
@@ -63,7 +67,8 @@ store rule (`BookInPolicy.mayBookInFor`, REQ-SEC-039) cannot answer on one.
    stores exactly as the web's store dialog does, all or nothing, and sets `storedAt`. Store lines
    need `exchange.refinery.store`; their receivers and org units are decided from the database
    (REQ-SEC-039, as ADR-0257 decides the org stock), and their job orders are those the member can
-   see.
+   see under the reduced exchange authorities, also when the member confirms a held set in the
+   browser. A completed order takes no store lines, as the web's store refuses it.
 8. **Hard delete through the API only.** A `delete` removes an own order without `storedAt`, its
    goods with it, and leaves booked stock untouched; it is audited as `REFINERY_ORDER_DELETED`. The
    web keeps cancel as its only removal.

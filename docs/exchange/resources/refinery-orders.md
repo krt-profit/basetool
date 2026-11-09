@@ -102,16 +102,17 @@ pages update at once, and a changed timer re-arms the ready notice as a web edit
 
 | Op | Fields | Does |
 | --- | --- | --- |
-| `create` | `clientKey`, `orgUnit`, `location`, optional `method`, `status`, `endsAt`, `durationMinutes`, `expenses`, `otherExpenses`, `oreSales`, `goods` | Creates an order owned by the member, with your client as its creator. |
+| `create` | `clientKey`, `orgUnit`, `location`, `goods` (at least one), optional `method`, `status`, `endsAt`, `durationMinutes`, `expenses`, `otherExpenses`, `oreSales` | Creates an order owned by the member, with your client as its creator. |
 | `update` | `id` or `clientKey`, `versions`, and any of `location`, `method`, `status`, `endsAt`, `durationMinutes`, `expenses`, `otherExpenses`, `oreSales` | Changes the fields it carries and leaves every absent field as it is. |
 | `good-add` | `id` or `clientKey`, `versions`, `good` | Adds one good; the result names the new row's id. |
 | `good-update` | `id` or `clientKey`, `versions`, `goodId`, and any of `input`, `inputQuantity`, `outputQuantity`, `quality` | Changes the fields of one good it carries. |
-| `good-remove` | `id` or `clientKey`, `versions`, `goodId` | Removes one good. |
-| `cancel` | `id` or `clientKey`, `versions` with `gameData` | Cancels the order as the web does, stored or not; a cancelled order is `unchanged`. |
+| `good-remove` | `id` or `clientKey`, `versions`, `goodId` | Removes one good; the order's last good stays (`GOODS_REQUIRED`). |
+| `cancel` | `id` or `clientKey`, `versions` with `gameData` | Cancels the order as the web does, stored or not; a cancelled order is `unchanged`, whatever counter you echo. |
 | `delete` | `id` or `clientKey`, `versions` with `gameData` and `finances` | Removes an order that is not stored, with its goods; a stored one is `ORDER_STORED`. |
 | `pickup` | `id` or `clientKey`, `versions`, optional `lines` | Reports the yield collected in the game: the order becomes `COMPLETED` with `pickedUpAt`. Without `lines` nothing is booked into stock; with them the yield is [stored](#store-lines). |
 
-Every op may carry an `opId` of your own, echoed in its result.
+Every op may carry an `opId` of your own, echoed in its result. A field the table does not list for
+an op is ignored: the server reports it as an `UNKNOWN_FIELD` warning and the op runs without it.
 
 ### Fields
 
@@ -120,7 +121,10 @@ Every op may carry an `opId` of your own, echoed in its result.
   once. An order of another owner, and a key another client set, are `ORDER_UNKNOWN`.
 - **Client key.** A `create` carries a `clientKey` of 1 to 128 characters, unique per member and
   client. A `create` whose key already names an order of the member is `rejected` as
-  `ALREADY_EXISTS`, and its result carries that order's `id`: adopt it, nothing is overwritten.
+  `ALREADY_EXISTS`, and outside a dry run its result carries that order's `id`: adopt it, nothing
+  is overwritten. Two creates under one key that arrive at once, from two installations or a retry,
+  are decided one after the other, so the second finds the first's order. A second `create` under
+  the key of a `create` the same set refused is `PRECEDING_OP_REJECTED`.
 - **Org unit.** `orgUnit` is `{id}` of one of the units
   [`GET /exchange/v1/me/org-units`](org-units.md) returns; another unit is `NOT_A_MEMBER`. The
   server never picks one. After the create, the owning unit and the mission link change only in
@@ -135,20 +139,26 @@ Every op may carry an `opId` of your own, echoed in its result.
 - **Pickup.** A `pickup` closes an `OPEN` or `IN_PROGRESS` order, also before its `endsAt`,
   because the game is the truth. The order becomes `COMPLETED`, the feed shows `pickedUpAt`, and
   the web shows it as picked up with your client's name. Nothing is booked into stock: send it
-  when your own stock sync books the goods. An order already `COMPLETED` is `unchanged`, so a
-  repeated pickup is harmless; a cancelled one is `ORDER_CANCELED`. The member may still change
-  the status in the web afterwards, unless the pickup carried store lines.
-- **Timer.** `endsAt` is RFC 3339 in UTC; `durationMinutes` needs `endsAt`. With both, the server
-  stores `startedAt = endsAt - durationMinutes`. Without a duration the run starts at the time of
-  the write, and `durationMinutes` is the rest until `endsAt`, rounded up to whole minutes, so
-  `endsAt` stays as sent.
+  when your own stock sync books the goods. Without store lines an order already `COMPLETED` is
+  `unchanged`, so a repeated pickup is harmless; a cancelled one is `ORDER_CANCELED`. The status
+  is decided before the counter, so a pickup or `cancel` you resend with the counter you first
+  echoed answers as the first one left the order. The member may still change the status in the web
+  afterwards, unless the pickup carried store lines.
+- **Timer.** `endsAt` is RFC 3339 in UTC, kept to the microsecond; `durationMinutes`, 0 to 525600
+  (one year), needs `endsAt`. With both, the server stores
+  `startedAt = endsAt - durationMinutes`. Without a duration the run starts at the time of the
+  write, and `durationMinutes` is the rest until `endsAt`, rounded up to whole minutes, so `endsAt`
+  stays as sent.
 - **Money.** `expenses`, `otherExpenses` and `oreSales` in aUEC, from 0 to 1000000000; 0 clears
   the value.
 - **Goods.** A good is `{input, inputQuantity, outputQuantity, quality}`. `input` is an
   [item reference](../formats.md#item-reference--item-ref) to a raw material, resolved exactly:
   one that is not raw is `MATERIAL_NOT_RAW`. The output material follows from the input as in the
   web. Quantities are whole units, 100 to the SCU. `good-update` and `good-remove` name a row by
-  its `goodId` from the feed or a result; a row of another order is `GOOD_UNKNOWN`.
+  its `goodId` from the feed or a result; a row of another order is `GOOD_UNKNOWN`. A good the
+  order holds stays writable while you leave its `input` as it is, also when that material is no
+  longer raw. An order always keeps at least one good: a `create` without goods and a
+  `good-remove` of the last one are `GOODS_REQUIRED`.
 
 Nothing is matched fuzzily, because no member reviews a direct write: a reference that matches
 nothing is `unmatched`, one that matches several `ambiguous`. Resolve doubtful names with
@@ -160,8 +170,10 @@ A `pickup` may carry `lines`, 1 to 100, to book the yield into stock as the web'
 does. A change set holding such a pickup needs `exchange.refinery.store` beside
 `exchange.refinery.write`; without it the whole set is `403 SCOPE_MISSING` and nothing runs. The
 order is stored exactly once: `storedAt` is set, its status is locked from then on, and each line
-becomes a stock row of its receiver. **All or nothing**: when one line is refused, the whole op is
-refused with that line's reason and nothing is booked.
+becomes a stock row of its receiver; the amounts of the lines on one good, summed, become that
+good's `outputQuantity`. A completed order takes no store lines: its yield counts as handled, as
+in the web (`ORDER_STORED`). **All or nothing**: when one line is refused, the whole op is refused
+with that line's reason and nothing is booked.
 
 A line is `{material, location, quality, quantity}` with optional `receiver`, `orgUnit`,
 `personal`, `jobOrder` and `note`:
@@ -205,10 +217,13 @@ failed.
 ### The result
 
 The change result lists every op that was not applied in `results[]`, with its
-[reason](../errors.md#per-op-reasons-in-a-change-result). For an applied op, outside a dry run,
-`orders[]` carries one entry: its `index` and `opId`, the order's `id`, the ids of the goods rows
-it created in `goods`, absent when it created none, and the order's `versions` after the op. Keep
-them, and write on without reading the feed first.
+[reason](../errors.md#per-op-reasons-in-a-change-result). For an applied op but a `delete`, outside
+a dry run, `orders[]` carries one entry: its `index` and `opId`, the order's `id`, the ids of the
+goods rows it created in `goods`, absent when it created none, and the order's `versions` after
+the op. A `create` lists its new rows in the order of its `goods`, so the first id is the first
+good you sent. Keep them, and write on without reading the feed first. An applied `delete` is
+counted in `applied` and has no entry anywhere, since its order is gone; a set whose only applied
+ops are deletes therefore has no `orders`.
 
 ```json
 {
@@ -241,10 +256,11 @@ them, and write on without reading the feed first.
 | `create` naming a unit the member is not a direct member of | `rejected` | `NOT_A_MEMBER` |
 | An `id` that names no order of the member, or a `clientKey` your client never set | `rejected` | `ORDER_UNKNOWN` |
 | A `goodId` that names no good of the order | `rejected` | `GOOD_UNKNOWN` |
-| `create` with a `clientKey` the member's orders already carry; `id` names the order | `rejected` | `ALREADY_EXISTS` |
+| `create` with a `clientKey` the member's orders already carry; outside a dry run `id` names the order | `rejected` | `ALREADY_EXISTS` |
+| `create` without goods, `good-remove` of the order's last good | `rejected` | `GOODS_REQUIRED` |
 | A stale or missing counter of a section the op touches | `rejected` | `VERSION_CONFLICT` |
-| An op on an order an earlier op of the set was refused for | `rejected` | `PRECEDING_OP_REJECTED` |
-| A status change or a `delete` of an order whose yield was booked into stock, or a `pickup` with lines of one | `rejected` | `ORDER_STORED` |
+| An op on an order an earlier op of the set was refused for, or a `create` under the key of a refused `create` | `rejected` | `PRECEDING_OP_REJECTED` |
+| A status change or a `delete` of an order whose yield was booked into stock, or a `pickup` with lines of a completed or stored one | `rejected` | `ORDER_STORED` |
 | A store line whose material is no output of the order's goods | `rejected` | `MATERIAL_NOT_AN_OUTPUT` |
 | A store line whose quantity is not in the material's unit | `rejected` | `UNIT_MISMATCH` |
 | A store line whose receiver the member may not book onto | `rejected` | `RECEIVER_UNKNOWN` |
@@ -254,12 +270,16 @@ them, and write on without reading the feed first.
 
 On `VERSION_CONFLICT`, pull the feed, merge, and send the op again under a new `Idempotency-Key`.
 
-**Dry run.** `dryRun: true` decides every op and writes nothing; its result has no `orders`.
+**Dry run.** `dryRun: true` decides every op exactly as the real run would — a pickup's store
+lines included, whose yields the later ops see — and writes nothing; its result has no `orders`.
+Read `dryRun` to tell a dry run, not the absence of `orders`.
 
 **Quota.** A change set counts **once** against the daily write quota, whatever its op count
 ([limits](../sync-guide.md#rate-limits-quota-and-back-off)). Only a `delete` counts as a removal
-for the [mass-change guard](../sync-guide.md#the-mass-change-guard); a set that deletes too many
-orders is held for the member's confirmation. A `cancel`, a `good-remove` and a `pickup` never count.
+for the [mass-change guard](../sync-guide.md#the-mass-change-guard), once per order of the member
+that exists and is not stored; a set that deletes too many orders is held for the member's
+confirmation. A `delete` that names no such order, a `cancel`, a `good-remove` and a `pickup`
+never count.
 
 **Delete.** A `delete` removes the order and its goods; stock already booked from it stays. Your
 feed carries its tombstone, with the `clientKey` when your client created the order.
@@ -282,6 +302,7 @@ Undoing a `delete` brings the order back under its `id`, its goods under their i
 | `400 IDEMPOTENCY_KEY_MISSING` | A change set without a well-formed `Idempotency-Key`. |
 | `403 SCOPE_MISSING` | Reading without `exchange.refinery.read`, writing without `exchange.refinery.write`, or a `pickup` with store lines without `exchange.refinery.store`. |
 | `410 CURSOR_EXPIRED` | The cursor is older than the tombstones, or not one the server issued. |
+| `409 PESSIMISTIC_LOCK` | Another write held an order the set names, so the set could not start; nothing was applied. Retry the same set. |
 | `413 BATCH_TOO_LARGE` | More than 500 ops. |
 
 The full list is the [error registry](../errors.md).

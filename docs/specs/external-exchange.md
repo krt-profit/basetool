@@ -774,7 +774,9 @@ decision 2026-09-26), and a `$id` is never changed once published. The schemas a
 flags `mineral`, `harvestable`, `raw`, `refined`, `buyable`, `sellable`), `blueprint`, `stock-lot`
 (material, location, quality, `stolen`, quantity — no org unit, no row id), `ship` (with required
 `version`), `refinery-order` (with the required section counters `versions`), `org-demand`, `org-unit` and `org-unit-list`, `store-choice-receivers` and `store-choice-job-orders`, `location`, `installation`, `account-check`, `change-set` (at most 500
-ops), `change-result` (compact, at most 32 KiB; its optional `cursor` is reserved and never sent in
+ops), `change-result` (compact: counts, the ops not applied and, for refinery orders, one entry per
+applied op but a delete; an answer above 32 KiB is delivered but not kept for an
+`Idempotency-Key` replay, REQ-XCH-020; its optional `cursor` is reserved and never sent in
 v1 — a client reads the feed after a push), `page`, `service-document`, `problem` and the
 offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, `items`,
 `extensions`; no handle, player, source folder or file path). One OpenAPI 3.1 document,
@@ -3328,16 +3330,25 @@ audit under the client (REQ-AUDIT-005) and its notices (REQ-REFINERY-023, -024) 
 web.
 
 - **Ops.** `create`, `update`, `good-add`, `good-update`, `good-remove`, `pickup` (REQ-XCH-053),
-  `cancel` and `delete` (REQ-XCH-055).
+  `cancel` and `delete` (REQ-XCH-055). A field an op's kind does not use is ignored: the gateway
+  reports it as an `UNKNOWN_FIELD` warning and does not relay it (REQ-XCH-026), and the backend
+  reads only the fields of the op's kind.
+- **Locking.** Before the first op runs, the set takes a transaction lock on every `clientKey` its
+  creates use, in ascending order, then row-locks every order of the member it names by `id` or key,
+  in ascending id order; an order of another member is neither read nor locked. A concurrent create
+  under the same key therefore waits and then finds the order (`ALREADY_EXISTS`), and two sets over
+  the same orders queue instead of deadlocking. A lock that cannot be had answers `409
+  PESSIMISTIC_LOCK` for the whole set, which the gateway passes through; nothing was applied.
 - **Addressing.** Every op but `create` names its order by `id` or by the client's own
   `clientKey`, so an order created earlier in the same set can be changed or picked up at once. An
   order of another owner, and a `clientKey` another client set, is unknown to the caller
   (`ORDER_UNKNOWN`).
 - **Client key.** A `create` carries a `clientKey` of at most 128 characters, unique per owner and
   client among the orders it names now. A `create` whose key already names an order of the member is
-  refused `ALREADY_EXISTS`; its result names the existing order's id, so the client adopts it, and
-  nothing is overwritten. A key whose order is gone may be used again: the new order takes it over,
-  and the removed order's tombstone keeps naming it (REQ-XCH-051).
+  refused `ALREADY_EXISTS`; outside a dry run its result names the existing order's id, so the
+  client adopts it, and nothing is overwritten. A second `create` under the key of a `create` the
+  set refused is `PRECEDING_OP_REJECTED`. A key whose order is gone may be used again: the new order
+  takes it over, and the removed order's tombstone keeps naming it (REQ-XCH-051).
 - **References.** The location, the refining method and a good's material are `ref`s resolved
   **exactly**, as the stock ops resolve theirs (REQ-XCH-016): a location by starmap `guid`, UEX id or
   exact name, a method by its code or exact name, a material by `bt`, `scGuid`, `uexId` or exact
@@ -3345,23 +3356,31 @@ web.
   `UNMATCHED`, one naming several entries `AMBIGUOUS`, a place without a location
   `LOCATION_UNKNOWN`. The location must be a refinery the web's picker offers (REQ-REFINERY-020),
   else `NOT_A_REFINERY`; a good's input material must be `RAW` or manual-raw, else
-  `MATERIAL_NOT_RAW`.
+  `MATERIAL_NOT_RAW`. Two references that name one material alike, such as `{bt}` and
+  `{bt, name}`, both resolve to it. A good the order already holds keeps its materials while an op
+  leaves its input as it is, even when that input is no longer refinable; only a newly named input
+  must be.
 - **`create`.** The owning org unit `orgUnit` `{id}` is required and must be one of the member's
   direct memberships, the set `GET /me/org-units` returns (`NOT_A_MEMBER`); the server never picks
   one. The status is `OPEN` or `IN_PROGRESS` (REQ-REFINERY-022); the order carries the client as its
-  creator (REQ-REFINERY-027). Goods, `expenses`, `otherExpenses` and `oreSales` are optional.
-- **Timer.** `endsAt` is written, `durationMinutes` is optional: the server stores
-  `startedAt = endsAt − durationMinutes`; without a duration `durationMinutes` is the rest from the
-  time of the write until `endsAt`, rounded up to whole minutes, and `startedAt` follows from it, so
-  the stored end stays `endsAt`. A create without `endsAt` starts at the write without a duration,
-  as in the web. A changed start re-arms the ready notice as a web edit does (REQ-REFINERY-023).
+  creator (REQ-REFINERY-027). At least one good is required (`GOODS_REQUIRED`), as the web's form
+  requires one; `expenses`, `otherExpenses` and `oreSales` are optional.
+- **Timer.** `endsAt` is written, `durationMinutes` (0 to 525600, one year) is optional: the
+  server stores `startedAt = endsAt − durationMinutes`; without a duration `durationMinutes` is the
+  rest from the time of the write until `endsAt`, rounded up to whole minutes, and `startedAt`
+  follows from it, so the stored end stays `endsAt`. `endsAt` is taken to the microsecond the
+  database keeps, so a resent end is `unchanged`. A create without `endsAt` starts at the write
+  without a duration, as in the web. A changed start re-arms the ready notice as a web edit does
+  (REQ-REFINERY-023).
 - **`update`.** Partial: it carries only the fields it changes — location, method, timer, status,
   `expenses`, `otherExpenses`, `oreSales` — and leaves every absent field as it is. The status is
   `OPEN` or `IN_PROGRESS`; `COMPLETED` comes only from a pickup and `CANCELED` only from a cancel or
   delete. A stored order's status is locked (`ORDER_STORED`, REQ-REFINERY-022). The mission link and
   the owning unit stay web-only.
 - **Goods ops.** `good-add` adds one row and returns its id; `good-update` and `good-remove` name a
-  row by its existing id, and a row of another order is `GOOD_UNKNOWN`.
+  row by its existing id, and a row of another order is `GOOD_UNKNOWN`. A `good-remove` of the
+  order's last good is `GOODS_REQUIRED`. A good stored without its materials is neither served nor
+  removed by a goods op; a quantity or quality stored as none reads as 0.
 - **Section counters.** An op echoes the counter of each section it touches (REQ-REFINERY-029):
   `gameData` for the location, method, timer, status, the goods ops, `pickup` and `cancel`;
   `finances` for `expenses`, `otherExpenses` and `oreSales`; both for `delete`. A stale counter is
@@ -3369,13 +3388,16 @@ web.
   left: every applied op that touches a section raises its counter by one.
 - **Follow-on refusals.** Once an op on an order is refused, every later op on the same order in
   the set is refused `PRECEDING_OP_REJECTED`.
-- **Result.** An applied op answers the order id, the ids of the goods rows it created and the new
-  section counters, so a client writes on without reading the feed first.
+- **Result.** An applied op but a `delete` answers the order id, the ids of the goods rows it
+  created and the new section counters, so a client writes on without reading the feed first; a
+  `create` lists its new goods rows in the order of its `goods`. An applied `delete` is counted in
+  `applied` and has no entry, since its order is gone; a set whose only applied ops are deletes has
+  no `orders`, and only `dryRun` tells a dry run.
 - **Refusal reasons**, per op in the change result: `UNMATCHED`, `AMBIGUOUS`, `LOCATION_UNKNOWN`,
   `NOT_A_REFINERY`, `MATERIAL_NOT_RAW`, `NOT_A_MEMBER`, `ORDER_UNKNOWN`, `GOOD_UNKNOWN`,
-  `ALREADY_EXISTS`, `VERSION_CONFLICT`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`, and those of
-  REQ-XCH-053 and REQ-XCH-055. Each is additive within `v1` (REQ-XCH-026) and listed in
-  `docs/exchange/errors.md`.
+  `GOODS_REQUIRED`, `ALREADY_EXISTS`, `VERSION_CONFLICT`, `PRECEDING_OP_REJECTED`, `ORDER_STORED`,
+  and those of REQ-XCH-053 and REQ-XCH-055. Each is additive within `v1` (REQ-XCH-026) and listed
+  in `docs/exchange/errors.md`.
 
 **Acceptance**
 
@@ -3398,18 +3420,31 @@ web.
   order. *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`.*
 - [x] A key a create takes over after a delete still names the deleted order's tombstone, and
   addresses the new order. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] Two references that name one material alike resolve, and a create lists its new goods rows in
+  the order of its goods. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A create without goods and a removal of an order's last good are `GOODS_REQUIRED`.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A set never locks another member's order; a create waits for a concurrent create under its
+  key and then answers `ALREADY_EXISTS` with that order's id; a second create under a refused
+  create's key is `PRECEDING_OP_REJECTED`. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A field an op's kind does not use changes nothing; a run longer than a year is `400`; a resent
+  end beyond the microsecond is `unchanged`; a held good whose input is no longer refinable stays
+  writable in the dry run and the real run alike; a good stored without its yield, quality or output
+  breaks neither the feed nor a write. *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] An undeclared field of an op's kind is reported `UNKNOWN_FIELD` and not relayed.
+  *`ExchangeSchemasTest`.*
 
-The result lists each applied op in `orders` (index, `opId`, order id, created goods row ids,
-counters) and names the existing order of an `ALREADY_EXISTS` refusal in its `results` item's `id`;
-both are additive fields of `change-result.schema.json`. Each applied write publishes, after the
+The result lists each applied op but a `delete` in `orders` (index, `opId`, order id, created goods
+row ids, counters) and names the existing order of an `ALREADY_EXISTS` refusal in its `results`
+item's `id`; both are additive fields of `change-result.schema.json`. Each applied write publishes, after the
 commit, into the `refinery` room (section `queue`) and the order's `refinery-order` room (section
 `order`; also `store` when a pickup booked the yield, and `deleted` when a delete or an undo removed
 the order) (REQ-XCH-030).
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`,
 `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest` · **Code:**
-`ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderReferences`,
-`RefineryExchangeWriter`/`RefineryExchangeWrites`, `V370`, `V374` · **Status:** implemented
+``ExchangeRefineryOrderWriteService`, `ExchangeRefineryOrderRun`, `ExchangeRefineryOrderState`,
+`ExchangeRefineryOrderReferences`, `RefineryExchangeWriter`/`RefineryExchangeWrites`, `V370`, `V374` · **Status:** implemented
 for `create`, `update` and the goods ops — #3168, `cancel` and `delete` — #3169, and `pickup`
 without store lines — #3170
 
@@ -3419,8 +3454,13 @@ A `pickup` op reports that the member collected an order's yield in the game. It
 `COMPLETED` with `pickedUpAt` and the reporting client (REQ-REFINERY-028), and echoes `gameData`.
 
 - **Precondition.** An `OPEN` or `IN_PROGRESS` order is closed, also before its `endsAt`, because
-  the game is the truth and `endsAt` is only derived. An order already `COMPLETED`, stored or not, is
-  `unchanged`. A `CANCELED` order is refused `ORDER_CANCELED`.
+  the game is the truth and `endsAt` is only derived. A pickup without store lines of an order
+  already `COMPLETED`, stored or not, is `unchanged`. A `CANCELED` order is refused
+  `ORDER_CANCELED`. Store lines on an order that is `COMPLETED` or stored are `ORDER_STORED`: its
+  yield counts as handled, as the web's store refuses a completed order.
+- **Retries.** The status decides before the counter, for a `pickup` as for a `cancel`
+  (REQ-XCH-055): a pickup resent with the counter it first echoed answers as the first one left the
+  order — `unchanged` without lines, `ORDER_STORED` with them.
 - **Without store lines** nothing is booked, for a client whose own stock sync books the goods. The
   order's status stays editable in the web as for an order completed without a store, and the web
   may store it later; a double booking beside the client's stock sync is the member's accepted risk.
@@ -3428,9 +3468,10 @@ A `pickup` op reports that the member collected an order's yield in the game. It
   quality, amount, receiving member, personal, job order, org unit, note — and the server stores the
   order exactly as the web does (`RefineryOrderStoreService`), so REQ-REFINERY-022 applies in full:
   `storedAt` is set, each line books an inventory row with its
-  `INVENTORY_RECEIVED_FROM_REFINERY` event, and the order is stored exactly once. **All or
-  nothing**: when one line is refused, the whole op is refused with that line's reason and nothing
-  changes.
+  `INVENTORY_RECEIVED_FROM_REFINERY` event, the amounts of the lines booked onto one good are
+  summed into that good's yield, and the order is stored exactly once. A dry run writes the same
+  yields into the goods it decides the later ops against. **All or nothing**: when one line is
+  refused, the whole op is refused with that line's reason and nothing changes.
 - **Rules of a line.** Its material must be an output material of one of the order's goods
   (`MATERIAL_NOT_AN_OUTPUT`), named by an `item-ref` that resolves exactly (`UNMATCHED`,
   `AMBIGUOUS`); its `quantity` in the material's own unit (`UNIT_MISMATCH`; one that rounds to zero
@@ -3445,7 +3486,10 @@ A `pickup` op reports that the member collected an order's yield in the game. It
   `ORDER_STORED`.
 - **Scope.** A change set that holds a `pickup` with store lines while the client lacks
   `exchange.refinery.store` is refused as a whole with `403 SCOPE_MISSING`, before any op runs. A
-  pickup without lines needs only `exchange.refinery.write`.
+  pickup without lines needs only `exchange.refinery.write`. A set the mass-change guard held is
+  checked again when the member previews or confirms it: `403 SCOPE_MISSING` when the client lost
+  `exchange.refinery.store` since, and its lines are decided under the member's reduced exchange
+  authorities, without the browser session's roles or active-context pin (REQ-XCH-021).
 - **Notices.** A pickup suppresses the ready notice without more, because REQ-REFINERY-023 selects
   only `OPEN` and `IN_PROGRESS` orders without `storedAt`.
 
@@ -3461,8 +3505,14 @@ A `pickup` op reports that the member collected an order's yield in the game. It
 - [x] A line whose material is no output, whose receiver or unit the rule refuses, or whose job
   order is unknown, invisible or does not need the material, is refused with its reason.
   *`ExchangeRefineryStoreControllerTest`.*
-- [x] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing.
+- [x] A set with store lines and without `exchange.refinery.store` is `403` and writes nothing,
+  also when the member confirms it after the guard held it.
+  *`ExchangeRefineryStoreControllerTest`, `ExchangeRefineryOrderWriteControllerTest`.*
+- [x] Several lines on one good write their sum into its yield, and a dry run decides the later ops
+  on those yields as the real run does; store lines on a completed order are `ORDER_STORED`.
   *`ExchangeRefineryStoreControllerTest`.*
+- [x] A held set's job orders are decided as the relay decides them, not under the confirming
+  browser session's admin role or pin. *`ExchangeRefineryStoreControllerTest`.*
 
 The lines book through the web's store operation (`RefineryOrderStoreBooking`, shared with
 `RefineryOrderStoreService`), so each line is audited `INVENTORY_RECEIVED_FROM_REFINERY`, the order
@@ -3471,7 +3521,7 @@ that member (REQ-REFINERY-024). Each stored pickup publishes, after the commit, 
 room (section `stock`), beside the refinery rooms of REQ-XCH-052.
 
 **Enforced by:** `ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryStoreControllerTest`,
-`ExchangeRefineryOrderRouteTest` · **Code:** `ExchangeRefineryOrderWriteService.pickup`,
+`ExchangeRefineryOrderRouteTest` · **Code:** `ExchangeRefineryOrderRun.pickup`,
 `ExchangeRefineryStoreLines`, `ExchangeStoreChoices`, `RefineryExchangeWrites.pickUp`,
 `RefineryOrderStoreBooking`, `V372` · **Status:** implemented — #3170 (pickup without store lines),
 #3171 (store lines)
@@ -3515,8 +3565,9 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
 ### REQ-XCH-055 — A client cancels or hard-deletes an order; only a delete counts as a removal
 
 - **`cancel`** sets `CANCELED` through the refinery's own cancel, audited
-  `REFINERY_ORDER_CANCELED`; it echoes `gameData`. A cancelled order is `unchanged`. A stored order
-  can be cancelled, as in the web.
+  `REFINERY_ORDER_CANCELED`; it echoes `gameData`. A cancelled order is `unchanged`, decided before
+  the counter, so a cancel resent with the counter it first echoed is `unchanged`, not
+  `VERSION_CONFLICT`. A stored order can be cancelled, as in the web.
 - **`delete`** removes an own order without `storedAt`, whatever created it: also an order picked up
   without store lines and an order linked to a mission, which then drops out of that mission. It
   echoes `gameData` and `finances`. A stored order is refused `ORDER_STORED`, because it is the
@@ -3526,9 +3577,10 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
   the order id, its last status, its location and the number of goods rows — no free text. The feed
   carries the tombstone of REQ-XCH-051.
 - **The web** keeps cancel as its only removal; a hard delete exists only through the exchange.
-- **Mass-change guard.** Only `delete` counts as a removal (REQ-XCH-021); `cancel` and
-  `good-remove` never count. A set above the guard's rule is held for the member's confirmation as
-  for every resource.
+- **Mass-change guard.** Only `delete` counts as a removal (REQ-XCH-021), once per distinct order
+  of the member that exists and is not stored; a delete that names no such order counts nothing.
+  `cancel` and `good-remove` never count. A set above the guard's rule is held for the member's
+  confirmation as for every resource.
 
 - **Within a set** a `cancel` of a cancelled order is `unchanged`, and every op after a
   `delete` of the same order is `ORDER_UNKNOWN`; a `create` may then reuse the deleted
@@ -3544,7 +3596,8 @@ of their own, the store choices, so a later warehouse book-in can reuse them; to
   tombstone; a stored order is `ORDER_STORED`. *`ExchangeRefineryOrderWriteControllerTest`;
   stock is untouched by construction, since inventory rows carry no reference to the order.*
 - [x] A set that deletes more orders than the guard allows is held and applies only after the
-  member confirms it; cancels and goods removals never trip it.
+  member confirms it; cancels, goods removals and deletes that remove nothing never trip it; a
+  cancel resent with its first counter is `unchanged`.
   *`ExchangeRefineryOrderWriteControllerTest`, `ExchangeRefineryOrderRouteTest`.*
 - [x] An open detail page of a deleted order locks its forms and shows the notice with the link to
   the list. *`RefineryOrderDetailPatternRenderTest` (the notice), `LiveSyncSectionMapParityTest`

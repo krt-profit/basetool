@@ -53,7 +53,9 @@ own ids. See [ships](resources/ships.md#links).
 
 Give every order your client creates a `clientKey` of your own and keep it with the order. A
 `create` that is retried, or sent by a second installation, is then refused `ALREADY_EXISTS` with
-the existing order's `id` instead of making a second order: adopt that id. Later ops can name the
+the existing order's `id` instead of making a second order: adopt that id. Two creates under one
+key that arrive at once are decided one after the other, so the second also answers
+`ALREADY_EXISTS`. Later ops can name the
 order by the same key, and the feed and its tombstones carry the key to your client only. Each op
 echoes the counters of the sections it touches, `gameData` or `finances`, so your timer updates
 never collide with a finance edit in the web. See
@@ -159,7 +161,7 @@ What counts as a removal:
 | Ships | a `remove`, and an `upsert` that changes both the name and the ship type |
 | Stock | a lot set to 0, or cut to at most a tenth of what it held before your client's first change to it within the 24 hours — unless the batch's rises of the same material or item cover the fall (a move) |
 | Org stock | a `book-out`, `sell`, `move-pool` or `move-holder` into another pool, counted per pool instead of per resource, against the pool's entries ([org stock](resources/org-stock.md#the-mass-change-guard)) |
-| Refinery orders | an applied `delete`; a `cancel`, a `good-remove` and a `pickup` never count |
+| Refinery orders | a `delete` of an order of the member that exists and is not stored, once per order; a `delete` that names no such order, a `cancel`, a `good-remove` and a `pickup` never count |
 
 For example, with 40 blueprints and no removals in the window, a batch may remove 8 (8 × 5 = 40, not
 more than 40); a batch removing 9 is held. Spreading removals over many small batches does not help,
