@@ -388,7 +388,19 @@ public class BankAccessRules implements BankAccessPolicy {
    * @return {@code true} iff the actor raised it
    */
   boolean ownsRequest(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
-    return actor.is(request.getRequestedBy());
+    return ownsRequest(actor.userId(), request);
+  }
+
+  /**
+   * {@link #ownsRequest(BankActor, BankBookingRequest)} for a caller known by id alone, which needs
+   * no actor read.
+   *
+   * @param requester the member, or {@code null} for none
+   * @param request the request
+   * @return {@code true} iff the member raised it
+   */
+  boolean ownsRequest(@Nullable UUID requester, @NotNull BankBookingRequest request) {
+    return requester != null && requester.equals(request.getRequestedBy());
   }
 
   /**

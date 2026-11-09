@@ -2395,14 +2395,15 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void cancelOwnBookingRequest_delegatesWithTheEchoedVersion() {
+  void cancelOwnBookingRequest_checksOwnershipByTheCallerIdWithoutBuildingTheActor() {
     UUID requestId = UUID.randomUUID();
-    BankActor requester = TestBankActor.of(UUID.randomUUID()).build();
-    actingAs(requester);
+    UUID requester = UUID.randomUUID();
+    when(bankCaller.userId()).thenReturn(requester);
 
     requestService.cancelOwnBookingRequest(requestId, 4L);
 
     verify(bankBookingRequestService).cancelOwn(requester, requestId, 4L);
+    verify(bankCaller, never()).actor();
   }
 
   @Test

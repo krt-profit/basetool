@@ -715,7 +715,7 @@ class BankBookingRequestServiceTest {
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     BankActor actor = TestBankActor.of(requester).build();
 
-    BankBookingRequestDto dto = service.cancelOwn(actor, requestId, 0L);
+    BankBookingRequestDto dto = service.cancelOwn(actor.userId(), requestId, 0L);
 
     assertThat(dto.status()).isEqualTo(BankBookingRequestStatus.CANCELLED);
     verify(bankAuditService)
@@ -752,7 +752,7 @@ class BankBookingRequestServiceTest {
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
     BankActor actor = TestBankActor.of(UUID.randomUUID()).build();
 
-    assertThrows(NotFoundException.class, () -> service.cancelOwn(actor, requestId, 0L));
+    assertThrows(NotFoundException.class, () -> service.cancelOwn(actor.userId(), requestId, 0L));
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.PENDING);
   }
 
@@ -768,7 +768,7 @@ class BankBookingRequestServiceTest {
     BankActor actor = TestBankActor.of(requester).build();
 
     BankConflictException ex =
-        assertThrows(BankConflictException.class, () -> service.cancelOwn(actor, requestId, 1L));
+        assertThrows(BankConflictException.class, () -> service.cancelOwn(actor.userId(), requestId, 1L));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_REQUEST_NOT_PENDING);
   }
 

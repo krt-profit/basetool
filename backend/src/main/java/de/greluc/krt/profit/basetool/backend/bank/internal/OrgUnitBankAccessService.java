@@ -330,6 +330,16 @@ public class OrgUnitBankAccessService {
   }
 
   /**
+   * The request's member id.
+   *
+   * @return the caller's id, or {@code null} without one
+   */
+  @Nullable
+  UUID userId() {
+    return bankCaller.userId();
+  }
+
+  /**
    * The request's active-org-unit pin as sent; the policy decides what it narrows.
    *
    * @return the pinned org unit, or {@code null}

@@ -296,7 +296,7 @@ class BankPurposeBoundRequestServiceTest {
   void aCancelledPurposeBoundRequestIsReportedToItsObserver() {
     BankBookingRequest request = pending(BankBookingRequestType.DEPOSIT, true);
     when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(request));
-    service.cancelOwn(TestBankActor.of(requester).build(), requestId, 0L);
+    service.cancelOwn(requester, requestId, 0L);
 
     assertThat(request.getStatus()).isEqualTo(BankBookingRequestStatus.CANCELLED);
     verify(observer).onCancelled(requestId, dealId);

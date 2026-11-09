@@ -478,7 +478,7 @@ public class BankBookingRequestService {
    * decided one a 409. Fires {@link BankBookingRequestCancelledEvent}, which clears the staff's
    * stale "new booking request" notifications (REQ-NOTIF-018).
    *
-   * @param actor the requester the ownership is checked for
+   * @param requester the member the ownership is checked for, or {@code null} for none
    * @param requestId the request to cancel
    * @param version the echoed optimistic-locking version
    * @return the cancelled request
@@ -489,9 +489,9 @@ public class BankBookingRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto cancelOwn(
-      @NotNull BankActor actor, @NotNull UUID requestId, long version) {
+      @Nullable UUID requester, @NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(actor, request)) {
+    if (!policy.ownsRequest(requester, request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);

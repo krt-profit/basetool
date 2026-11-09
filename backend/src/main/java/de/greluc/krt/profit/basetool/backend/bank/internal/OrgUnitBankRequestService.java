@@ -412,7 +412,7 @@ public class OrgUnitBankRequestService {
    */
   @NotNull
   public BankBookingRequestDto cancelOwnBookingRequest(@NotNull UUID requestId, long version) {
-    return bankBookingRequestService.cancelOwn(accessService.actor(), requestId, version);
+    return bankBookingRequestService.cancelOwn(accessService.userId(), requestId, version);
   }
 
   /**
