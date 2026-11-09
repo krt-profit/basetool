@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepositor
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -61,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
  * paths of {@link UserService#applyMembershipDelta} go through the seam, and the same steps,
  * written as the direct calls {@code UserService} made before the seam existed, run on a second
  * user. Both must leave the same membership rows (kind, role, flags, row version), as the database
- * holds them straight after the call as well as after an explicit flush,, write the same audit rows
+ * holds them straight after the call as well as after an explicit flush, write the same audit rows
  * and fail with the same exception type and message.
  *
  * <p>Runs against the real schema inside one rolled-back transaction, so the after-commit
@@ -95,7 +96,10 @@ class UserServiceMembershipSeamDifferentialTest {
   /** A delta builder: the units and the current row version of the user's membership in sk1. */
   private interface Step extends BiFunction<Units, Long, MembershipDeltaRequest> {}
 
-  /** What one step did: the user's rows afterwards, or the exception it ended with. */
+  /** One audit row: when it was written and its id-free description. */
+  private record AuditRow(Instant occurredAt, String text) {}
+
+  /** What one step did:the user's rows afterwards, or the exception it ended with. */
   private record Observed(
       List<String> storedRows, List<String> rows, List<UUID> staffelIds, String failure) {}
 
@@ -373,19 +377,27 @@ class UserServiceMembershipSeamDifferentialTest {
         + m.getVersion();
   }
 
+  /**
+   * The user's audit rows in {@code occurredAt} order. Rows sharing an instant have no defined
+   * order (the audit id is random), so they are compared as a multiset, sorted by their text.
+   */
   private List<String> auditOf(UUID userId) {
     return auditEventRepository.findAll().stream()
         .filter(e -> userId.equals(e.getTargetUserId()))
-        .sorted(Comparator.comparing(AuditEvent::getOccurredAt))
-        .map(e ->
-            e.getDomain()
-                + "|"
-                + e.getEventType()
-                + "|"
-                + e.getSubjectLabel()
-                + "|"
-                + UUID_TEXT.matcher(String.valueOf(e.getDetails())).replaceAll("<id>"))
+        .map(e -> new AuditRow(e.getOccurredAt(), describe(e)))
+        .sorted(Comparator.comparing(AuditRow::occurredAt).thenComparing(AuditRow::text))
+        .map(AuditRow::text)
         .toList();
+  }
+
+  private String describe(AuditEvent e) {
+    return e.getDomain()
+        + "|"
+        + e.getEventType()
+        + "|"
+        + e.getSubjectLabel()
+        + "|"
+        + UUID_TEXT.matcher(String.valueOf(e.getDetails())).replaceAll("<id>");
   }
 
   private User newUser(String tag) {
