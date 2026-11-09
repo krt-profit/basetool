@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.frontend.bank.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +74,21 @@ class OrgUnitBankRequestsBackendClientTest {
 
     backend.expect("GET", REQUESTS + "/page?size=3&status=CONFIRMED&status=REJECTED");
     backend.expect("GET", REQUESTS + "/page?size=5");
+  }
+
+  @Test
+  void anUnknownOrHiddenRequestReadsAsAbsent() {
+    backend.answerProblem(404, "NOT_FOUND");
+
+    assertThat(client.view(UUID.randomUUID())).isNull();
+  }
+
+  @Test
+  void anyOtherBackendFailureOfTheRequestReadStillFails() {
+    backend.answerProblem(403, "ACCESS_DENIED");
+
+    assertThatThrownBy(() -> client.view(UUID.randomUUID()))
+        .isInstanceOf(BackendServiceException.class);
   }
 
   @Test

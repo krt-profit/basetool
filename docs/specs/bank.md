@@ -3224,7 +3224,8 @@ and the backend decides what it shows.
   staff note reaches staff and approvers, never the requester (`BankRequestViewTest`).
 - [x] The page renders the details and the right way to act for staff, approvers and the requester,
   its `requestDetail` fragment resolves, and a hidden request shows the empty state
-  (`BankRequestPageControllerMvcTest`).
+  (`BankRequestPageControllerMvcTest`); the client reads the backend's `404` as no request and
+  still fails on every other error (`OrgUnitBankRequestsBackendClientTest`).
 
 **Enforced by:** `BankBookingRequestViewService`, `OrgUnitBankRequestService#viewRequest`,
 `OrgUnitBankController#getRequest` (backend) ·

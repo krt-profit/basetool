@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -129,11 +131,10 @@ class BankRequestPageControllerMvcTest {
   /**
    * Answers the single-request read.
    *
-   * @param view the backend's answer, or {@code null}
+   * @param view the client's answer, {@code null} for the backend's {@code 404}
    */
   private void stub(BankBookingRequestViewDto view) {
-    when(backendApiClient.get(eq(URI), eq(BankBookingRequestViewDto.class), eq(ID)))
-        .thenReturn(view);
+    when(backendApiClient.execute(eq(HttpMethod.GET), eq(URI), any(), any())).thenReturn(view);
   }
 
   /**
