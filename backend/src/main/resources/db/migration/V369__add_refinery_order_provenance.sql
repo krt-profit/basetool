@@ -14,8 +14,13 @@ ALTER TABLE refinery_order
             OR (last_change_source = 'CLIENT' AND last_change_client IS NOT NULL)),
     ADD CONSTRAINT ck_refinery_order_pickup CHECK ((picked_up_at IS NULL) = (picked_up_client IS NULL));
 
+-- The backfill is no change an exchange client should see: V367's feed trigger stays off for it.
+ALTER TABLE refinery_order DISABLE TRIGGER trg_refinery_order_exchange_change;
+
 UPDATE refinery_order
 SET last_changed_at = COALESCE(updated_at, created_at, now());
+
+ALTER TABLE refinery_order ENABLE TRIGGER trg_refinery_order_exchange_change;
 
 ALTER TABLE refinery_order
     ALTER COLUMN last_changed_at SET NOT NULL;
