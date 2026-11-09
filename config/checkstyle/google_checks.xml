@@ -205,7 +205,7 @@
   <module name="FileLength">
     <property name="id" value="fileLengthBankBookingRequestService"/>
     <property name="fileExtensions" value="java"/>
-    <property name="max" value="995"/>
+    <property name="max" value="982"/>
   </module>
   <module name="SuppressionSingleFilter">
     <property name="id" value="fileLength"/>
