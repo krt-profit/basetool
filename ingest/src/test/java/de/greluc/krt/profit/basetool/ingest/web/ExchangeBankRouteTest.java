@@ -92,12 +92,15 @@ class ExchangeBankRouteTest {
                 "basetool-ingest",
                 ExchangeTestSupport.thumbprint(key),
                 UUID.randomUUID().toString(),
-                "exchange.connect exchange.bank.read",
+                "exchange.connect exchange.bank.read exchange.bank.queue",
                 Instant.now().minusSeconds(30)));
     when(registryReader.current())
         .thenReturn(
             ExchangeTestSupport.registryWithLimits(
-                Set.of("exchange.connect", "exchange.bank.read"), "2.0.0", 120, true));
+                Set.of("exchange.connect", "exchange.bank.read", "exchange.bank.queue"),
+                "2.0.0",
+                120,
+                true));
     when(revocationReader.isDenied(anyString())).thenReturn(false);
   }
 
@@ -196,6 +199,42 @@ class ExchangeBankRouteTest {
         .andExpect(jsonPath("$.errors[0].pointer").value("/from"));
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void theStaffQueueIsRelayedAndCheckedAgainstItsSchema() throws Exception {
+    when(relay.forward(
+            eq(HttpMethod.GET),
+            eq("/api/v1/exchange/bank/queue?limit=500"),
+            isNull(),
+            any(),
+            any()))
+        .thenReturn(ok(example("bank-queue/valid/staff-and-approver.json")));
+
+    call("/exchange/v1/bank/queue?limit=500")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.open[0].mayConfirm").value(true))
+        .andExpect(jsonPath("$.toApprove[0].requiredApprover").value("BANK_MANAGEMENT"));
+  }
+
+  @Test
+  void aStaffQueuePageAboveFiveHundredIsRefusedBeforeTheRelay() throws Exception {
+    call("/exchange/v1/bank/queue?limit=501")
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"))
+        .andExpect(jsonPath("$.errors[0].pointer").value("/limit"));
+
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+  }
+
+  @Test
+  void aStaffQueueItemLinkingOutsideTheBasetoolIsARelayFailure() throws Exception {
+    when(relay.forward(any(), anyString(), any(), any(), any()))
+        .thenReturn(ok(example("bank-queue/invalid/foreign-link.json")));
+
+    call("/exchange/v1/bank/queue")
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value(ExchangeRelay.RELAY_FAILED));
   }
 
   @Test

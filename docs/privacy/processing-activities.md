@@ -247,7 +247,11 @@ requires it and duplicating it into further files spreads personal data for no g
   `exchange.bank.read` (REQ-BXCH-002, built) receives the balances, targets, 30-day trends and
   booking history of the bank accounts the member may view in the Basetool — redacted as on the
   member's account page, so no holder and no staff note, but with the handle of the member who
-  handed money in or received it, unless that member withholds their name (REQ-BXCH-007). The
+  handed money in or received it, unless that member withholds their name (REQ-BXCH-007). A
+  client approved for `exchange.bank.queue` (REQ-BXCH-005, built) receives, for a member who is
+  bank staff or an approver, the pending booking requests they work on: amount, accounts,
+  justification and note, the requester's handle (again unless withheld) and, for the Bankleitung
+  and on granted accounts, the account balance; no staff note, holder or custody balance. The
   client keeps other people's bank data in memory only, for at most 7 days, as its approval
   requires. The same scope gives the client the member's own booking requests (REQ-BXCH-003, built)
   without any staff note, staff identity, counterparty or purpose; being the member's own data,

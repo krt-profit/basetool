@@ -65,6 +65,7 @@ GET /api/v1/bank/org-units/requests | OrgUnitBankController#listOwnBookingReques
 POST /api/v1/bank/org-units/requests | OrgUnitBankController#createBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/requests/foreign | OrgUnitBankController#listForeignRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/bank/org-units/requests/page | OrgUnitBankController#pageOwnBookingRequests | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#getRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/bank/org-units/requests/{id} | OrgUnitBankController#updateOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/bank/org-units/requests/{id}/cancel | OrgUnitBankController#cancelOwnBookingRequest | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/bank/org-units/requests/{id}/owner-approval | OrgUnitBankController#revokeOwnerApproval | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -143,6 +144,7 @@ POST /api/v1/connected-apps/{clientId}/undo | ConnectedAppsController#undo | pre
 GET /api/v1/exchange/bank/accounts | ExchangeBankController#accounts | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/accounts/{id}/balance-series | ExchangeBankController#balanceSeries | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/accounts/{id}/bookings | ExchangeBankController#bookings | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/bank/queue | ExchangeBankQueueController#queue | pre=@exchangeGate.allows('exchange.bank.queue', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/bank/requests | ExchangeBankRequestController#requests | pre=@exchangeGate.allows('exchange.bank.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/catalog/locations | ExchangeCatalogController#locations | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/catalog/resolve | ExchangeCatalogController#resolve | pre=@exchangeGate.allowsAny(authentication) | url=anyRequest -> authenticated

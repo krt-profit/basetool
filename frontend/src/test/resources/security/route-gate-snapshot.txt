@@ -273,6 +273,7 @@
 /bank/holders/{id} GET -> BankPageController#holderDetail gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/manage GET -> BankManagePageController#manage gate=method:hasRole('BANK_EMPLOYEE') layout=yes
 /bank/requests GET -> BankRequestQueuePageController#queue gate=method:hasRole('BANK_EMPLOYEE') layout=yes
+/bank/requests/{id} GET -> BankRequestPageController#request gate=method:isAuthenticated() layout=yes
 /blueprint-overview GET -> BlueprintOverviewPageController#view gate=class:isAuthenticated() layout=yes
 /blueprint-overview/owners GET -> BlueprintOverviewPageController#owners gate=class:isAuthenticated() layout=yes
 /catalog/location-search GET -> CatalogSearchController#locationSearch gate=class:isAuthenticated() layout=no

@@ -62,6 +62,7 @@ public class OrgUnitBankRequestService {
   private final BankAccountRepository bankAccountRepository;
   private final BankBookingRequestRepository bankBookingRequestRepository;
   private final BankBookingRequestService bankBookingRequestService;
+  private final BankBookingRequestViewService bankBookingRequestViewService;
 
   /**
    * Raises a booking request and delegates persistence to {@link BankBookingRequestService}.
@@ -352,6 +353,20 @@ public class OrgUnitBankRequestService {
   @Transactional(readOnly = true)
   public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
     return bankBookingRequestService.listForeign(policy.foreignRequestScope(accessService.actor()));
+  }
+
+  /**
+   * Reads one booking request the caller raised, sees as bank staff or approves (REQ-BANK-068).
+   *
+   * @param requestId the request
+   * @return the request with the caller's roles on it
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the request is
+   *     unknown or hidden from the caller
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public BankBookingRequestViewDto viewRequest(@NotNull UUID requestId) {
+    return bankBookingRequestViewService.view(accessService.actor(), requestId);
   }
 
   /**

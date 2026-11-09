@@ -32,8 +32,8 @@ The guiding rules:
 
 ### REQ-BXCH-001 — The bank scopes, their consent and the one decision point
 
-> [!note] Implemented (#3157; ADR-0354, ADR-0352). The routes of `exchange.bank.request` and
-> `exchange.bank.queue` come with REQ-BXCH-003…005.
+> [!note] Implemented (#3157; ADR-0354, ADR-0352). The queue route came with REQ-BXCH-005 (#3160);
+> the routes of `exchange.bank.request` come with REQ-BXCH-004.
 
 **Three capabilities.** The bank has three scopes of its own (`ExchangeCapability`, the
 `ck_exchange_client_capability` check, the provisioner's `EXCHANGE_SCOPES`, the sandbox and E2E
@@ -47,7 +47,7 @@ realms, the admin client page and the client application form):
 
 The queue has a scope of its own, so a staff member's ordinary login carries no staff view. No
 client is granted a bank scope until its approval amendment (REQ-BXCH-007); until the routes of
-REQ-BXCH-003…005 exist, `exchange.bank.request` and `exchange.bank.queue` serve no route.
+REQ-BXCH-004 exist, `exchange.bank.request` serves no route.
 
 **One decision point.** Every bank decision of the exchange is made by the bank access policy
 (ADR-0352), never by exchange code:
@@ -57,7 +57,8 @@ REQ-BXCH-003…005 exist, `exchange.bank.request` and `exchange.bank.queue` serv
   grants and memberships (REQ-XCH-009); seeing the whole bank needs Bank Management;
 - the exchange passes no active-org-unit pin;
 - exchange code reaches the bank only through `BankAccessPolicy` and its decision types,
-  `BankActors`, `BankAccountReads` and `BankOwnRequestReads` with their value types
+  `BankActors`, `BankAccountReads`, `BankOwnRequestReads` and `BankStaffQueueReads` with their value
+  types
   (`BankAccessPolicyRulesTest.theExchangeReachesTheBankOnlyThroughThePolicy`).
 
 No money moves through a client and no bank-staff action is taken through one (ADR-0354).
@@ -182,6 +183,79 @@ it — the web's requests too — as a snapshot followed by the change feed of R
 `BankOwnRequestReadService` (backend) · `ExchangeBankRequestController`, `ExchangeRoutes`
 (gateway) · `bank-request.schema.json`, `page.schema.json#/$defs/bankRequestPage` · V365 ·
 **Related:** REQ-BANK-022, REQ-XCH-013, REQ-BXCH-007 · **Issues:** #3118, #3119, #3158
+### REQ-BXCH-005 — The read-only bank-staff queue
+
+> [!note] Implemented (#3160). `client` stays `null` until a request records the application that
+> raised it (REQ-BXCH-004).
+
+`GET /exchange/v1/bank/queue` under `exchange.bank.queue`, relayed to `/api/v1/exchange/bank/queue`.
+A snapshot, decided anew on every call by the bank access policy (`BankAccessPolicy#staffRights`,
+read through `BankStaffQueueReads`) with the actor `BankActors.forExchange`: a withdrawn grant or
+role hides everything on the next call, and the Admin role has no effect. The Bankleitung sees the
+whole bank by Bank Management.
+
+**Two sections, oldest first,** with the request id as the tiebreaker within one instant:
+
+- **`open`** is the web staff queue's set (REQ-BANK-023): every pending request on an account the
+  member holds a grant on, every pending request of the bank for the Bankleitung. Each item says in
+  `mayConfirm` whether the member's grant covers the request type and four-eyes does not bar them
+  (REQ-BANK-062); the member's own requests stay listed with `mayConfirm = false`.
+- **`toApprove`** is exactly the set of the "approval needed" notices for the member (REQ-NOTIF-033):
+  pending, over the limit, not yet approved in the Basetool, not raised by the member, and routed to
+  an approver class the member belongs to — the responsible holder over the limit, the Bankleitung
+  on the middle KRT band, the Organisationsleitung above `T2`. An attested confirm in the browser
+  stays possible; the queue enforces nothing (REQ-BANK-041).
+
+**Paging.** `cursor` and `limit` (1…500 per section, default 500; above that `400 SCHEMA_INVALID` at
+the gateway). One opaque cursor carries the position of both sections; a cursor the server did not
+issue answers `410 CURSOR_EXPIRED`. `hasMore` is true while either section continues.
+
+**The answer.** `oldestOpenAt` (the oldest request in either whole section, or `null`),
+`oldestOverdue` (true from 48 hours on, the threshold of `BankBookingApprovalOverdue`), `open`,
+`toApprove`, `nextCursor`, `hasMore`. Each item carries `id`, `type`, `amount`, `createdAt`,
+`ageHours`, `account { id, no, name, orgUnitShorthand }`, `targetAccount { id, no }` or `null`,
+`requesterHandle`, `justification` and `note` as plain text, `requiresOwnerApproval`,
+`requiredApprover` or `null`, `ownerApprovalGranted`, `mayConfirm`, `accountBalance`, `client` and
+`link`:
+
+- `requesterHandle` is `null` when the requester withholds their name (REQ-XCH-044);
+- `accountBalance` is set for the Bankleitung on every account and for an employee on a granted
+  account only, otherwise `null`;
+- `link` is the absolute `https://profit-base.online/bank/requests/{id}`, the request's page
+  (REQ-BANK-068); the server builds it, a client builds no links.
+
+Left out: the staff note, the holder fields, custody balances and every handle but the requester's.
+
+**Refusal.** A member with no bank role, no grant and no request waiting for their approval gets
+`403 NOT_BANK_STAFF`, which the gateway passes on.
+
+**Counted.** Every snapshot served counts `basetool_exchange_bank_reads_total{route="queue"}`, every
+refusal `basetool_exchange_bank_refused_total{reason="not_bank_staff"}` (REQ-OBS-024).
+
+**Retention.** Foreign bank data: a client keeps it in memory only, for at most 7 days (REQ-BXCH-007).
+
+**Acceptance**
+
+- [x] An employee sees the pending requests on their granted accounts with `mayConfirm` by grant
+  flag, the Bankleitung the whole bank; an own request is listed with `mayConfirm = false` and never
+  waits for its requester (`ExchangeBankQueueTest`).
+- [x] `toApprove` holds the responsible holder's, the Bankleitung's middle-band and the OL's top-band
+  requests, and nothing for anyone else; an approver without a bank role sees only that section,
+  without balances (`ExchangeBankQueueTest`).
+- [x] A member and an administrator without bank roles, grants or approvals get `403 NOT_BANK_STAFF`,
+  counted (`ExchangeBankQueueTest`).
+- [x] The item carries exactly the allow-listed fields, the link and `client = null`; a withholding
+  requester has no handle; the oldest request is overdue from 48 hours; both sections page with one
+  cursor; a foreign cursor is `410` (`ExchangeBankQueueTest`).
+- [x] The gateway checks the limit before the relay and the answer against `bank-queue.schema.json`;
+  the route, schema, fixtures and golden are part of the frozen contract (`ExchangeBankRouteTest`,
+  `ExchangeGoldenAnswerTest`, `ExchangeContractTest`, `ExchangeWireContractTest`).
+
+**Enforced by:** `ExchangeBankQueueController`, `ExchangeBankQueueService`, `BankExchangeCursor`,
+`BankStaffQueueReadService` (backend) · `ExchangeBankQueueController`, `ExchangeRoutes` (gateway) ·
+`bank-queue.schema.json` · **Related:** REQ-BANK-023, REQ-BANK-041, REQ-BANK-062, REQ-BANK-068,
+REQ-NOTIF-033, REQ-XCH-044 · **Issues:** #3120, #3116, #3160
+
 ### REQ-BXCH-006 — The bank switch, the limits and the refusal codes
 
 > [!note] Implemented (#3156; ADR-0354). The bank routes themselves come with REQ-BXCH-002…005.
@@ -255,8 +329,8 @@ REQ-XCH-025, REQ-AUDIT-001, REQ-OBS-024 · **Issues:** #3121, #3156
 
 ### REQ-BXCH-007 — Retention classes, the onboarding criterion and name withholding
 
-> [!note] Implemented for the reads of REQ-BXCH-002 (#3157) and the own requests of REQ-BXCH-003
-> (#3158). The staff queue takes its class with REQ-BXCH-005.
+> [!note] Implemented for the reads of REQ-BXCH-002 (#3157), the own requests of REQ-BXCH-003
+> (#3158) and the staff queue of REQ-BXCH-005 (#3160).
 
 **Retention classes.** Every bank route names its class in the gateway's OpenAPI document and in
 [`docs/exchange/resources/bank.md`](../exchange/resources/bank.md):
@@ -271,8 +345,8 @@ The approval names the criterion in `docs/legal/approved-clients.md`; that amend
 request, after the bank switch, the cap and the monitoring.
 
 **Name withholding.** A member who withholds their name from connected applications (REQ-XCH-044)
-is left out of the bank answers: `counterpartyHandle` in a booking is `null`; the booking itself
-stays.
+is left out of the bank answers: `counterpartyHandle` in a booking and `requesterHandle` in a queue
+item are `null`; the booking and the request themselves stay.
 
 **Privacy.** A11 „Connected applications" of the records of processing names the bank data on a
 client and its legal bases, the DPIA threshold assessment is reassessed, and the privacy notice
@@ -281,7 +355,7 @@ client and its legal bases, the DPIA threshold assessment is reassessed, and the
 **Acceptance**
 
 - [x] The gateway's OpenAPI document and the client page name the retention class of every bank
-  read route.
+  read route and of the staff queue.
 - [x] A counterparty who withholds their name has no handle in a booking, and the booking is still
   listed (`ExchangeBankReadsTest`).
 - [x] The onboarding criterion is part of `docs/exchange/onboarding.md`; A11, the DPIA threshold

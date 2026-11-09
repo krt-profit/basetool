@@ -259,7 +259,7 @@ public class ExchangeBankReadService {
    * @param amount the whole amount
    * @return its value
    */
-  private static long whole(@NotNull BigDecimal amount) {
+  static long whole(@NotNull BigDecimal amount) {
     return amount.longValueExact();
   }
 
@@ -270,7 +270,7 @@ public class ExchangeBankReadService {
    * @return its value, or {@code null}
    */
   @Contract("null -> null; !null -> !null")
-  private static @Nullable Long wholeOrNull(@Nullable BigDecimal amount) {
+  static @Nullable Long wholeOrNull(@Nullable BigDecimal amount) {
     return amount == null ? null : whole(amount);
   }
 }

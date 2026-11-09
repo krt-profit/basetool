@@ -38,6 +38,9 @@ public final class ExchangeProblemException extends DomainProblem {
   /** A feed cursor older than the retained changes, or not one the server issued. */
   public static final String CURSOR_EXPIRED = "CURSOR_EXPIRED";
 
+  /** A member without a bank role, a grant and a request waiting for their approval. */
+  public static final String NOT_BANK_STAFF = "NOT_BANK_STAFF";
+
   /** A change set that removes more than the mass-change guard allows without confirmation. */
   public static final String MASS_CHANGE_CONFIRMATION_REQUIRED =
       "MASS_CHANGE_CONFIRMATION_REQUIRED";
@@ -197,6 +200,17 @@ public final class ExchangeProblemException extends DomainProblem {
   public static @NotNull ExchangeProblemException cursorExpired() {
     return new ExchangeProblemException(
         HttpStatus.GONE, CURSOR_EXPIRED, "The feed cursor is older than the retained changes.");
+  }
+
+  /**
+   * The refusal of the staff queue for a member without a bank role, a grant and a request waiting
+   * for their approval (REQ-BXCH-005).
+   *
+   * @return the {@code 403 NOT_BANK_STAFF} refusal
+   */
+  public static @NotNull ExchangeProblemException notBankStaff() {
+    return new ExchangeProblemException(
+        HttpStatus.FORBIDDEN, NOT_BANK_STAFF, "The member is no bank staff and approves nothing.");
   }
 
   /**

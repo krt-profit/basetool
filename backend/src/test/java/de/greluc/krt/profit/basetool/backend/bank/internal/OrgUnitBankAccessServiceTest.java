@@ -156,7 +156,8 @@ class OrgUnitBankAccessServiceTest {
             policy,
             bankAccountRepository,
             bankBookingRequestRepository,
-            bankBookingRequestService);
+            bankBookingRequestService,
+            null);
   }
 
   /**

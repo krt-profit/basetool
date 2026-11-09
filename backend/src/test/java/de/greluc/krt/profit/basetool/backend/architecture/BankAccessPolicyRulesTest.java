@@ -113,6 +113,7 @@ class BankAccessPolicyRulesTest {
           BANK + ".api.BankStaffRights",
           BANK + ".api.BankBookingRequestType",
           BANK + ".api.BankAccountReads",
+          BANK + ".api.BankStaffQueueReads",
           BANK + ".api.BankOwnRequestReads");
 
   @Test

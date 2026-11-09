@@ -11,8 +11,9 @@ decides every call anew from the member's bank roles, memberships and grants, so
 hides an account at once. An administrator sees through a client only what their bank roles,
 grants and memberships give them, never the whole bank.
 
-The scopes `exchange.bank.request` (raising, correcting and cancelling the member's own requests)
-and `exchange.bank.queue` (the read-only bank-staff queue) exist; their routes are not published yet.
+The read-only [bank-staff queue](#staff-queue) lies under its own scope `exchange.bank.queue`. The
+scope `exchange.bank.request` (raising, correcting and cancelling the member's own requests) exists;
+its routes are not published yet.
 
 ## Retention
 
@@ -21,6 +22,7 @@ and `exchange.bank.queue` (the read-only bank-staff queue) exist; their routes a
 | `GET /exchange/v1/bank/accounts` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/accounts/{id}/bookings` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/accounts/{id}/balance-series` | foreign bank data | keep it in memory only, for at most 7 days |
+| `GET /exchange/v1/bank/queue` | foreign bank data | keep it in memory only, for at most 7 days |
 | `GET /exchange/v1/bank/requests` | the member's own data | persist it |
 
 The retention class is a condition of the approval ([becoming a client](../onboarding.md)).
@@ -168,14 +170,75 @@ Each item is a [`bank-request`](../schemas/):
 No staff note, no bank-staff identity, no counterparty and no purpose leave the Basetool. These are
 the member's own data: a client may keep them.
 
+## Staff queue
+
+`GET /exchange/v1/bank/queue` under scope `exchange.bank.queue` — the pending booking requests the
+member works on as bank staff or approver, read-only and decided anew on every call. Two sections,
+both oldest first:
+
+- `open` — the requests of the member's staff queue in the Basetool: every pending request on an
+  account the member holds a grant on, every pending request of the bank for the Bankleitung.
+  `mayConfirm` tells whether the member's bank rights cover the request type there and the member
+  did not raise it; the member's own requests are listed with `mayConfirm: false`.
+- `toApprove` — the requests waiting for the member's approval, exactly those the member got an
+  "approval needed" notice for in the Basetool.
+
+Page with `cursor` and `limit` (1 to 500 per section, default 500): one cursor continues both
+sections, and `hasMore` stays true while either continues. `oldestOpenAt` is when the oldest request
+of either section was raised, `oldestOverdue` is true once it is 48 hours old.
+
+```json
+{
+  "oldestOpenAt": "2026-11-06T09:30:00Z",
+  "oldestOverdue": true,
+  "open": [
+    {
+      "id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "type": "WITHDRAWAL",
+      "amount": 2500,
+      "createdAt": "2026-11-06T09:30:00Z",
+      "ageHours": 52,
+      "account": { "id": "5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f", "no": "KB-0007",
+                   "name": "Staffel Nord", "orgUnitShorthand": "NORD" },
+      "targetAccount": null,
+      "requesterHandle": "nova",
+      "justification": "Fuel for the convoy",
+      "note": null,
+      "requiresOwnerApproval": false,
+      "requiredApprover": null,
+      "ownerApprovalGranted": false,
+      "mayConfirm": true,
+      "accountBalance": 1250000,
+      "client": null,
+      "link": "https://profit-base.online/bank/requests/7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+    }
+  ],
+  "toApprove": [],
+  "nextCursor": null,
+  "hasMore": false
+}
+```
+
+- `requesterHandle` is `null` when the requester withholds their name from connected applications.
+- `accountBalance` is the account's balance for the Bankleitung, and for an employee on an account
+  they hold a grant on; otherwise `null`.
+- `requiredApprover` is `RESPONSIBLE_HOLDER`, `BANK_MANAGEMENT` or `ORGANISATIONSLEITUNG` for a
+  request over the requester's limit, or `null`.
+- `client` names the connected application that raised the request, or `null`.
+- `link` opens the request in the Basetool. Confirming, rejecting and approving happen there only;
+  build no links of your own.
+
+No staff note, holder, custody balance or handle other than the requester's leaves the Basetool.
+
 ## Refusals
 
 | Answer | When |
 | --- | --- |
 | `404 NOT_FOUND` | The account does not exist, is closed, or the member may not view it. All three answer alike. |
-| `400 SCHEMA_INVALID` | The account id is not an id, or a bound is malformed, missing or too far apart. |
+| `400 SCHEMA_INVALID` | The account id is not an id, a bound is malformed, missing or too far apart, or a queue `limit` lies outside 1 to 500. |
 | `410 CURSOR_EXPIRED` | The cursor is not one the server issued, its account is gone for the member, or a feed cursor is older than the retained changes. |
-| `403 SCOPE_MISSING` | The token or the client's approval lacks `exchange.bank.read`. |
+| `403 NOT_BANK_STAFF` | The queue was asked for by a member with no bank role, no grant and no request to approve. |
+| `403 SCOPE_MISSING` | The token or the client's approval lacks `exchange.bank.read`, or `exchange.bank.queue` for the queue. |
 | `503 BANK_EXCHANGE_DISABLED` | The bank is switched off for connected applications. |
 
 The rest of the [error registry](../errors.md) applies as on every route.

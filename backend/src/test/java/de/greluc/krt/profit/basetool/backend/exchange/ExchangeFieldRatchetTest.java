@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccou
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankAccountPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBookingPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQueueDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
@@ -104,6 +105,7 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeBankAccountPageDto.class, "page.schema.json#/$defs/bankAccountPage"),
           Map.entry(ExchangeBankBookingPageDto.class, "page.schema.json#/$defs/bankBookingPage"),
           Map.entry(ExchangeBankBalanceSeriesDto.class, "bank-balance-series.schema.json"),
+          Map.entry(ExchangeBankQueueDto.class, "bank-queue.schema.json"),
           Map.entry(ExchangeBankRequestPageDto.class, "page.schema.json#/$defs/bankRequestPage"),
           Map.entry(ExchangeChangeResultDto.class, "change-result.schema.json"),
           Map.entry(
