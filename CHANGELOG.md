@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [v1.23.1](https://github.com/krt-profit/basetool/releases/tag/v1.23.1) - 2026-11-09
+
+### Changed
+
+- **Katalog-Namen.** Hersteller, Gegenstände, Schiffe, Materialien und Orte erscheinen auf jeder
+  Seite mit ihrem englischen Spielnamen, auch auf deutschen Seiten; Schiffsbeschreibungen kommen
+  auf Englisch. Der P4K-Import speichert die deutschen Texte weiter, sie werden nur nicht angezeigt.
+
+### Fixed
+
+- **Rohstoffpreise.** Der UEX-Abgleich übernimmt die Rohstoffpreise wieder. SCU-Mengen über rund
+  2,1 Milliarden ließen den ganzen Preisabruf und damit den Job `uex_sync` scheitern; sie werden
+  jetzt vollständig gespeichert (Migration V375).
+
+- **Deployment.** Ändert ein Release nur die gerenderte Umgebungsdatei eines Dienstes
+  (`env.d/<dienst>.env`), startet `deploy.sh` diesen Dienst jetzt neu – App-Dienste im geprüften
+  Neustartfenster, Monitoring-Dienste beim Monitoring-Abgleich. Bisher lief der Container mit der
+  alten Umgebung weiter, bis ihn jemand von Hand neu startete.
+
 ## [v1.23.0](https://github.com/krt-profit/basetool/releases/tag/v1.23.0) - 2026-11-09
 
 ### Added
