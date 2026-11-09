@@ -6242,7 +6242,8 @@ condition of the admin OTP (REQ-SEC-082); the Basetool never reads it.
 - **Read from the database only.** `CustomJwtGrantedAuthoritiesConverter` assembles the
   authorities from the stored roles and ignores a `realm_access` claim. A committed role change
   publishes `UserRolesChangedEvent`, which evicts every cached authority set of the member, so the
-  backend applies it on the member's next request. The frontend maps no role from the OIDC token;
+  backend applies it on the member's next request; an assembly that overlapped a role change does
+  not cache its result, so it cannot put the old roles back for the cache's TTL. The frontend maps no role from the OIDC token;
   `BackendRoleSyncFilter` takes the roles from `/api/v1/users/me` on the first request of a
   session and every 60 seconds after (ADR-0122).
 - **Never written by login or sync.** The login (`UserReconciliationService#syncUser(Jwt)`) and the

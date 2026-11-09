@@ -300,6 +300,31 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verify(userReconciliationService, times(2)).syncUser(jwt);
   }
 
+  /**
+   * An assembly that read the roles before a role change committed does not cache its result, so
+   * the eviction that ran while it was assembling is not undone for the cache's TTL.
+   */
+  @Test
+  void convert_whenTheRolesChangeWhileAssembling_doesNotCacheTheStaleResult() {
+    User admin = userWithNoRoles();
+    admin.setRoles(Set.of(namedRole("Admin"), namedRole("KRT Member")));
+    Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
+    when(userReconciliationService.syncUser(jwt))
+        .thenAnswer(_ -> {
+          converter.onRolesChanged(new UserRolesChangedEvent(USER_ID));
+          return admin;
+        })
+        .thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+
+    converter.convert(jwt);
+    Collection<String> after =
+        converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertFalse(after.contains("ROLE_ADMIN"), "the withdrawn role must not be served from cache");
+    verify(userReconciliationService, times(2)).syncUser(jwt);
+  }
+
   /** Another member's role change leaves this member's cached authorities alone. */
   @Test
   void convert_afterAnotherMembersRolesChanged_staysServedFromTheCache() {

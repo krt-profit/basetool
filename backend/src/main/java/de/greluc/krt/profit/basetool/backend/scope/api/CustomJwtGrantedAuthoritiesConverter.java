@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
@@ -126,6 +127,12 @@ public class CustomJwtGrantedAuthoritiesConverter
   private final Cache<String, Collection<GrantedAuthority>> authoritiesCache;
 
   /**
+   * Counts the committed role changes; an assembly that saw it move does not keep its result in
+   * {@link #authoritiesCache}, since it may have read the roles before the change.
+   */
+  private final AtomicLong roleChanges = new AtomicLong();
+
+  /**
    * Creates the converter and sizes its authorities cache from {@code
    * app.security.authorities-cache.ttl}.
    *
@@ -178,9 +185,15 @@ public class CustomJwtGrantedAuthoritiesConverter
         return cached;
       }
     }
+    long generation = roleChanges.get();
     Collection<GrantedAuthority> authorities = List.copyOf(assembleAuthorities(jwt));
     if (cacheKey != null && !authorities.contains(PENDING_APPROVAL_AUTHORITY)) {
       authoritiesCache.put(cacheKey, authorities);
+      // Put before the check: an eviction either bumped the generation already, or removes the
+      // entry after this put.
+      if (roleChanges.get() != generation) {
+        authoritiesCache.invalidate(cacheKey);
+      }
     }
     return authorities;
   }
@@ -240,6 +253,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    */
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onRolesChanged(@NonNull UserRolesChangedEvent event) {
+    roleChanges.incrementAndGet();
     String prefix = keyPrefix(event.userId().toString());
     authoritiesCache.asMap().keySet().removeIf(key -> key.startsWith(prefix));
   }
