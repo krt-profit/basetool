@@ -503,6 +503,7 @@ class ExchangeGoldenAnswerTest {
         get(
             "/bank/accounts/5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f/balance-series"
                 + "?from=2026-11-06T00:00:00Z&to=2026-11-08T23:59:59Z"));
+    routes.put("route-get-bank-queue", get("/bank/queue?limit=2"));
     routes.put("route-get-openapi", get("/openapi.json"));
     routes.put("route-get-schema", get("/schemas/page.schema.json"));
     return routes;
@@ -547,6 +548,8 @@ class ExchangeGoldenAnswerTest {
             fixture("page--bankBookingPage/valid/first-page.json");
         case "GET /api/v1/exchange/bank/accounts/{id}/balance-series" ->
             fixture("bank-balance-series/valid/three-days.json");
+        case "GET /api/v1/exchange/bank/queue" ->
+            fixture("bank-queue/valid/staff-and-approver.json");
         case "POST /api/v1/exchange/me/drafts/blueprints" -> PREVIEW;
         case "POST /api/v1/exchange/me/drafts/refinery-orders" -> REFINERY_DRAFT;
         default -> "{\"code\":\"NOT_FOUND\"}";

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountReads;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffQueueReads;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -27,11 +28,14 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * The opaque snapshot cursors of the bank reads (REQ-BXCH-002): {@code a1.<accountId>} continues
  * the account list after that account, {@code b1.<epochSecond>.<nano>.<postingId>} the bookings
- * after that booking. A value the server did not issue answers {@code 410 CURSOR_EXPIRED}.
+ * after that booking, {@code q1.<open>.<toApprove>} the two staff-queue sections, each after {@code
+ * <epochSecond>.<nano>.<requestId>} or from the start ({@code s}). A value the server did not issue
+ * answers {@code 410 CURSOR_EXPIRED}.
  */
 final class BankExchangeCursor {
 
@@ -42,6 +46,14 @@ final class BankExchangeCursor {
 
   private static final Pattern BOOKING =
       Pattern.compile("^b1\\.(\\d{1,12})\\.(\\d{1,9})\\." + UUID_PATTERN + "$");
+
+  private static final String QUEUE_KEY = "(s|(\\d{1,12})\\.(\\d{1,9})\\." + UUID_PATTERN + ")";
+
+  private static final Pattern QUEUE =
+      Pattern.compile("^q1\\." + QUEUE_KEY + "\\." + QUEUE_KEY + "$");
+
+  /** The queue key of a section read from its start. */
+  private static final String QUEUE_START = "s";
 
   /** Not instantiable. */
   private BankExchangeCursor() {}
@@ -104,4 +116,79 @@ final class BankExchangeCursor {
       throw ExchangeProblemException.cursorExpired();
     }
   }
+
+  /**
+   * Writes the cursor after the last item of each staff-queue section.
+   *
+   * @param open the last {@code open} item delivered so far, or {@code null}
+   * @param toApprove the last {@code toApprove} item delivered so far, or {@code null}
+   * @return the opaque value
+   */
+  static @NotNull String afterQueue(
+      @Nullable BankStaffQueueReads.QueueKey open,
+      @Nullable BankStaffQueueReads.QueueKey toApprove) {
+    return "q1." + queueKey(open) + "." + queueKey(toApprove);
+  }
+
+  /**
+   * Reads a staff-queue cursor a client echoed.
+   *
+   * @param value the cursor
+   * @return the last item delivered of each section
+   * @throws ExchangeProblemException {@code 410 CURSOR_EXPIRED} for a value the server did not
+   *     issue
+   */
+  static @NotNull QueuePosition parseQueue(@NotNull String value) {
+    Matcher matcher = QUEUE.matcher(value);
+    if (!matcher.matches()) {
+      throw ExchangeProblemException.cursorExpired();
+    }
+    try {
+      return new QueuePosition(queueKey(matcher, 1), queueKey(matcher, 5));
+    } catch (DateTimeException _) {
+      throw ExchangeProblemException.cursorExpired();
+    }
+  }
+
+  /**
+   * Writes one section's key.
+   *
+   * @param key the last item delivered, or {@code null}
+   * @return its cursor part
+   */
+  private static @NotNull String queueKey(@Nullable BankStaffQueueReads.QueueKey key) {
+    if (key == null) {
+      return QUEUE_START;
+    }
+    Instant at = key.createdAt();
+    return at.getEpochSecond() + "." + at.getNano() + "." + key.requestId();
+  }
+
+  /**
+   * Reads one section's key from the matched groups.
+   *
+   * @param matcher the matched cursor
+   * @param first the group of the whole key; the second, nano and id follow it
+   * @return the key, or {@code null} for a section read from its start
+   */
+  private static @Nullable BankStaffQueueReads.QueueKey queueKey(
+      @NotNull Matcher matcher, int first) {
+    if (QUEUE_START.equals(matcher.group(first))) {
+      return null;
+    }
+    Instant at =
+        Instant.ofEpochSecond(
+            Long.parseLong(matcher.group(first + 1)), Long.parseLong(matcher.group(first + 2)));
+    return new BankStaffQueueReads.QueueKey(at, UUID.fromString(matcher.group(first + 3)));
+  }
+
+  /**
+   * Where each staff-queue section continues.
+   *
+   * @param open the last {@code open} item delivered, or {@code null}
+   * @param toApprove the last {@code toApprove} item delivered, or {@code null}
+   */
+  record QueuePosition(
+      @Nullable BankStaffQueueReads.QueueKey open,
+      @Nullable BankStaffQueueReads.QueueKey toApprove) {}
 }

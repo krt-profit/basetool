@@ -112,7 +112,8 @@ class BankAccessPolicyRulesTest {
           BANK + ".api.BankRequestApprover",
           BANK + ".api.BankStaffRights",
           BANK + ".api.BankBookingRequestType",
-          BANK + ".api.BankAccountReads");
+          BANK + ".api.BankAccountReads",
+          BANK + ".api.BankStaffQueueReads");
 
   @Test
   @DisplayName("the bank access policy never reads the security context, directly or by a call")

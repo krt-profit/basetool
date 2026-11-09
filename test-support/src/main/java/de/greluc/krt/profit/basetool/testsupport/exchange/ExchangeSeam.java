@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 22 relay operations on 21 backend paths, each with the gateway route that relays it, the
+   * The 23 relay operations on 22 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -237,7 +237,15 @@ public final class ExchangeSeam {
               "exchange.bank.read",
               false,
               null,
-              "bank-balance-series.schema.json"));
+              "bank-balance-series.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/bank/queue",
+              "/bank/queue",
+              "exchange.bank.queue",
+              true,
+              null,
+              "bank-queue.schema.json"));
 
   /** The query parameters a paged relay operation passes on. */
   public static final @Unmodifiable List<String> PAGE_PARAMETERS = List.of("cursor", "limit");
@@ -299,8 +307,7 @@ public final class ExchangeSeam {
    * The capability scopes the registry, the realm and the consent screen know although no route
    * serves them yet; a client granted one is refused nothing and given nothing (REQ-BXCH-001).
    */
-  public static final @Unmodifiable Set<String> UNROUTED_SCOPES =
-      Set.of("exchange.bank.request", "exchange.bank.queue");
+  public static final @Unmodifiable Set<String> UNROUTED_SCOPES = Set.of("exchange.bank.request");
 
   /**
    * The registry gate's codes, each with the only status either side answers it with (REQ-XCH-025).
@@ -325,6 +332,7 @@ public final class ExchangeSeam {
           "ACTING_MEMBER_REFUSED",
           "NOT_PERMITTED",
           "NOT_FOUND",
+          "NOT_BANK_STAFF",
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
           "CURSOR_EXPIRED",

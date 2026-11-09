@@ -75,7 +75,8 @@ public final class ExchangeRoutes {
               "exchange.drafts.refinery"),
           route(HttpMethod.GET, BANK_PATH + "/accounts", "exchange.bank.read"),
           route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/bookings", "exchange.bank.read"),
-          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/balance-series", "exchange.bank.read"));
+          route(HttpMethod.GET, BANK_PATH + "/accounts/{id}/balance-series", "exchange.bank.read"),
+          route(HttpMethod.GET, BANK_PATH + "/queue", "exchange.bank.queue"));
 
   /** Not instantiable. */
   private ExchangeRoutes() {}

@@ -1517,6 +1517,72 @@
           }
         ]
       }
+    },
+    "/exchange/v1/bank/queue": {
+      "get": {
+        "operationId": "bank_queue",
+        "summary": "The read-only bank-staff queue: the pending requests the member's staff queue shows and those waiting for the member's approval, oldest first: a snapshot.",
+        "tags": [
+          "bank"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.bank.queue"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/bank-queue.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "open is the Basetool staff queue's set (the granted accounts for a bank employee, the whole bank for the Bankleitung) with mayConfirm; toApprove the requests whose approval-needed notice goes to the member. Decided anew on every call; the Admin role has no effect. A member without a bank role, a grant and a request to approve answers 403 NOT_BANK_STAFF. Each item links to its page in the Basetool; confirming and approving stay there. Retention class: foreign bank data. A client keeps it in memory only, for at most 7 days.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque position of both sections from a previous page of the same snapshot. A cursor the server did not issue answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "The page size of each section.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 500
+            }
+          }
+        ]
+      }
     }
   },
   "components": {

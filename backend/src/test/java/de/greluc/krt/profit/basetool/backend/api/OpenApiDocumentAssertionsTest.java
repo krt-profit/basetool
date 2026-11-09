@@ -121,13 +121,13 @@ class OpenApiDocumentAssertionsTest {
         .anySatisfy(problem -> assertThat(problem).contains("is not an exchange relay path"))
         .anySatisfy(problem -> assertThat(problem).contains("anonymous operations"))
         .anySatisfy(problem -> assertThat(problem).contains("not exchange only"))
-        .anySatisfy(problem -> assertThat(problem).contains("expected exactly 22"))
+        .anySatisfy(problem -> assertThat(problem).contains("expected exactly 23"))
         .anySatisfy(problem -> assertThat(problem).contains("lacks the component"));
 
     ObjectNode relay = (ObjectNode) CommittedOpenApi.relay().deepCopy();
     ((ObjectNode) relay.path("paths")).remove("/api/v1/exchange/me/org-demand");
     assertThat(OpenApiDocumentAssertions.relayProblems(relay))
-        .anySatisfy(problem -> assertThat(problem).contains("has 21 operations"));
+        .anySatisfy(problem -> assertThat(problem).contains("has 22 operations"));
   }
 
   /**
