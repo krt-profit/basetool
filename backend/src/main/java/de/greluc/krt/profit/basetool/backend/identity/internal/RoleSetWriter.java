@@ -88,8 +88,8 @@ public class RoleSetWriter {
   }
 
   /**
-   * Moves the counter of a user whose role set was changed before the row was saved, which may
-   * have created it, and mirrors it on the entity.
+   * Moves the counter of a user whose role set was changed before the row was saved, which may have
+   * created it, and mirrors it on the entity.
    *
    * @param user the user, now saved
    */

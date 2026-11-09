@@ -83,8 +83,8 @@ class BootstrapAdminLoginIntegrationTest {
             UUID.class,
             Roles.ADMIN,
             SUBJECT));
-    parkedAdmins.forEach(
-        id -> jdbcTemplate.update("UPDATE app_user SET enabled_in_keycloak = FALSE WHERE id = ?", id));
+    parkedAdmins.forEach(id ->
+        jdbcTemplate.update("UPDATE app_user SET enabled_in_keycloak = FALSE WHERE id = ?", id));
   }
 
   /** Removes the bootstrap subject's rows and turns the parked admins back on. */
@@ -96,8 +96,8 @@ class BootstrapAdminLoginIntegrationTest {
     jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", SUBJECT);
     jdbcTemplate.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", SUBJECT);
     jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", SUBJECT);
-    parkedAdmins.forEach(
-        id -> jdbcTemplate.update("UPDATE app_user SET enabled_in_keycloak = TRUE WHERE id = ?", id));
+    parkedAdmins.forEach(id ->
+        jdbcTemplate.update("UPDATE app_user SET enabled_in_keycloak = TRUE WHERE id = ?", id));
     parkedAdmins.clear();
   }
 

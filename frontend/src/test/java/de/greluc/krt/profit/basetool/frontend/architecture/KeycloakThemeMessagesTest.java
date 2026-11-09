@@ -67,7 +67,9 @@ class KeycloakThemeMessagesTest {
       }
     });
 
-    assertThat(broken).as("messages in %s with an apostrophe MessageFormat drops", bundle).isEmpty();
+    assertThat(broken)
+        .as("messages in %s with an apostrophe MessageFormat drops", bundle)
+        .isEmpty();
   }
 
   /**

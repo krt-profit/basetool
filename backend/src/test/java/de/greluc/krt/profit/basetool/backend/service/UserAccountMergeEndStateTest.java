@@ -53,9 +53,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -169,9 +169,11 @@ class UserAccountMergeEndStateTest {
           .isEqualTo(targetBefore.get(column) + moved.getValue());
     }
     assertThat(counts(bystander)).as("the bystander's rows").isEqualTo(bystanderBefore);
-    assertThat(rolesVersion(source)).as("the emptied role set's counter")
+    assertThat(rolesVersion(source))
+        .as("the emptied role set's counter")
         .isGreaterThan(sourceRolesVersion);
-    assertThat(rolesVersion(target)).as("the joined role set's counter")
+    assertThat(rolesVersion(target))
+        .as("the joined role set's counter")
         .isGreaterThan(targetRolesVersion);
     assertThat(rolesVersion(bystander)).isEqualTo(bystanderRolesVersion);
     assertThat(events.stream(UserRolesChangedEvent.class).map(UserRolesChangedEvent::userId))

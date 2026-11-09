@@ -79,8 +79,9 @@ class FrontendRequestedScopesParityTest {
     offered.add(OPENID);
 
     assertThat(requestedScopes())
-        .as("scopes %s requests that %s does not offer in %s", APPLICATION_YAML, FRONTEND_CLIENT_ID,
-            realmPath)
+        .as(
+            "scopes %s requests that %s does not offer in %s",
+            APPLICATION_YAML, FRONTEND_CLIENT_ID, realmPath)
         .isSubsetOf(offered);
   }
 

@@ -39,8 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Runs in the login's reconciliation transaction: {@link #lockFor} serialises a bootstrap
  * subject's logins before the user is read, {@link #grantIfDue} adds the role to the loaded user,
- * and {@link #recordGrant} bumps the role-set counter and audits the grant once the
- * row is persisted.
+ * and {@link #recordGrant} bumps the role-set counter and audits the grant once the row is
+ * persisted.
  */
 @Component
 @RequiredArgsConstructor
