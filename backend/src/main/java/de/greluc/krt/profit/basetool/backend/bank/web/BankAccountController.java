@@ -59,7 +59,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -155,20 +154,18 @@ public class BankAccountController {
    * (REQ-BANK-003).
    *
    * @param id the account
-   * @param authentication the caller's authentication, used to evaluate the capability flags
    * @return the detail payload
    */
   @Operation(summary = "Read one bank account incl. holder distribution")
   @GetMapping("/{id}")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSee(#id)")
   @Transactional(readOnly = true)
-  public BankAccountDetailDto getAccount(
-      @PathVariable @NotNull UUID id, Authentication authentication) {
+  public BankAccountDetailDto getAccount(@PathVariable @NotNull UUID id) {
     BankCapabilitiesDto capabilities =
         new BankCapabilitiesDto(
-            bankSecurityService.canDeposit(id, authentication),
-            bankSecurityService.canWithdraw(id, authentication),
-            bankSecurityService.canTransfer(id, authentication),
+            bankSecurityService.canDeposit(id),
+            bankSecurityService.canWithdraw(id),
+            bankSecurityService.canTransfer(id),
             bankSecurityService.isManagement());
     return bankAccountService.getAccountDetail(id, capabilities);
   }
@@ -200,7 +197,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Set or clear a bank account's balance target (bank staff with access)")
   @PutMapping("/{id}/balance-target")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSee(#id)")
   @Transactional
   public BankAccountDto setBalanceTarget(
       @PathVariable @NotNull UUID id,
@@ -275,7 +272,7 @@ public class BankAccountController {
    */
   @Operation(summary = "List the booking history of a bank account (paged, optional period)")
   @GetMapping("/{id}/transactions")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSee(#id)")
   @Transactional(readOnly = true)
   public PageResponse<BankBookingDto> getBookings(
       @PathVariable @NotNull UUID id,
@@ -303,7 +300,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Balance-over-time series of a bank account for a period")
   @GetMapping("/{id}/balance-series")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSee(#id)")
   @Transactional(readOnly = true)
   public BankBalanceSeriesDto getBalanceSeries(
       @PathVariable @NotNull UUID id,
@@ -326,7 +323,7 @@ public class BankAccountController {
    */
   @Operation(summary = "Download the account statement PDF for a period")
   @GetMapping("/{id}/statement")
-  @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
+  @PreAuthorize("@bankSecurityService.canSee(#id)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,

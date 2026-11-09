@@ -26,15 +26,13 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The {@code @PreAuthorize} helper bean of the bank-staff surface (ADR-0011): a thin adapter that
  * asks {@link BankAccessPolicy} for the request's {@link BankCaller#actor()} and decides nothing
- * itself (ADR-0352). The authentication argument of the gates is the SpEL contract; the actor comes
- * from the database.
+ * itself (ADR-0352). The gates pass only the id they check; the actor comes from the database.
  */
 @Service("bankSecurityService")
 @RequiredArgsConstructor
@@ -69,10 +67,9 @@ public class BankSecurityService {
    * Whether the caller may see the account on the bank-staff side (REQ-BANK-009).
    *
    * @param accountId the account to check
-   * @param authentication the current authentication, the SpEL argument of the gate
    * @return {@link BankStaffRights#canSee(UUID)} of the caller
    */
-  public boolean canSee(@NotNull UUID accountId, Authentication authentication) {
+  public boolean canSee(@NotNull UUID accountId) {
     return staffRights().canSee(accountId);
   }
 
@@ -80,10 +77,9 @@ public class BankSecurityService {
    * Whether the caller may see a holder's custody history (REQ-BANK-032).
    *
    * @param holderId the holder whose history is requested
-   * @param authentication the current authentication, the SpEL argument of the gate
    * @return {@link BankStaffRights#maySeeHolder(UUID)} for the member the holder belongs to
    */
-  public boolean canSeeHolder(@NotNull UUID holderId, Authentication authentication) {
+  public boolean canSeeHolder(@NotNull UUID holderId) {
     return staffRights()
         .maySeeHolder(
             holderRepository
@@ -96,10 +92,9 @@ public class BankSecurityService {
    * Whether the caller may book deposits onto the account (REQ-BANK-009).
    *
    * @param accountId the receiving account
-   * @param authentication the current authentication, the SpEL argument of the gate
    * @return {@code true} iff the caller holds the deposit capability
    */
-  public boolean canDeposit(@NotNull UUID accountId, Authentication authentication) {
+  public boolean canDeposit(@NotNull UUID accountId) {
     return staffRights().canBook(BankBookingRequestType.DEPOSIT, accountId);
   }
 
@@ -107,10 +102,9 @@ public class BankSecurityService {
    * Whether the caller may book withdrawals from the account (REQ-BANK-009).
    *
    * @param accountId the paying account
-   * @param authentication the current authentication, the SpEL argument of the gate
    * @return {@code true} iff the caller holds the withdrawal capability
    */
-  public boolean canWithdraw(@NotNull UUID accountId, Authentication authentication) {
+  public boolean canWithdraw(@NotNull UUID accountId) {
     return staffRights().canBook(BankBookingRequestType.WITHDRAWAL, accountId);
   }
 
@@ -118,10 +112,9 @@ public class BankSecurityService {
    * Whether the caller may transfer out of the account (REQ-BANK-011).
    *
    * @param accountId the source account
-   * @param authentication the current authentication, the SpEL argument of the gate
    * @return {@code true} iff the caller holds the transfer capability
    */
-  public boolean canTransfer(@NotNull UUID accountId, Authentication authentication) {
+  public boolean canTransfer(@NotNull UUID accountId) {
     return staffRights().canBook(BankBookingRequestType.TRANSFER, accountId);
   }
 
