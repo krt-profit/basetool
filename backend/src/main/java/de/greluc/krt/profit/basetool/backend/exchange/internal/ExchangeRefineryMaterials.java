@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatal
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -50,7 +51,7 @@ class ExchangeRefineryMaterials {
   private final MaterialRepository materialRepository;
 
   /**
-   * Resolves every distinct reference.
+   * Resolves every distinct reference; references that name one material alike each map to it.
    *
    * @param refs the references, duplicates allowed
    * @return per reference its material or the outcome of a reference that names no single one
@@ -64,24 +65,30 @@ class ExchangeRefineryMaterials {
     }
     ExchangeResolveResponse response =
         resolveService.resolve(new ExchangeResolveRequest(ExchangeCatalogKind.MATERIAL, distinct));
-    Map<UUID, ExchangeItemRef> byId = new HashMap<>();
+    Map<UUID, List<ExchangeItemRef>> byId = new HashMap<>();
     for (ExchangeResolveResponse.Result result : response.results()) {
       ExchangeItemRef ref = distinct.get(result.index());
       switch (result.status()) {
-        case RESOLVED -> byId.put(UUID.fromString(Objects.requireNonNull(result.ref()).bt()), ref);
+        case RESOLVED ->
+            byId.computeIfAbsent(
+                    UUID.fromString(Objects.requireNonNull(result.ref()).bt()),
+                    _ -> new ArrayList<>())
+                .add(ref);
         case AMBIGUOUS ->
             resolved.put(
                 ref,
-                Resolved.refused(
-                    new Outcome(ExchangeOps.AMBIGUOUS, ExchangeRefineryReasons.AMBIGUOUS)));
+                Resolved.refused(new Outcome(ExchangeOps.AMBIGUOUS, ExchangeReasons.AMBIGUOUS)));
         case UNMATCHED -> resolved.put(ref, Resolved.UNMATCHED);
         case null -> throw new IllegalStateException("A resolver result without a status");
       }
     }
     for (Material material : materialRepository.findAllById(byId.keySet())) {
-      resolved.put(byId.get(material.getId()), new Resolved(material, null));
+      Resolved found = new Resolved(material, null);
+      byId.getOrDefault(material.getId(), List.of()).forEach(ref -> resolved.put(ref, found));
     }
-    byId.values().forEach(ref -> resolved.putIfAbsent(ref, Resolved.UNMATCHED));
+    byId.values().stream()
+        .flatMap(List::stream)
+        .forEach(ref -> resolved.putIfAbsent(ref, Resolved.UNMATCHED));
     return resolved;
   }
 
@@ -95,7 +102,7 @@ class ExchangeRefineryMaterials {
 
     /** A reference that names nothing. */
     static final Resolved UNMATCHED =
-        refused(new Outcome(ExchangeOps.UNMATCHED, ExchangeRefineryReasons.UNMATCHED));
+        refused(new Outcome(ExchangeOps.UNMATCHED, ExchangeReasons.UNMATCHED));
 
     /**
      * A reference that ends its op.

@@ -96,10 +96,10 @@ public class ExchangeOrgStockWriteService
   static final String HOLDER_UNKNOWN = "HOLDER_UNKNOWN";
 
   /** The refusal of a place without a Lager location. */
-  static final String LOCATION_UNKNOWN = "LOCATION_UNKNOWN";
+  static final String LOCATION_UNKNOWN = ExchangeReasons.LOCATION_UNKNOWN;
 
   /** The refusal of a quantity whose unit is not the material's. */
-  static final String UNIT_MISMATCH = "UNIT_MISMATCH";
+  static final String UNIT_MISMATCH = ExchangeReasons.UNIT_MISMATCH;
 
   private final ExchangeOrgUnitService orgUnitService;
   private final ExchangeOrgStockRoster roster;

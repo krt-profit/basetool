@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
  * @param locationId where the stock is booked, a location the Lager offers
  * @param quality the quality from 0 to 1000
  * @param amount the amount in the material's own unit, above zero
+ * @param unit the material's own unit, the one {@code amount} is in
  * @param receiverId the member whose stock receives the line
  * @param orgUnitId the owning unit of the booked stock, or {@code null} for none
  * @param personal whether the stock is the receiver's private stock
@@ -42,6 +44,7 @@ public record RefineryExchangeStoreLine(
     @NotNull UUID locationId,
     int quality,
     double amount,
+    @NotNull QuantityType unit,
     @NotNull UUID receiverId,
     @Nullable UUID orgUnitId,
     boolean personal,

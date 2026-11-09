@@ -19,27 +19,37 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * What the journal holds of a refinery order, and its JSON shape (REQ-XCH-056): every field a
- * client writes, the section counters and the location's name for the activity list.
+ * A refinery order as an exchange write sees it (REQ-XCH-052, REQ-XCH-056): what each op of a
+ * change set is decided against, what the journal holds for the undo, and its JSON shape there. A
+ * real run reads it from every order the refinery module returns; a dry run derives it from each op
+ * by the {@link de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter}
+ * contract, so both decide every op alike.
  *
  * @param location the location
  * @param locationName the location's name
@@ -47,9 +57,9 @@ import tools.jackson.databind.JsonNode;
  * @param startedAt the run's start, or {@code null}
  * @param durationMinutes the run's length, or {@code null}
  * @param status the status
- * @param expenses the refining costs, or {@code null}
- * @param otherExpenses further costs, or {@code null}
- * @param oreSales the raw-ore revenue, or {@code null}
+ * @param expenses the refining costs as stored, or {@code null}
+ * @param otherExpenses further costs as stored, or {@code null}
+ * @param oreSales the raw-ore revenue as stored, or {@code null}
  * @param goods the goods with their row ids
  * @param gameData the game-data counter
  * @param finances the finances counter
@@ -96,9 +106,9 @@ record ExchangeRefineryOrderState(
   private static final String READY_NOTIFIED_AT = "readyNotifiedAt";
 
   /**
-   * Captures an order.
+   * Captures an order as the refinery module returns it.
    *
-   * @param order the order as the refinery module reads it
+   * @param order the order
    * @return the state
    */
   static @NotNull ExchangeRefineryOrderState of(@NotNull RefineryExchangeOrder order) {
@@ -117,6 +127,174 @@ record ExchangeRefineryOrderState(
         order.financesVersion(),
         order.storedAt() != null,
         null);
+  }
+
+  /**
+   * The order a create writes: counters at 0, the run started at its timer or at the write.
+   *
+   * @param edit the create's parts, with location and status
+   * @param place the location's name
+   * @param outputs the output material of each input the create names
+   * @param now the time of the write
+   * @return the state of the created order
+   */
+  static @NotNull ExchangeRefineryOrderState created(
+      @NotNull RefineryExchangeEdit edit,
+      @NotNull String place,
+      @NotNull Map<UUID, UUID> outputs,
+      @NotNull Instant now) {
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    RefineryExchangeEdit.Finances finances = edit.finances();
+    return new ExchangeRefineryOrderState(
+        Objects.requireNonNull(edit.locationId(), "locationId"),
+        place,
+        edit.method() == null ? null : edit.method().id(),
+        timer != null && timer.startedAt() != null ? timer.startedAt() : now,
+        timer == null ? null : timer.durationMinutes(),
+        Objects.requireNonNull(edit.status(), "status"),
+        finances == null ? null : RefineryExchangeRules.money(finances.expenses()),
+        finances == null ? null : RefineryExchangeRules.money(finances.otherExpenses()),
+        finances == null ? null : RefineryExchangeRules.money(finances.oreSales()),
+        edit.goods() == null ? List.of() : goods(edit.goods(), outputs),
+        0L,
+        0L,
+        false,
+        null);
+  }
+
+  /**
+   * The order after an edit: each section it writes set and its counter raised by one.
+   *
+   * @param edit the edit
+   * @param place the name of the location the edit names, or {@code null} when it names none
+   * @param outputs the output material of each input the edit newly names
+   * @return the state after the edit
+   */
+  @NotNull
+  ExchangeRefineryOrderState edited(
+      @NotNull RefineryExchangeEdit edit,
+      @Nullable String place,
+      @NotNull Map<UUID, UUID> outputs) {
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    RefineryExchangeEdit.Finances finances = edit.finances();
+    Map<UUID, UUID> known = new HashMap<>(outputs);
+    goods.forEach(good -> {
+      if (good.output() != null) {
+        known.putIfAbsent(good.input(), good.output());
+      }
+    });
+    return new ExchangeRefineryOrderState(
+        edit.locationId() == null ? location : edit.locationId(),
+        edit.locationId() == null || place == null ? locationName : place,
+        edit.method() == null ? method : edit.method().id(),
+        timer == null ? startedAt : timer.startedAt(),
+        timer == null ? durationMinutes : timer.durationMinutes(),
+        edit.status() == null ? status : edit.status(),
+        finances == null ? expenses : RefineryExchangeRules.money(finances.expenses()),
+        finances == null ? otherExpenses : RefineryExchangeRules.money(finances.otherExpenses()),
+        finances == null ? oreSales : RefineryExchangeRules.money(finances.oreSales()),
+        edit.goods() == null ? goods : goods(edit.goods(), known),
+        gameData + (edit.touchesGameData() ? 1 : 0),
+        this.finances + (finances == null ? 0 : 1),
+        stored,
+        null);
+  }
+
+  /**
+   * The order after a cancel.
+   *
+   * @return the state, cancelled with the game-data counter raised by one
+   */
+  @NotNull
+  ExchangeRefineryOrderState canceled() {
+    return closed(RefineryOrderStatus.CANCELED, stored, goods);
+  }
+
+  /**
+   * The order after a pickup. Store lines store it and write the amounts booked onto each good back
+   * into that good's yield, summed, as the refinery's store does (REQ-REFINERY-022).
+   *
+   * @param lines the pickup's store lines, each of an output of the goods; empty to book nothing
+   * @return the state, completed with the game-data counter raised by one
+   */
+  @NotNull
+  ExchangeRefineryOrderState pickedUp(@NotNull List<RefineryExchangeStoreLine> lines) {
+    if (lines.isEmpty()) {
+      return closed(RefineryOrderStatus.COMPLETED, stored, goods);
+    }
+    List<Integer> positions = IntStream.range(0, goods.size()).boxed().toList();
+    Map<Integer, Booked> booked = new HashMap<>();
+    for (RefineryExchangeStoreLine line : lines) {
+      Integer at =
+          Objects.requireNonNull(
+              RefineryExchangeRules.storedGood(
+                  positions,
+                  i -> goods.get(i).output(),
+                  i -> goods.get(i).quality(),
+                  line.materialId(),
+                  line.quality()),
+              "good");
+      booked.merge(at, new Booked(line.unit(), line.amount()), Booked::plus);
+    }
+    List<Good> written =
+        positions.stream()
+            .map(i -> {
+              Booked onto = booked.get(i);
+              return onto == null
+                  ? goods.get(i)
+                  : goods
+                      .get(i)
+                      .withOutputQuantity(
+                          RefineryExchangeRules.storedYield(onto.unit(), onto.amount()));
+            })
+            .toList();
+    return closed(RefineryOrderStatus.COMPLETED, true, written);
+  }
+
+  /**
+   * Whether an update would leave the order as it is.
+   *
+   * @param edit the update
+   * @return {@code true} when every part it carries equals the order's
+   */
+  boolean unchangedBy(@NotNull RefineryExchangeEdit edit) {
+    RefineryExchangeEdit.Finances money = edit.finances();
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    return (edit.locationId() == null || edit.locationId().equals(location))
+        && (edit.method() == null || Objects.equals(edit.method().id(), method))
+        && (edit.status() == null || edit.status() == status)
+        && (timer == null
+            || (Objects.equals(timer.startedAt(), startedAt)
+                && Objects.equals(timer.durationMinutes(), durationMinutes)))
+        && (money == null
+            || (Objects.equals(RefineryExchangeRules.money(money.expenses()), expenses)
+                && Objects.equals(RefineryExchangeRules.money(money.otherExpenses()), otherExpenses)
+                && Objects.equals(RefineryExchangeRules.money(money.oreSales()), oreSales)));
+  }
+
+  /**
+   * The goods as the rows the refinery module writes back under their ids.
+   *
+   * @return every good with its row id
+   */
+  @NotNull
+  @Unmodifiable
+  List<RefineryExchangeEdit.Good> editGoods() {
+    return goods.stream().map(Good::toEdit).toList();
+  }
+
+  /**
+   * The output materials of the goods.
+   *
+   * @return the materials a store line may book
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> outputs() {
+    return goods.stream()
+        .map(Good::output)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
@@ -142,17 +320,6 @@ record ExchangeRefineryOrderState(
         finances,
         stored,
         removed);
-  }
-
-  /**
-   * The goods as the rows the refinery module writes back under their ids.
-   *
-   * @return the goods
-   */
-  @NotNull
-  @Unmodifiable
-  List<RefineryExchangeEdit.Good> editGoods() {
-    return goods.stream().map(Good::toEdit).toList();
   }
 
   /**
@@ -214,7 +381,7 @@ record ExchangeRefineryOrderState(
     }
     return new ExchangeRefineryOrderState(
         location,
-        Objects.requireNonNullElse(ExchangeJournalJson.text(node, LOCATION_NAME), ""),
+        Objects.requireNonNullElse(locationName(node), ""),
         ExchangeJournalJson.uuid(node, METHOD),
         instant(node, STARTED_AT),
         longOrNull(node, DURATION_MINUTES),
@@ -227,6 +394,66 @@ record ExchangeRefineryOrderState(
         finances.longValue(),
         stored != null && stored.asBoolean(),
         originOf(node.get(ORIGIN)));
+  }
+
+  /**
+   * Reads the location's name of a state the journal stores, for the activity list.
+   *
+   * @param node the state
+   * @return the name, or {@code null} when absent
+   */
+  static @Nullable String locationName(@NotNull JsonNode node) {
+    return ExchangeJournalJson.text(node, LOCATION_NAME);
+  }
+
+  /**
+   * The order closed with a status, the game-data counter raised by one.
+   *
+   * @param closedAs the status
+   * @param storedAfter whether the yield is booked afterwards
+   * @param goodsAfter the goods afterwards
+   * @return the state
+   */
+  private @NotNull ExchangeRefineryOrderState closed(
+      @NotNull RefineryOrderStatus closedAs,
+      boolean storedAfter,
+      @NotNull @Unmodifiable List<Good> goodsAfter) {
+    return new ExchangeRefineryOrderState(
+        location,
+        locationName,
+        method,
+        startedAt,
+        durationMinutes,
+        closedAs,
+        expenses,
+        otherExpenses,
+        oreSales,
+        goodsAfter,
+        gameData + 1,
+        finances,
+        storedAfter,
+        null);
+  }
+
+  /**
+   * The goods an edit sets.
+   *
+   * @param goods the edit's goods
+   * @param outputs the output material of each input
+   * @return the goods with their outputs
+   */
+  private static @NotNull @Unmodifiable List<Good> goods(
+      @NotNull List<RefineryExchangeEdit.Good> goods, @NotNull Map<UUID, UUID> outputs) {
+    return goods.stream()
+        .map(good ->
+            new Good(
+                good.id(),
+                good.inputMaterialId(),
+                outputs.get(good.inputMaterialId()),
+                good.inputQuantity(),
+                good.outputQuantity(),
+                good.quality()))
+        .toList();
   }
 
   /**
@@ -329,19 +556,46 @@ record ExchangeRefineryOrderState(
   }
 
   /**
-   * One good as the journal holds it.
+   * The amounts a pickup's store lines book onto one good.
    *
-   * @param id the row id
+   * @param unit the output material's own unit
+   * @param amount the amounts together, in that unit
+   */
+  private record Booked(@NotNull QuantityType unit, double amount) {
+
+    /**
+     * Adds another line's amount.
+     *
+     * @param other the other line's booking
+     * @return the bookings together
+     */
+    @NotNull
+    Booked plus(@NotNull Booked other) {
+      return new Booked(unit, amount + other.amount());
+    }
+  }
+
+  /**
+   * One good.
+   *
+   * @param id the row id, or {@code null} for one a dry run adds
    * @param input the input material
+   * @param output the output material, or {@code null} in a journal state written without it
    * @param inputQuantity the input amount in units
    * @param outputQuantity the yield in units
    * @param quality the quality
    */
   record Good(
-      @NotNull UUID id, @NotNull UUID input, int inputQuantity, int outputQuantity, int quality) {
+      @Nullable UUID id,
+      @NotNull UUID input,
+      @Nullable UUID output,
+      int inputQuantity,
+      int outputQuantity,
+      int quality) {
 
     private static final String ID = "id";
     private static final String INPUT = "input";
+    private static final String OUTPUT = "output";
     private static final String INPUT_QUANTITY = "inputQuantity";
     private static final String OUTPUT_QUANTITY = "outputQuantity";
     private static final String QUALITY = "quality";
@@ -350,21 +604,33 @@ record ExchangeRefineryOrderState(
      * Captures a good.
      *
      * @param good the good as the refinery module reads it
-     * @return the journaled good
+     * @return the good
      */
     static @NotNull Good of(@NotNull RefineryExchangeOrder.Good good) {
       return new Good(
           good.id(),
           good.inputMaterialId(),
+          good.outputMaterialId(),
           good.inputQuantity(),
           good.outputQuantity(),
           good.quality());
     }
 
     /**
+     * The same good with another yield.
+     *
+     * @param units the yield in units
+     * @return the good
+     */
+    @NotNull
+    Good withOutputQuantity(int units) {
+      return new Good(id, input, output, inputQuantity, units, quality);
+    }
+
+    /**
      * Turns the good into the row the refinery module writes back under its id.
      *
-     * @return the good
+     * @return the row
      */
     @NotNull
     RefineryExchangeEdit.Good toEdit() {
@@ -379,8 +645,9 @@ record ExchangeRefineryOrderState(
     @NotNull
     Map<String, Object> toJournal() {
       Map<String, Object> good = new LinkedHashMap<>();
-      good.put(ID, id.toString());
+      good.put(ID, text(id));
       good.put(INPUT, input.toString());
+      good.put(OUTPUT, text(output));
       good.put(INPUT_QUANTITY, inputQuantity);
       good.put(OUTPUT_QUANTITY, outputQuantity);
       good.put(QUALITY, quality);
@@ -391,7 +658,7 @@ record ExchangeRefineryOrderState(
      * Reads a good the journal stores.
      *
      * @param node the good
-     * @return the good, or {@code null} when a field is absent or of the wrong kind
+     * @return the good, or {@code null} when a required field is absent or of the wrong kind
      */
     static @Nullable Good read(@NotNull JsonNode node) {
       UUID id = ExchangeJournalJson.uuid(node, ID);
@@ -409,6 +676,7 @@ record ExchangeRefineryOrderState(
       return new Good(
           id,
           input,
+          ExchangeJournalJson.uuid(node, OUTPUT),
           Math.toIntExact(inputQuantity),
           Math.toIntExact(outputQuantity),
           Math.toIntExact(quality));

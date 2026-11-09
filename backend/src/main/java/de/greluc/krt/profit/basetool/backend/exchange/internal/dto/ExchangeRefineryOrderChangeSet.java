@@ -24,6 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -42,6 +43,9 @@ import org.jetbrains.annotations.Nullable;
  */
 public record ExchangeRefineryOrderChangeSet(
     @NotNull @Size(min = 1, max = 500) List<@NotNull @Valid Op> ops, boolean dryRun) {
+
+  /** The longest run an op may report, one year in minutes. */
+  public static final long MAX_DURATION_MINUTES = 525_600L;
 
   /**
    * Whether an op of the set books stock: a pickup with store lines, which needs {@code
@@ -69,7 +73,8 @@ public record ExchangeRefineryOrderChangeSet(
    * @param method the refining method, or {@code null} to leave it
    * @param status {@code OPEN} or {@code IN_PROGRESS}, or {@code null} to leave it
    * @param endsAt when the run ends, or {@code null} to leave the timer
-   * @param durationMinutes the run's length, or {@code null} to start the run at the write
+   * @param durationMinutes the run's length, at most one year, or {@code null} to start the run at
+   *     the write
    * @param expenses the refining costs, or {@code null} to leave them
    * @param otherExpenses further costs, or {@code null} to leave them
    * @param oreSales the raw-ore revenue, or {@code null} to leave it
@@ -97,7 +102,7 @@ public record ExchangeRefineryOrderChangeSet(
       @Nullable @Valid MethodRef method,
       @Nullable @Pattern(regexp = "^(OPEN|IN_PROGRESS)$") String status,
       @Nullable Instant endsAt,
-      @Nullable @Min(0) Long durationMinutes,
+      @Nullable @Min(0) @Max(MAX_DURATION_MINUTES) Long durationMinutes,
       @Nullable @DecimalMin("0") @DecimalMax("1000000000") Double expenses,
       @Nullable @DecimalMin("0") @DecimalMax("1000000000") Double otherExpenses,
       @Nullable @DecimalMin("0") @DecimalMax("1000000000") Double oreSales,
@@ -119,6 +124,41 @@ public record ExchangeRefineryOrderChangeSet(
      */
     public @org.jetbrains.annotations.NotNull Kind kind() {
       return Kind.of(op);
+    }
+
+    /**
+     * The op with only the fields its kind uses; every other field is ignored (REQ-XCH-052).
+     *
+     * @return the op without the fields its kind does not use
+     */
+    public @org.jetbrains.annotations.NotNull Op used() {
+      Kind kind = kind();
+      boolean addressed = kind != Kind.CREATE;
+      boolean orderFields = kind == Kind.CREATE || kind == Kind.UPDATE;
+      boolean goodFields = kind == Kind.GOOD_UPDATE;
+      return new Op(
+          opId,
+          op,
+          addressed ? id : null,
+          clientKey,
+          addressed ? versions : null,
+          kind == Kind.CREATE ? orgUnit : null,
+          orderFields ? location : null,
+          orderFields ? method : null,
+          orderFields ? status : null,
+          orderFields ? endsAt : null,
+          orderFields ? durationMinutes : null,
+          orderFields ? expenses : null,
+          orderFields ? otherExpenses : null,
+          orderFields ? oreSales : null,
+          kind == Kind.CREATE ? goods : null,
+          kind == Kind.GOOD_ADD ? good : null,
+          kind == Kind.GOOD_UPDATE || kind == Kind.GOOD_REMOVE ? goodId : null,
+          goodFields ? input : null,
+          goodFields ? inputQuantity : null,
+          goodFields ? outputQuantity : null,
+          goodFields ? quality : null,
+          kind == Kind.PICKUP ? lines : null);
     }
   }
 

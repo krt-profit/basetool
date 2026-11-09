@@ -31,9 +31,6 @@ import org.jetbrains.annotations.NotNull;
  */
 final class RefineryOrders {
 
-  /** Units a good's output quantity counts per SCU of an SCU-measured output material. */
-  static final double UNITS_PER_SCU = 100.0d;
-
   private RefineryOrders() {}
 
   /**

@@ -19,21 +19,25 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Writes a member's own refinery orders for an exchange client and for the undo of its writes, with
  * the web's rules, audit and notices (REQ-XCH-052, REQ-XCH-056). Every method runs in the caller's
- * transaction and touches only orders the member owns.
+ * transaction and touches only orders the member owns; a method that writes an existing order
+ * expects the caller to have locked it with {@code lockOwn} first.
  */
 public interface RefineryExchangeWriter {
 
   /**
-   * Locks one of the member's orders for the rest of the transaction.
+   * Locks one of the member's orders for the rest of the transaction; an order of another member is
+   * not locked.
    *
    * @param owner the member
    * @param orderId the order
@@ -43,14 +47,26 @@ public interface RefineryExchangeWriter {
   Optional<RefineryExchangeOrder> lockOwn(@NotNull UUID owner, @NotNull UUID orderId);
 
   /**
+   * Locks the member's orders among the given ids for the rest of the transaction, in ascending id
+   * order; an order of another member is not locked.
+   *
+   * @param owner the member
+   * @param orderIds the orders
+   * @return the member's orders among them, ordered by id
+   */
+  @NotNull
+  @Unmodifiable
+  List<RefineryExchangeOrder> lockOwn(@NotNull UUID owner, @NotNull Collection<UUID> orderIds);
+
+  /**
    * Creates an order owned by the member and marked as created by the client.
    *
    * @param owner the member
    * @param clientId the client
    * @param orgUnitId the owning unit, one of the member's direct memberships
    * @param edit the order's location, status and every further part it starts with; the location
-   *     and the status are required
-   * @return the saved order, counters at 0
+   *     and the status are required, and every good is a new row
+   * @return the saved order, counters at 0, its goods in the order the edit names them
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the location is
    *     not an offered refinery, a material may not be refined or the unit is no membership
    */

@@ -22,6 +22,13 @@ package de.greluc.krt.profit.basetool.backend.refinery.api;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +38,9 @@ import org.jetbrains.annotations.Nullable;
  * exchange alike (REQ-REFINERY-020, REQ-XCH-052).
  */
 public final class RefineryExchangeRules {
+
+  /** Units a good's quantities count per SCU of an SCU-measured material. */
+  public static final double UNITS_PER_SCU = 100.0d;
 
   /** Non-instantiable static-helper holder. */
   private RefineryExchangeRules() {}
@@ -80,5 +90,65 @@ public final class RefineryExchangeRules {
    */
   public static @NotNull Material output(@NotNull Material input) {
     return input.getRefinedMaterial() != null ? input.getRefinedMaterial() : input;
+  }
+
+  /**
+   * The end of a run: its start plus its length.
+   *
+   * @param startedAt the run's start, or {@code null}
+   * @param durationMinutes the run's length in minutes, or {@code null}
+   * @return {@code startedAt + durationMinutes}, or {@code null} when either is unset
+   */
+  public static @Nullable Instant endsAt(
+      @Nullable Instant startedAt, @Nullable Long durationMinutes) {
+    return startedAt == null || durationMinutes == null
+        ? null
+        : startedAt.plus(durationMinutes, ChronoUnit.MINUTES);
+  }
+
+  /**
+   * The good a store line books onto (REQ-REFINERY-022): the first good whose output is the line's
+   * material at the line's grade, else the first of that material at another grade.
+   *
+   * @param goods the order's goods
+   * @param output a good's output material, or {@code null} when it has none
+   * @param grade a good's quality, or {@code null} when it has none
+   * @param material the line's material
+   * @param quality the line's quality, or {@code null} to take the first good of the material
+   * @param <G> the type of a good
+   * @return the good, or {@code null} when no good outputs the material
+   */
+  public static <G> @Nullable G storedGood(
+      @NotNull Collection<G> goods,
+      @NotNull Function<G, UUID> output,
+      @NotNull Function<G, Integer> grade,
+      @NotNull UUID material,
+      @Nullable Integer quality) {
+    G sameMaterial = null;
+    for (G good : goods) {
+      if (!material.equals(output.apply(good))) {
+        continue;
+      }
+      if (quality == null || Objects.equals(grade.apply(good), quality)) {
+        return good;
+      }
+      if (sameMaterial == null) {
+        sameMaterial = good;
+      }
+    }
+    return sameMaterial;
+  }
+
+  /**
+   * The yield a store writes back into a good: every amount booked onto the good together, in
+   * units, at least one.
+   *
+   * @param unit the output material's own unit
+   * @param amount the amounts booked onto the good, summed, in that unit
+   * @return the yield in units, 100 to the SCU
+   */
+  public static int storedYield(@NotNull QuantityType unit, double amount) {
+    long units = unit == QuantityType.SCU ? Math.round(amount * UNITS_PER_SCU) : Math.round(amount);
+    return Math.clamp(units, 1, Integer.MAX_VALUE);
   }
 }

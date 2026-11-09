@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefineryYieldReposito
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
@@ -193,7 +194,7 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
    */
   private static double toScu(int outputQuantityUnits, QuantityType quantityType) {
     if (quantityType == QuantityType.SCU) {
-      return outputQuantityUnits / RefineryOrders.UNITS_PER_SCU;
+      return outputQuantityUnits / RefineryExchangeRules.UNITS_PER_SCU;
     }
     return outputQuantityUnits;
   }

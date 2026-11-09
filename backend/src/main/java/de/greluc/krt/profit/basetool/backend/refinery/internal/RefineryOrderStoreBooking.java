@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
@@ -32,9 +31,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import java.time.Instant;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,11 +47,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Stores a refinery order: books each checked line as an inventory row, writes the stored amount
- * back into its good, completes the order with {@code storedAt}, notifies the members booked onto
- * and audits {@code REFINERY_ORDER_STORED} (REQ-REFINERY-022, REQ-REFINERY-024). The web's store
- * and a client's pickup with store lines share it; each checks its lines before, and both run in
- * the caller's transaction.
+ * Stores a refinery order: books each checked line as an inventory row, writes the amounts booked
+ * onto each good back into it, summed, completes the order with {@code storedAt}, notifies the
+ * members booked onto and audits {@code REFINERY_ORDER_STORED} (REQ-REFINERY-022,
+ * REQ-REFINERY-024). The web's store and a client's pickup with store lines share it; each checks
+ * its lines before, and both run in the caller's transaction.
  */
 @Component
 @RequiredArgsConstructor
@@ -85,6 +86,7 @@ class RefineryOrderStoreBooking {
             .map(line -> requireOutputGood(order, line.material().getId(), line.quality()))
             .toList();
     final Set<UUID> bookedOnto = new LinkedHashSet<>();
+    final IdentityHashMap<RefineryGood, Double> storedPerGood = new IdentityHashMap<>();
     for (int index = 0; index < lines.size(); index++) {
       Line line = lines.get(index);
       JobOrder jobOrder = line.jobOrder();
@@ -102,8 +104,11 @@ class RefineryOrderStoreBooking {
           jobOrder != null ? jobOrder.getDisplayId() : null,
           order.getMissionId());
       bookedOnto.add(line.receiver().getId());
-      writeBackOutputQuantity(goods.get(index), line.amount());
+      storedPerGood.merge(goods.get(index), line.amount(), Double::sum);
     }
+    storedPerGood.forEach((good, amount) ->
+        good.setOutputQuantity(
+            RefineryExchangeRules.storedYield(good.getOutputMaterial().getQuantityType(), amount)));
     Instant storedAt = Instant.now();
     order.setStatus(RefineryOrderStatus.COMPLETED);
     order.setStoredAt(storedAt);
@@ -176,58 +181,19 @@ class RefineryOrderStoreBooking {
   @NotNull
   static RefineryGood requireOutputGood(
       @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
-    RefineryGood good = findGood(order, materialId, quality);
-    if (good == null) {
-      good = findGood(order, materialId, null);
-    }
+    RefineryGood good =
+        order.getGoods() == null
+            ? null
+            : RefineryExchangeRules.storedGood(
+                order.getGoods(),
+                row -> row.getOutputMaterial() == null ? null : row.getOutputMaterial().getId(),
+                RefineryGood::getQuality,
+                materialId,
+                quality);
     if (good == null) {
       throw new BadRequestException("error.refinery_order.material_not_an_output");
     }
     return good;
-  }
-
-  /**
-   * Writes the stored amount back into the good's output quantity, converting SCU to units (×100)
-   * and clamping to at least one unit.
-   *
-   * @param good the good the line belongs to
-   * @param amount the stored amount in the material's quantity type
-   */
-  private static void writeBackOutputQuantity(@NotNull RefineryGood good, double amount) {
-    long units =
-        good.getOutputMaterial().getQuantityType() == QuantityType.SCU
-            ? Math.round(amount * RefineryOrders.UNITS_PER_SCU)
-            : Math.round(amount);
-    good.setOutputQuantity(Math.clamp(units, 1, Integer.MAX_VALUE));
-  }
-
-  /**
-   * Finds the good a line belongs to.
-   *
-   * @param order the order whose goods to search
-   * @param materialId the output material the line books
-   * @param quality the grade the line carries, or {@code null} to match on the material alone
-   * @return the good, or {@code null} when none matches or the order has no goods
-   */
-  @Nullable
-  private static RefineryGood findGood(
-      @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
-    if (order.getGoods() == null) {
-      return null;
-    }
-    for (RefineryGood good : order.getGoods()) {
-      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
-        continue;
-      }
-      if (!good.getOutputMaterial().getId().equals(materialId)) {
-        continue;
-      }
-      if (quality != null && !quality.equals(good.getQuality())) {
-        continue;
-      }
-      return good;
-    }
-    return null;
   }
 
   /**

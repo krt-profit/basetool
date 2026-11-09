@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -76,6 +77,36 @@ final class RefineryOrderEdits {
     return OfferedLocations.requireOfferedOrCurrent(
         Entities.require(repository.findById(locationId), "error.location.not_found"),
         order.getLocation());
+  }
+
+  /**
+   * Refuses a location without a refinery (REQ-REFINERY-020).
+   *
+   * @param location the location
+   * @return the same location
+   * @throws BadRequestException {@code error.refinery_order.location_without_refinery} when it
+   *     hosts no refinery
+   */
+  static @NotNull Location requireRefinery(@NotNull Location location) {
+    if (!RefineryExchangeRules.hostsRefinery(location)) {
+      throw new BadRequestException("error.refinery_order.location_without_refinery");
+    }
+    return location;
+  }
+
+  /**
+   * Refuses a good's input material that may not be refined (REQ-REFINERY-020).
+   *
+   * @param material the material
+   * @return the same material
+   * @throws BadRequestException {@code error.refinery_order.input_material_not_raw} when it is
+   *     neither raw nor manual-raw
+   */
+  static @NotNull Material requireRefinable(@NotNull Material material) {
+    if (!RefineryExchangeRules.refinable(material)) {
+      throw new BadRequestException("error.refinery_order.input_material_not_raw");
+    }
+    return material;
   }
 
   /**
