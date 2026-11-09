@@ -99,14 +99,15 @@ public class ScWikiVehicleSyncService {
             .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
     UUID runId = syncReportService.beginRun();
     Instant now = Instant.now();
+    var run = new VehicleRun(nameCounts, Set.copyOf(seen), runId, now);
     var outcome =
         chunkWriter.write(
             valid,
             SyncChunkWriter.DEFAULT_CHUNK_SIZE,
             chunk ->
                 chunk.stream()
-                    .map(dto -> upsert(dto, nameCounts, runId, now))
-                    .filter(id -> id != null)
+                    .map(dto -> upsert(dto, run))
+                    .filter(disposition -> disposition != null)
                     .toList(),
             "Wiki vehicle",
             dto -> dto.uuid().toString());
@@ -148,7 +149,11 @@ public class ScWikiVehicleSyncService {
       syncReportService.recordSweep(false);
     }
     syncReportService.pruneRuns(SyncSourceSystem.SCWIKI);
-    return outcome.results().size() + restored;
+    long written =
+        outcome.results().stream()
+            .filter(disposition -> disposition == Disposition.WRITTEN)
+            .count();
+    return Math.toIntExact(written) + restored;
   }
 
   private int restorePresent(List<UUID> present, UUID runId, Instant now) {
@@ -174,23 +179,32 @@ public class ScWikiVehicleSyncService {
     return restored;
   }
 
+  /**
+   * Links or seeds the ship type of one Wiki vehicle.
+   *
+   * @param dto the Wiki vehicle
+   * @param run the census-wide facts of this run
+   * @return {@link Disposition#WRITTEN} for a saved row, {@link Disposition#COVERED_BY_SIBLING} for
+   *     a variant whose shared name a ship type of this census holds, {@code null} for a conflict
+   */
   @Nullable
-  private UUID upsert(ScWikiVehicleDto dto, Map<String, Long> nameCounts, UUID runId, Instant now) {
+  private Disposition upsert(ScWikiVehicleDto dto, VehicleRun run) {
     Optional<ShipType> match = shipTypeRepository.findByExternalUuid(dto.uuid());
     if (match.isEmpty() && StringUtils.hasText(dto.className())) {
       match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
     }
     if (match.isEmpty()) {
       Optional<ShipType> named = shipTypeRepository.findByNameIgnoreCase(dto.name());
-      if (named.isPresent()
-          && nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) > 1) {
-        return reportIdentityConflict(dto, runId, "Name is shared by several Wiki vehicles.");
+      if (named.isPresent() && run.sharesName(dto)) {
+        return named.map(ShipType::getExternalUuid).filter(run.census()::contains).isPresent()
+            ? reportSiblingVariant(dto, run.runId())
+            : reportIdentityConflict(dto, run.runId(), "Name is shared by several Wiki vehicles.");
       }
       match = named;
     }
     ShipType ship = match.orElseGet(ShipType::new);
     if (ship.getExternalUuid() != null && !ship.getExternalUuid().equals(dto.uuid())) {
-      return reportIdentityConflict(dto, runId, "Existing vehicle has another game UUID.");
+      return reportIdentityConflict(dto, run.runId(), "Existing vehicle has another game UUID.");
     }
     if (match.isEmpty()) {
       ship.setName(dto.name());
@@ -198,10 +212,10 @@ public class ScWikiVehicleSyncService {
     }
     ship.setExternalUuid(dto.uuid());
     P4kLedColumns led = new P4kLedColumns(ship);
-    applyWikiFields(ship, dto, now, led);
+    applyWikiFields(ship, dto, run.now(), led);
     if (!led.disagreements().isEmpty()) {
       syncReportService.logScwikiEvent(
-          runId,
+          run.runId(),
           SyncEventType.P4K_DISAGREEMENT,
           "ship_type",
           dto.uuid(),
@@ -211,8 +225,27 @@ public class ScWikiVehicleSyncService {
     if (ship.getSourceSystems() == GameItemSourceSystem.UEX_ONLY) {
       ship.setSourceSystems(GameItemSourceSystem.BOTH);
     }
-    ShipType saved = shipTypeRepository.save(ship);
-    return saved.getExternalUuid();
+    shipTypeRepository.save(ship);
+    return Disposition.WRITTEN;
+  }
+
+  /**
+   * Reports a Wiki variant left without a row of its own because a ship type linked to another
+   * vehicle of this census holds its shared name; the census still covers it (REQ-DATA-014).
+   *
+   * @param dto the Wiki variant left unlinked
+   * @param runId the sync run the event belongs to
+   * @return always {@link Disposition#COVERED_BY_SIBLING}
+   */
+  private Disposition reportSiblingVariant(ScWikiVehicleDto dto, UUID runId) {
+    syncReportService.logScwikiEvent(
+        runId,
+        SyncEventType.SOURCE_IDENTITY_CONFLICT,
+        "ship_type",
+        dto.uuid(),
+        dto.name(),
+        "Name is held by a sibling Wiki vehicle of this census.");
+    return Disposition.COVERED_BY_SIBLING;
   }
 
   /**
@@ -225,11 +258,41 @@ public class ScWikiVehicleSyncService {
    * @return always {@code null}, the upsert's "nothing written" result
    */
   @Nullable
-  private UUID reportIdentityConflict(ScWikiVehicleDto dto, UUID runId, String reason) {
+  private Disposition reportIdentityConflict(ScWikiVehicleDto dto, UUID runId, String reason) {
     syncReportService.logScwikiEvent(
         runId, SyncEventType.SOURCE_IDENTITY_CONFLICT, "ship_type", dto.uuid(), dto.name(), reason);
     syncReportService.recordIncomplete();
     return null;
+  }
+
+  /** How a Wiki vehicle of a complete census is accounted for. */
+  private enum Disposition {
+    /** The vehicle's ship type row was linked or seeded and saved. */
+    WRITTEN,
+    /** The vehicle has no row of its own; a sibling of this census holds its shared name. */
+    COVERED_BY_SIBLING
+  }
+
+  /**
+   * The census-wide facts one vehicle upsert reads.
+   *
+   * @param nameCounts how many valid Wiki vehicles carry each lower-cased name
+   * @param census the UUIDs of every valid Wiki vehicle of this run
+   * @param runId the sync run the events belong to
+   * @param now the sync time
+   */
+  private record VehicleRun(
+      Map<String, Long> nameCounts, Set<UUID> census, UUID runId, Instant now) {
+
+    /**
+     * Tells whether more than one Wiki vehicle of this census carries the vehicle's name.
+     *
+     * @param dto the Wiki vehicle
+     * @return {@code true} when the name is shared, ignoring case
+     */
+    boolean sharesName(ScWikiVehicleDto dto) {
+      return nameCounts.getOrDefault(dto.name().toLowerCase(Locale.ROOT), 0L) > 1;
+    }
   }
 
   /**
