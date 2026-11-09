@@ -38,9 +38,6 @@ public final class ExchangeProblemException extends DomainProblem {
   /** A feed cursor older than the retained changes, or not one the server issued. */
   public static final String CURSOR_EXPIRED = "CURSOR_EXPIRED";
 
-  /** A resource that is unknown or hidden from the member; both answer alike. */
-  public static final String NOT_FOUND = "NOT_FOUND";
-
   /** A change set that removes more than the mass-change guard allows without confirmation. */
   public static final String MASS_CHANGE_CONFIRMATION_REQUIRED =
       "MASS_CHANGE_CONFIRMATION_REQUIRED";
@@ -200,17 +197,6 @@ public final class ExchangeProblemException extends DomainProblem {
   public static @NotNull ExchangeProblemException cursorExpired() {
     return new ExchangeProblemException(
         HttpStatus.GONE, CURSOR_EXPIRED, "The feed cursor is older than the retained changes.");
-  }
-
-  /**
-   * The refusal of a resource that is unknown or hidden from the member, which answer alike
-   * (REQ-BANK-066, REQ-BXCH-002).
-   *
-   * @return the {@code 404 NOT_FOUND} refusal
-   */
-  public static @NotNull ExchangeProblemException notFound() {
-    return new ExchangeProblemException(
-        HttpStatus.NOT_FOUND, NOT_FOUND, "The resource is unknown or hidden from the member.");
   }
 
   /**
