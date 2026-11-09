@@ -100,26 +100,22 @@ class BankAccessPolicyRulesTest {
   private static final String EXCHANGE = ROOT + ".exchange";
 
   /**
-   * What the exchange may use of the bank (REQ-BXCH-001): the policy with its decision types, the
-   * actor adapter, the account and own-request reads and the own-request writes with their value
-   * types, and the bank's problem codes.
+   * What the exchange may use of the bank (REQ-BXCH-001): the actor adapter with its actor, the
+   * account, own-request and staff-queue reads and the own-request writes with their value types,
+   * the request type and approver class they answer, and the open-request-cap refusal. Each port
+   * asks the policy itself.
    */
   private static final Set<String> EXCHANGE_SURFACE =
       Set.of(
-          BANK + ".api.BankAccessPolicy",
-          BANK + ".api.BankAccountAccess",
-          BANK + ".api.BankAccountRight",
           BANK + ".api.BankActor",
           BANK + ".api.BankActors",
-          BANK + ".api.BankAdmission",
-          BANK + ".api.BankRequestApprover",
-          BANK + ".api.BankStaffRights",
-          BANK + ".api.BankBookingRequestType",
           BANK + ".api.BankAccountReads",
-          BANK + ".api.BankStaffQueueReads",
           BANK + ".api.BankOwnRequestReads",
+          BANK + ".api.BankStaffQueueReads",
           BANK + ".api.BankOwnRequestWrites",
-          BANK + ".api.BankProblemCode");
+          BANK + ".api.BankOpenRequestCapException",
+          BANK + ".api.BankBookingRequestType",
+          BANK + ".api.BankRequestApprover");
 
   /** The bank's implementation of the exchange's own-request writes. */
   private static final String OWN_REQUEST_WRITES = BANK + ".internal.BankOwnRequestWriteService";
@@ -166,14 +162,14 @@ class BankAccessPolicyRulesTest {
   }
 
   @Test
-  @DisplayName("exchange code reaches the bank only through the policy, the reads and their values")
+  @DisplayName("exchange code reaches the bank only through the actor adapter and the ports")
   void theExchangeReachesTheBankOnlyThroughThePolicy() {
     assertThat(bankReaches(PRODUCTION, c -> c.getPackageName().startsWith(EXCHANGE)))
         .as(
             """
-            Exchange classes that use a bank type outside the policy, BankActors and \
-            BankAccountReads. Every bank decision of the exchange goes through the policy \
-            (REQ-BXCH-001, ADR-0352).\
+            Exchange classes that use a bank type outside the actor adapter, the reads, the \
+            own-request writes and their values. Every bank decision of the exchange goes \
+            through the policy behind those ports (REQ-BXCH-001, ADR-0352).\
             """)
         .isEmpty();
   }

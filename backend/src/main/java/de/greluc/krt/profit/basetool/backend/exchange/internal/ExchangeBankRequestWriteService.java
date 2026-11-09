@@ -19,15 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActors;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankOpenRequestCapException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankOwnRequestWrites;
-import de.greluc.krt.profit.basetool.backend.bank.api.BankProblemCode;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelledDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCorrectionDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestWrittenDto;
-import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -48,16 +46,20 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ExchangeBankRequestWriteService {
 
-  private final BankActors bankActors;
+  private final ExchangeBankActors bankActors;
   private final BankOwnRequestWrites requestWrites;
   private final ExchangeBankMetrics metrics;
 
   /**
-   * Raises a request.
+   * Raises a deposit, withdrawal or transfer request for the member with the web's validation and
+   * the policy's approval routing, and records the calling client on it (REQ-BANK-067).
    *
-   * @param caller the acting member and client
-   * @param body the request
-   * @return the terse answer
+   * @param caller the acting member and the client the request is recorded for
+   * @param body the type, accounts, amount, texts and the split of a deposit
+   * @return the new request's id, {@code PENDING} status, version and amount
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException for an unknown, closed
+   *     or hidden account
+   * @throws BankOpenRequestCapException when the member already holds the cap of pending requests
    */
   @NotNull
   public ExchangeBankRequestWrittenDto raise(
@@ -67,7 +69,7 @@ public class ExchangeBankRequestWriteService {
         () ->
             written(
                 requestWrites.raise(
-                    actor(caller),
+                    bankActors.of(caller),
                     new BankOwnRequestWrites.NewRequest(
                         body.type(),
                         body.sourceAccountId(),
@@ -81,12 +83,15 @@ public class ExchangeBankRequestWriteService {
   }
 
   /**
-   * Corrects one of the member's pending requests.
+   * Replaces amount, texts and destination of one of the member's pending, not yet approved
+   * requests and re-routes its approval; the counterparty the request names stays.
    *
    * @param caller the acting member and client
-   * @param requestId the request
-   * @param body the corrected values and the echoed version
-   * @return the terse answer
+   * @param requestId the member's request
+   * @param body the corrected values and the version the client last read
+   * @return the request's id, status, new version and corrected amount
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException for another member's or
+   *     an unknown request, or a closed or unknown destination
    */
   @NotNull
   public ExchangeBankRequestWrittenDto correct(
@@ -98,7 +103,7 @@ public class ExchangeBankRequestWriteService {
         () ->
             written(
                 requestWrites.correct(
-                    actor(caller),
+                    bankActors.of(caller),
                     requestId,
                     new BankOwnRequestWrites.Correction(
                         body.amount(),
@@ -109,12 +114,14 @@ public class ExchangeBankRequestWriteService {
   }
 
   /**
-   * Cancels one of the member's pending requests.
+   * Cancels one of the member's pending requests; nothing was booked, so nothing is undone.
    *
    * @param caller the acting member and client
-   * @param requestId the request
-   * @param version the echoed version
-   * @return the cancelled request
+   * @param requestId the member's request
+   * @param version the version the client last read
+   * @return the request's id, {@code CANCELLED} status and new version
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException for another member's or
+   *     an unknown request
    */
   @NotNull
   public ExchangeBankRequestCancelledDto cancel(
@@ -123,7 +130,7 @@ public class ExchangeBankRequestWriteService {
         caller,
         () -> {
           BankOwnRequestWrites.Written cancelled =
-              requestWrites.cancel(actor(caller), requestId, version);
+              requestWrites.cancel(bankActors.of(caller), requestId, version);
           return new ExchangeBankRequestCancelledDto(
               cancelled.id(), cancelled.status(), cancelled.version());
         });
@@ -133,10 +140,10 @@ public class ExchangeBankRequestWriteService {
    * Runs one write and counts its outcome, and the refusal reason of a shared {@code 404} or a cap
    * refusal.
    *
-   * @param caller the acting member and client
-   * @param write the write
+   * @param caller the acting member and the client the outcome is counted for
+   * @param write the bank write to run
    * @param <T> the answer's type
-   * @return the answer
+   * @return the write's answer, after counting it as applied
    */
   @NotNull
   private <T> T counted(@NotNull ExchangeCaller caller, @NotNull Supplier<T> write) {
@@ -148,10 +155,8 @@ public class ExchangeBankRequestWriteService {
       metrics.countRefused(BankExchangeRefusal.NOT_FOUND);
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw e;
-    } catch (DomainProblem e) {
-      if (BankProblemCode.BANK_OPEN_REQUEST_CAP.code().equals(e.code())) {
-        metrics.countRefused(BankExchangeRefusal.OPEN_REQUEST_CAP);
-      }
+    } catch (BankOpenRequestCapException e) {
+      metrics.countRefused(BankExchangeRefusal.OPEN_REQUEST_CAP);
       metrics.countWrite(caller.clientId(), ExchangeOps.REJECTED);
       throw e;
     } catch (RuntimeException e) {
@@ -161,26 +166,15 @@ public class ExchangeBankRequestWriteService {
   }
 
   /**
-   * The member's bank actor.
+   * Shapes the terse answer of a raise or correction; the amount is a JSON integer of whole aUEC.
    *
-   * @param caller the acting member and client
-   * @return the actor without Admin
-   */
-  @NotNull
-  private BankActor actor(@NotNull ExchangeCaller caller) {
-    return bankActors.forExchange(caller.member());
-  }
-
-  /**
-   * Shapes the terse answer; money is a whole JSON integer.
-   *
-   * @param written the request after the write
-   * @return the answer
+   * @param written the request as the bank stored it
+   * @return its id, status, version and amount
    */
   @NotNull
   private static ExchangeBankRequestWrittenDto written(
       @NotNull BankOwnRequestWrites.Written written) {
     return new ExchangeBankRequestWrittenDto(
-        written.id(), written.status(), written.version(), written.amount().longValueExact());
+        written.id(), written.status(), written.version(), ExchangeAmounts.whole(written.amount()));
   }
 }

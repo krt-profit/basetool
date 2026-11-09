@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountReads;
-import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActors;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankAccountDto;
@@ -32,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankC
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -40,7 +38,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -57,10 +54,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeBankReadService {
 
-  /** The longest period a balance series covers. */
-  static final Duration MAX_SERIES_SPAN = Duration.ofDays(365);
+  /** The most days a balance series covers. */
+  public static final int MAX_SERIES_DAYS = 365;
 
-  private final BankActors bankActors;
+  /** The longest period a balance series covers, {@value #MAX_SERIES_DAYS} days. */
+  static final Duration MAX_SERIES_SPAN = Duration.ofDays(MAX_SERIES_DAYS);
+
+  private final ExchangeBankActors bankActors;
   private final BankAccountReads bankReads;
   private final ExchangeNameWithholdings nameWithholdings;
   private final ExchangeBankMetrics metrics;
@@ -82,7 +82,7 @@ public class ExchangeBankReadService {
     UUID after = cursor == null ? null : BankExchangeCursor.parseAccount(cursor);
     BankAccountReads.AccountPage page =
         bankReads
-            .viewableAccounts(actor(caller), after, ExchangeFeedReader.pageSize(limit))
+            .viewableAccounts(bankActors.of(caller), after, ExchangeFeedReader.pageSize(limit))
             .orElseThrow(ExchangeProblemException::cursorExpired);
     List<ExchangeBankAccountDto> items =
         page.items().stream().map(ExchangeBankReadService::toAccount).toList();
@@ -121,7 +121,13 @@ public class ExchangeBankReadService {
         cursor == null ? null : BankExchangeCursor.parseBooking(cursor);
     BankAccountReads.BookingPage page =
         bankReads
-            .bookings(actor(caller), accountId, from, to, after, ExchangeFeedReader.pageSize(limit))
+            .bookings(
+                bankActors.of(caller),
+                accountId,
+                from,
+                to,
+                after,
+                ExchangeFeedReader.pageSize(limit))
             .orElseThrow(this::notFound);
     Set<UUID> withheld =
         nameWithholdings.withholding(
@@ -161,28 +167,21 @@ public class ExchangeBankReadService {
       throw new BadRequestException("A balance series needs both from and to");
     }
     if (from.isAfter(to) || Duration.between(from, to).compareTo(MAX_SERIES_SPAN) > 0) {
-      throw new BadRequestException("A balance series covers from <= to and at most 365 days");
+      throw new BadRequestException(
+          "A balance series covers from <= to and at most " + MAX_SERIES_DAYS + " days");
     }
     BankAccountReads.BalanceSeries series =
-        bankReads.balanceSeries(actor(caller), accountId, from, to).orElseThrow(this::notFound);
+        bankReads
+            .balanceSeries(bankActors.of(caller), accountId, from, to)
+            .orElseThrow(this::notFound);
     metrics.countRead(caller.clientId(), BankExchangeReadRoute.BALANCE_SERIES);
     return new ExchangeBankBalanceSeriesDto(
         series.points().stream()
             .map(point ->
-                new ExchangeBankBalanceSeriesDto.Point(point.date(), whole(point.balance())))
+                new ExchangeBankBalanceSeriesDto.Point(
+                    point.date(), ExchangeAmounts.whole(point.balance())))
             .toList(),
-        wholeOrNull(series.balanceTarget()));
-  }
-
-  /**
-   * The member's bank actor on the exchange path.
-   *
-   * @param caller the acting member
-   * @return the actor without the Admin role
-   */
-  @NotNull
-  private BankActor actor(@NotNull ExchangeCaller caller) {
-    return bankActors.forExchange(caller.member());
+        ExchangeAmounts.wholeOrNull(series.balanceTarget()));
   }
 
   /**
@@ -213,12 +212,12 @@ public class ExchangeBankReadService {
         owner == null
             ? null
             : new ExchangeOrgUnitDto(owner.id(), owner.name(), owner.shorthand(), owner.kind()),
-        whole(account.balance()),
-        wholeOrNull(account.balanceTarget()),
-        whole(account.delta30d()),
-        account.sparkline().stream().map(ExchangeBankReadService::whole).toList(),
+        ExchangeAmounts.whole(account.balance()),
+        ExchangeAmounts.wholeOrNull(account.balanceTarget()),
+        ExchangeAmounts.whole(account.delta30d()),
+        account.sparkline().stream().map(ExchangeAmounts::whole).toList(),
         account.requestable(),
-        wholeOrNull(account.ownLimit()));
+        ExchangeAmounts.wholeOrNull(account.ownLimit()));
   }
 
   /**
@@ -238,7 +237,7 @@ public class ExchangeBankReadService {
         booking.postingId(),
         booking.transactionId(),
         booking.type(),
-        whole(booking.amount()),
+        ExchangeAmounts.whole(booking.amount()),
         booking.createdAt(),
         booking.note(),
         booking.justification(),
@@ -248,29 +247,8 @@ public class ExchangeBankReadService {
                 booking.counterAccountNo(), booking.counterAccountName())
             : null,
         booking.intraAccount(),
-        booking.transferFee().signum() == 0 ? null : whole(booking.transferFee()),
+        booking.transferFee().signum() == 0 ? null : ExchangeAmounts.whole(booking.transferFee()),
         hidden ? null : booking.counterpartyHandle(),
         booking.counterpartyOrgUnitName());
-  }
-
-  /**
-   * An amount as a JSON integer of whole aUEC (ADR-0010).
-   *
-   * @param amount the whole amount
-   * @return its value
-   */
-  static long whole(@NotNull BigDecimal amount) {
-    return amount.longValueExact();
-  }
-
-  /**
-   * An optional amount as a JSON integer of whole aUEC.
-   *
-   * @param amount the whole amount, or {@code null}
-   * @return its value, or {@code null}
-   */
-  @Contract("null -> null; !null -> !null")
-  static @Nullable Long wholeOrNull(@Nullable BigDecimal amount) {
-    return amount == null ? null : whole(amount);
   }
 }

@@ -159,7 +159,7 @@ public class ExchangeBankRequestService {
         request.createdAt(),
         request.decidedAt(),
         request.type().name(),
-        request.amount().longValueExact(),
+        ExchangeAmounts.whole(request.amount()),
         request.note(),
         request.justification(),
         new ExchangeBankRequestAccountDto(

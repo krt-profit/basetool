@@ -55,9 +55,10 @@ client is granted a bank scope until its approval amendment (REQ-BXCH-007).
   their memberships and grants. An administrator acts through a client only by their bank roles,
   grants and memberships (REQ-XCH-009); seeing the whole bank needs Bank Management;
 - the exchange passes no active-org-unit pin;
-- exchange code reaches the bank only through `BankAccessPolicy` and its decision types,
-  `BankActors`, `BankAccountReads`, `BankOwnRequestReads` and `BankStaffQueueReads` with their value
-  types
+- exchange code reaches the bank only through `BankActors` with `BankActor`, the ports
+  `BankAccountReads`, `BankOwnRequestReads`, `BankStaffQueueReads` and `BankOwnRequestWrites` with
+  their value types, the `BankBookingRequestType` and `BankRequestApprover` they answer, and the
+  refusal `BankOpenRequestCapException`; each port asks the policy itself
   (`BankAccessPolicyRulesTest.theExchangeReachesTheBankOnlyThroughThePolicy`).
 
 No money moves through a client and no bank-staff action is taken through one (ADR-0354).
@@ -70,8 +71,8 @@ No money moves through a client and no bank-staff action is taken through one (A
 - [x] Every read of REQ-BXCH-002 answers as the web's characterisation matrix recorded it, with
   the Admin role stripped as the one expected difference for administrators and a closed account
   hidden (`BankExchangeParityTest`).
-- [x] Exchange code using a bank type outside the policy, the actor adapter and the reads fails the
-  build (`BankAccessPolicyRulesTest`).
+- [x] Exchange code using a bank type outside the actor adapter, the ports and their values fails
+  the build (`BankAccessPolicyRulesTest`).
 
 **Enforced by:** `ExchangeCapability`, `ExchangeBankReadService`, `BankActors#forExchange`,
 `BankAccessPolicyRulesTest` · V364 · **Related:** REQ-XCH-005, REQ-XCH-009 · **Issues:** #3113,

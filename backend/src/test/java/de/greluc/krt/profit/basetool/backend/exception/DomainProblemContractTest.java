@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankOpenRequestCapException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
@@ -224,6 +225,16 @@ class DomainProblemContractTest {
             "problem.bank_approver_note_required",
             "problem.bank_approver_note_required.detail",
             "Bank approver note required",
+            null,
+            Map.of()),
+        new Expected(
+            new BankOpenRequestCapException(),
+            HttpStatus.CONFLICT,
+            "BANK_OPEN_REQUEST_CAP",
+            "bank-open-request-cap",
+            "problem.bank_open_request_cap",
+            "problem.bank_open_request_cap.detail",
+            "Bank open request cap",
             null,
             Map.of()),
         new Expected(

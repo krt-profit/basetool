@@ -30,8 +30,9 @@ import org.jetbrains.annotations.Nullable;
  * an explicit actor and no pin. A raised request records the calling client.
  *
  * <p>An unknown, closed or hidden account and another member's request are all {@code
- * NotFoundException}; the bank's own conflicts stay {@link BankConflictException}, among them
- * {@code BANK_OPEN_REQUEST_CAP} once the member holds the configured number of pending requests.
+ * NotFoundException}; the bank's own conflicts stay {@link BankConflictException}, and a raise once
+ * the member holds the configured number of pending requests is {@link
+ * BankOpenRequestCapException}.
  */
 public interface BankOwnRequestWrites {
 
