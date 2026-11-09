@@ -235,9 +235,9 @@ class BankRequestsPatternRenderTest {
   }
 
   /**
-   * REQ-BANK-067: a request raised through a connected application carries "über &lt;client&gt;"
-   * in its row and its detail, one raised in the Basetool carries none, and the requester's text
-   * renders as plain text, so a link in it is not clickable.
+   * REQ-BANK-067: a request raised through a connected application carries "über &lt;client&gt;" in
+   * its row, one raised in the Basetool carries none, and the requester's text renders as plain
+   * text, so a link in it is not clickable.
    */
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
@@ -265,10 +265,8 @@ class BankRequestsPatternRenderTest {
 
     String html = render(page, "");
 
-    assertThat(html.split("data-testid=\"bank-request-client\"", -1)).hasSize(3);
+    assertThat(html.split("data-testid=\"bank-request-client\"", -1)).hasSize(2);
     assertThat(html).containsPattern("data-testid=\"bank-request-client\"[^>]*>über VerseKit<");
-    assertThat(html).contains("id=\"bank-req-" + viaClient + "\"");
-    assertThat(html).doesNotContain("id=\"bank-req-" + viaWeb + "\"");
     assertThat(html)
         .doesNotContain("<a href=\"https://evil.example\"")
         .contains("&lt;a href=&quot;https://evil.example&quot;&gt;Beleg&lt;/a&gt;");

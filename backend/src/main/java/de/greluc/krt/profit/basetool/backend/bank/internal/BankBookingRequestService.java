@@ -45,7 +45,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -96,7 +95,7 @@ public class BankBookingRequestService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final ApplicationEventPublisher eventPublisher;
   private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
-  private final ClientDirectory clientDirectory;
+  private final BankRequestClientNames clientNames;
 
   /**
    * Persists a new {@code PENDING} booking request, audits it and fires the notification event
@@ -123,70 +122,15 @@ public class BankBookingRequestService {
    * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
    *     {@code null} to derive the requester at confirmation
    * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
+   * @param purpose what another module raised the request for (REQ-BANK-061), or {@code null}
+   * @param clientId the connected application that raised it through the exchange (REQ-BANK-067),
+   *     or {@code null} for a request raised in the Basetool
    * @return the created request
    * @throws NotFoundException when the source or destination account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
    *     BANK_SELF_TRANSFER} when source equals destination
    * @throws BadRequestException when a counterparty is named on a non-withdrawal, or its org unit
    *     is not one of that user's memberships
-   */
-  @NotNull
-  @Transactional
-  public BankBookingRequestDto create(
-      @NotNull UUID accountId,
-      @NotNull BankBookingRequestType type,
-      @NotNull BigDecimal amount,
-      @Nullable String note,
-      @Nullable String justification,
-      @Nullable UUID targetAccountId,
-      boolean requiresOwnerApproval,
-      @Nullable BigDecimal applicableLimit,
-      @Nullable BankRequestApprover requiredApprover,
-      boolean splitEnabled,
-      @Nullable BigDecimal splitPercent,
-      @Nullable UUID counterpartyUserId,
-      @Nullable UUID counterpartyOrgUnitId) {
-    return create(
-        accountId,
-        type,
-        amount,
-        note,
-        justification,
-        targetAccountId,
-        requiresOwnerApproval,
-        applicableLimit,
-        requiredApprover,
-        splitEnabled,
-        splitPercent,
-        counterpartyUserId,
-        counterpartyOrgUnitId,
-        null,
-        null);
-  }
-
-  /**
-   * Persists a new {@code PENDING} booking request that another module raised for a purpose
-   * (REQ-BANK-061) or a connected application raised through the exchange (REQ-BANK-067);
-   * otherwise exactly {@link #create(UUID, BankBookingRequestType, BigDecimal, String, String,
-   * UUID, boolean, BigDecimal, BankRequestApprover, boolean, BigDecimal, UUID, UUID)}.
-   *
-   * @param accountId the source account
-   * @param type deposit, withdrawal or transfer
-   * @param amount the requested whole-aUEC amount
-   * @param note the requester's optional note
-   * @param justification the requester's optional Begr&uuml;ndung
-   * @param targetAccountId the transfer destination, or {@code null}
-   * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
-   * @param applicableLimit the requester's resolved approval limit, or {@code null}
-   * @param requiredApprover the approver class a flagged request needs, or {@code null}
-   * @param splitEnabled whether a deposit is split across the squadron accounts
-   * @param splitPercent the whole percent to distribute, or {@code null}
-   * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL}, or {@code null}
-   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
-   * @param purpose what the request is for, or {@code null} for a request without a purpose
-   * @param clientId the connected application's bounded label, or {@code null} for a request
-   *     raised in the Basetool
-   * @return the created request
    */
   @NotNull
   @Transactional
@@ -636,7 +580,11 @@ public class BankBookingRequestService {
     }
     BankStaffRights rights = staffRights();
     return pageQueue(statuses, pageable, rights)
-        .map(request -> toDto(request, callerMayConfirm(request, rights)));
+        .map(request ->
+            BankBookingRequestDtos.of(
+                request,
+                clientNames.nameOf(request),
+                BankBookingRequestDtos.callerMayConfirm(request, rights)));
   }
 
   /**
@@ -677,23 +625,6 @@ public class BankBookingRequestService {
     }
     return requestRepository.findByStatusInAndAccountIdIn(
         statuses, rights.grantedAccountIds(), pageable);
-  }
-
-  /**
-   * Whether the caller may confirm the request now: it is still {@code PENDING}, the caller holds
-   * the capability {@link #confirm} requires for it, and the four-eyes rule does not bar them. The
-   * over-limit attestation stays a confirm-time input and is not part of this answer
-   * (REQ-BANK-041).
-   *
-   * @param request the request to judge
-   * @param rights the caller's staff rights
-   * @return {@code true} iff the confirm action applies to this row for this caller
-   */
-  private static boolean callerMayConfirm(
-      @NotNull BankBookingRequest request, @NotNull BankStaffRights rights) {
-    return request.getStatus() == BankBookingRequestStatus.PENDING
-        && rights.canBook(request.getType(), request.getAccount().getId())
-        && !rights.boundByFourEyes(request.getRequestedBy());
   }
 
   /**
@@ -1057,80 +988,7 @@ public class BankBookingRequestService {
    */
   @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
-    return toDto(request, null);
-  }
-
-  /**
-   * Maps a request entity to its wire shape, resolving the owning org unit, recorded holder and
-   * resulting transaction (all eagerly fetched on the list/queue reads, lazily resolvable within
-   * the single-row transactional paths).
-   *
-   * @param request the request entity
-   * @param callerMayConfirm whether the caller may confirm it, or {@code null} when not judged
-   * @return the wire DTO
-   */
-  @NotNull
-  private BankBookingRequestDto toDto(
-      @NotNull BankBookingRequest request, @Nullable Boolean callerMayConfirm) {
-    BankAccount account = request.getAccount();
-    OrgUnit orgUnit = account.getOrgUnit();
-    BankHolder holder = request.getHolder();
-    BankTransaction transaction = request.getResultingTransaction();
-    BankAccount target = request.getTargetAccount();
-    return new BankBookingRequestDto(
-        request.getId(),
-        account.getId(),
-        account.getAccountNo(),
-        account.getName(),
-        orgUnit == null ? null : orgUnit.getId(),
-        orgUnit == null ? null : orgUnit.getName(),
-        orgUnit == null ? null : orgUnit.getShorthand(),
-        request.getType(),
-        request.getAmount(),
-        request.getNote(),
-        request.getJustification(),
-        request.getStaffNote(),
-        request.getStatus(),
-        request.getRequesterHandle(),
-        holder == null ? null : holder.getId(),
-        holder == null ? null : holder.getDisplayName(),
-        transaction == null ? null : transaction.getId(),
-        request.getDeciderHandle(),
-        request.getRejectReason(),
-        request.getDecidedAt(),
-        request.getCreatedAt(),
-        target == null ? null : target.getId(),
-        target == null ? null : target.getAccountNo(),
-        request.isRequiresOwnerApproval(),
-        request.getApplicableLimit(),
-        request.getRequiredApprover() == null ? null : request.getRequiredApprover().name(),
-        request.isOwnerApprovalGranted(),
-        request.getOwnerApprovalGrantedByHandle(),
-        request.isSplitEnabled(),
-        request.getSplitPercent(),
-        request.getCounterpartyUserId(),
-        request.getCounterpartyHandle(),
-        request.getCounterpartyOrgUnitId(),
-        request.getCounterpartyOrgUnitName(),
-        request.getPurposeKind(),
-        request.getPurposeRef(),
-        clientName(request.getClientId()),
-        request.getVersion(),
-        callerMayConfirm);
-  }
-
-  /**
-   * Names the connected application a request came through for the staff badge (REQ-BANK-067).
-   *
-   * @param clientId the stored client label, or {@code null} for a request raised in the Basetool
-   * @return the registry's display name, the label itself for a client the registry no longer
-   *     holds, or {@code null} for a request raised in the Basetool
-   */
-  @Nullable
-  private String clientName(@Nullable String clientId) {
-    return clientId == null
-        ? null
-        : clientDirectory.displayNames(List.of(clientId)).getOrDefault(clientId, clientId);
+    return BankBookingRequestDtos.of(request, clientNames.nameOf(request), null);
   }
 
   /**

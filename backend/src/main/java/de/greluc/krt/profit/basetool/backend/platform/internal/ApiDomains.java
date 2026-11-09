@@ -81,6 +81,7 @@ public final class ApiDomains {
           Map.entry("DiscordRegistrationMergeController", "identity"),
           Map.entry("ExchangeAccountCheckController", "exchange"),
           Map.entry("ExchangeBankController", "exchange"),
+          Map.entry("ExchangeBankQueueController", "exchange"),
           Map.entry("ExchangeBankRequestController", "exchange"),
           Map.entry("ExchangeBlueprintController", "exchange"),
           Map.entry("ExchangeCatalogController", "exchange"),

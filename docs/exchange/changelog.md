@@ -5,6 +5,20 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-09
 
+- **New: raising, correcting and cancelling bank requests.** `POST /exchange/v1/bank/requests`,
+  `PUT …/requests/{id}` and `POST …/requests/{id}/cancel` under the scope
+  `exchange.bank.request`, each a write with a mandatory `Idempotency-Key`
+  ([bank](resources/bank.md#raising-correcting-and-cancelling-a-request)). A raise answers
+  `201 { id, status, version, amount }`. New schema `bank-request-write` and error codes
+  `409 BANK_OPEN_REQUEST_CAP`, `BANK_JUSTIFICATION_REQUIRED`, `BANK_SELF_TRANSFER`,
+  `BANK_REQUEST_NOT_PENDING` and `BANK_REQUEST_ALREADY_APPROVED` ([errors](errors.md)). The own
+  requests and the staff queue now fill `client`. `PUT` is allowed cross-origin on the exchange.
+- **New: the bank-staff queue.** `GET /exchange/v1/bank/queue` under the scope
+  `exchange.bank.queue`: the pending requests of the member's staff queue (`open`, with
+  `mayConfirm`) and those waiting for the member's approval (`toApprove`), oldest first, with a
+  link into the Basetool for each ([bank](resources/bank.md#staff-queue)). New schema
+  `bank-queue` and error code `403 NOT_BANK_STAFF` ([errors](errors.md)). The answer is foreign
+  bank data: memory only, for at most 7 days.
 - **New: the member's own bank requests.** `GET /exchange/v1/bank/requests` under
   `exchange.bank.read`: every booking request the member raised, in the Basetool or through any
   client, as a snapshot and a change feed with tombstones ([bank](resources/bank.md)). New schema

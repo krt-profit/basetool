@@ -19,8 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
-import java.math.BigDecimal;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 

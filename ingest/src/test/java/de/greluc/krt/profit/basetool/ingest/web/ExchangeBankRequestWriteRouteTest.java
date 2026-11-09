@@ -61,9 +61,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The writes on the member's own bank requests through both gates, with the backend relay mocked
- * (REQ-BXCH-004): the gateway checks the body and the request id before the relay, answers a
- * raised request with {@code 201}, passes the bank's refusals on and needs {@code
- * exchange.bank.request}.
+ * (REQ-BXCH-004): the gateway checks the body and the request id before the relay, answers a raised
+ * request with {@code 201}, passes the bank's refusals on and needs {@code exchange.bank.request}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 class ExchangeBankRequestWriteRouteTest {
@@ -155,7 +154,10 @@ class ExchangeBankRequestWriteRouteTest {
 
   @Test
   void aBodyOutsideTheSchemaAndAMalformedIdAreRefusedBeforeTheRelay() throws Exception {
-    call(HttpMethod.POST, ROUTE, example("bank-request-write--raise/invalid/fractional-amount.json"))
+    call(
+            HttpMethod.POST,
+            ROUTE,
+            example("bank-request-write--raise/invalid/fractional-amount.json"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
     call(

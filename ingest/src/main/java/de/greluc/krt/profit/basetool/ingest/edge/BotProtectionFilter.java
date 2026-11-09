@@ -49,10 +49,11 @@ import tools.jackson.databind.ObjectMapper;
  * Rejects bot, scanner and exploit-probe requests before Spring Security (REQ-INGEST-009).
  *
  * <p>In order: a query chunk with an empty parameter name gets 400; a method other than GET, POST,
- * HEAD or OPTIONS, and on an exchange path also PUT, gets 405; a known scanner path prefix or a foreign file extension gets 404. On an
- * exchange route every refusal is a problem with a registered code instead (REQ-XCH-025): {@code
- * 400 SCHEMA_INVALID} for the query, {@code 404 NOT_FOUND} for the rest. Matching is
- * case-insensitive, and only the bounded rule is counted on {@code basetool_bot_blocked_total}.
+ * HEAD or OPTIONS, and on an exchange path also PUT, gets 405; a known scanner path prefix or a
+ * foreign file extension gets 404. On an exchange route every refusal is a problem with a
+ * registered code instead (REQ-XCH-025): {@code 400 SCHEMA_INVALID} for the query, {@code 404
+ * NOT_FOUND} for the rest. Matching is case-insensitive, and only the bounded rule is counted on
+ * {@code basetool_bot_blocked_total}.
  */
 @Component
 @Order(BotProtectionFilter.ORDER)
@@ -149,8 +150,7 @@ public class BotProtectionFilter extends OncePerRequestFilter {
    * HTTP methods that pass on an {@code /exchange} path: the others and {@code PUT}, which the bank
    * request correction uses (REQ-BXCH-004); the exchange gate answers an unrouted method itself.
    */
-  static final Set<String> EXCHANGE_HTTP_METHODS =
-      Set.of("GET", "POST", "PUT", "HEAD", "OPTIONS");
+  static final Set<String> EXCHANGE_HTTP_METHODS = Set.of("GET", "POST", "PUT", "HEAD", "OPTIONS");
 
   /**
    * Actuator paths exempt from {@link #isBotPath(String)}, matched case-insensitively as the exact

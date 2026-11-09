@@ -40,8 +40,8 @@ public interface BankOwnRequestWrites {
    *
    * @param actor the requester, from {@link BankActors#forExchange}
    * @param request what to raise
-   * @param clientId the registry id of the connected application the gate admitted, recorded on
-   *     the request
+   * @param clientId the registry id of the connected application the gate admitted, recorded on the
+   *     request
    * @return the pending request
    */
   @NotNull

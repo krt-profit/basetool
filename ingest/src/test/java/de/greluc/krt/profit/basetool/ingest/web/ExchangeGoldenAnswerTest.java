@@ -503,6 +503,7 @@ class ExchangeGoldenAnswerTest {
         get(
             "/bank/accounts/5d0e9c1a-2b3f-4a6d-8e71-9c0b1a2d3e4f/balance-series"
                 + "?from=2026-11-06T00:00:00Z&to=2026-11-08T23:59:59Z"));
+    routes.put("route-get-bank-queue", get("/bank/queue?limit=2"));
     routes.put("route-get-bank-requests", get("/bank/requests?limit=2"));
     routes.put(
         "route-post-bank-request",
@@ -562,6 +563,8 @@ class ExchangeGoldenAnswerTest {
             fixture("page--bankBookingPage/valid/first-page.json");
         case "GET /api/v1/exchange/bank/accounts/{id}/balance-series" ->
             fixture("bank-balance-series/valid/three-days.json");
+        case "GET /api/v1/exchange/bank/queue" ->
+            fixture("bank-queue/valid/staff-and-approver.json");
         case "GET /api/v1/exchange/bank/requests" ->
             fixture("page--bankRequestPage/valid/snapshot.json");
         case "POST /api/v1/exchange/bank/requests", "PUT /api/v1/exchange/bank/requests/{id}" ->

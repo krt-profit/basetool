@@ -37,8 +37,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Raises, corrects and cancels the member's own booking requests for an exchange client
- * (REQ-BXCH-004) through {@link BankOwnRequestWrites}, for the member's actor without Admin
- * ({@link BankActors#forExchange}). It decides nothing itself: every rule is the bank's.
+ * (REQ-BXCH-004) through {@link BankOwnRequestWrites}, for the member's actor without Admin ({@link
+ * BankActors#forExchange}). It decides nothing itself: every rule is the bank's.
  *
  * <p>Every write counts on {@code basetool_exchange_writes_total{resource="bank_request"}}, a
  * shared {@code 404} and a cap refusal also on {@code basetool_exchange_bank_refused_total}

@@ -175,6 +175,10 @@ public class ExchangeRelay {
           Map.entry(
               ExchangeRefusals.NOT_FOUND,
               "No such resource, or the member may not see it; both answer alike."),
+          Map.entry(
+              "NOT_BANK_STAFF",
+              "The member holds no bank role and no grant, and no request waits for their"
+                  + " approval."),
           Map.entry("SCHEMA_INVALID", "The Basetool refused the request's content as malformed."),
           Map.entry(
               "VERSION_CONFLICT", "The entry changed since it was read; pull, merge and retry."),

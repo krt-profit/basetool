@@ -156,7 +156,8 @@ class OrgUnitBankAccessServiceTest {
             policy,
             bankAccountRepository,
             bankBookingRequestRepository,
-            bankBookingRequestService);
+            bankBookingRequestService,
+            null);
   }
 
   /**
@@ -1680,7 +1681,9 @@ class OrgUnitBankAccessServiceTest {
             eq(false),
             eq(null),
             eq(null),
-            eq(null)))
+            eq(null),
+            isNull(),
+            isNull()))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.raiseCartelDirectBookingRequest(
@@ -1705,7 +1708,9 @@ class OrgUnitBankAccessServiceTest {
             eq(false),
             eq(null),
             eq(null),
-            eq(null));
+            eq(null),
+            isNull(),
+            isNull());
   }
 
   @Test
@@ -1730,7 +1735,9 @@ class OrgUnitBankAccessServiceTest {
             eq(false),
             eq(null),
             eq(null),
-            eq(null)))
+            eq(null),
+            isNull(),
+            isNull()))
         .thenReturn(requestDto(accountId, UUID.randomUUID()));
 
     requestService.raiseCartelDirectBookingRequest(
@@ -1750,7 +1757,9 @@ class OrgUnitBankAccessServiceTest {
             eq(false),
             eq(null),
             eq(null),
-            eq(null));
+            eq(null),
+            isNull(),
+            isNull());
   }
 
   @Test

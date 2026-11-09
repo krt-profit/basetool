@@ -31,8 +31,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Counts the bank's traffic on the exchange (REQ-BXCH-006, REQ-OBS-024): reads by registered client
- * and route, request writes by client and outcome, refusals by reason. Every label is a registry client id or a fixed enumeration, never
- * an id, a path or an amount (REQ-OBS-011).
+ * and route, request writes by client and outcome, refusals by reason. Every label is a registry
+ * client id or a fixed enumeration, never an id, a path or an amount (REQ-OBS-011).
  */
 @Component
 @RequiredArgsConstructor
@@ -66,8 +66,8 @@ public class ExchangeBankMetrics {
   }
 
   /**
-   * Counts one bank request write on {@code basetool_exchange_writes_total{resource="bank_request"}}
-   * (REQ-BXCH-004).
+   * Counts one bank request write on {@code
+   * basetool_exchange_writes_total{resource="bank_request"}} (REQ-BXCH-004).
    *
    * @param clientId the registry client id the relay bounded
    * @param outcome {@code applied} or {@code rejected}

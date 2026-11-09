@@ -36,8 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Serves {@link BankOwnRequestWrites} through the web's request services (REQ-BXCH-004): the
- * payload passes the web's bean validation, the policy admits and routes for the given actor, and
- * a raised request records the connected application the gate admitted (REQ-BANK-067).
+ * payload passes the web's bean validation, the policy admits and routes for the given actor, and a
+ * raised request records the connected application the gate admitted (REQ-BANK-067).
  *
  * <p>What the exchange adds is only its refusals: an unknown, closed or hidden account and another
  * member's request answer the same {@link NotFoundException}, and a member who holds {@link
@@ -81,11 +81,7 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
     }
     BankBookingRequestDto raised =
         requestService.raiseForClient(
-            actor,
-            account,
-            payload,
-            BankOwnRequestWriteService::notFound,
-            clientId);
+            actor, account, payload, BankOwnRequestWriteService::notFound, clientId);
     return written(raised.id());
   }
 

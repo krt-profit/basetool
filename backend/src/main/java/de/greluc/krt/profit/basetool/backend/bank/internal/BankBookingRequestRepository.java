@@ -243,6 +243,16 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   List<BankBookingRequest> findByAccountIdInOrderByCreatedAtDesc(Collection<UUID> accountIds);
 
   /**
+   * Lists every request in one lifecycle state, unordered, for the exchange's staff queue snapshot
+   * (REQ-BXCH-005).
+   *
+   * @param status the lifecycle state (the queue passes {@code PENDING})
+   * @return the requests with their accounts and org unit loaded
+   */
+  @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
+  List<BankBookingRequest> findAllByStatus(BankBookingRequestStatus status);
+
+  /**
    * Existence probe backing the close-account guard (REQ-BANK-025): an account with an open request
    * cannot be closed.
    *

@@ -114,6 +114,7 @@ class BankAccessPolicyRulesTest {
           BANK + ".api.BankStaffRights",
           BANK + ".api.BankBookingRequestType",
           BANK + ".api.BankAccountReads",
+          BANK + ".api.BankStaffQueueReads",
           BANK + ".api.BankOwnRequestReads",
           BANK + ".api.BankOwnRequestWrites",
           BANK + ".api.BankProblemCode");

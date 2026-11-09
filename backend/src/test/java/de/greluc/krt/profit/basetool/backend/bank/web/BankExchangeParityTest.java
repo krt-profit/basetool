@@ -112,7 +112,9 @@ class BankExchangeParityTest {
   /**
    * The exchange outcome of a raise, correction or cancel, derived from the web's: a raise answers
    * {@code 201}, a refused or closed account the shared {@code 404}, and the routing stays without
-   * the limit, which the exchange does not expose.
+   * the limit, which the exchange does not expose. A pending registration is refused by the
+   * acting-member gate, and an administrator without memberships may not debit any account
+   * (REQ-XCH-009).
    *
    * @param c the case
    * @param web the web's recorded outcome
@@ -120,7 +122,15 @@ class BankExchangeParityTest {
    */
   @NotNull
   private static String expectedWrite(@NotNull Case c, @NotNull String web) {
-    if (web.startsWith("403") || web.equals("409 BANK_ACCOUNT_CLOSED")) {
+    if (c.actor() == Actor.PENDING) {
+      return "403 PENDING_APPROVAL";
+    }
+    boolean debit =
+        c.operation() == Operation.RAISE_WITHDRAWAL || c.operation() == Operation.RAISE_TRANSFER;
+    if (web.startsWith("403")
+        || web.equals("409 BANK_ACCOUNT_CLOSED")
+        || c.subject() == Account.CLOSED
+        || (debit && c.actor() == Actor.ADMIN)) {
       return NOT_FOUND;
     }
     Matcher routed = ROUTED.matcher(web);

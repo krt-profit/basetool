@@ -46,8 +46,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Sends bank reads to the backend's exchange surface as the ingest gateway relays them, for a
- * registry client granted {@code exchange.bank.read}, inside the caller's transaction.
+ * Sends bank reads and request writes to the backend's exchange surface as the ingest gateway
+ * relays them, for a registry client granted {@code exchange.bank.read}, {@code
+ * exchange.bank.queue} and {@code exchange.bank.request}, inside the caller's transaction.
  *
  * <p>Registering the client and switching the exchange and the bank on happen in the caller's
  * transaction, so a rolled-back test leaves neither behind.
@@ -82,6 +83,7 @@ final class BankExchangeRelay {
         EnumSet.of(
             ExchangeCapability.CONNECT,
             ExchangeCapability.BANK_READ,
+            ExchangeCapability.BANK_QUEUE,
             ExchangeCapability.BANK_REQUEST));
     context.getBean(ExchangeClientRepository.class).saveAndFlush(registered);
     ExchangeSettingsRepository settingsRepository =
@@ -175,6 +177,8 @@ final class BankExchangeRelay {
         .header(
             ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER,
             ExchangeCapability.BANK_READ.getScope()
+                + ","
+                + ExchangeCapability.BANK_QUEUE.getScope()
                 + ","
                 + ExchangeCapability.BANK_REQUEST.getScope())
         .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, KEY);

@@ -30,7 +30,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeAccou
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankAccountPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankBookingPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankQueueDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCancelledDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCorrectionDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestWrittenDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintDraftDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintPageDto;
@@ -104,7 +110,20 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeBankAccountPageDto.class, "page.schema.json#/$defs/bankAccountPage"),
           Map.entry(ExchangeBankBookingPageDto.class, "page.schema.json#/$defs/bankBookingPage"),
           Map.entry(ExchangeBankBalanceSeriesDto.class, "bank-balance-series.schema.json"),
+          Map.entry(ExchangeBankQueueDto.class, "bank-queue.schema.json"),
           Map.entry(ExchangeBankRequestPageDto.class, "page.schema.json#/$defs/bankRequestPage"),
+          Map.entry(
+              ExchangeBankRequestCreateDto.class, "bank-request-write.schema.json#/$defs/raise"),
+          Map.entry(
+              ExchangeBankRequestCorrectionDto.class,
+              "bank-request-write.schema.json#/$defs/correction"),
+          Map.entry(
+              ExchangeBankRequestCancelDto.class, "bank-request-write.schema.json#/$defs/cancel"),
+          Map.entry(
+              ExchangeBankRequestWrittenDto.class, "bank-request-write.schema.json#/$defs/written"),
+          Map.entry(
+              ExchangeBankRequestCancelledDto.class,
+              "bank-request-write.schema.json#/$defs/cancelled"),
           Map.entry(ExchangeChangeResultDto.class, "change-result.schema.json"),
           Map.entry(
               ExchangeBlueprintChangeSet.class, "change-set.schema.json#/$defs/blueprintChangeSet"),

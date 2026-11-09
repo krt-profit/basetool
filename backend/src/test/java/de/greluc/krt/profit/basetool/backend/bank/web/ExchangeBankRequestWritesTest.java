@@ -108,6 +108,27 @@ class ExchangeBankRequestWritesTest {
   }
 
   @Test
+  void theStaffQueueNamesTheClientARequestCameThrough() throws Exception {
+    String id =
+        body(raise(Actor.STAFFELLEITER, deposit(world.account(Account.OWN_ORG_UNIT), 500)), 201)
+            .path("id")
+            .asString();
+    entityManager.flush();
+
+    JsonNode queue =
+        body(relay.read(world.user(Actor.MANAGEMENT), "/queue", Map.of("limit", "500")), 200);
+
+    JsonNode item = null;
+    for (JsonNode candidate : queue.path("open")) {
+      if (id.equals(candidate.path("id").asString())) {
+        item = candidate;
+      }
+    }
+    assertThat(item).as("the raised request is in the open queue").isNotNull();
+    assertThat(item.path("client").asString()).isEqualTo(relay.client());
+  }
+
+  @Test
   void routesAWithdrawalThroughThePolicyAsTheWebDoes() throws Exception {
     String id =
         body(
@@ -211,8 +232,7 @@ class ExchangeBankRequestWritesTest {
     long version = version(id);
 
     assertCode(correct(Actor.MEMBER, id, 600, version + 7), 409, "OPTIMISTIC_LOCK");
-    jdbc.update(
-        "UPDATE bank_booking_request SET owner_approval_granted = TRUE WHERE id = ?", id);
+    jdbc.update("UPDATE bank_booking_request SET owner_approval_granted = TRUE WHERE id = ?", id);
     entityManager.clear();
     assertCode(correct(Actor.MEMBER, id, 600, version), 409, "BANK_REQUEST_ALREADY_APPROVED");
   }
@@ -336,7 +356,10 @@ class ExchangeBankRequestWritesTest {
   private MockHttpServletResponse cancel(@NotNull Actor actor, @NotNull UUID id, long version)
       throws Exception {
     return relay.write(
-        HttpMethod.POST, world.user(actor), REQUESTS + "/" + id + "/cancel", Map.of("version", version));
+        HttpMethod.POST,
+        world.user(actor),
+        REQUESTS + "/" + id + "/cancel",
+        Map.of("version", version));
   }
 
   /**
@@ -394,7 +417,8 @@ class ExchangeBankRequestWritesTest {
    * @param code the expected code
    * @throws Exception when the body is no JSON
    */
-  private void assertCode(@NotNull MockHttpServletResponse response, int status, @NotNull String code)
+  private void assertCode(
+      @NotNull MockHttpServletResponse response, int status, @NotNull String code)
       throws Exception {
     assertThat(body(response, status).path("code").asString()).isEqualTo(code);
   }

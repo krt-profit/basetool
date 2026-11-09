@@ -20,14 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
-import java.math.BigDecimal;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A booking request a connected application raises for the member (REQ-BXCH-004): type, account
- * and amount are required, everything else the bank checks by the web's rules.
+ * A booking request a connected application raises for the member (REQ-BXCH-004): type, account and
+ * amount are required, everything else the bank checks by the web's rules.
  *
  * @param type deposit, withdrawal or transfer
  * @param sourceAccountId the (source) account

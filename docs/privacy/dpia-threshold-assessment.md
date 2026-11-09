@@ -64,7 +64,13 @@ none of the triggers above either: no new data category (the bank data of A3, sh
 members as in the Basetool), no profiling or automated decision, no monitoring and no money moved.
 The data stays with the member who may already see it, on a client approved only if it keeps
 other people's bank data in memory for at most 7 days (REQ-BXCH-007), and a member can withhold
-their name. **Still no DPIA required.** The staff queue (REQ-BXCH-005) is assessed with its slice.
+their name. **Still no DPIA required.**
+
+The staff queue (REQ-BXCH-005) adds, for bank staff and approvers only, the pending requests they
+already work on in the Basetool: the requester's handle, the justification and note, and the
+account balance for the Bankleitung and on granted accounts. Still the A3 bank data, to the same
+people as in the Basetool, read-only, under the same 7-day memory-only condition and the same name
+withholding; no new trigger. **Still no DPIA required.**
 
 ---
 

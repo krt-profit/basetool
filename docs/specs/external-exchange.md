@@ -1665,7 +1665,8 @@ Responses carry `RateLimit` and `Retry-After` headers. The account check has its
 | live DPoP proofs in total (`dpop-proofs-total`) | 100 000, per path scope | in-process `jti` replay cache (REQ-XCH-006) |
 | change sets of more than 100 ops relayed at once, over all clients and members | 4 | in-process bulkhead `exchangeLargeChangeSets` (`resilience4j.bulkhead.instances.…max-concurrent-calls`) |
 
-The write routes are the six `…/changes` and `…/drafts/…` routes (`ExchangeRoutes`); the org
+The write routes are the six `…/changes` and `…/drafts/…` routes and the three bank request
+writes of REQ-BXCH-004, one unit each (`ExchangeRoutes`); the org
 stock's change set counts once more for every op after its first (REQ-XCH-045). A request over
 a per-period limit is `429 RATE_LIMITED`, over the quota `429 QUOTA_EXCEEDED`, each with
 `Retry-After` (the quota's until the next UTC day); a quota that cannot be counted is `503
@@ -1998,7 +1999,8 @@ The gateway admits extensions cross-origin on `/exchange/**` only: each approved
 fixed `chrome-extension://<id>`, bound to its client as `<clientId>=chrome-extension://<id>`
 (`app.exchange.cors.extension-origins`, from `BASETOOL_EXCHANGE_CORS_EXTENSION_ORIGINS`), and
 `moz-extension://*` while one client has a Firefox build (`app.exchange.cors.firefox-clients`, from
-`BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST` and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
+`BASETOOL_EXCHANGE_CORS_FIREFOX_CLIENTS`), for `GET`, `POST`, `PUT` (the bank request correction,
+REQ-BXCH-004) and `OPTIONS`, with `Authorization`, `DPoP`, `Content-Type`,
 `Accept`, `Accept-Language`, `Idempotency-Key`, `X-Correlation-Id`, `User-Agent` and
 `Exchange-Client-Agent`, never with credentials, and exposes `DPoP-Nonce`, `WWW-Authenticate`,
 `RateLimit`, `RateLimit-Policy`, `Retry-After`, `Idempotency-Replayed`, `X-Correlation-Id` and
@@ -2470,8 +2472,8 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 23 relay operations on 22 backend
-paths (with the three bank reads of REQ-BXCH-002 and the own requests of REQ-BXCH-003), their parameters, request and answer shapes, the relayed codes and statuses, and the
+byte-identical (D-05 of the domain modularisation plan): the 27 relay operations on 25 backend
+paths (with the three bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004 and the staff queue of REQ-BXCH-005), their parameters, request and answer shapes, the relayed codes and statuses, and the
 gateway's security filters. Four build-time guards hold it, so a drift fails a build instead of
 surfacing in production as a `502 BACKEND_RELAY_FAILED` or a `400 SCHEMA_INVALID` for a body the
 contract allows.
@@ -2486,8 +2488,9 @@ contract allows.
   `refinery-draft/invalid/no-orders.json` (`"orders": []`), which the schema refuses, is refused
   by the backend too, with `400 VALIDATION_FAILED`. Of `GET /api/v1/exchange/me/installation` the gateway takes only
   `installationId` into the service document, so only that member is checked. The bank
-  reads answer only with the bank switched on and a seeded bank world; `ExchangeBankReadsTest`
-  and `ExchangeBankRequestsTest` check their answers against the published schemas on one.
+  reads answer only with the bank switched on and a seeded bank world; `ExchangeBankReadsTest`,
+  `ExchangeBankRequestsTest` and `ExchangeBankQueueTest` check their answers against the published
+  schemas on one.
 - **Golden answers.** `ExchangeGoldenAnswerTest` records, for every `/exchange/v1` route and for a
   relayed refusal, a translated code, a relay failure, an answer that breaks its schema, a draft
   its schema refuses before the relay and a staged mass change, the client's request, the backend request the relay sent with every header,
@@ -2497,7 +2500,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 23 relay
+  pull request. The test also asserts that the backend stub received exactly the 27 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2539,16 +2542,16 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 23 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's twelve exchange controllers and their `@exchangeGate`
-  expressions, `ActingMemberFilter`'s 22 paths (each exact but for a whole `{id}` segment, as in
+- the 27 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's thirteen exchange controllers and their `@exchangeGate`
+  expressions, `ActingMemberFilter`'s 25 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
 - the five relay headers, the eighteen capability scopes (`exchange.orgstock.details` and
-  `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` and
-  `exchange.bank.queue` the two no route serves yet), the gate codes with their statuses, the
-  codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 among them) and the
+  `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` the one no
+  route serves yet), the gate codes with their statuses, the
+  codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 and `NOT_BANK_STAFF` of REQ-BXCH-005 among them) and the
   four backend codes it translates;
 - the registry mirror document: the backend's writer must produce the seam's sample document, and
   the gateway's reader must read every member of it — renaming any member it reads changes what it
@@ -2603,7 +2606,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  23 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
+  27 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
   scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
   reference (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2617,8 +2620,8 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 23 relay operations and 107 schemas; `openapi.json` holds
-  none of them and the 88 schemas only they reach left it; the union of both is the generated
+- [x] The relay document holds exactly the 27 relay operations and 116 schemas; `openapi.json` holds
+  none of them and the 97 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.
@@ -2770,8 +2773,8 @@ a **Logistician of the unit** carries `entries[]`; in any other pool a lot carri
 A profile setting „Meinen Namen nicht an verbundene Anwendungen weitergeben" is off by default.
 While it is on, the member's entries in the org stock carry no name, `ref` or note
 (REQ-XCH-043) and the member is left out of the roster (REQ-XCH-045) and cannot be chosen as a
-holder. In the bank's bookings the member's `counterpartyHandle` is `null` (REQ-BXCH-007); the
-booking itself stays. Their entries stay in the lots
+holder. In the bank's bookings the member's `counterpartyHandle` and in the staff queue their
+`requesterHandle` are `null` (REQ-BXCH-007); the booking and the request themselves stay. Their entries stay in the lots
 and stay writable by id. Switching it takes effect on the next request and announces the affected
 lots in the feed. The setting is part of the member's data export; the privacy notice
 („Verbundene Anwendungen") and the records of processing state which names reach a connected

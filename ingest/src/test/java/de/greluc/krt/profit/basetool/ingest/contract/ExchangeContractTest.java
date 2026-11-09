@@ -91,6 +91,7 @@ class ExchangeContractTest {
           "/exchange/v1/bank/accounts",
           "/exchange/v1/bank/accounts/{id}/bookings",
           "/exchange/v1/bank/accounts/{id}/balance-series",
+          "/exchange/v1/bank/queue",
           "/exchange/v1/bank/requests",
           "/exchange/v1/bank/requests/{id}",
           "/exchange/v1/bank/requests/{id}/cancel");

@@ -39,8 +39,8 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Runs the read and own-request cases of the {@link BankAccessMatrix} through the bank routes of the
- * exchange and renders each outcome in the vocabulary of {@link BankWebAccessDriver}.
+ * Runs the read and own-request cases of the {@link BankAccessMatrix} through the bank routes of
+ * the exchange and renders each outcome in the vocabulary of {@link BankWebAccessDriver}.
  *
  * <p>{@code ORG_BALANCES} runs as the account list and renders each listed account with {@code
  * canRequest} for {@code requestable} and the {@code ownLimit}; {@code ORG_VIEW} runs as the
@@ -91,7 +91,7 @@ final class BankExchangeAccessDriver {
     };
   }
 
-/**
+  /**
    * Raises a request on the case's account, with the web driver's justification and transfer
    * destination.
    *

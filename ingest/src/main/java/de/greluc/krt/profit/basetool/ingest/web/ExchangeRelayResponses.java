@@ -43,8 +43,8 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Relays the gateway's reads and single-body writes and shapes every answer a route sends: the
- * checked page request or body, a usable backend answer that holds its contract, and the problems of a refusal (REQ-XCH-011,
- * REQ-XCH-025).
+ * checked page request or body, a usable backend answer that holds its contract, and the problems
+ * of a refusal (REQ-XCH-011, REQ-XCH-025).
  */
 @Component
 @RequiredArgsConstructor

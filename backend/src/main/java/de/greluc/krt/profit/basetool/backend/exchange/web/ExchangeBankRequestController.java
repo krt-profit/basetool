@@ -139,8 +139,8 @@ public class ExchangeBankRequestController {
   @Operation(
       summary = "Exchange: correct one of my pending bank booking requests",
       description =
-          "Gateway-only. Replaces amount, note, justification and destination of a pending,"
-              + " not yet approved own request, raised anywhere, and re-routes its approval. Another"
+          "Gateway-only. Replaces amount, note, justification and destination of a pending, not yet"
+              + " approved own request, raised anywhere, and re-routes its approval. Another"
               + " member's request answers 404 NOT_FOUND.")
   @ApiResponse(responseCode = "200", description = "The corrected request")
   @ApiResponse(responseCode = "404", description = "Unknown or foreign request")
@@ -174,7 +174,7 @@ public class ExchangeBankRequestController {
   @ApiResponse(responseCode = "409", description = "Not pending or a stale version")
   public ResponseEntity<ExchangeBankRequestCancelledDto> cancel(
       @NotNull @PathVariable UUID id,
-      @NotNull @RequestBody ExchangeBankRequestCancelDto body,
+      @NotNull @Valid @RequestBody ExchangeBankRequestCancelDto body,
       @NotNull Authentication authentication) {
     return ResponseEntity.ok(
         writeService.cancel(

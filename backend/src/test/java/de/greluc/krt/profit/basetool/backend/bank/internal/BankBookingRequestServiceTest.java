@@ -55,7 +55,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -105,7 +104,7 @@ class BankBookingRequestServiceTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
-  @Mock private ClientDirectory clientDirectory;
+  @Mock private BankRequestClientNames clientNames;
 
   private BankAccessRules policy;
   private BankBookingRequestService service;
@@ -134,7 +133,7 @@ class BankBookingRequestServiceTest {
             orgUnitMembershipQueryService,
             eventPublisher,
             purposeObservers,
-            clientDirectory);
+            clientNames);
   }
 
   @Test
@@ -402,7 +401,9 @@ class BankBookingRequestServiceTest {
             false,
             null,
             recipientId,
-            orgUnitId);
+            orgUnitId,
+            null,
+            null);
 
     assertThat(dto.counterpartyUserId()).isEqualTo(recipientId);
     assertThat(dto.counterpartyHandle()).isEqualTo("payee");
@@ -443,7 +444,9 @@ class BankBookingRequestServiceTest {
                 false,
                 null,
                 recipientId,
-                UUID.randomUUID()));
+                UUID.randomUUID(),
+                null,
+                null));
     verify(requestRepository, never()).save(any(BankBookingRequest.class));
   }
 
@@ -474,6 +477,8 @@ class BankBookingRequestServiceTest {
                 false,
                 null,
                 UUID.randomUUID(),
+                null,
+                null,
                 null));
     verify(requestRepository, never()).save(any(BankBookingRequest.class));
   }
@@ -507,6 +512,8 @@ class BankBookingRequestServiceTest {
             null,
             null,
             false,
+            null,
+            null,
             null,
             null,
             null);
@@ -557,6 +564,8 @@ class BankBookingRequestServiceTest {
         true,
         new BigDecimal("30"),
         null,
+        null,
+        null,
         null);
 
     assertThat(saved.getValue().isSplitEnabled()).isTrue();
@@ -587,6 +596,8 @@ class BankBookingRequestServiceTest {
                     false,
                     null,
                     null,
+                    null,
+                    null,
                     null));
     assertThat(ex.getCode()).isEqualTo(BankConflictException.CODE_BANK_ACCOUNT_CLOSED);
     verify(requestRepository, never()).save(any());
@@ -613,6 +624,8 @@ class BankBookingRequestServiceTest {
                     null,
                     BankRequestApprover.RESPONSIBLE_HOLDER,
                     false,
+                    null,
+                    null,
                     null,
                     null,
                     null));
@@ -649,6 +662,8 @@ class BankBookingRequestServiceTest {
         false,
         null,
         null,
+        null,
+        null,
         null);
 
     assertThat(saved.getValue().getJustification()).isNull();
@@ -681,6 +696,8 @@ class BankBookingRequestServiceTest {
         null,
         BankRequestApprover.RESPONSIBLE_HOLDER,
         false,
+        null,
+        null,
         null,
         null,
         null);

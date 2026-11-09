@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.bank.client;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestViewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -83,5 +85,17 @@ public class OrgUnitBankRequestsBackendClient {
   @Nullable
   public List<BankBookingRequestDto> foreign() {
     return backendApiClient.get(REQUESTS + "/foreign", BOOKING_REQUEST_LIST);
+  }
+
+  /**
+   * Reads one booking request the caller raised, sees as bank staff or approves (REQ-BANK-068).
+   *
+   * @param id the request
+   * @return the request with the caller's roles on it, or {@code null} when it is unknown or hidden
+   *     from the caller
+   */
+  @Nullable
+  public BankBookingRequestViewDto view(@NotNull UUID id) {
+    return backendApiClient.get(REQUESTS + "/" + id, BankBookingRequestViewDto.class);
   }
 }
