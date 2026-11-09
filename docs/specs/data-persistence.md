@@ -1497,9 +1497,10 @@ zeros.
 The UEX sync stores these fields of UEX API 2.0, inside the key sets of REQ-DATA-015:
 
 - **`GET /commodities_prices_all` → `material_price`.** `price_buy_avg` and `price_sell_avg` as
-  `NUMERIC` like `price_buy`; `scu_buy_avg`, `scu_sell_avg` and `scu_sell_stock_avg` as `INTEGER`;
-  `container_sizes` as `INTEGER[]` in UEX order. A blank or partly non-numeric list
-  (`UexValues.parseContainerSizes`) is stored as `NULL`, never half-parsed.
+  `NUMERIC` like `price_buy`; `scu_buy_avg`, `scu_sell_avg` and `scu_sell_stock_avg` as `BIGINT`
+  like `scu_buy`, `scu_sell` and `scu_sell_stock`, since UEX delivers SCU figures beyond the
+  `INTEGER` range; `container_sizes` as `INTEGER[]` in UEX order. A blank or partly non-numeric
+  list (`UexValues.parseContainerSizes`) is stored as `NULL`, never half-parsed.
 - **`GET /terminals` → `terminal`.** `max_container_size` as `INTEGER`; `is_refinery`, `is_refuel`
   and `is_repair` as nullable `BOOLEAN` (an absent flag stays `NULL`); `game_version` as text, a
   blank value as `NULL`. `is_refinery` is UEX's claim for the location and is set on terminals of

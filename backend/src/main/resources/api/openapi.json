@@ -87755,23 +87755,23 @@
           },
           "scuBuy" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int64"
           },
           "scuBuyAvg" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int64"
           },
           "scuSell" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int64"
           },
           "scuSellAvg" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int64"
           },
           "scuSellStockAvg" : {
             "type" : "integer",
-            "format" : "int32"
+            "format" : "int64"
           },
           "statusBuy" : {
             "type" : "boolean"
