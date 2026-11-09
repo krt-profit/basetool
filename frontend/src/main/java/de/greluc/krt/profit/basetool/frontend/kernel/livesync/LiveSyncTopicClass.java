@@ -256,6 +256,22 @@ public enum LiveSyncTopicClass {
       Set.of(Roles.authority(Roles.ADMIN))),
 
   /**
+   * One member's room for the admin member page {@code /members/{id}/edit}, keyed by the member's
+   * id, with the {@code roles} section (the role tab, REQ-SEC-088); authorized locally by {@code
+   * ROLE_ADMIN} ({@link #requiredAnyRole}) alone, so the member is admitted only as an admin.
+   */
+  MEMBER(
+      "member",
+      true,
+      Set.of("roles"),
+      false,
+      "member",
+      null,
+      null,
+      null,
+      Set.of(Roles.authority(Roles.ADMIN))),
+
+  /**
    * Global org-structure room of {@code /admin/org-structure}, with sections {@code units} and
    * {@code forms}; authorized by the socket's authentication alone, the admin sections staying
    * protected per fragment.
