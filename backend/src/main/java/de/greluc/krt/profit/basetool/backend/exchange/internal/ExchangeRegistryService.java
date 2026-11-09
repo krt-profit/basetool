@@ -340,7 +340,7 @@ public class ExchangeRegistryService {
       return settings;
     }
     ExchangeRegistrySnapshot before = mirrorSync.load();
-    ExchangeSettings saved = write.apply(settings);
+    final ExchangeSettings saved = write.apply(settings);
     mirrorSync.mirrorChange(before, mirrorSync.load());
     auditRecorder.record(
         target.getAuditType(), null, null, null, AuditDetails.of("enabled", enabled));
