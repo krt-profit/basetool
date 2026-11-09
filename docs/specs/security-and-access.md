@@ -6270,7 +6270,8 @@ condition of the admin OTP (REQ-SEC-082); the Basetool never reads it.
 - **Bootstrap.** `app.bootstrap.admin-subs` (env `APP_BOOTSTRAP_ADMIN_SUBS`, comma-separated
   Keycloak subjects, empty by default; a value that is not a UUID fails the start) lists subjects
   that receive Admin at login while no other active admin exists; the account is approved with it
-  and the same request is authorised as Admin.
+  and the same request is authorised as Admin. A bootstrap subject's logins take the Admin role row
+  lock before they read the account, so concurrent first requests grant it once.
 - **Traces.** Every change, the bootstrap grant included, records `USER_ROLE_ASSIGNED` /
   `USER_ROLE_WITHDRAWN` (subject and target the member, details the `role` code and, for the
   bootstrap grant, `source=bootstrap`; REQ-AUDIT-001), counts
@@ -6284,7 +6285,8 @@ scope. The frontend therefore requests only `openid, profile, email`, since Keyc
 scope the client is not offered with `invalid_scope`. The runbook ([`deployment.md` → *Roles in the Basetool*](../deployment.md#roles-in-the-basetool-the-switch-and-its-rollback)) carries the
 final roster sync before the switch and the rollback (`scripts/restore-keycloak-realm-roles.py`).
 
-**Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
+**Enforced by:** `FirstLoginAuthoritiesIntegrationTest`, `BootstrapAdminLoginIntegrationTest`,
+`CustomJwtGrantedAuthoritiesConverterTest`,
 `UserRoleControllerIntegrationTest`, `UserReconciliationServiceTest`, `UserRegistrationServiceTest`,
 `BootstrapAdminPropertiesTest`, `UserRoleProxyControllerTest`, `BankGrantsPageControllerTest`,
 `SecurityConfigTest` (frontend), `FrontendRequestedScopesParityTest`,
@@ -6302,6 +6304,8 @@ final roster sync before the switch and the rollback (`scripts/restore-keycloak-
 - [x] Withdrawing KRT Member publishes the departure.
 - [x] Each change is audited, counted and announced; an unchanged role set leaves no trace.
 - [x] A bootstrap subject receives Admin at login only while no other active admin exists.
+- [x] With `APP_BOOTSTRAP_ADMIN_SUBS` set, the granting request itself is authorised as Admin, and
+  concurrent first requests all succeed with one stored grant.
 - [x] A token's realm roles grant nothing; the stored roles authorise, and a login writes none.
 - [x] A role assigned in the Basetool applies on the member's next request of the same session.
 - [x] Approving a registration grants KRT Member.

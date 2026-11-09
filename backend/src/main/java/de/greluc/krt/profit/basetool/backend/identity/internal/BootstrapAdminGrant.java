@@ -25,7 +25,9 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -35,8 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Gives a bootstrap subject of {@link BootstrapAdminProperties} the Admin role at login while no
  * other active admin exists, the emergency access of REQ-SEC-088.
  *
- * <p>Runs in the login's reconciliation transaction: {@link #grantIfDue} adds the role to the
- * loaded user, and {@link #recordGrant} bumps the role-set counter and audits the grant once the
+ * <p>Runs in the login's reconciliation transaction: {@link #lockFor} serialises a bootstrap
+ * subject's logins before the user is read, {@link #grantIfDue} adds the role to the loaded user,
+ * and {@link #recordGrant} bumps the role-set counter and audits the grant once the
  * row is persisted.
  */
 @Component
@@ -49,10 +52,24 @@ public class BootstrapAdminGrant implements LoginRoleGrant {
   private final RoleChangeRecorder recorder;
 
   /**
-   * Adds the Admin role to a bootstrap subject who lacks it while no other active admin exists. The
-   * Admin role row is locked first, as for a withdrawal of Admin.
+   * Locks the Admin role row for a bootstrap subject, as for a withdrawal of Admin, so its
+   * concurrent logins read the user one after the other; any other subject takes no lock.
    *
-   * @param user the logging-in user, created or loaded, not necessarily persisted yet
+   * @param subject the Keycloak {@code sub} of the logging-in user
+   */
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockFor(@NotNull UUID subject) {
+    if (properties.isBootstrapSubject(subject)) {
+      roleRepository.lockByCode(AssignableRole.ADMIN.getCode());
+    }
+  }
+
+  /**
+   * Adds the Admin role, its permissions loaded for the authority assembly after the commit, to a
+   * bootstrap subject who lacks it while no other active admin exists.
+   *
+   * @param user the logging-in user, read after {@link #lockFor}, not necessarily persisted yet
    * @return {@code true} when the role was added and the caller must persist and then call {@link
    *     #recordGrant}
    */
@@ -68,6 +85,7 @@ public class BootstrapAdminGrant implements LoginRoleGrant {
             > 0) {
       return false;
     }
+    Hibernate.initialize(admin.get().getPermissions());
     user.getRoles().add(admin.get());
     return true;
   }

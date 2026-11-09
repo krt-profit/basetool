@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -29,8 +30,16 @@ import org.jetbrains.annotations.NotNull;
 public interface LoginRoleGrant {
 
   /**
-   * Adds the earned role to the logging-in user, unless the user holds it already or nothing is
-   * due.
+   * Takes the lock the grant is checked under, before the login reads the user, so that concurrent
+   * logins of one subject run one after the other and each sees the grant of the one before.
+   *
+   * @param subject the Keycloak {@code sub} of the logging-in user
+   */
+  void lockFor(@NotNull UUID subject);
+
+  /**
+   * Adds the earned role, with its permissions loaded, to the logging-in user, unless the user
+   * holds it already or nothing is due.
    *
    * @param user the logging-in user, created or loaded, not necessarily persisted yet
    * @return {@code true} when a role was added and the caller must persist the user and then call

@@ -89,6 +89,7 @@ public class UserReconciliationService {
 
     final String discordUserId = jwt.getClaimAsString("discord_user_id");
 
+    loginRoleGrant.lockFor(finalUserId);
     Optional<User> existingUser = userRepository.findById(finalUserId);
     if (existingUser.isEmpty() && username != null) {
       List<UUID> sameCallsign = userRepository.findIdsByUsername(username);
