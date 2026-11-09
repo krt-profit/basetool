@@ -60,7 +60,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * The bank reads on the exchange (REQ-BXCH-002, REQ-BXCH-007): the accounts the member views with
- * the two facts about the member, the redacted bookings and the daily balance series, their
+ * the three facts about the member, the redacted bookings and the daily balance series, their
  * allow-lists, paging and refusals, against a seeded {@link BankAccessWorld}.
  */
 @SpringBootTest
@@ -79,7 +79,8 @@ class ExchangeBankReadsTest {
           "delta30d",
           "sparkline",
           "requestable",
-          "ownLimit");
+          "ownLimit",
+          "approvalExempt");
 
   private static final Set<String> BOOKING_FIELDS =
       Set.of(
@@ -132,6 +133,7 @@ class ExchangeBankReadsTest {
     assertThat(own.path("balanceTarget").isNull()).isTrue();
     assertThat(own.path("requestable").asBoolean()).isTrue();
     assertThat(own.path("ownLimit").asLong()).isEqualTo(1_000L);
+    assertThat(own.path("approvalExempt").asBoolean()).isFalse();
     assertThat(fields(own.path("orgUnit")))
         .containsExactlyInAnyOrder("id", "shorthand", "name", "kind");
     assertThat(own.path("orgUnit").path("kind").asString()).isEqualTo("SQUADRON");
@@ -139,6 +141,17 @@ class ExchangeBankReadsTest {
     assertThat(shared.path("orgUnit").isNull()).isTrue();
     assertThat(shared.path("requestable").asBoolean()).isFalse();
     assertThat(shared.path("ownLimit").isNull()).isTrue();
+    assertThat(shared.path("approvalExempt").asBoolean()).isFalse();
+  }
+
+  @Test
+  void theResponsibleHoldersNullLimitIsToldApartAsAnExemption() throws Exception {
+    JsonNode own =
+        item(ok(accounts(Actor.STAFFELLEITER, Map.of())), Account.OWN_ORG_UNIT);
+
+    assertThat(own.path("requestable").asBoolean()).isTrue();
+    assertThat(own.path("ownLimit").isNull()).isTrue();
+    assertThat(own.path("approvalExempt").asBoolean()).isTrue();
   }
 
   @Test

@@ -51,7 +51,8 @@ Each item is a [`bank-account`](../schemas/) (the `sparkline` shortened here):
   "delta30d": 250000,
   "sparkline": [1000000, 1000000, 1250000],
   "requestable": true,
-  "ownLimit": 1000
+  "ownLimit": 1000,
+  "approvalExempt": false
 }
 ```
 
@@ -62,8 +63,10 @@ Each item is a [`bank-account`](../schemas/) (the `sparkline` shortened here):
 - `sparkline` holds the 30 end-of-day balances of the last 30 days, oldest first, ending with the
   current balance; `delta30d` is the net change over them.
 - `requestable` tells whether the member may raise a withdrawal or transfer from the account;
-  `ownLimit` is the member's own limit above which such a request needs an approval, or `null` when
-  none applies.
+  `ownLimit` is the member's own limit above which such a request needs an approval, or `null`.
+- `approvalExempt` tells the two meanings of a `null` `ownLimit` apart: `true` when the member is
+  the account's responsible holder and never needs an approval, `false` when every request needs
+  one. The field is additive; the server always sends it.
 
 No holders, custody, approval-limit tables or ceilings leave the Basetool.
 

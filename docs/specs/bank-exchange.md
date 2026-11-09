@@ -95,9 +95,12 @@ so a withdrawn grant hides everything at once.
 **The accounts** are the active accounts the member views (REQ-BANK-064), each with `accountId`,
 `accountNo`, `name`, `type`, `orgUnit { id, name, shorthand, kind }` or `null`, `balance`,
 `balanceTarget` or `null`, `delta30d`, `sparkline` (30 end-of-day balances, oldest first, ending with
-the current balance) and two facts about the member from the policy: `requestable` (may raise a
-withdrawal or transfer here) and `ownLimit` (the applicable limit above which an approval is needed)
-or `null`. No holders, custody, limit tables, ceilings, `version` or staff capabilities.
+the current balance) and three facts about the member from the policy: `requestable` (may raise a
+withdrawal or transfer here), `ownLimit` (the applicable limit above which an approval is needed)
+or `null`, and `approvalExempt`, which tells a `null` limit of the responsible holder, who never
+needs an approval, from one where every request needs it. `approvalExempt` is additive and not
+required by the schema; the server always sends it. No holders, custody, limit tables, ceilings,
+`version` or staff capabilities.
 
 **The bookings** carry the member detail page's redaction (REQ-BANK-038): `postingId`,
 `transactionId`, `type`, `amount` (this account's signed leg), `createdAt`, `note`, `justification`,
@@ -124,8 +127,9 @@ it on with a fixed detail. A malformed account id answers `400 SCHEMA_INVALID` a
 
 **Acceptance**
 
-- [x] The accounts come KRT first, carry exactly the allow-listed fields with the two facts about the
-  member, and page with an opaque cursor; a foreign cursor is `410` (`ExchangeBankReadsTest`).
+- [x] The accounts come KRT first, carry exactly the allow-listed fields with the three facts about
+  the member, and page with an opaque cursor; a foreign cursor is `410`; the responsible holder's
+  `null` limit comes with `approvalExempt = true` (`ExchangeBankReadsTest`).
 - [x] The bookings come newest first with the redaction, page and are bounded by `from` / `to`
   (`ExchangeBankReadsTest`).
 - [x] The KRT account's holder-transfer fee leg is served as `HOLDER_TRANSFER` within the published
