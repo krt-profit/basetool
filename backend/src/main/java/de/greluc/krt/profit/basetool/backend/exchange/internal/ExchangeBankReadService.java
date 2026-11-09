@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankB
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankCounterAccountDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -103,8 +104,9 @@ public class ExchangeBankReadService {
    * @param cursor the cursor of the previous page, or {@code null}
    * @param limit the requested page size
    * @return the page
-   * @throws ExchangeProblemException {@code 404 NOT_FOUND} for a hidden, closed or unknown account,
-   *     {@code 410 CURSOR_EXPIRED} for a cursor the server did not issue
+   * @throws NotFoundException {@code 404 NOT_FOUND} for a hidden, closed or unknown account
+   * @throws ExchangeProblemException {@code 410 CURSOR_EXPIRED} for a cursor the server did not
+   *     issue
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -146,7 +148,7 @@ public class ExchangeBankReadService {
    * @return the series
    * @throws BadRequestException when a bound is missing, {@code from} lies after {@code to} or the
    *     period exceeds {@link #MAX_SERIES_SPAN}
-   * @throws ExchangeProblemException {@code 404 NOT_FOUND} for a hidden, closed or unknown account
+   * @throws NotFoundException {@code 404 NOT_FOUND} for a hidden, closed or unknown account
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -189,9 +191,9 @@ public class ExchangeBankReadService {
    * @return the refusal
    */
   @NotNull
-  private ExchangeProblemException notFound() {
+  private NotFoundException notFound() {
     metrics.countRefused(BankExchangeRefusal.NOT_FOUND);
-    return ExchangeProblemException.notFound();
+    return new NotFoundException("The resource is unknown or hidden from the member.");
   }
 
   /**
