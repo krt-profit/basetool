@@ -43,6 +43,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface BankBookingRequestRepository extends JpaRepository<BankBookingRequest, UUID> {
 
+  /** The first key of the open-request-cap advisory locks: {@code 'BXCH'} as a 32-bit integer. */
+  int OPEN_REQUEST_CAP_LOCK_SPACE = 0x42584348;
+
   /**
    * Counts booking requests in the given status, backing the {@code
    * basetool_bank_booking_request_pending_*} queue-depth gauge (REQ-OBS-011).
@@ -61,6 +64,24 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @return the number of the requester's requests in that status
    */
   long countByRequestedByAndStatus(UUID requestedBy, BankBookingRequestStatus status);
+
+  /**
+   * Takes the requester's open-request-cap lock, which the transaction holds until it ends, so two
+   * exchange raises of one member count and insert one after the other (REQ-BXCH-004).
+   *
+   * <p>The two-key advisory lock space {@value #OPEN_REQUEST_CAP_LOCK_SPACE} is the cap's alone;
+   * members whose ids hash alike only wait for each other.
+   *
+   * @param requestedBy the requesting user's id
+   * @return always one
+   */
+  @Query(
+      value =
+          "SELECT 1 FROM pg_advisory_xact_lock("
+              + OPEN_REQUEST_CAP_LOCK_SPACE
+              + ", hashtext(CAST(:requestedBy AS text)))",
+      nativeQuery = true)
+  int lockOpenRequestCap(@Param("requestedBy") UUID requestedBy);
 
   /**
    * Finds the creation timestamp of the oldest booking request in the given status, for the "oldest

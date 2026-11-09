@@ -113,19 +113,21 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   @Transactional
   public Written cancel(@NotNull BankActor actor, @NotNull UUID requestId, long version) {
     ownRequest(actor, requestId);
-    bookingRequestService.cancelOwn(requestId, version);
+    bookingRequestService.cancelOwn(actor, requestId, version);
     return written(requestId);
   }
 
   /**
    * Refuses a request once the member holds the cap of pending requests, whichever channel raised
-   * them.
+   * them. The member's cap lock, held until the raise's transaction ends, makes a concurrent raise
+   * count only after this one committed or rolled back.
    *
    * @param actor the requester
    * @throws BankConflictException {@code BANK_OPEN_REQUEST_CAP} at or over the cap
    */
   private void requireBelowCap(@NotNull BankActor actor) {
     UUID requester = Objects.requireNonNull(actor.userId(), "An exchange actor names its member");
+    requestRepository.lockOpenRequestCap(requester);
     if (requestRepository.countByRequestedByAndStatus(requester, BankBookingRequestStatus.PENDING)
         >= properties.openRequestCap()) {
       throw new BankConflictException(

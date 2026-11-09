@@ -209,6 +209,11 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   KRT direct-booking request is raised through a client.
 - **Open-request cap.** A member who holds `app.bank.exchange.open-request-cap` (20) `PENDING`
   requests, whichever channel raised them, gets `409 BANK_OPEN_REQUEST_CAP` for the next raise.
+  The raise counts under a per-member transaction lock (`pg_advisory_xact_lock`), so two concurrent
+  raises of one member never take them past the cap.
+- **The explicit actor.** Correction and cancel check ownership for the actor the exchange built,
+  down every call; neither reads who calls from the security context
+  (`BankAccessPolicyRulesTest.theExchangeOwnRequestWritesDecideForTheExplicitActor`).
 - **Origin.** A raised request records the registry client the exchange gate admitted in
   `bank_booking_request.client_id` (V366); the own requests (REQ-BXCH-003) and the staff queue
   (REQ-BXCH-005) answer it as `client`, the Basetool badges it (REQ-BANK-067).
@@ -235,6 +240,10 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   answer the same counted `404` (`ExchangeBankRequestWritesTest`).
 - [x] The bank's refusals, the bean rules, a stale version and the cap at 20 pending requests answer
   as listed (`ExchangeBankRequestWritesTest`).
+- [x] A raise racing the member's last free slot waits for the other raise and is refused with the
+  cap (`BankOpenRequestCapConcurrencyTest`).
+- [x] A correction or cancel path that reaches the security context fails the build
+  (`BankAccessPolicyRulesTest`).
 - [x] Every raise, correction and cancel case of the access matrix answers as the web recorded it,
   with `201` for a raise and the shared `404` for a refusal (`BankExchangeParityTest`).
 - [x] The gateway checks the body and the request id before the relay, answers `201`, passes the

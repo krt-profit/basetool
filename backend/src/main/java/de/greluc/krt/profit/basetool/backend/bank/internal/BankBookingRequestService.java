@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
@@ -156,7 +157,6 @@ public class BankBookingRequestService {
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(account, justification);
     }
-
     BankAccount targetAccount = null;
     if (type == BankBookingRequestType.TRANSFER) {
       if (targetAccountId == null) {
@@ -327,12 +327,12 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Applies a requester's correction to their own pending, not yet owner-approved booking request
-   * (REQ-BANK-056), stamping the approval snapshot the caller re-derived from the new amount, and
-   * replacing the open notices about it with ones that show the new values.
+   * Applies the actor's correction to their own pending, not yet owner-approved request
+   * (REQ-BANK-056), stamping the re-derived approval snapshot and renewing the open notices.
    *
    * <p>All guards run under the row lock; a foreign request is reported as not found.
    *
+   * @param actor the requester the ownership is checked for
    * @param requestId the request to correct
    * @param update the corrected values plus the echoed version
    * @param requiresOwnerApproval the re-derived approval flag for the new amount
@@ -349,13 +349,14 @@ public class BankBookingRequestService {
   @NotNull
   @Transactional
   public BankBookingRequestDto updateOwn(
+      @NotNull BankActor actor,
       @NotNull UUID requestId,
       @NotNull UpdateBankBookingRequest update,
       boolean requiresOwnerApproval,
       @Nullable BigDecimal applicableLimit,
       @Nullable BankRequestApprover requiredApprover) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(bankCaller.actor(), request)) {
+    if (!policy.ownsRequest(actor, request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, update.version());
@@ -365,7 +366,6 @@ public class BankBookingRequestService {
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
           "An approved request can no longer be edited; cancel it and raise a new one");
     }
-
     BankBookingRequestType type = request.getType();
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
@@ -471,12 +471,11 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Cancels the caller's own pending request (REQ-BANK-022). A request that does not belong to the
-   * caller is reported as not found (per-user isolation never reveals foreign requests); a request
-   * that is no longer pending yields a 409. Fires {@link BankBookingRequestCancelledEvent} so the
-   * now-stale "new booking request" notifications the bank staff were shown are cleared
-   * (REQ-NOTIF-018).
+   * Cancels the actor's own pending request (REQ-BANK-022); a foreign request is not found, a
+   * decided one a 409. Fires {@link BankBookingRequestCancelledEvent}, which clears the staff's
+   * stale "new booking request" notifications (REQ-NOTIF-018).
    *
+   * @param actor the requester the ownership is checked for
    * @param requestId the request to cancel
    * @param version the echoed optimistic-locking version
    * @return the cancelled request
@@ -486,9 +485,10 @@ public class BankBookingRequestService {
    */
   @NotNull
   @Transactional
-  public BankBookingRequestDto cancelOwn(@NotNull UUID requestId, long version) {
+  public BankBookingRequestDto cancelOwn(
+      @NotNull BankActor actor, @NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(bankCaller.actor(), request)) {
+    if (!policy.ownsRequest(actor, request)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);

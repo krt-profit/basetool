@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.BankAccessPolicyFixtures;
@@ -44,10 +45,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * The three rules of the one bank access policy (ADR-0352): the policy and everything it calls
- * never read who calls from the security context, no bank class outside the policy reads the
- * caller's roles or seats, which is what every bank rule needs, and the exchange reaches the bank
- * only through the policy, the actor adapter and the reads (REQ-BXCH-001).
+ * The rules of the one bank access policy (ADR-0352): the policy and everything it calls never read
+ * who calls from the security context, no bank class outside the policy reads the caller's roles or
+ * seats, which is what every bank rule needs, the exchange reaches the bank only through the
+ * policy, the actor adapter, the reads and the own-request writes (REQ-BXCH-001), and the
+ * exchange's correction and cancel decide for the explicit actor down every call (REQ-BXCH-004).
  *
  * <p>Every rule is proven able to fail on {@link BankAccessPolicyFixtures}.
  */
@@ -119,6 +121,18 @@ class BankAccessPolicyRulesTest {
           BANK + ".api.BankOwnRequestWrites",
           BANK + ".api.BankProblemCode");
 
+  /** The bank's implementation of the exchange's own-request writes. */
+  private static final String OWN_REQUEST_WRITES = BANK + ".internal.BankOwnRequestWriteService";
+
+  /** The own-request writes that decide for the explicit actor all the way down. */
+  private static final Set<String> EXPLICIT_ACTOR_WRITES = Set.of("correct", "cancel");
+
+  /**
+   * The bank's audit trail, which stamps the acting member and client from the request's token
+   * (REQ-AUDIT-001) and decides nothing.
+   */
+  private static final Set<String> ATTRIBUTION = Set.of(BANK + ".internal.BankAuditService");
+
   @Test
   @DisplayName("the bank access policy never reads the security context, directly or by a call")
   void thePolicyNeverReadsTheSecurityContext() {
@@ -162,6 +176,44 @@ class BankAccessPolicyRulesTest {
             (REQ-BXCH-001, ADR-0352).\
             """)
         .isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "the exchange's correction and cancel never read who calls from the security context")
+  void theExchangeOwnRequestWritesDecideForTheExplicitActor() {
+    assertThat(
+            methodCallerReads(
+                PRODUCTION,
+                OWN_REQUEST_WRITES,
+                method -> EXPLICIT_ACTOR_WRITES.contains(method.getName()),
+                ATTRIBUTION))
+        .as(
+            """
+            Calls by which the exchange's correction or cancel reaches the security context. \
+            They decide for the explicit BankActor the exchange built; pass it through \
+            (REQ-BXCH-004, ADR-0352).\
+            """)
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("proof: a writer reaching the security context two calls away is reported")
+  void plantedOwnRequestWriterIsReported() {
+    String writer = BankAccessPolicyFixtures.PlantedOwnRequestWriter.class.getName();
+    String service = BankAccessPolicyFixtures.PlantedRequestService.class.getName();
+    assertThat(
+            methodCallerReads(
+                FIXTURES,
+                writer,
+                method -> EXPLICIT_ACTOR_WRITES.contains(method.getName()),
+                Set.of()))
+        .containsExactly(
+            writer
+                + ".correct -> "
+                + service
+                + ".updateOwn -> "
+                + AuthHelperService.class.getName());
   }
 
   @Test
@@ -232,6 +284,76 @@ class BankAccessPolicyRulesTest {
       }
     }
     return reads;
+  }
+
+  /**
+   * Follows the calls from the selected methods of one class method by method, through the lambdas
+   * they declare, and reports each path that ends in a caller reader.
+   *
+   * @param classes the imported classes
+   * @param owner the class whose methods start the walk
+   * @param start the methods to start from
+   * @param skipped the classes the walk does not enter
+   * @return one path per reached caller reader, as {@code Owner.method -> … -> reader}
+   */
+  @NotNull
+  private static Set<String> methodCallerReads(
+      @NotNull JavaClasses classes,
+      @NotNull String owner,
+      @NotNull Predicate<JavaCodeUnit> start,
+      @NotNull Set<String> skipped) {
+    Map<JavaCodeUnit, String> pathTo = new HashMap<>();
+    Deque<JavaCodeUnit> queue = new ArrayDeque<>();
+    for (JavaCodeUnit unit : classes.get(owner).getCodeUnits()) {
+      if (start.test(unit)) {
+        enqueue(unit, owner + "." + unit.getName(), pathTo, queue);
+      }
+    }
+    Set<String> reads = new TreeSet<>();
+    while (!queue.isEmpty()) {
+      JavaCodeUnit current = queue.removeFirst();
+      String path = pathTo.get(current);
+      for (JavaCall<?> call : current.getCallsFromSelf()) {
+        String target = call.getTargetOwner().getName();
+        if (CALLER_READERS.contains(target)) {
+          reads.add(path + " -> " + target);
+        } else if (target.startsWith(ROOT)
+            && classes.contain(target)
+            && !skipped.contains(target)) {
+          call.getTarget()
+              .resolveMember()
+              .filter(unit -> !pathTo.containsKey(unit))
+              .ifPresent(unit ->
+                  enqueue(unit, path + " -> " + target + "." + unit.getName(), pathTo, queue));
+        }
+      }
+    }
+    return reads;
+  }
+
+  /**
+   * Queues a code unit and the lambdas it declares, which the compiler moves into synthetic methods
+   * named {@code lambda$<method>$<n>} of the same class.
+   *
+   * @param unit the code unit
+   * @param path the call path that reached it
+   * @param pathTo the path of every queued unit
+   * @param queue the units still to walk
+   */
+  private static void enqueue(
+      @NotNull JavaCodeUnit unit,
+      @NotNull String path,
+      @NotNull Map<JavaCodeUnit, String> pathTo,
+      @NotNull Deque<JavaCodeUnit> queue) {
+    pathTo.put(unit, path);
+    queue.add(unit);
+    String lambdas = "lambda$" + unit.getName() + "$";
+    for (JavaCodeUnit lambda : unit.getOwner().getCodeUnits()) {
+      if (lambda.getName().startsWith(lambdas) && !pathTo.containsKey(lambda)) {
+        pathTo.put(lambda, path);
+        queue.add(lambda);
+      }
+    }
   }
 
   /**
