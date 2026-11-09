@@ -1,7 +1,5 @@
 import org.gradle.plugin.use.PluginDependency
 
-buildscript { dependencies { constraints { classpath(libs.kotlin.gradle.plugin) } } }
-
 plugins { `kotlin-dsl` }
 
 fun Provider<PluginDependency>.marker(): Provider<String> = map {

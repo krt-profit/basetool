@@ -75,8 +75,8 @@ jobs:
 
       - name: reference / Add the pinned Redoc bundle
         env:
-          REDOC_VERSION: 3.0.1
-          REDOC_INTEGRITY: sha512-KDfoKaYW19LCl4YStgBnwlaNjYEFfs5zCNt1s1WZ2YM5u8d26Yuzd2l43fZO851ZsgIMe/D640fDJkD8eaRQKQ==
+          REDOC_VERSION: 3.1.0
+          REDOC_INTEGRITY: sha512-hYsN0ABpoDAPE2+A+mNvs6DDTzhPlJaIeJK2jCFgvxtiXHpWzBXqNBWWKUNq/VLBMZGnyT4qiQnODVWEX031uQ==
         run: |
           set -euo pipefail
           mkdir -p build/redoc
