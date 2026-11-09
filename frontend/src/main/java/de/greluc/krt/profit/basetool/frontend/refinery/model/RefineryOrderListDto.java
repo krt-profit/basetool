@@ -35,6 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * Data transfer record carrying Refinery Order List payload.
  *
  * @param canEdit the backend's verdict on whether the caller may edit, cancel or store the order
+ * @param provenance the creating client, the last change and the pickup marker, or {@code null}
+ *     when the backend sent none
  */
 @DtoMirror
 public record RefineryOrderListDto(
@@ -53,7 +55,8 @@ public record RefineryOrderListDto(
     List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Boolean canEdit) {
+    Boolean canEdit,
+    @Nullable RefineryOrderProvenanceDto provenance) {
   /**
    * Whether the backend lets the caller edit this order; {@code false} when the field is absent.
    *

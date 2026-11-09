@@ -46,7 +46,8 @@ interface ExchangeEntryRestorer {
    *
    * @param scope the member, the client and the member's memberships
    * @param group the client's writes to the entry, newest first
-   * @return {@code null} when restored, else {@code CHANGED_AFTERWARDS} or {@code GONE}
+   * @return {@code null} when restored, else {@code CHANGED_AFTERWARDS}, {@code GONE} or, for a
+   *     refinery pickup that booked stock, {@code STOCK_BOOKED}
    */
   @Nullable
   String restore(@NotNull UndoScope scope, @NotNull List<ExchangeJournalEntry> group);

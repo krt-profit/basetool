@@ -213,6 +213,8 @@ public class AdminAuditLogPageController {
                   "REFINERY_ORDER_CREATED",
                   "REFINERY_ORDER_UPDATED",
                   "REFINERY_ORDER_CANCELED",
+                  "REFINERY_ORDER_DELETED",
+                  "REFINERY_ORDER_RESTORED",
                   "REFINERY_ORDER_STORED",
                   "REFINERY_METHOD_CREATED",
                   "REFINERY_METHOD_UPDATED",

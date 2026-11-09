@@ -143,6 +143,9 @@ class RefineryImportAjaxControllerTest {
             RefineryOrderStatus.OPEN,
             null,
             null,
+            null,
+            null,
+            null,
             null);
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/import-extract"), any(), eq(RefineryImportDraftDto.class)))

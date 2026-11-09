@@ -1959,7 +1959,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   a rising `mismatch` share means clients see alt accounts (REQ-XCH-031).
 - `basetool_exchange_writes_total{client_id,resource,outcome}` counter — ops external clients sent to
   the member's synced data and to the org stock, by registered client, resource (`blueprint` /
-  `stock` / `ship` / `org_stock`) and outcome (`applied` / `unchanged` / `unmatched` / `ambiguous` /
+  `stock` / `ship` / `org_stock` / `refinery_order`, the last for the refinery-order writes of
+  REQ-XCH-052 and their undo) and outcome (`applied` / `unchanged` / `unmatched` / `ambiguous` /
   `rejected`), plus `held` per change set the mass-change guard held back, an org-stock set once however
   many of its pools are over the threshold; shown per day on panel 80 of the operations dashboard
   (REQ-XCH-015…-017, REQ-XCH-021, REQ-XCH-045, REQ-XCH-046). `ExchangeGuardStorm`

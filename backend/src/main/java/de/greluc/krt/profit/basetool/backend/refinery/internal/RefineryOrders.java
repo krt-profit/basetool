@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -29,9 +30,6 @@ import org.jetbrains.annotations.NotNull;
  * <p>Stateless; every method takes what it needs.
  */
 final class RefineryOrders {
-
-  /** Units a good's output quantity counts per SCU of an SCU-measured output material. */
-  static final double UNITS_PER_SCU = 100.0d;
 
   private RefineryOrders() {}
 
@@ -48,6 +46,19 @@ final class RefineryOrders {
   }
 
   /**
+   * Loads an order for a write, row-locked until the transaction ends (REQ-REFINERY-029), or fails.
+   *
+   * @param repository the order repository
+   * @param id refinery order primary key
+   * @return the locked order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no match
+   */
+  static RefineryOrder requireLocked(
+      @NotNull RefineryOrderRepository repository, @NotNull UUID id) {
+    return Entities.require(repository.lockById(id), "error.refinery_order.not_found");
+  }
+
+  /**
    * Builds the non-personal audit subject label {@code <method> · <location>} for a refinery order
    * (REQ-AUDIT-001).
    *
@@ -57,6 +68,21 @@ final class RefineryOrders {
   @NotNull
   static String label(@NotNull RefineryOrder order) {
     return methodName(order) + " · " + locationName(order);
+  }
+
+  /**
+   * The audit details a create or an update of a refinery order records (REQ-AUDIT-001).
+   *
+   * @param order the saved order
+   * @param status the status entry: the status, or {@code <before>-><after>} on an update
+   * @return the location, method, number of goods and status
+   */
+  @NotNull
+  static AuditDetails summary(@NotNull RefineryOrder order, @NotNull Object status) {
+    return AuditDetails.of("location", locationName(order))
+        .with("method", methodName(order))
+        .with("goods", order.getGoods() != null ? order.getGoods().size() : 0)
+        .with("status", status);
   }
 
   /**

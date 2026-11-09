@@ -11,39 +11,46 @@
 <body>
 <th:block th:fragment="pageContent">
 <main class="refinery-order">
-    <div class="page-head" data-testid="page-head"
-         th:with="headState=${orderState != null ? orderState.name() : null},
-                  headStateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  headStateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} }">
+    <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
             <a class="page-eyebrow" th:href="@{/refinery-orders}" data-testid="page-eyebrow"
               ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg
               ><span th:text="#{refineryorder.index.title}">Raffinerie</span></a>
             <div class="page-title">
                 <h1 th:text="#{refineryorder.detail.heading(${#strings.substring(orderId.toString(), 32)})}">Auftrag #1042</h1>
-                <span th:if="${headState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
-                      th:classappend="${headStateClasses.get(headState)}"
-                      th:text="#{${headStateKeys.get(headState)}}">Abholbereit</span>
+                <span th:if="${orderState != null}" id="rod-status-badge" class="status-badge" data-testid="refinery-status-badge"
+                      th:classappend="${orderState.badgeClass}"
+                      th:text="#{${orderState.labelKey}}">Abholbereit</span>
+                <span th:if="${order != null and order.provenance != null and order.provenance.createdByClient != null}" class="chip chip--info" data-testid="refinery-client-chip"
+                      th:title="#{refineryorder.client.chip(${order.provenance.createdByClient})}"
+                      th:text="${order.provenance.createdByClient}">VerseKit</span>
             </div>
         </div>
     </div>
 
     <div th:if="${errorToast}" class="alert alert-danger" role="alert" th:text="#{__${errorToast}__}">Fehler</div>
 
+    <div id="refinery-order-deleted" class="alert alert-warning" role="status" data-testid="refinery-order-deleted" hidden>
+        <span th:text="#{refineryorder.deleted.notice}">Eine verbundene Anwendung hat diesen Auftrag gelöscht.</span>
+        <a th:href="@{/refinery-orders}" th:text="#{refineryorder.deleted.backToList}">Zur Auftragsliste</a>
+    </div>
+
     <div id="refinery-order-results">
     <th:block th:fragment="refineryOrderSection">
     <div class="rod-layout"
          th:with="stateName=${orderState != null ? orderState.name() : null},
-                  stateKeys=${ {'RUNNING': 'refinery.status.running', 'READY': 'refinery.status.ready', 'COMPLETED': 'refinery.status.stored', 'CANCELED': 'refineryorder.status.CANCELED'} },
-                  stateClasses=${ {'RUNNING': 'status-planned', 'READY': 'status-active', 'COMPLETED': 'status-completed', 'CANCELED': 'status-canceled'} },
                   openRun=${stateName == 'RUNNING' or stateName == 'READY'},
                   sales=${refineryOrderForm.oreSales ?: 0},
                   costs=${(refineryOrderForm.expenses ?: 0) + (refineryOrderForm.otherExpenses ?: 0)}"
-         th:attr="data-rod-state=${stateName},data-rod-state-class=${stateName != null ? stateClasses.get(stateName) : null},data-rod-state-label=${stateName != null ? #messages.msg(stateKeys.get(stateName)) : null}">
+         th:attr="data-rod-state=${stateName},data-rod-state-class=${orderState != null ? orderState.badgeClass : null},data-rod-state-label=${orderState != null ? #messages.msg(orderState.labelKey) : null}">
         <form id="refineryOrderMainForm" class="form-layout card rod-form" th:action="@{/refinery-orders/{id}(id=${orderId})}" method="post" th:object="${refineryOrderForm}">
-            <input type="hidden" th:field="*{version}" />
+            <input type="hidden" th:field="*{gameDataVersion}" />
+            <input type="hidden" th:field="*{financesVersion}" />
+            <input type="hidden" th:field="*{gameDataChanged}" data-rod-changed="gameData" />
+            <input type="hidden" th:field="*{financesChanged}" data-rod-changed="finances" />
+            <input type="hidden" th:field="*{missionChanged}" data-rod-changed="mission" />
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|1 · #{refineryorder.form.location}|">1 · Raffinerie</legend>
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
@@ -63,7 +70,7 @@
                     </div>
                     <div class="form-group">
                         <label for="missionId" th:text="#{refineryorder.form.mission}">Einsatz (Optional)</label>
-                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}">
+                        <select id="missionId" th:field="*{missionId}" th:disabled="${!canEdit}" data-rod-section="mission">
                             <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                             <option th:each="mis : ${missions}" th:value="${mis.id}"
                                     th:text="${mis.plannedStartTime != null} ? |${mis.name} - ${#temporals.format(mis.plannedStartTime, #messages.msg('format.date'), #locale)}| : ${mis.name}"></option>
@@ -77,7 +84,7 @@
                 </div>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|2 · #{refineryorder.form.section.time}|">2 · Zeit</legend>
                 <div class="form-grid form-grid--3 rod-time">
                     <div class="form-group datetime-split-group" th:attr="data-validate-not-past='false', data-error-past=#{validation.datetime.past}">
@@ -107,7 +114,7 @@
                 </div>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="gameData">
                 <legend class="form-section__head" th:text="|3 · #{refineryorder.form.materials.title}|">3 · Materialien</legend>
                 <div class="rod-good rod-good--head" aria-hidden="true">
                     <span class="rod-req" th:text="#{refineryorder.goods.input}">Eingang (Erz)</span>
@@ -121,6 +128,7 @@
                 </div>
                 <div id="materials-container" class="rod-goods">
                     <div th:each="good, stat : *{goods}" class="material-entry rod-good">
+                        <input type="hidden" th:id="'goodId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].id}" data-testid="refinery-good-id" />
                         <div class="form-group rod-good__in">
                             <label class="rod-good__label" th:for="'inputMaterialId_' + ${stat.index}"><span class="rod-good__label-text" th:text="#{refineryorder.form.material.input}">Eingangsmaterial</span></label>
                             <select th:id="'inputMaterialId_' + ${stat.index}" th:field="*{goods[__${stat.index}__].inputMaterialId}" required data-trigger="rod-update-output" data-krt-combobox="remote-materials-raw" th:disabled="${!canEdit}">
@@ -166,7 +174,7 @@
                 <button th:if="${canEdit}" type="button" class="btn btn-ghost rod-add" data-trigger="rod-add-material"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{refineryorder.form.material.add}">Material hinzufügen</span></button>
             </fieldset>
 
-            <fieldset class="form-section">
+            <fieldset class="form-section" data-rod-section="finances">
                 <legend class="form-section__head" th:text="|4 · #{refineryorder.form.section.finance}|">4 · Finanzen</legend>
                 <div class="form-grid form-grid--3">
                     <div class="form-group">
@@ -200,7 +208,7 @@
                     </div>
                     <div class="form-group">
                         <label for="status" th:text="#{refineryorder.form.status}">Status</label>
-                        <select id="status" th:field="*{status}" th:disabled="${!canEdit}">
+                        <select id="status" th:field="*{status}" th:disabled="${!canEdit}" data-rod-section="gameData">
                             <option value="OPEN" th:text="#{refineryorder.status.OPEN}">Offen</option>
                             <option value="IN_PROGRESS" th:text="#{refineryorder.status.IN_PROGRESS}">In Bearbeitung</option>
                             <option value="COMPLETED" th:text="#{refineryorder.status.COMPLETED}">Abgeschlossen</option>
@@ -223,7 +231,7 @@
             <div class="card card--accent rod-status" data-testid="refinery-status-card">
                 <div class="rod-status__head">
                     <ol class="ablauf rod-steps">
-                        <li class="step" th:classappend="${stateName == 'RUNNING'} ? 'step--now' : (${stateName == 'READY' or stateName == 'COMPLETED'} ? 'step--done')">
+                        <li class="step" th:classappend="${stateName == 'RUNNING'} ? 'step--now' : (${stateName == 'READY' or stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done')">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
                                 <span class="step-title" th:text="#{refinery.status.running}">Läuft</span>
@@ -231,7 +239,7 @@
                                       th:text="#{refineryorder.step.start(${#temporals.format(@relativeDays.local(order.startedAt), 'dd.MM. HH:mm')})}">Start 02.10. 18:40</span>
                             </span>
                         </li>
-                        <li class="step" th:classappend="${stateName == 'READY'} ? 'step--now' : (${stateName == 'COMPLETED'} ? 'step--done')">
+                        <li class="step" th:classappend="${stateName == 'READY'} ? 'step--now' : (${stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done')">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
                                 <span class="step-title" th:text="#{refinery.status.ready}">Abholbereit</span>
@@ -241,10 +249,12 @@
                                       th:text="#{refineryorder.step.end(${#temporals.format(@relativeDays.local(orderEndsAt), 'dd.MM. HH:mm')})}">Fertig 03.10. 09:00</span>
                             </span>
                         </li>
-                        <li class="step" th:classappend="${stateName == 'COMPLETED'} ? 'step--done'">
+                        <li class="step" th:classappend="${stateName == 'COMPLETED' or stateName == 'PICKED_UP'} ? 'step--done'" data-testid="refinery-step-closed">
                             <span class="step-num" aria-hidden="true"></span>
                             <span class="step-body">
-                                <span class="step-title" th:text="#{refinery.status.stored}">Eingelagert</span>
+                                <span class="step-title" th:text="${stateName == 'PICKED_UP'} ? #{refinery.status.pickedUp} : #{refinery.status.stored}">Eingelagert</span>
+                                <span class="step-meta" th:if="${(stateName == 'PICKED_UP' or stateName == 'COMPLETED') and order != null and order.provenance != null and order.provenance.pickedUpByClient != null}" data-testid="refinery-picked-up-via"
+                                      th:text="#{refineryorder.list.via(${order.provenance.pickedUpByClient})}">via VerseKit</span>
                             </span>
                         </li>
                     </ol>
@@ -282,6 +292,10 @@
                 <span class="kpi-label" th:text="#{refineryorder.assigned.title}">Zugeordnet</span>
                 <p class="rod-assigned__title" th:text="${order.mission != null ? order.mission.name : #messages.msg('refineryorder.assigned.noMission')}">Quantanium-Abbau</p>
                 <p class="rod-assigned__meta"><span th:text="#{refineryorder.assigned.owner(${order.owner != null ? order.owner.effectiveName : '—'})}">Besitzer greluc</span><th:block th:if="${order.owningSquadron != null}"> &middot; <span th:text="${order.owningSquadron.name}">ALPHA</span></th:block></p>
+                <p th:if="${order.provenance != null}" class="rod-assigned__meta" data-testid="refinery-provenance"
+                   th:with="web=#{refineryorder.assigned.web},created=${order.provenance.createdByClient ?: web},changed=${order.provenance.lastChangedByClient ?: web}"
+                   ><span th:text="#{refineryorder.assigned.createdBy(${created})}">Erstellt von VerseKit</span><th:block th:if="${order.provenance.lastChangedAt != null}"> &middot; <span
+                      th:text="#{refineryorder.assigned.lastChange(${changed}, ${#temporals.format(@relativeDays.local(order.provenance.lastChangedAt), 'dd.MM. HH:mm')})}">Zuletzt geändert: Web, 08.11. 17:20</span></th:block></p>
             </div>
         </aside>
     </div>

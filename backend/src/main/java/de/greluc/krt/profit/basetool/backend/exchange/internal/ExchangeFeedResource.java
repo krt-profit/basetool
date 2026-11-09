@@ -39,5 +39,8 @@ public enum ExchangeFeedResource {
   ORG_STOCK,
 
   /** The member's own bank booking requests, keyed by request id; read-only through the feed. */
-  BANK_REQUEST
+  BANK_REQUEST,
+
+  /** The member's own refinery orders, keyed by order id (REQ-XCH-051). */
+  REFINERY_ORDER
 }

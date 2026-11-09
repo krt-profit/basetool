@@ -113,6 +113,16 @@ public class ExchangeExportSections implements PersonalDataExportSection {
             FROM exchange_ship_link WHERE user_id = :userId ORDER BY created_at
             """),
         new Section(
+            172,
+            "exchangeRefineryOrderKeys",
+            ART_15,
+            "Recorded when an external client creates one of the member's refinery orders under"
+                + " its own key.",
+            """
+            SELECT client_id, client_key, refinery_order_id, created_at
+            FROM exchange_refinery_order_link WHERE user_id = :userId ORDER BY created_at
+            """),
+        new Section(
             175,
             "connectedAppsNameWithholding",
             ART_15_20,

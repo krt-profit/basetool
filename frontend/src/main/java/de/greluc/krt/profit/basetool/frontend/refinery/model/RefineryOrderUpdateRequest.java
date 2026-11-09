@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MissionReferenceDto;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Frontend mirror of the backend {@code RefineryOrderUpdateRequest}; must match it field for field.
@@ -38,8 +39,10 @@ import java.util.List;
  * @param oreSales the ore sales
  * @param refiningMethod the refining method, or {@code null} to clear it
  * @param status the new status, or {@code null} to keep the current one
- * @param goods the goods of the run, replacing the stored ones
- * @param version the last-seen version
+ * @param goods every good of the run; a good with the id of a stored good changes it in place
+ * @param parts the parts the request writes (REQ-REFINERY-029); an empty set writes nothing
+ * @param gameDataVersion the last-seen game-data counter, sent when {@code parts} names it
+ * @param financesVersion the last-seen finances counter, sent when {@code parts} names it
  */
 @DtoMirror
 public record RefineryOrderUpdateRequest(
@@ -53,4 +56,6 @@ public record RefineryOrderUpdateRequest(
     RefiningMethodDto refiningMethod,
     RefineryOrderStatus status,
     List<RefineryGoodDto> goods,
-    Long version) {}
+    Set<RefineryOrderPart> parts,
+    Long gameDataVersion,
+    Long financesVersion) {}

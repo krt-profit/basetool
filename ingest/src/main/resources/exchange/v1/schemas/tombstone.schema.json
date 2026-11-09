@@ -11,6 +11,12 @@
       "maxLength": 128,
       "description": "Opaque identifier issued by the Basetool. Clients store and echo it, never parse it."
     },
+    "clientKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "A removed refinery order's key, carried only to the client that created it."
+    },
     "removedAt": {
       "type": "string",
       "format": "date-time",

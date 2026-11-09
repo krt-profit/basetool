@@ -73,16 +73,16 @@ public class ExchangeShipWriteService
   private static final UUID PENDING = new UUID(0, 0);
 
   /** The reason of a ship the member does not own or the server does not know. */
-  static final String UNMATCHED_REASON = "UNMATCHED";
+  static final String UNMATCHED_REASON = ExchangeReasons.UNMATCHED;
 
   /** The reason of a ship type that matches several catalogue entries. */
-  static final String AMBIGUOUS_REASON = "AMBIGUOUS";
+  static final String AMBIGUOUS_REASON = ExchangeReasons.AMBIGUOUS;
 
   /** The refusal of a place without a Lager location. */
-  static final String LOCATION_UNKNOWN = "LOCATION_UNKNOWN";
+  static final String LOCATION_UNKNOWN = ExchangeReasons.LOCATION_UNKNOWN;
 
   /** The refusal of a version the ship no longer has, or of a linked id sent without its ship. */
-  static final String VERSION_CONFLICT = "VERSION_CONFLICT";
+  static final String VERSION_CONFLICT = ExchangeReasons.VERSION_CONFLICT;
 
   /** The refusal of linking a ship the installation already links to another id. */
   static final String LINK_TARGET_TAKEN = "LINK_TARGET_TAKEN";
@@ -91,7 +91,7 @@ public class ExchangeShipWriteService
   static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
 
   /** The refusal of an org unit that is not one of the member's direct memberships. */
-  static final String ORG_UNIT_NOT_ALLOWED = "ORG_UNIT_NOT_ALLOWED";
+  static final String ORG_UNIT_NOT_ALLOWED = ExchangeReasons.ORG_UNIT_NOT_ALLOWED;
 
   /** The refusal of a unit counter the ship no longer has. */
   static final String ORG_UNIT_VERSION_CONFLICT = "ORG_UNIT_VERSION_CONFLICT";

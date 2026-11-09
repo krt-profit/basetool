@@ -19,18 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -40,19 +35,14 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
-import java.time.Instant;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,18 +71,15 @@ public class RefineryOrderStoreService {
 
   private final OrgUnitStampingService orgUnitStampingService;
   private final StockCommands stockCommands;
-  private final AuditRecorder auditRecorder;
 
-  /** Publishes the refinery notices after the commit (REQ-REFINERY-024). */
-  private final ApplicationEventPublisher eventPublisher;
-
-  private final UserService userService;
+  /** Books the checked lines and completes the order. */
+  private final RefineryOrderStoreBooking storeBooking;
 
   /**
    * Completes a refinery order by booking each output material as an inventory row.
    *
    * <p>Rows marked {@code personal} get no earmark (REQ-INV-035); a non-logistician may only book
-   * onto themselves (REQ-SEC-039).
+   * onto themselves (REQ-SEC-039). Every line is checked before the first row is booked.
    *
    * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
    *     non-logistician names another user as an item's receiving stock owner
@@ -109,7 +96,7 @@ public class RefineryOrderStoreService {
       @NotNull UUID orderId,
       @NotNull RefineryOrderStoreDto dto,
       boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
 
     if (order.getStoredAt() != null || order.getStatus() == RefineryOrderStatus.COMPLETED) {
       throw new BadRequestException("error.refinery_order.already_stored");
@@ -122,101 +109,97 @@ public class RefineryOrderStoreService {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
     }
 
-    final RefineryOrderStatus previousStatus = order.getStatus();
-    final Set<UUID> bookedOnto = new LinkedHashSet<>();
-    final List<RefineryGood> goods =
-        dto.items().stream()
-            .map(item -> requireOutputGood(order, item.materialId(), item.quality()))
-            .toList();
+    dto.items()
+        .forEach(item ->
+            RefineryOrderStoreBooking.requireOutputGood(order, item.materialId(), item.quality()));
+    List<RefineryOrderStoreBooking.Line> lines = new ArrayList<>(dto.items().size());
+    for (RefineryOrderStoreItemDto itemDto : dto.items()) {
+      lines.add(line(order, userId, isLogistician, itemDto));
+    }
+    storeBooking.store(order, userId, lines, null);
+  }
 
-    for (int index = 0; index < dto.items().size(); index++) {
-      final RefineryOrderStoreItemDto itemDto = dto.items().get(index);
-      final RefineryGood good = goods.get(index);
-      final Material mat =
+  /**
+   * Checks one item of the web's store dialog and loads what it names.
+   *
+   * @param order the locked order
+   * @param userId the caller
+   * @param isLogistician whether the caller is a Logistician of the order
+   * @param itemDto the item
+   * @return the checked line
+   * @throws AccessDeniedException when the caller may not book onto the item's receiver
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when an id is unknown or
+   *     the job order lies outside the caller's read scope
+   * @throws BadRequestException when the item combines {@code personal} with a job order, its job
+   *     order does not need its material, or its unit is not allowed
+   */
+  private @NotNull RefineryOrderStoreBooking.Line line(
+      @NotNull RefineryOrder order,
+      @NotNull UUID userId,
+      boolean isLogistician,
+      @NotNull RefineryOrderStoreItemDto itemDto) {
+    final Material mat =
+        Entities.require(
+            materialRepository.findById(itemDto.materialId()),
+            () -> "Material not found: " + itemDto.materialId());
+
+    final Location loc =
+        OfferedLocations.requireOffered(
+            Entities.require(
+                locationRepository.findById(itemDto.locationId()),
+                () -> "Location not found: " + itemDto.locationId()));
+
+    final UUID targetUserId =
+        itemDto.userId() != null
+            ? itemDto.userId()
+            : (order.getOwner() != null ? order.getOwner().getId() : null);
+    stockCommands.requireBookIn(
+        targetUserId,
+        userId,
+        isLogistician,
+        Boolean.TRUE.equals(itemDto.personal()),
+        BookInRule.refineryStore());
+
+    User assignee;
+    if (itemDto.userId() != null) {
+      assignee =
           Entities.require(
-              materialRepository.findById(itemDto.materialId()),
-              () -> "Material not found: " + itemDto.materialId());
-
-      final Location loc =
-          OfferedLocations.requireOffered(
-              Entities.require(
-                  locationRepository.findById(itemDto.locationId()),
-                  () -> "Location not found: " + itemDto.locationId()));
-
-      final UUID targetUserId =
-          itemDto.userId() != null
-              ? itemDto.userId()
-              : (order.getOwner() != null ? order.getOwner().getId() : null);
-      stockCommands.requireBookIn(
-          targetUserId,
-          userId,
-          isLogistician,
-          Boolean.TRUE.equals(itemDto.personal()),
-          BookInRule.refineryStore());
-
-      User assignee;
-      if (itemDto.userId() != null) {
-        assignee =
-            Entities.require(
-                userRepository.findById(itemDto.userId()),
-                () -> "User not found: " + itemDto.userId());
-      } else {
-        assignee = order.getOwner();
-      }
-
-      final boolean personal = Boolean.TRUE.equals(itemDto.personal());
-      if (personal && itemDto.jobOrderId() != null) {
-        throw new BadRequestException(
-            "Personal items cannot be assigned to a mission or job order");
-      }
-
-      JobOrder jobOrder = null;
-      if (itemDto.jobOrderId() != null) {
-        jobOrder =
-            Entities.require(
-                jobOrderRepository
-                    .findById(itemDto.jobOrderId())
-                    .filter(jobOrderVisibility::canSeeJobOrderInScope),
-                () -> "JobOrder not found: " + itemDto.jobOrderId());
-        assertMaterialRequiredByJobOrder(mat, jobOrder);
-      }
-
-      final OrgUnit owningOrgUnit =
-          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
-              assignee, itemDto.owningOrgUnitId());
-
-      String incomingNote = StringNormalization.trimToNull(itemDto.note());
-
-      stockCommands.bookInFromRefinery(
-          orderId,
-          assignee,
-          owningOrgUnit,
-          mat,
-          loc,
-          itemDto.quality(),
-          itemDto.amount(),
-          incomingNote,
-          personal,
-          jobOrder != null ? jobOrder.getId() : null,
-          jobOrder != null ? jobOrder.getDisplayId() : null,
-          order.getMissionId());
-      bookedOnto.add(assignee.getId());
-
-      writeBackOutputQuantity(good, itemDto.amount());
+              userRepository.findById(itemDto.userId()),
+              () -> "User not found: " + itemDto.userId());
+    } else {
+      assignee = order.getOwner();
     }
 
-    order.setStatus(RefineryOrderStatus.COMPLETED);
-    order.setStoredAt(Instant.now());
-    refineryOrderRepository.save(order);
-    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
-    announceStored(order, userId, bookedOnto);
-    auditRecorder.record(
-        AuditEventType.REFINERY_ORDER_STORED,
-        order.getId(),
-        RefineryOrders.label(order),
-        order.getOwner() != null ? order.getOwner().getId() : null,
-        AuditDetails.of("items", dto.items().size())
-            .with("status", previousStatus + "->COMPLETED"));
+    final boolean personal = Boolean.TRUE.equals(itemDto.personal());
+    if (personal && itemDto.jobOrderId() != null) {
+      throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
+    }
+
+    JobOrder jobOrder = null;
+    if (itemDto.jobOrderId() != null) {
+      jobOrder =
+          Entities.require(
+              jobOrderRepository
+                  .findById(itemDto.jobOrderId())
+                  .filter(jobOrderVisibility::canSeeJobOrderInScope),
+              () -> "JobOrder not found: " + itemDto.jobOrderId());
+      assertMaterialRequiredByJobOrder(mat, jobOrder);
+    }
+
+    final OrgUnit owningOrgUnit =
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+            assignee, itemDto.owningOrgUnitId());
+
+    return new RefineryOrderStoreBooking.Line(
+        mat,
+        loc,
+        itemDto.quality(),
+        itemDto.amount(),
+        assignee,
+        owningOrgUnit,
+        personal,
+        jobOrder,
+        StringNormalization.trimToNull(itemDto.note()));
   }
 
   /**
@@ -237,108 +220,5 @@ public class RefineryOrderStoreService {
               + jobOrder.getId()
               + "; an inventory item can only be linked to an order that needs its material.");
     }
-  }
-
-  /**
-   * Tells the owner that somebody else stored their order, and every other member whose stock
-   * received a yield the acting member booked onto them (REQ-REFINERY-024).
-   *
-   * @param order the stored order
-   * @param actorId the acting member
-   * @param bookedOnto the members whose stock received a row
-   */
-  private void announceStored(
-      @NotNull RefineryOrder order, @NotNull UUID actorId, @NotNull Set<UUID> bookedOnto) {
-    UUID ownerId = order.getOwner() == null ? null : order.getOwner().getId();
-    String location = order.getLocation() == null ? null : order.getLocation().getName();
-    ActorRef actor = null;
-    if (ownerId != null && !actorId.equals(ownerId)) {
-      actor = userService.currentActor();
-      eventPublisher.publishEvent(
-          RefineryNotices.changedByOther(
-              order.getId(),
-              ownerId,
-              location,
-              bookedOnto.contains(ownerId) ? "STORED_TO_YOU" : "STORED",
-              actor));
-    }
-    for (UUID memberId : bookedOnto) {
-      if (memberId.equals(actorId) || memberId.equals(ownerId)) {
-        continue;
-      }
-      if (actor == null) {
-        actor = userService.currentActor();
-      }
-      eventPublisher.publishEvent(
-          RefineryNotices.changedByOther(
-              order.getId(), memberId, location, "STORED_TO_YOU", actor));
-    }
-  }
-
-  /**
-   * Resolves the good a store item books, refusing a material that is not an output of the order
-   * (REQ-REFINERY-022).
-   *
-   * @param order the order being stored
-   * @param materialId the material the item books
-   * @param quality the grade the item carries; a good of another grade matches when none carries it
-   * @return the good of that material and grade, or of that material at another grade
-   * @throws BadRequestException when no good of the order outputs the material
-   */
-  @NotNull
-  private RefineryGood requireOutputGood(
-      @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
-    RefineryGood good = findGood(order, materialId, quality);
-    if (good == null) {
-      good = findGood(order, materialId, null);
-    }
-    if (good == null) {
-      throw new BadRequestException("error.refinery_order.material_not_an_output");
-    }
-    return good;
-  }
-
-  /**
-   * Writes the stored amount back into the good's output quantity, converting SCU to units (×100)
-   * and clamping to at least one unit.
-   *
-   * @param good the good the item belongs to
-   * @param amount the stored amount in the material's quantity type
-   */
-  private void writeBackOutputQuantity(@NotNull RefineryGood good, double amount) {
-    long units =
-        good.getOutputMaterial().getQuantityType() == QuantityType.SCU
-            ? Math.round(amount * RefineryOrders.UNITS_PER_SCU)
-            : Math.round(amount);
-    good.setOutputQuantity(Math.clamp(units, 1, Integer.MAX_VALUE));
-  }
-
-  /**
-   * Finds the good a store item belongs to.
-   *
-   * @param order the order whose goods to search
-   * @param materialId the output material the item books
-   * @param quality the grade the item carries, or {@code null} to match on the material alone
-   * @return the good, or {@code null} when none matches or the order has no goods
-   */
-  @Nullable
-  private RefineryGood findGood(
-      @NotNull RefineryOrder order, @NotNull UUID materialId, @Nullable Integer quality) {
-    if (order.getGoods() == null) {
-      return null;
-    }
-    for (RefineryGood good : order.getGoods()) {
-      if (good.getOutputMaterial() == null || good.getOutputMaterial().getId() == null) {
-        continue;
-      }
-      if (!good.getOutputMaterial().getId().equals(materialId)) {
-        continue;
-      }
-      if (quality != null && !quality.equals(good.getQuality())) {
-        continue;
-      }
-      return good;
-    }
-    return null;
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,18 @@ public class ExchangeLiveSync {
 
   /** The section of the Materialbörse room's offer board. */
   static final String BOARD = "board";
+
+  /** The section of the refinery-order list room. */
+  static final String REFINERY_QUEUE = "queue";
+
+  /** The section of a refinery order's detail room that holds the order's fields and goods. */
+  static final String REFINERY_ORDER = "order";
+
+  /** The section of a refinery order's detail room that shows where its yield was stored. */
+  static final String REFINERY_STORE = "store";
+
+  /** The section of a refinery order's detail room that announces the order's deletion. */
+  static final String REFINERY_ORDER_DELETED = "deleted";
 
   /** The section of the bank-staff room's request queue. */
   static final String REQUEST_QUEUE = "requestQueue";
@@ -86,6 +99,32 @@ public class ExchangeLiveSync {
     if (offersChanged) {
       afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.MATERIALBOARD), BOARD);
     }
+  }
+
+  /**
+   * Refreshes the refinery-order list after the commit, the detail page of every written order and
+   * the store part of every order a write stored, and tells the detail page of every removed order
+   * that it is gone (REQ-XCH-030, REQ-XCH-053, REQ-XCH-055).
+   *
+   * @param orders the orders the write changed or created and kept
+   * @param stored the orders among them whose yield the write booked into stock
+   * @param deleted the orders the write removed
+   */
+  public void refineryOrdersChanged(
+      @NotNull Collection<UUID> orders,
+      @NotNull Collection<UUID> stored,
+      @NotNull Collection<UUID> deleted) {
+    if (orders.isEmpty() && deleted.isEmpty()) {
+      return;
+    }
+    afterCommit(LiveSyncTopic.global(LiveSyncTopicClass.REFINERY), REFINERY_QUEUE);
+    orders.forEach(order ->
+        afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER));
+    stored.forEach(order ->
+        afterCommit(LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_STORE));
+    deleted.forEach(order ->
+        afterCommit(
+            LiveSyncTopic.of(LiveSyncTopicClass.REFINERY_ORDER, order), REFINERY_ORDER_DELETED));
   }
 
   /**

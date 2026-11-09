@@ -203,7 +203,7 @@ member can undo there.
 - The resources: [blueprints](resources/blueprints.md), [stock](resources/stock.md),
   [ships](resources/ships.md), [org demand](resources/org-demand.md),
   [org units](resources/org-units.md), [org stock](resources/org-stock.md),
-  [drafts](resources/drafts.md).
+  [refinery orders](resources/refinery-orders.md), [drafts](resources/drafts.md).
 - [Conformance fixtures](examples/README.md): test your requests against them, or run
   `python3 scripts/sandbox-smoke.py --conformance`.
 - [Test scenarios](sandbox.md#test-scenarios): conflicts, tombstones, the mass-change guard,

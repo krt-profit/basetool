@@ -29,11 +29,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.engine.spi.SessionImplementor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The refinery module's per-transaction memo of the missions its orders are linked to (plan §7.5
@@ -52,7 +49,8 @@ public class RefineryOrderMissionCache implements RefineryOrderMissionLookup {
     if (missionId == null) {
       return null;
     }
-    Map<UUID, Optional<MissionReferenceDto>> memo = memoObject().references;
+    Map<UUID, Optional<MissionReferenceDto>> memo =
+        RefineryTransactionMemo.bound(this, Memo.class, Memo::new).references;
     Optional<MissionReferenceDto> known = memo.get(missionId);
     if (known != null) {
       return known.orElse(null);
@@ -69,39 +67,12 @@ public class RefineryOrderMissionCache implements RefineryOrderMissionLookup {
 
   private Set<UUID> missionsInContext() {
     Set<UUID> ids = new LinkedHashSet<>();
-    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      return ids;
-    }
-    for (Map.Entry<Object, ?> entry :
-        entityManager
-            .unwrap(SessionImplementor.class)
-            .getPersistenceContextInternal()
-            .reentrantSafeEntityEntries()) {
-      if (entry.getKey() instanceof RefineryOrder order && order.getMissionId() != null) {
+    for (RefineryOrder order : RefineryTransactionMemo.ordersInContext(entityManager)) {
+      if (order.getMissionId() != null) {
         ids.add(order.getMissionId());
       }
     }
     return ids;
-  }
-
-  private Memo memoObject() {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return new Memo();
-    }
-    if (TransactionSynchronizationManager.getResource(this) instanceof Memo bound) {
-      return bound;
-    }
-    Memo memo = new Memo();
-    TransactionSynchronizationManager.bindResource(this, memo);
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCompletion(int status) {
-            TransactionSynchronizationManager.unbindResourceIfPossible(
-                RefineryOrderMissionCache.this);
-          }
-        });
-    return memo;
   }
 
   /** One transaction's memo. */

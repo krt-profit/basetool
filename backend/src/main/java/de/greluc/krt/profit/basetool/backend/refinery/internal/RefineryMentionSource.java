@@ -27,7 +27,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * The refinery's part of the person search: the columns of refinery orders that can name a person,
- * and those left out (REQ-SEC-060).
+ * and those left out (REQ-SEC-060). The status and the provenance sources are enum codes, the
+ * provenance clients are exchange-registry client ids the server writes (REQ-REFINERY-027); none
+ * holds text a person typed.
  */
 @Component
 public class RefineryMentionSource implements PersonMentionSource {
@@ -39,6 +41,12 @@ public class RefineryMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull Set<String> exemptColumns() {
-    return Set.of("refinery_order.status");
+    return Set.of(
+        "refinery_order.created_client",
+        "refinery_order.created_source",
+        "refinery_order.last_change_client",
+        "refinery_order.last_change_source",
+        "refinery_order.picked_up_client",
+        "refinery_order.status");
   }
 }

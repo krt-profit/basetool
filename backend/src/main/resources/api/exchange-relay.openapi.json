@@ -2397,6 +2397,261 @@
         "x-domain" : "exchange"
       }
     },
+    "/api/v1/exchange/me/refinery-orders" : {
+      "get" : {
+        "description" : "Gateway-only. Without a cursor a snapshot of the open and running orders, with one every order changed since it.",
+        "operationId" : "refineryOrders_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeRefineryOrderPageDto"
+                }
+              }
+            },
+            "description" : "The page",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "410" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeRefineryOrderPageDto"
+                }
+              }
+            },
+            "description" : "The cursor has expired (CURSOR_EXPIRED)"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: my refinery orders and their changes",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/refinery-orders/changes" : {
+      "post" : {
+        "description" : "Gateway-only. Ops decided in order against the section counters the earlier ops left.",
+        "operationId" : "refineryOrderChanges",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeRefineryOrderChangeSet"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeChangeResultDto"
+                }
+              }
+            },
+            "description" : "The result"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: change my refinery orders",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/me/ships" : {
       "get" : {
         "description" : "Gateway-only. Without a cursor a snapshot, with one the changes since it.",
@@ -2903,6 +3158,241 @@
           }
         },
         "summary" : "Exchange: set my stock lots",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/store-choices/job-orders" : {
+      "get" : {
+        "description" : "Gateway-only. The open and in-progress job orders in the member's read scope that need the material.",
+        "operationId" : "jobOrders_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "material",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeStoreChoiceJobOrdersDto"
+                }
+              }
+            },
+            "description" : "The job orders",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the job orders a store line may earmark to",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/store-choices/receivers" : {
+      "get" : {
+        "description" : "Gateway-only. The member, and for a Logistician the direct members of the units they are a Logistician of, without those who withhold their name.",
+        "operationId" : "receivers",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeStoreChoiceReceiversDto"
+                }
+              }
+            },
+            "description" : "The receivers",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: whom my store lines may book onto",
         "tags" : [ "exchange" ],
         "x-domain" : "exchange"
       }
@@ -3625,6 +4115,17 @@
           }
         }
       },
+      "Creator" : {
+        "type" : "object",
+        "properties" : {
+          "clientId" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "Entry" : {
         "type" : "object",
         "properties" : {
@@ -4297,6 +4798,12 @@
           "offersRemoved" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "orders" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrderResult"
+            }
           },
           "results" : {
             "type" : "array",
@@ -5092,6 +5599,118 @@
         },
         "required" : [ "orders", "schemaVersion" ]
       },
+      "ExchangeRefineryOrderChangeSet" : {
+        "type" : "object",
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "ops" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryOrderOp"
+            },
+            "maxItems" : 500,
+            "minItems" : 1
+          }
+        },
+        "required" : [ "ops" ]
+      },
+      "ExchangeRefineryOrderDto" : {
+        "type" : "object",
+        "properties" : {
+          "clientKey" : {
+            "type" : "string"
+          },
+          "createdBy" : {
+            "$ref" : "#/components/schemas/Creator"
+          },
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "endsAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Good"
+            }
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationDto"
+          },
+          "method" : {
+            "$ref" : "#/components/schemas/Method"
+          },
+          "missionId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "pickedUpAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "storedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/Versions"
+          }
+        }
+      },
+      "ExchangeRefineryOrderPageDto" : {
+        "type" : "object",
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeRefineryOrderDto"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "removed" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeTombstoneDto"
+            }
+          }
+        }
+      },
       "ExchangeRemovedByDto" : {
         "type" : "object",
         "properties" : {
@@ -5386,9 +6005,34 @@
           }
         }
       },
+      "ExchangeStoreChoiceJobOrdersDto" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StoreChoiceJobOrder"
+            }
+          }
+        }
+      },
+      "ExchangeStoreChoiceReceiversDto" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StoreChoiceReceiver"
+            }
+          }
+        }
+      },
       "ExchangeTombstoneDto" : {
         "type" : "object",
         "properties" : {
+          "clientKey" : {
+            "type" : "string"
+          },
           "key" : {
             "type" : "string"
           },
@@ -5398,6 +6042,32 @@
           },
           "removedBy" : {
             "$ref" : "#/components/schemas/ExchangeRemovedByDto"
+          }
+        }
+      },
+      "Good" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "output" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
@@ -5662,6 +6332,17 @@
           }
         }
       },
+      "Method" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "MissionEarmark" : {
         "type" : "object",
         "properties" : {
@@ -5763,6 +6444,9 @@
       "OpResult" : {
         "type" : "object",
         "properties" : {
+          "id" : {
+            "type" : "string"
+          },
           "index" : {
             "type" : "integer",
             "format" : "int32"
@@ -5775,6 +6459,30 @@
           },
           "result" : {
             "type" : "string"
+          }
+        }
+      },
+      "OrderResult" : {
+        "type" : "object",
+        "properties" : {
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "index" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "opId" : {
+            "type" : "string"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/Versions"
           }
         }
       },
@@ -6120,6 +6828,21 @@
           }
         }
       },
+      "RefineryMethodRef" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 1
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 1
+          }
+        }
+      },
       "RefineryOrderDto" : {
         "type" : "object",
         "properties" : {
@@ -6133,6 +6856,14 @@
             "format" : "double",
             "maximum" : 1.0E9,
             "minimum" : 0
+          },
+          "financesVersion" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "gameDataVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "goods" : {
             "type" : "array",
@@ -6177,6 +6908,9 @@
             "type" : "number",
             "format" : "double"
           },
+          "provenance" : {
+            "$ref" : "#/components/schemas/RefineryOrderProvenanceDto"
+          },
           "refiningMethod" : {
             "$ref" : "#/components/schemas/RefiningMethodDto"
           },
@@ -6193,6 +6927,237 @@
           }
         },
         "required" : [ "goods", "location" ]
+      },
+      "RefineryOrderOp" : {
+        "type" : "object",
+        "properties" : {
+          "clientKey" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "durationMinutes" : {
+            "type" : "integer",
+            "format" : "int64",
+            "maximum" : 525600,
+            "minimum" : 0
+          },
+          "endsAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "good" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpGood"
+          },
+          "goodId" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "goods" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryOrderOpGood"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          },
+          "id" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RefineryStoreLine"
+            },
+            "maxItems" : 100,
+            "minItems" : 1
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "method" : {
+            "$ref" : "#/components/schemas/RefineryMethodRef"
+          },
+          "op" : {
+            "type" : "string",
+            "pattern" : "^(create|update|good-add|good-update|good-remove|cancel|delete|pickup)$"
+          },
+          "opId" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 1
+          },
+          "oreSales" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpUnit"
+          },
+          "otherExpenses" : {
+            "type" : "number",
+            "format" : "double",
+            "maximum" : 1000000000,
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "status" : {
+            "type" : "string",
+            "pattern" : "^(OPEN|IN_PROGRESS)$"
+          },
+          "versions" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpVersions"
+          }
+        },
+        "required" : [ "op" ]
+      },
+      "RefineryOrderOpGood" : {
+        "type" : "object",
+        "properties" : {
+          "input" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "inputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 0
+          },
+          "outputQuantity" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          }
+        },
+        "required" : [ "input", "inputQuantity", "outputQuantity", "quality" ]
+      },
+      "RefineryOrderOpUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "id" ]
+      },
+      "RefineryOrderOpVersions" : {
+        "type" : "object",
+        "properties" : {
+          "finances" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          },
+          "gameData" : {
+            "type" : "integer",
+            "format" : "int64",
+            "minimum" : 0
+          }
+        }
+      },
+      "RefineryOrderProvenanceDto" : {
+        "type" : "object",
+        "properties" : {
+          "createdByClient" : {
+            "type" : "string"
+          },
+          "lastChangedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastChangedByClient" : {
+            "type" : "string"
+          },
+          "pickedUpAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "pickedUpByClient" : {
+            "type" : "string"
+          },
+          "storedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "RefineryStoreLine" : {
+        "type" : "object",
+        "properties" : {
+          "jobOrder" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationRef"
+          },
+          "material" : {
+            "$ref" : "#/components/schemas/ExchangeItemRef"
+          },
+          "note" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/RefineryOrderOpUnit"
+          },
+          "personal" : {
+            "type" : "boolean"
+          },
+          "quality" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0
+          },
+          "quantity" : {
+            "$ref" : "#/components/schemas/Quantity"
+          },
+          "receiver" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 1
+          }
+        },
+        "required" : [ "location", "material", "quality", "quantity" ]
       },
       "RefiningMethodDto" : {
         "type" : "object",
@@ -6271,6 +7236,42 @@
         },
         "required" : [ "id" ]
       },
+      "StoreChoiceJobOrder" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "number" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        }
+      },
+      "StoreChoiceReceiver" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "orgUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeOrgUnitDto"
+            }
+          },
+          "ref" : {
+            "type" : "string"
+          },
+          "self" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Target" : {
         "type" : "object",
         "properties" : {
@@ -6329,6 +7330,19 @@
           },
           "username" : {
             "type" : "string"
+          }
+        }
+      },
+      "Versions" : {
+        "type" : "object",
+        "properties" : {
+          "finances" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "gameData" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

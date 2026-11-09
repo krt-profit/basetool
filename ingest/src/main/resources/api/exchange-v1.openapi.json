@@ -322,6 +322,21 @@
           },
           {
             "memberToken": [
+              "exchange.refinery.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.store"
+            ]
+          },
+          {
+            "memberToken": [
               "exchange.drafts.blueprints"
             ]
           },
@@ -442,6 +457,21 @@
           {
             "memberToken": [
               "exchange.orgstock.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.read"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          },
+          {
+            "memberToken": [
+              "exchange.refinery.store"
             ]
           },
           {
@@ -843,6 +873,224 @@
             }
           }
         }
+      }
+    },
+    "/exchange/v1/me/refinery-orders": {
+      "get": {
+        "operationId": "refinery_orders_read",
+        "summary": "The member's own refinery orders: a snapshot of the open and running ones, or every order changed since a cursor.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/refineryOrderPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/refinery-orders/changes": {
+      "post": {
+        "operationId": "refinery_orders_write",
+        "summary": "Create and update the member's own refinery orders and their goods, as in the web.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/refineryOrderChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/store-choices/receivers": {
+      "get": {
+        "operationId": "storechoices_receivers",
+        "summary": "The members a refinery pickup's store lines may book onto, with their direct org units.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.store"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/store-choice-receivers.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "The member, and for a Logistician the direct members of the units they are a Logistician of, without those who withhold their name.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/store-choices/job-orders": {
+      "get": {
+        "operationId": "storechoices_job_orders",
+        "summary": "The open and in-progress job orders the member sees that need a material, for a store line's earmark.",
+        "tags": [
+          "refinery"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.refinery.store"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/store-choice-job-orders.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "A material that names nothing answers an empty list.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "material",
+            "in": "query",
+            "required": true,
+            "description": "The material's bt id.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ]
       }
     },
     "/exchange/v1/me/org-demand": {

@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -82,6 +85,43 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   Optional<RefineryOrder> findById(@NotNull UUID id);
 
   /**
+   * Loads one refinery order and row-locks it until the transaction ends, so a writer checks and
+   * raises its section counters (REQ-REFINERY-029) on state no concurrent writer can change.
+   *
+   * @param id the order id
+   * @return the locked order, or empty when none exists
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.id = :id")
+  Optional<RefineryOrder> lockById(@Param("id") UUID id);
+
+  /**
+   * Loads one of a member's orders and row-locks it until the transaction ends; an order of another
+   * member is neither returned nor locked (REQ-XCH-052).
+   *
+   * @param id the order id
+   * @param owner the member
+   * @return the locked order, or empty when the member owns none of that id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.id = :id AND r.owner.id = :owner")
+  Optional<RefineryOrder> lockOwnedById(@Param("id") UUID id, @Param("owner") UUID owner);
+
+  /**
+   * Row-locks a member's orders among the given ids in ascending id order, so two writers over
+   * overlapping orders queue instead of deadlocking; an order of another member is neither returned
+   * nor locked (REQ-XCH-052).
+   *
+   * @param owner the member
+   * @param ids the order ids
+   * @return the member's orders among them, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM RefineryOrder r WHERE r.owner.id = :owner AND r.id IN :ids ORDER BY r.id")
+  List<RefineryOrder> lockOwnedByIdsOrderById(
+      @Param("owner") UUID owner, @Param("ids") Collection<UUID> ids);
+
+  /**
    * Counts refinery orders in the given lifecycle status, backing the {@code
    * basetool_refinery_order_open_*} queue-depth gauge (REQ-OBS-011).
    *
@@ -89,6 +129,23 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @return the number of refinery orders in that status
    */
   long countByStatus(RefineryOrderStatus status);
+
+  /**
+   * Counts a member's refinery orders, whatever their status (REQ-XCH-021).
+   *
+   * @param ownerId the owning member
+   * @return the number of orders the member owns
+   */
+  long countByOwnerId(@NotNull UUID ownerId);
+
+  /**
+   * Lists which of the given orders exist, whoever owns them (REQ-XCH-052).
+   *
+   * @param ids the order ids
+   * @return the ids among {@code ids} that name an order
+   */
+  @Query("SELECT r.id FROM RefineryOrder r WHERE r.id IN :ids")
+  List<UUID> findExistingIds(@Param("ids") Collection<UUID> ids);
 
   /**
    * Finds the creation timestamp of the oldest refinery order in the given status, for the "oldest
@@ -323,8 +380,8 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   @Query(
       """
       SELECT o.id FROM RefineryOrder o
-      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
-                         de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.IN_PROGRESS)
+      WHERE o.status IN (de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
+                         de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.IN_PROGRESS)
         AND o.storedAt IS NULL AND o.readyNotifiedAt IS NULL
         AND o.endsAt IS NOT NULL AND o.endsAt > :notBefore AND o.endsAt <= :now
       ORDER BY o.endsAt, o.id
@@ -345,4 +402,158 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
       "UPDATE RefineryOrder o SET o.readyNotifiedAt = :now"
           + " WHERE o.id = :id AND o.readyNotifiedAt IS NULL")
   int markReadyNotified(@Param("id") UUID id, @Param("now") Instant now);
+
+  /**
+   * Returns the ids of one exchange snapshot page of a member's orders in the given statuses.
+   *
+   * @param owner the owning member
+   * @param statuses the statuses to include
+   * @param after the last order delivered, or the zero id for the first page
+   * @param limit the page size
+   * @return the ids after {@code after}, ascending
+   */
+  @Query(
+      "SELECT o.id FROM RefineryOrder o WHERE o.owner.id = :owner AND o.status IN :statuses"
+          + " AND o.id > :after ORDER BY o.id")
+  List<UUID> findExchangeOrderIds(
+      @Param("owner") UUID owner,
+      @Param("statuses") Collection<RefineryOrderStatus> statuses,
+      @Param("after") UUID after,
+      Limit limit);
+
+  /**
+   * Loads a member's orders with everything the exchange feed serves: the location with its city
+   * and space station, the refining method and the goods with their materials.
+   *
+   * @param owner the owning member
+   * @param ids the order ids
+   * @return the orders among {@code ids} the member owns
+   */
+  @EntityGraph(
+      attributePaths = {
+        "location",
+        "location.city",
+        "location.spaceStation",
+        "refiningMethod",
+        "goods",
+        "goods.inputMaterial",
+        "goods.outputMaterial"
+      })
+  @Query("SELECT o FROM RefineryOrder o WHERE o.owner.id = :owner AND o.id IN :ids")
+  List<RefineryOrder> findExchangeOrders(
+      @Param("owner") UUID owner, @Param("ids") Collection<UUID> ids);
+
+  /**
+   * Inserts a good under an id it had before, which the undo of an exchange write brings back
+   * (REQ-XCH-056); the generated id of a JPA insert cannot carry it.
+   *
+   * @param id the good's former row id
+   * @param order the order
+   * @param input the input material
+   * @param inputQuantity the input amount in units
+   * @param output the output material
+   * @param outputQuantity the yield in units
+   * @param quality the quality from 0 to 1000
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          INSERT INTO refinery_good (id, version, created_at, updated_at, input_material_id,
+                                     input_quantity, output_material_id, output_quantity, quality,
+                                     refinery_order_id)
+          VALUES (:id, 0, now(), now(), :input, :inputQuantity, :output, :outputQuantity, :quality,
+                  :order)
+          """)
+  void insertGood(
+      @Param("id") UUID id,
+      @Param("order") UUID order,
+      @Param("input") UUID input,
+      @Param("inputQuantity") int inputQuantity,
+      @Param("output") UUID output,
+      @Param("outputQuantity") int outputQuantity,
+      @Param("quality") int quality);
+
+  /**
+   * Inserts an order under the id it had before, unstored, with the member's undo as its last
+   * change, for the undo of a client's delete (REQ-XCH-056); the generated id of a JPA insert
+   * cannot carry it.
+   *
+   * @param row the order's columns
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      nativeQuery = true,
+      value =
+          """
+          INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id,
+                                      mission_id, started_at, duration_minutes,
+                                      refining_method_id, expenses, other_expenses, ore_sales,
+                                      status, ready_notified_at, owning_org_unit_id,
+                                      game_data_version, finances_version, created_source,
+                                      created_client, last_change_source, last_changed_at,
+                                      picked_up_at, picked_up_client)
+          VALUES (:#{#row.id()}, 0,
+                  COALESCE(CAST(:#{#row.createdAt()} AS timestamptz), now()), now(),
+                  :#{#row.owner()}, :#{#row.location()}, CAST(:#{#row.mission()} AS uuid),
+                  CAST(:#{#row.startedAt()} AS timestamptz),
+                  CAST(:#{#row.durationMinutes()} AS bigint), CAST(:#{#row.method()} AS uuid),
+                  CAST(:#{#row.expenses()} AS double precision),
+                  CAST(:#{#row.otherExpenses()} AS double precision),
+                  CAST(:#{#row.oreSales()} AS double precision), :#{#row.status()},
+                  CAST(:#{#row.readyNotifiedAt()} AS timestamptz),
+                  CAST(:#{#row.orgUnit()} AS uuid),
+                  :#{#row.gameDataVersion()}, :#{#row.financesVersion()},
+                  CASE WHEN CAST(:#{#row.createdClient()} AS varchar) IS NULL THEN 'WEB'
+                       ELSE 'CLIENT' END,
+                  CAST(:#{#row.createdClient()} AS varchar), 'WEB', now(),
+                  CAST(:#{#row.pickedUpAt()} AS timestamptz),
+                  CAST(:#{#row.pickedUpClient()} AS varchar))
+          """)
+  void insertOrder(@Param("row") RestoredRow row);
+
+  /**
+   * The columns of an order the undo of a client's delete inserts again.
+   *
+   * @param id the former id
+   * @param createdAt the creation time, or {@code null} for now
+   * @param owner the owning member
+   * @param location the location
+   * @param mission the linked mission, or {@code null}
+   * @param startedAt the run's start, or {@code null}
+   * @param durationMinutes the run's length, or {@code null}
+   * @param method the refining method, or {@code null}
+   * @param expenses the refining costs, or {@code null}
+   * @param otherExpenses further costs, or {@code null}
+   * @param oreSales the raw-ore revenue, or {@code null}
+   * @param status the status name
+   * @param readyNotifiedAt when the ready notice was raised, or {@code null}
+   * @param orgUnit the owning unit, or {@code null}
+   * @param gameDataVersion the game-data counter
+   * @param financesVersion the finances counter
+   * @param createdClient the creating client, or {@code null} for the web
+   * @param pickedUpAt when a client reported the pickup, or {@code null}
+   * @param pickedUpClient that client, or {@code null}
+   */
+  record RestoredRow(
+      @NotNull UUID id,
+      @Nullable Instant createdAt,
+      @NotNull UUID owner,
+      @NotNull UUID location,
+      @Nullable UUID mission,
+      @Nullable Instant startedAt,
+      @Nullable Long durationMinutes,
+      @Nullable UUID method,
+      @Nullable Double expenses,
+      @Nullable Double otherExpenses,
+      @Nullable Double oreSales,
+      @NotNull String status,
+      @Nullable Instant readyNotifiedAt,
+      @Nullable UUID orgUnit,
+      long gameDataVersion,
+      long financesVersion,
+      @Nullable String createdClient,
+      @Nullable Instant pickedUpAt,
+      @Nullable String pickedUpClient) {}
 }

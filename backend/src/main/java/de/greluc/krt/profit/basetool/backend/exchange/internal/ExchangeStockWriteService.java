@@ -93,13 +93,13 @@ public class ExchangeStockWriteService
   private static final String CLIENT_CHANNEL = "client";
 
   /** The refusal of a quantity whose unit is not the material's. */
-  static final String UNIT_MISMATCH = "UNIT_MISMATCH";
+  static final String UNIT_MISMATCH = ExchangeReasons.UNIT_MISMATCH;
 
   /** The refusal of a place without a Lager location. */
-  static final String LOCATION_UNKNOWN = "LOCATION_UNKNOWN";
+  static final String LOCATION_UNKNOWN = ExchangeReasons.LOCATION_UNKNOWN;
 
   /** The refusal of an expected quantity the lot no longer holds. */
-  static final String VERSION_CONFLICT = "VERSION_CONFLICT";
+  static final String VERSION_CONFLICT = ExchangeReasons.VERSION_CONFLICT;
 
   /** The refusal of refilling a lot emptied by another channel or installation. */
   static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";

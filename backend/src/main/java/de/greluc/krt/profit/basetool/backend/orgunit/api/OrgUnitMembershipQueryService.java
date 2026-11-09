@@ -220,6 +220,55 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
+   * Batched {@link #findDirectMemberUserIds(UUID)}: the users who are direct members of any of the
+   * given org units, in one query (REQ-XCH-054).
+   *
+   * @param orgUnitIds the org units; never {@code null}.
+   * @return the distinct user ids; never {@code null}, empty for no unit.
+   */
+  @NotNull
+  public Set<UUID> findDirectMemberUserIdsOfUnits(@NotNull Collection<UUID> orgUnitIds) {
+    return orgUnitIds.isEmpty()
+        ? Set.of()
+        : membershipRepository.findDistinctUserIdsByOrgUnitIdIn(orgUnitIds);
+  }
+
+  /**
+   * Batched {@link #listDirectMembershipOptions(UUID)}: each user's direct memberships across all
+   * four kinds as named picker options in the same order, read in two queries for the whole set
+   * (REQ-DATA-003, REQ-XCH-054).
+   *
+   * @param userIds the users; never {@code null}.
+   * @return the options per user; a user without a direct membership is absent.
+   */
+  @NotNull
+  public Map<UUID, List<OrgUnitMembershipOptionDto>> listDirectMembershipOptionsByUser(
+      @NotNull Collection<UUID> userIds) {
+    if (userIds.isEmpty()) {
+      return Map.of();
+    }
+    List<OrgUnitMembership> rows =
+        membershipRepository.findAllByIdUserIdInAndKindIn(
+            userIds, EnumSet.allOf(OrgUnitKind.class));
+    Map<UUID, OrgUnit> units =
+        orgUnitRepository
+            .findAllById(rows.stream().map(r -> r.getId().getOrgUnitId()).distinct().toList())
+            .stream()
+            .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
+    Map<UUID, List<OrgUnitMembershipOptionDto>> options = new HashMap<>();
+    for (OrgUnitMembership row : rows) {
+      OrgUnit unit = units.get(row.getId().getOrgUnitId());
+      if (unit != null) {
+        options
+            .computeIfAbsent(row.getId().getUserId(), _ -> new ArrayList<>())
+            .add(toOption(unit));
+      }
+    }
+    options.values().forEach(list -> list.sort(pickerOrder()));
+    return options;
+  }
+
+  /**
    * Returns the org-unit ids in which the user is a Logistician: the units whose membership makes
    * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit(boolean)}, plus the units below a
    * Bereich or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043). A rank counts only
@@ -287,28 +336,9 @@ public class OrgUnitMembershipQueryService {
   @NotNull
   public Map<UUID, OrgUnitMembershipOptionDto> findPrimaryDirectMembershipOptions(
       @NotNull Collection<UUID> userIds) {
-    if (userIds.isEmpty()) {
-      return Map.of();
-    }
-    List<OrgUnitMembership> rows =
-        membershipRepository.findAllByIdUserIdInAndKindIn(
-            userIds, EnumSet.allOf(OrgUnitKind.class));
-    Map<UUID, OrgUnit> units =
-        orgUnitRepository
-            .findAllById(rows.stream().map(r -> r.getId().getOrgUnitId()).distinct().toList())
-            .stream()
-            .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
-    Comparator<OrgUnitMembershipOptionDto> order = pickerOrder();
     Map<UUID, OrgUnitMembershipOptionDto> primary = new HashMap<>();
-    for (OrgUnitMembership row : rows) {
-      OrgUnit unit = units.get(row.getId().getOrgUnitId());
-      if (unit != null) {
-        primary.merge(
-            row.getId().getUserId(),
-            toOption(unit),
-            (current, candidate) -> order.compare(candidate, current) < 0 ? candidate : current);
-      }
-    }
+    listDirectMembershipOptionsByUser(userIds)
+        .forEach((user, options) -> primary.put(user, options.getFirst()));
     return primary;
   }
 

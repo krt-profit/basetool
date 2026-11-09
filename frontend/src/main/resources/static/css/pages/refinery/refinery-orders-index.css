@@ -40,6 +40,12 @@
         font-weight: var(--fw-regular);
     }
 
+    .refinery-done__via {
+        display: block;
+        color: var(--color-gray-2-text);
+        font-size: var(--fs-xs);
+    }
+
     .refinery-meter {
         max-width: 16rem;
     }

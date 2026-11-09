@@ -416,6 +416,12 @@ class DataExportEndStateTest {
         thumbprint,
         ship.getId());
     jdbc.update(
+        "INSERT INTO exchange_refinery_order_link (id, user_id, client_id, client_key,"
+            + " refinery_order_id) VALUES (?, ?, 'zzz-export-client', 'key-1', ?)",
+        UUID.randomUUID(),
+        subject.getId(),
+        UUID.randomUUID());
+    jdbc.update(
         "INSERT INTO exchange_name_withholding (user_id, withhold_name) VALUES (?, TRUE)",
         subject.getId());
     jdbc.update(

@@ -22,11 +22,9 @@ package de.greluc.krt.profit.basetool.backend.refinery.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -34,24 +32,30 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.api.MissionParticipantRequiredException;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerScopeService;
 import java.time.Instant;
-import java.util.Objects;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -124,8 +128,11 @@ public class RefineryOrderService {
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId, boolean onBehalf) {
     order.setId(null);
     order.setVersion(null);
+    order.setGameDataVersion(0L);
+    order.setFinancesVersion(0L);
     order.setStatus(RefineryOrderStatus.OPEN);
     order.setStoredAt(null);
+    order.setProvenance(RefineryOrderProvenance.createdInWeb(Instant.now()));
 
     User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
@@ -140,7 +147,7 @@ public class RefineryOrderService {
           OfferedLocations.require(
               locationRepository.findById(order.getLocation().getId()),
               "error.location.not_found"));
-      validateLocationHasRefinery(order.getLocation());
+      RefineryOrderEdits.requireRefinery(order.getLocation());
     } else {
       throw new BadRequestException("error.refinery_order.location_required");
     }
@@ -168,9 +175,8 @@ public class RefineryOrderService {
       order.setStartedAt(Instant.now());
     }
 
-    order.setExpenses(zeroToNull(order.getExpenses()));
-    order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
-    order.setOreSales(zeroToNull(order.getOreSales()));
+    RefineryOrderEdits.setFinances(
+        order, order.getExpenses(), order.getOtherExpenses(), order.getOreSales());
 
     RefineryOrder saved = refineryOrderRepository.save(order);
     auditRecorder.record(
@@ -178,10 +184,7 @@ public class RefineryOrderService {
         saved.getId(),
         RefineryOrders.label(saved),
         saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", saved.getStatus()));
+        RefineryOrders.summary(saved, saved.getStatus()));
     return saved;
   }
 
@@ -209,59 +212,123 @@ public class RefineryOrderService {
     return mission.getId();
   }
 
-  @Contract("null -> null")
-  @Nullable
-  private static Double zeroToNull(@Nullable Double value) {
-    if (value == null) {
-      return null;
-    }
-    return value == 0.0 ? null : value;
+  /**
+   * Row-locks a refinery order in the caller's transaction. A web write takes this lock before it
+   * reads the order at all, so a writer that committed in the meantime is seen rather than reported
+   * as a stale managed instance (REQ-REFINERY-029).
+   *
+   * @param orderId the order
+   * @return the locked, managed order
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no order has that
+   *     id
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public RefineryOrder lockRefineryOrder(@NotNull UUID orderId) {
+    return RefineryOrders.requireLocked(refineryOrderRepository, orderId);
   }
 
   /**
-   * Updates a refinery order, replacing its goods; only the owner or a logistician may do so.
+   * Updates the named parts of a refinery order and leaves the others as they are
+   * (REQ-REFINERY-029). Each section among the parts is checked against the counter the caller
+   * echoed on {@code details} and raised by one; the mission link is not checked.
    *
+   * @param userId the acting member, or the owner when a logistician acts
+   * @param orderId the order
+   * @param details the transient order holding the requested values and the echoed counters
+   * @param parts the parts to write; an empty set writes nothing
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
    * @throws AccessDeniedException when the caller is neither owner nor logistician
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the counter of a
+   *     written section is absent or stale
    * @throws BadRequestException when the order is already stored and the status would change
    * @throws MissionParticipantRequiredException when the mission is changed to one the owner does
    *     not take part in (REQ-SEC-042)
    */
   @Transactional
-  public RefineryOrder updateRefineryOrder(
+  public RefineryOrder updateRefineryOrderParts(
       @NotNull UUID userId,
       @NotNull UUID orderId,
       @NotNull RefineryOrder details,
+      @NotNull Set<RefineryOrderPart> parts,
       boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
+    for (RefineryOrderPart part : parts) {
+      RefineryOrderSection section = part.section();
+      if (section != null) {
+        section.check(order, section.read(details));
+      }
+    }
+    return update(userId, order, details, parts, isLogistician);
+  }
 
-    OptimisticLock.checkOptionalClient(
-        order.getVersion(), details.getVersion(), RefineryOrder.class, orderId);
-
+  /**
+   * Applies the named parts of {@code details} to the locked order and raises the counter of each
+   * section written.
+   *
+   * @param userId the acting member, or the owner when a logistician acts
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested values
+   * @param parts the parts to write
+   * @param isLogistician whether the caller is a logistician of the order's unit
+   * @return the saved order
+   */
+  private RefineryOrder update(
+      @NotNull UUID userId,
+      @NotNull RefineryOrder order,
+      @NotNull RefineryOrder details,
+      @NotNull Set<RefineryOrderPart> parts,
+      boolean isLogistician) {
     if (!isLogistician
         && (order.getOwner() == null
             || order.getOwner().getId() == null
             || !order.getOwner().getId().equals(userId))) {
       throw new AccessDeniedException("Access denied: You do not own this refinery order");
     }
-
-    if (order.getStoredAt() != null
-        && details.getStatus() != null
-        && details.getStatus() != order.getStatus()) {
-      throw new BadRequestException("error.refinery_order.stored_status_locked");
+    if (parts.isEmpty()) {
+      return order;
     }
 
-    if (details.getLocation() != null && details.getLocation().getId() != null) {
-      order.setLocation(
-          OfferedLocations.requireOfferedOrCurrent(
-              Entities.require(
-                  locationRepository.findById(details.getLocation().getId()),
-                  "error.location.not_found"),
-              order.getLocation()));
-      validateLocationHasRefinery(order.getLocation());
+    final RefineryOrderStatus previousStatus = order.getStatus();
+    final boolean runTimeChanged =
+        parts.contains(RefineryOrderPart.GAME_DATA) && applyGameData(order, details);
+    if (parts.contains(RefineryOrderPart.MISSION_LINK)) {
+      applyMissionLink(order, details);
     }
+    if (parts.contains(RefineryOrderPart.FINANCES)) {
+      RefineryOrderEdits.setFinances(
+          order, details.getExpenses(), details.getOtherExpenses(), details.getOreSales());
+    }
+    for (RefineryOrderPart part : parts) {
+      RefineryOrderSection section = part.section();
+      if (section != null) {
+        section.advance(order);
+      }
+    }
+    order.getProvenance().recordWebChange(Instant.now());
 
+    RefineryOrder saved = refineryOrderRepository.save(order);
+    RefineryOrderEdits.clearReadyNoticeIfDue(eventPublisher, saved, runTimeChanged);
+    announceByOther(
+        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        saved.getOwner() != null ? saved.getOwner().getId() : null,
+        RefineryOrders.summary(saved, previousStatus + "->" + saved.getStatus()));
+    return saved;
+  }
+
+  /**
+   * Links, re-links or unlinks the order's mission: a reference with an id links that mission, a
+   * reference without an id leaves the link as it is, no reference unlinks it.
+   *
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested link
+   * @throws MissionParticipantRequiredException when the owner does not take part in the mission
+   */
+  private void applyMissionLink(@NotNull RefineryOrder order, @NotNull RefineryOrder details) {
     UUID requestedMissionId = details.getMissionId();
     if (requestedMissionId != null) {
       if (!requestedMissionId.equals(order.getMissionId())) {
@@ -269,6 +336,25 @@ public class RefineryOrderService {
       }
     } else if (!details.isMissionReferenceWithoutId()) {
       order.setMissionId(null);
+    }
+  }
+
+  /**
+   * Writes the game-data section: location, method, timer, status and goods. A changed timer clears
+   * the ready marker so the run is announced again (REQ-REFINERY-023).
+   *
+   * @param order the locked, managed order
+   * @param details the transient order holding the requested values
+   * @return {@code true} when the start or the duration changed
+   * @throws BadRequestException when the order is already stored and the status would change
+   */
+  private boolean applyGameData(@NotNull RefineryOrder order, @NotNull RefineryOrder details) {
+    RefineryOrderEdits.requireStatusUnlocked(order, details.getStatus());
+    if (details.getLocation() != null && details.getLocation().getId() != null) {
+      order.setLocation(
+          RefineryOrderEdits.offeredOrCurrent(
+              locationRepository, order, details.getLocation().getId()));
+      RefineryOrderEdits.requireRefinery(order.getLocation());
     }
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
@@ -280,52 +366,52 @@ public class RefineryOrderService {
       order.setRefiningMethod(null);
     }
 
-    final Instant previousStart = order.getStartedAt();
-    final Long previousDuration = order.getDurationMinutes();
-    order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
-    order.setDurationMinutes(details.getDurationMinutes());
     final boolean runTimeChanged =
-        !Objects.equals(previousStart, order.getStartedAt())
-            || !Objects.equals(previousDuration, order.getDurationMinutes());
-    if (runTimeChanged) {
-      order.setReadyNotifiedAt(null);
-    }
-    order.setExpenses(zeroToNull(details.getExpenses()));
-    order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
-    order.setOreSales(zeroToNull(details.getOreSales()));
-    final RefineryOrderStatus previousStatus = order.getStatus();
+        RefineryOrderEdits.setRunTime(
+            order,
+            details.getStartedAt() != null ? details.getStartedAt() : Instant.now(),
+            details.getDurationMinutes());
     if (details.getStatus() != null) {
       order.setStatus(details.getStatus());
     }
 
     if (details.getGoods() != null) {
-      order.getGoods().clear();
-      details
-          .getGoods()
-          .forEach(good -> {
-            resolveGood(good, order);
-            order.getGoods().add(good);
-          });
+      setGoods(order, details.getGoods());
     }
+    return runTimeChanged;
+  }
 
-    RefineryOrder saved = refineryOrderRepository.save(order);
-    if (runTimeChanged
-        || saved.getStatus() == RefineryOrderStatus.COMPLETED
-        || saved.getStatus() == RefineryOrderStatus.CANCELED) {
-      eventPublisher.publishEvent(RefineryNotices.readyCleared(saved.getId()));
+  /**
+   * Makes the order hold exactly the given goods: a good with the id of a held row changes that row
+   * in place and keeps its id, a good without an id is added, and every other row is removed.
+   *
+   * @param order the locked, managed order
+   * @param goods every good the order holds afterwards, transient with id-only material references
+   * @throws BadRequestException when a good names an id the order does not hold, or names one twice
+   */
+  private void setGoods(@NotNull RefineryOrder order, @NotNull Set<RefineryGood> goods) {
+    Map<UUID, RefineryGood> held = new HashMap<>();
+    order.getGoods().forEach(good -> held.put(good.getId(), good));
+    Set<UUID> kept = new HashSet<>();
+    List<RefineryGood> added = new ArrayList<>();
+    for (RefineryGood good : goods) {
+      resolveGood(good, order);
+      if (good.getId() == null) {
+        added.add(good);
+        continue;
+      }
+      RefineryGood row = held.get(good.getId());
+      if (row == null || !kept.add(good.getId())) {
+        throw new BadRequestException("error.refinery_order.good_unknown");
+      }
+      row.setInputMaterial(good.getInputMaterial());
+      row.setInputQuantity(good.getInputQuantity());
+      row.setOutputMaterial(good.getOutputMaterial());
+      row.setOutputQuantity(good.getOutputQuantity());
+      row.setQuality(good.getQuality());
     }
-    announceByOther(
-        saved, userId, saved.getStatus() == RefineryOrderStatus.CANCELED ? "CANCELED" : "UPDATED");
-    auditRecorder.record(
-        AuditEventType.REFINERY_ORDER_UPDATED,
-        saved.getId(),
-        RefineryOrders.label(saved),
-        saved.getOwner() != null ? saved.getOwner().getId() : null,
-        AuditDetails.of("location", RefineryOrders.locationName(saved))
-            .with("method", RefineryOrders.methodName(saved))
-            .with("goods", saved.getGoods() != null ? saved.getGoods().size() : 0)
-            .with("status", previousStatus + "->" + saved.getStatus()));
-    return saved;
+    order.getGoods().removeIf(good -> !kept.contains(good.getId()));
+    order.getGoods().addAll(added);
   }
 
   /**
@@ -344,15 +430,7 @@ public class RefineryOrderService {
               materialRepository.findById(good.getInputMaterial().getId()),
               "error.material.input.not_found");
 
-      if (inMat.getType() != MaterialType.RAW
-          && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
-        throw new IllegalArgumentException(
-            "Refinery goods input must be of type RAW. Material '"
-                + inMat.getName()
-                + "' is "
-                + inMat.getType());
-      }
-      good.setInputMaterial(inMat);
+      good.setInputMaterial(RefineryOrderEdits.requireRefinable(inMat));
 
       if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
         Material outMat =
@@ -362,17 +440,12 @@ public class RefineryOrderService {
 
         if (inMat.getRefinedMaterial() != null
             && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
-          throw new IllegalArgumentException(
-              "Output material must match the refined material of the input material.");
+          throw new BadRequestException("error.refinery_order.output_not_refined");
         }
 
         good.setOutputMaterial(outMat);
       } else {
-        if (inMat.getRefinedMaterial() != null) {
-          good.setOutputMaterial(inMat.getRefinedMaterial());
-        } else {
-          good.setOutputMaterial(inMat);
-        }
+        good.setOutputMaterial(RefineryExchangeRules.output(inMat));
       }
     } else {
       throw new BadRequestException("error.refinery_order.input_material_required");
@@ -382,14 +455,14 @@ public class RefineryOrderService {
 
   /**
    * Cancels (soft-deletes) a refinery order. Same owner-vs-logistician gate as {@link
-   * #updateRefineryOrder}.
+   * #updateRefineryOrderParts}.
    *
    * @throws AccessDeniedException when the caller is not allowed to delete this order
    */
   @Transactional
   public void deleteRefineryOrder(
       @NotNull UUID userId, @NotNull UUID orderId, boolean isLogistician) {
-    RefineryOrder order = RefineryOrders.require(refineryOrderRepository, orderId);
+    RefineryOrder order = RefineryOrders.requireLocked(refineryOrderRepository, orderId);
 
     if (!isLogistician
         && (order.getOwner() == null
@@ -400,6 +473,8 @@ public class RefineryOrderService {
 
     final RefineryOrderStatus previousStatus = order.getStatus();
     order.setStatus(RefineryOrderStatus.CANCELED);
+    RefineryOrderSection.GAME_DATA.advance(order);
+    order.getProvenance().recordWebChange(Instant.now());
     refineryOrderRepository.save(order);
     eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
     announceByOther(order, userId, "CANCELED");
@@ -431,29 +506,5 @@ public class RefineryOrderService {
             order.getLocation() == null ? null : order.getLocation().getName(),
             changeCode,
             userService.currentActor()));
-  }
-
-  /**
-   * Rejects a location whose derived {@code hasRefineryTerminal} flag is false, the same signal the
-   * picker uses (REQ-REFINERY-020).
-   *
-   * <p>Reads the parent through the association, never a query, so it cannot trigger an auto-flush
-   * mid-update.
-   *
-   * @param location the order's chosen location
-   * @throws IllegalArgumentException when the location hosts no live refinery terminal
-   */
-  private void validateLocationHasRefinery(Location location) {
-    boolean hasRefinery = false;
-    if (location.getCity() != null
-        && Boolean.TRUE.equals(location.getCity().getHasRefineryTerminal())) {
-      hasRefinery = true;
-    } else if (location.getSpaceStation() != null
-        && Boolean.TRUE.equals(location.getSpaceStation().getHasRefineryTerminal())) {
-      hasRefinery = true;
-    }
-    if (!hasRefinery) {
-      throw new IllegalArgumentException("Selected location does not have a refinery.");
-    }
   }
 }

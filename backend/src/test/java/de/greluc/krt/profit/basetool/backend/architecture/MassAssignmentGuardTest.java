@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.StarSystemDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
@@ -354,6 +355,24 @@ class MassAssignmentGuardTest {
                       + " RebookCommands require to be a direct membership of the member, or"
                       + " whose pool an unshare empties of the member's own rows only"
                       + " (REQ-XCH-016)")),
+          Map.entry(
+              ExchangeRefineryOrderChangeSet.Op.class,
+              Map.of(
+                  "orgUnit",
+                  "the owning unit of a create, which ExchangeRefineryOrderReferences requires to"
+                      + " be a direct membership of the member and"
+                      + " OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable stamps"
+                      + " (REQ-XCH-052)",
+                  "status",
+                  "OPEN or IN_PROGRESS as the web's form sets it; a stored order refuses a change"
+                      + " with ORDER_STORED, ExchangeRefineryOrderWriteService (REQ-XCH-052)")),
+          Map.entry(
+              ExchangeRefineryOrderChangeSet.StoreLine.class,
+              Map.of(
+                  "orgUnit",
+                  "the owning unit of a store line's stock, which ExchangeRefineryStoreLines"
+                      + " requires to be a direct membership of the receiver or a unit the member"
+                      + " is a Logistician of (REQ-XCH-053, REQ-SEC-039)")),
           Map.entry(
               ExchangeOrgUnitChoice.class,
               Map.of(

@@ -60,9 +60,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeShipFeedService {
 
-  /** The id before every ship, which starts a snapshot. */
-  private static final UUID FIRST = new UUID(0, 0);
-
   /** The insurance value of a lifetime insurance. */
   private static final String LTI = "LTI";
 
@@ -90,15 +87,11 @@ public class ExchangeShipFeedService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeShipPageDto page(
       @NotNull ExchangeCaller caller, @Nullable String cursor, int limit) {
-    int size = ExchangeFeedReader.pageSize(limit);
-    if (cursor == null) {
-      return snapshot(caller, feedReader.snapshotStart(), FIRST, size);
-    }
-    ExchangeFeedCursor position = feedReader.resume(cursor);
-    UUID afterId = position.afterId();
-    return afterId != null
-        ? snapshot(caller, position.position(), afterId, size)
-        : feed(caller, position.position(), size);
+    return feedReader.answer(
+        cursor,
+        limit,
+        (at, afterId, size) -> snapshot(caller, at, afterId, size),
+        (after, size) -> feed(caller, after, size));
   }
 
   /**
@@ -115,21 +108,19 @@ public class ExchangeShipFeedService {
       @NotNull ExchangeFeedPosition at,
       @NotNull UUID afterId,
       int size) {
-    List<ExchangeShipRow> rows =
-        shipRepository.findExchangeShips(caller.member(), afterId, PageRequest.of(0, size + 1));
-    boolean more = rows.size() > size;
-    List<ExchangeShipRow> delivered = more ? rows.subList(0, size) : rows;
-    String next =
-        more
-            ? ExchangeFeedCursor.snapshot(at, delivered.getLast().id()).format()
-            : ExchangeFeedCursor.feed(at).format();
-    Map<UUID, String> linked = links(caller, delivered);
-    Map<UUID, UUID> guids = guids(delivered);
+    ExchangeFeedReader.Slice<ExchangeShipRow> page =
+        ExchangeFeedReader.slice(
+            shipRepository.findExchangeShips(caller.member(), afterId, PageRequest.of(0, size + 1)),
+            size,
+            at,
+            ExchangeShipRow::id);
+    Map<UUID, String> linked = links(caller, page.items());
+    Map<UUID, UUID> guids = guids(page.items());
     return new ExchangeShipPageDto(
-        delivered.stream().map(ship -> toDto(ship, linked.get(ship.id()), guids)).toList(),
+        page.items().stream().map(ship -> toDto(ship, linked.get(ship.id()), guids)).toList(),
         List.of(),
-        next,
-        more);
+        page.next(),
+        page.more());
   }
 
   /**

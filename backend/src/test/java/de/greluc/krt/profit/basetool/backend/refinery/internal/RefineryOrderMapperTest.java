@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderProvenanceDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import java.time.Instant;
 import java.util.HashMap;
@@ -62,7 +64,28 @@ class RefineryOrderMapperTest {
             Mappers.getMapper(SquadronMapper.class),
             new LocationMapperImpl(),
             new RefiningMethodMapperImpl(),
-            missions::get);
+            missions::get,
+            order -> order == null ? null : PROVENANCE);
+  }
+
+  /** The provenance the stub lookup answers for every order. */
+  private static final RefineryOrderProvenanceDto PROVENANCE =
+      new RefineryOrderProvenanceDto(
+          "VerseKit", null, Instant.parse("2026-11-01T10:00:00Z"), null, null, null);
+
+  /** The detail, the yield-enriched detail and the list row carry the order's provenance. */
+  @Test
+  void everyProjectionCarriesTheProvenance() {
+    RefineryOrder order = new RefineryOrder();
+    order.setId(UUID.randomUUID());
+
+    assertEquals(PROVENANCE, mapper.toDto(order).provenance());
+    assertEquals(
+        PROVENANCE,
+        mapper
+            .toDto(order, Map.of(UUID.randomUUID(), new RefineryYieldBonusDto(5, null, null)))
+            .provenance());
+    assertEquals(PROVENANCE, mapper.toListDto(order, true).provenance());
   }
 
   @Test
@@ -240,6 +263,8 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            java.util.Set.of(),
+            null,
             null);
 
     assertEquals(missionId, mapper.toEntity(request).getMissionId());
@@ -249,7 +274,19 @@ class RefineryOrderMapperTest {
   void toEntity_withoutAMissionReference_leavesTheOrderUnlinked() {
     RefineryOrderUpdateRequest request =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            java.util.Set.of(),
+            null,
+            null);
 
     assertNull(mapper.toEntity(request).getMissionId());
   }
@@ -268,10 +305,24 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            java.util.Set.of(),
+            null,
             null);
     RefineryOrderUpdateRequest absent =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, null, java.util.List.of(), null);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            null,
+            java.util.List.of(),
+            java.util.Set.of(),
+            null,
+            null);
     RefineryOrderUpdateRequest withId =
         new RefineryOrderUpdateRequest(
             null,
@@ -284,6 +335,8 @@ class RefineryOrderMapperTest {
             null,
             null,
             java.util.List.of(),
+            java.util.Set.of(),
+            null,
             null);
 
     org.junit.jupiter.api.Assertions.assertTrue(
@@ -337,10 +390,22 @@ class RefineryOrderMapperTest {
   }
 
   @Test
-  void toEntity_fromAnUpdateRequest_carriesStatusAndVersionButNoIdentity() {
+  void toEntity_fromAnUpdateRequest_carriesStatusAndCountersButNoIdentity() {
     RefineryOrderUpdateRequest request =
         new RefineryOrderUpdateRequest(
-            null, null, null, 30L, 1.0, 2.0, 3.0, null, "IN_PROGRESS", java.util.List.of(), 7L);
+            null,
+            null,
+            null,
+            30L,
+            1.0,
+            2.0,
+            3.0,
+            null,
+            "IN_PROGRESS",
+            java.util.List.of(),
+            java.util.Set.of(),
+            7L,
+            3L);
 
     RefineryOrder entity = mapper.toEntity(request);
 
@@ -348,7 +413,9 @@ class RefineryOrderMapperTest {
     assertNull(entity.getOwner());
     assertNull(entity.getOwningOrgUnit());
     assertEquals(RefineryOrderStatus.IN_PROGRESS, entity.getStatus());
-    assertEquals(7L, entity.getVersion());
+    assertNull(entity.getVersion());
+    assertEquals(7L, entity.getGameDataVersion());
+    assertEquals(3L, entity.getFinancesVersion());
   }
 
   @Test

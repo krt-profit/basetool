@@ -51,6 +51,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockTargetsDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitListDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryDraftRequest;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRevocationRow;
@@ -58,6 +60,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipC
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockPageDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceJobOrdersDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStoreChoiceReceiversDto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -107,6 +111,8 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeStockPageDto.class, "page.schema.json#/$defs/stockPage"),
           Map.entry(ExchangeShipPageDto.class, "page.schema.json#/$defs/shipPage"),
           Map.entry(ExchangeOrgStockPageDto.class, "page.schema.json#/$defs/orgStockPage"),
+          Map.entry(
+              ExchangeRefineryOrderPageDto.class, "page.schema.json#/$defs/refineryOrderPage"),
           Map.entry(ExchangeBankAccountPageDto.class, "page.schema.json#/$defs/bankAccountPage"),
           Map.entry(ExchangeBankBookingPageDto.class, "page.schema.json#/$defs/bankBookingPage"),
           Map.entry(ExchangeBankBalanceSeriesDto.class, "bank-balance-series.schema.json"),
@@ -131,10 +137,15 @@ class ExchangeFieldRatchetTest {
           Map.entry(ExchangeShipChangeSet.class, "change-set.schema.json#/$defs/shipChangeSet"),
           Map.entry(
               ExchangeOrgStockChangeSet.class, "change-set.schema.json#/$defs/orgStockChangeSet"),
+          Map.entry(
+              ExchangeRefineryOrderChangeSet.class,
+              "change-set.schema.json#/$defs/refineryOrderChangeSet"),
           Map.entry(ExchangeOrgDemandDto.class, "org-demand.schema.json"),
           Map.entry(ExchangeOrgStockMembersDto.class, "org-stock-members.schema.json"),
           Map.entry(ExchangeOrgStockTargetsDto.class, "org-stock-targets.schema.json"),
           Map.entry(ExchangeOrgUnitListDto.class, "org-unit-list.schema.json"),
+          Map.entry(ExchangeStoreChoiceReceiversDto.class, "store-choice-receivers.schema.json"),
+          Map.entry(ExchangeStoreChoiceJobOrdersDto.class, "store-choice-job-orders.schema.json"),
           Map.entry(ExchangeBlueprintDraftDto.class, "blueprint-draft.schema.json"),
           Map.entry(ExchangeRefineryDraftRequest.class, "refinery-draft.schema.json"));
 

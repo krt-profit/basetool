@@ -1,0 +1,257 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.exchange.internal;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Outcome;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet.Op;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet.StoreLine;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.stereotype.Component;
+
+/**
+ * Resolves the store lines of a change set's pickups exactly and decides each by the exchange's
+ * database rule, before anything is written (REQ-XCH-053, REQ-SEC-039): the material, the offered
+ * location, the unit of the quantity, the receiver among the member's store choices, the unit among
+ * the receiver's direct memberships and the member's Logistician units, and the job order. What
+ * depends on the order, whether the material is one of its outputs, is decided when the op runs.
+ */
+@Component
+@RequiredArgsConstructor
+public class ExchangeRefineryStoreLines {
+
+  private final ExchangeLocationResolver locationResolver;
+  private final OrgUnitMembershipQueryService membershipQueryService;
+  private final ExchangeStoreChoices storeChoices;
+
+  /**
+   * Resolves the store lines of every op.
+   *
+   * @param caller the client and member
+   * @param ops the ops
+   * @param materials every line's material by reference, resolved once for the change set
+   * @return per op the resolved lines, empty for an op without lines, or the refusal of its first
+   *     refused line
+   * @throws BadRequestException when a line's amount rounds to zero
+   */
+  @NotNull
+  @Unmodifiable
+  List<Lines> resolve(
+      @NotNull ExchangeCaller caller,
+      @NotNull List<Op> ops,
+      @NotNull Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> materials) {
+    if (ops.stream().allMatch(op -> linesOf(op).isEmpty())) {
+      return ops.stream().map(_ -> Lines.NONE).toList();
+    }
+    Context context = new Context(materials, storeChoices.receivers(caller), new HashMap<>());
+    return ops.stream().map(op -> lines(op, context)).toList();
+  }
+
+  /**
+   * The materials an op's store lines name.
+   *
+   * @param op the op
+   * @return a pickup's line materials, empty for every other op
+   */
+  static @NotNull List<ExchangeItemRef> materialsOf(@NotNull Op op) {
+    return linesOf(op).stream().map(StoreLine::material).toList();
+  }
+
+  /**
+   * Refuses a pickup's store lines an order cannot take (REQ-XCH-053): an order that is completed
+   * or stored, whose yield counts as handled as in the web's store, or a line whose material is
+   * none of the order's outputs.
+   *
+   * @param order the order as the earlier ops left it
+   * @param lines the resolved store lines
+   * @return the refusal, or {@code null} when every line fits or there is none
+   */
+  static @Nullable Outcome refusalFor(
+      @NotNull ExchangeRefineryOrderState order, @NotNull List<RefineryExchangeStoreLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    if (order.stored() || order.status() == RefineryOrderStatus.COMPLETED) {
+      return Outcome.rejected(ExchangeRefineryReasons.ORDER_STORED);
+    }
+    Set<UUID> outputs = order.outputs();
+    return lines.stream().allMatch(line -> outputs.contains(line.materialId()))
+        ? null
+        : Outcome.rejected(ExchangeRefineryReasons.MATERIAL_NOT_AN_OUTPUT);
+  }
+
+  /**
+   * Resolves one op's lines.
+   *
+   * @param op the op
+   * @param context what the change set resolved once
+   * @return the lines, or the refusal of the first refused one
+   */
+  private @NotNull Lines lines(@NotNull Op op, @NotNull Context context) {
+    List<RefineryExchangeStoreLine> resolved = new ArrayList<>();
+    for (StoreLine line : linesOf(op)) {
+      ExchangeRefineryMaterials.Resolved match =
+          Objects.requireNonNull(context.materials().get(line.material()));
+      Material material = match.material();
+      if (material == null) {
+        return new Lines(List.of(), match.refusal());
+      }
+      QuantityType unit =
+          material.getQuantityType() == QuantityType.PIECE ? QuantityType.PIECE : QuantityType.SCU;
+      if (!unit.name().equals(line.quantity().unit())) {
+        return Lines.refused(ExchangeReasons.UNIT_MISMATCH);
+      }
+      BigDecimal amount = ExchangeOps.round(line.quantity().amount(), unit.name());
+      if (amount.signum() <= 0) {
+        throw new BadRequestException("A store line's quantity rounds to zero");
+      }
+      Optional<Location> location = locationResolver.resolve(line.location());
+      if (location.isEmpty() || !OfferedLocations.isOffered(location.get())) {
+        return Lines.refused(ExchangeReasons.LOCATION_UNKNOWN);
+      }
+      UUID receiver = context.receivers().resolve(line.receiver());
+      if (receiver == null) {
+        return Lines.refused(ExchangeRefineryReasons.RECEIVER_UNKNOWN);
+      }
+      Set<UUID> memberships =
+          context
+              .memberships()
+              .computeIfAbsent(receiver, membershipQueryService::findDirectMembershipOrgUnitIds);
+      UUID orgUnit = unit(line, memberships, context.receivers().units());
+      if (orgUnit == null && (line.orgUnit() != null || memberships.size() > 1)) {
+        return Lines.refused(ExchangeReasons.ORG_UNIT_NOT_ALLOWED);
+      }
+      UUID jobOrder = null;
+      if (line.jobOrder() != null) {
+        jobOrder = ExchangeIds.parse(line.jobOrder());
+        if (jobOrder == null || !storeChoices.jobOrderAdmits(jobOrder, material.getId())) {
+          return Lines.refused(ExchangeRefineryReasons.JOB_ORDER_INVALID);
+        }
+      }
+      resolved.add(
+          new RefineryExchangeStoreLine(
+              material.getId(),
+              location.get().getId(),
+              line.quality(),
+              amount.doubleValue(),
+              unit,
+              receiver,
+              orgUnit,
+              Boolean.TRUE.equals(line.personal()),
+              jobOrder,
+              StringNormalization.trimToNull(line.note())));
+    }
+    return new Lines(List.copyOf(resolved), null);
+  }
+
+  /**
+   * Decides a line's unit: the named one when it is a direct membership of the receiver or a unit
+   * the member is a Logistician of, else the receiver's only direct membership.
+   *
+   * @param line the line
+   * @param memberships the receiver's direct memberships
+   * @param logisticianUnits the units the member may book for others in
+   * @return the unit, or {@code null} when the named one is not allowed, the receiver has no
+   *     membership or several and the line names none
+   */
+  private static @Nullable UUID unit(
+      @NotNull StoreLine line,
+      @NotNull Set<UUID> memberships,
+      @NotNull Set<UUID> logisticianUnits) {
+    if (line.orgUnit() == null) {
+      return memberships.size() == 1 ? memberships.iterator().next() : null;
+    }
+    UUID named = ExchangeIds.parse(line.orgUnit().id());
+    return named != null
+            && !memberships.isEmpty()
+            && (memberships.contains(named) || logisticianUnits.contains(named))
+        ? named
+        : null;
+  }
+
+  /**
+   * The store lines an op carries.
+   *
+   * @param op the op
+   * @return a pickup's lines, empty for every other op and a pickup without lines
+   */
+  private static @NotNull List<StoreLine> linesOf(@NotNull Op op) {
+    return op.kind() == ExchangeRefineryOrderChangeSet.Kind.PICKUP && op.lines() != null
+        ? op.lines()
+        : List.of();
+  }
+
+  /**
+   * What one change set resolves once for all its lines.
+   *
+   * @param materials the line materials by reference, or the outcome of one that names none
+   * @param receivers whom the member may book onto
+   * @param memberships each receiver's direct memberships, read on first use
+   */
+  private record Context(
+      @NotNull Map<ExchangeItemRef, ExchangeRefineryMaterials.Resolved> materials,
+      @NotNull ExchangeStoreChoices.Receivers receivers,
+      @NotNull Map<UUID, Set<UUID>> memberships) {}
+
+  /**
+   * The resolved store lines of one op, or the refusal of its first refused line.
+   *
+   * @param lines the lines in the op's order, empty when the op books nothing or one is refused
+   * @param refusal the refusal, or {@code null}
+   */
+  record Lines(
+      @NotNull @Unmodifiable List<RefineryExchangeStoreLine> lines, @Nullable Outcome refusal) {
+
+    /** The lines of an op without store lines. */
+    static final Lines NONE = new Lines(List.of(), null);
+
+    /**
+     * The lines of an op one line refuses.
+     *
+     * @param reason the refusal's reason
+     * @return the lines
+     */
+    static @NotNull Lines refused(@NotNull String reason) {
+      return new Lines(List.of(), Outcome.rejected(reason));
+    }
+  }
+}

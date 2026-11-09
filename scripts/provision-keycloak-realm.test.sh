@@ -923,9 +923,9 @@ state="$(mktemp -d)"
 make_stub "$state" empty
 output="$(run_provisioner "$state" --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
-EXCHANGE="['exchange.bank.queue', 'exchange.bank.read', 'exchange.bank.request', 'exchange.blueprints.read', 'exchange.blueprints.write', 'exchange.connect', 'exchange.demand.details', 'exchange.demand.read', 'exchange.drafts.blueprints', 'exchange.drafts.refinery', 'exchange.hangar.read', 'exchange.hangar.write', 'exchange.orgstock.details', 'exchange.orgstock.read', 'exchange.orgstock.write', 'exchange.orgunits.read', 'exchange.stock.read', 'exchange.stock.write']"
+EXCHANGE="['exchange.bank.queue', 'exchange.bank.read', 'exchange.bank.request', 'exchange.blueprints.read', 'exchange.blueprints.write', 'exchange.connect', 'exchange.demand.details', 'exchange.demand.read', 'exchange.drafts.blueprints', 'exchange.drafts.refinery', 'exchange.hangar.read', 'exchange.hangar.write', 'exchange.orgstock.details', 'exchange.orgstock.read', 'exchange.orgstock.write', 'exchange.orgunits.read', 'exchange.refinery.read', 'exchange.refinery.store', 'exchange.refinery.write', 'exchange.stock.read', 'exchange.stock.write']"
 assert_eq "$(query "$state" "sorted(s['name'] for s in d['scopes'] if s['name'].startswith('exchange.'))")" \
-  "$EXCHANGE" "all eighteen exchange scopes exist"
+  "$EXCHANGE" "all twenty-one exchange scopes exist"
 assert_eq "$(query "$state" "sorted({s['attributes']['include.in.token.scope'] for s in d['scopes'] if s['name'].startswith('exchange.')})")" \
   "['true']" "each puts its name in the scope claim"
 assert_eq "$(query "$state" "sorted({m['config']['included.custom.audience'] for s in d['scopes'] if s['name'].startswith('exchange.') for m in d['scope_mappers'].get(s['id'], [])})")" \

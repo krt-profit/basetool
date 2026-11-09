@@ -39,8 +39,9 @@ public record ExchangeUndoResultDto(int restored, @NotNull @Unmodifiable List<Sk
    * @param resource {@code BLUEPRINT}, {@code STOCK} or {@code SHIP}
    * @param label the entry's name — a blueprint, a material or item, or a ship type — or {@code
    *     null} when it is no longer known
-   * @param reason {@code CHANGED_AFTERWARDS} when it was changed after the client's last write, or
-   *     {@code GONE} when it no longer belongs to the member or what it names is gone
+   * @param reason {@code CHANGED_AFTERWARDS} when it was changed after the client's last write,
+   *     {@code GONE} when it no longer belongs to the member or what it names is gone, or {@code
+   *     STOCK_BOOKED} when a refinery pickup booked its yield into stock
    */
   @Schema(name = "Skipped")
   public record Skipped(@NotNull String resource, @Nullable String label, @NotNull String reason) {}

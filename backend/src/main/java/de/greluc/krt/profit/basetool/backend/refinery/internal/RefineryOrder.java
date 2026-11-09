@@ -25,8 +25,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.TenantScoped;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -45,12 +47,12 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Formula;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Refinery Order JPA entity. */
@@ -60,7 +62,6 @@ import org.jetbrains.annotations.Nullable;
 @Setter
 @ToString
 @NoArgsConstructor
-@AllArgsConstructor
 public class RefineryOrder extends AbstractEntity<UUID> {
 
   @Getter(onMethod_ = @__(@Override))
@@ -155,6 +156,23 @@ public class RefineryOrder extends AbstractEntity<UUID> {
    */
   @Nullable private Instant storedAt;
 
+  /**
+   * Optimistic-lock counter of the game-data section: location, method, timer, status, goods and
+   * the store marker (REQ-REFINERY-029). A business counter beside the row {@code @Version}, raised
+   * by {@link RefineryOrderSection#advance}; on an update request it carries the caller's echo.
+   */
+  @Column(name = "game_data_version", nullable = false)
+  @Nullable
+  private Long gameDataVersion = 0L;
+
+  /**
+   * Optimistic-lock counter of the finances section: {@link #expenses}, {@link #otherExpenses} and
+   * {@link #oreSales} (REQ-REFINERY-029). Raised and echoed like {@link #gameDataVersion}.
+   */
+  @Column(name = "finances_version", nullable = false)
+  @Nullable
+  private Long financesVersion = 0L;
+
   @OneToMany(mappedBy = "refineryOrder", cascade = CascadeType.ALL, orphanRemoval = true)
   @ToString.Exclude
   private Set<@Valid RefineryGood> goods = new HashSet<>();
@@ -170,4 +188,8 @@ public class RefineryOrder extends AbstractEntity<UUID> {
   @ToString.Exclude
   @Nullable
   private OrgUnit owningOrgUnit;
+
+  /** Who created the order, who changed it last and who reported its pickup (REQ-REFINERY-027). */
+  @Embedded @NotNull
+  private RefineryOrderProvenance provenance = RefineryOrderProvenance.createdInWeb(Instant.now());
 }

@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -35,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param canEdit whether the caller may edit, cancel or store the order: the owner, or a
  *     Logistician whose grant covers the order's unit (REQ-REFINERY-019)
+ * @param provenance the creating client, the last change and the pickup marker (REQ-REFINERY-027)
  */
 public record RefineryOrderListDto(
     UUID id,
@@ -52,15 +52,13 @@ public record RefineryOrderListDto(
     List<RefineryGoodDto> goods,
     SquadronReferenceDto owningSquadron,
     Long version,
-    Boolean canEdit) {
+    Boolean canEdit,
+    @Nullable RefineryOrderProvenanceDto provenance) {
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */
   @Nullable
   public Instant getEndsAt() {
-    if (startedAt != null && durationMinutes != null) {
-      return startedAt.plus(durationMinutes, ChronoUnit.MINUTES);
-    }
-    return null;
+    return RefineryExchangeRules.endsAt(startedAt, durationMinutes);
   }
 }

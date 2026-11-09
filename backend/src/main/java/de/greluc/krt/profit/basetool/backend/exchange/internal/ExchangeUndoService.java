@@ -33,6 +33,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -67,6 +68,11 @@ public class ExchangeUndoService {
    */
   static final String GONE = "GONE";
 
+  /**
+   * The reason of a refinery pickup that booked stock, which the member takes back in the Lager.
+   */
+  static final String STOCK_BOOKED = "STOCK_BOOKED";
+
   private static final String RESTORED = "restored";
   private static final String SKIPPED = "skipped";
 
@@ -76,6 +82,7 @@ public class ExchangeUndoService {
   private final ExchangeStockJournal stockJournal;
   private final ExchangeShipJournal shipJournal;
   private final ExchangeOrgStockJournal orgStockJournal;
+  private final ExchangeRefineryOrderJournal refineryOrderJournal;
   private final ExchangeOrgUnitService orgUnitService;
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final AuditRecorder auditRecorder;
@@ -204,6 +211,7 @@ public class ExchangeUndoService {
     List<Skipped> skipped = new ArrayList<>();
     Set<ExchangeResource> touched = EnumSet.noneOf(ExchangeResource.class);
     List<UUID> undone = new ArrayList<>();
+    Set<UUID> refineryOrders = new LinkedHashSet<>();
     ExchangeEntryRestorer.UndoScope scope =
         new ExchangeEntryRestorer.UndoScope(
             member,
@@ -226,12 +234,15 @@ public class ExchangeUndoService {
       group.forEach(entry -> undone.add(entry.getId()));
       restored++;
       touched.add(entryResource);
+      if (entryResource == ExchangeResource.REFINERY_ORDER) {
+        refineryOrders.add(UUID.fromString(newest.getEntityKey()));
+      }
       counter(clientId, entryResource, RESTORED).increment();
     }
     if (!undone.isEmpty()) {
       journalRepository.markUndone(undone, clock.instant());
     }
-    touched.forEach(entryResource -> refresh(member, entryResource));
+    touched.forEach(entryResource -> refresh(member, entryResource, refineryOrders));
     return new Outcome(restored, List.copyOf(skipped), List.copyOf(skippedEntries));
   }
 
@@ -248,6 +259,7 @@ public class ExchangeUndoService {
       case STOCK -> stockJournal;
       case SHIP -> shipJournal;
       case ORG_STOCK -> throw new IllegalStateException("Org-stock entries are restored together");
+      case REFINERY_ORDER -> refineryOrderJournal;
     };
   }
 
@@ -256,12 +268,15 @@ public class ExchangeUndoService {
    *
    * @param member the member
    * @param resource the resource
+   * @param refineryOrders the refinery orders the undo set back
    */
-  private void refresh(@NotNull UUID member, @NotNull ExchangeResource resource) {
+  private void refresh(
+      @NotNull UUID member, @NotNull ExchangeResource resource, @NotNull Set<UUID> refineryOrders) {
     switch (resource) {
       case BLUEPRINT -> liveSync.blueprintsChanged(member);
       case STOCK, ORG_STOCK -> liveSync.stockChanged(false);
       case SHIP -> liveSync.hangarChanged(member);
+      case REFINERY_ORDER -> refineryOrderJournal.announce(member, refineryOrders);
       case null -> throw new NullPointerException("resource");
     }
   }
@@ -303,7 +318,7 @@ public class ExchangeUndoService {
    *
    * @param journalEntryId the entry's newest journal entry
    * @param resource the entry's resource
-   * @param reason {@code CHANGED_AFTERWARDS} or {@code GONE}
+   * @param reason {@code CHANGED_AFTERWARDS}, {@code GONE} or {@code STOCK_BOOKED}
    */
   public record Skipped(
       @NotNull UUID journalEntryId, @NotNull ExchangeResource resource, @NotNull String reason) {}

@@ -65,9 +65,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExchangeOrgStockService {
 
-  /** The id before every row, which starts a snapshot. */
-  private static final UUID FIRST = new UUID(0, 0);
-
   private final StockReads stockReads;
   private final ExchangeFeedReader feedReader;
   private final ExchangeOrgUnitService orgUnitService;
@@ -101,7 +98,6 @@ public class ExchangeOrgStockService {
   @Transactional(readOnly = true)
   public @NotNull ExchangeOrgStockPageDto page(
       @NotNull ExchangeCaller caller, @Nullable String cursor, int limit, boolean details) {
-    int size = ExchangeFeedReader.pageSize(limit);
     List<ExchangeOrgUnitDto> units = orgUnitService.orgUnits(caller.member()).items();
     Map<UUID, ExchangeOrgUnitDto> byId =
         units.stream().collect(Collectors.toMap(ExchangeOrgUnitDto::id, Function.identity()));
@@ -112,17 +108,12 @@ public class ExchangeOrgStockService {
             .map(unit -> ExchangeOrgStockPoolDto.of(unit, logistician.contains(unit.id())))
             .toList();
     Pools pools = new Pools(byId, listed, details ? logistician : Set.of());
-    ExchangeOrgStockPageDto page;
-    if (cursor == null) {
-      page = snapshot(caller, pools, feedReader.snapshotStart(), FIRST, size);
-    } else {
-      ExchangeFeedCursor position = feedReader.resume(cursor);
-      UUID afterId = position.afterId();
-      page =
-          afterId != null
-              ? snapshot(caller, pools, position.position(), afterId, size)
-              : feed(caller, pools, position.position(), size);
-    }
+    ExchangeOrgStockPageDto page =
+        feedReader.answer(
+            cursor,
+            limit,
+            (at, afterId, size) -> snapshot(caller, pools, at, afterId, size),
+            (after, size) -> feed(caller, pools, after, size));
     meterRegistry
         .counter(
             ExchangeMetricNames.EXCHANGE_ORG_STOCK_PAGES,
@@ -148,16 +139,14 @@ public class ExchangeOrgStockService {
       @NotNull ExchangeFeedPosition at,
       @NotNull UUID afterId,
       int size) {
-    List<ExchangeOrgStockLotRow> rows =
-        stockReads.exchangeOrgLots(pools.byId().keySet(), afterId, size + 1);
-    boolean more = rows.size() > size;
-    List<ExchangeOrgStockLotRow> delivered = more ? rows.subList(0, size) : rows;
-    String next =
-        more
-            ? ExchangeFeedCursor.snapshot(at, delivered.getLast().getAnchor()).format()
-            : ExchangeFeedCursor.feed(at).format();
+    ExchangeFeedReader.Slice<ExchangeOrgStockLotRow> page =
+        ExchangeFeedReader.slice(
+            stockReads.exchangeOrgLots(pools.byId().keySet(), afterId, size + 1),
+            size,
+            at,
+            ExchangeOrgStockLotRow::getAnchor);
     return new ExchangeOrgStockPageDto(
-        toDtos(caller, pools, delivered), List.of(), pools.units(), next, more);
+        toDtos(caller, pools, page.items()), List.of(), pools.units(), page.next(), page.more());
   }
 
   /**

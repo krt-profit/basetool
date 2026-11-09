@@ -293,6 +293,9 @@ class ExchangeGoldenAnswerTest {
     OVERRIDES.put(
         "POST /api/v1/exchange/me/stock/changes", json(409, "{\"code\":\"OPTIMISTIC_LOCK\"}"));
     OVERRIDES.put("GET /api/v1/exchange/me/ships", json(403, "{\"code\":\"SCOPE_MISSING\"}"));
+    OVERRIDES.put(
+        "POST /api/v1/exchange/me/refinery-orders/changes",
+        json(409, "{\"code\":\"PESSIMISTIC_LOCK\"}"));
     OVERRIDES.put("GET /api/v1/exchange/me/org-demand", json(500, "{\"code\":\"INTERNAL\"}"));
     OVERRIDES.put("GET /api/v1/exchange/catalog/locations", json(200, "{\"items\":[{}]}"));
     OVERRIDES.put(
@@ -300,6 +303,12 @@ class ExchangeGoldenAnswerTest {
     Map<String, Call> refusals = new LinkedHashMap<>();
     refusals.put("refused-stock-changes-version-conflict", post("/me/stock/changes", stockSet()));
     refusals.put("refused-ships-scope-missing", get("/me/ships"));
+    refusals.put(
+        "refused-refinery-order-changes-pessimistic-lock",
+        post(
+            "/me/refinery-orders/changes",
+            fixture(
+                "change-set--refineryOrderChangeSet/valid/create-then-update-by-client-key.json")));
     refusals.put("failed-org-demand-backend-error", get("/me/org-demand"));
     refusals.put("failed-locations-answer-breaks-schema", get("/catalog/locations"));
     refusals.put("refused-service-document-exchange-disabled", get(""));
@@ -486,12 +495,23 @@ class ExchangeGoldenAnswerTest {
         "route-post-ship-changes",
         post(
             "/me/ships/changes", fixture("change-set--shipChangeSet/valid/link-then-upsert.json")));
+    routes.put("route-get-refinery-orders", get("/me/refinery-orders?limit=10"));
+    routes.put(
+        "route-post-refinery-order-changes",
+        post(
+            "/me/refinery-orders/changes",
+            fixture(
+                "change-set--refineryOrderChangeSet/valid/create-then-update-by-client-key.json")));
     routes.put("route-get-org-demand", get("/me/org-demand"));
     routes.put("route-get-org-units", get("/me/org-units"));
     routes.put("route-get-org-stock", get("/org-stock"));
     routes.put(
         "route-post-org-stock-changes",
         post("/org-stock/changes", fixture("change-set--orgStockChangeSet/valid/book-out.json")));
+    routes.put("route-get-store-choice-receivers", get("/me/store-choices/receivers"));
+    routes.put(
+        "route-get-store-choice-job-orders",
+        get("/me/store-choices/job-orders?material=7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f"));
     routes.put(
         "route-get-org-stock-members",
         get("/org-stock/members?unit=0c2f8a51-7d3e-4b9a-9f10-5a6b7c8d9e01"));
@@ -557,6 +577,10 @@ class ExchangeGoldenAnswerTest {
         case "GET /api/v1/exchange/me/blueprints" -> fixture("page--blueprintPage/valid/feed.json");
         case "GET /api/v1/exchange/me/stock" -> fixture("page--stockPage/valid/snapshot.json");
         case "GET /api/v1/exchange/me/ships" -> SHIP_PAGE;
+        case "GET /api/v1/exchange/me/refinery-orders" ->
+            fixture("page--refineryOrderPage/valid/snapshot.json");
+        case "POST /api/v1/exchange/me/refinery-orders/changes" ->
+            fixture("change-result/valid/refinery-orders.json");
         case "GET /api/v1/exchange/me/org-demand" -> fixture("org-demand/valid/both-lists.json");
         case "GET /api/v1/exchange/me/org-units" -> fixture("org-unit-list/valid/all-kinds.json");
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");
@@ -564,6 +588,10 @@ class ExchangeGoldenAnswerTest {
             fixture("org-stock-members/valid/roster.json");
         case "GET /api/v1/exchange/org-stock/targets" ->
             fixture("org-stock-targets/valid/targets.json");
+        case "GET /api/v1/exchange/me/store-choices/receivers" ->
+            fixture("store-choice-receivers/valid/receivers.json");
+        case "GET /api/v1/exchange/me/store-choices/job-orders" ->
+            fixture("store-choice-job-orders/valid/job-orders.json");
         case "POST /api/v1/exchange/me/blueprints/changes",
             "POST /api/v1/exchange/me/stock/changes",
             "POST /api/v1/exchange/me/ships/changes",

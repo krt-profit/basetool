@@ -44,12 +44,14 @@ import org.mapstruct.Mapping;
       SquadronMapper.class,
       LocationMapper.class,
       RefiningMethodMapper.class,
-      RefineryOrderMissionLookup.class
+      RefineryOrderMissionLookup.class,
+      RefineryOrderProvenanceLookup.class
     })
 public interface RefineryOrderMapper {
   /**
    * Maps a {@link RefineryOrder} to its full DTO, deriving {@code profit} via {@link
-   * #computeProfit} and publishing the owning org unit as {@code owningSquadron}.
+   * #computeProfit}, publishing the owning org unit as {@code owningSquadron} and the provenance
+   * with its clients named by {@link RefineryOrderProvenanceLookup}.
    *
    * @param entity the entity to project; {@code null} returns {@code null}
    * @return the refinery-order DTO
@@ -58,6 +60,7 @@ public interface RefineryOrderMapper {
   @Mapping(target = "mission", source = "missionId")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "owningOrgUnitId", ignore = true)
+  @Mapping(target = "provenance", source = "entity")
   RefineryOrderDto toDto(RefineryOrder entity);
 
   /**
@@ -105,7 +108,10 @@ public interface RefineryOrderMapper {
         enriched,
         base.owningSquadron(),
         base.version(),
-        base.owningOrgUnitId());
+        base.owningOrgUnitId(),
+        base.gameDataVersion(),
+        base.financesVersion(),
+        base.provenance());
   }
 
   /**
@@ -119,6 +125,7 @@ public interface RefineryOrderMapper {
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   @Mapping(target = "mission", source = "entity.missionId")
   @Mapping(target = "owningSquadron", source = "entity.owningOrgUnit")
+  @Mapping(target = "provenance", source = "entity")
   RefineryOrderListDto toListDto(RefineryOrder entity, boolean canEdit);
 
   /**
@@ -139,17 +146,21 @@ public interface RefineryOrderMapper {
   @Mapping(target = "readyNotifiedAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "gameDataVersion", ignore = true)
+  @Mapping(target = "financesVersion", ignore = true)
+  @Mapping(target = "provenance", ignore = true)
   RefineryOrder toEntity(RefineryOrderCreateRequest request);
 
   /**
    * Builds the transient {@link RefineryOrder} that carries an update request's values into {@code
-   * RefineryOrderService#updateRefineryOrder}. The order is identified by the path, so no id, owner
-   * or org unit is read from the request.
+   * RefineryOrderService#updateRefineryOrderParts}. The order is identified by the path, so no id,
+   * owner or org unit is read from the request.
    *
    * @param request the update request; {@code null} returns {@code null}
-   * @return a transient order holding the requested values and the last-seen version
+   * @return a transient order holding the requested values and the echoed section counters
    */
   @Mapping(target = "id", ignore = true)
+  @Mapping(target = "version", ignore = true)
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "missionId", source = "mission.id")
   @Mapping(
@@ -160,6 +171,7 @@ public interface RefineryOrderMapper {
   @Mapping(target = "readyNotifiedAt", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
+  @Mapping(target = "provenance", ignore = true)
   RefineryOrder toEntity(RefineryOrderUpdateRequest request);
 
   /**

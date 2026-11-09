@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 27 relay operations on 25 backend paths, each with the gateway route that relays it, the
+   * The 31 relay operations on 29 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -174,6 +174,38 @@ public final class ExchangeSeam {
               true,
               null,
               "page.schema.json#/$defs/orgStockPage"),
+          new RelayOperation(
+              "GET",
+              "/me/refinery-orders",
+              "/me/refinery-orders",
+              "exchange.refinery.read",
+              true,
+              null,
+              "page.schema.json#/$defs/refineryOrderPage"),
+          new RelayOperation(
+              "POST",
+              "/me/refinery-orders/changes",
+              "/me/refinery-orders/changes",
+              "exchange.refinery.write",
+              false,
+              "change-set.schema.json#/$defs/refineryOrderChangeSet",
+              "change-result.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/me/store-choices/receivers",
+              "/me/store-choices/receivers",
+              "exchange.refinery.store",
+              false,
+              null,
+              "store-choice-receivers.schema.json"),
+          new RelayOperation(
+              "GET",
+              "/me/store-choices/job-orders",
+              "/me/store-choices/job-orders",
+              "exchange.refinery.store",
+              false,
+              null,
+              "store-choice-job-orders.schema.json"),
           new RelayOperation(
               "POST",
               "/org-stock/changes",
@@ -325,6 +357,9 @@ public final class ExchangeSeam {
           "exchange.orgstock.read",
           "exchange.orgstock.details",
           "exchange.orgstock.write",
+          "exchange.refinery.read",
+          "exchange.refinery.write",
+          "exchange.refinery.store",
           "exchange.drafts.blueprints",
           "exchange.drafts.refinery",
           "exchange.bank.read",
@@ -364,6 +399,7 @@ public final class ExchangeSeam {
           "NOT_BANK_STAFF",
           "SCHEMA_INVALID",
           "VERSION_CONFLICT",
+          "PESSIMISTIC_LOCK",
           "CURSOR_EXPIRED",
           "MASS_CHANGE_CONFIRMATION_REQUIRED",
           "BANK_JUSTIFICATION_REQUIRED",

@@ -19,6 +19,14 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.CHANGES;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.GATEWAY;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_BLUEPRINTS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_REFINERY_ORDERS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_SHIPS;
+import static de.greluc.krt.profit.basetool.ingest.contract.ExchangeRoutes.MEMBER_STOCK;
+
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeGatewayProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
@@ -42,6 +50,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -66,21 +75,21 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.HandlerMapping;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The authenticated exchange routes built so far (REQ-XCH-001). Each request has passed both
- * exchange gates; a body is checked against its v1 schema before the relay, undeclared fields are
- * reported as {@code UNKNOWN_FIELD} warnings where the answer carries warnings, and the backend's
- * answer reaches the client only when it matches its schema and carries no property the schema does
- * not declare (REQ-XCH-050). The committed exchange document describes these routes.
+ * The authenticated exchange routes (REQ-XCH-001) the committed document describes, each behind
+ * both exchange gates: a body is checked against its v1 schema before the relay, an undeclared
+ * field is reported as {@code UNKNOWN_FIELD} and left out of a relayed change set, and the answer
+ * reaches the client only when it matches its schema and declares every property (REQ-XCH-050).
  */
 @Slf4j
 @RestController
-@RequestMapping("/exchange/v1")
+@RequestMapping(GATEWAY)
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class ExchangeController {
@@ -127,6 +136,22 @@ public class ExchangeController {
 
   /** The relay prefix of the backend's exchange surface. */
   static final String BACKEND = "/api/v1/exchange";
+
+  /** The change-set definition in {@code change-set.schema.json} of each of the member's feeds. */
+  private static final Map<String, String> MEMBER_CHANGE_SETS =
+      Map.of(
+          MEMBER_BLUEPRINTS, "blueprintChangeSet",
+          MEMBER_STOCK, "stockChangeSet",
+          MEMBER_SHIPS, "shipChangeSet",
+          MEMBER_REFINERY_ORDERS, "refineryOrderChangeSet");
+
+  /** The page schema of each of the member's feeds. */
+  private static final Map<String, String> MEMBER_FEED_PAGES =
+      Map.of(
+          MEMBER_BLUEPRINTS, "page.schema.json#/$defs/blueprintPage",
+          MEMBER_STOCK, "page.schema.json#/$defs/stockPage",
+          MEMBER_SHIPS, "page.schema.json#/$defs/shipPage",
+          MEMBER_REFINERY_ORDERS, "page.schema.json#/$defs/refineryOrderPage");
 
   /** The shape of an id the gateway relays in a path or query. */
   static final Pattern UUID_SHAPE =
@@ -309,8 +334,9 @@ public class ExchangeController {
   }
 
   /**
-   * Returns a snapshot page of the member's blueprints, or with {@code cursor} the changes since
-   * it.
+   * Returns a snapshot page of one of the member's own feeds — the blueprints, the personal stock
+   * lots, the ships or the open and running refinery orders (REQ-XCH-051) — or with {@code cursor}
+   * the changes since it.
    *
    * @param cursor the cursor of the last page, or {@code null} for a new snapshot
    * @param limit the page size, 1 to 1000, or {@code null} for the default
@@ -318,64 +344,22 @@ public class ExchangeController {
    * @param acceptLanguage the caller's language
    * @return the page or a problem
    */
-  @GetMapping("/me/blueprints")
+  @GetMapping({MEMBER_BLUEPRINTS, MEMBER_STOCK, MEMBER_SHIPS, MEMBER_REFINERY_ORDERS})
   @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> blueprints(
+  public @NotNull ResponseEntity<?> memberFeed(
       @Nullable @RequestParam(required = false) String cursor,
       @Nullable @RequestParam(required = false) String limit,
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
+    String feed = matchedFeed(request);
     return responses.page(
-        "/me/blueprints",
-        "page.schema.json#/$defs/blueprintPage",
+        feed,
+        Objects.requireNonNull(MEMBER_FEED_PAGES.get(feed)),
         cursor,
         limit,
         request,
         acceptLanguage);
-  }
-
-  /**
-   * Returns a snapshot page of the member's personal stock lots, or with {@code cursor} the changes
-   * since it.
-   *
-   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
-   * @param limit the page size, 1 to 1000, or {@code null} for the default
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the page or a problem
-   */
-  @GetMapping("/me/stock")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> stock(
-      @Nullable @RequestParam(required = false) String cursor,
-      @Nullable @RequestParam(required = false) String limit,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return responses.page(
-        "/me/stock", "page.schema.json#/$defs/stockPage", cursor, limit, request, acceptLanguage);
-  }
-
-  /**
-   * Returns a snapshot page of the member's ships, or with {@code cursor} the changes since it.
-   *
-   * @param cursor the cursor of the last page, or {@code null} for a new snapshot
-   * @param limit the page size, 1 to 1000, or {@code null} for the default
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the page or a problem
-   */
-  @GetMapping("/me/ships")
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> ships(
-      @Nullable @RequestParam(required = false) String cursor,
-      @Nullable @RequestParam(required = false) String limit,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return responses.page(
-        "/me/ships", "page.schema.json#/$defs/shipPage", cursor, limit, request, acceptLanguage);
   }
 
   /**
@@ -540,57 +524,52 @@ public class ExchangeController {
   }
 
   /**
-   * Adds or removes blueprints.
+   * Applies a change set to one of the member's own resources — the blueprints, the stock lots, the
+   * ships or the refinery orders (REQ-XCH-052); each set counts once against the daily write quota,
+   * whatever its op count.
    *
    * @param body the change set
    * @param request the admitted request
    * @param acceptLanguage the caller's language
    * @return the change result or a problem
    */
-  @PostMapping(value = "/me/blueprints/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(
+      value = {
+        MEMBER_BLUEPRINTS + CHANGES,
+        MEMBER_STOCK + CHANGES,
+        MEMBER_SHIPS + CHANGES,
+        MEMBER_REFINERY_ORDERS + CHANGES
+      },
+      consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> blueprintChanges(
+  public @NotNull ResponseEntity<?> memberChanges(
       @NotNull @RequestBody JsonNode body,
       @NotNull HttpServletRequest request,
       @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage) {
-    return changes("blueprints", "blueprintChangeSet", false, body, request, acceptLanguage);
+    String feed = matchedFeed(request);
+    return changes(
+        feed.substring(MEMBER.length()),
+        Objects.requireNonNull(MEMBER_CHANGE_SETS.get(feed)),
+        false,
+        body,
+        request,
+        acceptLanguage);
   }
 
   /**
-   * Sets the quantities of stock lots.
+   * Reads the member feed a request of a feed or of its change set matched.
    *
-   * @param body the change set
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the change result or a problem
+   * @param request a request a member-feed route matched
+   * @return the feed below {@code /exchange/v1}, such as {@code /me/stock}
    */
-  @PostMapping(value = "/me/stock/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> stockChanges(
-      @NotNull @RequestBody JsonNode body,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return changes("stock", "stockChangeSet", false, body, request, acceptLanguage);
-  }
-
-  /**
-   * Links, creates, updates or removes ships.
-   *
-   * @param body the change set
-   * @param request the admitted request
-   * @param acceptLanguage the caller's language
-   * @return the change result or a problem
-   */
-  @PostMapping(value = "/me/ships/changes", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
-  public @NotNull ResponseEntity<?> shipChanges(
-      @NotNull @RequestBody JsonNode body,
-      @NotNull HttpServletRequest request,
-      @Nullable @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
-          String acceptLanguage) {
-    return changes("ships", "shipChangeSet", false, body, request, acceptLanguage);
+  private static @NotNull String matchedFeed(@NotNull HttpServletRequest request) {
+    String path =
+        String.valueOf(
+                Objects.requireNonNull(
+                    request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE)))
+            .substring(GATEWAY.length());
+    return path.endsWith(CHANGES) ? path.substring(0, path.length() - CHANGES.length()) : path;
   }
 
   /**
@@ -794,6 +773,7 @@ public class ExchangeController {
     if (unreportable != null) {
       return unreportable;
     }
+    JsonNode relayed = schemas.withoutFields(body, unknown);
     if (everyOpCounts
         && !body.path("dryRun").asBoolean(false)
         && body.get("ops") instanceof ArrayNode ops
@@ -803,21 +783,21 @@ public class ExchangeController {
         return overQuota;
       }
     }
-    String digest = heldMassChanges.digest(context, resource, body);
+    String digest = heldMassChanges.digest(context, resource, relayed);
     ResponseEntity<?> resent = heldMassChanges.resent(context, digest);
     if (resent != null) {
       return resent;
     }
     String target = BACKEND + (ORG_STOCK.equals(resource) ? "/" : "/me/") + resource + "/changes";
     ExchangeRelay.Result result =
-        body.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
-            ? relay.forwardLarge(HttpMethod.POST, target, body, context, acceptLanguage)
-            : relay.forward(HttpMethod.POST, target, body, context, acceptLanguage);
+        relayed.get("ops") instanceof ArrayNode ops && ops.size() > LARGE_CHANGE_SET_OPS
+            ? relay.forwardLarge(HttpMethod.POST, target, relayed, context, acceptLanguage)
+            : relay.forward(HttpMethod.POST, target, relayed, context, acceptLanguage);
     if (ExchangeRefusals.RELAY_BUSY.equals(result.code())) {
       quotas.refundCounted(request);
     }
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
-      return staged(context, request, resource, body, result, digest);
+      return staged(context, request, resource, relayed, result, digest);
     }
     return responses.relayed(result, "change-result.schema.json", unknown, context, request);
   }

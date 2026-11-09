@@ -1,5 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-11.
-> **Owner area:** REFINERY · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-08.
+> **Owner area:** REFINERY · **Related ADRs:** [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+> (REQ-REFINERY-022, -027…029)
 
 # Refinery-order overview list
 
@@ -245,9 +246,29 @@ event per row plus one `REFINERY_ORDER_STORED` event. It MUST happen at most onc
 - Migration `V259` adds the nullable column `refinery_order.stored_at` and backfills it for orders that
   are already `COMPLETED`.
 
+A **client create** (REQ-XCH-052, `RefineryExchangeWrites`) sets its status, `OPEN` or
+`IN_PROGRESS`, because a client reads running orders from the game. `COMPLETED` comes only from a
+pickup and `CANCELED` only from a cancel or delete; `storedAt`, `id`, the owner and the counters stay
+server-managed, and the web's create is unchanged. A client's **pickup without store lines**
+(REQ-XCH-053, `RefineryExchangeWrites.pickUp`) sets `COMPLETED` without `storedAt`
+(REQ-REFINERY-028): such an order stays editable like one a `PUT` completed, and the member may
+reopen and then store it in the web.
+
+A client's hard delete (REQ-XCH-055) refuses an order with `storedAt` set, so the record behind
+booked stock is never deleted; the web keeps cancelling through `DELETE`.
+
+A client's **pickup with store lines** (REQ-XCH-053) stores through the same store operation as
+the web (`RefineryOrderStoreBooking`, shared with `RefineryOrderStoreService`), so it books exactly
+once, writes the stored amounts back into the goods and sets `storedAt` with the client's pickup
+marker; its lines are checked before the first row is booked, and a refused line refuses the whole
+pickup and books nothing. Its receivers, units and job orders are decided by REQ-SEC-039's exchange
+rule.
+
 **Enforced by:** `RefineryOrderServiceLifecycleTest` (`UpdateRefineryOrderTests`, `clientSuppliedServerManagedFields_areIgnoredOnCreate`),
-`RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`)
+`RefineryOrderStoreServiceTest`, `RefineryOrderTest` (`storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne`),
+`ExchangeRefineryStoreControllerTest`
 · **Code:** `RefineryOrderService.updateRefineryOrder` / `RefineryOrderStoreService.storeRefineryOrder`,
+`RefineryOrderStoreBooking`, `RefineryExchangeWrites.pickUp`,
 `JobOrderVisibility`
 
 ### Write requests and settings (wave 6 of the API cut)
@@ -305,11 +326,162 @@ and its tooltip in place (REQ-FE-001).
 **Code:** `UexRefineryYieldDto`, `UexRefinerySyncService`, `RefineryYield`,
 `RefineryYieldBonusDto`, `RefineryOrderQueryService`, `refinery-yield-badge.js`
 
+### REQ-REFINERY-027 — An order shows the client that created it and the last change
+
+Decided in [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+(variant A of the prototype on `prototype/refinery-client-marker`). An order records the exchange
+client that created it, or none for an order created in the web (a saved draft included), and the
+source — the web or a named client — and time of its last change. The creator never changes; every
+write that changes the order or its goods, from either channel, moves the last change. Nothing is
+VerseKit-specific: the name shown is the client's display name from the registry (REQ-XCH-003).
+
+- **List** (`/refinery-orders`): an order a client created carries an info chip (`.chip--info`)
+  with the client's name next to its number; a picked-up order (REQ-REFINERY-028) shows „via
+  <client>" after its status.
+- **Detail head**: the same chip next to the status badge.
+- **Assigned card**: „Erstellt von <client | Web>", which never changes, and „Zuletzt geändert:
+  <client | Web>, <time>". A web edit keeps the chip and moves only the last change.
+- Every label comes from the message bundles (DE/EN, umlauts as `\uXXXX`); a change made by a client
+  reaches an open list or detail page live (REQ-XCH-030, REQ-FE-001…010).
+- **Deleted by a client** (REQ-XCH-055): an open detail page of the order stays where it is, locks
+  its forms, keeps what the member typed on screen and shows a notice that a connected application
+  deleted the order, with a link to the list; no redirect. The page locks only after its presence
+  read (`GET /refinery-orders/{id}/presence`) answers `404` or `403`; a readable order re-renders
+  its sections instead. The `deleted` section is a signal section: a reconnect, a subscribe denial
+  and an open dialog neither fire nor defer it, and the relay drops it from a browser's frame, so
+  only the server publishes it. A later change of the order (an undo) re-renders the order and the
+  store section together and lifts the lock.
+- The exchange feed carries the creator as the client marker (REQ-XCH-051).
+- **Storage:** migration `V369` adds `created_source` / `created_client`, `last_change_source` /
+  `last_change_client`, `last_changed_at` and the pickup marker `picked_up_at` /
+  `picked_up_client` to `refinery_order`; a `CLIENT` source always names its client id, a `WEB`
+  source never does (check constraints), and existing orders read as web orders whose last change
+  is their `updated_at`. The web's create, update, cancel and store record a web change. The read
+  DTOs carry it as `provenance` with each client named by its registry display name, or by its id
+  once the registry no longer holds it; a page of orders reads the names in one query.
+- **Privacy:** the member's data export lists the provenance and the pickup marker of each own
+  order in `refineryOrdersOwned` (REQ-SEC-058). The sources are codes and the clients are registry
+  client ids the server writes, so the Personensuche lists the five text columns as exempt
+  (REQ-SEC-060).
+
+**Acceptance**
+
+- [x] An order a client created shows the chip in the list and the detail head and „Erstellt von
+  <client>"; an order created in the web shows no chip and „Erstellt von Web".
+- [x] A web edit of a client's order keeps the chip and shows „Zuletzt geändert: Web" with its
+  time; a client's update of a web order shows that client as the last change and adds no chip.
+
+**Enforced by:** `RefineryOrderProvenanceStampingTest`, `RefineryOrderStoreServiceTest`
+(`aWebStoreIsTheLastChange`), `RefineryOrderProvenanceViewTest`, `RefineryOrderProvenanceReadTest`,
+`RefineryOrderMapperTest`, `RefineryOrdersListPatternRenderTest`,
+`RefineryOrderDetailPatternRenderTest`, `ExchangeRefineryOrderControllerTest` (the feed's `createdBy`),
+`DataExportEndStateTest`, `PersonSearchCoverageTest` ·
+**Code:** `RefineryOrderProvenance`,
+`RefineryOrderProvenanceView`, `RefineryOrderProvenanceDto`, `refinery-orders-index.html`,
+`refinery-orders-details.html`, migration `V369`
+
+**Status:** implemented — the web side and the feed's marker (#3166, #3167), and the client
+writes that set a client source (#3168, `RefineryExchangeWrites`); the deleted notice (#3169,
+`refinery-orders-details.js`)
+
+### REQ-REFINERY-028 — A picked-up order is shown as „Abgeholt"
+
+An order closed by an exchange `pickup` (REQ-XCH-053) carries `pickedUpAt` and the client that
+reported it beside its status `COMPLETED`; the status enum is unchanged. An order in `COMPLETED`
+with `pickedUpAt` and without `storedAt` gets its own label and progress step **„Abgeholt"**
+(Läuft → Abholbereit → Abgeholt) and „via <client>"; with `storedAt` it stays „Eingelagert". Such an
+order's status stays editable in the web, as for an order completed without a store
+(REQ-REFINERY-022). The ready notice ignores it, since REQ-REFINERY-023 selects only open and
+running orders without `storedAt`.
+
+The web derives the label from the markers alone (`RefineryProgress.State.PICKED_UP`): an order
+reopened to `OPEN` or `IN_PROGRESS`, or canceled, reads by its status again and shows no „via
+<client>", and an order with `pickedUpAt` and `storedAt` shows „Eingelagert" with „via <client>". „via
+<client>" shows only while the order is `COMPLETED`, in the list and on the detail page. A picked-up
+order offers no store action, as for any `COMPLETED` order.
+
+**Acceptance**
+
+- [x] A pickup without store lines shows „Abgeholt via <client>" in the list and the detail page;
+  a pickup with store lines shows „Eingelagert".
+- [x] The labels come from the bundles in DE and EN.
+
+**Enforced by:** `RefineryProgressTest` (`aPickupWithoutStoreIsItsOwnState`,
+`aPickedUpRowIsClosed`), `RefineryOrdersListPatternRenderTest` (`rendersTheClientChipAndThePickup`,
+`aReopenedOrCanceledPickupDropsTheViaClient`), `RefineryOrderDetailPatternRenderTest`
+(`aReopenedPickupDropsTheViaClient`), `ExchangeRefineryOrderWriteControllerTest` (the pickup op
+and its undo) · **Code:** `RefineryProgress.state`,
+`RefineryOrderProvenanceDto.pickedUpWithoutStore`, `RefineryOrderProvenance.recordPickup`,
+`RefineryExchangeWrites.pickUp`
+
+The undo of a client's pickup (REQ-XCH-056) sets the status back and clears the marker
+(`RefineryOrderProvenance.clearPickup`); a web reopen keeps it.
+
+**Status:** marker and labels implemented (#3166); the pickup op without store lines and its undo
+implemented (#3170)
+
+### REQ-REFINERY-029 — An order is locked per section: game data and finances
+
+An order's optimistic lock is two independent counters instead of one order version, as the
+repository's fine-grained locking rule asks:
+
+| Section | Fields |
+| --- | --- |
+| **game data** (`gameData`) | location, refining method, timer (`startedAt`, `durationMinutes`), status, goods, the pickup and store markers |
+| **finances** (`finances`) | `expenses`, `otherExpenses`, `oreSales` |
+
+A write echoes the counter of each section whose fields it changes and is refused `409` only when
+that section changed since; a section it leaves as it is is not checked. Every applied write raises
+the counter of each section it changed by one. The mission link and the owning unit belong to
+neither section, so a mission edit collides with neither. The web's edit form, the store, the
+cancel and every exchange op (REQ-XCH-052) use the same counters, and the read DTO and the
+exchange feed carry both.
+
+On `PUT /api/v1/refinery-orders/{id}` (and the logistician's per-target path) the request names the
+parts it writes in `parts` (`GAME_DATA`, `FINANCES`, `MISSION_LINK`) and echoes `gameDataVersion` /
+`financesVersion` for each section among them; the values of a part it does not name are not
+applied. `parts` is required: a request without it is refused `400`, and there is no full-replace
+update and no order `version` on the request. An empty `parts` writes nothing. The store and the
+cancel raise the game-data counter without an echo. Every order write row-locks the order before it
+reads it at all, the controller's owner and logistician checks included, so the check and the raise
+of a counter cannot interleave with another writer and a writer that committed a section the
+request does not touch never turns into a `409` (`RefineryOrderService.lockRefineryOrder`,
+`RefineryOrderRepository.lockById`).
+
+A game-data write keeps the goods' ids (the exchange contract, REQ-XCH-051): a good that carries
+the id of a good the order holds changes that good in place, a good without an id is added, a held
+good the request does not list is removed, and an id the order does not hold is refused `400`
+(`error.refinery_order.good_unknown`). The edit form carries each row's good id in a hidden field.
+
+The edit form tracks which of its parts the member changed and sends only those; an edit that
+changed nothing sends no request. The page renders its three change flags as `true` and the page
+script clears them on load, so a submit the script did not intercept writes every part (the no-JS
+fallback of REQ-FE-006).
+
+**Acceptance**
+
+- [ ] A finance edit in the web and a concurrent timer update by a client both apply; two
+  concurrent edits of the same section give one `409`. *(The web half holds; the client op comes
+  with REQ-XCH-052.)*
+- [x] A mission link change moves neither counter.
+- [x] The edit form echoes both counters and a stale one of an unchanged section does not refuse
+  the save.
+
+**Enforced by:** `RefineryOrderSectionCounterTest`, `RefineryOrderWebLockOrderIntegrationTest`
+(a save, cancel and store while another writer commits), `RefineryOrderControllerTest`,
+`RefineryOrderServiceLifecycleTest` (goods kept in place), `RefineryOrderChangedPartsTest`,
+`RefineryOrderDetailFragmentMvcTest` (flags and good ids rendered), `ExchangeRefineryOrderControllerTest`
+
+**Status:** implemented for the web, the order API and the exchange feed — #3165, #3167; the
+exchange ops follow with REQ-XCH-052.
+
 ## Out of scope
 
 - The order **detail**, **create**, **store**, **cancel** and screenshot-**import** flows — covered
   by [`refinery-screenshot-import.md`](refinery-screenshot-import.md) and the controller's other
-  handlers; this spec only governs the list view's pagination. The store dialog's personal marker
+  handlers; this spec governs the list view's pagination, the refinery locations, storing exactly
+  once, the goods' input amount, the yield badge and an order's provenance, pickup marker and section
+  counters (REQ-REFINERY-027…029). The store dialog's personal marker
   (booking refinery output straight into the receiver's private pool) is specified in
   [`inventory-lager.md`](inventory-lager.md) `REQ-INV-035`.
 - User-chosen sort columns. The UI sorts each segment by the fixed order of REQ-REFINERY-019; the

@@ -1062,9 +1062,87 @@
     },
     {
       "attributes": {
-        "consent.screen.text": "${xchConsentBankRead}",
+        "consent.screen.text": "${xchConsentRefineryRead}",
         "display.on.consent.screen": "true",
         "gui.order": "16",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.refinery.read",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentRefineryWrite}",
+        "display.on.consent.screen": "true",
+        "gui.order": "17",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.refinery.write",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentRefineryStore}",
+        "display.on.consent.screen": "true",
+        "gui.order": "18",
+        "include.in.openid.provider.metadata": "true",
+        "include.in.token.scope": "true"
+      },
+      "name": "exchange.refinery.store",
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "included.custom.audience": "basetool-ingest",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          },
+          "consentRequired": false,
+          "name": "aud-basetool-ingest",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper"
+        }
+      ]
+    },
+    {
+      "attributes": {
+        "consent.screen.text": "${xchConsentBankRead}",
+        "display.on.consent.screen": "true",
+        "gui.order": "19",
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "true"
       },
@@ -1090,7 +1168,7 @@
       "attributes": {
         "consent.screen.text": "${xchConsentBankRequest}",
         "display.on.consent.screen": "true",
-        "gui.order": "17",
+        "gui.order": "20",
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "true"
       },
@@ -1116,7 +1194,7 @@
       "attributes": {
         "consent.screen.text": "${xchConsentBankQueue}",
         "display.on.consent.screen": "true",
-        "gui.order": "18",
+        "gui.order": "21",
         "include.in.openid.provider.metadata": "true",
         "include.in.token.scope": "true"
       },
@@ -1338,6 +1416,9 @@
         "exchange.orgstock.details",
         "exchange.demand.details",
         "exchange.orgstock.write",
+        "exchange.refinery.read",
+        "exchange.refinery.write",
+        "exchange.refinery.store",
         "exchange.bank.read",
         "exchange.bank.request",
         "exchange.bank.queue",

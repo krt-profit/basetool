@@ -56,6 +56,66 @@ function refineryStoreModalOpen() {
     return !!modal && window.getComputedStyle(modal).display !== 'none';
 }
 
+/** Whether the page shows the deletion notice and holds its forms disabled. */
+let refineryOrderLocked = false;
+
+/**
+ * Shows that a connected application deleted the order and locks every form of the page, keeping
+ * what the user typed on screen; the page stays where it is (REQ-XCH-055).
+ */
+function lockDeletedOrder() {
+    refineryOrderLocked = true;
+    const page = document.querySelector('main.refinery-order');
+    const notice = document.getElementById('refinery-order-deleted');
+    if (notice) {
+        notice.hidden = false;
+    }
+    if (!page) return;
+    page.querySelectorAll('form').forEach((form) => {
+        Array.from(form.elements).forEach((control) => {
+            if ('disabled' in control) {
+                control.disabled = true;
+            }
+        });
+    });
+}
+
+/**
+ * Re-renders the given sections; while the page is locked it re-renders the order and the store
+ * section together, so every form the lock disabled comes back, and hides the notice once one of
+ * them swapped.
+ *
+ * @param {string[]} keys the sections a peer changed
+ * @param {(sectionKeys: string[]) => Promise<boolean[]>} run re-renders sections without a broadcast
+ */
+function refreshRefineryOrderSections(keys, run) {
+    const list = refineryOrderLocked ? ['order', 'store'] : keys;
+    run(list).then((swapped) => {
+        if (!swapped.some(Boolean)) return;
+        refineryOrderLocked = false;
+        const notice = document.getElementById('refinery-order-deleted');
+        if (notice) notice.hidden = true;
+    });
+}
+
+/**
+ * Asks the server whether the order is still readable after a `deleted` signal: a 404 or 403
+ * locks the page, a readable order re-renders its sections instead, and any other failure leaves
+ * the page as it is (REQ-XCH-055).
+ *
+ * @param {(sectionKeys: string[]) => Promise<boolean[]>} run re-renders sections without a broadcast
+ */
+function confirmRefineryOrderDeleted(run) {
+    krtFetch
+        .getJson(`/refinery-orders/${window.refineryOrderId}/presence`)
+        .then(() => refreshRefineryOrderSections(['order', 'store'], run))
+        .catch((/** @type {unknown} */ error) => {
+            const status =
+                error && typeof error === 'object' && 'status' in error ? error.status : 0;
+            if (status === 404 || status === 403) lockDeletedOrder();
+        });
+}
+
 function initRefineryOrdersDetails() {
     refinerySeam = krtPageSections.create({
         dict() {
@@ -68,14 +128,20 @@ function initRefineryOrdersDetails() {
         sections: {
             order: { container: '#refinery-order-results', fragmentValue: 'order' },
             store: { container: '#refinery-store-results', fragmentValue: 'store' },
+            deleted: { container: '#refinery-order-deleted', signal: true },
         },
         pageUrl() {
             return window.refineryOrderId ? `/refinery-orders/${window.refineryOrderId}` : null;
         },
         topic: refineryTopic,
         receiver: {
-            busyTest() {
-                return refineryStoreModalOpen();
+            busyTest: refineryStoreModalOpen,
+            refresh(keys, run) {
+                if (keys.includes('deleted')) {
+                    confirmRefineryOrderDeleted(run);
+                    return;
+                }
+                refreshRefineryOrderSections(keys, run);
             },
             pill: {
                 label() {
@@ -377,7 +443,19 @@ function updateOutputMaterial(selectElement) {
     krtRefineryYield.refreshFor(selectElement);
 }
 
+/**
+ * Clears the change flags the page renders as `true`; the order form sets a flag again when its
+ * section changes, so a save writes only the changed parts, while a submit without this script
+ * writes every part (REQ-FE-006, REQ-REFINERY-029).
+ */
+function resetRefineryChangeFlags() {
+    document.querySelectorAll('#refineryOrderMainForm [data-rod-changed]').forEach((flag) => {
+        /** @type {HTMLInputElement} */ (flag).value = 'false';
+    });
+}
+
 function initRefineryOrderSection() {
+    resetRefineryChangeFlags();
     const inputSelects = /** @type {NodeListOf<KrtRefineryControl>} */ (
         document.querySelectorAll('[id^="inputMaterialId_"]')
     );
@@ -779,6 +857,24 @@ function markRefineryFormDirty(event) {
     if (!target || !target.closest('#refineryOrderMainForm')) return;
     const hint = document.getElementById('rod-unsaved');
     if (hint) hint.hidden = false;
+    markRefinerySectionChanged(target);
+}
+
+/**
+ * Marks the order-form part the element belongs to as changed, so the save writes that part and
+ * echoes its counter (REQ-REFINERY-029); the other parts are left as the server holds them.
+ *
+ * @param {Element} element a control or button inside the order form
+ */
+function markRefinerySectionChanged(element) {
+    const section = element.closest('[data-rod-section]');
+    if (!section) return;
+    const flag = /** @type {HTMLInputElement | null} */ (
+        document.querySelector(
+            `#refineryOrderMainForm [data-rod-changed="${section.getAttribute('data-rod-section')}"]`,
+        )
+    );
+    if (flag) flag.value = 'true';
 }
 
 document.addEventListener('input', markRefineryFormDirty);
@@ -792,10 +888,17 @@ krtEvents.on('focusout', 'rod-update-profit', (el) => {
         updateProfitPreview();
     }
 });
-krtEvents.on('click', 'rod-set-started-now', setStartedAtNow);
+krtEvents.on('click', 'rod-set-started-now', (el) => {
+    setStartedAtNow();
+    markRefinerySectionChanged(el);
+});
 krtEvents.on('change', 'rod-update-method', updateMethodRatings);
-krtEvents.on('click', 'rod-add-material', addMaterialRow);
+krtEvents.on('click', 'rod-add-material', (el) => {
+    addMaterialRow();
+    markRefinerySectionChanged(el);
+});
 krtEvents.on('click', 'rod-remove-material', (el) => {
+    markRefinerySectionChanged(el);
     removeMaterialRow(el);
 });
 krtEvents.on('change', 'rod-update-output', (el) => {

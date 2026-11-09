@@ -66,6 +66,8 @@ public class ExchangeMentionSource implements PersonMentionSource {
         "exchange_journal.entity_key",
         "exchange_journal.installation_key",
         "exchange_journal.resource",
+        "exchange_refinery_order_link.client_id",
+        "exchange_refinery_order_link.client_key",
         "exchange_ship_link.client_id",
         "exchange_ship_link.external_id",
         "exchange_ship_link.installation_key");

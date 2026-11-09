@@ -168,6 +168,10 @@ class AdminExchangeClientsPageControllerMvcTest {
                     containsString(
                         "Gemeinsamen Lagerbestand der Einheiten, in denen du Logistiker bist, ein-"
                             + " und ausbuchen")))
+        .andExpect(content().string(containsString("value=\"exchange.refinery.read\"")))
+        .andExpect(content().string(containsString("Deine Raffinerieaufträge lesen")))
+        .andExpect(content().string(containsString("value=\"exchange.refinery.write\"")))
+        .andExpect(content().string(containsString("value=\"exchange.refinery.store\"")))
         .andExpect(
             content().string(containsString("id=\"xc-requestsPerMinute\" min=\"1\" max=\"1200\"")))
         .andExpect(

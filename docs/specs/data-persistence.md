@@ -563,7 +563,8 @@ Concrete handling, in order:
   the installations (a revoked one is the deny-list entry for its key), the client revocations, the
   change sequence, the write journal, the ship links and an admin bulk undo's per-member skips —
   `exchange_installation`, `exchange_client_revocation`, `exchange_change`, `exchange_journal`,
-  `exchange_ship_link`, `exchange_bulk_undo_skip` (`V249`, `V252`–`V254`, `V256`) — each reference
+  `exchange_ship_link`, `exchange_refinery_order_link`, `exchange_bulk_undo_skip` (`V249`,
+  `V252`–`V254`, `V256`, `V370`) — each reference
   `app_user(id)` with `ON DELETE CASCADE` and go with the account; `UserIdentityColumnForeignKeyTest`
   holds them to it like every other `user_id` column. The bulk-undo run itself stays and keeps its
   counts; its `requested_by` is `ON DELETE SET NULL` (`V256`).
@@ -1141,7 +1142,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |
 | `supply` | 3 | `supply_donation`, `supply_need`, `supply_unit_setting` |
 | `purchasing` | 11 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_setting_governing_area`, `purchasing_unit_pause` |
-| `exchange` | 11 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_settings`, `exchange_ship_link` |
+| `exchange` | 12 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_refinery_order_link`, `exchange_settings`, `exchange_ship_link` |
 
 The listed crossings:
 
@@ -1151,7 +1152,8 @@ The listed crossings:
 | The V293 change-feed trigger `trg_org_unit_exchange_change` on `org_unit` | `exchange_change` (write), `app_user`, `ship`, `inventory_item` (read) | A renamed unit re-announces its ships and, since V296, the lots of its pool in the exchange's key log (REQ-XCH-017, REQ-XCH-042, ADR-0261) |
 | The V296 org-stock triggers on `inventory_item` (extended), both allocation tables and `org_unit_membership` | `exchange_change` (write), `org_unit`, `inventory_item` (read) | A change of a pool's shared rows, an earmark or a join is written to the org-stock feed keyed by unit (REQ-XCH-042, ADR-0257) |
 | The V297 org-stock triggers on `app_user`, `exchange_name_withholding` and `mission` | `exchange_change` (write), `inventory_item`, `inventory_item_mission_allocation`, `org_unit` (read) | A holder's rename or name withholding, or the rename of an earmarked mission, re-announces the lots whose entries show it (REQ-XCH-043, REQ-XCH-044) |
-| The V359 change-feed triggers on `location`, `city`, `space_station` and `starmap_object` | `exchange_change` (write), `app_user`, `ship`, `inventory_item`, `org_unit` (read) | A change of what a place's location reference serialises to re-announces the ships, stock lots and org-stock lots at that place (REQ-XCH-018) |
+| The V359 change-feed triggers on `location`, `city`, `space_station` and `starmap_object` | `exchange_change` (write), `app_user`, `ship`, `inventory_item`, `org_unit`, since V367 `refinery_order` (read) | A change of what a place's location reference serialises to re-announces the ships, stock lots, refinery orders and org-stock lots at that place (REQ-XCH-018, REQ-XCH-051) |
+| The V367 change-feed triggers on `refinery_order` and `refinery_good` | `exchange_change` (write), `app_user` (read) | An order and its goods announce the order to its owner, once per writing transaction (REQ-XCH-051) |
 | `InventoryItemRepository#findExchangeLots`, `#findExchangeLotsByKeys`, `#findExchangeOrgLots`, `#findExchangeOrgLotsByKeys` | `city`, `game_item`, `location`, `material`, `space_station`, `starmap_object` (read) | Catalogue names and the place's starmap GUID joined into the exchange's stock lots |
 | `PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers` | `app_user` (read) | Grants the default set to every active account in one statement |
 

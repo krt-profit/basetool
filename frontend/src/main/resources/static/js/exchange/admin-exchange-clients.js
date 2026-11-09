@@ -540,6 +540,7 @@ function initAdminExchangeClients() {
                 reasons: {
                     CHANGED_AFTERWARDS: text(data, 'reasonChangedAfterwards'),
                     GONE: text(data, 'reasonGone'),
+                    STOCK_BOOKED: text(data, 'reasonStockBooked'),
                     FAILED: text(data, 'reasonFailed'),
                 },
                 /** @type {Record<string, string>} */
@@ -548,6 +549,7 @@ function initAdminExchangeClients() {
                     STOCK: text(data, 'resourceStock'),
                     SHIP: text(data, 'resourceShip'),
                     ORG_STOCK: text(data, 'resourceOrgStock'),
+                    REFINERY_ORDER: text(data, 'resourceRefineryOrder'),
                 },
             };
         }

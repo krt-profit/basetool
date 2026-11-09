@@ -81,12 +81,14 @@ function initConnectedApps() {
             reasons: {
                 CHANGED_AFTERWARDS: text('reasonChangedAfterwards'),
                 GONE: text('reasonGone'),
+                STOCK_BOOKED: text('reasonStockBooked'),
             },
             resources: {
                 BLUEPRINT: text('resourceBlueprint'),
                 STOCK: text('resourceStock'),
                 SHIP: text('resourceShip'),
                 ORG_STOCK: text('resourceOrgStock'),
+                REFINERY_ORDER: text('resourceRefineryOrder'),
             },
         };
     }

@@ -33,7 +33,8 @@ import org.springframework.stereotype.Component;
 /**
  * Nightly purge of the exchange change feed's entries, and so its tombstones, of the exchange write
  * journal and of the ended bulk undo runs past their retention of {@code
- * app.exchange.change-retention.max-age} (default 90 days, REQ-XCH-013, REQ-XCH-022, REQ-XCH-034).
+ * app.exchange.change-retention.max-age} (default 90 days, REQ-XCH-013, REQ-XCH-022, REQ-XCH-034),
+ * then of the refinery-order keys of gone orders neither of the two refers to any more.
  */
 @Component
 @ConditionalOnProperty(
@@ -48,6 +49,7 @@ public class ExchangeChangeRetentionTask {
   private final ExchangeChangeRetentionService retentionService;
   private final ExchangeJournalService journalService;
   private final ExchangeBulkUndoService bulkUndoService;
+  private final ExchangeRefineryOrderKeys refineryOrderKeys;
   private final ExchangeChangeRetentionProperties properties;
   private final TaskMetrics taskMetrics;
   private final Clock clock = Clock.systemUTC();
@@ -64,7 +66,8 @@ public class ExchangeChangeRetentionTask {
   /**
    * Runs one purge.
    *
-   * @return the number of change entries, journal entries and bulk undo runs deleted
+   * @return the number of change entries, journal entries, bulk undo runs and refinery-order keys
+   *     deleted
    */
   private int purge() {
     Instant now = clock.instant();
@@ -72,12 +75,15 @@ public class ExchangeChangeRetentionTask {
     int changes = retentionService.purgeOlderThan(cutoff, now);
     int writes = journalService.purgeRecordedBefore(cutoff);
     int runs = bulkUndoService.purgeFinishedBefore(cutoff);
+    int keys = refineryOrderKeys.purgeUnreferenced();
     log.info(
-        "Exchange retention: {} change entries, {} journal entries and {} bulk undo runs purged.",
+        "Exchange retention: {} change entries, {} journal entries, {} bulk undo runs and {}"
+            + " refinery-order keys purged.",
         changes,
         writes,
-        runs);
-    return changes + writes + runs;
+        runs,
+        keys);
+    return changes + writes + runs + keys;
   }
 
   /**

@@ -143,6 +143,8 @@ exempt-column|exchange_journal.client_id
 exempt-column|exchange_journal.entity_key
 exempt-column|exchange_journal.installation_key
 exempt-column|exchange_journal.resource
+exempt-column|exchange_refinery_order_link.client_id
+exempt-column|exchange_refinery_order_link.client_key
 exempt-column|exchange_ship_link.client_id
 exempt-column|exchange_ship_link.external_id
 exempt-column|exchange_ship_link.installation_key
@@ -253,6 +255,11 @@ exempt-column|purchasing_unit_pause.reason
 exempt-column|quality_tier.code
 exempt-column|quality_tier.label_de
 exempt-column|quality_tier.label_en
+exempt-column|refinery_order.created_client
+exempt-column|refinery_order.created_source
+exempt-column|refinery_order.last_change_client
+exempt-column|refinery_order.last_change_source
+exempt-column|refinery_order.picked_up_client
 exempt-column|refinery_order.status
 exempt-column|role.code
 exempt-column|role.description

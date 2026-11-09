@@ -121,11 +121,12 @@ class ExchangeChangeSetRunnerTest {
 
     assertThat(result.results())
         .containsExactly(
-            new ExchangeChangeResultDto.OpResult(1, "op-1", "unchanged", null),
-            new ExchangeChangeResultDto.OpResult(2, "op-2", "unmatched", "UNMATCHED"),
-            new ExchangeChangeResultDto.OpResult(4, "op-4", "unchanged", null),
-            new ExchangeChangeResultDto.OpResult(5, "op-5", "rejected", "NOT_PERMITTED"));
+            new ExchangeChangeResultDto.OpResult(1, "op-1", "unchanged", null, null),
+            new ExchangeChangeResultDto.OpResult(2, "op-2", "unmatched", "UNMATCHED", null),
+            new ExchangeChangeResultDto.OpResult(4, "op-4", "unchanged", null, null),
+            new ExchangeChangeResultDto.OpResult(5, "op-5", "rejected", "NOT_PERMITTED", null));
     assertThat(result.results()).isUnmodifiable();
+    assertThat(result.orders()).isNull();
     assertThat(result.offersReduced()).isEqualTo(3);
     assertThat(result.offersRemoved()).isEqualTo(1);
     assertThat(result.detachedFromMissions()).isNull();

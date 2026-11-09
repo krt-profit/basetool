@@ -151,6 +151,12 @@
       "source_client" : null,
       "changed_at" : "<instant>"
     }, {
+      "resource" : "REFINERY_ORDER",
+      "entity_key" : "<uuid>",
+      "source_channel" : "system",
+      "source_client" : null,
+      "changed_at" : "<instant>"
+    }, {
       "resource" : "BANK_REQUEST",
       "entity_key" : "<uuid>",
       "source_channel" : "system",
@@ -190,6 +196,16 @@
       "client_id" : "zzz-export-client",
       "external_id" : "ext-1",
       "ship_id" : "<uuid>",
+      "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "exchangeRefineryOrderKeys",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "client_id" : "zzz-export-client",
+      "client_key" : "key-1",
+      "refinery_order_id" : "<uuid>",
       "created_at" : "<instant>"
     } ],
     "truncated" : false
@@ -316,7 +332,14 @@
       "expenses" : 100.0,
       "ore_sales" : null,
       "location" : "Zzz Export Hub",
-      "created_at" : "<instant>"
+      "created_at" : "<instant>",
+      "created_source" : "WEB",
+      "created_client" : null,
+      "last_change_source" : "WEB",
+      "last_change_client" : null,
+      "last_changed_at" : "<instant>",
+      "picked_up_at" : null,
+      "picked_up_client" : null
     } ],
     "truncated" : false
   }, {
@@ -334,7 +357,7 @@
     "key" : "materialClaims",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
-      "job_order" : 1,
+      "job_order" : <n>,
       "material" : "Zzz Export Ore",
       "amount" : 5.0,
       "quality_requirement" : "GOOD",

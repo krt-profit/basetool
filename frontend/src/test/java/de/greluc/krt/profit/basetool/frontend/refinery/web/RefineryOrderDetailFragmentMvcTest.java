@@ -47,6 +47,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,9 +126,14 @@ class RefineryOrderDetailFragmentMvcTest {
 
   /** Stubs the order read for {@code orderId} with a single SCU output good. */
   private void stubOrder(UUID orderId, UUID userId) {
+    stubOrder(orderId, userId, UUID.randomUUID());
+  }
+
+  /** Stubs the order read for {@code orderId} with a single SCU output good of the given id. */
+  private void stubOrder(UUID orderId, UUID userId, UUID goodId) {
     RefineryGoodDto good =
         new RefineryGoodDto(
-            UUID.randomUUID(),
+            goodId,
             material("Quantanium Ore"),
             100,
             material("Refined Quantanium"),
@@ -150,6 +157,9 @@ class RefineryOrderDetailFragmentMvcTest {
             RefineryOrderStatus.OPEN,
             null,
             1L,
+            null,
+            null,
+            null,
             null);
     when(backendApiClient.get(
             eq("/api/v1/refinery-orders/{id}"), eq(RefineryOrderDto.class), eq(orderId)))
@@ -199,6 +209,28 @@ class RefineryOrderDetailFragmentMvcTest {
     assertThat(html).as("store dialog is a separate section").doesNotContain("id=\"storeForm\"");
     assertThat(html).as("no re-nested container").doesNotContain("id=\"refinery-order-results\"");
     verify(backendApiClient, never()).get(eq("/api/v1/orders/lookup"), anyTypeRef());
+  }
+
+  @Test
+  void orderFragment_rendersEveryChangeFlagTrueAndEachGoodsRowWithItsId() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID goodId = UUID.randomUUID();
+    stubOrder(orderId, userId, goodId);
+
+    String html = render(orderId, userId, "?fragment=order");
+
+    for (String flag : List.of("gameDataChanged", "financesChanged", "missionChanged")) {
+      assertThat(inputTag(html, flag)).as(flag).contains("value=\"true\"");
+    }
+    assertThat(inputTag(html, "goods[0].id")).contains("value=\"" + goodId + "\"");
+  }
+
+  private static String inputTag(String html, String name) {
+    Matcher tag =
+        Pattern.compile("<input[^>]*name=\"" + Pattern.quote(name) + "\"[^>]*>").matcher(html);
+    assertThat(tag.find()).as("input " + name).isTrue();
+    return tag.group();
   }
 
   @Test

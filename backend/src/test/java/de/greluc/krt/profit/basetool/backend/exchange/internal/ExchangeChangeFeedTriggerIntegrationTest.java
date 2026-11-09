@@ -63,6 +63,8 @@ class ExchangeChangeFeedTriggerIntegrationTest {
           "inventory_item_job_order_allocation",
           "inventory_item_mission_allocation",
           "ship",
+          "refinery_order",
+          "refinery_good",
           "org_unit",
           "org_unit_membership",
           "app_user",
@@ -315,6 +317,90 @@ class ExchangeChangeFeedTriggerIntegrationTest {
             org.assertj.core.groups.Tuple.tuple(ExchangeFeedResource.SHIP, ship.toString()))
         .hasSize(2);
     assertThat(changes(bob)).extracting(ExchangeChange::getEntityKey).contains(ship.toString());
+  }
+
+  @Test
+  void aRefineryOrderIsSequencedOncePerTransactionAndFollowsItsOwner() {
+    UUID order = refineryOrder(alice, location("feed-crusader-refinery"));
+
+    jdbc.update("UPDATE refinery_order SET status = 'CANCELED' WHERE id = ?", order);
+    jdbc.update("UPDATE refinery_order SET owner_id = ? WHERE id = ?", bob, order);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+    assertThat(changes(bob))
+        .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+  }
+
+  @Test
+  void aHardDeleteOfARefineryOrderAndItsGoodsSequencesTheOrderOnly() {
+    UUID order = refineryOrder(alice, location("feed-arc-refinery"));
+    refineryGood(order, material("feed-quantainium"));
+    refineryGood(order, material("feed-bexalite"));
+    jdbc.update("DELETE FROM exchange_change WHERE user_id = ?", alice);
+
+    jdbc.update("DELETE FROM refinery_good WHERE refinery_order_id = ?", order);
+    jdbc.update("DELETE FROM refinery_order WHERE id = ?", order);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+  }
+
+  @Test
+  void theGoodsOfOneTransactionAnnounceTheirOrderOnce() {
+    UUID order = refineryOrder(alice, location("feed-hurston-refinery"));
+    UUID good = refineryGood(order, material("feed-taranite"));
+    refineryGood(order, material("feed-agricium"));
+    jdbc.update("UPDATE refinery_good SET quality = 600 WHERE id = ?", good);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(order.toString());
+    assertThat(changes(bob)).isEmpty();
+  }
+
+  @Test
+  void movingAGoodToAnotherOrderAnnouncesBothOrders() {
+    UUID place = location("feed-microtech-refinery");
+    UUID from = refineryOrder(alice, place);
+    UUID to = refineryOrder(bob, place);
+    UUID good = refineryGood(from, material("feed-laranite-ore"));
+    jdbc.update("DELETE FROM exchange_change WHERE user_id IN (?, ?)", alice, bob);
+
+    jdbc.update("UPDATE refinery_good SET refinery_order_id = ? WHERE id = ?", to, good);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(from.toString());
+    assertThat(changes(bob))
+        .extracting(ExchangeChange::getEntityKey)
+        .containsExactly(to.toString());
+  }
+
+  @Test
+  void renamingAPlaceReannouncesTheRefineryOrdersAtIt() {
+    UUID place = location("feed-pyro-refinery");
+    UUID order = refineryOrder(alice, place);
+    refineryOrder(bob, location("feed-other-refinery"));
+    jdbc.update("DELETE FROM exchange_change WHERE user_id IN (?, ?)", alice, bob);
+
+    jdbc.update("UPDATE location SET name = 'feed-pyro-refinery-renamed' WHERE id = ?", place);
+
+    assertThat(changes(alice))
+        .extracting(ExchangeChange::getResource, ExchangeChange::getEntityKey)
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple(
+                ExchangeFeedResource.REFINERY_ORDER, order.toString()));
+    assertThat(changes(bob)).isEmpty();
   }
 
   @Test
@@ -1033,6 +1119,46 @@ class ExchangeChangeFeedTriggerIntegrationTest {
         """,
         id,
         name);
+    return id;
+  }
+
+  /**
+   * Seeds an open refinery order.
+   *
+   * @param owner the owner
+   * @param location the refinery's location
+   * @return its id
+   */
+  private @NotNull UUID refineryOrder(@NotNull UUID owner, @NotNull UUID location) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO refinery_order (id, version, owner_id, location_id, last_changed_at)"
+            + " VALUES (?, 0, ?, ?, now())",
+        id,
+        owner,
+        location);
+    return id;
+  }
+
+  /**
+   * Seeds a good of a refinery order that refines a material into itself.
+   *
+   * @param order the order
+   * @param material the input and output material
+   * @return its id
+   */
+  private @NotNull UUID refineryGood(@NotNull UUID order, @NotNull UUID material) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO refinery_good (id, version, input_material_id, input_quantity,
+                                   output_material_id, output_quantity, quality, refinery_order_id)
+        VALUES (?, 0, ?, 1200, ?, 900, 500, ?)
+        """,
+        id,
+        material,
+        material,
+        order);
     return id;
   }
 

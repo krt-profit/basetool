@@ -71,10 +71,10 @@ public class ExchangeBlueprintWriteService
   static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
 
   /** The reason of an op whose reference matched no product. */
-  static final String UNMATCHED_REASON = "UNMATCHED";
+  static final String UNMATCHED_REASON = ExchangeReasons.UNMATCHED;
 
   /** The reason of an op whose reference matched several products. */
-  static final String AMBIGUOUS_REASON = "AMBIGUOUS";
+  static final String AMBIGUOUS_REASON = ExchangeReasons.AMBIGUOUS;
 
   private static final String CLIENT_CHANNEL = "client";
 

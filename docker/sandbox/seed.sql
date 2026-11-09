@@ -79,9 +79,10 @@ VALUES ('5a4d0000-0000-4000-8000-000000001101', 0, now(), now(), 990001, 'Sandbo
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO space_station (id, version, created_at, updated_at, id_space_station, name, code,
-                           star_system_name, is_available, is_available_live, is_visible)
+                           star_system_name, is_available, is_available_live, is_visible,
+                           has_refinery_terminal)
 VALUES ('5a4d0000-0000-4000-8000-000000001102', 0, now(), now(), 990002, 'Sandbox Station', 'SBXS',
-        'Sandbox System', true, true, true)
+        'Sandbox System', true, true, true, true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO location (id, version, created_at, updated_at, name, description, city_id,
@@ -279,7 +280,8 @@ FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read'), ('exchange.blue
              ('exchange.stock.read'), ('exchange.stock.write'), ('exchange.hangar.read'),
              ('exchange.hangar.write'), ('exchange.demand.read'), ('exchange.demand.details'), ('exchange.orgunits.read'),
              ('exchange.orgstock.read'), ('exchange.orgstock.details'),
-             ('exchange.orgstock.write'), ('exchange.drafts.blueprints'),
+             ('exchange.orgstock.write'), ('exchange.refinery.read'), ('exchange.refinery.write'),
+             ('exchange.refinery.store'), ('exchange.drafts.blueprints'),
              ('exchange.drafts.refinery')) AS c (capability)
 UNION ALL
 SELECT '5a4d0000-0000-4000-8000-000000002302'::uuid, c.capability

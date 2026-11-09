@@ -348,8 +348,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a {@code changed} frame: resolves its topic, sanitises the sections, relays locally
-   * (excluding the origin) and hands it to the cross-replica fan-out; no subscription is required.
+   * Handles a {@code changed} frame: resolves its topic, sanitises the sections (a browser never
+   * publishes a server-only section), relays locally (excluding the origin) and hands it to the
+   * cross-replica fan-out; no subscription is required, since what remains only triggers
+   * re-fetches.
    *
    * @param session the publishing session
    * @param node the parsed {@code changed} frame

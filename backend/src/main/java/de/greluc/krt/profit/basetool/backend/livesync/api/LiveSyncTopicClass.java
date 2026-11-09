@@ -82,6 +82,15 @@ public enum LiveSyncTopicClass {
   /** Global Materialbörse room; the backend pokes {@code board} when a book-out changed offers. */
   MATERIALBOARD("materialboard", false, "materialboard"),
 
+  /** Global refinery-order queue room; an exchange write pokes {@code queue} (REQ-XCH-030). */
+  REFINERY("refinery", false, "refinery_queue"),
+
+  /**
+   * One refinery order's detail page, keyed by the order's id; an exchange write pokes {@code
+   * order}, an exchange delete {@code deleted} (REQ-XCH-030, REQ-XCH-055).
+   */
+  REFINERY_ORDER("refinery-order", true, "refinery_order"),
+
   /**
    * Global bank-staff room; the backend pokes {@code requestQueue} when a booking request was
    * raised, corrected or cancelled through the exchange (REQ-XCH-030, REQ-BANK-068).
@@ -167,6 +176,8 @@ public enum LiveSyncTopicClass {
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
+      case REFINERY -> Set.of("queue");
+      case REFINERY_ORDER -> Set.of("order", "store", "deleted");
       case BANK_STAFF -> Set.of("requestQueue");
       case ORGUNIT_BANK -> Set.of("orgUnitBank");
       case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;

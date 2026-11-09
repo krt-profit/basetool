@@ -35,19 +35,22 @@ class ExchangeResourceTest {
             ExchangeResource.BLUEPRINT, "blueprints",
             ExchangeResource.STOCK, "stock",
             ExchangeResource.SHIP, "ships",
-            ExchangeResource.ORG_STOCK, "org-stock");
+            ExchangeResource.ORG_STOCK, "org-stock",
+            ExchangeResource.REFINERY_ORDER, "refinery-orders");
     Map<ExchangeResource, ExchangeCapability> capabilities =
         Map.of(
             ExchangeResource.BLUEPRINT, ExchangeCapability.BLUEPRINTS_WRITE,
             ExchangeResource.STOCK, ExchangeCapability.STOCK_WRITE,
             ExchangeResource.SHIP, ExchangeCapability.HANGAR_WRITE,
-            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE);
+            ExchangeResource.ORG_STOCK, ExchangeCapability.ORGSTOCK_WRITE,
+            ExchangeResource.REFINERY_ORDER, ExchangeCapability.REFINERY_WRITE);
     Map<ExchangeResource, String> tags =
         Map.of(
             ExchangeResource.BLUEPRINT, "blueprint",
             ExchangeResource.STOCK, "stock",
             ExchangeResource.SHIP, "ship",
-            ExchangeResource.ORG_STOCK, "org_stock");
+            ExchangeResource.ORG_STOCK, "org_stock",
+            ExchangeResource.REFINERY_ORDER, "refinery_order");
 
     assertThat(capabilities).containsOnlyKeys(Arrays.asList(ExchangeResource.values()));
     for (ExchangeResource resource : ExchangeResource.values()) {
@@ -69,7 +72,8 @@ class ExchangeResourceTest {
   @Test
   void theFeedsAreTheValuesTheChangeTableAllows() {
     assertThat(Arrays.stream(ExchangeFeedResource.values()).map(Enum::name))
-        .containsExactly("BLUEPRINT", "STOCK", "SHIP", "ORG_STOCK", "BANK_REQUEST");
+        .containsExactly(
+            "BLUEPRINT", "STOCK", "SHIP", "ORG_STOCK", "BANK_REQUEST", "REFINERY_ORDER");
   }
 
   @Test

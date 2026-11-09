@@ -59,10 +59,13 @@ class IngestEndpointSurfaceTest {
           new Call(HttpMethod.GET, "/exchange/v1/me/blueprints"),
           new Call(HttpMethod.GET, "/exchange/v1/me/stock"),
           new Call(HttpMethod.GET, "/exchange/v1/me/ships"),
+          new Call(HttpMethod.GET, "/exchange/v1/me/refinery-orders"),
           new Call(HttpMethod.GET, "/exchange/v1/me/org-demand"),
           new Call(HttpMethod.GET, "/exchange/v1/me/org-units"),
           new Call(HttpMethod.GET, "/exchange/v1/org-stock"),
           new Call(HttpMethod.GET, "/exchange/v1/org-stock/members"),
+          new Call(HttpMethod.GET, "/exchange/v1/me/store-choices/receivers"),
+          new Call(HttpMethod.GET, "/exchange/v1/me/store-choices/job-orders"),
           new Call(HttpMethod.GET, "/exchange/v1/org-stock/targets"),
           new Call(HttpMethod.GET, "/exchange/v1/bank/accounts"),
           new Call(
@@ -84,6 +87,7 @@ class IngestEndpointSurfaceTest {
           new Call(HttpMethod.POST, "/exchange/v1/me/blueprints/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/stock/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/ships/changes"),
+          new Call(HttpMethod.POST, "/exchange/v1/me/refinery-orders/changes"),
           new Call(HttpMethod.POST, "/exchange/v1/me/drafts/blueprints"),
           new Call(HttpMethod.POST, "/exchange/v1/me/drafts/refinery-orders"));
 

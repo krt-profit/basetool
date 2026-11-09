@@ -42,6 +42,27 @@ public final class ExchangeRoutes {
   /** Stands for "any granted exchange capability". */
   public static final String ANY = "*";
 
+  /** The gateway path every exchange route lies below. */
+  public static final String GATEWAY = "/exchange/v1";
+
+  /** The prefix of the member's own resources below {@link #GATEWAY}. */
+  public static final String MEMBER = "/me/";
+
+  /** The member's blueprint feed below {@link #GATEWAY}. */
+  public static final String MEMBER_BLUEPRINTS = MEMBER + "blueprints";
+
+  /** The member's stock feed below {@link #GATEWAY}. */
+  public static final String MEMBER_STOCK = MEMBER + "stock";
+
+  /** The member's ship feed below {@link #GATEWAY}. */
+  public static final String MEMBER_SHIPS = MEMBER + "ships";
+
+  /** The member's refinery-order feed below {@link #GATEWAY}. */
+  public static final String MEMBER_REFINERY_ORDERS = MEMBER + "refinery-orders";
+
+  /** The change-set path below each of the member's feeds. */
+  public static final String CHANGES = "/changes";
+
   /**
    * The root of the bank route family, which the bank switch gates (REQ-BXCH-006): every path at or
    * below it, whether a route serves it or not.
@@ -51,17 +72,29 @@ public final class ExchangeRoutes {
   /** Every authenticated exchange route. */
   public static final @Unmodifiable List<Route> ROUTES =
       List.of(
-          route(HttpMethod.GET, "/exchange/v1", CONNECT),
+          route(HttpMethod.GET, GATEWAY, CONNECT),
           route(HttpMethod.POST, "/exchange/v1/me/installation", CONNECT),
           route(HttpMethod.POST, "/exchange/v1/me/account-check", CONNECT),
           route(HttpMethod.POST, "/exchange/v1/catalog/resolve", ANY),
           route(HttpMethod.GET, "/exchange/v1/catalog/locations", ANY),
-          route(HttpMethod.GET, "/exchange/v1/me/blueprints", "exchange.blueprints.read"),
-          write(HttpMethod.POST, "/exchange/v1/me/blueprints/changes", "exchange.blueprints.write"),
-          route(HttpMethod.GET, "/exchange/v1/me/stock", "exchange.stock.read"),
-          write(HttpMethod.POST, "/exchange/v1/me/stock/changes", "exchange.stock.write"),
-          route(HttpMethod.GET, "/exchange/v1/me/ships", "exchange.hangar.read"),
-          write(HttpMethod.POST, "/exchange/v1/me/ships/changes", "exchange.hangar.write"),
+          route(HttpMethod.GET, GATEWAY + MEMBER_BLUEPRINTS, "exchange.blueprints.read"),
+          write(
+              HttpMethod.POST, GATEWAY + MEMBER_BLUEPRINTS + CHANGES, "exchange.blueprints.write"),
+          route(HttpMethod.GET, GATEWAY + MEMBER_STOCK, "exchange.stock.read"),
+          write(HttpMethod.POST, GATEWAY + MEMBER_STOCK + CHANGES, "exchange.stock.write"),
+          route(HttpMethod.GET, GATEWAY + MEMBER_SHIPS, "exchange.hangar.read"),
+          write(HttpMethod.POST, GATEWAY + MEMBER_SHIPS + CHANGES, "exchange.hangar.write"),
+          route(HttpMethod.GET, GATEWAY + MEMBER_REFINERY_ORDERS, "exchange.refinery.read"),
+          write(
+              HttpMethod.POST,
+              GATEWAY + MEMBER_REFINERY_ORDERS + CHANGES,
+              "exchange.refinery.write"),
+          route(
+              HttpMethod.GET, "/exchange/v1/me/store-choices/receivers", "exchange.refinery.store"),
+          route(
+              HttpMethod.GET,
+              "/exchange/v1/me/store-choices/job-orders",
+              "exchange.refinery.store"),
           route(HttpMethod.GET, "/exchange/v1/me/org-demand", "exchange.demand.read"),
           route(HttpMethod.GET, "/exchange/v1/me/org-units", "exchange.orgunits.read"),
           route(HttpMethod.GET, "/exchange/v1/org-stock", "exchange.orgstock.read"),

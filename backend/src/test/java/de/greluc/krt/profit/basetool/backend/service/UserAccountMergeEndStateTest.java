@@ -105,6 +105,7 @@ class UserAccountMergeEndStateTest {
     EXPECTED_MOVED.put("notification_mute.user_id", 1);
     EXPECTED_MOVED.put("exchange_installation.user_id", 1);
     EXPECTED_MOVED.put("exchange_ship_link.user_id", 1);
+    EXPECTED_MOVED.put("exchange_refinery_order_link.user_id", 1);
     EXPECTED_MOVED.put("user_roles.user_id", 1);
   }
 
@@ -153,7 +154,7 @@ class UserAccountMergeEndStateTest {
     long sourceRolesVersion = rolesVersion(source);
     long targetRolesVersion = rolesVersion(target);
     long bystanderRolesVersion = rolesVersion(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(28);
+    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(29);
     assertThat(counts(source).values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
@@ -216,6 +217,53 @@ class UserAccountMergeEndStateTest {
   }
 
   @Test
+  void merging_keepsTheMovingOrdersClientKey_whereTheTargetsKeyNamesAGoneOrder() {
+    tag = UUID.randomUUID().toString().substring(0, 8);
+    UUID source = member("merge-src-" + tag);
+    UUID target = member("merge-tgt-" + tag);
+    UUID admin = member("merge-adm-" + tag);
+    fixtures();
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id,"
+            + " last_changed_at) VALUES (?, 0, now(), now(), ?, ?, now())",
+        order,
+        source,
+        location);
+    UUID moving = UUID.randomUUID();
+    UUID dead = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO exchange_refinery_order_link (id, user_id, client_id, client_key,"
+            + " refinery_order_id) VALUES (?, ?, 'merge-client', 'k', ?), (?, ?, 'merge-client',"
+            + " 'k', ?)",
+        moving,
+        source,
+        order,
+        dead,
+        target,
+        UUID.randomUUID());
+    entityManager.flush();
+
+    mergeService.merge(source, target, admin);
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(
+            jdbc.queryForList(
+                "SELECT id FROM exchange_refinery_order_link WHERE user_id = ? AND client_key = 'k'"
+                    + " AND retired_at IS NULL",
+                UUID.class,
+                target))
+        .containsExactly(moving);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT retired_at IS NOT NULL FROM exchange_refinery_order_link WHERE id = ?",
+                Boolean.class,
+                dead))
+        .isTrue();
+  }
+
+  @Test
   void merging_twoLedgers_isRefusedBeforeAnythingMoves() {
     tag = UUID.randomUUID().toString().substring(0, 8);
     UUID source = member("merge-src-" + tag);
@@ -254,7 +302,7 @@ class UserAccountMergeEndStateTest {
   }
 
   private String expectedDetails(UUID source) {
-    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=32");
+    StringBuilder details = new StringBuilder("fromUser=" + source + " rows=33");
     EXPECTED_MOVED.forEach(
         (column, rows) -> details.append(' ').append(column).append('=').append(rows));
     return details.toString();
@@ -494,8 +542,8 @@ class UserAccountMergeEndStateTest {
 
   private void refineryOrder(UUID owner) {
     jdbc.update(
-        "INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id)"
-            + " VALUES (?, 0, now(), now(), ?, ?)",
+        "INSERT INTO refinery_order (id, version, created_at, updated_at, owner_id, location_id,"
+            + " last_changed_at) VALUES (?, 0, now(), now(), ?, ?, now())",
         UUID.randomUUID(),
         owner,
         location);
@@ -713,6 +761,13 @@ class UserAccountMergeEndStateTest {
         user,
         external,
         ship);
+    jdbc.update(
+        "INSERT INTO exchange_refinery_order_link (id, user_id, client_id, client_key,"
+            + " refinery_order_id) VALUES (?, ?, 'merge-client', ?, ?)",
+        UUID.randomUUID(),
+        user,
+        external,
+        UUID.randomUUID());
   }
 
   private UUID auditEventBy(UUID actor) {

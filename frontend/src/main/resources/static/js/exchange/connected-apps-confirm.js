@@ -50,6 +50,7 @@ function initConnectedAppsConfirm() {
                 stock: text('resourceStock'),
                 ships: text('resourceShips'),
                 'org-stock': text('resourceOrgStock'),
+                'refinery-orders': text('resourceRefineryOrders'),
             }),
         };
     }

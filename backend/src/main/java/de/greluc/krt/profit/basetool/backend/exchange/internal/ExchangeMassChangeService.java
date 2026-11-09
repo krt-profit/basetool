@@ -23,9 +23,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
+import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBlueprintChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockChangeSet;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -51,9 +53,11 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Previews and applies a change set the ingest gateway staged because the mass-change guard held it
  * back, once the member has seen it in the browser (REQ-XCH-021). Before either it checks again
- * what the gateway checked when the batch arrived: the global switch, the client's status and
- * capability, that the batch is within its staging lifetime, and that since its staging the client
- * was neither suspended nor disconnected and the installation was not disconnected.
+ * what the gateway and the backend checked when the batch arrived: the global switch, the client's
+ * status and capability, the store capability of a refinery set that books stock (REQ-XCH-053),
+ * that the batch is within its staging lifetime, and that since its staging the client was neither
+ * suspended nor disconnected and the installation was not disconnected. The set then runs as the
+ * client's relayed request runs, under the member's reduced exchange authorities.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,7 +77,9 @@ public class ExchangeMassChangeService {
   private final ExchangeStockWriteService stockWriteService;
   private final ExchangeShipWriteService shipWriteService;
   private final ExchangeOrgStockWriteService orgStockWriteService;
+  private final ExchangeRefineryOrderWriteService refineryOrderWriteService;
   private final AuditRecorder auditRecorder;
+  private final ExchangeActingMemberScope actingMemberScope;
   private final MeterRegistry meterRegistry;
   private final ObjectMapper objectMapper;
   private final Validator validator;
@@ -98,7 +104,7 @@ public class ExchangeMassChangeService {
     ExchangeClient client = admit(member, request);
     ExchangeCaller caller =
         new ExchangeCaller(member, request.clientId(), request.installationKey());
-    ExchangeChangeResultDto result = run(caller, resourceOf(request), request, true);
+    ExchangeChangeResultDto result = run(caller, client, request, true);
     return toDto(client, request.resource(), result);
   }
 
@@ -128,8 +134,7 @@ public class ExchangeMassChangeService {
             request.installationKey(),
             () ->
                 transaction.execute(_ -> {
-                  ExchangeChangeResultDto applied =
-                      run(caller, resourceOf(request), request, false);
+                  ExchangeChangeResultDto applied = run(caller, client, request, false);
                   auditRecorder.record(
                       AuditEventType.EXCHANGE_MASS_CHANGE_CONFIRMED,
                       client.getId(),
@@ -200,19 +205,41 @@ public class ExchangeMassChangeService {
   }
 
   /**
-   * Reads the change set as its resource's and runs it.
+   * Reads the change set as its resource's and runs it as the client's relayed request runs.
    *
    * @param caller the client, installation and member
+   * @param client the client, with its capabilities
+   * @param request the staged change set
+   * @param dryRun whether to preview only
+   * @return the result
+   * @throws de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException {@code 403
+   *     SCOPE_MISSING} for a refinery set that books stock while the client lacks {@code
+   *     exchange.refinery.store}
+   */
+  private @NotNull ExchangeChangeResultDto run(
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeClient client,
+      @NotNull ConnectedAppMassChangeRequestDto request,
+      boolean dryRun) {
+    return actingMemberScope.call(
+        caller, client.getCapabilities(), () -> runAs(caller, client, request, dryRun));
+  }
+
+  /**
+   * Reads the change set as its resource's and runs it in the current security context.
+   *
+   * @param caller the client, installation and member
+   * @param client the client, with its capabilities
    * @param request the staged change set
    * @param dryRun whether to preview only
    * @return the result
    */
-  private @NotNull ExchangeChangeResultDto run(
+  private @NotNull ExchangeChangeResultDto runAs(
       @NotNull ExchangeCaller caller,
-      @NotNull ExchangeResource resource,
+      @NotNull ExchangeClient client,
       @NotNull ConnectedAppMassChangeRequestDto request,
       boolean dryRun) {
-    return switch (resource) {
+    return switch (resourceOf(request)) {
       case BLUEPRINT -> {
         ExchangeBlueprintChangeSet read = read(request, ExchangeBlueprintChangeSet.class);
         ExchangeBlueprintChangeSet changeSet = new ExchangeBlueprintChangeSet(read.ops(), dryRun);
@@ -240,6 +267,18 @@ public class ExchangeMassChangeService {
         yield dryRun
             ? orgStockWriteService.apply(caller, changeSet)
             : orgStockWriteService.applyConfirmed(caller, changeSet);
+      }
+      case REFINERY_ORDER -> {
+        ExchangeRefineryOrderChangeSet read = read(request, ExchangeRefineryOrderChangeSet.class);
+        if (read.storesStock()
+            && !client.getCapabilities().contains(ExchangeCapability.REFINERY_STORE)) {
+          throw ExchangeProblemException.scopeMissing();
+        }
+        ExchangeRefineryOrderChangeSet changeSet =
+            new ExchangeRefineryOrderChangeSet(read.ops(), dryRun);
+        yield dryRun
+            ? refineryOrderWriteService.apply(caller, changeSet)
+            : refineryOrderWriteService.applyConfirmed(caller, changeSet);
       }
     };
   }

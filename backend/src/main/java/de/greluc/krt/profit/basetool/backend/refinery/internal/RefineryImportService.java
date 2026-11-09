@@ -51,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExtractOrderDt
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryImportDraftDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -277,24 +278,7 @@ public class RefineryImportService implements RefineryDraftBuilder {
 
     reconcileHeaderTotals(order, sourceGoods, issues);
 
-    RefineryOrderDto draftOrder =
-        new RefineryOrderDto(
-            null,
-            resolveOwnerReference(callerId),
-            location.map(locationMapper::toDto).orElse(null),
-            null,
-            deriveStartedAt(order.sourceImages()),
-            order.durationMinutes(),
-            order.expenses(),
-            null,
-            null,
-            null,
-            method.map(refiningMethodMapper::toDto).orElse(null),
-            RefineryOrderStatus.OPEN.name(),
-            draftGoods,
-            null,
-            null,
-            null);
+    RefineryOrderDto draftOrder = draftOrder(callerId, order, location, method, draftGoods);
     log.debug(
         "Built refinery import draft: {} of {} rows matched, {} skipped, {} issues",
         goodsMatched,
@@ -303,6 +287,46 @@ public class RefineryImportService implements RefineryDraftBuilder {
         issues.size());
     return new RefineryImportDraftDto(
         draftOrder, List.copyOf(issues), goodsMatched, sourceGoods.size(), rowsSkipped);
+  }
+
+  /**
+   * Builds the draft's unsaved order: {@code OPEN}, owned by the caller, with the matched location
+   * and method and the extracted timer and expenses; id, mission, owning unit, version, section
+   * counters and provenance stay unset.
+   *
+   * @param callerId the uploading member, or {@code null}
+   * @param order the extracted order
+   * @param location the matched refinery location, if any
+   * @param method the matched refining method, if any
+   * @param draftGoods the resolved goods
+   * @return the draft order
+   */
+  private @NotNull RefineryOrderDto draftOrder(
+      @Nullable UUID callerId,
+      @NotNull RefineryExtractOrderDto order,
+      @NotNull Optional<Location> location,
+      @NotNull Optional<RefiningMethod> method,
+      @NotNull List<RefineryGoodDto> draftGoods) {
+    return new RefineryOrderDto(
+        null,
+        resolveOwnerReference(callerId),
+        location.map(locationMapper::toDto).orElse(null),
+        null,
+        deriveStartedAt(order.sourceImages()),
+        order.durationMinutes(),
+        order.expenses(),
+        null,
+        null,
+        null,
+        method.map(refiningMethodMapper::toDto).orElse(null),
+        RefineryOrderStatus.OPEN.name(),
+        draftGoods,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   /**

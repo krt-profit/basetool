@@ -214,6 +214,16 @@ class RefineryOrderTest {
     return node.toString();
   }
 
+  /**
+   * Serialises an order as an update request that writes every part against the counters the order
+   * carries (REQ-REFINERY-029).
+   */
+  private String updatePayload(RefineryOrder order) {
+    ObjectNode node = (ObjectNode) objectMapper.readTree(payload(order));
+    node.putArray("parts").add("GAME_DATA").add("FINANCES").add("MISSION_LINK");
+    return node.toString();
+  }
+
   @Test
   void testUserCreateAndManageRefineryOrder() throws Exception {
     RefineryOrder order = new RefineryOrder();
@@ -299,7 +309,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(updatePayload)))
+                .content(updatePayload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(saved.getId()).orElseThrow();
@@ -323,7 +333,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(saved.getId()).get().getStatus());
   }
 
@@ -381,7 +391,20 @@ class RefineryOrderTest {
     order.setGoods(new HashSet<>(Set.of(good)));
     order = refineryOrderRepository.save(order);
 
-    order.setRefiningMethod(ferron);
+    RefineryOrder updatePayload = new RefineryOrder();
+    updatePayload.setId(order.getId());
+    updatePayload.setVersion(order.getVersion());
+    updatePayload.setLocation(order.getLocation());
+    updatePayload.setOwner(order.getOwner());
+    updatePayload.setOwningOrgUnit(order.getOwningOrgUnit());
+    updatePayload.setRefiningMethod(ferron);
+    RefineryGood updatedGood = new RefineryGood();
+    updatedGood.setInputMaterial(quantanium);
+    updatedGood.setInputQuantity(100);
+    updatedGood.setOutputMaterial(quantanium);
+    updatedGood.setOutputQuantity(100);
+    updatedGood.setQuality(100);
+    updatePayload.setGoods(new HashSet<>(Set.of(updatedGood)));
     mockMvc
         .perform(
             put("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
@@ -396,7 +419,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(updatePayload(updatePayload)))
         .andExpect(status().isOk());
 
     RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();
@@ -418,7 +441,7 @@ class RefineryOrderTest {
         .andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.CANCELED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.CANCELED,
         refineryOrderRepository.findById(order.getId()).get().getStatus());
   }
 
@@ -458,7 +481,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(updatePayload(order)))
         .andExpect(status().isForbidden());
 
     mockMvc
@@ -475,7 +498,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_READ"),
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(payload(order)))
+                .content(updatePayload(order)))
         .andExpect(status().isForbidden());
   }
 
@@ -601,7 +624,7 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.COMPLETED,
         stored.getStatus());
 
     java.util.List<InventoryItem> items =
@@ -725,7 +748,7 @@ class RefineryOrderTest {
         .andExpect(status().isNotFound());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
         refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
     assertTrue(
         inventoryItemRepository
@@ -744,7 +767,7 @@ class RefineryOrderTest {
     mockMvc.perform(storeRequest(order.getId(), ownOrder.getId())).andExpect(status().isOk());
 
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.COMPLETED,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.COMPLETED,
         refineryOrderRepository.findById(order.getId()).orElseThrow().getStatus());
   }
 
@@ -784,7 +807,7 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN,
+        de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN,
         stored.getStatus());
     assertEquals(100, stored.getGoods().iterator().next().getOutputQuantity().intValue());
     assertTrue(
@@ -807,8 +830,7 @@ class RefineryOrderTest {
     order.setLocation(station);
     order.setOwner(user1);
     order.setRefiningMethod(dinyx);
-    order.setStatus(
-        de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus.OPEN);
+    order.setStatus(de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus.OPEN);
     RefineryGood good = new RefineryGood();
     good.setInputMaterial(quantanium);
     good.setInputQuantity(100);

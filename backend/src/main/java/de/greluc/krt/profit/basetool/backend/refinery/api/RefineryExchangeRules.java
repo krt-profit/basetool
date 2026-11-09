@@ -1,0 +1,154 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.refinery.api;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * The rules a refinery order's location, goods and money fields follow in the web and in the
+ * exchange alike (REQ-REFINERY-020, REQ-XCH-052).
+ */
+public final class RefineryExchangeRules {
+
+  /** Units a good's quantities count per SCU of an SCU-measured material. */
+  public static final double UNITS_PER_SCU = 100.0d;
+
+  /** Non-instantiable static-helper holder. */
+  private RefineryExchangeRules() {}
+
+  /**
+   * Whether a location hosts a refinery: its city's or its space station's derived {@code
+   * hasRefineryTerminal} flag, the signal the web's picker uses. Reads the parent through the
+   * association, never a query, so it cannot trigger an auto-flush mid-update.
+   *
+   * @param location the location with its city and space station reachable
+   * @return {@code true} when the city or the space station has a refinery terminal
+   */
+  public static boolean hostsRefinery(@NotNull Location location) {
+    return (location.getCity() != null
+            && Boolean.TRUE.equals(location.getCity().getHasRefineryTerminal()))
+        || (location.getSpaceStation() != null
+            && Boolean.TRUE.equals(location.getSpaceStation().getHasRefineryTerminal()));
+  }
+
+  /**
+   * Whether a material may be a good's input: a {@code RAW} material or a manual raw one.
+   *
+   * @param material the material
+   * @return {@code true} when it may be refined
+   */
+  public static boolean refinable(@NotNull Material material) {
+    return material.getType() == MaterialType.RAW
+        || Boolean.TRUE.equals(material.getIsManualRawMaterial());
+  }
+
+  /**
+   * The value a money field stores: 0 means none and is stored as {@code null}.
+   *
+   * @param value the requested value
+   * @return the value, or {@code null} for {@code null} and 0
+   */
+  @Contract("null -> null")
+  public static @Nullable Double money(@Nullable Double value) {
+    return value == null || value == 0.0 ? null : value;
+  }
+
+  /**
+   * The output a good of the input yields: the input's refined material, else the input itself.
+   *
+   * @param input the input material
+   * @return the output material
+   */
+  public static @NotNull Material output(@NotNull Material input) {
+    return input.getRefinedMaterial() != null ? input.getRefinedMaterial() : input;
+  }
+
+  /**
+   * The end of a run: its start plus its length.
+   *
+   * @param startedAt the run's start, or {@code null}
+   * @param durationMinutes the run's length in minutes, or {@code null}
+   * @return {@code startedAt + durationMinutes}, or {@code null} when either is unset
+   */
+  public static @Nullable Instant endsAt(
+      @Nullable Instant startedAt, @Nullable Long durationMinutes) {
+    return startedAt == null || durationMinutes == null
+        ? null
+        : startedAt.plus(durationMinutes, ChronoUnit.MINUTES);
+  }
+
+  /**
+   * The good a store line books onto (REQ-REFINERY-022): the first good whose output is the line's
+   * material at the line's grade, else the first of that material at another grade.
+   *
+   * @param goods the order's goods
+   * @param output a good's output material, or {@code null} when it has none
+   * @param grade a good's quality, or {@code null} when it has none
+   * @param material the line's material
+   * @param quality the line's quality, or {@code null} to take the first good of the material
+   * @param <G> the type of a good
+   * @return the good, or {@code null} when no good outputs the material
+   */
+  public static <G> @Nullable G storedGood(
+      @NotNull Collection<G> goods,
+      @NotNull Function<G, UUID> output,
+      @NotNull Function<G, Integer> grade,
+      @NotNull UUID material,
+      @Nullable Integer quality) {
+    G sameMaterial = null;
+    for (G good : goods) {
+      if (!material.equals(output.apply(good))) {
+        continue;
+      }
+      if (quality == null || Objects.equals(grade.apply(good), quality)) {
+        return good;
+      }
+      if (sameMaterial == null) {
+        sameMaterial = good;
+      }
+    }
+    return sameMaterial;
+  }
+
+  /**
+   * The yield a store writes back into a good: every amount booked onto the good together, in
+   * units, at least one.
+   *
+   * @param unit the output material's own unit
+   * @param amount the amounts booked onto the good, summed, in that unit
+   * @return the yield in units, 100 to the SCU
+   */
+  public static int storedYield(@NotNull QuantityType unit, double amount) {
+    long units = unit == QuantityType.SCU ? Math.round(amount * UNITS_PER_SCU) : Math.round(amount);
+    return Math.clamp(units, 1, Integer.MAX_VALUE);
+  }
+}

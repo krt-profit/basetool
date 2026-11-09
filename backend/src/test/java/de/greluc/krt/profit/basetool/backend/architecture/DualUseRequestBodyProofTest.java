@@ -48,9 +48,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
-import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.HashMap;
@@ -613,7 +613,8 @@ class DualUseRequestBodyProofTest {
             "location", Map.of("id", station.getId()),
             "durationMinutes", 90,
             "goods", goods,
-            "version", own.getVersion()));
+            "parts", List.of("GAME_DATA"),
+            "gameDataVersion", own.getGameDataVersion()));
 
     RefineryOrder updated = refineryOrderRepository.findById(own.getId()).orElseThrow();
     assertThat(updated.getOwner().getId()).isEqualTo(member.getId());

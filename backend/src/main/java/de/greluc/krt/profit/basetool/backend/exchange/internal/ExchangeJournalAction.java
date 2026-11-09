@@ -45,7 +45,15 @@ public enum ExchangeJournalAction {
   ORG_STOCK_STOLEN(ExchangeResource.ORG_STOCK),
   ORG_STOCK_EARMARK_ADD(ExchangeResource.ORG_STOCK),
   ORG_STOCK_EARMARK_CHANGE(ExchangeResource.ORG_STOCK),
-  ORG_STOCK_EARMARK_REMOVE(ExchangeResource.ORG_STOCK);
+  ORG_STOCK_EARMARK_REMOVE(ExchangeResource.ORG_STOCK),
+  REFINERY_CREATE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_UPDATE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_GOOD_ADD(ExchangeResource.REFINERY_ORDER),
+  REFINERY_GOOD_UPDATE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_GOOD_REMOVE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_CANCEL(ExchangeResource.REFINERY_ORDER),
+  REFINERY_DELETE(ExchangeResource.REFINERY_ORDER),
+  REFINERY_PICKUP(ExchangeResource.REFINERY_ORDER);
 
   /** The resource the action belongs to. */
   @NotNull private final ExchangeResource resource;

@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -188,7 +189,8 @@ class RefineryOrdersListPatternRenderTest {
         List.of(good),
         null,
         1L,
-        canEdit);
+        canEdit,
+        null);
   }
 
   /**
@@ -267,6 +269,128 @@ class RefineryOrdersListPatternRenderTest {
         .contains("href=\"/refinery-orders/00000000-0000-0000-0000-000000001042?store=open\"")
         .containsPattern(
             "href=\"/refinery-orders/00000000-0000-0000-0000-000000001051\\?store=open\"[^>]*hidden=\"hidden\"");
+  }
+
+  /**
+   * A closed order of the viewer with its provenance.
+   *
+   * @param id the order id
+   * @param status the backend status
+   * @param provenance the provenance
+   * @return the order
+   */
+  private static @NotNull RefineryOrderListDto closedOrder(
+      @NotNull UUID id, @NotNull String status, @NotNull RefineryOrderProvenanceDto provenance) {
+    RefineryOrderListDto base = order(id, 300, 60, "Gold-Erz", "Gold", true);
+    return new RefineryOrderListDto(
+        base.id(),
+        base.owner(),
+        base.location(),
+        null,
+        base.startedAt(),
+        base.durationMinutes(),
+        0d,
+        0d,
+        0d,
+        0d,
+        base.refiningMethod(),
+        status,
+        base.goods(),
+        null,
+        1L,
+        true,
+        provenance);
+  }
+
+  /**
+   * A client's order carries its info chip; a pickup without store reads „Abgeholt" via the client,
+   * one with a store stays „Abgeschlossen", and a web order has no chip (REQ-REFINERY-027, -028).
+   */
+  @Test
+  void rendersTheClientChipAndThePickup() throws Exception {
+    Instant at = Instant.now().minus(30, ChronoUnit.MINUTES);
+    UUID pickedUpId = UUID.fromString("00000000-0000-0000-0000-00000000a0c1");
+    UUID storedId = UUID.fromString("00000000-0000-0000-0000-00000000a0c2");
+    UUID webId = UUID.fromString("00000000-0000-0000-0000-00000000a0c3");
+    PageResponse<RefineryOrderListDto> page =
+        new PageResponse<>(
+            List.of(
+                closedOrder(
+                    pickedUpId,
+                    "COMPLETED",
+                    new RefineryOrderProvenanceDto(
+                        "VerseKit", "VerseKit", at, at, "VerseKit", null)),
+                closedOrder(
+                    storedId,
+                    "COMPLETED",
+                    new RefineryOrderProvenanceDto("VerseKit", null, at, at, "VerseKit", at)),
+                closedOrder(
+                    webId,
+                    "COMPLETED",
+                    new RefineryOrderProvenanceDto(null, null, at, null, null, at))),
+            0,
+            50,
+            3L,
+            1,
+            List.of());
+
+    String html = render(page, "view=COMPLETED");
+    String pickedUpRow = row(html, "#a0c1");
+    String storedRow = row(html, "#a0c2");
+    String webRow = row(html, "#a0c3");
+
+    assertThat(pickedUpRow)
+        .containsPattern("class=\"chip chip--info\"[^>]*>VerseKit<")
+        .contains("data-state=\"PICKED_UP\"")
+        .containsPattern("data-testid=\"refinery-picked-up\"[^>]*>Abgeholt<")
+        .contains(">via VerseKit<");
+    assertThat(storedRow)
+        .contains("chip--info")
+        .contains("data-state=\"COMPLETED\"")
+        .doesNotContain(">Abgeholt<")
+        .contains(">via VerseKit<");
+    assertThat(webRow).doesNotContain("chip--info").doesNotContain("via ");
+  }
+
+  /**
+   * A picked-up order the member reopened or canceled reads by its status again, without „via
+   * <client>" (REQ-REFINERY-028).
+   */
+  @Test
+  void aReopenedOrCanceledPickupDropsTheViaClient() throws Exception {
+    Instant at = Instant.now().minus(30, ChronoUnit.MINUTES);
+    RefineryOrderProvenanceDto pickedUp =
+        new RefineryOrderProvenanceDto("VerseKit", null, at, at, "VerseKit", null);
+    PageResponse<RefineryOrderListDto> page =
+        new PageResponse<>(
+            List.of(
+                closedOrder(
+                    UUID.fromString("00000000-0000-0000-0000-00000000b0c1"), "OPEN", pickedUp),
+                closedOrder(
+                    UUID.fromString("00000000-0000-0000-0000-00000000b0c2"), "CANCELED", pickedUp)),
+            0,
+            50,
+            2L,
+            1,
+            List.of());
+
+    String html = render(page, "view=ALL");
+
+    assertThat(row(html, "#b0c1")).doesNotContain("refinery-picked-up-via");
+    assertThat(row(html, "#b0c2")).doesNotContain("refinery-picked-up-via");
+  }
+
+  /**
+   * Cuts the table row that holds {@code marker} out of the page.
+   *
+   * @param html the rendered page
+   * @param marker text only that row holds
+   * @return the row's HTML
+   */
+  private static @NotNull String row(@NotNull String html, @NotNull String marker) {
+    int at = html.indexOf(marker);
+    int start = html.lastIndexOf("<tr", at);
+    return html.substring(start, html.indexOf("</tr>", at));
   }
 
   /** An order the backend does not let the viewer edit shows no store action, even when ready. */

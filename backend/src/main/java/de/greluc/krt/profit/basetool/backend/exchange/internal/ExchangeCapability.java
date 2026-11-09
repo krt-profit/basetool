@@ -74,6 +74,15 @@ public enum ExchangeCapability {
   /** Booking stock into and out of the pools of the member's Logistician units. */
   ORGSTOCK_WRITE("exchange.orgstock.write"),
 
+  /** Reading the member's own refinery orders (REQ-XCH-051). */
+  REFINERY_READ("exchange.refinery.read"),
+
+  /** Changing the member's own refinery orders (REQ-XCH-052). */
+  REFINERY_WRITE("exchange.refinery.write"),
+
+  /** Booking a picked-up order's yield into stock and reading the store choices (REQ-XCH-053). */
+  REFINERY_STORE("exchange.refinery.store"),
+
   /** Submitting blueprint drafts for review in the browser. */
   DRAFTS_BLUEPRINTS("exchange.drafts.blueprints"),
 

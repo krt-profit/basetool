@@ -123,6 +123,9 @@ class RefineryImportProxyControllerTest {
             RefineryOrderStatus.OPEN,
             null,
             null,
+            null,
+            null,
+            null,
             null);
     RefineryImportDraftDto draft =
         new RefineryImportDraftDto(
@@ -319,6 +322,9 @@ class RefineryImportProxyControllerTest {
             null,
             List.of(),
             RefineryOrderStatus.OPEN,
+            null,
+            null,
+            null,
             null,
             null,
             null);

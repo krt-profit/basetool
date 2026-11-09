@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
@@ -56,8 +57,10 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -71,7 +74,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -113,7 +115,7 @@ class RefineryOrderStoreServiceTest {
 
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
-  @InjectMocks private RefineryOrderStoreService refineryOrderService;
+  private RefineryOrderStoreService refineryOrderService;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -130,9 +132,7 @@ class RefineryOrderStoreServiceTest {
 
   @BeforeEach
   void setUpEntities() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        refineryOrderService,
-        "stockCommands",
+    StockCommands stockCommands =
         new InventoryStockCommands(
             inventoryItemRepository,
             userRepository,
@@ -141,7 +141,20 @@ class RefineryOrderStoreServiceTest {
             auditService,
             bookInPolicy,
             null,
-            null));
+            null);
+    refineryOrderService =
+        new RefineryOrderStoreService(
+            refineryOrderRepository,
+            userRepository,
+            locationRepository,
+            materialRepository,
+            jobOrderRepository,
+            jobOrderItemService,
+            jobOrderVisibility,
+            orgUnitStampingService,
+            stockCommands,
+            new RefineryOrderStoreBooking(
+                refineryOrderRepository, stockCommands, auditService, eventPublisher, userService));
     lenient().when(userService.currentActor()).thenReturn(ActorRef.system());
     owner = new User();
     owner.setId(OWNER_ID);
@@ -168,7 +181,7 @@ class RefineryOrderStoreServiceTest {
     completedOrder.setId(ORDER_ID);
     completedOrder.setStatus(RefineryOrderStatus.COMPLETED);
 
-    when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(completedOrder));
+    when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(completedOrder));
 
     RefineryOrderStoreDto dto = new RefineryOrderStoreDto(Collections.emptyList());
 
@@ -184,7 +197,7 @@ class RefineryOrderStoreServiceTest {
   void shouldRefuseStoringAnOrderThatCarriesTheStoredMarker_evenWhenReopened() {
     order.setStatus(RefineryOrderStatus.OPEN);
     order.setStoredAt(java.time.Instant.now());
-    when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+    when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
 
     BadRequestException ex =
         assertThrows(
@@ -209,6 +222,21 @@ class RefineryOrderStoreServiceTest {
         OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
 
     assertTrue(order.getStoredAt() != null);
+  }
+
+  /** A store in the web is the order's last change, at the store time (REQ-REFINERY-027). */
+  @Test
+  void aWebStoreIsTheLastChange() {
+    order.setProvenance(
+        RefineryOrderProvenance.createdByClient("versekit", Instant.parse("2026-11-01T10:00:00Z")));
+    stubLookupsForSingleItem();
+
+    refineryOrderService.storeRefineryOrder(
+        OWNER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of(item(null, null))), false);
+
+    assertEquals(RefineryChangeSource.WEB, order.getProvenance().getLastChangeSource());
+    assertEquals(order.getStoredAt(), order.getProvenance().getLastChangedAt());
+    assertEquals("versekit", order.getProvenance().getCreatedClient());
   }
 
   @Test
@@ -267,7 +295,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsNotFound_whenOrderDoesNotExist() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class,
@@ -279,7 +307,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsAccessDenied_whenNonLogisticianIsNotOwner() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
 
       assertThrows(
           AccessDeniedException.class,
@@ -292,7 +320,7 @@ class RefineryOrderStoreServiceTest {
     @Test
     void throwsAccessDenied_whenOrderOwnerIsNull_andCallerIsNotLogistician() {
       order.setOwner(null);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
 
       assertThrows(
           AccessDeniedException.class,
@@ -304,7 +332,7 @@ class RefineryOrderStoreServiceTest {
     @Test
     void throwsAccessDenied_whenOwnerHasNullId_andCallerIsNotLogistician() {
       owner.setId(null);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
 
       assertThrows(
           AccessDeniedException.class,
@@ -315,7 +343,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void logisticianBypassesOwnershipCheck_evenForSomeoneElsesOrder() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
 
       refineryOrderService.storeRefineryOrder(
           OTHER_USER_ID, ORDER_ID, new RefineryOrderStoreDto(List.of()), true);
@@ -330,7 +358,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsNotFound_whenMaterialIsMissing() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.empty());
 
       assertThrows(
@@ -342,7 +370,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsNotFound_whenLocationIsMissing() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.empty());
 
@@ -357,7 +385,7 @@ class RefineryOrderStoreServiceTest {
     @MethodSource("de.greluc.krt.profit.basetool.backend.catalogue.api.NotOfferedPlaces#places")
     void throwsLocationNotOffered_whenNoPickerOffersThePlace(Location place) {
       place.setId(LOCATION_ID);
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(place));
 
@@ -371,7 +399,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsNotFound_whenAssigneeUserIsMissing() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.empty());
@@ -389,7 +417,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void throwsNotFound_whenJobOrderIsMissing() {
-      when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
       when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.empty());
@@ -654,7 +682,7 @@ class RefineryOrderStoreServiceTest {
       high.setQuality(874);
       order.setGoods(new HashSet<>(Set.of(low, high)));
 
-      lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      lenient().when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       lenient()
           .when(materialRepository.findById(eq(scuMaterial.getId())))
           .thenReturn(Optional.of(scuMaterial));
@@ -835,7 +863,7 @@ class RefineryOrderStoreServiceTest {
 
     @Test
     void rejectsPersonalCombinedWithAJobOrder_andWritesNothing() {
-      lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+      lenient().when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
       lenient().when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
       lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
 
@@ -949,13 +977,13 @@ class RefineryOrderStoreServiceTest {
   }
 
   private void stubLookupsForSingleItem() {
-    lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+    lenient().when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
     lenient().when(materialRepository.findById(MATERIAL_ID)).thenReturn(Optional.of(material));
     lenient().when(locationRepository.findById(LOCATION_ID)).thenReturn(Optional.of(location));
   }
 
   private void storeWithMaterial(Material material, double amount) {
-    lenient().when(refineryOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
+    lenient().when(refineryOrderRepository.lockById(ORDER_ID)).thenReturn(Optional.of(order));
     lenient()
         .when(materialRepository.findById(eq(material.getId())))
         .thenReturn(Optional.of(material));

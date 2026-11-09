@@ -779,12 +779,17 @@ public class RefineryOrderPageController {
         form.setOwnerId(orderDto.owner().id());
       }
       form.setStatus(orderDto.status());
-      form.setVersion(orderDto.version());
+      form.setGameDataVersion(orderDto.gameDataVersion());
+      form.setFinancesVersion(orderDto.financesVersion());
+      form.setGameDataChanged(true);
+      form.setFinancesChanged(true);
+      form.setMissionChanged(true);
 
       if (orderDto.goods() != null && !orderDto.goods().isEmpty()) {
         List<RefineryGoodForm> goodsForm = new ArrayList<>();
         for (RefineryGoodDto goodDto : orderDto.goods()) {
           RefineryGoodForm goodForm = new RefineryGoodForm();
+          goodForm.setId(goodDto.id());
           if (goodDto.inputMaterial() != null) {
             goodForm.setInputMaterialId(goodDto.inputMaterial().id());
           }
@@ -875,7 +880,8 @@ public class RefineryOrderPageController {
     Instant now = Instant.now();
     Instant endsAt = order.getEndsAt();
     RefineryProgress.State state =
-        RefineryProgress.state(order.status() == null ? null : order.status().name(), endsAt, now);
+        RefineryProgress.state(
+            order.status() == null ? null : order.status().name(), endsAt, order.provenance(), now);
     model.addAttribute("orderState", state);
     model.addAttribute("orderEndsAt", endsAt);
     model.addAttribute(

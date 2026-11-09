@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderPart;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderStoreForm;
@@ -49,9 +50,12 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -213,8 +217,7 @@ public class RefineryOrderWriteController {
         redirectAttributes.addFlashAttribute("refineryOrderForm", form);
         return "redirect:/refinery-orders/" + id;
       }
-      refineryClient.update(id, request);
-      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
+      saveChangedParts(id, request);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.update");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/refinery-orders/{id}", id, e);
@@ -345,19 +348,21 @@ public class RefineryOrderWriteController {
         nullToZero(form.getOtherExpenses()),
         nullToZero(form.getOreSales()),
         refiningMethodOf(form),
-        goodsOf(form),
+        goodsOf(form, _ -> null),
         form.getOwningOrgUnitId());
   }
 
   /**
    * Builds the update request from the edit form, dropping goods rows without an input material or
-   * quantity. Shared by {@link #updateOrder} and its AJAX twin.
+   * quantity and keeping the id of each stored good a row edits. Shared by {@link #updateOrder} and
+   * its AJAX twin.
    *
    * @param form the bound edit form
-   * @return the request ready to PUT, carrying the form's optimistic-lock version
+   * @return the request ready to PUT, naming the parts the form changed and echoing both section
+   *     counters (REQ-REFINERY-029)
    */
   @NotNull
-  private RefineryOrderUpdateRequest buildUpdateRequest(RefineryOrderForm form) {
+  private static RefineryOrderUpdateRequest buildUpdateRequest(RefineryOrderForm form) {
     return new RefineryOrderUpdateRequest(
         locationOf(form),
         missionOf(form),
@@ -368,8 +373,47 @@ public class RefineryOrderWriteController {
         nullToZero(form.getOreSales()),
         refiningMethodOf(form),
         form.getStatus() != null ? form.getStatus() : RefineryOrderStatus.OPEN,
-        goodsOf(form),
-        form.getVersion());
+        goodsOf(form, RefineryGoodForm::getId),
+        changedParts(form),
+        form.getGameDataVersion(),
+        form.getFinancesVersion());
+  }
+
+  /**
+   * Collects the parts the edit form changed; a flag the page script did not report counts as
+   * changed, so the part is written and its counter checked.
+   *
+   * @param form the bound edit form
+   * @return the changed parts, empty when the form changed nothing
+   */
+  @NotNull
+  private static Set<RefineryOrderPart> changedParts(RefineryOrderForm form) {
+    Set<RefineryOrderPart> parts = EnumSet.noneOf(RefineryOrderPart.class);
+    if (!Boolean.FALSE.equals(form.getGameDataChanged())) {
+      parts.add(RefineryOrderPart.GAME_DATA);
+    }
+    if (!Boolean.FALSE.equals(form.getFinancesChanged())) {
+      parts.add(RefineryOrderPart.FINANCES);
+    }
+    if (!Boolean.FALSE.equals(form.getMissionChanged())) {
+      parts.add(RefineryOrderPart.MISSION_LINK);
+    }
+    return parts;
+  }
+
+  /**
+   * Sends an edit to the backend and pokes the refinery queue; an edit that changed no part sends
+   * nothing.
+   *
+   * @param id the refinery order id
+   * @param request the update request
+   */
+  private void saveChangedParts(UUID id, RefineryOrderUpdateRequest request) {
+    if (request.parts().isEmpty()) {
+      return;
+    }
+    refineryClient.update(id, request);
+    liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
   }
 
   /**
@@ -438,7 +482,15 @@ public class RefineryOrderWriteController {
             + (form.getDurationMinutes() != null ? form.getDurationMinutes() : 0));
   }
 
-  private static List<RefineryGoodDto> goodsOf(RefineryOrderForm form) {
+  /**
+   * Maps the form's goods rows with an input material to request goods.
+   *
+   * @param form the bound form
+   * @param idOf the id a row's good is sent with: the stored good's id on an edit, none on a create
+   * @return the request goods in row order
+   */
+  private static List<RefineryGoodDto> goodsOf(
+      RefineryOrderForm form, Function<RefineryGoodForm, @Nullable UUID> idOf) {
     List<RefineryGoodDto> goodsDto = new ArrayList<>();
     for (RefineryGoodForm g : form.getGoods()) {
       if (g.getInputMaterialId() != null) {
@@ -480,7 +532,7 @@ public class RefineryOrderWriteController {
                 : null;
         goodsDto.add(
             new RefineryGoodDto(
-                null,
+                idOf.apply(g),
                 inMat,
                 g.getInputQuantity() != null ? g.getInputQuantity() : 0,
                 outMat,
@@ -557,8 +609,7 @@ public class RefineryOrderWriteController {
       return ResponseEntity.badRequest().build();
     }
     try {
-      refineryClient.update(id, request);
-      liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
+      saveChangedParts(id, request);
       return ResponseEntity.ok(Map.of("targetUrl", "/refinery-orders"));
     } catch (BackendServiceException bse) {
       log.debug("Failed to update refinery order {} (ajax): {}", id, bse.getMessage());

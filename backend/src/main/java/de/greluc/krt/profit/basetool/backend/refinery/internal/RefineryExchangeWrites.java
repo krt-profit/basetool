@@ -1,0 +1,598 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.refinery.internal;
+
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RefiningMethodRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeEdit;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrigin;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRestore;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeStoreLine;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeWriter;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
+import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
+import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Writes a member's own refinery orders for the exchange (REQ-XCH-052, REQ-XCH-056) with the web's
+ * rules: an offered refinery as the location, raw inputs, the stored status lock, the ready notice
+ * re-armed on a moved run, the section counters and the provenance (REQ-REFINERY-020, -022, -023,
+ * -027, -029), audited like a web write.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(propagation = Propagation.MANDATORY)
+public class RefineryExchangeWrites implements RefineryExchangeWriter {
+
+  private final RefineryOrderRepository refineryOrderRepository;
+  private final UserRepository userRepository;
+  private final LocationRepository locationRepository;
+  private final RefiningMethodRepository refiningMethodRepository;
+  private final MaterialRepository materialRepository;
+  private final MissionRepository missionRepository;
+  private final OrgUnitRepository orgUnitRepository;
+  private final JobOrderRepository jobOrderRepository;
+  private final RefineryOrderStoreBooking storeBooking;
+  private final OrgUnitStampingService orgUnitStampingService;
+  private final AuditRecorder auditRecorder;
+  private final ApplicationEventPublisher eventPublisher;
+  private final EntityManager entityManager;
+
+  @Override
+  public @NotNull Optional<RefineryExchangeOrder> lockOwn(
+      @NotNull UUID owner, @NotNull UUID orderId) {
+    return refineryOrderRepository.lockOwnedById(orderId, owner).map(RefineryExchangeReads::toRow);
+  }
+
+  @Override
+  public @NotNull @Unmodifiable List<RefineryExchangeOrder> lockOwn(
+      @NotNull UUID owner, @NotNull Collection<UUID> orderIds) {
+    if (orderIds.isEmpty()) {
+      return List.of();
+    }
+    return refineryOrderRepository.lockOwnedByIdsOrderById(owner, orderIds).stream()
+        .map(RefineryExchangeReads::toRow)
+        .toList();
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder create(
+      @NotNull UUID owner,
+      @NotNull String clientId,
+      @NotNull UUID orgUnitId,
+      @NotNull RefineryExchangeEdit edit) {
+    User user = Entities.require(userRepository.findById(owner), "error.user.not_found");
+    RefineryOrder order = new RefineryOrder();
+    order.setOwner(user);
+    order.setOwningOrgUnit(
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, orgUnitId));
+    order.setLocation(
+        RefineryOrderEdits.requireRefinery(
+            OfferedLocations.require(
+                locationRepository.findById(
+                    Objects.requireNonNull(edit.locationId(), "locationId")),
+                "error.location.not_found")));
+    order.setStatus(Objects.requireNonNull(edit.status(), "status"));
+    order.setGameDataVersion(0L);
+    order.setFinancesVersion(0L);
+    order.setProvenance(RefineryOrderProvenance.createdByClient(clientId, Instant.now()));
+    if (edit.method() != null) {
+      setMethod(order, edit.method());
+    }
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    order.setStartedAt(
+        timer != null && timer.startedAt() != null ? timer.startedAt() : Instant.now());
+    order.setDurationMinutes(timer == null ? null : timer.durationMinutes());
+    if (edit.finances() != null) {
+      setFinances(order, edit.finances());
+    }
+    List<RefineryGood> goods = new ArrayList<>();
+    if (edit.goods() != null) {
+      for (RefineryExchangeEdit.Good good : edit.goods()) {
+        goods.add(newGood(order, good));
+      }
+    }
+    order.getGoods().addAll(goods);
+    RefineryOrder saved = refineryOrderRepository.save(order);
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_CREATED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        owner,
+        RefineryOrders.summary(saved, saved.getStatus()));
+    return RefineryExchangeReads.toRow(saved, goods);
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder edit(
+      @NotNull UUID owner,
+      @Nullable String clientId,
+      @NotNull UUID orderId,
+      @NotNull RefineryExchangeEdit edit) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    final RefineryOrderStatus previousStatus = order.getStatus();
+    boolean runTimeChanged = false;
+    List<RefineryExchangeEdit.Good> reinserted = List.of();
+    if (edit.touchesGameData()) {
+      runTimeChanged = applyGameData(order, edit, clientId != null);
+      if (edit.goods() != null) {
+        reinserted = setGoods(order, edit.goods());
+      }
+      RefineryOrderSection.GAME_DATA.advance(order);
+    }
+    if (edit.finances() != null) {
+      setFinances(order, edit.finances());
+      RefineryOrderSection.FINANCES.advance(order);
+    }
+    if (clientId != null) {
+      order.getProvenance().recordClientChange(clientId, Instant.now());
+    } else {
+      order.getProvenance().recordWebChange(Instant.now());
+    }
+    if (edit.goods() != null) {
+      refineryOrderRepository.flush();
+    }
+    if (!reinserted.isEmpty()) {
+      reinsert(order.getId(), reinserted);
+      entityManager.refresh(order);
+    }
+    RefineryOrderEdits.clearReadyNoticeIfDue(eventPublisher, order, runTimeChanged);
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        order.getId(),
+        RefineryOrders.label(order),
+        owner,
+        RefineryOrders.summary(order, previousStatus + "->" + order.getStatus()));
+    return RefineryExchangeReads.toRow(order);
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder cancel(
+      @NotNull UUID owner, @NotNull String clientId, @NotNull UUID orderId) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    final RefineryOrderStatus previousStatus = order.getStatus();
+    order.setStatus(RefineryOrderStatus.CANCELED);
+    RefineryOrderSection.GAME_DATA.advance(order);
+    order.getProvenance().recordClientChange(clientId, Instant.now());
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_CANCELED,
+        order.getId(),
+        RefineryOrders.label(order),
+        owner,
+        AuditDetails.of("previousStatus", previousStatus));
+    return RefineryExchangeReads.toRow(order);
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder pickUp(
+      @NotNull UUID owner,
+      @NotNull String clientId,
+      @NotNull UUID orderId,
+      @NotNull List<RefineryExchangeStoreLine> lines) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    RefineryOrderStatus previousStatus = order.getStatus();
+    if (previousStatus != RefineryOrderStatus.OPEN
+        && previousStatus != RefineryOrderStatus.IN_PROGRESS) {
+      throw new BadRequestException("error.refinery_order.not_running");
+    }
+    if (!lines.isEmpty()) {
+      storeBooking.store(order, owner, lines.stream().map(this::storeLine).toList(), clientId);
+      return RefineryExchangeReads.toRow(order);
+    }
+    order.setStatus(RefineryOrderStatus.COMPLETED);
+    order.getProvenance().recordPickup(clientId, Instant.now());
+    RefineryOrderSection.GAME_DATA.advance(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(order.getId()));
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_UPDATED,
+        order.getId(),
+        RefineryOrders.label(order),
+        owner,
+        RefineryOrders.summary(order, previousStatus + "->" + order.getStatus())
+            .with("pickup", true));
+    return RefineryExchangeReads.toRow(order);
+  }
+
+  @Override
+  public void clearPickup(@NotNull UUID owner, @NotNull UUID orderId) {
+    requireOwn(owner, orderId).getProvenance().clearPickup();
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrigin delete(@NotNull UUID owner, @NotNull UUID orderId) {
+    RefineryOrder order = requireOwn(owner, orderId);
+    if (order.getStoredAt() != null) {
+      throw new BadRequestException("error.refinery_order.stored");
+    }
+    final RefineryExchangeOrigin origin = originOf(order);
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_DELETED,
+        order.getId(),
+        RefineryOrders.label(order),
+        owner,
+        AuditDetails.of("status", order.getStatus())
+            .with("location", RefineryOrders.locationName(order))
+            .with("goods", order.getGoods().size()));
+    refineryOrderRepository.delete(order);
+    eventPublisher.publishEvent(RefineryNotices.readyCleared(orderId));
+    return origin;
+  }
+
+  @Override
+  public @NotNull RefineryExchangeOrder restore(
+      @NotNull UUID owner, @NotNull RefineryExchangeRestore restore) {
+    User user = Entities.require(userRepository.findById(owner), "error.user.not_found");
+    RefineryExchangeEdit edit = restore.edit();
+    RefineryExchangeOrigin origin = restore.origin();
+    UUID location =
+        Entities.require(
+                locationRepository.findById(Objects.requireNonNull(edit.locationId(), "location")),
+                "error.location.not_found")
+            .getId();
+    UUID methodId = edit.method() == null ? null : edit.method().id();
+    UUID method =
+        methodId == null
+            ? null
+            : Entities.require(
+                    refiningMethodRepository.findById(methodId), "error.refining_method.not_found")
+                .getId();
+    OrgUnit unit = orgUnitStampingService.resolveOwnerMembershipTarget(user, origin.orgUnitId());
+    UUID linked = origin.missionId();
+    UUID mission = linked != null && missionRepository.existsById(linked) ? linked : null;
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    RefineryExchangeEdit.Finances finances = edit.finances();
+    refineryOrderRepository.insertOrder(
+        new RefineryOrderRepository.RestoredRow(
+            restore.id(),
+            origin.createdAt(),
+            owner,
+            location,
+            mission,
+            timer == null ? null : timer.startedAt(),
+            timer == null ? null : timer.durationMinutes(),
+            method,
+            finances == null ? null : RefineryExchangeRules.money(finances.expenses()),
+            finances == null ? null : RefineryExchangeRules.money(finances.otherExpenses()),
+            finances == null ? null : RefineryExchangeRules.money(finances.oreSales()),
+            Objects.requireNonNull(edit.status(), "status").name(),
+            origin.readyNotifiedAt(),
+            unit == null ? null : unit.getId(),
+            restore.gameDataVersion(),
+            restore.financesVersion(),
+            origin.createdClient(),
+            origin.pickedUpAt(),
+            origin.pickedUpClient()));
+    if (edit.goods() != null) {
+      reinsert(restore.id(), edit.goods());
+    }
+    RefineryOrder saved = requireOwn(owner, restore.id());
+    auditRecorder.record(
+        AuditEventType.REFINERY_ORDER_RESTORED,
+        saved.getId(),
+        RefineryOrders.label(saved),
+        owner,
+        AuditDetails.of("goods", saved.getGoods().size()));
+    return RefineryExchangeReads.toRow(saved);
+  }
+
+  /**
+   * Loads what a client's checked store line names.
+   *
+   * @param line the line
+   * @return the line the store books
+   * @throws NotFoundException when an entry it names does not exist
+   * @throws de.greluc.krt.profit.basetool.backend.catalogue.api.LocationNotOfferedException when
+   *     the location is not offered
+   */
+  private @NotNull RefineryOrderStoreBooking.Line storeLine(
+      @NotNull RefineryExchangeStoreLine line) {
+    UUID unit = line.orgUnitId();
+    UUID jobOrder = line.jobOrderId();
+    return new RefineryOrderStoreBooking.Line(
+        Entities.require(
+            materialRepository.findById(line.materialId()), "error.material.output.not_found"),
+        OfferedLocations.require(
+            locationRepository.findById(line.locationId()), "error.location.not_found"),
+        line.quality(),
+        line.amount(),
+        Entities.require(userRepository.findById(line.receiverId()), "error.user.not_found"),
+        unit == null
+            ? null
+            : Entities.require(
+                orgUnitRepository.findById(unit), () -> "OrgUnit not found: " + unit),
+        line.personal(),
+        jobOrder == null
+            ? null
+            : Entities.require(
+                jobOrderRepository.findById(jobOrder), () -> "JobOrder not found: " + jobOrder),
+        line.note());
+  }
+
+  /**
+   * Reads what an order holds beyond the fields a client writes.
+   *
+   * @param order the order
+   * @return its creation, unit, mission, pickup and notice markers
+   */
+  private static @NotNull RefineryExchangeOrigin originOf(@NotNull RefineryOrder order) {
+    RefineryOrderProvenance provenance = order.getProvenance();
+    return new RefineryExchangeOrigin(
+        order.getCreatedAt(),
+        provenance.getCreatedClient(),
+        order.getOwningOrgUnit() == null ? null : order.getOwningOrgUnit().getId(),
+        order.getMissionId(),
+        provenance.getPickedUpAt(),
+        provenance.getPickedUpClient(),
+        order.getReadyNotifiedAt());
+  }
+
+  /**
+   * Writes the location, method, timer and status an edit carries.
+   *
+   * @param order the locked, managed order
+   * @param edit the edit
+   * @param byClient whether a client writes, which may not change a stored order's status
+   * @return {@code true} when the start or the length of the run changed
+   * @throws BadRequestException when a client would change the status of a stored order
+   */
+  private boolean applyGameData(
+      @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit edit, boolean byClient) {
+    RefineryOrderStatus status = edit.status();
+    if (byClient) {
+      RefineryOrderEdits.requireStatusUnlocked(order, status);
+    }
+    if (edit.locationId() != null) {
+      order.setLocation(
+          RefineryOrderEdits.requireRefinery(
+              RefineryOrderEdits.offeredOrCurrent(locationRepository, order, edit.locationId())));
+    }
+    if (edit.method() != null) {
+      setMethod(order, edit.method());
+    }
+    RefineryExchangeEdit.Timer timer = edit.timer();
+    boolean runTimeChanged =
+        timer != null
+            && RefineryOrderEdits.setRunTime(order, timer.startedAt(), timer.durationMinutes());
+    if (status != null) {
+      order.setStatus(status);
+    }
+    return runTimeChanged;
+  }
+
+  /**
+   * Sets the order's refining method, or clears it for a method without an id.
+   *
+   * @param order the order
+   * @param method the method to set
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the method does not
+   *     exist
+   */
+  private void setMethod(
+      @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit.Method method) {
+    order.setRefiningMethod(
+        method.id() == null
+            ? null
+            : Entities.require(
+                refiningMethodRepository.findById(method.id()), "error.refining_method.not_found"));
+  }
+
+  /**
+   * Sets the order's expenses, other expenses and ore sales, a 0 stored as none.
+   *
+   * @param order the order
+   * @param finances the values
+   */
+  private static void setFinances(
+      @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit.Finances finances) {
+    RefineryOrderEdits.setFinances(
+        order, finances.expenses(), finances.otherExpenses(), finances.oreSales());
+  }
+
+  /**
+   * Makes the order hold exactly the given goods: known rows are changed in place, rows without an
+   * id are added, and every other row the exchange serves is removed. A known row keeps every value
+   * the edit leaves as it is, its materials included, so a held good whose input is no longer
+   * refinable stays writable; only a newly named input must be refinable.
+   *
+   * @param order the managed order
+   * @param goods every good the order holds afterwards
+   * @return the goods whose id the order does not hold, to insert under that id after the flush
+   * @throws BadRequestException when a newly named input material is unknown or may not be refined
+   */
+  private @NotNull List<RefineryExchangeEdit.Good> setGoods(
+      @NotNull RefineryOrder order, @NotNull List<RefineryExchangeEdit.Good> goods) {
+    Map<UUID, RefineryGood> held = new HashMap<>();
+    order.getGoods().forEach(good -> held.put(good.getId(), good));
+    Set<UUID> kept = new HashSet<>();
+    List<RefineryGood> added = new ArrayList<>();
+    List<RefineryExchangeEdit.Good> reinserted = new ArrayList<>();
+    for (RefineryExchangeEdit.Good good : goods) {
+      RefineryGood row = good.id() == null ? null : held.get(good.id());
+      if (good.id() != null) {
+        kept.add(good.id());
+      }
+      if (row != null) {
+        update(row, good);
+      } else if (good.id() != null) {
+        reinserted.add(good);
+      } else {
+        added.add(newGood(order, good));
+      }
+    }
+    order
+        .getGoods()
+        .removeIf(good -> RefineryExchangeReads.served(good) && !kept.contains(good.getId()));
+    order.getGoods().addAll(added);
+    return reinserted;
+  }
+
+  /**
+   * Builds a new row of a good, not yet part of the order's goods.
+   *
+   * @param order the order the row belongs to
+   * @param good the good's values; its id is not used
+   * @return the row
+   * @throws BadRequestException when the input material may not be refined
+   */
+  private @NotNull RefineryGood newGood(
+      @NotNull RefineryOrder order, @NotNull RefineryExchangeEdit.Good good) {
+    RefineryGood row = new RefineryGood();
+    row.setRefineryOrder(order);
+    setInput(row, input(good.inputMaterialId()));
+    row.setInputQuantity(good.inputQuantity());
+    row.setOutputQuantity(good.outputQuantity());
+    row.setQuality(good.quality());
+    return row;
+  }
+
+  /**
+   * Writes the values of a good that differ from its row; the materials only when the input
+   * changes.
+   *
+   * @param row the held row
+   * @param good the good as the order holds it afterwards
+   * @throws BadRequestException when the newly named input material may not be refined
+   */
+  private void update(@NotNull RefineryGood row, @NotNull RefineryExchangeEdit.Good good) {
+    UUID heldInput = row.getInputMaterial() == null ? null : row.getInputMaterial().getId();
+    if (!good.inputMaterialId().equals(heldInput)) {
+      setInput(row, input(good.inputMaterialId()));
+    }
+    if (good.inputQuantity() != RefineryExchangeReads.units(row.getInputQuantity())) {
+      row.setInputQuantity(good.inputQuantity());
+    }
+    if (good.outputQuantity() != RefineryExchangeReads.units(row.getOutputQuantity())) {
+      row.setOutputQuantity(good.outputQuantity());
+    }
+    if (good.quality() != RefineryExchangeReads.units(row.getQuality())) {
+      row.setQuality(good.quality());
+    }
+  }
+
+  /**
+   * Inserts the goods an undo brings back under their former ids.
+   *
+   * @param orderId the flushed or inserted order
+   * @param goods the goods
+   */
+  private void reinsert(@NotNull UUID orderId, @NotNull List<RefineryExchangeEdit.Good> goods) {
+    for (RefineryExchangeEdit.Good good : goods) {
+      Material input = input(good.inputMaterialId());
+      refineryOrderRepository.insertGood(
+          Objects.requireNonNull(good.id()),
+          orderId,
+          input.getId(),
+          good.inputQuantity(),
+          RefineryExchangeRules.output(input).getId(),
+          good.outputQuantity(),
+          good.quality());
+    }
+  }
+
+  /**
+   * Sets a good's input material and the output it yields.
+   *
+   * @param row the row
+   * @param input the input material
+   */
+  private static void setInput(@NotNull RefineryGood row, @NotNull Material input) {
+    row.setInputMaterial(input);
+    row.setOutputMaterial(RefineryExchangeRules.output(input));
+  }
+
+  /**
+   * Loads a good's input material.
+   *
+   * @param id the material
+   * @return the material
+   * @throws BadRequestException when it may not be refined
+   */
+  private @NotNull Material input(@NotNull UUID id) {
+    return RefineryOrderEdits.requireRefinable(
+        Entities.require(materialRepository.findById(id), "error.material.input.not_found"));
+  }
+
+  /**
+   * Returns one of the member's orders, locked: the instance the caller's {@code lockOwn} locked,
+   * without a further query, or one locked now.
+   *
+   * @param owner the member
+   * @param orderId the order
+   * @return the locked order
+   * @throws NotFoundException when the member owns no such order
+   */
+  private @NotNull RefineryOrder requireOwn(@NotNull UUID owner, @NotNull UUID orderId) {
+    return Entities.require(
+        Optional.ofNullable(
+                entityManager.find(RefineryOrder.class, orderId, LockModeType.PESSIMISTIC_WRITE))
+            .filter(order -> owns(order, owner)),
+        "error.refinery_order.not_found");
+  }
+
+  /**
+   * Whether the member owns an order.
+   *
+   * @param order the order
+   * @param owner the member
+   * @return {@code true} when the order's owner is the member
+   */
+  private static boolean owns(@NotNull RefineryOrder order, @NotNull UUID owner) {
+    return order.getOwner() != null && owner.equals(order.getOwner().getId());
+  }
+}

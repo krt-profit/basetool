@@ -110,12 +110,13 @@ public enum LiveSyncTopicClass {
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET
-   * /api/v1/refinery-orders/{id}}; sections {@code order} and {@code store}.
+   * /api/v1/refinery-orders/{id}}; sections {@code order}, {@code store} and the server-only {@code
+   * deleted}.
    */
   REFINERY_ORDER(
       "refinery-order",
       true,
-      Set.of("order", "store"),
+      Set.of("order", "store", "deleted"),
       false,
       "refinery_order",
       "/api/v1/refinery-orders/{id}",
@@ -410,6 +411,9 @@ public enum LiveSyncTopicClass {
   /** Separates alternative capability fields of which one grants the subscribe. */
   static final String CAPABILITY_ANY_SEPARATOR = "\\|";
 
+  /** The {@link #REFINERY_ORDER} sections only the server publishes. */
+  private static final Set<String> REFINERY_ORDER_SERVER_ONLY = Set.of("deleted");
+
   /**
    * A second per-resource read tried when the {@link #authProbePath} explicitly refuses (403/404),
    * so a subscribe is denied only when both refuse; {@code null} when the class has no fallback
@@ -541,6 +545,18 @@ public enum LiveSyncTopicClass {
   @NotNull
   public Set<String> allowedSections() {
     return allowedSections;
+  }
+
+  /**
+   * Returns the keys of {@link #allowedSections} that only the server may publish. The relay drops
+   * them from a browser's {@code changed} frame, because a page acts on them beyond a re-fetch
+   * (ADR-0094); the server and the fan-out still forward them.
+   *
+   * @return the immutable server-only section keys, empty for most classes
+   */
+  @NotNull
+  public Set<String> serverOnlySections() {
+    return this == REFINERY_ORDER ? REFINERY_ORDER_SERVER_ONLY : Set.of();
   }
 
   /**

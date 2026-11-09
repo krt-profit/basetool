@@ -95,6 +95,7 @@ class ExchangeRoutesContractTest {
             "/exchange/v1/me/blueprints/changes",
             "/exchange/v1/me/drafts/blueprints",
             "/exchange/v1/me/drafts/refinery-orders",
+            "/exchange/v1/me/refinery-orders/changes",
             "/exchange/v1/me/ships/changes",
             "/exchange/v1/me/stock/changes",
             "/exchange/v1/org-stock/changes");

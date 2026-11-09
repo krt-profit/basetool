@@ -115,6 +115,9 @@ class RefineryOrderStoreJobOrderDropdownTest {
             RefineryOrderStatus.OPEN,
             null,
             1L,
+            null,
+            null,
+            null,
             null);
 
     JobOrderReferenceDto matching =
