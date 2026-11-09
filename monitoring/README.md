@@ -942,7 +942,7 @@ scripts/check-monitoring-configs.test.sh
 # with the directory elsewhere it matches nothing and promtool silently checks no rule file at all.
 docker run --rm --entrypoint promtool \
   -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
-  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.15.1 \
+  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.16.0 \
   check config /etc/prometheus/prometheus.yml
 # Rule syntax and every alert-rule unit test use the compose image's exact digest.
 ./gradlew testPrometheusRules
