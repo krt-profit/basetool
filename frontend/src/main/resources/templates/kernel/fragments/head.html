@@ -19,6 +19,9 @@
     <meta name="apple-mobile-web-app-title" th:content="#{pwa.short_name}">
     <link rel="preload" th:href="@{/fonts/Lato-Regular.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/kernel/styles.css}">
+    <link th:if="${pagePickers != false}" rel="stylesheet" th:href="@{/css/kernel/pickers.css}">
+    <link th:if="${pageFilters != false}" rel="stylesheet" th:href="@{/css/kernel/filters.css}">
+    <link th:if="${pageOverflow != false}" rel="stylesheet" th:href="@{/css/kernel/overflow.css}">
     <script th:src="@{/js/kernel/krt-client-error.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="importmap" th:with="importMapJson=${@moduleImportMap.json(#execInfo.processedTemplateName)}" th:attr="nonce=${cspNonce}" th:utext="${importMapJson}"></script>
     <script th:attr="nonce=${cspNonce}">
@@ -71,6 +74,7 @@
         window.krtFetchI18n = {
             saved: /*[[#{frontend.ajax.saved}]]*/ 'Saved.',
             saveFailed: /*[[#{frontend.ajax.saveFailed}]]*/ 'Save failed.',
+            refreshFailed: /*[[#{frontend.ajax.refreshFailed}]]*/ 'Saved. The display could not be refreshed.',
             conflictTitle: /*[[#{frontend.ajax.conflict.title}]]*/ 'Conflict',
             conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Please reload the page.',
             conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
@@ -133,21 +137,21 @@
             }
         };
     </script>
-    <script type="module" th:src="@{/js/kernel/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-bank-account-search.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pagePickers != false}" type="module" th:src="@{/js/kernel/krt-user-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pagePickers != false}" type="module" th:src="@{/js/kernel/krt-catalog-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pagePickers != false}" type="module" th:src="@{/js/kernel/krt-bank-account-search.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pagePickers != false}" type="module" th:src="@{/js/kernel/krt-searchable-select.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/notification/notifications.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/datetime-splitter.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/scu-decimal-input.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-number-input.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageDates != false}" type="module" th:src="@{/js/kernel/datetime-splitter.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageNumbers != false}" type="module" th:src="@{/js/kernel/scu-decimal-input.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageNumbers != false}" type="module" th:src="@{/js/kernel/krt-number-input.js}" th:attr="nonce=${cspNonce}"></script>
     <script type="module" th:src="@{/js/kernel/inline-style-apply.js}" th:attr="nonce=${cspNonce}"></script>
 
-    <script type="module" th:src="@{/js/kernel/krt-filter-panel.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-overflow-menu.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-filter-chips.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-list-count.js}" th:attr="nonce=${cspNonce}"></script>
-    <script type="module" th:src="@{/js/kernel/krt-focus.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageFilters != false}" type="module" th:src="@{/js/kernel/krt-filter-panel.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageOverflow != false}" type="module" th:src="@{/js/kernel/krt-overflow-menu.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageFilters != false}" type="module" th:src="@{/js/kernel/krt-filter-chips.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageFilters != false}" type="module" th:src="@{/js/kernel/krt-list-count.js}" th:attr="nonce=${cspNonce}"></script>
+    <script th:if="${pageFocus != false}" type="module" th:src="@{/js/kernel/krt-focus.js}" th:attr="nonce=${cspNonce}"></script>
 
     <title th:replace="${titleContent}"></title>
     <th:block th:if="${additionalLinks != null}">

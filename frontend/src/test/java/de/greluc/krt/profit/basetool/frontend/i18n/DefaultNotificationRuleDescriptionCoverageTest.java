@@ -59,7 +59,7 @@ class DefaultNotificationRuleDescriptionCoverageTest {
   private static final Map<String, Path> BUNDLES =
       Map.of(
           "messages.properties",
-          resolveModuleRelative("src/main/resources/messages.properties"),
+          resolveModuleRelative("build/generated/default-messages/messages.properties"),
           "messages_de.properties",
           resolveModuleRelative("src/main/resources/messages_de.properties"),
           "messages_en.properties",

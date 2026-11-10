@@ -28,6 +28,7 @@ dependencies {
   }
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
+  implementation(project(":technical-support"))
 
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 

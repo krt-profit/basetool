@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,7 +53,7 @@ class AnnouncementServiceTest {
     old.setContent("Old Info");
     old.setUpdatedAt(Instant.now().minus(1, ChronoUnit.DAYS));
 
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(old, latest));
+    when(announcementRepository.findBySingletonTrue()).thenReturn(Optional.of(latest));
 
     Announcement result = announcementService.getAdminAnnouncement();
 
@@ -67,7 +68,7 @@ class AnnouncementServiceTest {
     active.setContent("Active Info");
     active.setUpdatedAt(Instant.now());
 
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(emptyZombie, active));
+    when(announcementRepository.findBySingletonTrue()).thenReturn(Optional.of(active));
 
     Announcement result = announcementService.getAdminAnnouncement();
 
@@ -81,19 +82,30 @@ class AnnouncementServiceTest {
     existing.setUpdatedAt(Instant.now());
     existing.setVersion(0L);
 
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(existing));
-    when(announcementRepository.save(any(Announcement.class))).thenAnswer(i -> i.getArguments()[0]);
+    when(announcementRepository.lockSingleton()).thenReturn(Optional.of(existing));
+    when(announcementRepository.saveAndFlush(any(Announcement.class)))
+        .thenAnswer(i -> i.getArguments()[0]);
 
     Announcement result = announcementService.updateAnnouncement("New Info", 0L);
 
     assertEquals("New Info", result.getContent());
-    verify(announcementRepository).save(existing);
+    verify(announcementRepository).saveAndFlush(existing);
   }
 
   @Test
-  void deleteAnnouncement_ShouldCallDeleteAll() {
+  void deleteAnnouncement_onAnAbsentSingletonDoesNotCreateOne() {
     announcementService.deleteAnnouncement();
-    verify(announcementRepository).deleteAll();
+    verify(announcementRepository).lockSingleton();
+    verify(announcementRepository, never()).ensureSingleton();
+  }
+
+  @Test
+  void deleteAnnouncementDeletesOnlyTheCurrentSingleton() {
+    Announcement current = new Announcement();
+    when(announcementRepository.lockSingleton()).thenReturn(Optional.of(current));
+    announcementService.deleteAnnouncement();
+    verify(announcementRepository).delete(current);
+    verify(announcementRepository, never()).deleteAll();
   }
 
   @Test
@@ -102,14 +114,14 @@ class AnnouncementServiceTest {
     existing.setContent("Old Info");
     existing.setUpdatedAt(Instant.now());
     existing.setVersion(3L);
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(existing));
+    when(announcementRepository.lockSingleton()).thenReturn(Optional.of(existing));
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> announcementService.updateAnnouncement("New Info", 2L));
 
     assertEquals("Old Info", existing.getContent());
-    verify(announcementRepository, never()).save(any(Announcement.class));
+    verify(announcementRepository, never()).saveAndFlush(any(Announcement.class));
   }
 
   @Test
@@ -118,21 +130,22 @@ class AnnouncementServiceTest {
     existing.setContent("Old Info");
     existing.setUpdatedAt(Instant.now());
     existing.setVersion(3L);
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(existing));
-    when(announcementRepository.save(any(Announcement.class))).thenAnswer(i -> i.getArguments()[0]);
+    when(announcementRepository.lockSingleton()).thenReturn(Optional.of(existing));
+    when(announcementRepository.saveAndFlush(any(Announcement.class)))
+        .thenAnswer(i -> i.getArguments()[0]);
 
     assertEquals("New Info", announcementService.updateAnnouncement("New Info", null).getContent());
   }
 
   @Test
-  void getAdminAnnouncement_onEmptyTable_createsAndReturnsAnEmptyRow() {
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of());
-    when(announcementRepository.save(any(Announcement.class))).thenAnswer(i -> i.getArguments()[0]);
-
+  void getAdminAnnouncement_onEmptyTableReturnsAnUnsavedEmptyView() {
+    when(announcementRepository.findBySingletonTrue()).thenReturn(Optional.empty());
     Announcement result = announcementService.getAdminAnnouncement();
 
     assertNull(result.getContent());
-    verify(announcementRepository).save(any(Announcement.class));
+    assertEquals(0L, result.getVersion());
+    verify(announcementRepository, never()).saveAndFlush(any(Announcement.class));
+    verify(announcementRepository, never()).ensureSingleton();
   }
 
   @Test
@@ -140,7 +153,7 @@ class AnnouncementServiceTest {
     Announcement blank = new Announcement();
     blank.setContent("   ");
     blank.setUpdatedAt(Instant.now());
-    when(announcementRepository.findAll()).thenReturn(java.util.List.of(blank));
+    when(announcementRepository.findBySingletonTrue()).thenReturn(Optional.of(blank));
 
     assertTrue(announcementService.getPublicAnnouncement().isEmpty());
   }

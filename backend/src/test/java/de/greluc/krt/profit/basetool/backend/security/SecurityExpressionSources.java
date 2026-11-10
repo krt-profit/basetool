@@ -20,8 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.security;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -72,10 +71,7 @@ final class SecurityExpressionSources {
    */
   private static List<Declared> collect() {
     List<Declared> out = new ArrayList<>();
-    for (JavaClass javaClass :
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(BASE_PACKAGE)) {
+    for (JavaClass javaClass : ModuleSubjects.importBackendMainClasses()) {
       Class<?> type = javaClass.reflect();
       add(out, type, type.getSimpleName(), type);
       for (Method method : type.getDeclaredMethods()) {

@@ -51,7 +51,8 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    *
    * @return the active Staffeln + SKs in arbitrary order; never {@code null}, possibly empty.
    */
-  @Query("SELECT o FROM OrgUnit o WHERE o.active = true AND TYPE(o) IN (Squadron, SpecialCommand)")
+  @Query("SELECT o FROM OrgUnit o LEFT JOIN FETCH o.parent "
+      + "WHERE o.active = true AND TYPE(o) IN (Squadron, SpecialCommand)")
   List<OrgUnit> findActiveSquadronsAndSpecialCommands();
 
   /**

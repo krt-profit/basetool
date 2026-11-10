@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -198,7 +200,7 @@ public class QuickAccessSearchController {
       hits = future.join();
     } catch (CompletionException e) {
       Throwable cause = e.getCause() == null ? e : e.getCause();
-      rethrowLostSession(cause);
+      SectionFallback.rethrowIfReauthenticationRequired(cause);
       Outcome outcome = cause instanceof TimeoutException ? Outcome.TIMEOUT : Outcome.ERROR;
       metrics.record(kind, outcome);
       Level level =
@@ -231,13 +233,4 @@ public class QuickAccessSearchController {
         .toList();
   }
 
-  private static void rethrowLostSession(@NotNull Throwable cause) {
-    if (cause instanceof ReauthenticationRequiredException reauth) {
-      throw reauth;
-    }
-    if (ReauthenticationRequiredException.isReauthSignal(cause)) {
-      throw new ReauthenticationRequiredException(
-          "Quick-access search lost the OAuth2 session", cause);
-    }
-  }
 }

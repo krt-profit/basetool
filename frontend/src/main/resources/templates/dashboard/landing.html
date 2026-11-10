@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageTitle=~{::title}, pageContent=~{::pageContent})}">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pagePickers=false, pageNumbers=false, pageDates=false, pageFilters=false, pageOverflow=false, pageFocus=false, pageTitle=~{::title}, pageContent=~{::pageContent})}">
 <head>
     <title th:text="${appTitle}">Profit Basetool</title>
 </head>

@@ -421,6 +421,10 @@ Every hangar mutation in this table — by the owner, by an admin on another mem
 
 ### 3.2a Data protection: export, erasure, name search (REQ-SEC-058/060/061/062)
 
+Bank and audit download relays validate the backend permission/status response before exposing
+attachment headers or bytes. The streaming relay uses the same authenticated caller and active
+org-unit context as the corresponding typed backend read (REQ-FE-029, ADR-0369).
+
 | Function (gate)                                                                                     | Member | Log. | MM | Officer | Admin |
 |:----------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Export **own** data, JSON + PDF (`/api/v1/users/me/export`, `isAuthenticated()`)                    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |

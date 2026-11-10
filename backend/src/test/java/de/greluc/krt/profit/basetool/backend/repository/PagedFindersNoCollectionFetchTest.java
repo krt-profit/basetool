@@ -177,13 +177,14 @@ class PagedFindersNoCollectionFetchTest {
 
   @Test
   void rolePage_arrivesWithPermissionsInitialisedOutsideItsTransaction() {
-    Page<Role> roles = roleService.getAllRoles(PageRequest.of(0, 50));
+    Page<de.greluc.krt.profit.basetool.backend.identity.internal.RoleDto> roles =
+        roleService.getAllRoles(PageRequest.of(0, 50));
 
     assertFalse(roles.isEmpty(), "DataInitializer seeds the roles");
-    for (Role role : roles) {
-      assertTrue(
-          Hibernate.isInitialized(role.getPermissions()),
-          () -> role.getCode() + " permissions must be initialised before the page is cached");
+    for (var role : roles) {
+      assertTrue(Hibernate.isInitialized(role.permissions()), "permissions are detached values");
+      org.junit.jupiter.api.Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> role.permissions().add("mutation"));
     }
   }
 

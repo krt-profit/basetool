@@ -261,7 +261,13 @@ public class BlueprintImportService implements BlueprintImports {
       ownedByKey.put(
           product.productKey(),
           personalBlueprintRepository.save(
-              newOwned(ownerUserId, product, resolution.acquiredAt(), resolution.note())));
+              PersonalBlueprintFactory.create(
+                  gameItemRepository,
+                  ownerUserId,
+                  product,
+                  resolution.acquiredAt(),
+                  resolution.note(),
+                  BlueprintSource.IMPORT)));
       added++;
     }
 
@@ -588,35 +594,6 @@ public class BlueprintImportService implements BlueprintImports {
       return false;
     }
     return existing == null || incoming.isBefore(existing);
-  }
-
-  /**
-   * Builds a new, unsaved owned-blueprint entity stamped with the resolved product, attaching the
-   * output item as a lazy reference when the product carries one.
-   *
-   * @param ownerUserId {@code app_user.id} of the owner
-   * @param product the chosen product to stamp
-   * @param acquiredAt optional acquisition time
-   * @param note optional note
-   * @return the new transient entity
-   */
-  @NotNull
-  private PersonalBlueprint newOwned(
-      @NotNull UUID ownerUserId,
-      @NotNull ResolvedProduct product,
-      @Nullable Instant acquiredAt,
-      @Nullable String note) {
-    PersonalBlueprint entity = new PersonalBlueprint();
-    entity.setOwnerUserId(ownerUserId);
-    entity.setProductKey(product.productKey());
-    entity.setProductName(product.productName());
-    if (product.outputItemId() != null) {
-      entity.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
-    }
-    entity.setAcquiredAt(acquiredAt);
-    entity.setNote(note);
-    entity.setSource(BlueprintSource.IMPORT);
-    return entity;
   }
 
   /**

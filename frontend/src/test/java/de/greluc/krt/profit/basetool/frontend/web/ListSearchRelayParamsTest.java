@@ -239,7 +239,11 @@ class ListSearchRelayParamsTest {
   private BackendApiClient realBackend() {
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     return new BackendApiClient(
-        webClient, webClient, new SimpleMeterRegistry(), new NoOpCacheManager());
+        webClient,
+        webClient,
+        new SimpleMeterRegistry(),
+        new NoOpCacheManager(),
+        de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture.create());
   }
 
   private HttpUrl receivedUrl() throws InterruptedException {

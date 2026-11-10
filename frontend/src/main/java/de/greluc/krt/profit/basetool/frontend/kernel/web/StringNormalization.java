@@ -19,20 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
-import java.text.Normalizer;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Free-text normalization primitives for the frontend, identical in behavior to the backend's
- * {@code support.StringNormalization}: the length cap, NFC normalization, the {@link
- * #normalize(String, int, boolean) pipeline} behind {@code NormalizedStringEditor}, and {@link
- * #blankToNull(String)}.
- */
+/** Application binding facade for the shared inbound-string normalization contract. */
 public final class StringNormalization {
 
   /** The free-text length cap, matching the backend's {@code MAX_FREE_TEXT_LENGTH}. */
-  public static final int MAX_FREE_TEXT_LENGTH = 8000;
+  public static final int MAX_FREE_TEXT_LENGTH =
+      de.greluc.krt.profit.basetool.technical.StringNormalization.MAX_FREE_TEXT_LENGTH;
 
   /** Non-instantiable holder of static normalization helpers. */
   private StringNormalization() {}
@@ -47,11 +42,8 @@ public final class StringNormalization {
    * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}
    */
   public static String normalizeAndCap(String value, int maxLength) {
-    String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
-    if (normalized.length() > maxLength) {
-      throw new IllegalArgumentException("String exceeds maximum allowed length of " + maxLength);
-    }
-    return normalized;
+    return de.greluc.krt.profit.basetool.technical.StringNormalization.normalizeAndCap(
+        value, maxLength);
   }
 
   /**
@@ -63,7 +55,7 @@ public final class StringNormalization {
    */
   @Contract(value = "null -> null", pure = true)
   public static @Nullable String blankToNull(@Nullable String value) {
-    return (value == null || value.isBlank()) ? null : value;
+    return de.greluc.krt.profit.basetool.technical.StringNormalization.blankToNull(value);
   }
 
   /**
@@ -75,7 +67,7 @@ public final class StringNormalization {
    */
   @Contract(value = "null -> null", pure = true)
   public static @Nullable String trimToNull(@Nullable String value) {
-    return (value == null || value.isBlank()) ? null : value.strip();
+    return de.greluc.krt.profit.basetool.technical.StringNormalization.trimToNull(value);
   }
 
   /**
@@ -91,13 +83,7 @@ public final class StringNormalization {
   @Contract(value = "null, _, _ -> null", pure = true)
   public static @Nullable String normalize(
       @Nullable String value, int maxLength, boolean emptyAsNull) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    if (emptyAsNull && trimmed.isEmpty()) {
-      return null;
-    }
-    return normalizeAndCap(trimmed, maxLength);
+    return de.greluc.krt.profit.basetool.technical.StringNormalization.normalize(
+        value, maxLength, emptyAsNull);
   }
 }

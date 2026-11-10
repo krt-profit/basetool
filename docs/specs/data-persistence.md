@@ -49,6 +49,10 @@ ships as Flyway migrations, not here.
 
 ### REQ-DATA-003 — No N+1
 
+The leadership overview resolves visible unit identifiers before batch-loading their rosters
+and command groups. These reads have a fixed query count as the number of visible units grows;
+they do not fetch multiple sibling collections in a cartesian join.
+
 Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out. Replace a
 `findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
 `MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
@@ -253,6 +257,13 @@ batch; the abbreviation fallback still adopts a legacy short-named row; the `V16
 child FKs and carries cross-source links onto the surviving canonical row.
 
 ### REQ-DATA-005 — the UEX syncs isolate each row (or chunk) in its own transaction
+
+Each universe-catalogue chunk batch-reads existing UEX identities and name fallbacks once.
+City and space-station chunks additionally batch-read their linked storage places and source
+or fallback name collisions once, keeping a transaction-local reservation index as rows change.
+Lookup count scales with chunks rather than DTOs. Terminal name fallback still adopts only an
+unclaimed row in stable local-id order. A failed chunk rebuilds every index in each isolated
+row-recovery transaction; no managed entity crosses transaction boundaries.
 
 UEX assigns the **same in-game `uuid`** to several distinct item ids (a base item and its
 skins/variants — e.g. ids `879`/`5457`/`5458` all carry the MaxLift tractor-beam uuid). `game_item`
@@ -811,6 +822,36 @@ cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachi
 `MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
 mutators).
 
+
+**Cache admission follows retained value shape, rather than one entry count for every shape.**
+`CacheConfig` keeps the TTLs, write/sync invalidation and statistics above, and assigns each cache a
+Caffeine `maximumWeight` budget. `CacheValueWeight` traverses immutable DTO records, pages,
+collections, indexes, strings and scalar values iteratively with identity tracking. It counts shared
+references once per entry, rejects unsupported/inaccessible value shapes and refuses oversized
+entries without failing the underlying read. Admission arithmetic saturates and a cyclic/deep graph
+cannot overflow the Java stack. Known catalogue, role and squadron DTO families have admission
+coverage.
+
+| Cache group | Conservative estimated-value budget per cache |
+| --- | --- |
+| `terminals`, `blueprintFamilyIndex` | 16 MiB |
+| `materials`, `shipTypes`, `pois` | 8 MiB |
+| `cities`, `locations`, `outposts`, `manufacturers`, `materialById` | 4 MiB |
+| `frequencyTypes`, `jobTypes`, `materialCategories`, `refiningMethods`, `starSystems`, `squadrons`, `roles` | 2 MiB |
+
+The 17 budgets total 90 MiB of admission weights. These are conservative model estimates, not a JVM
+retained-heap limit: cache bookkeeping, collector layout and cross-entry sharing differ. Large pages
+and complete indexes consume proportionally more budget and a load-all value above its cache's
+budget is returned without being retained. Existing hit/miss/eviction metrics keep their names and
+label vocabulary; no new public surface or metric family is introduced.
+
+`CacheValueWeightTest` covers all cached DTO families, large-page rejection, eviction statistics,
+unknown shapes and cyclic/deep graphs. `:backend:characterizeCacheBudgets` records synthetic real
+`TerminalDto` shapes, approximate retained-heap deltas and the same fixed mixed-locality request
+trace for entry-count and weighted policies. The method and evidence limits live in
+[`audit-3267-cache-budgets.md`](../research/audit-3267-cache-budgets.md). No production heap or latency
+improvement is inferred from a synthetic result.
+
 ### REQ-DATA-012 — Operation-detail + job-order read-shape hardening (operation-side ADR-0078, #1109)
 
 The operation-detail page (`/operations/{id}`) is the operation-aggregate mirror of the mission-page
@@ -1281,8 +1322,9 @@ services switched on 2026-10-12: a cached method maps the entity to its existing
 (`CityDto`, `LocationDto`, `MaterialDto`, …) in its own read-only transaction and caches that
 immutable record; cache names, keys, TTLs and evict triggers are unchanged and so is the JSON, and
 a mutator loads the entity through a private `require…` method, never through its cached getter.
-The three methods that still return an entity (`RoleService`, `SquadronService`) are listed with
-their reason, and the list may only shrink.
+Role and squadron reads also cache detached scalar records; role permissions are copied into
+unmodifiable sets. No entity-cache exception remains. Their existing wire representations, cache
+keys, TTLs and write invalidation remain compatible.
 
 **Acceptance**
 
@@ -1748,3 +1790,23 @@ The run view displays outcomes, counters and the last fully successful source sw
 from the most recent attempt. Existing anomalies stay queryable. Metrics, alerts and dashboards
 follow the same bounded source/aggregate/status vocabulary. A clean run without events and a
 failed run before the first event both appear in history.
+
+### REQ-DATA-039 — Announcement reads do not create state
+
+The announcement table enforces at most one current row through a unique partial index on its
+current-row discriminator. Migration selects the latest nonblank banner, otherwise the latest
+row, and retains every non-current row. Public and administrator GETs perform no writes; an
+absent administrator view has version zero. Only the write path initializes the row and its
+conflict-safe insertion serializes concurrent first writes before checking the expected version.
+Deleting the current banner lets the next banner obtain a fresh UUID, so a previous dismissal
+cannot suppress it. Content, blank-banner visibility and optimistic conflicts retain their
+existing contracts.
+
+### REQ-DATA-040 — Transaction resources follow suspension and resumption
+
+Live-sync flushes and transaction-local mission, inventory and refinery memos unbind when their
+own transaction is suspended and rebind when it resumes. A `REQUIRES_NEW` transaction cannot
+read or append to the suspended transaction's resources. Inner notifications follow the inner
+commit independently of the outer outcome, and every completion releases its own resources.
+These are infrastructure guarantees; the regression tests do not establish a production user
+flow that previously exercised a conflicting nested resource.

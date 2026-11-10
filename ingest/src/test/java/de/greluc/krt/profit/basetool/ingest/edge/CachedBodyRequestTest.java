@@ -82,6 +82,18 @@ class CachedBodyRequestTest {
   }
 
   @Test
+  void bufferedBodyCannotExposeOrMutateTheOwnedArray() throws Exception {
+    CachedBodyRequest wrapped = (CachedBodyRequest) wrappedChunkedRequest();
+    java.nio.ByteBuffer first = wrapped.bufferedBody();
+    assertThat(first.isReadOnly()).isTrue();
+    assertThat(first.hasArray()).isFalse();
+    first.get();
+    assertThat(wrapped.bufferedBody().position()).isZero();
+    assertThat(wrapped.getInputStream().readAllBytes())
+        .isEqualTo(BODY.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
   void replaysTheBufferedBodyThroughTheInputStream() throws Exception {
     ServletInputStream in = wrappedChunkedRequest().getInputStream();
 

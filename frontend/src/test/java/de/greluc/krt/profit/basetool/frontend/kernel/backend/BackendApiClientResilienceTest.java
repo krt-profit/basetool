@@ -71,7 +71,9 @@ class BackendApiClientResilienceTest {
             webClient,
             termsDocumentClient,
             meterRegistry,
-            new org.springframework.cache.support.NoOpCacheManager());
+            new org.springframework.cache.support.NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
   }
 
   @Nested

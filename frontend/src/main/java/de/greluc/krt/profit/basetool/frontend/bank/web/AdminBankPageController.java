@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
@@ -92,6 +94,7 @@ public class AdminBankPageController {
         redirectAttributes.addFlashAttribute("wipeResult", result);
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Bank wipe reset failed", e);
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.failed");
     }

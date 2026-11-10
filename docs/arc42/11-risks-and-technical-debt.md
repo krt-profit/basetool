@@ -42,8 +42,9 @@ twice, and the second one can be forgotten.
 `GeneratedDtoAgreementTest` compares them field by field against the models generated from the same
 document, and `DtoMirrorConsistencyTest` pairs every mirror with its backend record wherever it
 lives in the backend source tree (REQ-OPS-038); all of them select the mirrors by their
-`@DtoMirror` marker, not by a package (REQ-FE-032). Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic,
-and until it happens the duplication is real.
+`@DtoMirror` marker, not by a package (REQ-FE-032). The `PurchasingVersionRequest` pilot is derived
+from OpenAPI into production build output (ADR-0369); the remaining manual models retain their
+parity guards and duplicate declarations. The pilot does not remove that residual debt.
 
 ## 11.4 Derived nullity annotations have no gate
 
@@ -154,11 +155,12 @@ until then the risk is bounded, named and watched, which is the most this layer 
 The operational scripts reach a host only through the Ansible role, so a host can apply a release with
 older scripts than it was built with. That is how the v1.14.0 promotion failed on 2026-10-10. Since
 ADR-0247 the config bundle carries the scripts' hashes and `deploy.sh` compares them (§7.5,
-`REQ-OPS-045`). Two gaps remain, both accepted: **a host whose `deploy.sh` lacks the check cannot
+`REQ-OPS-045`). The bootstrap gap remains: **a host whose `deploy.sh` lacks the check cannot
 police itself** — its first install comes through the role, and until then the mandatory comparison in
-`docs/deployment.md` and the absent-metric alert `HostScriptsCheckStale` are the protection; and
-**the role's units, drop-ins, logrotate and tmpfiles files outside `/opt/basetool/scripts` are not
-hashed**. Extending `scripts/host-scripts.list` with their installed paths closes the second.
+`docs/deployment.md` and the absent-metric alert `HostScriptsCheckStale` are the protection.
+The role's operational units, drop-ins, logrotate and tmpfiles files are covered by the shared
+[`host-companions.json`](../../scripts/host-companions.json) inventory and release drift comparison
+(ADR-0364). The generated ordering file normalizes its service uid before comparison.
 
 ## 11.5e The layout and realm cutover — closed
 

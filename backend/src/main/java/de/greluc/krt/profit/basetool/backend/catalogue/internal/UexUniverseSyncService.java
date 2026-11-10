@@ -104,26 +104,33 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids = chunk.stream().map(UexCityDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexCityDto::name).toList();
+          List<City> existing =
+              ids.isEmpty()
+                  ? List.of()
+                  : cityRepository.findByIdCityInOrNameInOrderByIdAsc(ids, names);
+          UexChunkIndex<City> index =
+              UexChunkIndex.of(existing, City::getIdCity, City::getName, false);
+          List<String> placeNames =
+              chunk.stream()
+                  .filter(dto -> dto.id() != null)
+                  .flatMap(
+                      dto -> Stream.of(dto.name(), dto.name() + " (UEX city " + dto.id() + ")"))
+                  .toList();
+          UexStoragePlaceIndex places =
+              new UexStoragePlaceIndex(
+                  ids.isEmpty()
+                      ? List.of()
+                      : locationRepository.findForUexChunk(
+                          existing.stream().map(City::getId).toList(), List.of(), placeNames));
           for (UexCityDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            City entity =
-                cityRepository
-                    .findByIdCity(dto.id())
-                    .orElseGet(() ->
-                        cityRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdCity(dto.id());
-                              return cityRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              City n = new City();
-                              n.setIdCity(dto.id());
-                              n.setName(dto.name());
-                              return cityRepository.save(n);
-                            }));
+            City entity = index.resolve(dto.id(), dto.name(), City::new);
+            entity.setIdCity(dto.id());
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -159,11 +166,12 @@ public class UexUniverseSyncService {
             entity.setJurisdictionName(dto.jurisdictionName());
             cityRepository.save(entity);
             syncStoragePlace(
-                locationRepository.findByCityId(entity.getId()).orElse(null),
+                places.city(entity.getId()),
                 entity.getName(),
                 entity.getName() + " (UEX city " + entity.getIdCity() + ")",
                 Boolean.TRUE.equals(entity.getIsAvailableLive()),
-                l -> l.setCity(entity));
+                l -> l.setCity(entity),
+                places);
           }
           return chunk;
         },
@@ -184,27 +192,32 @@ public class UexUniverseSyncService {
    * @param fallbackName the name of a new location when another location holds {@code name}
    * @param live whether UEX reports the place as available live
    * @param link links a location to the place
+   * @param places the chunk's storage-place links and name reservations
    */
   private void syncStoragePlace(
       @Nullable Location linked,
       String name,
       @NotNull String fallbackName,
       boolean live,
-      @NotNull Consumer<Location> link) {
+      @NotNull Consumer<Location> link,
+      @NotNull UexStoragePlaceIndex places) {
     if (live) {
-      Location location = linked != null ? linked : newStoragePlace(name, fallbackName, link);
+      Location location =
+          linked != null ? linked : newStoragePlace(name, fallbackName, link, places);
       if (location == null) {
         log.warn("No free storage-place name for {}; the place gets no location.", fallbackName);
         return;
       }
       location.setReferenceOnly(false);
-      renameIfFree(location, name);
+      places.renameIfFree(location, name);
       locationRepository.save(location);
+      places.remember(location);
       return;
     }
     if (linked != null && Boolean.TRUE.equals(linked.getReferenceOnly())) {
-      renameIfFree(linked, name);
+      places.renameIfFree(linked, name);
       locationRepository.save(linked);
+      places.remember(linked);
     }
   }
 
@@ -214,41 +227,24 @@ public class UexUniverseSyncService {
    * @param name the place's synced name
    * @param fallbackName the name to take when {@code name} is held
    * @param link links the location to the place
+   * @param places the chunk's storage-place links and name reservations
    * @return the unsaved location, or {@code null} when both names are held
    */
   @Nullable
   private Location newStoragePlace(
-      String name, @NotNull String fallbackName, @NotNull Consumer<Location> link) {
-    String free =
-        Stream.of(name, fallbackName)
-            .filter(n -> locationRepository.findByName(n).isEmpty())
-            .findFirst()
-            .orElse(null);
+      String name,
+      @NotNull String fallbackName,
+      @NotNull Consumer<Location> link,
+      @NotNull UexStoragePlaceIndex places) {
+    String free = Stream.of(name, fallbackName).filter(places::isFree).findFirst().orElse(null);
     if (free == null) {
       return null;
     }
     Location location = new Location();
     location.setName(free);
     link.accept(location);
+    places.remember(location);
     return location;
-  }
-
-  /**
-   * Gives a location the synced name unless another location holds it, since {@code location.name}
-   * is unique.
-   *
-   * @param location the location to rename
-   * @param name the synced name
-   */
-  private void renameIfFree(@NotNull Location location, String name) {
-    boolean takenByOther =
-        locationRepository
-            .findByName(name)
-            .filter(other -> !Objects.equals(other.getId(), location.getId()))
-            .isPresent();
-    if (!takenByOther) {
-      location.setName(name);
-    }
   }
 
   /**
@@ -268,26 +264,24 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexFactionDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexFactionDto::name).toList();
+          UexChunkIndex<Faction> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : factionRepository.findByIdFactionInOrNameInOrderByIdAsc(ids, names),
+                  Faction::getIdFaction,
+                  Faction::getName,
+                  false);
           for (UexFactionDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Faction entity =
-                factionRepository
-                    .findByIdFaction(dto.id())
-                    .orElseGet(() ->
-                        factionRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdFaction(dto.id());
-                              return factionRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Faction n = new Faction();
-                              n.setIdFaction(dto.id());
-                              n.setName(dto.name());
-                              return factionRepository.save(n);
-                            }));
+            Faction entity = index.resolve(dto.id(), dto.name(), Faction::new);
+            entity.setIdFaction(dto.id());
             entity.setName(dto.name());
             entity.setWiki(dto.wiki());
             entity.setIsPiracy(dto.checkIsPiracy());
@@ -318,26 +312,25 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexJurisdictionDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexJurisdictionDto::name).toList();
+          UexChunkIndex<Jurisdiction> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : jurisdictionRepository.findByIdJurisdictionInOrNameInOrderByIdAsc(
+                          ids, names),
+                  Jurisdiction::getIdJurisdiction,
+                  Jurisdiction::getName,
+                  false);
           for (UexJurisdictionDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Jurisdiction entity =
-                jurisdictionRepository
-                    .findByIdJurisdiction(dto.id())
-                    .orElseGet(() ->
-                        jurisdictionRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdJurisdiction(dto.id());
-                              return jurisdictionRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Jurisdiction n = new Jurisdiction();
-                              n.setIdJurisdiction(dto.id());
-                              n.setName(dto.name());
-                              return jurisdictionRepository.save(n);
-                            }));
+            Jurisdiction entity = index.resolve(dto.id(), dto.name(), Jurisdiction::new);
+            entity.setIdJurisdiction(dto.id());
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
@@ -367,26 +360,23 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids = chunk.stream().map(UexMoonDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexMoonDto::name).toList();
+          UexChunkIndex<Moon> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : moonRepository.findByIdMoonInOrNameInOrderByIdAsc(ids, names),
+                  Moon::getIdMoon,
+                  Moon::getName,
+                  false);
           for (UexMoonDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Moon entity =
-                moonRepository
-                    .findByIdMoon(dto.id())
-                    .orElseGet(() ->
-                        moonRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdMoon(dto.id());
-                              return moonRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Moon n = new Moon();
-                              n.setIdMoon(dto.id());
-                              n.setName(dto.name());
-                              return moonRepository.save(n);
-                            }));
+            Moon entity = index.resolve(dto.id(), dto.name(), Moon::new);
+            entity.setIdMoon(dto.id());
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -421,26 +411,23 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids = chunk.stream().map(UexOrbitDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexOrbitDto::name).toList();
+          UexChunkIndex<Orbit> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : orbitRepository.findByIdOrbitInOrNameInOrderByIdAsc(ids, names),
+                  Orbit::getIdOrbit,
+                  Orbit::getName,
+                  false);
           for (UexOrbitDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Orbit entity =
-                orbitRepository
-                    .findByIdOrbit(dto.id())
-                    .orElseGet(() ->
-                        orbitRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdOrbit(dto.id());
-                              return orbitRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Orbit n = new Orbit();
-                              n.setIdOrbit(dto.id());
-                              n.setName(dto.name());
-                              return orbitRepository.save(n);
-                            }));
+            Orbit entity = index.resolve(dto.id(), dto.name(), Orbit::new);
+            entity.setIdOrbit(dto.id());
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -474,26 +461,24 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexOutpostDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexOutpostDto::name).toList();
+          UexChunkIndex<Outpost> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : outpostRepository.findByIdOutpostInOrNameInOrderByIdAsc(ids, names),
+                  Outpost::getIdOutpost,
+                  Outpost::getName,
+                  false);
           for (UexOutpostDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Outpost entity =
-                outpostRepository
-                    .findByIdOutpost(dto.id())
-                    .orElseGet(() ->
-                        outpostRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdOutpost(dto.id());
-                              return outpostRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Outpost n = new Outpost();
-                              n.setIdOutpost(dto.id());
-                              n.setName(dto.name());
-                              return outpostRepository.save(n);
-                            }));
+            Outpost entity = index.resolve(dto.id(), dto.name(), Outpost::new);
+            entity.setIdOutpost(dto.id());
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -553,26 +538,24 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexPlanetDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexPlanetDto::name).toList();
+          UexChunkIndex<Planet> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : planetRepository.findByIdPlanetInOrNameInOrderByIdAsc(ids, names),
+                  Planet::getIdPlanet,
+                  Planet::getName,
+                  false);
           for (UexPlanetDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Planet entity =
-                planetRepository
-                    .findByIdPlanet(dto.id())
-                    .orElseGet(() ->
-                        planetRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdPlanet(dto.id());
-                              return planetRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Planet n = new Planet();
-                              n.setIdPlanet(dto.id());
-                              n.setName(dto.name());
-                              return planetRepository.save(n);
-                            }));
+            Planet entity = index.resolve(dto.id(), dto.name(), Planet::new);
+            entity.setIdPlanet(dto.id());
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
@@ -608,26 +591,23 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids = chunk.stream().map(UexPoiDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexPoiDto::name).toList();
+          UexChunkIndex<Poi> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : poiRepository.findByIdPoiInOrNameInOrderByIdAsc(ids, names),
+                  Poi::getIdPoi,
+                  Poi::getName,
+                  false);
           for (UexPoiDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Poi entity =
-                poiRepository
-                    .findByIdPoi(dto.id())
-                    .orElseGet(() ->
-                        poiRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdPoi(dto.id());
-                              return poiRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Poi n = new Poi();
-                              n.setIdPoi(dto.id());
-                              n.setName(dto.name());
-                              return poiRepository.save(n);
-                            }));
+            Poi entity = index.resolve(dto.id(), dto.name(), Poi::new);
+            entity.setIdPoi(dto.id());
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -690,26 +670,37 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexSpaceStationDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexSpaceStationDto::name).toList();
+          List<SpaceStation> existing =
+              ids.isEmpty()
+                  ? List.of()
+                  : spacestationRepository.findByIdSpaceStationInOrNameInOrderByIdAsc(ids, names);
+          UexChunkIndex<SpaceStation> index =
+              UexChunkIndex.of(
+                  existing, SpaceStation::getIdSpaceStation, SpaceStation::getName, false);
+          List<String> placeNames =
+              chunk.stream()
+                  .filter(dto -> dto.id() != null)
+                  .flatMap(dto ->
+                      Stream.of(dto.name(), dto.name() + " (UEX space station " + dto.id() + ")"))
+                  .toList();
+          UexStoragePlaceIndex places =
+              new UexStoragePlaceIndex(
+                  ids.isEmpty()
+                      ? List.of()
+                      : locationRepository.findForUexChunk(
+                          List.of(),
+                          existing.stream().map(SpaceStation::getId).toList(),
+                          placeNames));
           for (UexSpaceStationDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            SpaceStation entity =
-                spacestationRepository
-                    .findByIdSpaceStation(dto.id())
-                    .orElseGet(() ->
-                        spacestationRepository
-                            .findByName(dto.name())
-                            .map(e -> {
-                              e.setIdSpaceStation(dto.id());
-                              return spacestationRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              SpaceStation n = new SpaceStation();
-                              n.setIdSpaceStation(dto.id());
-                              n.setName(dto.name());
-                              return spacestationRepository.save(n);
-                            }));
+            SpaceStation entity = index.resolve(dto.id(), dto.name(), SpaceStation::new);
+            entity.setIdSpaceStation(dto.id());
             entity.setName(dto.name());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
@@ -748,11 +739,12 @@ public class UexUniverseSyncService {
             entity.setJurisdictionName(dto.jurisdictionName());
             spacestationRepository.save(entity);
             syncStoragePlace(
-                locationRepository.findBySpaceStationId(entity.getId()).orElse(null),
+                places.station(entity.getId()),
                 entity.getName(),
                 entity.getName() + " (UEX space station " + entity.getIdSpaceStation() + ")",
                 Boolean.TRUE.equals(entity.getIsAvailableLive()),
-                l -> l.setSpaceStation(entity));
+                l -> l.setSpaceStation(entity),
+                places);
           }
           return chunk;
         },
@@ -779,26 +771,24 @@ public class UexUniverseSyncService {
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
         chunk -> {
+          List<Integer> ids =
+              chunk.stream().map(UexTerminalDto::id).filter(Objects::nonNull).toList();
+          List<String> names =
+              chunk.stream().filter(dto -> dto.id() != null).map(UexTerminalDto::name).toList();
+          UexChunkIndex<Terminal> index =
+              UexChunkIndex.of(
+                  ids.isEmpty()
+                      ? List.of()
+                      : terminalRepository.findByIdTerminalInOrNameInOrderByIdAsc(ids, names),
+                  Terminal::getIdTerminal,
+                  Terminal::getName,
+                  true);
           for (UexTerminalDto dto : chunk) {
             if (dto.id() == null) {
               continue;
             }
-            Terminal entity =
-                terminalRepository
-                    .findByIdTerminal(dto.id())
-                    .orElseGet(() ->
-                        terminalRepository
-                            .findFirstByNameAndIdTerminalIsNullOrderByIdAsc(dto.name())
-                            .map(e -> {
-                              e.setIdTerminal(dto.id());
-                              return terminalRepository.save(e);
-                            })
-                            .orElseGet(() -> {
-                              Terminal n = new Terminal();
-                              n.setIdTerminal(dto.id());
-                              n.setName(dto.name());
-                              return terminalRepository.save(n);
-                            }));
+            Terminal entity = index.resolve(dto.id(), dto.name(), Terminal::new);
+            entity.setIdTerminal(dto.id());
             entity.setName(dto.name());
             entity.setCode(dto.code());
             entity.setType(dto.type());

@@ -22,10 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import io.github.resilience4j.bulkhead.BulkheadRegistry;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import java.time.Duration;
 import java.util.Map;
 import okhttp3.mockwebserver.MockResponse;
@@ -118,14 +114,6 @@ class WebClientCborNegotiationTest {
   private WebClient buildBackendClient(AppHttpProperties.BackendCodec codec) {
     return WebClientTestSupport.config(
             AppHttpProperties.BackendProtocol.H2, codec, server.url("/").toString())
-        .webClient(
-            mock(OAuth2AuthorizedClientManager.class),
-            CircuitBreakerRegistry.ofDefaults(),
-            RetryRegistry.ofDefaults(),
-            TimeLimiterRegistry.of(
-                io.github.resilience4j.timelimiter.TimeLimiterConfig.custom()
-                    .timeoutDuration(Duration.ofSeconds(20))
-                    .build()),
-            BulkheadRegistry.ofDefaults());
+        .webClient(mock(OAuth2AuthorizedClientManager.class));
   }
 }

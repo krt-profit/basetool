@@ -367,6 +367,8 @@ public enum AuditEventType {
    * subject is the role's {@code code}; the details carry the added and removed permission names.
    */
   ROLE_PERMISSIONS_CHANGED(AuditDomain.ROLE),
+  /** A role description was edited; details contain only its new section version. */
+  ROLE_DESCRIPTION_CHANGED(AuditDomain.ROLE),
   /**
    * An admin changed a member's numeric member rank (1–20). The subject and the target are the
    * member; the details carry only the {@code from} and {@code to} ranks.

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserHandleProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleScrubber;
@@ -202,7 +203,7 @@ public class DataExportService {
    * @return the scrubber
    */
   private @NotNull HandleScrubber scrubberForOthers(@NotNull UUID subjectId) {
-    List<User> roster = userRepository.findAll();
+    List<UserHandleProjection> roster = userRepository.findAllHandleSpellings();
     List<String> others =
         roster.stream()
             .filter(u -> !u.getId().equals(subjectId))

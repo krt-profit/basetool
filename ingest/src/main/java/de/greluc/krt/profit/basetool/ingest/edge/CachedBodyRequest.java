@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletRequestWrapper;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.jetbrains.annotations.NotNull;
 
@@ -47,6 +48,15 @@ public final class CachedBodyRequest extends HttpServletRequestWrapper {
   public CachedBodyRequest(@NotNull HttpServletRequest request, byte @NotNull [] body) {
     super(request);
     this.body = body;
+  }
+
+  /**
+   * Exposes the buffered bytes through an independent read-only cursor.
+   *
+   * @return the complete body without copying or exposing the backing array
+   */
+  public @NotNull ByteBuffer bufferedBody() {
+    return ByteBuffer.wrap(body).asReadOnlyBuffer();
   }
 
   @NotNull

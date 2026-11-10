@@ -173,6 +173,7 @@ public class AdminLocationsPageController {
       }
       return "redirect:/admin/locations";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Toggle location visibility failed", e);
       return "redirect:/admin/locations?error=ToggleVisibilityFailed";
     }
@@ -218,6 +219,7 @@ public class AdminLocationsPageController {
       }
       return "redirect:/admin/locations";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Toggle home-location failed", e);
       return "redirect:/admin/locations?error=ToggleHomeLocationFailed";
     }

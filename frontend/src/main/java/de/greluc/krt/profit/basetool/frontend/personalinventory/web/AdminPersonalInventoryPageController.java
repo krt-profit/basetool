@@ -153,6 +153,7 @@ public class AdminPersonalInventoryPageController {
       personalInventoryClient.createForMember(userSub, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.created");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to create personal inventory item for {}", userSub, e);
       redirectAttributes.addFlashAttribute("errorToast", "personalInventory.error.create");
       redirectAttributes.addFlashAttribute("personalInventoryForm", form);
@@ -198,6 +199,7 @@ public class AdminPersonalInventoryPageController {
       personalInventoryClient.updateForMember(id, request);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.updated");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to update personal inventory item {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.error.update"));
@@ -223,6 +225,7 @@ public class AdminPersonalInventoryPageController {
       personalInventoryClient.deleteForMember(id);
       redirectAttributes.addFlashAttribute("successToast", "personalInventory.toast.deleted");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to delete personal inventory item {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.error.delete"));

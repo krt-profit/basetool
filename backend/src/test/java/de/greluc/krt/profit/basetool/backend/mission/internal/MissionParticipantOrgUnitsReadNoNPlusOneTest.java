@@ -86,6 +86,11 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   private static final int PAYOUT_BOUND = 7;
 
   @Autowired private MissionController missionController;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController
+      rosterController;
+
   @Autowired private MissionMapper missionMapper;
   @Autowired private MissionPeerRedactor missionPeerRedactor;
   @Autowired private MissionRepository missionRepository;
@@ -184,14 +189,14 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   void theUnassignedRosterListsEachParticipantsOrgUnitsWithAStatementCountIndependentOfItsSize() {
     UUID few = seed(FEW);
     UUID many = seed(MANY);
-    missionController.getUnassignedParticipants(few);
+    rosterController.getUnassignedParticipants(few);
     Statistics stats = statistics();
 
     stats.clear();
-    List<MissionParticipantDto> fewRows = missionController.getUnassignedParticipants(few);
+    List<MissionParticipantDto> fewRows = rosterController.getUnassignedParticipants(few);
     long fewStatements = stats.getPrepareStatementCount();
     stats.clear();
-    List<MissionParticipantDto> manyRows = missionController.getUnassignedParticipants(many);
+    List<MissionParticipantDto> manyRows = rosterController.getUnassignedParticipants(many);
     long manyStatements = stats.getPrepareStatementCount();
     report("unassigned roster", fewStatements, manyStatements);
 
@@ -281,14 +286,14 @@ class MissionParticipantOrgUnitsReadNoNPlusOneTest {
   }
 
   private MissionParticipantDto changePayout(Target target) {
-    return missionController.updatePayoutPreferenceSlim(
+    return rosterController.updatePayoutPreferenceSlim(
         target.missionId(),
         target.participantId(),
         new UpdatePayoutPreferenceRequest(PayoutPreference.DONATE));
   }
 
   private MissionParticipantDto updateOrgUnits(Target target, UUID orgUnitId) {
-    return missionController.updateParticipantSlim(
+    return rosterController.updateParticipantSlim(
         target.missionId(),
         target.participantId(),
         new UpdateParticipantRequest(

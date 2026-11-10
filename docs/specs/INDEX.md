@@ -191,7 +191,7 @@ keep the old ids — read them with this table.
 | `REQ-UI-010` | `materials-overview-grouping.md` (category grouping toggle) | `REQ-UI-022` | action-button icons (`ui-design-system.md`) |
 
 > **Next free id per area** (highest heading in use + 1, 2026-10-03 — re-grep `main` **and** open
-> PRs before claiming one): `ADMIN-004`, `API-022`, `AUDIT-008`, `BANK-061`, `DATA-023`, `FE-032`,
+> PRs before claiming one): `ADMIN-004`, `API-022`, `AUDIT-008`, `BANK-061`, `DATA-023`, `FE-038`,
 > `HANGAR-014`, `INGEST-015`, `INV-057`, `MARKET-023`, `MISSION-021`, `MOD-006`, `NOTIF-023`,
 > `OBS-021`, `OPS-048`, `ORDERS-041`, `ORG-031` (`ORG-022` was skipped and stays unused), `P4K-048`,
 > `REFINERY-026`, `ROLE-008`, `SEC-081`, `UI-028`, `XCH-050` (corrected 2026-09-26:

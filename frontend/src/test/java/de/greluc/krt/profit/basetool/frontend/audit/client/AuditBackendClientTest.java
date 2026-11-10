@@ -117,10 +117,10 @@ class AuditBackendClientTest {
     backend.answerJson("{\"deletedCount\":3}");
     backend.answerJson("{\"deletedCount\":4}");
 
-    assertThat(client.exportPdf("BANK", FROM, TO, "Europe/Berlin")).isEqualTo(pdf);
-    assertThat(client.exportPdf("HANGAR", FROM, TO, " ")).isEqualTo(pdf);
-    assertThat(client.exportJson("BANK", FROM, TO)).isEqualTo(pdf);
-    assertThat(client.exportJson("MISSION", FROM, TO)).isEqualTo(pdf);
+    assertThat(bytes(client.exportPdf("BANK", FROM, TO, "Europe/Berlin"))).isEqualTo(pdf);
+    assertThat(bytes(client.exportPdf("HANGAR", FROM, TO, " "))).isEqualTo(pdf);
+    assertThat(bytes(client.exportJson("BANK", FROM, TO))).isEqualTo(pdf);
+    assertThat(bytes(client.exportJson("MISSION", FROM, TO))).isEqualTo(pdf);
     assertThat(client.purge("BANK", FROM)).isNotEmpty();
     assertThat(client.purge("REFINERY", FROM)).isNotEmpty();
 
@@ -133,5 +133,12 @@ class AuditBackendClientTest {
     backend.expect("GET", "/api/v1/audit/MISSION/export.json" + period);
     backend.expect("DELETE", "/api/v1/bank/admin/audit?before=2026-09-01T10:15:30Z", null);
     backend.expect("DELETE", "/api/v1/audit/REFINERY?before=2026-09-01T10:15:30Z", null);
+  }
+
+  private static byte[] bytes(
+      de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendBinaryTransfer transfer) {
+    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    transfer.writeTo(output, _ -> {});
+    return output.toByteArray();
   }
 }

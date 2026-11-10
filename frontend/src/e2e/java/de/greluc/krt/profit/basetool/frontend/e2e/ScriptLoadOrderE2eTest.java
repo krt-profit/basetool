@@ -66,8 +66,10 @@ class ScriptLoadOrderE2eTest {
       """
       () => {
         const missing = [];
-        const globals = ['krtFetch', 'krtCsrf', 'krtLiveSync', 'krtSearchableSelect',
-                         'krtComboboxRemoteSources', 'krtI18nText', 'krtHtml'];
+        const globals = ['krtFetch', 'krtCsrf', 'krtLiveSync', 'krtI18nText', 'krtHtml'];
+        if (document.querySelector('script[src*="/js/kernel/krt-searchable-select"]')) {
+          globals.push('krtSearchableSelect', 'krtComboboxRemoteSources');
+        }
         for (const name of globals) {
           if (window[name] === undefined || window[name] === null) {
             missing.push(name);

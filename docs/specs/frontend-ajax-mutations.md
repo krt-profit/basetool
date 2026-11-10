@@ -221,6 +221,10 @@ a followed redirect.
 
 ### REQ-FE-031 — Every read goes through `krtFetch.get` / `krtFetch.getJson`
 
+A keyed JSON read remains supersedable through body parsing. A superseded response cannot publish
+its parsed result or clear the current blueprint search results; cancellation is separate from a
+genuine lookup failure. `:frontend:testKrtFetchReadJs` pins reversed body completion.
+
 A background read — a picker's remote source, a lazily loaded fragment, a poll, a report download —
 behaves on session loss and at the consent gate exactly like a write. There is one read path in
 `krt-fetch.js`:
@@ -2454,6 +2458,21 @@ this rule is what notices.
 
 ### REQ-FE-029 — The backend clients stay in the kernel and send only to the backend
 
+`BackendCallPolicy` protects the complete `BackendApiClient` request, body consumption and decoding.
+Its concurrency permit stays held until the caller's operation completes, fails or is cancelled.
+The `backendApi` time-limiter/circuit/retry metrics cover that lifetime. HTTP 4xx refusals retain their
+status, are not retried and do not count as circuit failures. Safe reads alone may retry; writes do
+not. Explicit identity-export response budgets cover body completion as well as headers.
+
+Bank and audit downloads use `BackendBinaryTransfer`: bounded prefetch, blocking output on bounded
+workers, one total configured export budget and no transfer retry. Authorization/status validation
+precedes attachment headers or bytes. An interrupted committed response ends through the disconnected
+client handler; an uncommitted partial response is cleared before error mapping. P4K uploads relay
+the multipart resource through its writer without calling `MultipartFile.getBytes()`.
+
+**Enforced by:** `BackendOperationLifetimeTest`, `WebClientResilienceTest`,
+`BankReportProxyControllerTest`, typed Bank/Audit/Catalogue client tests; ADR-0369.
+
 The frontend reaches the backend through four `WebClient` beans, all built in `WebClientConfig`:
 `webClient` (OAuth2 bearer relay, correlation, org-unit, locale and client-IP relays, Resilience4j),
 the anonymous `termsDocumentClient`, the SSE relay's `sseWebClient` and the live-sync probe's
@@ -2478,11 +2497,11 @@ the breaker, the error mapping.
 - **Controllers call their domain's typed client** (plan F3, since 2026-10-05). Each domain has a
   `<Domain>BackendClient` in `frontend.<domain>.client`, a `@Service` over `BackendApiClient` that
   owns the domain's backend paths, passes runtime values as URI-template variables and returns
-  typed records; only the kernel packages (`kernel.backend`, `kernel.layout`, `kernel.security`; before F4 `service`, `config`, `websocket`) and these clients
+  typed records or a narrow binary-transfer capability; only the kernel packages (`kernel.backend`, `kernel.layout`, `kernel.security`; before F4 `service`, `config`, `websocket`) and these clients
   call `BackendApiClient`. A typed client takes no `java.net.URI` or `UriBuilderFactory` and
-  carries no cache annotation. A client sends and returns records, never an untyped `Map`, with
-  two exceptions by design: the org-unit bank path-only writes, whose backend endpoint binds no
-  request body, and the refinery import's extract, a `JsonNode` relayed unchanged because the
+  carries no cache annotation. A client sends and returns records, never an untyped `Map`. Org-unit
+  bank path-only visibility writes send no body. The refinery import's extract remains a `JsonNode`
+  relayed unchanged because the
   extractor's file is its own JSON contract (ADR-0008). Twenty-one clients cover every
   controller, and no class outside
   the kernel and the client packages calls `BackendApiClient` (`TypedBackendClientTest`, no
@@ -2558,6 +2577,14 @@ call from such a section carries exactly what a call from the request thread car
 `kernel/backend/ReactorContextPropagationConfig` · **Related:** REQ-OBS-002, REQ-OBS-009
 
 ### REQ-FE-032 — The frontend's Java code is packaged by domain
+
+Mission writes have focused participant, leadership, unit/crew, frequency, plan and core controllers.
+Their route gates, section versions and form/AJAX variants remain pinned by the route snapshot and
+mission MVC tests. Shared JSON/date conversion and form trimming each have one narrow owner.
+
+`generateWireRecords` derives the `PurchasingVersionRequest` pilot from OpenAPI into build output.
+Its package, boxed version, required validation and JSON shape remain compatible. DTO parity tests
+continue to select it by `@DtoMirror`, alongside the manual models. Unsupported generator shapes fail.
 
 Since 2026-10-10 (plan §5.9, F4) a domain's frontend code lives in its own package tree:
 `frontend.<domain>.web` holds its controllers, view rows and view helpers, `frontend.<domain>.model`
@@ -2692,6 +2719,14 @@ REQ-FE-033, REQ-UI-023, REQ-OPS-038
 
 ### REQ-FE-035 — Scripts are ES modules behind a per-page import map
 
+Layout calls declare optional picker, number, date, filter, overflow and focus capabilities. A page
+that disables a capability omits its script tags and its optional stylesheets. Static script order,
+module imports, CSP nonces and hashed import maps stay binding. The capability inventory follows
+literal fragments, static imports and the domain fragments a scripted page can insert; it rejects
+disabling a component used in those trees (`:frontend:testPageCapabilitiesJs`). Picker, filter and
+overflow styles retain their existing layers and declarations in separate selectively linked files.
+Known hook collaborators use concrete shared JSDoc function contracts.
+
 Since 2026-10-12 (plan §8.2, F5, ADR-0250) every script under `static/js` is an ES module except the
 ones `frontend/module-ratchet.json` lists as classic — today only `kernel/krt-client-error.js`, the
 head's first, synchronous script. The list only shrinks.
@@ -2769,6 +2804,18 @@ REQ-FE-033, REQ-FE-034, ADR-0250
 
 ### REQ-FE-036 — A web handler leaves an unexpected failure to the central error mapping
 
+Mutation failures are never converted into successful empty section results. A failed blueprint batch
+returns its backend failure and leaves the browser's staging and dialog available. `krtFetch` awaits
+both synchronous and asynchronous callbacks and reports a thrown/rejected callback through the
+existing script-error channel. A successful write with a failed success callback returns
+`ok: true, refreshFailed: true`, shows a saved/display-refresh-failed notice, releases the submitter
+and never repeats persistence. Error callbacks suppress default error handling only after a
+successful truthy result. Every confirmed backend fallback, including form-post feedback, cached
+feature/catalogue reads, layout reads, shared mutation helpers and parallel completion callbacks,
+passes direct and nested session loss to the central reauthentication mapping before publishing a
+fallback. Expected non-authentication backend failures keep their existing status or local feedback.
+Pure parsing, transport cleanup and deliberate logout/session maintenance catches remain local.
+
 A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answered once, by
 `GlobalExceptionHandler`. A handler in a `web` package does not map it a second time.
 
@@ -2793,6 +2840,10 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   expired session redirects to the login instead of rendering its sections' error banners. It logs
   every other failure once and answers the fallback. A pure parse fallback (`Instant.parse`,
   `Long.parseLong`, `UUID.fromString`, `RoundingMode.valueOf`) catches its specific exception.
+- **A custom fallback guards session loss first.** A form-post fallback or a fallback with its own
+  status/model contract calls `SectionFallback.rethrowIfReauthenticationRequired(failure)` before
+  logging or publishing feedback. The same guard applies inside `CompletableFuture.exceptionally`
+  callbacks; nested wrappers never convert session loss into an unavailable counter or empty list.
 - **A page reader is the place a page's section fallbacks live.** Where a page has section
   fallbacks, defaults or parallel loads, a per-domain page reader above the typed client reads it as
   one immutable record (ADR-0291; the job-order pages are the pilot, `JobOrderPageReader`). The
@@ -2828,7 +2879,8 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   `JobOrderPageReader`; `JobOrderPageReaderTest` stubs the typed client by method and
   `JobOrderPageControllerReaderTest` stubs the reader.
 
-**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, `JobOrderPageReaderTest`, the `…ReauthMvcTest` of each
+**Enforced by:** `BroadCatchRatchetTest`, `SectionFallbackTest`, `BackendFallbackReauthenticationTest`,
+`MutationResponseHelperTest`, `JobOrderPageReaderTest`, the `…ReauthMvcTest` of each
 migrated page controller, the controller tests of the changed handlers · **Code:**
 `kernel/web/GlobalExceptionHandler`, `kernel/web/BackendErrorResponses`, `kernel/web/SectionFallback` · **Related:** REQ-FE-029,
 REQ-SEC-012, ADR-0032
@@ -2867,3 +2919,14 @@ REQ-SEC-012, ADR-0032
   swaps the pre-filled create-form fragment in place via the `importExtractAjax` twin (see REQ-FE-005
   above), and `datetime-splitter.js` was made swap-safe in the process. The whole refinery surface is
   now reload-free.
+
+### REQ-FE-037 - The default message bundle is derived from the canonical German source
+
+`messages_de.properties` is the one manually maintained German bundle. `generateDefaultMessages`
+copies it byte-for-byte into the generated `messages.properties` runtime resource before resources
+are packaged or tested. Explicit German and unsupported-locale/default lookups resolve the same
+values. The English key set, duplicate/missing-key checks and escaped-umlaut checks remain binding.
+The generated output is build state, with declared inputs/outputs and configuration-cache support.
+
+**Enforced by:** `MessageBundleConsistencyTest`, locale message coverage tests,
+`generateDefaultMessages`; ADR-0369.

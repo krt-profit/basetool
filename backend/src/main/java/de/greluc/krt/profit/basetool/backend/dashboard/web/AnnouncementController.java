@@ -57,6 +57,7 @@ public class AnnouncementController {
    * @return announcement DTO with 200, or 204 when none active
    */
   @GetMapping
+  @Transactional(readOnly = true)
   public ResponseEntity<AnnouncementDto> getPublicAnnouncement() {
     return announcementService
         .getPublicAnnouncement()
@@ -72,6 +73,7 @@ public class AnnouncementController {
    * @return the announcement DTO
    */
   @GetMapping("/admin")
+  @Transactional(readOnly = true)
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public AnnouncementDto getAdminAnnouncement() {
     return announcementMapper.toDto(announcementService.getAdminAnnouncement());
@@ -91,7 +93,7 @@ public class AnnouncementController {
         announcementService.updateAnnouncement(request.content(), request.version()));
   }
 
-  /** Removes the announcement entirely. Next PUT creates a fresh row. */
+  /** Removes the current banner so a later one receives a fresh dismissal identity. */
   @DeleteMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteAnnouncement() {

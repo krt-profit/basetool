@@ -3,6 +3,7 @@ import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
 import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 import de.greluc.krt.profit.basetool.conventions.backendModuleDirectories
+import de.greluc.krt.profit.basetool.conventions.registerNodeScriptTest
 import java.io.File
 
 buildscript {
@@ -21,13 +22,23 @@ plugins {
   id("basetool.quality-conventions")
   id("basetool.mutation-conventions")
   id("basetool.supply-chain-conventions")
-  alias(libs.plugins.node.gradle)
+  id("com.github.node-gradle.node")
   alias(libs.plugins.openapi.generator)
 }
 
 description = "frontend"
 
 val generatedContract = layout.buildDirectory.dir("generated/openapi")
+
+val generateDefaultMessages =
+  tasks.register<Sync>("generateDefaultMessages") {
+    from(layout.projectDirectory.file("src/main/resources/messages_de.properties")) {
+      rename { "messages.properties" }
+    }
+    into(layout.buildDirectory.dir("generated/default-messages"))
+  }
+
+sourceSets.named("main") { resources.srcDir(generateDefaultMessages) }
 
 openApiGenerate {
   generatorName.set("java")
@@ -65,6 +76,23 @@ sourceSets.named("test") { java.srcDir(generatedContract.map { it.dir("src/main/
 spotless { java { target("src/**/*.java") } }
 
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
+
+tasks.named<Test>("test") { useJUnitPlatform { excludeTags("resource-profile") } }
+
+tasks.register<Test>("resourceProfileTest") {
+  group = "verification"
+  description = "Profiles bounded frontend transfers and OAuth retention with synthetic local data."
+  testClassesDirs = sourceSets["test"].output.classesDirs
+  classpath = sourceSets["test"].runtimeClasspath
+  useJUnitPlatform { includeTags("resource-profile") }
+  maxHeapSize = "1024m"
+  maxParallelForks = 1
+  systemProperty(
+    "basetool.resource-profile-output",
+    providers.gradleProperty("resourceProfileOutput").get(),
+  )
+  outputs.upToDateWhen { false }
+}
 
 val projectVersion = project.version.toString()
 val gitIsReachable =
@@ -142,6 +170,7 @@ dependencies {
   implementation(libs.micrometer.context.propagation)
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
+  implementation(project(":technical-support"))
 
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
@@ -509,6 +538,20 @@ tasks.register<Test>("smokeTest") {
   useJUnitPlatform { includeTags("smoke") }
 }
 
+tasks.register<Test>("assetProfileTest") {
+  description = "Measures cold legal-page asset bytes and Chromium script execution."
+  playwrightSuiteConfig()
+  useJUnitPlatform { includeTags("asset-profile") }
+  systemProperty(
+    "basetool.resource-profile-output",
+    providers.gradleProperty("resourceProfileOutput").get(),
+  )
+  systemProperty(
+    "basetool.asset-profile-baseline-css",
+    providers.gradleProperty("assetProfileBaselineCss").get(),
+  )
+}
+
 node {
   version.set(libs.versions.node.get())
   download.set(true)
@@ -665,6 +708,23 @@ tasks.register<NpxTask>("prettierApply") {
 }
 
 val openApiSpec = layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json")
+val generatedWireRecords = layout.buildDirectory.dir("generated/wire-records")
+val generateWireRecords =
+  tasks.register<NodeTask>("generateWireRecords") {
+    group = "build"
+    description = "Generates the pilot frontend wire records from the backend OpenAPI contract."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(layout.projectDirectory.file("scripts/gen-wire-records.mjs").asFile)
+    args.set(
+      listOf(openApiSpec.asFile.absolutePath, generatedWireRecords.get().asFile.absolutePath),
+    )
+    inputs.file(openApiSpec)
+    inputs.file(layout.projectDirectory.file("scripts/gen-wire-records.mjs"))
+    outputs.dir(generatedWireRecords)
+  }
+
+sourceSets.named("main") { java.srcDir(generateWireRecords) }
+
 val generatedApiTypes = layout.buildDirectory.file("generated/ts/api.d.ts")
 
 val generateApiTypesScript = layout.projectDirectory.file("scripts/gen-api-types.mjs")
@@ -705,14 +765,12 @@ val typecheckJs =
   }
 
 val testTypecheckRatchet =
-  tasks.register<NodeTask>("testTypecheckRatchet") {
-    group = "verification"
-    description =
-      "Holds the type-check ratchet: every script has a domain, the strict options stay on, and the ratchet fires on planted trees."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/typecheck-ratchet.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/typecheck-ratchet.test.mjs"))
+  registerNodeScriptTest(
+    "testTypecheckRatchet",
+    "Holds the type-check ratchet: every script has a domain, the strict options stay on, and the ratchet fires on planted trees.",
+    "scripts/typecheck-ratchet.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/typecheck-ratchet.mjs"))
     inputs.file(layout.projectDirectory.file("typecheck-ratchet.json"))
     inputs.file(layout.projectDirectory.file("tsconfig.json"))
@@ -721,306 +779,248 @@ val testTypecheckRatchet =
         include("*.js")
       },
     )
-    outputs.upToDateWhen { false }
   }
 
 val testGenApiTypes =
-  tasks.register<NodeTask>("testGenApiTypes") {
-    group = "verification"
-    description = "Regression tests for the OpenAPI -> .d.ts emitter (scripts/gen-api-types.mjs)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/gen-api-types.test.mjs").asFile)
-    ignoreExitValue.set(false)
+  registerNodeScriptTest(
+    "testGenApiTypes",
+    "Regression tests for the OpenAPI -> .d.ts emitter (scripts/gen-api-types.mjs).",
+    "scripts/gen-api-types.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(generateApiTypesScript)
-    inputs.file(layout.projectDirectory.file("scripts/gen-api-types.test.mjs"))
-    outputs.upToDateWhen { false }
   }
 
 val testLiveSyncJs =
-  tasks.register<NodeTask>("testLiveSyncJs") {
-    group = "verification"
-    description =
-      "Regression tests for the live-sync socket script (static/js/kernel/krt-live-sync.js)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-live-sync.test.mjs"))
+  registerNodeScriptTest(
+    "testLiveSyncJs",
+    "Regression tests for the live-sync socket script (static/js/kernel/krt-live-sync.js).",
+    "scripts/krt-live-sync.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-live-sync.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testKrtFetchReadJs =
-  tasks.register<NodeTask>("testKrtFetchReadJs") {
-    group = "verification"
-    description = "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-fetch-read.test.mjs"))
+  registerNodeScriptTest(
+    "testKrtFetchReadJs",
+    "Regression tests for the one read path, krtFetch.get / getJson (REQ-FE-031).",
+    "scripts/krt-fetch-read.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testPageSectionsJs =
-  tasks.register<NodeTask>("testPageSectionsJs") {
-    group = "verification"
-    description =
-      "Regression tests for the page-section module: write, version, re-render, broadcast and peer frame (ADR-0289)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-page-sections.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-page-sections.test.mjs"))
+  registerNodeScriptTest(
+    "testPageSectionsJs",
+    "Regression tests for the page-section module: write, version, re-render, broadcast and peer frame (ADR-0289).",
+    "scripts/krt-page-sections.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-page-sections.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testTrustedTypesJs =
-  tasks.register<NodeTask>("testTrustedTypesJs") {
-    group = "verification"
-    description =
-      "Regression tests for the krt-html builder and the krt-fragment policy (ADR-0239)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/trusted-types.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/trusted-types.test.mjs"))
+  registerNodeScriptTest(
+    "testTrustedTypesJs",
+    "Regression tests for the krt-html builder and the krt-fragment policy (ADR-0239).",
+    "scripts/trusted-types.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-html.js"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-fetch.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testClientErrorCspJs =
-  tasks.register<NodeTask>("testClientErrorCspJs") {
-    group = "verification"
-    description =
-      "Regression tests for the client-error beacon's CSP violation report (REQ-SEC-064, REQ-FE-022)."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/client-error-csp.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/client-error-csp.test.mjs"))
+  registerNodeScriptTest(
+    "testClientErrorCspJs",
+    "Regression tests for the client-error beacon's CSP violation report (REQ-SEC-064, REQ-FE-022).",
+    "scripts/client-error-csp.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-client-error.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testSafeUrl =
-  tasks.register<NodeTask>("testSafeUrl") {
-    group = "verification"
-    description =
-      "Regression tests for safeSameOriginUrl, the validator between a DOM-read URL and a form action."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/safe-url.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/safe-url.test.mjs"))
+  registerNodeScriptTest(
+    "testSafeUrl",
+    "Regression tests for safeSameOriginUrl, the validator between a DOM-read URL and a form action.",
+    "scripts/safe-url.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/safe-url.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testTableSort =
-  tasks.register<NodeTask>("testTableSort") {
-    group = "verification"
-    description =
-      "Regression tests for krtTableSort, the shared sortable table headers: value order, click cycle and aria-sort."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-table-sort.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-table-sort.test.mjs"))
+  registerNodeScriptTest(
+    "testTableSort",
+    "Regression tests for krtTableSort, the shared sortable table headers: value order, click cycle and aria-sort.",
+    "scripts/krt-table-sort.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-table-sort.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testReorderJs =
-  tasks.register<NodeTask>("testReorderJs") {
-    group = "verification"
-    description =
-      "Regression tests for krtReorder, the accessible list reorder: controls, Alt+Arrow keys, focus and announcement."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-reorder.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-reorder.test.mjs"))
+  registerNodeScriptTest(
+    "testReorderJs",
+    "Regression tests for krtReorder, the accessible list reorder: controls, Alt+Arrow keys, focus and announcement.",
+    "scripts/krt-reorder.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-reorder.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testFavouriteOrderJs =
-  tasks.register<NodeTask>("testFavouriteOrderJs") {
-    group = "verification"
-    description =
-      "Regression tests for the merge of a reordered favourites group into the stored favourites."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/nav-favourite-order.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/nav-favourite-order.test.mjs"))
+  registerNodeScriptTest(
+    "testFavouriteOrderJs",
+    "Regression tests for the merge of a reordered favourites group into the stored favourites.",
+    "scripts/nav-favourite-order.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/nav-favourite-order.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testBoardSyncJs =
-  tasks.register<NodeTask>("testBoardSyncJs") {
-    group = "verification"
-    description =
-      "Regression tests for the dashboard board reconcile: the saved-state signature and the swap decision."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/board-sync.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/board-sync.test.mjs"))
+  registerNodeScriptTest(
+    "testBoardSyncJs",
+    "Regression tests for the dashboard board reconcile: the saved-state signature and the swap decision.",
+    "scripts/board-sync.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/dashboard/board-sync.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testBankLiveSyncJs =
-  tasks.register<NodeTask>("testBankLiveSyncJs") {
-    group = "verification"
-    description =
-      "Regression tests for the bank forms' live-sync publish matrix and its placeholder topics."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/bank-livesync.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/bank-livesync.test.mjs"))
+  registerNodeScriptTest(
+    "testBankLiveSyncJs",
+    "Regression tests for the bank forms' live-sync publish matrix and its placeholder topics.",
+    "scripts/bank-livesync.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/bank/bank-livesync.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testMemberRolesJs =
-  tasks.register<NodeTask>("testMemberRolesJs") {
-    group = "verification"
-    description =
-      "Regression tests for the member page's role tab: confirm, write, revert and refusal message."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/member-roles.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/member-roles.test.mjs"))
+  registerNodeScriptTest(
+    "testMemberRolesJs",
+    "Regression tests for the member page's role tab: confirm, write, revert and refusal message.",
+    "scripts/member-roles.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/identity/member-roles.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testShortcutsJs =
-  tasks.register<NodeTask>("testShortcutsJs") {
-    group = "verification"
-    description =
-      "Regression tests for the navigation shortcuts Alt+1 to Alt+9 and Alt+0: digit-row key matching and the per-slot decision."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-shortcuts.test.mjs"))
+  registerNodeScriptTest(
+    "testShortcutsJs",
+    "Regression tests for the navigation shortcuts Alt+1 to Alt+9 and Alt+0: digit-row key matching and the per-slot decision.",
+    "scripts/krt-shortcuts.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-shortcuts.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testNavRailJs =
-  tasks.register<NodeTask>("testNavRailJs") {
-    group = "verification"
-    description =
-      "Regression tests for the icon rail: a rail item that survives a navigation refresh is bound once."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/nav-rail.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/nav-rail.test.mjs"))
+  registerNodeScriptTest(
+    "testNavRailJs",
+    "Regression tests for the icon rail: a rail item that survives a navigation refresh is bound once.",
+    "scripts/nav-rail.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/nav-rail.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testSearchJs =
-  tasks.register<NodeTask>("testSearchJs") {
-    group = "verification"
-    description =
-      "Regression tests for the tolerant menu search, the quick-access ranking and the frequent-use decay and the empty-state de-duplication."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-search.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-search.test.mjs"))
+  registerNodeScriptTest(
+    "testSearchJs",
+    "Regression tests for the tolerant menu search, the quick-access ranking and the frequent-use decay and the empty-state de-duplication.",
+    "scripts/krt-search.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-search.js"))
     inputs.file(layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-frequent.js"))
-    outputs.upToDateWhen { false }
   }
 
 val testNumberFormatJs =
-  tasks.register<NodeTask>("testNumberFormatJs") {
-    group = "verification"
-    description =
-      "Regression tests for the number field formatting: separators per language, sign, decimals, caret and separator deletes."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-number-format.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-number-format.test.mjs"))
+  registerNodeScriptTest(
+    "testNumberFormatJs",
+    "Regression tests for the number field formatting: separators per language, sign, decimals, caret and separator deletes.",
+    "scripts/krt-number-format.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-number-format.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testLocalisedNameJs =
-  tasks.register<NodeTask>("testLocalisedNameJs") {
-    group = "verification"
-    description =
-      "Regression tests for the catalogue name a script shows under the game-text language policy."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/krt-localised-name.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/krt-localised-name.test.mjs"))
+  registerNodeScriptTest(
+    "testLocalisedNameJs",
+    "Regression tests for the catalogue name a script shows under the game-text language policy.",
+    "scripts/krt-localised-name.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testNotificationBellLabelJs =
-  tasks.register<NodeTask>("testNotificationBellLabelJs") {
-    group = "verification"
-    description =
-      "Regression tests for the notification bell's accessible name: the unread count, the 99+ cap and the plain label."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/notification-bell-label.test.mjs"))
+  registerNodeScriptTest(
+    "testNotificationBellLabelJs",
+    "Regression tests for the notification bell's accessible name: the unread count, the 99+ cap and the plain label.",
+    "scripts/notification-bell-label.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file(
         "src/main/resources/static/js/notification/notification-bell-label.js",
       ),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testBlueprintStatsJs =
-  tasks.register<NodeTask>("testBlueprintStatsJs") {
-    group = "verification"
-    description =
-      "Regression tests for the blueprint recipe's stat values: quality factor, base times factor and the unit-aware text."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/blueprint-stats.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/blueprint-stats.test.mjs"))
+  registerNodeScriptTest(
+    "testBlueprintStatsJs",
+    "Regression tests for the blueprint recipe's stat values: quality factor, base times factor and the unit-aware text.",
+    "scripts/blueprint-stats.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file(
@@ -1032,55 +1032,55 @@ val testBlueprintStatsJs =
         "src/main/resources/static/js/personalinventory/personal-inventory-blueprint-metadata.js",
       ),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testCatalogueAdminJs =
-  tasks.register<NodeTask>("testCatalogueAdminJs") {
-    group = "verification"
-    description =
-      "Regression tests for the P4K catalogue admin pages: the storage-place name, read ordering and peer sync."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/catalogue-admin.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/catalogue-admin.test.mjs"))
+  registerNodeScriptTest(
+    "testCatalogueAdminJs",
+    "Regression tests for the P4K catalogue admin pages: the storage-place name, read ordering and peer sync.",
+    "scripts/catalogue-admin.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.dir(layout.projectDirectory.dir("src/main/resources/static/js/catalogue"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-localised-name.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testShipTypePickerJs =
-  tasks.register<NodeTask>("testShipTypePickerJs") {
-    group = "verification"
-    description =
-      "Regression tests for the hangar dialogs' ship-type picker: the manufacturer filter and mark."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/ship-type-picker.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/ship-type-picker.test.mjs"))
+  registerNodeScriptTest(
+    "testShipTypePickerJs",
+    "Regression tests for the hangar dialogs' ship-type picker: the manufacturer filter and mark.",
+    "scripts/ship-type-picker.test.mjs",
+    "npmSetup",
+  ) {
     inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/hangar/ship-type-picker.js"),
     )
-    outputs.upToDateWhen { false }
   }
 
 val testEslintBans =
-  tasks.register<NodeTask>("testEslintBans") {
-    group = "verification"
-    description =
-      "Proves the ESLint transport, browser-baseline and Trusted Types sink bans fire on planted sources."
-    dependsOn(tasks.named("npmInstall"))
-    script.set(layout.projectDirectory.file("scripts/eslint-bans.test.mjs").asFile)
-    ignoreExitValue.set(false)
-    inputs.file(layout.projectDirectory.file("scripts/eslint-bans.test.mjs"))
+  registerNodeScriptTest(
+    "testEslintBans",
+    "Proves the ESLint transport, browser-baseline and Trusted Types sink bans fire on planted sources.",
+    "scripts/eslint-bans.test.mjs",
+    "npmInstall",
+  ) {
     inputs.file(layout.projectDirectory.file("eslint.config.mjs"))
     inputs.file(layout.projectDirectory.file("module-ratchet.json"))
     inputs.file(layout.projectDirectory.file("package.json"))
-    outputs.upToDateWhen { false }
+  }
+
+val testPageCapabilitiesJs =
+  registerNodeScriptTest(
+    "testPageCapabilitiesJs",
+    "Checks selective page capabilities and their static module and fragment dependencies.",
+    "scripts/page-capabilities.test.mjs",
+  ) {
+    inputs.dir(layout.projectDirectory.dir("src/main/resources/templates"))
+    inputs.dir(layout.projectDirectory.dir("src/main/resources/static/js"))
   }
 
 val repositoryRoot = layout.settingsDirectory
@@ -1207,6 +1207,7 @@ tasks.named("check").configure {
     testCatalogueAdminJs,
     testShipTypePickerJs,
     testEslintBans,
+    testPageCapabilitiesJs,
     testTypecheckRatchet,
     lintCss,
     lintCssInline,

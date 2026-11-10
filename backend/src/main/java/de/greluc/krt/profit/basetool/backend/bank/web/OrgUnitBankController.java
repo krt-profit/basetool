@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestViewDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankPdfExport;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.GrantOwnerApprovalRequest;
@@ -41,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.SetBankApprovalLimitR
 import de.greluc.krt.profit.basetool.backend.bank.internal.UpdateBankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -50,6 +50,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -58,6 +59,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -232,13 +234,14 @@ public class OrgUnitBankController {
       in = ParameterIn.HEADER,
       required = false,
       schema = @Schema(type = "string"))
-  public ResponseEntity<byte[]> downloadStatement(
+  public ResponseEntity<Resource> downloadStatement(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull Instant from,
       @RequestParam @NotNull Instant to,
-      @UserZone ZoneId userZone) {
-    byte[] pdf = orgUnitBankAccessService.exportViewableStatement(id, from, to, userZone);
-    return PdfResponses.pdfAttachment(pdf, "kontoauszug-" + id + ".pdf");
+      @UserZone ZoneId userZone,
+      HttpServletRequest request) {
+    BankPdfExport pdf = orgUnitBankAccessService.exportViewableStatement(id, from, to, userZone);
+    return BankReportCleanupFilter.attachment(request, pdf, "kontoauszug-" + id + ".pdf");
   }
 
   /**

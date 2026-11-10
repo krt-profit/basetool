@@ -29,7 +29,6 @@ import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.ListenerAndObserverFixtures;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
@@ -69,10 +68,7 @@ import org.springframework.web.context.request.RequestContextHolder;
  */
 class ListenerAndObserverRulesTest {
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackagesOf(ListenerAndObserverFixtures.class);

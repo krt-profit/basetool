@@ -236,6 +236,7 @@ public class AdminUexPageController {
       cacheEviction.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Toggle terminal visibility failed", e);
       return "redirect:/admin/uex-data?error=ToggleVisibilityFailed";
     }
@@ -370,6 +371,7 @@ public class AdminUexPageController {
       log.debug("Override update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Override update failed", e);
       return "redirect:/admin/uex-data?error=OverrideUpdateFailed";
     }

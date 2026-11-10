@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.store;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -45,6 +46,11 @@ class ExchangeIdempotencyTest {
 
     assertThat(ExchangeIdempotency.fingerprint("POST", "/exchange/v1/me/blueprints/changes", bytes))
         .isEqualTo(expected);
+    ByteBuffer buffered = ByteBuffer.wrap(bytes).asReadOnlyBuffer();
+    assertThat(
+            ExchangeIdempotency.fingerprint("POST", "/exchange/v1/me/blueprints/changes", buffered))
+        .isEqualTo(expected);
+    assertThat(buffered.position()).isZero();
   }
 
   @ParameterizedTest

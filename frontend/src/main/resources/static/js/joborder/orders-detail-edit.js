@@ -436,7 +436,9 @@ initOrdersDetailEdit2();
  */
 export function _refreshMaterialsSection(orderId, broadcastOpts) {
     if (joborderHooks.refreshOrderSection) {
-        return joborderHooks.refreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts);
+        return joborderHooks
+            .refreshOrderSection(['materials', 'aggregated', 'kpi'], broadcastOpts)
+            .then((outcomes) => outcomes.every(Boolean));
     }
     orderId ||= window.orderId || _odFieldValue('claim-order-id');
     const mat = document.getElementById('order-materials-results');
@@ -463,7 +465,9 @@ export function _refreshMaterialsSection(orderId, broadcastOpts) {
  */
 export function _swapOrderSection(orderId, containerId, fragmentValue, broadcastOpts) {
     if (joborderHooks.refreshOrderSection) {
-        return joborderHooks.refreshOrderSection(fragmentValue, broadcastOpts);
+        return joborderHooks
+            .refreshOrderSection(fragmentValue, broadcastOpts)
+            .then((outcomes) => outcomes.every(Boolean));
     }
     const c = document.getElementById(containerId);
     if (!c || !orderId) return Promise.resolve(false);

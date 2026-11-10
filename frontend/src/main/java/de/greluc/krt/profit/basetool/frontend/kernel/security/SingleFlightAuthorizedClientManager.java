@@ -19,17 +19,21 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.session.events.SessionDestroyedEvent;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -48,8 +52,10 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   /** Number of lock stripes; bounds memory and avoids a per-session lock-map leak. */
   private static final int STRIPE_COUNT = 64;
 
-  /** Hard cap on cached entries; the map is cleared wholesale if it is ever exceeded. */
+  /** Maximum number of independently evictable freshness entries. */
   private static final int MAX_CACHE_ENTRIES = 50_000;
+
+  private static final Duration MAX_RETENTION = Duration.ofMinutes(5);
 
   /**
    * Margin subtracted from the access-token expiry, within which a cached token counts as stale.
@@ -59,7 +65,37 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
 
   private final OAuth2AuthorizedClientManager delegate;
   private final ReentrantLock[] stripes;
-  private final Map<String, OAuth2AuthorizedClient> freshClients = new ConcurrentHashMap<>();
+  private final Cache<ClientKey, OAuth2AuthorizedClient> freshClients =
+      Caffeine.newBuilder()
+          .maximumSize(MAX_CACHE_ENTRIES)
+          .scheduler(Scheduler.systemScheduler())
+          .expireAfter(
+              new Expiry<ClientKey, OAuth2AuthorizedClient>() {
+                @Override
+                public long expireAfterCreate(
+                    ClientKey key, OAuth2AuthorizedClient value, long currentTime) {
+                  return retention(value);
+                }
+
+                @Override
+                public long expireAfterUpdate(
+                    ClientKey key,
+                    OAuth2AuthorizedClient value,
+                    long currentTime,
+                    long currentDuration) {
+                  return retention(value);
+                }
+
+                @Override
+                public long expireAfterRead(
+                    ClientKey key,
+                    OAuth2AuthorizedClient value,
+                    long currentTime,
+                    long currentDuration) {
+                  return currentDuration;
+                }
+              })
+          .build();
 
   /**
    * Wraps the real authorized-client manager.
@@ -86,25 +122,22 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   @Override
   @Nullable
   public OAuth2AuthorizedClient authorize(@NotNull OAuth2AuthorizeRequest authorizeRequest) {
-    String key = cacheKey(authorizeRequest);
+    ClientKey key = cacheKey(authorizeRequest);
     if (key == null) {
       return delegate.authorize(authorizeRequest);
     }
     ReentrantLock lock = stripes[Math.floorMod(key.hashCode(), STRIPE_COUNT)];
     lock.lock();
     try {
-      OAuth2AuthorizedClient cached = freshClients.get(key);
+      OAuth2AuthorizedClient cached = freshClients.getIfPresent(key);
       if (isFresh(cached)) {
         return cached;
       }
       OAuth2AuthorizedClient authorized = delegate.authorize(authorizeRequest);
       if (isFresh(authorized)) {
-        if (freshClients.size() >= MAX_CACHE_ENTRIES) {
-          freshClients.clear();
-        }
         freshClients.put(key, authorized);
       } else {
-        freshClients.remove(key);
+        freshClients.invalidate(key);
       }
       return authorized;
     } finally {
@@ -121,17 +154,17 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
    * @return the cache key, or {@code null} if no session / principal context is available
    */
   @Nullable
-  private static String cacheKey(@NotNull OAuth2AuthorizeRequest request) {
+  private static ClientKey cacheKey(@NotNull OAuth2AuthorizeRequest request) {
     String registrationId = request.getClientRegistrationId();
     HttpServletRequest servletRequest = request.getAttribute(HttpServletRequest.class.getName());
     if (servletRequest == null) {
       servletRequest = currentServletRequest();
     }
     if (servletRequest != null && servletRequest.getSession(false) != null) {
-      return registrationId + "|s:" + servletRequest.getSession(false).getId();
+      return new ClientKey(registrationId, servletRequest.getSession(false).getId(), null);
     }
     if (request.getPrincipal() != null && request.getPrincipal().getName() != null) {
-      return registrationId + "|p:" + request.getPrincipal().getName();
+      return new ClientKey(registrationId, null, request.getPrincipal().getName());
     }
     return null;
   }
@@ -166,4 +199,28 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
     Instant expiresAt = client.getAccessToken().getExpiresAt();
     return expiresAt != null && Instant.now().plus(EXPIRY_SKEW).isBefore(expiresAt);
   }
+
+  /**
+   * Evicts the freshness entries of a deleted or expired Spring Session.
+   *
+   * @param event the ended session
+   */
+  @EventListener
+  public void sessionEnded(@NotNull SessionDestroyedEvent event) {
+    freshClients.asMap().keySet().removeIf(key -> event.getSessionId().equals(key.sessionId()));
+  }
+
+  private static long retention(@NotNull OAuth2AuthorizedClient client) {
+    Instant expiresAt = client.getAccessToken().getExpiresAt();
+    if (expiresAt == null) {
+      return 0;
+    }
+    Duration remaining = Duration.between(Instant.now(), expiresAt.minus(EXPIRY_SKEW));
+    return Math.max(
+        0, remaining.compareTo(MAX_RETENTION) < 0 ? remaining.toNanos() : MAX_RETENTION.toNanos());
+  }
+
+  /** Identifies one registration's session or sessionless principal. */
+  private record ClientKey(
+      String registrationId, @Nullable String sessionId, @Nullable String principal) {}
 }

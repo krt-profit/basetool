@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -35,7 +34,8 @@ import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.ArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -61,19 +61,39 @@ class HangarPageControllerReauthMvcTest {
     SecurityContextHolder.clearContext();
   }
 
-  @Test
-  void anExpiredSessionOnTheUnitOverviewRedirectsToLogin() throws Exception {
-    when(client.squadronOverview(anyInt(), anyInt(), any())).thenThrow(expiredSession());
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionOnTheUnitOverviewRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+    when(client.squadronOverview(anyInt(), anyInt(), any())).thenThrow(sessionFailure);
 
     mockMvc
         .perform(get("/hangar/squadron").param("fragment", "results"))
         .andExpect(redirectsToLogin());
   }
 
-  @Test
-  void anExpiredSessionOnTheOwnerOptionsRedirectsToLogin() throws Exception {
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionInTheParallelShipReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
-    when(client.pickableOrgUnits()).thenThrow(expiredSession());
+    when(client.myShips(anyInt(), anyInt(), any(), any())).thenThrow(sessionFailure);
+
+    mockMvc.perform(get("/hangar").param("fragment", "results")).andExpect(redirectsToLogin());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionInTheParallelHomeLocationsReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+    when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
+    when(client.homeLocations()).thenThrow(sessionFailure);
+
+    mockMvc.perform(get("/hangar").param("fragment", "results")).andExpect(redirectsToLogin());
+  }
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionOnTheOwnerOptionsRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+    when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
+    when(client.pickableOrgUnits()).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/hangar").param("fragment", "results")).andExpect(redirectsToLogin());
   }

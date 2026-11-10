@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -141,40 +142,53 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
+    boolean proceed;
+    try {
+      proceed = refreshSession(request, response);
+    } catch (ReauthenticationRequiredException _) {
+      if (!PublicPaths.isGateExempt(PublicPaths.relativePath(request))
+          && !ReauthenticationHandoff.isWebSocketUpgrade(request)) {
+        ReauthenticationHandoff.send(request, response);
+        return;
+      }
+      proceed = true;
+    }
+    if (proceed) {
+      filterChain.doFilter(request, response);
+    }
+  }
+
+  private boolean refreshSession(
+      @NotNull HttpServletRequest request, @NotNull HttpServletResponse response)
+      throws IOException {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-    if (auth != null
-        && auth.isAuthenticated()
-        && auth instanceof OAuth2AuthenticationToken token
-        && !isStaticAsset(request)) {
-      HttpSession session = request.getSession(false);
-      if (session != null) {
-        String approval = resolveApprovalState(session);
-        if (STATE_PENDING.equals(approval)
-            || STATE_REJECTED.equals(approval)
-            || STATE_NO_ROLE.equals(approval)) {
-          routeToAccountStatus(request, response, filterChain);
-          return;
-        }
-
-        if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
-          filterChain.doFilter(request, response);
-          return;
-        }
-
-        if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
-          log.debug("Session exists, starting role sync for the current user");
-          if (syncRoles(token, session, request, response)) {
-            session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
-          } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
-            routeToAccountStatus(request, response, filterChain);
-            return;
-          }
-        }
+    if (!(auth instanceof OAuth2AuthenticationToken token)
+        || !auth.isAuthenticated()
+        || isStaticAsset(request)) {
+      return true;
+    }
+    HttpSession session = request.getSession(false);
+    if (session == null) {
+      return true;
+    }
+    String approval = resolveApprovalState(session);
+    if (STATE_PENDING.equals(approval)
+        || STATE_REJECTED.equals(approval)
+        || STATE_NO_ROLE.equals(approval)) {
+      return routeToAccountStatus(request, response);
+    }
+    if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
+      return true;
+    }
+    if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
+      log.debug("Session exists, starting role sync for the current user");
+      if (syncRoles(token, session, request, response)) {
+        session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
+      } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
+        return routeToAccountStatus(request, response);
       }
     }
-
-    filterChain.doFilter(request, response);
+    return true;
   }
 
   /**
@@ -243,8 +257,8 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Reads the caller's approval status from the backend; any failure yields {@code null}, treated
-   * as not pending.
+   * Reads the caller's approval status, preserving session loss and yielding {@code null} on other
+   * failures.
    *
    * @return the approval status ({@code PENDING}/{@code ACTIVE}/{@code REJECTED}), or {@code null}
    *     when it could not be read
@@ -256,9 +270,11 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           backendApiClient.get("/api/v1/users/me/registration-status", RegistrationStatusDto.class);
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Could not read approval status; treating as non-pending for this request.", e);
       return null;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.warn("Could not read approval status; treating as non-pending for this request.", e);
       return null;
     }
@@ -280,23 +296,21 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Redirects the caller to the account-status page, unless the request is {@linkplain
-   * #isApprovalExempt exempt}, in which case it continues down the chain.
+   * Redirects to the account-status page unless the request is exempt.
    *
    * @param request the current request
-   * @param response the response the redirect is written to
-   * @param filterChain the chain an exempt request continues down
-   * @throws ServletException propagated from an exempt request's downstream chain
-   * @throws IOException propagated from writing the redirect or the downstream chain
+   * @param response the response carrying a redirect
+   * @return whether the exempt request should continue down the chain
+   * @throws IOException when the redirect cannot be written
    */
-  private static void routeToAccountStatus(
-      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-      throws ServletException, IOException {
+  private static boolean routeToAccountStatus(
+      @NotNull HttpServletRequest request, @NotNull HttpServletResponse response)
+      throws IOException {
     if (isApprovalExempt(request)) {
-      filterChain.doFilter(request, response);
-    } else {
-      response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
+      return true;
     }
+    response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
+    return false;
   }
 
   /**
@@ -411,9 +425,9 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       }
 
       return true;
-    } catch (BackendServiceException | ReauthenticationRequiredException e) {
-      if (e instanceof BackendServiceException backendFailure
-          && BackendServiceException.CODE_NO_ROLE.equals(backendFailure.getProblemCode())) {
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
+      if (BackendServiceException.CODE_NO_ROLE.equals(e.getProblemCode())) {
         session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
         session.setAttribute(APPROVAL_CHECKED_AT_FLAG, System.currentTimeMillis());
         log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
@@ -422,6 +436,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       log.debug("Backend role sync deferred (backend unavailable) for the current user", e);
       return false;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to sync backend roles for the current user", e);
       return false;
     }

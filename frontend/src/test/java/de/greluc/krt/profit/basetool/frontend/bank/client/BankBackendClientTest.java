@@ -300,9 +300,9 @@ class BankBackendClientTest {
     backend.answerBytes("application/pdf", pdf);
     backend.answerJson("{\"accountsReset\":3,\"holderStashesZeroed\":2}");
 
-    assertThat(client.accountStatement(ID, FROM, TO, "Europe/Berlin")).isEqualTo(pdf);
-    assertThat(client.threeMonthReport(" ")).isEqualTo(pdf);
-    assertThat(client.orgUnitAccountStatement(ID, FROM, TO, "Europe/Berlin")).isEqualTo(pdf);
+    assertThat(bytes(client.accountStatement(ID, FROM, TO, "Europe/Berlin"))).isEqualTo(pdf);
+    assertThat(bytes(client.threeMonthReport(" "))).isEqualTo(pdf);
+    assertThat(bytes(client.orgUnitAccountStatement(ID, FROM, TO, "Europe/Berlin"))).isEqualTo(pdf);
     assertThat(client.wipeReset()).isNotNull();
 
     RecordedRequest statement =
@@ -359,11 +359,11 @@ class BankBackendClientTest {
         ID, new UpdateBankBookingRequest(AMOUNT, null, null, OTHER, null, null, 1L));
     assertThat(client.setOrgUnitBalanceTarget(ID, new OrgUnitBalanceTargetRequest(AMOUNT, 1L)))
         .isNotNull();
-    client.addRoleVisibility(ID, "KRT_MEMBER", Map.of());
+    client.addRoleVisibility(ID, "KRT_MEMBER");
     client.removeRoleVisibility(ID, "KRT_MEMBER");
-    client.setAllMembersVisibility(ID, true, Map.of());
-    client.setAreaMembersVisibility(ID, false, Map.of());
-    client.addUserVisibility(ID, USER, Map.of());
+    client.setAllMembersVisibility(ID, true);
+    client.setAreaMembersVisibility(ID, false);
+    client.addUserVisibility(ID, USER);
     client.removeUserVisibility(ID, USER);
     client.setRoleApprovalLimit(ID, "OFFICER", limit);
     client.clearRoleApprovalLimit(ID, "OFFICER");
@@ -401,11 +401,11 @@ class BankBackendClientTest {
             + OTHER
             + "\",\"counterpartyUserId\":null,\"counterpartyOrgUnitId\":null,\"version\":1}");
     backend.expect("PUT", account + "/balance-target", "{\"target\":1000,\"version\":1}");
-    backend.expect("POST", account + "/visibility/role/KRT_MEMBER", "{}");
+    backend.expect("POST", account + "/visibility/role/KRT_MEMBER", null);
     backend.expect("DELETE", account + "/visibility/role/KRT_MEMBER", null);
-    backend.expect("PUT", account + "/visibility/all-members/true", "{}");
-    backend.expect("PUT", account + "/visibility/area-members/false", "{}");
-    backend.expect("POST", account + "/visibility/user/" + USER, "{}");
+    backend.expect("PUT", account + "/visibility/all-members/true", null);
+    backend.expect("PUT", account + "/visibility/area-members/false", null);
+    backend.expect("POST", account + "/visibility/user/" + USER, null);
     backend.expect("DELETE", account + "/visibility/user/" + USER, null);
     backend.expect("PUT", account + "/approval-limit/role/OFFICER", limitJson);
     backend.expect("DELETE", account + "/approval-limit/role/OFFICER", null);
@@ -417,5 +417,12 @@ class BankBackendClientTest {
     backend.expect("DELETE", account + "/approval-limit/user/" + USER, null);
     backend.expect("POST", requests + "/" + ID + "/owner-approval", "{}");
     backend.expect("DELETE", requests + "/" + ID + "/owner-approval", null);
+  }
+
+  private static byte[] bytes(
+      de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendBinaryTransfer transfer) {
+    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    transfer.writeTo(output, _ -> {});
+    return output.toByteArray();
   }
 }

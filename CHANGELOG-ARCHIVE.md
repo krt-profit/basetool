@@ -2540,7 +2540,7 @@ Archivierte Changelog-Einträge für Versionen **vor v1.13.1** (v1.13.0 und ält
 
 ### Changed
 
-- **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (vorher lucas.greuloch@pm.me).
+- **Kontakt-E-Mail-Adresse aktualisiert.** Die Betreiber-Adresse in Impressum und Datenschutzerklärung (alle drei Sprachvarianten) sowie in CLA, Code of Conduct und Beitragsleitfaden lautet jetzt lucas.greuloch@gmail.com (die bisherige Kontaktadresse wurde abgelöst).
 
 ### Fixed
 

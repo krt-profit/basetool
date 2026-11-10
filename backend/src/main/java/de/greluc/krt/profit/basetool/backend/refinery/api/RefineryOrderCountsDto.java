@@ -17,15 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.purchasing.model;
-
-import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
-import jakarta.validation.constraints.NotNull;
+package de.greluc.krt.profit.basetool.backend.refinery.api;
 
 /**
- * Frontend mirror of the backend {@code PurchasingVersionRequest}; must match it field for field.
+ * Scoped refinery segment totals from one database snapshot.
  *
- * @param version the echoed optimistic-locking version
+ * @param running orders with an active status
+ * @param ready active orders with an unknown or elapsed end time
+ * @param completed completed orders
+ * @param all orders of every status
  */
-@DtoMirror
-public record PurchasingVersionRequest(@NotNull Long version) {}
+public record RefineryOrderCountsDto(long running, long ready, long completed, long all) {}

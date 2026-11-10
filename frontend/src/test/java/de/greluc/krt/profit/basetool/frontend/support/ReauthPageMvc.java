@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletionException;
+import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.security.core.GrantedAuthority;
@@ -96,6 +98,17 @@ public final class ReauthPageMvc {
   public static ReauthenticationRequiredException expiredSession() {
     return new ReauthenticationRequiredException(
         "expired", new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak"));
+  }
+
+  /**
+   * Supplies direct and nested session-loss signals for controller regressions.
+   *
+   * @return the session failures
+   */
+  public static Stream<RuntimeException> sessionFailures() {
+    ReauthenticationRequiredException reauth =
+        new ReauthenticationRequiredException("expired", null);
+    return Stream.of(reauth, new CompletionException(new IllegalStateException(reauth)));
   }
 
   /**

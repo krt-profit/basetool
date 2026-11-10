@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
@@ -128,6 +130,7 @@ public class RefineryImportProxyController {
       }
       return "redirect:/refinery-orders/create";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Refinery import relay failed", e);
       redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.failed");
       return "redirect:/refinery-orders/create";

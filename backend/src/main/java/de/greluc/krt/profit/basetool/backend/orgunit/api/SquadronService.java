@@ -60,10 +60,11 @@ public class SquadronService {
    * @return cached list
    */
   @Cacheable(cacheNames = CacheConfig.SQUADRONS_CACHE)
-  public List<Squadron> getAllSquadrons(boolean includeInactive) {
-    return includeInactive
-        ? squadronRepository.findAll()
-        : squadronRepository.findAllByActiveTrue();
+  public List<SquadronDto> getAllSquadrons(boolean includeInactive) {
+    return (includeInactive
+            ? squadronRepository.findAll()
+            : squadronRepository.findAllByActiveTrue())
+        .stream().map(SquadronMapper::snapshot).toList();
   }
 
   /**
@@ -74,10 +75,11 @@ public class SquadronService {
    * @return cached page
    */
   @Cacheable(cacheNames = CacheConfig.SQUADRONS_CACHE)
-  public Page<Squadron> getAllSquadrons(@NotNull Pageable pageable, boolean includeInactive) {
-    return includeInactive
-        ? squadronRepository.findAll(pageable)
-        : squadronRepository.findAllByActiveTrue(pageable);
+  public Page<SquadronDto> getAllSquadrons(@NotNull Pageable pageable, boolean includeInactive) {
+    return (includeInactive
+            ? squadronRepository.findAll(pageable)
+            : squadronRepository.findAllByActiveTrue(pageable))
+        .map(SquadronMapper::snapshot);
   }
 
   /**

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -134,6 +136,7 @@ public class OrgUnitContextAdvice {
           backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
+      SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
       return List.of();
     }

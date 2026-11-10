@@ -94,11 +94,9 @@ class SquadronControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
-    Squadron entity = new Squadron();
     SquadronDto dto = new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, false, 1L);
-    Page<Squadron> servicePage = new PageImpl<>(List.of(entity));
+    Page<SquadronDto> servicePage = new PageImpl<>(List.of(dto));
     when(service.getAllSquadrons(any(Pageable.class), eq(false))).thenReturn(servicePage);
-    when(mapper.toDto(entity)).thenReturn(dto);
 
     PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false);
 

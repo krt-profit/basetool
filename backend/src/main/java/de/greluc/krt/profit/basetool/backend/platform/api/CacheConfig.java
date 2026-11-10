@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.platform.internal.CacheValueWeight;
 import java.time.Duration;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.CacheManager;
@@ -38,14 +39,13 @@ import org.springframework.context.annotation.Configuration;
  *   <li><b>Roles (2 min)</b> — short so permission changes propagate quickly.
  * </ul>
  *
- * <p>All caches hold at most 1000 entries, record statistics and never cache {@code null}.
+ * <p>Caches use value-shape admission budgets, record statistics and never cache {@code null}.
  */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
-  /** Maximum number of entries per cache. */
-  private static final long MAX_CACHE_SIZE = 1000;
+  private static final int MEBIBYTE = 1024 * 1024;
 
   /**
    * TTL for quasi-static master data. Only a backstop: admin editors trigger {@code @CacheEvict}
@@ -173,19 +173,50 @@ public class CacheConfig {
   }
 
   /**
-   * Registers a Caffeine cache under {@code name} with the shared sizing and statistics policy.
+   * Registers a cache with its own retained-value budget and the shared freshness/statistics
+   * policy.
    *
    * @param manager target Spring cache manager
    * @param name cache name as referenced from {@code @Cacheable}
    * @param ttl expire-after-write duration
    */
   private static void register(@NotNull CaffeineCacheManager manager, String name, Duration ttl) {
+    int maximumBytes = maximumWeight(name);
     manager.registerCustomCache(
         name,
         Caffeine.newBuilder()
-            .maximumSize(MAX_CACHE_SIZE)
+            .maximumWeight(maximumBytes)
+            .weigher((key, value) -> CacheValueWeight.weigh(key, value, maximumBytes))
             .expireAfterWrite(ttl)
             .recordStats()
             .build());
+  }
+
+  /**
+   * Returns the admission budget for a registered cache in conservative estimated bytes.
+   *
+   * @param name registered cache name
+   * @return maximum accumulated value weight
+   */
+  public static int maximumWeight(@NotNull String name) {
+    return switch (name) {
+      case TERMINALS_CACHE, BLUEPRINT_FAMILY_INDEX_CACHE -> 16 * MEBIBYTE;
+      case MATERIALS_CACHE, SHIP_TYPES_CACHE, POIS_CACHE -> 8 * MEBIBYTE;
+      case CITIES_CACHE,
+          LOCATIONS_CACHE,
+          OUTPOSTS_CACHE,
+          MANUFACTURERS_CACHE,
+          MATERIAL_BY_ID_CACHE ->
+          4 * MEBIBYTE;
+      case FREQUENCY_TYPES_CACHE,
+          JOB_TYPES_CACHE,
+          MATERIAL_CATEGORIES_CACHE,
+          REFINING_METHODS_CACHE,
+          STAR_SYSTEMS_CACHE,
+          SQUADRONS_CACHE,
+          ROLES_CACHE ->
+          2 * MEBIBYTE;
+      default -> throw new IllegalArgumentException("No admission budget for cache " + name);
+    };
   }
 }

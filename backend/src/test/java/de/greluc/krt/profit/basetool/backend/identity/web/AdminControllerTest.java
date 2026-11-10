@@ -55,17 +55,13 @@ class AdminControllerTest {
   @InjectMocks private AdminController controller;
 
   @Test
-  void getAllRoles_pagesEntitiesThroughMapperIntoPageResponse() {
-    Role roleA = new Role();
-    Role roleB = new Role();
-    RoleDto dtoA = new RoleDto(1L, "ADMIN", "Admin role", Set.of(), 1L);
-    RoleDto dtoB = new RoleDto(2L, "OFFICER", "Officer role", Set.of(), 1L);
-    Page<Role> page =
+  void getAllRoles_wrapsImmutableReadModelsIntoPageResponse() {
+    RoleDto dtoA = new RoleDto(1L, "ADMIN", "Admin role", Set.of(), 1L, 0L, 0L);
+    RoleDto dtoB = new RoleDto(2L, "OFFICER", "Officer role", Set.of(), 1L, 0L, 0L);
+    Page<RoleDto> page =
         new PageImpl<>(
-            List.of(roleA, roleB), PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name")), 2);
+            List.of(dtoA, dtoB), PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "name")), 2);
     when(roleService.getAllRoles(any(Pageable.class))).thenReturn(page);
-    when(roleMapper.toDto(roleA)).thenReturn(dtoA);
-    when(roleMapper.toDto(roleB)).thenReturn(dtoB);
 
     PageResponse<RoleDto> result = controller.getAllRoles(0, 20, "name,asc");
 
@@ -80,7 +76,7 @@ class AdminControllerTest {
 
   @Test
   void getAllRoles_withDefaults_returnsEmptyContentWhenNoRoles() {
-    Page<Role> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+    Page<RoleDto> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
     when(roleService.getAllRoles(any(Pageable.class))).thenReturn(page);
 
     PageResponse<RoleDto> result = controller.getAllRoles(null, null, null);
@@ -93,28 +89,32 @@ class AdminControllerTest {
   @Test
   void updatePermissions_mapsServiceResultThroughRoleMapper() {
     Role updated = new Role();
-    RoleDto dto = new RoleDto(2L, "OFFICER", "Officer role", Set.of("READ", "WRITE"), 1L);
+    RoleDto dto = new RoleDto(2L, "OFFICER", "Officer role", Set.of("READ", "WRITE"), 1L, 0L, 0L);
     Set<String> newPerms = Set.of("READ", "WRITE");
-    when(roleService.updatePermissions("OFFICER", newPerms)).thenReturn(updated);
+    when(roleService.updatePermissions("OFFICER", newPerms, 0L)).thenReturn(updated);
     when(roleMapper.toDto(updated)).thenReturn(dto);
 
-    RoleDto result = controller.updatePermissions("OFFICER", newPerms);
+    RoleDto result =
+        controller.updatePermissions(
+            "OFFICER", new AdminController.PermissionsRequest(newPerms, 0L));
 
     assertThat(result).isSameAs(dto);
-    verify(roleService).updatePermissions("OFFICER", newPerms);
+    verify(roleService).updatePermissions("OFFICER", newPerms, 0L);
     verify(roleMapper).toDto(updated);
   }
 
   @Test
   void updateRoleDescription_mapsServiceResultThroughRoleMapper() {
     Role updated = new Role();
-    RoleDto dto = new RoleDto(1L, "ADMIN", "New text", Set.of(), 1L);
-    when(roleService.updateRoleDescription("ADMIN", "New text")).thenReturn(updated);
+    RoleDto dto = new RoleDto(1L, "ADMIN", "New text", Set.of(), 1L, 0L, 0L);
+    when(roleService.updateRoleDescription("ADMIN", "New text", 0L)).thenReturn(updated);
     when(roleMapper.toDto(updated)).thenReturn(dto);
 
-    RoleDto result = controller.updateRoleDescription("ADMIN", "New text");
+    RoleDto result =
+        controller.updateRoleDescription(
+            "ADMIN", new AdminController.DescriptionRequest("New text", 0L));
 
     assertThat(result).isSameAs(dto);
-    verify(roleService).updateRoleDescription("ADMIN", "New text");
+    verify(roleService).updateRoleDescription("ADMIN", "New text", 0L);
   }
 }

@@ -278,6 +278,15 @@ class QuickAccessSearchControllerTest {
         .isInstanceOf(ReauthenticationRequiredException.class);
   }
 
+  @Test
+  void aNestedSessionLossWithoutAnOAuthCausePropagates() {
+    ReauthenticationRequiredException failure = new ReauthenticationRequiredException("no token", null);
+    QuickAccessSearchController controller = controller(contributor(QuickAccessSearchKind.MISSION,
+        (q, limit) -> { throw new IllegalStateException(new java.util.concurrent.CompletionException(failure)); }));
+
+    assertThatThrownBy(() -> controller.search("mm", null)).isSameAs(failure);
+  }
+
   /** A search adds no series, so the term is in no label value. */
   @Test
   void theTermNeverBecomesALabel() {

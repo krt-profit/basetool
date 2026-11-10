@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.testcontext;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankReportRenderer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialExternalAliasService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncReportService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.UexClient;
@@ -49,6 +50,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest
 @MockitoBean(
     types = {
+      BankReportRenderer.class,
       DataExportReportService.class,
       DataExportService.class,
       DeletionRequestService.class,

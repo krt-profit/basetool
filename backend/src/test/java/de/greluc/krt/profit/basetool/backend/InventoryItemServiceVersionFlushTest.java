@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepo
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,7 +89,7 @@ class InventoryItemServiceVersionFlushTest {
   @BeforeEach
   void wireCheckoutDelegate() {
     realCheckoutService =
-        new InventoryCheckoutService(
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,

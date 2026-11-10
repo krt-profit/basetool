@@ -32,51 +32,13 @@ import sys
 import tempfile
 from typing import Sequence
 
+from env_file import EnvFileError, parse_env_file
+
 PLACEHOLDER = re.compile(r"\{\{(hash|state):([A-Za-z_][A-Za-z0-9_]*)\}\}")
 
 
 class Refusal(Exception):
     """Raised when the template cannot be rendered into a safe ACL file."""
-
-
-def parse_env_file(path: str) -> dict[str, str]:
-    """Read a ``.env`` the way compose and ``render-env-d.py`` read one.
-
-    Skips blanks and ``#`` comments, tolerates ``export``, strips one layer of matching quotes,
-    keeps the last value of a repeated key, and interpolates nothing.
-
-    Args:
-        path: path to the ``.env``.
-
-    Returns:
-        The mapping.
-
-    Raises:
-        Refusal: if the file cannot be read.
-    """
-    try:
-        with open(path, encoding="utf-8") as handle:
-            lines = handle.readlines()
-    except OSError as exc:
-        raise Refusal(f"cannot read {path}: {exc}") from exc
-    env: dict[str, str] = {}
-    for raw in lines:
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].lstrip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
-        env[key] = value
-    return env
 
 
 def sha256_password(value: str) -> str:
@@ -266,7 +228,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         env = parse_env_file(args.env)
         with open(args.template, encoding="utf-8") as handle:
             content = render(handle.read(), env)
-    except (Refusal, OSError) as exc:
+    except (Refusal, EnvFileError, OSError) as exc:
         print(f"render-redis-acl: REFUSING, nothing written: {exc}", file=sys.stderr)
         return 1
     users = [line.split()[1] for line in content.splitlines()]

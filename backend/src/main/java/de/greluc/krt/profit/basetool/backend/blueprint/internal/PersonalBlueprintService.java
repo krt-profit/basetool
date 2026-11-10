@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -152,8 +151,9 @@ public class PersonalBlueprintService {
       throw new DuplicateEntityException(
           "Blueprint '" + product.productName() + "' is already owned.");
     }
-    PersonalBlueprint entity = newOwned(ownerUserId, product, request.acquiredAt(), request.note());
-    entity.setSource(source);
+    PersonalBlueprint entity =
+        PersonalBlueprintFactory.create(
+            gameItemRepository, ownerUserId, product, request.acquiredAt(), request.note(), source);
     entity.setSourceClientId(sourceClientId);
     PersonalBlueprint saved = repository.save(entity);
     auditRecorder.record(
@@ -199,8 +199,9 @@ public class PersonalBlueprintService {
         alreadyOwned++;
         continue;
       }
-      PersonalBlueprint entity = newOwned(ownerUserId, product, null, null);
-      entity.setSource(BlueprintSource.MANUAL);
+      PersonalBlueprint entity =
+          PersonalBlueprintFactory.create(
+              gameItemRepository, ownerUserId, product, null, null, BlueprintSource.MANUAL);
       repository.save(entity);
       added++;
     }
@@ -558,34 +559,6 @@ public class PersonalBlueprintService {
     if (defaultBlueprintKeyService.isDefault(entity.getProductKey())) {
       throw new BusinessConflictException("error.personalBlueprint.defaultNotRemovable");
     }
-  }
-
-  /**
-   * Builds a new, unsaved owned-blueprint entity stamped with the resolved product. The output item
-   * is attached as a lazy reference (no extra query) when the product resolved one.
-   *
-   * @param ownerUserId Keycloak {@code sub} of the owner
-   * @param product the resolved product to stamp
-   * @param acquiredAt optional acquisition time
-   * @param note optional note
-   * @return the new transient entity
-   */
-  @NotNull
-  private PersonalBlueprint newOwned(
-      @NotNull UUID ownerUserId,
-      @NotNull ResolvedProduct product,
-      @Nullable Instant acquiredAt,
-      @Nullable String note) {
-    PersonalBlueprint entity = new PersonalBlueprint();
-    entity.setOwnerUserId(ownerUserId);
-    entity.setProductKey(product.productKey());
-    entity.setProductName(product.productName());
-    if (product.outputItemId() != null) {
-      entity.setOutputItem(gameItemRepository.getCanonicalReferenceById(product.outputItemId()));
-    }
-    entity.setAcquiredAt(acquiredAt);
-    entity.setNote(note);
-    return entity;
   }
 
   /**

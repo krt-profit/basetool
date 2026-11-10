@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.keycloak.spi.gate;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import de.greluc.krt.profit.basetool.keycloak.spi.http.BoundedResponseBodyHandlers;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -98,7 +99,7 @@ public class BackendAccountChecker {
     try {
       response =
           httpClient.send(
-              buildRequest(url, sharedSecret, body), HttpResponse.BodyHandlers.ofString());
+              buildRequest(url, sharedSecret, body), BoundedResponseBodyHandlers.utf8(4_096));
     } catch (IOException e) {
       log.warnf(
           e,

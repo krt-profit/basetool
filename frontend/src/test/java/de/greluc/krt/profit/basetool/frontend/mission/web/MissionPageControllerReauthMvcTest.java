@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
-import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -33,7 +32,8 @@ import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -58,16 +58,18 @@ class MissionPageControllerReauthMvcTest {
     SecurityContextHolder.clearContext();
   }
 
-  @Test
-  void anExpiredSessionOnTheMissionsListRedirectsToLogin() throws Exception {
-    when(missionClient.searchMissions(any())).thenThrow(expiredSession());
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionOnTheMissionsListRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+    when(missionClient.searchMissions(any())).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/missions")).andExpect(redirectsToLogin());
   }
 
-  @Test
-  void anExpiredSessionOnTheMissionDetailRedirectsToLogin() throws Exception {
-    when(missionClient.mission(any())).thenThrow(expiredSession());
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void anExpiredSessionOnTheMissionDetailRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+    when(missionClient.mission(any())).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/missions/" + UUID.randomUUID())).andExpect(redirectsToLogin());
   }

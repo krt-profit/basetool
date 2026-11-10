@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -56,13 +57,11 @@ public class CachedCatalogListLoader {
       @NotNull CachedCatalog catalog,
       @NotNull ParameterizedTypeReference<PageResponse<T>> pageType,
       @NotNull String errorLabel) {
-    try {
-      PageResponse<T> page = backendApiClient.getCached(catalog, pageType);
-      if (page != null && page.content() != null) {
-        return new ArrayList<>(page.content());
-      }
-    } catch (Exception e) {
-      log.error("Failed to fetch {}", errorLabel, e);
+    PageResponse<T> page =
+        SectionFallback.load(
+            log, errorLabel, () -> backendApiClient.getCached(catalog, pageType), null);
+    if (page != null && page.content() != null) {
+      return new ArrayList<>(page.content());
     }
     return new ArrayList<>();
   }

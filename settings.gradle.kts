@@ -39,3 +39,5 @@ include("keycloak-spi")
 include("test-support")
 
 include("logging-support")
+
+include("technical-support")

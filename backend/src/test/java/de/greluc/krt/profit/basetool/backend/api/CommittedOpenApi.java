@@ -105,8 +105,8 @@ public final class CommittedOpenApi {
    * Brings a committed document up to date, or reports that it is stale.
    *
    * <p>Line ends are ignored in the comparison. When the file differs and {@code rewrite} is set,
-   * it is replaced atomically through a temporary sibling, so a concurrent reader never sees a
-   * partial file.
+   * it is replaced through a temporary file and an atomic move when supported, avoiding a
+   * partial file on supported filesystems.
    *
    * @param target the committed file
    * @param content the content the build generated
@@ -132,7 +132,7 @@ public final class CommittedOpenApi {
     }
     Path directory = target.toAbsolutePath().getParent();
     Files.createDirectories(directory);
-    Path temporary = Files.createTempFile(directory, "openapi-", ".json.tmp");
+    Path temporary = Files.createTempFile("openapi-", ".json.tmp");
     try {
       Files.writeString(temporary, content, StandardCharsets.UTF_8);
       try {

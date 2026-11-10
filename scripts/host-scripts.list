@@ -3,9 +3,16 @@ backup.sh
 restore-drill.sh
 container-cleanup.sh
 lib/common.sh
+lib/deploy-release.sh
+lib/deploy-observability.sh
+lib/deploy-drift.sh
+lib/deploy-config.sh
 lib/container-runtime.sh
 lib/restic-repo.sh
 render-env-d.py
+env_file.py
+host-companions.json
+host_companions.py
 render-redis-acl.py
 mint-internal-tls.sh
 redis-users.acl.tmpl

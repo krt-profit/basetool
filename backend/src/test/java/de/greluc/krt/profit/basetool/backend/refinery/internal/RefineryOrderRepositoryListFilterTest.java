@@ -99,6 +99,39 @@ class RefineryOrderRepositoryListFilterTest {
   private RefiningMethod plainMethod;
   private Material plainMaterial;
 
+  @Test
+  void aggregateSegmentsMatchTheOwnerAndTenantListTotals() {
+    RefineryOrder running = createOrder(plainOwner, plainLocation, null, staffel);
+    RefineryOrder ready = createOrder(plainOwner, plainLocation, null, staffel);
+    ready.setStartedAt(NOW.minusSeconds(7200));
+    RefineryOrder completed = createOrder(plainOwner, plainLocation, null, staffel);
+    completed.setStatus(RefineryOrderStatus.COMPLETED);
+    RefineryOrder canceled = createOrder(plainOwner, plainLocation, null, staffel);
+    canceled.setStatus(RefineryOrderStatus.CANCELED);
+    createOrder(createUser("foreign-" + token, null), plainLocation, null, createSquadron());
+    flushAndClear();
+
+    for (boolean mine : List.of(true, false)) {
+      var counts =
+          refineryOrderRepository.countSegments(
+              mine,
+              plainOwner.getId(),
+              OPEN_STATUSES,
+              RefineryOrderStatus.COMPLETED,
+              NOW,
+              false,
+              staffel.getId(),
+              Set.of(staffel.getId()));
+      assertThat(counts.running()).isEqualTo(2);
+      assertThat(counts.ready()).isEqualTo(1);
+      assertThat(counts.completed()).isEqualTo(1);
+      assertThat(counts.all()).isEqualTo(4);
+    }
+    assertThat(scoped(OPEN_STATUSES, false, null, FIRST_PAGE).getTotalElements()).isEqualTo(2);
+    assertThat(scoped(OPEN_STATUSES, true, null, FIRST_PAGE).getTotalElements()).isEqualTo(1);
+    assertThat(running.getId()).isNotNull();
+  }
+
   @BeforeEach
   void setUp() {
     token = "zq" + UUID.randomUUID().toString().substring(0, 8);

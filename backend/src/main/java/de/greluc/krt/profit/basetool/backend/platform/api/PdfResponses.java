@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,22 @@ public final class PdfResponses {
   @NotNull
   public static ResponseEntity<byte[]> pdfAttachment(
       byte @NotNull [] body, @NotNull String filename) {
+    return attachment(body, filename);
+  }
+
+  /**
+   * Builds a PDF attachment that the response converter streams from a resource.
+   *
+   * @param body the completed, request-owned resource
+   * @param filename browser download filename
+   * @return the streaming attachment response
+   */
+  public static ResponseEntity<Resource> pdfAttachment(
+      @NotNull Resource body, @NotNull String filename) {
+    return attachment(body, filename);
+  }
+
+  private static <T> ResponseEntity<T> attachment(T body, String filename) {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_PDF);
     headers.setContentDispositionFormData("attachment", filename);

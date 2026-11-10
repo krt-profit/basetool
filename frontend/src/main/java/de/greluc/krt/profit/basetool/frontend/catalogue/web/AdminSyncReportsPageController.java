@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.SyncReportBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
@@ -131,6 +133,7 @@ public class AdminSyncReportsPageController {
       SyncReportPurgeResultDto result = syncReportClient.purgeSyncReports(canonicalSource, days);
       redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
       redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
     }

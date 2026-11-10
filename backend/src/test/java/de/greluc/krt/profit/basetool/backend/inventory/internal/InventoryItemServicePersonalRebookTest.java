@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -85,7 +85,7 @@ class InventoryItemServicePersonalRebookTest {
 
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService service;
+  private InventoryCheckoutService service;
 
   private static final UUID ITEM_ID = UUID.randomUUID();
   private static final UUID OWNER_ID = UUID.randomUUID();
@@ -98,6 +98,20 @@ class InventoryItemServicePersonalRebookTest {
 
   @BeforeEach
   void setUpEntities() {
+    service =
+        InventoryCheckoutFixtures.create(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            orgUnitStampingService,
+            auditService,
+            eventPublisher);
     owner = new User();
     owner.setId(OWNER_ID);
     owner.setUsername("alice");

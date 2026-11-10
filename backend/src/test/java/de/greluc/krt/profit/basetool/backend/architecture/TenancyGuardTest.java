@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
@@ -94,10 +93,7 @@ import org.junit.jupiter.api.Test;
  */
 class TenancyGuardTest {
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackages("de.greluc.krt.profit.basetool.guardfixture.tenancy");
@@ -225,73 +221,125 @@ class TenancyGuardTest {
               new HandlerKey(SupplyDonationController.class, "withdraw"),
               "SupplyDonationService.withdraw checks canWithdrawPledge: the donor or an admin"),
           Map.entry(
-              new HandlerKey(MissionController.class, "joinMission"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "joinMission"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "setPartyLead"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "setPartyLead"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "addUnitSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "addUnitSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updateUnitSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "updateUnitSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "deleteUnitSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "deleteUnitSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "addStepSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "addStepSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updateStepSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "updateStepSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "deleteStepSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "deleteStepSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "reorderStepsSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "reorderStepsSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "toggleStepDoneSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "toggleStepDoneSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "addObjectiveSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "addObjectiveSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updateObjectiveSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "updateObjectiveSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "deleteObjectiveSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "deleteObjectiveSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "reorderObjectivesSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
+                  "reorderObjectivesSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "addCrewSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "addCrewSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updateCrewSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "updateCrewSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "removeCrewSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController
+                      .class,
+                  "removeCrewSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updateParticipantSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "updateParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "checkInParticipantSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "checkInParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "checkOutParticipantSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "checkOutParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "updatePayoutPreferenceSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "updatePayoutPreferenceSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "addParticipantSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "addParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
-              new HandlerKey(MissionController.class, "removeParticipantSlim"),
+              new HandlerKey(
+                  de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+                  "removeParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
           Map.entry(
               new HandlerKey(MissionController.class, "addManagerSlim"),
@@ -340,6 +388,10 @@ class TenancyGuardTest {
   private static final Set<Class<?>> LEGACY_WHITELIST =
       Set.of(
           MissionController.class,
+          de.greluc.krt.profit.basetool.backend.mission.web.MissionScheduleController.class,
+          de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
+          de.greluc.krt.profit.basetool.backend.mission.web.MissionStructureController.class,
+          de.greluc.krt.profit.basetool.backend.mission.web.MissionPlanController.class,
           OperationController.class,
           HangarController.class,
           InventoryItemController.class,

@@ -130,8 +130,32 @@ public class ExchangeSchemas {
       throw new IllegalArgumentException("No exchange schema is named " + schemaName);
     }
     List<String> unknown = new ArrayList<>();
-    walk(List.of(root), instance, "", unknown, 0);
+    walk(List.of(root), instance, "", unknown, 0, MAX_REPORTED);
     return List.copyOf(unknown);
+  }
+
+  /**
+   * Removes every undeclared field while keeping diagnostics within their published limits.
+   *
+   * @param schemaName the request schema
+   * @param instance the request document
+   * @return the sanitized document, capped warnings and capped unreportable pointers
+   */
+  public @NotNull SanitizedRequest sanitize(
+      @NotNull String schemaName, @NotNull JsonNode instance) {
+    Located root = resolve(file(schemaName), schemaName);
+    if (root == null) {
+      throw new IllegalArgumentException("No exchange schema is named " + schemaName);
+    }
+    List<String> unknown = new ArrayList<>();
+    walk(List.of(root), instance, "", unknown, 0, Integer.MAX_VALUE);
+    return new SanitizedRequest(
+        withoutFields(instance, unknown),
+        unknown.stream().limit(MAX_REPORTED).toList(),
+        unknown.stream()
+            .filter(pointer -> pointer.length() > MAX_POINTER)
+            .limit(MAX_REPORTED)
+            .toList());
   }
 
   /**
@@ -202,14 +226,16 @@ public class ExchangeSchemas {
    * @param pointer the instance node's JSON Pointer
    * @param unknown the collected pointers
    * @param depth the nesting depth
+   * @param limit the number of unknown fields collected by this walk
    */
   private void walk(
       @NotNull List<Located> schemas,
       @NotNull JsonNode instance,
       @NotNull String pointer,
       @NotNull List<String> unknown,
-      int depth) {
-    if (depth > MAX_DEPTH || unknown.size() >= MAX_REPORTED) {
+      int depth,
+      int limit) {
+    if (depth > MAX_DEPTH || unknown.size() >= limit) {
       return;
     }
     List<Located> branches = new ArrayList<>();
@@ -239,8 +265,8 @@ public class ExchangeSchemas {
         String child = pointer + "/" + escape(field.getKey());
         List<Located> declarations = declared.get(field.getKey());
         if (declarations != null) {
-          walk(declarations, field.getValue(), child, unknown, depth + 1);
-        } else if (!open && !declared.isEmpty() && unknown.size() < MAX_REPORTED) {
+          walk(declarations, field.getValue(), child, unknown, depth + 1, limit);
+        } else if (!open && !declared.isEmpty() && unknown.size() < limit) {
           unknown.add(child);
         }
       }
@@ -254,7 +280,7 @@ public class ExchangeSchemas {
       }
       if (!items.isEmpty()) {
         for (int i = 0; i < instance.size(); i++) {
-          walk(items, instance.get(i), pointer + "/" + i, unknown, depth + 1);
+          walk(items, instance.get(i), pointer + "/" + i, unknown, depth + 1, limit);
         }
       }
     }
@@ -399,6 +425,16 @@ public class ExchangeSchemas {
    * @param message the violated keyword
    */
   public record Violation(@NotNull String pointer, @NotNull String message) {}
+
+  /**
+   * A fully sanitized request with independently bounded diagnostic lists.
+   *
+   * @param body the document to forward
+   * @param warnings the reportable unknown-field diagnostics
+   * @param longPointers unknown fields whose pointers exceed the warning contract
+   */
+  public record SanitizedRequest(
+      @NotNull JsonNode body, @NotNull List<String> warnings, @NotNull List<String> longPointers) {}
 
   /**
    * A schema node and the file it sits in.

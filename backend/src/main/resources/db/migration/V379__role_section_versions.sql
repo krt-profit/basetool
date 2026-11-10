@@ -1,0 +1,2 @@
+ALTER TABLE role ADD COLUMN description_version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE role ADD COLUMN permissions_version BIGINT NOT NULL DEFAULT 0;

@@ -50,8 +50,12 @@ backend matches it case-insensitively as a substring of the owner's display name
 location name, the refining-method name, or an input or output material name of any of the order's
 goods. Its LIKE wildcards are matched literally.
 
-**Counters.** The four segment counters are the `totalElements` of four `size=1` requests of the
-segments without the search; the ready counter is the open statuses plus `ready=true`.
+**Counters.** One authenticated `GET /api/v1/refinery-orders/counts?onlyMine=...` returns
+`running`, `ready`, `completed` and `all` from one aggregate database query. The owner and
+org-unit scope are identical to the selected list endpoint. Counters ignore the search and
+exact-status filter; running includes `OPEN` and `IN_PROGRESS`, ready is that same set with an
+unknown or elapsed end, completed counts `COMPLETED`, and all includes every status. A failed
+aggregate leaves the counters unavailable instead of inventing zero totals.
 
 **Backend list API.** `GET /api/v1/refinery-orders/all` (the caller's org-unit scope, unchanged)
 and `GET /api/v1/refinery-orders/my-orders` (the caller's own orders) take, besides `page`, `size`

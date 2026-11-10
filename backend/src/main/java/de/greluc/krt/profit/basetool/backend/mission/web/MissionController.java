@@ -19,66 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
-import de.greluc.krt.profit.basetool.backend.kernel.Entities;
-import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrewDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjective;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveDto;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionStep;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionStepDto;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
-import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddCrewRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddCustomFrequencyRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddFrequencyRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionObjectiveRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddMissionStepRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionStructureService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTimelineService;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver.ParticipantTarget;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionFlagsRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionScheduleRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ReorderMissionObjectivesRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ReorderMissionStepsRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.SetPartyLeadRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.ToggleMissionStepRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateCrewRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateCustomFrequencyRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionObjectiveRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwnerRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionStepRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdatePayoutPreferenceRequest;
-import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -86,24 +42,17 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -116,35 +65,19 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * REST surface over the mission aggregate and its sub-aggregates (units, crew, participants,
- * frequencies, managers, ownership).
- *
- * <p>Section patches ({@code /core}, {@code /schedule}, {@code /flags}) are versioned
- * independently, and {@code .../slim} endpoints return only the affected sub-DTO. Responses for
- * non-admin callers pass through {@link MissionPeerRedactor#cleanupMissionForPeer} (REQ-SEC-007);
- * authorisation is delegated to {@link MissionAccessPolicy}.
- */
+/** Mission queries, core fields, ownership and manager HTTP handlers. */
 @RestController
 @RequestMapping("/api/v1/missions")
 @RequiredArgsConstructor
 @Tag(name = "Missions", description = "Mission management endpoints")
 @Transactional
-@Slf4j
 public class MissionController {
 
   private final MissionService missionService;
-  private final MissionTimelineService missionTimelineService;
   private final MissionParticipantService missionParticipantService;
-  private final MissionStructureService missionStructureService;
-  private final UserService userService;
   private final MissionMapper missionMapper;
   private final UserMapper userMapper;
-  private final ShipMapper shipMapper;
-  private final MissionAccessPolicy missionAccessPolicy;
-  private final AuthHelperService authHelperService;
-  private final MissionPeerRedactor missionPeerRedactor;
-  private final ParticipantTargetResolver participantTargetResolver;
+  private final MissionHttpProjection projection;
 
   /**
    * Pages the missions visible to the calling member, optionally narrowed by a name fragment, a
@@ -221,7 +154,7 @@ public class MissionController {
           + " and @missionAccessPolicy.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
-    return redactForPeer(missionMapper.toDto(missionService.getMissionById(id)));
+    return projection.cleanupForPeer(missionMapper.toDto(missionService.getMissionById(id)));
   }
 
   /**
@@ -237,7 +170,7 @@ public class MissionController {
   public ResponseEntity<MissionDto> getNextMission() {
     return missionService
         .getNextMission()
-        .map(m -> ResponseEntity.ok(redactForPeer(missionMapper.toDto(m))))
+        .map(m -> ResponseEntity.ok(projection.cleanupForPeer(missionMapper.toDto(m))))
         .orElse(ResponseEntity.noContent().build());
   }
 
@@ -252,7 +185,7 @@ public class MissionController {
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
   public MissionDto createMission(@RequestBody @Valid @NotNull CreateMissionRequest request) {
-    return redactForPeer(missionMapper.toDto(missionService.createMission(request)));
+    return projection.cleanupForPeer(missionMapper.toDto(missionService.createMission(request)));
   }
 
   /**
@@ -268,7 +201,7 @@ public class MissionController {
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
-    return redactForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
+    return projection.cleanupForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
   }
 
   /**
@@ -290,7 +223,7 @@ public class MissionController {
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull PatchMissionCoreRequest request) {
-    return redactForPeer(
+    return projection.cleanupForPeer(
         missionMapper.toDto(
             missionService.updateCoreSection(
                 id,
@@ -300,37 +233,6 @@ public class MissionController {
                 request.status(),
                 request.operationId(),
                 request.meetingPoint(),
-                request.version())));
-  }
-
-  /**
-   * Patches the schedule section (meeting, planned and actual times, UTC) under its own section
-   * version.
-   *
-   * @param id mission id
-   * @param request schedule patch payload (carries the expected schedule-section version)
-   * @return the persisted DTO
-   */
-  @PatchMapping("/{id}/schedule")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Patch mission schedule section",
-      description =
-          "Patches only the schedule section (meeting/planned/actual times) of a mission. Thanks "
-              + "to decoupled sub-collections, concurrent edits to participants, units or finances "
-              + "no longer cause a version conflict. Timestamps are in UTC.")
-  public MissionDto patchMissionSchedule(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull PatchMissionScheduleRequest request) {
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.updateScheduleSection(
-                id,
-                request.meetingTime(),
-                request.plannedStartTime(),
-                request.plannedEndTime(),
-                request.actualStartTime(),
-                request.actualEndTime(),
                 request.version())));
   }
 
@@ -349,7 +251,7 @@ public class MissionController {
   public MissionDto patchMissionFlags(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull PatchMissionFlagsRequest request) {
-    return redactForPeer(
+    return projection.cleanupForPeer(
         missionMapper.toDto(
             missionService.updateFlagsSection(id, request.isInternal(), request.version())));
   }
@@ -367,43 +269,6 @@ public class MissionController {
   public ResponseEntity<Void> deleteMission(@PathVariable @NotNull UUID id) {
     missionService.deleteMission(id);
     return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Enrols the caller as a participant of the mission.
-   *
-   * <p>The optional body carries the desired Funktion and payout preference; a bodyless request
-   * behaves as before (REQ-API-009).
-   *
-   * @param jwt caller's JWT
-   * @param id mission id
-   * @param request the optional sign-up answers; {@code null} when no body was sent
-   * @return the persisted DTO
-   */
-  @PostMapping("/{id}/join")
-  @Operation(
-      summary = "Join a mission",
-      description =
-          "Self-enrolment: adds the caller as participant. The body is optional and carries the"
-              + " desired job type and the payout preference; omitting it (or either field) keeps"
-              + " the pre-2026-09-02 behaviour, including the profile-default payout chain of"
-              + " REQ-MISSION-002.")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  public MissionDto joinMission(
-      @AuthenticationPrincipal Jwt jwt,
-      @PathVariable @NotNull UUID id,
-      @RequestBody(required = false) @Valid JoinMissionRequest request) {
-    MissionDto dto =
-        missionMapper.toDto(
-            missionParticipantService.addParticipant(
-                id,
-                userService.getUserIdFromJwt(jwt),
-                null,
-                request == null ? null : request.desiredJobTypeId(),
-                null,
-                null,
-                request == null ? null : request.payoutPreference()));
-    return redactForPeer(dto);
   }
 
   /**
@@ -437,7 +302,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull UpdateMissionOwnerRequest request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
-    return redactForPeer(missionMapper.toDto(mission));
+    return projection.cleanupForPeer(missionMapper.toDto(mission));
   }
 
   /**
@@ -480,735 +345,7 @@ public class MissionController {
       @RequestBody @Valid @NotNull UpdateMissionOwningOrgUnitRequest request) {
     var mission =
         missionService.updateOwningOrgUnit(id, request.owningOrgUnitId(), request.version());
-    return redactForPeer(missionMapper.toDto(mission));
-  }
-
-  /**
-   * Assigns or clears the mission's party lead (Partyleiter), guarded by {@code partyLeadVersion}.
-   *
-   * <p>A free-text name resolves like a participant add (unique match links, none stores it as
-   * external, several are a 409); neither id nor name clears the party lead.
-   *
-   * @param id mission id
-   * @param request party-lead payload (userId XOR guestName + expected partyLeadVersion)
-   * @return the updated mission DTO
-   */
-  @PutMapping("/{id}/party-lead")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Set or clear the party lead of a mission",
-      description =
-          "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text"
-              + " guestName, mirroring the participant-add resolution: a free-text name is resolved"
-              + " case-insensitively against registered members (unique match links the user,"
-              + " multiple matches return 409, no match stores an external handle). Submitting"
-              + " neither"
-              + " clears the party lead. The version must match the mission's current"
-              + " partyLeadVersion or 409 (application/problem+json) is returned.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Party lead updated"),
-    @ApiResponse(responseCode = "400", description = "Validation error"),
-    @ApiResponse(responseCode = "403", description = "Caller may not manage this mission"),
-    @ApiResponse(responseCode = "404", description = "Mission or referenced user not found"),
-    @ApiResponse(
-        responseCode = "409",
-        description = "Ambiguous party-lead name or stale partyLeadVersion")
-  })
-  public MissionDto setPartyLead(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull SetPartyLeadRequest request) {
-    ParticipantTarget target =
-        participantTargetResolver.resolve(
-            request.userId(), request.guestName(), "Party lead name is ambiguous.");
-    return redactForPeer(
-        missionMapper.toDto(
-            missionParticipantService.setPartyLead(
-                id, target.userId(), target.guestName(), request.version())));
-  }
-
-  /**
-   * Finds a unit inside a mission aggregate by id.
-   *
-   * @param mission mission aggregate
-   * @param unitId unit id to find
-   * @return the matching unit
-   */
-  private MissionUnit findUnit(@NotNull Mission mission, UUID unitId) {
-    return Entities.require(
-        mission.getAssignedUnits().stream().filter(u -> unitId.equals(u.getId())).findFirst(),
-        "Mission unit not found");
-  }
-
-  /**
-   * Locates a participant inside a mission aggregate by id, or throws {@link NotFoundException}.
-   *
-   * @param mission mission aggregate
-   * @param participantId participant id to find
-   * @return the matching participant
-   */
-  private MissionParticipant findParticipant(@NotNull Mission mission, UUID participantId) {
-    return Entities.require(
-        mission.getParticipants().stream().filter(p -> participantId.equals(p.getId())).findFirst(),
-        "Participant not found");
-  }
-
-  /**
-   * Locates a crew entry inside a unit by id, or throws {@link NotFoundException}.
-   *
-   * @param unit unit aggregate
-   * @param crewId crew entry id to find
-   * @return the matching crew entry
-   */
-  private MissionCrew findCrew(@NotNull MissionUnit unit, UUID crewId) {
-    return Entities.require(
-        unit.getCrew().stream().filter(c -> crewId.equals(c.getId())).findFirst(),
-        "Crew member not found");
-  }
-
-  /**
-   * Adds a unit and returns only the updated unit list.
-   *
-   * @param id mission id
-   * @param request unit payload
-   * @return the updated unit list
-   */
-  @PostMapping("/{id}/units")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Add a unit to a mission (slim response)",
-      description =
-          "Adds a new unit and returns the updated list of units as slim DTOs. "
-              + "Preferred replacement for POST /api/v1/missions/{id}/units to support "
-              + "multi-user concurrency on the mission detail page.")
-  public List<MissionUnitDto> addUnitSlim(
-      @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddUnitRequest request) {
-    var mission =
-        missionStructureService.addUnitToMission(
-            id,
-            request.name(),
-            request.shipTypeId(),
-            request.shipId(),
-            request.isHighValueUnit(),
-            request.frequency(),
-            request.responsibleUserId(),
-            request.note());
-    return redactUnitsForPeer(
-        mission.getAssignedUnits().stream().map(missionMapper::toDto).toList());
-  }
-
-  /**
-   * Updates a unit and returns only the updated unit (slim).
-   *
-   * @param id mission id
-   * @param unitId unit id
-   * @param request unit payload
-   * @return the updated unit DTO
-   */
-  @PutMapping("/{id}/units/{unitId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Update a mission unit (slim response)",
-      description = "Updates a unit and returns only the updated unit as a slim DTO.")
-  public MissionUnitDto updateUnitSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID unitId,
-      @Valid @RequestBody @NotNull UpdateUnitRequest request) {
-    var mission =
-        missionStructureService.updateMissionUnit(
-            id,
-            unitId,
-            request.version(),
-            request.name(),
-            request.shipTypeId(),
-            request.shipId(),
-            request.isHighValueUnit(),
-            request.frequency(),
-            request.responsibleUserId(),
-            request.note());
-    return redactForPeer(missionMapper.toDto(findUnit(mission, unitId)));
-  }
-
-  /**
-   * Deletes a unit; returns 204.
-   *
-   * @param id mission id
-   * @param unitId unit id
-   * @return 204 No Content
-   */
-  @DeleteMapping("/{id}/units/{unitId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Delete a mission unit (slim response)",
-      description = "Deletes a unit and returns 204 No Content.")
-  public ResponseEntity<Void> deleteUnitSlim(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
-    missionStructureService.removeMissionUnit(id, unitId);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Appends an Ablauf step, guarded by the mission's {@code stepsVersion}, and returns the ordered
-   * step list.
-   *
-   * @param id mission id
-   * @param request the step payload (title, optional meta, expected stepsVersion)
-   * @return the mission's ordered Ablauf steps after the add
-   */
-  @PostMapping("/{id}/steps")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Add an Ablauf step to a mission (slim response)",
-      description =
-          "Adds a procedure-timeline step and returns the mission's ordered step list as slim"
-              + " DTOs.")
-  public List<MissionStepDto> addStepSlim(
-      @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddMissionStepRequest request) {
-    var mission =
-        missionTimelineService.addStep(id, request.title(), request.meta(), request.stepsVersion());
-    return toStepDtos(mission);
-  }
-
-  /**
-   * Edits an Ablauf step's title / time-place hint and returns the mission's ordered step list.
-   *
-   * @param id mission id
-   * @param stepId step id
-   * @param request the step payload (title, optional meta, expected stepsVersion)
-   * @return the mission's ordered Ablauf steps after the edit
-   */
-  @PutMapping("/{id}/steps/{stepId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Update an Ablauf step (slim response)",
-      description = "Edits a step's title / time-place hint and returns the ordered step list.")
-  public List<MissionStepDto> updateStepSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID stepId,
-      @Valid @RequestBody @NotNull UpdateMissionStepRequest request) {
-    var mission =
-        missionTimelineService.updateStep(
-            id, stepId, request.title(), request.meta(), request.stepsVersion());
-    return toStepDtos(mission);
-  }
-
-  /**
-   * Removes an Ablauf step and returns the mission's remaining ordered step list.
-   *
-   * @param id mission id
-   * @param stepId step id
-   * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
-   * @return the mission's ordered Ablauf steps after the removal
-   */
-  @DeleteMapping("/{id}/steps/{stepId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Delete an Ablauf step (slim response)",
-      description = "Removes a step, re-packs the order, and returns the ordered step list.")
-  public List<MissionStepDto> deleteStepSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID stepId,
-      @RequestParam @NotNull Long stepsVersion) {
-    var mission = missionTimelineService.deleteStep(id, stepId, stepsVersion);
-    return toStepDtos(mission);
-  }
-
-  /**
-   * Reorders the mission's Ablauf steps and returns the new ordered step list.
-   *
-   * @param id mission id
-   * @param request the desired step-id order + expected stepsVersion
-   * @return the mission's ordered Ablauf steps after the reorder
-   */
-  @PutMapping("/{id}/steps/reorder")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Reorder a mission's Ablauf steps (slim response)",
-      description = "Reorders the procedure timeline and returns the ordered step list.")
-  public List<MissionStepDto> reorderStepsSlim(
-      @PathVariable @NotNull UUID id,
-      @Valid @RequestBody @NotNull ReorderMissionStepsRequest request) {
-    var mission =
-        missionTimelineService.reorderSteps(id, request.stepIds(), request.stepsVersion());
-    return toStepDtos(mission);
-  }
-
-  /**
-   * Toggles an Ablauf step's shared done flag and returns the mission's ordered step list.
-   *
-   * @param id mission id
-   * @param stepId step id
-   * @param request the new done state + expected stepsVersion
-   * @return the mission's ordered Ablauf steps after the toggle
-   */
-  @PatchMapping("/{id}/steps/{stepId}/done")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Toggle an Ablauf step's done flag (slim response)",
-      description = "Sets a step's shared done flag and returns the ordered step list.")
-  public List<MissionStepDto> toggleStepDoneSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID stepId,
-      @Valid @RequestBody @NotNull ToggleMissionStepRequest request) {
-    var mission =
-        missionTimelineService.toggleStepDone(id, stepId, request.done(), request.stepsVersion());
-    return toStepDtos(mission);
-  }
-
-  /**
-   * Projects a mission's Ablauf steps into an ordered list of slim DTOs (by {@code orderIndex}).
-   */
-  private List<MissionStepDto> toStepDtos(@NotNull Mission m) {
-    return m.getSteps().stream()
-        .sorted(Comparator.comparingInt(MissionStep::getOrderIndex))
-        .map(missionMapper::toDto)
-        .toList();
-  }
-
-  /**
-   * Appends a goal (Ziel), guarded by the mission's {@code objectivesVersion}, and returns the
-   * ordered goal list.
-   *
-   * @param id mission id
-   * @param request the goal payload (title, kind, expected objectivesVersion)
-   * @return the mission's ordered goals after the add
-   */
-  @PostMapping("/{id}/objectives")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Add a goal (Ziel) to a mission (slim response)",
-      description =
-          "Adds a classified goal and returns the mission's ordered goal list as slim DTOs.")
-  public List<MissionObjectiveDto> addObjectiveSlim(
-      @PathVariable @NotNull UUID id,
-      @Valid @RequestBody @NotNull AddMissionObjectiveRequest request) {
-    var mission =
-        missionTimelineService.addObjective(
-            id, request.title(), request.kind(), request.objectivesVersion());
-    return toObjectiveDtos(mission);
-  }
-
-  /**
-   * Edits a goal's text / classification and returns the mission's ordered goal list.
-   *
-   * @param id mission id
-   * @param objectiveId goal id
-   * @param request the goal payload (title, kind, expected objectivesVersion)
-   * @return the mission's ordered goals after the edit
-   */
-  @PutMapping("/{id}/objectives/{objectiveId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Update a mission goal (slim response)",
-      description = "Edits a goal's text / classification and returns the ordered goal list.")
-  public List<MissionObjectiveDto> updateObjectiveSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID objectiveId,
-      @Valid @RequestBody @NotNull UpdateMissionObjectiveRequest request) {
-    var mission =
-        missionTimelineService.updateObjective(
-            id, objectiveId, request.title(), request.kind(), request.objectivesVersion());
-    return toObjectiveDtos(mission);
-  }
-
-  /**
-   * Removes a goal and returns the mission's remaining ordered goal list.
-   *
-   * @param id mission id
-   * @param objectiveId goal id
-   * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
-   * @return the mission's ordered goals after the removal
-   */
-  @DeleteMapping("/{id}/objectives/{objectiveId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Delete a mission goal (slim response)",
-      description = "Removes a goal, re-packs the order, and returns the ordered goal list.")
-  public List<MissionObjectiveDto> deleteObjectiveSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID objectiveId,
-      @RequestParam @NotNull Long objectivesVersion) {
-    var mission = missionTimelineService.deleteObjective(id, objectiveId, objectivesVersion);
-    return toObjectiveDtos(mission);
-  }
-
-  /**
-   * Reorders the mission's goals and returns the new ordered goal list.
-   *
-   * @param id mission id
-   * @param request the desired goal-id order + expected objectivesVersion
-   * @return the mission's ordered goals after the reorder
-   */
-  @PutMapping("/{id}/objectives/reorder")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Reorder a mission's goals (slim response)",
-      description = "Reorders the goal list and returns the ordered goal list.")
-  public List<MissionObjectiveDto> reorderObjectivesSlim(
-      @PathVariable @NotNull UUID id,
-      @Valid @RequestBody @NotNull ReorderMissionObjectivesRequest request) {
-    var mission =
-        missionTimelineService.reorderObjectives(
-            id, request.objectiveIds(), request.objectivesVersion());
-    return toObjectiveDtos(mission);
-  }
-
-  /** Projects a mission's goals into an ordered list of slim DTOs (by {@code orderIndex}). */
-  private List<MissionObjectiveDto> toObjectiveDtos(@NotNull Mission m) {
-    return m.getObjectives().stream()
-        .sorted(Comparator.comparingInt(MissionObjective::getOrderIndex))
-        .map(missionMapper::toDto)
-        .toList();
-  }
-
-  /**
-   * Lists the ships a unit of this mission may be crewed with: ships owned by registered
-   * participants of any org unit plus ships already pinned to one of its units.
-   *
-   * @param id mission id
-   * @return the candidate ships for this mission's unit ship pickers
-   */
-  @GetMapping("/{id}/unit-ship-options")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Transactional(readOnly = true)
-  @Operation(
-      summary = "List selectable ships for a mission's units",
-      description =
-          "Returns the ships a unit of this mission may be crewed with: ships owned by registered "
-              + "participants (regardless of OrgUnit) plus ships already assigned to a unit of the "
-              + "mission. Restricted to callers who may manage the mission.")
-  public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
-    return redactShipsForPeer(
-        missionStructureService.getSelectableUnitShips(id).stream()
-            .map(shipMapper::toDto)
-            .toList());
-  }
-
-  /**
-   * Adds crew and returns only the affected unit's crew list (slim).
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param request crew payload (participant + job types)
-   * @return the updated crew list of the unit
-   */
-  @PostMapping("/{id}/units/{missionUnitId}/crew")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Add crew to a mission unit (slim response)",
-      description =
-          "Adds a crew member and returns the updated crew list of the affected unit as slim DTOs.")
-  public List<MissionCrewDto> addCrewSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @RequestBody @Valid @NotNull AddCrewRequest request) {
-    Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
-    var mission =
-        missionStructureService.addCrewToShip(
-            id, missionUnitId, request.participantId(), jobTypeIds);
-    return missionMapper.toDto(findUnit(mission, missionUnitId)).crew();
-  }
-
-  /**
-   * Updates a crew entry and returns only the updated entry (slim).
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param crewId crew entry id
-   * @param request crew payload (job-type set)
-   * @return the updated crew DTO
-   */
-  @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Update crew in a mission unit (slim response)",
-      description = "Updates a crew member and returns only the updated crew entry as a slim DTO.")
-  public MissionCrewDto updateCrewSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @PathVariable @NotNull UUID crewId,
-      @RequestBody @Valid @NotNull UpdateCrewRequest request) {
-    Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
-    var mission =
-        missionStructureService.updateCrewInShip(
-            id, missionUnitId, crewId, request.version(), jobTypeIds);
-    return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
-  }
-
-  /**
-   * Removes a crew entry; returns 204.
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param crewId crew entry id
-   * @return 204 No Content
-   */
-  @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(
-      summary = "Remove crew from a mission unit (slim response)",
-      description = "Removes a crew member and returns 204 No Content.")
-  public ResponseEntity<Void> removeCrewSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @PathVariable @NotNull UUID crewId) {
-    missionStructureService.removeCrewFromShip(id, missionUnitId, crewId);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Updates a participant and returns only the updated participant (slim).
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @param request participant payload (carries the expected participant version)
-   * @return the updated participant DTO
-   */
-  @PutMapping("/{id}/participants/{participantId}")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(
-      summary = "Update a participant (slim response)",
-      description = "Updates a participant and returns only the updated participant as a slim DTO.")
-  public MissionParticipantDto updateParticipantSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @RequestBody @Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication) {
-    var mission =
-        missionParticipantService.updateParticipantAttributes(
-            id,
-            participantId,
-            request.desiredMissionJobTypeId(),
-            request.plannedMissionJobTypeId(),
-            request.comment(),
-            request.startTime(),
-            request.endTime(),
-            request.orgUnitIds(),
-            request.payoutPreference(),
-            request.guestName(),
-            request.version(),
-            authentication);
-    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
-  }
-
-  /**
-   * Slim check-in. Stamps {@code startTime} on the participant.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
-   */
-  @PostMapping("/{id}/participants/{participantId}/check-in")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(
-      summary = "Check in a participant (slim response)",
-      description =
-          "Checks in a participant and returns only the updated participant as a slim DTO.")
-  public MissionParticipantDto checkInParticipantSlim(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    var mission = missionParticipantService.checkIn(id, participantId);
-    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
-  }
-
-  /**
-   * Slim check-out. Stamps {@code endTime} on the participant.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
-   */
-  @PostMapping("/{id}/participants/{participantId}/check-out")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(
-      summary = "Check out a participant (slim response)",
-      description =
-          "Checks out a participant and returns only the updated participant as a slim DTO.")
-  public MissionParticipantDto checkOutParticipantSlim(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    var mission = missionParticipantService.checkOut(id, participantId);
-    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
-  }
-
-  /**
-   * Updates a participant's payout preference; {@code DONATE} stays sticky for the whole operation.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @param request payout preference payload
-   * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
-   */
-  @PutMapping("/{id}/participants/{participantId}/payout-preference")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(
-      summary = "Update payout preference for a participant (slim response)",
-      description =
-          "Updates the payout preference and returns only the updated participant as a slim DTO.")
-  public MissionParticipantDto updatePayoutPreferenceSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @RequestBody @Valid @NotNull UpdatePayoutPreferenceRequest request) {
-    var mission =
-        missionParticipantService.updatePayoutPreference(id, participantId, request.preference());
-    return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
-  }
-
-  /**
-   * Adds a participant, an explicit user or a guest name, and returns only the updated participant
-   * list.
-   *
-   * @param id mission id
-   * @param request add-participant payload (userId XOR guestName + meta)
-   * @param authentication current Spring Security authentication
-   * @return the updated participant list
-   */
-  @PostMapping("/{id}/participants")
-  @Operation(
-      summary = "Add a participant (slim response)",
-      description =
-          "Adds a participant and returns the updated participant list as slim DTOs. Mirrors the"
-              + " public add-participant logic: explicit userId (autocomplete) or free-text"
-              + " guestName (case-insensitive resolution against registered users). Callers may"
-              + " always add themselves; adding anyone else is restricted to"
-              + " managers/officers/admins.")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  public List<MissionParticipantDto> addParticipantSlim(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
-      Authentication authentication) {
-    ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
-    var mission =
-        missionParticipantService.addParticipant(
-            id,
-            target.userId(),
-            target.guestName(),
-            request.desiredJobTypeId(),
-            request.comment(),
-            request.orgUnitIds(),
-            request.payoutPreference());
-    return redactParticipantsForPeer(
-        mission.getParticipants().stream().map(missionMapper::toDto).toList());
-  }
-
-  /**
-   * Removes a participant; returns 204.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return 204 No Content
-   */
-  @DeleteMapping("/{id}/participants/{participantId}")
-  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(
-      summary = "Remove a participant (slim response)",
-      description = "Removes a participant and returns 204 No Content.")
-  public ResponseEntity<Void> removeParticipantSlim(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    missionParticipantService.removeParticipant(id, participantId);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Participants of a mission that are not yet on any unit's crew roster — drives the "unassigned"
-   * tray on the mission detail page.
-   *
-   * @param id mission id
-   * @return unassigned participant DTOs
-   */
-  @GetMapping("/{id}/participants/unassigned")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Get unassigned participants",
-      description =
-          "Returns all participants of a mission that are not yet assigned to any unit crew.")
-  public List<MissionParticipantDto> getUnassignedParticipants(@PathVariable @NotNull UUID id) {
-    return redactParticipantsForPeer(
-        missionParticipantService.getUnassignedParticipants(id).stream()
-            .map(missionMapper::toDto)
-            .toList());
-  }
-
-  /**
-   * Upserts a frequency by type; returns only the updated frequency list (slim).
-   *
-   * @param id mission id
-   * @param request frequency payload (type + value)
-   * @return the updated frequency list
-   */
-  @PostMapping("/{id}/frequencies")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Add or update a frequency for a mission (slim response)",
-      description =
-          "Adds or updates a frequency and returns the updated frequency list as slim DTOs.")
-  public List<MissionFrequencyDto> addOrUpdateFrequencySlim(
-      @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid AddFrequencyRequest request) {
-    var mission =
-        missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value());
-    return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
-  }
-
-  /**
-   * Removes a frequency; returns 204.
-   *
-   * @param id mission id
-   * @param frequencyId frequency id
-   * @return 204 No Content
-   */
-  @DeleteMapping("/{id}/frequencies/{frequencyId}")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Remove a frequency from a mission (slim response)",
-      description = "Removes a frequency and returns 204 No Content.")
-  public ResponseEntity<Void> removeFrequencySlim(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
-    missionService.removeMissionFrequency(id, frequencyId);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * Adds a custom (mission-specific) frequency with a free-text label and value (REQ-MISSION-014).
-   *
-   * @param id mission id
-   * @param request the custom-frequency payload (name + value)
-   * @return the updated frequency list
-   */
-  @PostMapping("/{id}/frequencies/custom")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Add a custom (mission-specific) frequency (slim response)",
-      description =
-          "Adds a free-text mission frequency and returns the updated frequency list as slim DTOs.")
-  public List<MissionFrequencyDto> addCustomFrequencySlim(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @Valid AddCustomFrequencyRequest request) {
-    var mission = missionService.addCustomMissionFrequency(id, request.name(), request.value());
-    return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
-  }
-
-  /**
-   * Updates a custom frequency's label and value, guarded by the row's own version
-   * (REQ-MISSION-014).
-   *
-   * @param id mission id
-   * @param frequencyId the custom frequency row id
-   * @param request the custom-frequency payload (name + value + version)
-   * @return the updated frequency list
-   */
-  @PutMapping("/{id}/frequencies/custom/{frequencyId}")
-  @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
-  @Operation(
-      summary = "Update a custom (mission-specific) frequency (slim response)",
-      description =
-          "Updates a free-text mission frequency and returns the updated frequency list as slim"
-              + " DTOs.")
-  public List<MissionFrequencyDto> updateCustomFrequencySlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID frequencyId,
-      @NotNull @RequestBody @Valid UpdateCustomFrequencyRequest request) {
-    var mission =
-        missionService.updateCustomMissionFrequency(
-            id, frequencyId, request.name(), request.value(), request.version());
-    return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
+    return projection.cleanupForPeer(missionMapper.toDto(mission));
   }
 
   /**
@@ -1249,45 +386,6 @@ public class MissionController {
   }
 
   /**
-   * Resolves whom a participant add names and checks that the caller may name them.
-   *
-   * <ol>
-   *   <li>Neither id nor name means the caller.
-   *   <li>A free-text name is resolved through {@link ParticipantTargetResolver}.
-   *   <li>Naming any registered member other than the caller requires {@code canManageMission}.
-   * </ol>
-   *
-   * @param id the mission
-   * @param request the submitted id, name and sign-up answers
-   * @param authentication the caller, for the {@code canManageMission} evaluation
-   * @return the resolved target the service records
-   * @throws BusinessConflictException when the name matches more than one member
-   * @throws AccessDeniedException when a non-manager names somebody other than themselves
-   */
-  private ParticipantTarget resolveParticipantTarget(
-      @NotNull UUID id,
-      @NotNull AddExternalParticipantRequest request,
-      Authentication authentication) {
-    UUID callerId = authHelperService.currentUserId().orElse(null);
-    UUID requestedUserId = request.userId();
-    String guestName = request.guestName();
-    if (requestedUserId == null && (guestName == null || guestName.isBlank())) {
-      requestedUserId = callerId;
-    }
-
-    ParticipantTarget target =
-        participantTargetResolver.resolve(
-            requestedUserId, guestName, "Participant name is ambiguous.");
-
-    if (target.userId() != null
-        && (callerId == null || !target.userId().equals(callerId))
-        && !missionAccessPolicy.canManageMission(id, authentication)) {
-      throw new AccessDeniedException("Only mission managers may add other users as participants.");
-    }
-    return target;
-  }
-
-  /**
    * Maps a page of missions to list rows, loading all registration counts in one grouped query and
    * the caller's own sign-ups in one more (REQ-DATA-003, REQ-MISSION-012).
    *
@@ -1302,76 +400,5 @@ public class MissionController {
     return missions.map(mission ->
         missionMapper.toListDto(
             mission, counts.getOrDefault(mission.getId(), 0L), signedUp.contains(mission.getId())));
-  }
-
-  /**
-   * Applies the peer redaction to a mission DTO for non-admin callers (REQ-SEC-007).
-   *
-   * @param dto the freshly mapped DTO
-   * @return the same DTO for admins, the peer-redacted copy for everyone else
-   */
-  private MissionDto redactForPeer(MissionDto dto) {
-    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupMissionForPeer(dto);
-  }
-
-  /**
-   * Peer pass for a single unit DTO (the slim unit endpoints).
-   *
-   * @param dto the freshly mapped unit
-   * @return the same DTO for admins, otherwise one whose nested ship owner is reduced to the public
-   *     callsign tuple (REQ-SEC-040)
-   */
-  private MissionUnitDto redactForPeer(MissionUnitDto dto) {
-    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupUnitForPeer(dto);
-  }
-
-  /**
-   * Peer pass for a single participant row (the slim participant endpoints).
-   *
-   * @param dto the freshly mapped participant
-   * @return the same DTO for admins, otherwise one whose nested user is reduced to the public
-   *     callsign tuple — no e-mail, no real name (REQ-SEC-007)
-   */
-  private MissionParticipantDto redactForPeer(MissionParticipantDto dto) {
-    return authHelperService.isAdmin() ? dto : missionPeerRedactor.cleanupParticipantForPeer(dto);
-  }
-
-  /**
-   * Peer pass for a participant list.
-   *
-   * @param participants the freshly mapped roster rows
-   * @return the same list for admins, otherwise one whose nested users are reduced to the public
-   *     callsign tuple
-   */
-  private List<MissionParticipantDto> redactParticipantsForPeer(
-      List<MissionParticipantDto> participants) {
-    return authHelperService.isAdmin()
-        ? participants
-        : participants.stream().map(missionPeerRedactor::cleanupParticipantForPeer).toList();
-  }
-
-  /**
-   * Peer pass for a unit list.
-   *
-   * @param units the freshly mapped units
-   * @return the same list for admins, otherwise a redacted copy
-   */
-  private List<MissionUnitDto> redactUnitsForPeer(List<MissionUnitDto> units) {
-    return authHelperService.isAdmin()
-        ? units
-        : units.stream().map(missionPeerRedactor::cleanupUnitForPeer).toList();
-  }
-
-  /**
-   * Applies the peer redaction to the unit ship picker's options, hiding the owners' personal data
-   * (REQ-SEC-040).
-   *
-   * @param ships the selectable ships
-   * @return the same list for admins, otherwise a redacted copy
-   */
-  private List<ShipDto> redactShipsForPeer(List<ShipDto> ships) {
-    return authHelperService.isAdmin()
-        ? ships
-        : ships.stream().map(missionPeerRedactor::cleanupShipForPeer).toList();
   }
 }

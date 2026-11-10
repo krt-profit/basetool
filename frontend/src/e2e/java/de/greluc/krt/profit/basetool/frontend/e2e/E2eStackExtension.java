@@ -392,8 +392,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Copies the synthetic e2e realm to {@code <repoRoot>/realm-export.json} for Keycloak's {@code
-   * --import-realm}.
+   * Copies the synthetic realm to the configured test-only path for Keycloak import.
    *
    * @param root the repository root containing the compose files
    * @throws IOException if the realm resource is missing or cannot be written
@@ -405,8 +404,25 @@ public final class E2eStackExtension implements BeforeAllCallback {
             "realm-export.e2e.json not found on the e2e classpath; expected under"
                 + " frontend/src/e2e/resources");
       }
-      Files.copy(in, root.resolve("realm-export.json"), StandardCopyOption.REPLACE_EXISTING);
+      Path target = realmPath(root);
+      Files.createDirectories(target.getParent());
+      Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
     }
+  }
+
+  /**
+   * Resolves the synthetic realm output used by the E2E compose override.
+   *
+   * @param root the repository root
+   * @return the normalized absolute realm path
+   */
+  private static Path realmPath(Path root) {
+    String configured = System.getenv("E2E_REALM_PATH");
+    return (configured == null || configured.isBlank()
+            ? root.resolve("realm-export.json")
+            : Path.of(configured))
+        .toAbsolutePath()
+        .normalize();
   }
 
   /**
@@ -566,6 +582,11 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private void captureServiceLog(Path root, String service, String label) {
     try {
       java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
+      String environmentFile = System.getenv("E2E_ENV_PATH");
+      if (environmentFile != null && !environmentFile.isBlank()) {
+        cmd.add("--env-file");
+        cmd.add(environmentFile);
+      }
       for (String f : COMPOSE_FILES) {
         cmd.add("-f");
         cmd.add(f);
@@ -611,6 +632,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   private Map<String, String> throwawayEnv() {
     Map<String, String> env = new LinkedHashMap<>();
+    env.put("COMPOSE_DISABLE_ENV_FILE", "1");
     env.put("POSTGRES_DB", "krt_basetool_e2e");
     env.put("POSTGRES_USER", "basetool_e2e");
     env.put("POSTGRES_PASSWORD", "basetool-e2e-pw-do-not-use-in-prod");
@@ -631,6 +653,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
     env.put("BASETOOL_VERSION", imageTag());
+    env.put("E2E_REALM_PATH", realmPath(repoRoot()).toString());
     env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
     env.put("BASETOOL_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
     env.put("BASETOOL_INGEST_EXPECTED_AUDIENCES", INGEST_AUDIENCE);

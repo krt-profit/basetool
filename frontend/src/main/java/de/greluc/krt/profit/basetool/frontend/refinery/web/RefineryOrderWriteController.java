@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.LocationDto;
@@ -179,6 +181,7 @@ public class RefineryOrderWriteController {
       return "redirect:/refinery-orders/create"
           + (form.getSource() != null ? "?source=" + form.getSource() : "");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to create refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.create.failed");
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -226,6 +229,7 @@ public class RefineryOrderWriteController {
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
       return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.update.failed");
       redirectAttributes.addFlashAttribute("refineryOrderForm", form);
@@ -269,6 +273,7 @@ public class RefineryOrderWriteController {
       BackendErrorLogging.warn(log, "DELETE /api/v1/refinery-orders/{id}", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to cancel refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.cancel.failed");
     }
@@ -321,6 +326,7 @@ public class RefineryOrderWriteController {
       redirectAttributes.addFlashAttribute("showStoreModal", true);
       return "redirect:/refinery-orders/" + id;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to store refinery order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.refineryorder.store.failed");
       redirectAttributes.addFlashAttribute("storeForm", form);
@@ -452,6 +458,7 @@ public class RefineryOrderWriteController {
         UserDto me = refineryClient.currentUser();
         return me != null ? me.id() : null;
       } catch (Exception e) {
+        SectionFallback.rethrowIfReauthenticationRequired(e);
         log.warn("Failed to get current user ID from backend: {}", e.getMessage());
         return null;
       }

@@ -49,6 +49,19 @@ public interface UserRepository
     extends JpaRepository<User, UUID>, UserRepositoryPlainLookupFragment {
 
   /**
+   * Reads only the names needed to scrub personal-data exports.
+   *
+   * @return every user's identity and supported name spellings
+   */
+  @Query(
+      """
+      SELECT u.id AS id, u.username AS username, u.displayName AS displayName,
+        u.discordGuildNickname AS discordGuildNickname, u.rsiHandle AS rsiHandle
+      FROM User u
+      """)
+  List<UserHandleProjection> findAllHandleSpellings();
+
+  /**
    * Counts users in the given approval status, backing the {@code basetool_registration_pending_*}
    * queue-depth gauge (REQ-OBS-011).
    *

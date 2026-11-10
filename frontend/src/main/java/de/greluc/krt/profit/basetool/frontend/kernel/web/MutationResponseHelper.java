@@ -25,19 +25,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Runs a Post/Redirect/Get mutation: flashes a success toast, or on any exception logs it and
- * flashes an error toast, then redirects (REQ-FE-002).
- *
- * <p>Handlers that repopulate a form or branch on the problem type keep their own logic.
+ * Runs a Post/Redirect/Get mutation with success or failure feedback (REQ-FE-002).
+ * Session loss propagates to the global reauthentication handler.
  */
 @Component
 @Slf4j
 public class MutationResponseHelper {
 
   /**
-   * A mutating backend interaction run for its side effects (the WebClient call). May fail with any
-   * runtime exception (e.g. {@code BackendServiceException} from the WebClient layer), which {@link
-   * #mutate} turns into an {@code errorToast}.
+   * A mutating backend interaction whose ordinary failure becomes an error toast.
    */
   @FunctionalInterface
   public interface MutationAction {
@@ -46,9 +42,7 @@ public class MutationResponseHelper {
   }
 
   /**
-   * Runs {@code action}; on success flashes {@code successToast=successKey}, on any {@link
-   * Exception} logs the failure and flashes {@code errorToast=errorKey}; either way returns a
-   * redirect to {@code redirectView}.
+   * Runs the mutation and redirects with a success or error toast, propagating session loss.
    *
    * @param redirectAttributes the flash-attribute carrier for the post-redirect toast
    * @param redirectView the target the browser is redirected to (without the {@code redirect:}
@@ -57,6 +51,8 @@ public class MutationResponseHelper {
    * @param errorKey the i18n message key flashed as {@code errorToast} on failure
    * @param action the backend mutation to run
    * @return the {@code redirect:}-prefixed view name for {@code redirectView}
+   * @throws de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException
+   *     when the backend call lost the session
    */
   @NotNull
   public String mutate(
@@ -69,6 +65,7 @@ public class MutationResponseHelper {
       action.run();
       redirectAttributes.addFlashAttribute("successToast", successKey);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Mutation failed, redirecting to {}: {}", redirectView, e.getMessage(), e);
       redirectAttributes.addFlashAttribute("errorToast", errorKey);
     }

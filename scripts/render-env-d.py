@@ -2,7 +2,7 @@
 """Profit Basetool - render the per-service environment files from their templates.
 
 Renders ``quadlet/env.d/<service>.env.tmpl`` against the host ``.env`` into the files the Quadlet
-units name in ``EnvironmentFile=``, one per service. Compose interpolation semantics, nesting
+units name in ``EnvironmentFile=``, one per service. The templates support Compose-style interpolation, nesting
 included::
 
     ${NAME}              unset -> empty
@@ -31,50 +31,11 @@ import os
 import sys
 from typing import Sequence
 
+from env_file import EnvFileError, parse_env_file
+
 
 class Refusal(Exception):
     """Raised when a template cannot be rendered correctly; the message names template and variable."""
-
-
-def parse_env_file(path: str) -> dict[str, str]:
-    """Read a ``.env`` into a mapping, the way compose reads one.
-
-    Skips blanks and ``#`` comments, tolerates ``export``, strips one layer of matching quotes, and
-    takes values literally.
-
-    Args:
-        path: absolute path to the ``.env``.
-
-    Returns:
-        The mapping. A key assigned more than once keeps its **last** value, matching compose.
-
-    Raises:
-        Refusal: if the file cannot be read at all.
-    """
-    try:
-        with open(path, encoding="utf-8") as handle:
-            lines = handle.readlines()
-    except OSError as exc:
-        raise Refusal(f"cannot read {path}: {exc}") from exc
-
-    env: dict[str, str] = {}
-    for raw in lines:
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].lstrip()
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key:
-            continue
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
-        env[key] = value
-    return env
 
 
 def _matching_brace(text: str, open_index: int) -> int:
@@ -269,7 +230,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         env = parse_env_file(args.env)
-    except Refusal as exc:
+    except (Refusal, EnvFileError) as exc:
         print(f"render-env-d: {exc}", file=sys.stderr)
         return 1
 
@@ -284,7 +245,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for tmpl in templates:
             service = tmpl[: -len(".env.tmpl")]
             produced[service] = render_one(os.path.join(args.templates, tmpl), env, missing)
-    except Refusal as exc:
+    except (Refusal, EnvFileError) as exc:
         print(f"render-env-d: {exc}", file=sys.stderr)
         return 1
 

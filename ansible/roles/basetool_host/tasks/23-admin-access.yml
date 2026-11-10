@@ -62,9 +62,12 @@
         /usr/bin/podman {{ sub }}, /usr/bin/podman {{ sub }} *{{ ', ' if not loop.last else '' }}
         {%- endfor %}
 
+      Defaults!BASETOOL_ADMIN_READ_PODMAN env_reset, always_set_home, !setenv
+      Defaults!BASETOOL_ADMIN_READ_PODMAN env_keep = "TERM"
+
       Cmnd_Alias BASETOOL_ADMIN_READ_ROOT = /usr/sbin/sshd -T, /usr/sbin/sshd -T *, /usr/bin/fail2ban-client status, /usr/bin/fail2ban-client status *
 
-      {{ basetool_host_admin_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: BASETOOL_ADMIN_READ_PODMAN
+      {{ basetool_host_admin_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: NOSETENV: BASETOOL_ADMIN_READ_PODMAN
       {{ basetool_host_admin_user }} ALL=(root) NOPASSWD: BASETOOL_ADMIN_READ_ROOT
   register: basetool_host_admin_sudoers
 

@@ -72,6 +72,11 @@ public final class RealBackendApiClient {
    * @return the real client
    */
   public static BackendApiClient over(WebClient webClient, MeterRegistry meterRegistry) {
-    return new BackendApiClient(webClient, webClient, meterRegistry, new NoOpCacheManager());
+    return new BackendApiClient(
+        webClient,
+        webClient,
+        meterRegistry,
+        new NoOpCacheManager(),
+        de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture.create());
   }
 }

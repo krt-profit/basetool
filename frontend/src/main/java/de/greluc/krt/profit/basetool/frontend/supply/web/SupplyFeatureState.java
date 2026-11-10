@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.supply.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyStateDto;
 import java.time.Duration;
@@ -60,6 +62,7 @@ public class SupplyFeatureState {
       remembered = new Remembered(enabled, Instant.now().plus(TTL));
       return enabled;
     } catch (RuntimeException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Supply state unavailable: {}", e.getMessage());
       return false;
     }

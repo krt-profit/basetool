@@ -39,7 +39,7 @@
                         <li>
                             <p>${msg("loginTotpStep2")}</p>
                             <div class="krt-qr-wrapper">
-                                <img id="kc-totp-secret-qr-code" class="krt-qr-code-img" src="data:image/png;base64, ${totp.totpSecretQrCode}" alt="Figure: Barcode">
+                                <img id="kc-totp-secret-qr-code" class="krt-qr-code-img" src="data:image/png;base64, ${totp.totpSecretQrCode}" alt="${msg("totpQrCodeAlt")}">
                             </div>
                             <br/>
                             <p><a href="${totp.manualUrl}" id="mode-manual" class="krt-link">${msg("loginTotpUnableToScan")}</a></p>

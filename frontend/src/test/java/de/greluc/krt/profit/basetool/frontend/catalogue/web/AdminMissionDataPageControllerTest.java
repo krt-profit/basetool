@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
@@ -33,12 +35,26 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.*;
+import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 @SuppressWarnings("unchecked")
 class AdminMissionDataPageControllerTest {
+
+  @ParameterizedTest
+  @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
+  void aFailedParallelCatalogReadReauthenticates(RuntimeException sessionFailure) throws Exception {
+    CatalogueBackendClient client = mock(CatalogueBackendClient.class, _ -> { throw sessionFailure; });
+    AdminMissionDataPageController controller =
+        new AdminMissionDataPageController(client, new ParallelPageLoader(), mock(CatalogueCacheEviction.class));
+
+    ReauthPageMvc.standalone(controller).perform(get("/admin/mission-data"))
+        .andExpect(redirectsToLogin());
+  }
 
   @Test
   void listData_ShouldSortListsAscendingByName() {

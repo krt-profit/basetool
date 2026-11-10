@@ -166,6 +166,8 @@ web, naming its client (REQ-AUDIT-005):
   (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
   capability-flag changes; **role permission-set changes** (`ROLE_PERMISSIONS_CHANGED` — the admin
   role editor's permission grid, previously the one mutation in this area that left no trace);
+  role description edits (`ROLE_DESCRIPTION_CHANGED`, role code as subject and only the new
+  numeric `sectionVersion` in details, never the description text);
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
   `from=<old|null> to=<new>`, REQ-ROLE-007); the assignment and withdrawal of one of the four

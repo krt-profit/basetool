@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +71,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -96,12 +96,26 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Mock private AuditService auditService;
 
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService checkoutService;
+  private InventoryCheckoutService checkoutService;
 
   private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
   @BeforeEach
   void stubSaveEcho() {
+    checkoutService =
+        InventoryCheckoutFixtures.create(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            stockOfferLookup,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            orgUnitStampingService,
+            auditService,
+            eventPublisher);
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.AdminDeletionRequestDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.CreateDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,15 +67,11 @@ public class DeletionRequestProxyController {
   @GetMapping(params = "fragment=card")
   @PreAuthorize("isAuthenticated()")
   public String card(Model model) {
-    AdminDeletionRequestDto deletionRequest = null;
-    boolean unavailable = false;
-    try {
-      deletionRequest = identityClient.myDeletionRequest();
-    } catch (Exception e) {
-      log.debug("Could not load the member's deletion request for the card fragment", e);
-      unavailable = true;
-    }
-    model.addAttribute("deletionRequest", deletionRequest);
+    boolean unavailable =
+        !SectionFallback.run(
+            log,
+            "deletion-request-card",
+            () -> model.addAttribute("deletionRequest", identityClient.myDeletionRequest()));
     model.addAttribute("deletionRequestUnavailable", unavailable);
     return "identity/fragments/profile-deletion-card :: card";
   }

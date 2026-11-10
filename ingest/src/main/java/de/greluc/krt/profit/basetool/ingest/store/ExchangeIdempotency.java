@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.ingest.store;
 
 import de.greluc.krt.profit.basetool.ingest.config.ExchangeStoreProperties;
 import de.greluc.krt.profit.basetool.ingest.registry.ExchangeUnavailableException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -106,9 +107,22 @@ public class ExchangeIdempotency {
    */
   public static @NotNull String fingerprint(
       @NotNull String method, @NotNull String path, byte @NotNull [] body) {
+    return fingerprint(method, path, ByteBuffer.wrap(body));
+  }
+
+  /**
+   * Hashes the remaining buffered body without changing its cursor.
+   *
+   * @param method the method
+   * @param path the path
+   * @param body the buffered body
+   * @return the byte-exact request fingerprint
+   */
+  public static @NotNull String fingerprint(
+      @NotNull String method, @NotNull String path, @NotNull ByteBuffer body) {
     MessageDigest digest = sha256Digest();
     digest.update((method + " " + path + "\n").getBytes(StandardCharsets.UTF_8));
-    digest.update(body);
+    digest.update(body.asReadOnlyBuffer());
     return HexFormat.of().formatHex(digest.digest());
   }
 

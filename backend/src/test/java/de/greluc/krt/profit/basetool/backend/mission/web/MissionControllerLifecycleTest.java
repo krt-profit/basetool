@@ -100,6 +100,8 @@ class MissionControllerLifecycleTest {
           new de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor();
 
   private MissionController controller;
+  private MissionRosterController rosterController;
+  private MissionScheduleController scheduleController;
 
   /**
    * Builds the controller by constructor with a real name resolver over the mocked {@link
@@ -110,18 +112,25 @@ class MissionControllerLifecycleTest {
     controller =
         new MissionController(
             missionService,
-            null,
             missionParticipantService,
-            null,
-            userService,
             missionMapper,
             userMapper,
-            null,
+            new MissionHttpProjection(authHelperService, missionPeerRedactor));
+    rosterController =
+        new MissionRosterController(
+            missionParticipantService,
+            userService,
+            missionMapper,
             missionAccessPolicy,
             authHelperService,
-            missionPeerRedactor,
             new de.greluc.krt.profit.basetool.backend.mission.internal.ParticipantTargetResolver(
-                userService));
+                userService),
+            new MissionHttpProjection(authHelperService, missionPeerRedactor));
+    scheduleController =
+        new MissionScheduleController(
+            missionService,
+            missionMapper,
+            new MissionHttpProjection(authHelperService, missionPeerRedactor));
   }
 
   /**
@@ -501,7 +510,7 @@ class MissionControllerLifecycleTest {
     when(missionMapper.toDto(persisted)).thenReturn(dto);
     when(authHelperService.isAdmin()).thenReturn(true);
 
-    MissionDto result = controller.joinMission(jwt, missionId, null);
+    MissionDto result = rosterController.joinMission(jwt, missionId, null);
 
     assertThat(result).isSameAs(dto);
     verify(missionParticipantService)
@@ -524,7 +533,7 @@ class MissionControllerLifecycleTest {
     when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result =
-        controller.joinMission(
+        rosterController.joinMission(
             jwt, missionId, new JoinMissionRequest(desiredJobTypeId, PayoutPreference.DONATE));
 
     assertThat(result).isSameAs(dto);
@@ -548,7 +557,7 @@ class MissionControllerLifecycleTest {
     when(authHelperService.isAdmin()).thenReturn(true);
 
     MissionDto result =
-        controller.joinMission(
+        rosterController.joinMission(
             jwt, missionId, new JoinMissionRequest(null, PayoutPreference.PAYOUT));
 
     assertThat(result).isSameAs(dto);
@@ -574,7 +583,7 @@ class MissionControllerLifecycleTest {
     when(missionMapper.toDto(persisted)).thenReturn(full);
     when(authHelperService.isAdmin()).thenReturn(false);
 
-    MissionDto result = controller.joinMission(jwt, missionId, null);
+    MissionDto result = rosterController.joinMission(jwt, missionId, null);
 
     assertThat(result).isNotSameAs(full);
     assertThat(result.owner()).isNotNull();
@@ -622,7 +631,7 @@ class MissionControllerLifecycleTest {
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.patchMissionSchedule(id, request);
+    MissionDto result = scheduleController.patchMissionSchedule(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(missionService)
@@ -670,7 +679,7 @@ class MissionControllerLifecycleTest {
     when(missionParticipantService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
     when(missionMapper.toDto(raw)).thenReturn(dto);
 
-    List<MissionParticipantDto> result = controller.getUnassignedParticipants(id);
+    List<MissionParticipantDto> result = rosterController.getUnassignedParticipants(id);
 
     assertThat(result).containsExactly(dto);
     verify(missionMapper).toDto(raw);
@@ -714,7 +723,7 @@ class MissionControllerLifecycleTest {
     when(missionParticipantService.setPartyLead(id, userId, null, 3L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.setPartyLead(id, request);
+    MissionDto result = rosterController.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(userService, never()).findMatchesByExactName(any());
@@ -734,7 +743,7 @@ class MissionControllerLifecycleTest {
     when(missionParticipantService.setPartyLead(id, resolvedId, null, 1L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.setPartyLead(id, request);
+    MissionDto result = rosterController.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(missionParticipantService).setPartyLead(id, resolvedId, null, 1L);
@@ -750,7 +759,7 @@ class MissionControllerLifecycleTest {
     when(missionParticipantService.setPartyLead(id, null, "Stranger", 0L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.setPartyLead(id, request);
+    MissionDto result = rosterController.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(missionParticipantService).setPartyLead(id, null, "Stranger", 0L);
@@ -767,7 +776,7 @@ class MissionControllerLifecycleTest {
     when(userService.findMatchesByExactName("Sam")).thenReturn(List.of(a, b));
 
     try {
-      controller.setPartyLead(id, request);
+      rosterController.setPartyLead(id, request);
       org.junit.jupiter.api.Assertions.fail("Expected BusinessConflictException");
     } catch (BusinessConflictException expected) {
     }
@@ -784,7 +793,7 @@ class MissionControllerLifecycleTest {
     when(missionParticipantService.setPartyLead(id, null, null, 4L)).thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
 
-    MissionDto result = controller.setPartyLead(id, request);
+    MissionDto result = rosterController.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
     verify(userService, never()).findMatchesByExactName(any());

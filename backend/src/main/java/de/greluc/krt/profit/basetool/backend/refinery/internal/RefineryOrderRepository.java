@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -43,6 +44,39 @@ import org.springframework.stereotype.Repository;
 /** Spring Data repository for Refinery Order. */
 @Repository
 public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UUID> {
+
+  /**
+   * Counts every visible segment with the same owner or tenant scope as the order list.
+   *
+   * @param onlyMine whether the owner predicate replaces the tenant predicate
+   * @param ownerId the calling member
+   * @param activeStatuses statuses counted by the running and ready segments
+   * @param completedStatus the completed segment's status
+   * @param now readiness snapshot
+   * @param isAdminAllScope whether every tenant is visible
+   * @param activeOrgUnitId the active tenant pin, if any
+   * @param memberOrgUnitIds the caller's allowed tenants
+   * @return all four counts in one aggregate row
+   */
+  @Query(
+      "SELECT new"
+          + " de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto(COALESCE(SUM(CASE"
+          + " WHEN r.status IN :activeStatuses THEN 1L ELSE 0L END), 0L), COALESCE(SUM(CASE WHEN"
+          + " r.status IN :activeStatuses AND (r.endsAt IS NULL OR r.endsAt <= :now) THEN 1L ELSE"
+          + " 0L END), 0L), COALESCE(SUM(CASE WHEN r.status = :completedStatus THEN 1L ELSE 0L"
+          + " END), 0L), COUNT(r)) FROM RefineryOrder r WHERE (:onlyMine = true AND r.owner.id ="
+          + " :ownerId) OR (:onlyMine = false AND "
+          + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE
+          + ")")
+  RefineryOrderCountsDto countSegments(
+      @Param("onlyMine") boolean onlyMine,
+      @Param("ownerId") UUID ownerId,
+      @Param("activeStatuses") Collection<RefineryOrderStatus> activeStatuses,
+      @Param("completedStatus") RefineryOrderStatus completedStatus,
+      @Param("now") Instant now,
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * The list filters of the paged order lists (alias {@code r}, REQ-REFINERY-019): the statuses,

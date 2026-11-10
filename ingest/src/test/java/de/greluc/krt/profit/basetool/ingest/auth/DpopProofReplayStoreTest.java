@@ -31,10 +31,15 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.DPoPProofContext;
 import org.springframework.security.oauth2.jwt.DPoPProofJwtDecoderFactory;
@@ -51,6 +56,84 @@ class DpopProofReplayStoreTest {
   private static final String OTHER = "/unrouted";
 
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  @Test
+  @EnabledIfSystemProperty(named = "basetool.audit.resourceProfile", matches = "true")
+  void profileSaturatedRefusalsAgainstTheTwoScanBaselineModel() {
+    Clock clock = Clock.fixed(Instant.parse("2026-11-10T12:00:00Z"), ZoneOffset.UTC);
+    Instant expiry = clock.instant().plusSeconds(30);
+    for (int capacity : new int[] {1000, 10000, 100000}) {
+      DpopProofReplayStore indexed = store(1, capacity, clock);
+      java.util.Map<String, Instant> baseline = new java.util.concurrent.ConcurrentHashMap<>();
+      for (int i = 0; i < capacity; i++) {
+        String key = "synthetic-" + i;
+        baseline.put(key, expiry);
+        indexed.claim(key, expiry, key);
+      }
+      int iterations = 1000;
+      long checksum = 0;
+      long started = System.nanoTime();
+      for (int i = 0; i < iterations; i++) {
+        checksum += scanRefusal(baseline, clock.instant());
+      }
+      long scanNanos = System.nanoTime() - started;
+      started = System.nanoTime();
+      for (int i = 0; i < iterations; i++) {
+        DpopProofReplayStore.Claim claim = indexed.claim("refused", expiry, "another-member");
+        assertThat(claim.outcome()).isEqualTo(Outcome.FULL);
+        checksum += claim.retryAfterSeconds();
+      }
+      long indexedNanos = System.nanoTime() - started;
+      assertThat(checksum).isEqualTo(2L * iterations * 31L);
+      assertThat(indexed.size()).isEqualTo(capacity);
+      System.out.printf("DPOP_SATURATION_PROFILE entries=%d iterations=%d scan_model_ns_per_refusal=%d "
+          + "indexed_ns_per_refusal=%d scan_model_entries_visited_per_refusal=%d%n",
+          capacity, iterations, scanNanos / iterations, indexedNanos / iterations, 2L * capacity);
+    }
+  }
+
+  private static long scanRefusal(java.util.Map<String, Instant> proofs, Instant now) {
+    for (var proof : proofs.entrySet()) {
+      if (now.isAfter(proof.getValue())) {
+        throw new IllegalStateException("The saturation profile requires only live proofs");
+      }
+    }
+    Instant earliest = null;
+    for (Instant expiresAt : proofs.values()) {
+      if (!now.isAfter(expiresAt) && (earliest == null || expiresAt.isBefore(earliest))) {
+        earliest = expiresAt;
+      }
+    }
+    return DpopProofReplayStore.retryAfterSeconds(now, earliest == null ? now : earliest);
+  }
+
+  @Test
+  void concurrentMembersCannotOvershootTheGlobalCapacity() throws Exception {
+    Clock clock = Clock.fixed(Instant.parse("2026-11-10T12:00:00Z"), ZoneOffset.UTC);
+    DpopProofReplayStore store = store(1, 10, clock);
+    CountDownLatch start = new CountDownLatch(1);
+    ArrayList<Future<Outcome>> claims = new ArrayList<>();
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      for (int i = 0; i < 200; i++) {
+        String key = "concurrent-" + i;
+        claims.add(
+            executor.submit(() -> {
+              start.await();
+              return store.claim(key, clock.instant().plusSeconds(30), key).outcome();
+            }));
+      }
+      start.countDown();
+      int stored = 0;
+      for (Future<Outcome> claim : claims) {
+        if (claim.get() == Outcome.STORED) {
+          stored++;
+        }
+        assertThat(store.size()).isLessThanOrEqualTo(10);
+      }
+      assertThat(stored).isEqualTo(10);
+      assertThat(store.size()).isEqualTo(10);
+    }
+  }
 
   /** A clock the tests move by hand. */
   private static final class MovableClock extends Clock {

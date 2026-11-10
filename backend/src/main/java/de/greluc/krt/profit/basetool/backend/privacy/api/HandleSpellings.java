@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserHandleProjection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -72,6 +73,20 @@ public final class HandleSpellings {
    * @return their username, display name, Discord guild nickname and RSI handle, nulls included
    */
   public static @NotNull Stream<String> of(@NotNull User user) {
+    return Stream.of(
+        user.getUsername(),
+        user.getDisplayName(),
+        user.getDiscordGuildNickname(),
+        user.getRsiHandle());
+  }
+
+  /**
+   * Returns the projected names in the same order as {@link #COLUMNS}.
+   *
+   * @param user the narrow identity projection
+   * @return the supported name spellings, including absent values
+   */
+  public static @NotNull Stream<String> of(@NotNull UserHandleProjection user) {
     return Stream.of(
         user.getUsername(),
         user.getDisplayName(),

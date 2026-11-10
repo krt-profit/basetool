@@ -3122,6 +3122,21 @@ after the apps, and the promotion failed.
 **Runbook:** `docs/deployment.md` → *Before a promotion: the host scripts* · **Related:** REQ-OPS-001,
 REQ-OPS-007, REQ-OPS-036, REQ-OBS-014
 
+**Installed operational companions participate in the same drift result.**
+`scripts/host-companions.json` owns the source, installed path, mode and kind for the operational
+units/timers, sandbox and ordering drop-ins, logrotate files and lock-file tmpfiles rule. The role's
+static installation loops consume that inventory, and the release manifest appends their hashes
+under `host/etc/...`. Comparison reads the installed paths; it writes no host configuration.
+The generated ordering drop-in is compared after removing non-semantic comments and normalizing
+only the detected service user's uid. A different numeric uid remains literal and reports drift.
+Other contents remain byte-exact. Existing drift metrics and alerts
+cover missing and changed companions; no automatic reconciliation is introduced.
+
+The deploy orchestrator retains state transitions and rollback order. Configuration/runtime apply,
+release verification, drift comparison and monitoring functions have focused owners under
+`scripts/lib/deploy-*.sh`, all installed, hashed and included in the apply-path gate. The shared
+literal environment parser is also part of that gate (ADR-0364).
+
 ### REQ-OPS-046 — The shared build conventions are precompiled plugins of an included build
 
 Every build convention the modules share lives in `build-logic/`, an included build
@@ -3185,6 +3200,21 @@ isolated projects have nothing to reject and a module added later inherits no de
 [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
 [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
+
+Node script tests register through `registerNodeScriptTest` in `build-logic`, retaining their task
+names, setup dependencies, script inputs, precise extra files/directories, nonzero-exit failures and
+always-run verification behavior. The included build resolves the Node plugin marker using the
+catalog; the frontend applies that already-versioned plugin by id. Configuration-cache reuse and
+the affected task graph are checked through the wrapper.
+
+Operational subprocesses have explicit configurable budgets (`Kcadm.timeout`, default 60 seconds;
+GraphQL commit request, default 60 seconds; sandbox HTTP calls, default 120 seconds). A kcadm timeout
+kills/waits for the local child; an uncertain write is not retried automatically and names the need
+to read server state first. The commit helper similarly requires checking the branch head before a
+retry. No diagnostic includes a credential or response payload. Script HTTP reads use a connection/I/O
+wait of at most five seconds and check their total deadline after each transport chunk, so an
+in-flight chunk may add at most one such I/O wait to the total budget; a slow trickle cannot keep
+the operation alive indefinitely.
 
 ### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
 

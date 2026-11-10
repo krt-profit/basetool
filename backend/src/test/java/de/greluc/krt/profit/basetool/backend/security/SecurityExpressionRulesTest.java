@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.backend.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ConnectedAppsGate;
@@ -181,10 +180,7 @@ class SecurityExpressionRulesTest {
    */
   private static Map<String, Class<?>> explicitComponentNames() {
     Map<String, Class<?>> names = new TreeMap<>();
-    for (JavaClass javaClass :
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(SecurityExpressionSources.BASE_PACKAGE)) {
+    for (JavaClass javaClass : ModuleSubjects.importBackendMainClasses()) {
       Class<?> type = javaClass.reflect();
       Component component = AnnotatedElementUtils.findMergedAnnotation(type, Component.class);
       if (component != null && !component.value().isEmpty()) {

@@ -523,14 +523,18 @@ def selftest() -> int:
     check("base: an empty chain offers nothing", base_candidates([], True, 20) == [])
     check("base: a non-sha line is dropped", base_candidates(["x", chain[0]], True, 20) == [chain[0]])
 
-    real = show("HEAD", APP_DOCKERFILE) or (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
+    real = (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
     real_own, real_shared = input_sets(real)
     for m in MODULES:
         check(f"the real Dockerfile yields {m}/src/main as {m}'s own input", f"{m}/src/main" in real_own[m])
-    for must in ("gradle", "build-logic", "logging-support/src/main", "build.gradle.kts",
-                 "backend/build.gradle.kts"):
+    for must in ("gradle", "build-logic", "logging-support/src/main", "technical-support/src/main", "build.gradle.kts",
+                 "backend/build.gradle.kts", "lombok.config"):
         check(f"the real Dockerfile yields shared input {must}", must in real_shared)
     real_sources = copy_sources(real)
+    check("the real Dockerfile copies the shared Lombok configuration", "lombok.config" in real_sources)
+    configuration_change = decide(base, head, real, ["lombok.config"], old, old, True)
+    check("a Lombok configuration change rebuilds every application image",
+          configuration_change["rebuild"] == list(MODULES) and configuration_change["reuse"] == [])
     for path in MODULE_OWN:
         check(f"MODULE_OWN entry {path} is still a COPY source", path in real_sources)
 

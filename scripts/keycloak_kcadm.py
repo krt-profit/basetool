@@ -24,21 +24,26 @@ class Kcadm:
     `kcadm.sh config credentials`.
     """
 
-    def __init__(self, prefix: list[str], realm: str, dry_run: bool):
+    def __init__(self, prefix: list[str], realm: str, dry_run: bool, timeout: float = 60.0):
+        if timeout <= 0:
+            raise ValueError("kcadm timeout must be positive")
+        self.timeout = timeout
         self.prefix = prefix
         self.realm = realm
         self.dry_run = dry_run
 
     def _run(self, args: list[str], stdin: str | None = None) -> str:
         command = self.prefix + args
-        if stdin is None:
+        try:
+            options = {"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}
             completed = subprocess.run(
-                command, stdin=subprocess.DEVNULL, capture_output=True, text=True, check=False
+                command, capture_output=True, text=True, check=False,
+                timeout=self.timeout, **options,
             )
-        else:
-            completed = subprocess.run(
-                command, input=stdin, capture_output=True, text=True, check=False
-            )
+        except subprocess.TimeoutExpired as error:
+            outcome = ("The server may have completed the mutation; read its current state before retrying."
+                       if args[0] != "get" else "No mutation was requested.")
+            raise KcadmError(f"kcadm {args[0]} exceeded {self.timeout:g}s. {outcome}") from error
         if completed.returncode != 0:
             raise KcadmError(
                 f"{shlex.join(command)}\n"

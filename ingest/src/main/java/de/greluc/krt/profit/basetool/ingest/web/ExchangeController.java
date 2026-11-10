@@ -768,12 +768,12 @@ public class ExchangeController {
     if (!violations.isEmpty()) {
       return responses.schemaInvalid(violations);
     }
-    List<String> unknown = schemas.unknownFields(schema, body);
-    ResponseEntity<?> unreportable = responses.unreportable(unknown);
+    ExchangeSchemas.SanitizedRequest sanitized = schemas.sanitize(schema, body);
+    ResponseEntity<?> unreportable = responses.unreportable(sanitized.longPointers());
     if (unreportable != null) {
       return unreportable;
     }
-    JsonNode relayed = schemas.withoutFields(body, unknown);
+    JsonNode relayed = sanitized.body();
     if (everyOpCounts
         && !body.path("dryRun").asBoolean(false)
         && body.get("ops") instanceof ArrayNode ops
@@ -799,7 +799,7 @@ public class ExchangeController {
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
       return staged(context, request, resource, relayed, result, digest);
     }
-    return responses.relayed(result, "change-result.schema.json", unknown, context, request);
+    return responses.relayed(result, "change-result.schema.json", sanitized.warnings(), context, request);
   }
 
   /**

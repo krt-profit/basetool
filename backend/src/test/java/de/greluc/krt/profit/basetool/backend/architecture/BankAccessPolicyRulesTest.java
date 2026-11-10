@@ -26,7 +26,6 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.BankAccessPolicyFixtures;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -60,10 +59,7 @@ class BankAccessPolicyRulesTest {
 
   private static final String BANK = ROOT + ".bank";
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages(ROOT);
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackagesOf(BankAccessPolicyFixtures.class);

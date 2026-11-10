@@ -17,11 +17,11 @@ fail() {
   exit 1
 }
 
+COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 read_env() {
-  local key="$1"
-  [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 1
-  sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*//p" "${ENV_FILE}" 2>/dev/null \
-    | tail -n 1 | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+  [[ "$1" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || return 1
+  python3 "${COMMON_SCRIPT_DIR}/../env_file.py" --file "${ENV_FILE}" --key "$1"
 }
 
 write_textfile() {

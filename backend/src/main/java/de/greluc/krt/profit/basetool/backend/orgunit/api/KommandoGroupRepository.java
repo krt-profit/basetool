@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -40,6 +41,14 @@ public interface KommandoGroupRepository extends JpaRepository<KommandoGroup, UU
    * @return the squadron's Kommandogruppen in display order; never {@code null}, possibly empty.
    */
   List<KommandoGroup> findBySquadronIdOrderBySortIndexAsc(UUID squadronOrgUnitId);
+
+  /**
+   * Reads command groups for all visible squadrons in their display order.
+   *
+   * @param squadronIds the visible squadrons
+   * @return their command groups ordered by sort index
+   */
+  List<KommandoGroup> findBySquadronIdInOrderBySortIndexAsc(Collection<UUID> squadronIds);
 
   /**
    * Counts the Kommandogruppen of the given Staffel, so a fifth group is rejected with a 4xx before

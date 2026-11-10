@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.notification.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPreferenceDto;
@@ -73,6 +75,7 @@ public class NotificationPreferenceProxyController {
     try {
       preferences = client.preferences();
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Could not load the notification preferences", e);
     }
     model.addAttribute("notificationPrefsUnavailable", preferences == null);

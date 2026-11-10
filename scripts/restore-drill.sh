@@ -153,16 +153,41 @@ dexec() { rt_exec "${CONTAINER}" "$@"; }
 log "restoring backend dump → krt_basetool"
 dexec createdb -U drill krt_basetool
 rt_cp_to "${BACKEND_DUMP}" "${CONTAINER}" /tmp/krt_basetool.dump
-dexec pg_restore -U drill -d krt_basetool --no-owner --no-privileges /tmp/krt_basetool.dump \
-  || log "WARN: pg_restore (backend) reported non-fatal errors — verifying anyway"
+dexec pg_restore -U drill -d krt_basetool --exit-on-error --no-owner --no-privileges /tmp/krt_basetool.dump \
+  || fail "backend restore failed; success timestamp is unchanged"
 
 log "restoring keycloak dump → keycloak"
 dexec createdb -U drill keycloak
 rt_cp_to "${KEYCLOAK_DUMP}" "${CONTAINER}" /tmp/keycloak.dump
-dexec pg_restore -U drill -d keycloak --no-owner --no-privileges /tmp/keycloak.dump \
-  || log "WARN: pg_restore (keycloak) reported non-fatal errors — verifying anyway"
+dexec pg_restore -U drill -d keycloak --exit-on-error --no-owner --no-privileges /tmp/keycloak.dump \
+  || fail "keycloak restore failed; success timestamp is unchanged"
 
-q() { dexec psql -U drill -d "$1" -tAc "$2" | tr -d '[:space:]'; }
+q() { dexec psql -v ON_ERROR_STOP=1 -U drill -d "$1" -tAc "$2" | tr -d '[:space:]'; }
+
+verify_restored_contents() {
+  local database="$1" dump="$2" table expected actual invalid
+  shift 2
+  for table in "$@"; do
+    expected="$(dexec pg_restore --data-only --table="${table}" --file=- "${dump}" | awk '
+      /^COPY / { copying=1; next }
+      /^\\\.$/ { copying=0; next }
+      copying { count++ }
+      END { print count+0 }
+    ')" || return 1
+    actual="$(q "${database}" "SELECT count(*) FROM public.\"${table}\"")" || return 1
+    if [[ ! "${expected}" =~ ^[0-9]+$ || "${expected}" -eq 0 || "${actual}" != "${expected}" ]]; then
+      log "FAIL: ${database}.${table} restored row count differs from the required dump contents"
+      return 1
+    fi
+  done
+  invalid="$(q "${database}" "SELECT count(*) FROM pg_constraint WHERE contype IN ('f','c') AND NOT convalidated")" || return 1
+  [[ "${invalid}" == 0 ]]
+}
+
+verify_restored_contents krt_basetool /tmp/krt_basetool.dump flyway_schema_history org_unit \
+  || fail "backend content/constraint verification failed"
+verify_restored_contents keycloak /tmp/keycloak.dump realm client \
+  || fail "keycloak content/constraint verification failed"
 
 FLYWAY_ROWS="$(q krt_basetool "select count(*) from flyway_schema_history" 2>/dev/null || echo 0)"
 BACKEND_TABLES="$(q krt_basetool "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo 0)"

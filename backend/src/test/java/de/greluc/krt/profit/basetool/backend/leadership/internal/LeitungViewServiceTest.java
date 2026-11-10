@@ -178,8 +178,9 @@ class LeitungViewServiceTest {
   void admin_seesEveryTierWithoutConsultingTheDelegatedAuthoriser() {
     when(authHelperService.isAdmin()).thenReturn(true);
     allUnitsExist();
-    when(membershipRepository.findAllByIdOrgUnitId(any())).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(any())).thenReturn(List.of());
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
+        .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
 
@@ -197,6 +198,10 @@ class LeitungViewServiceTest {
     verifyNoInteractions(roleSecurity);
     verifyNoInteractions(specialCommandSecurity);
     verifyNoInteractions(cascadeService);
+    verify(membershipRepository).findAllByIdOrgUnitIdIn(any());
+    verify(kommandoGroupRepository).findBySquadronIdInOrderBySortIndexAsc(any());
+    verify(membershipRepository, never()).findAllByIdOrgUnitId(any());
+    verify(kommandoGroupRepository, never()).findBySquadronIdOrderBySortIndexAsc(any());
   }
 
   @Test
@@ -211,8 +216,9 @@ class LeitungViewServiceTest {
     when(orgUnitRepository.findActiveBereiche()).thenReturn(List.of(profit));
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands())
         .thenReturn(List.of(grouped, ungrouped));
-    when(membershipRepository.findAllByIdOrgUnitId(any())).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(any())).thenReturn(List.of());
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
+        .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
 
@@ -241,8 +247,9 @@ class LeitungViewServiceTest {
         .thenReturn(true);
     when(roleSecurity.canAppointBereichRole(otherBereichId, BereichLeadershipRole.LEITER, auth))
         .thenReturn(true);
-    when(membershipRepository.findAllByIdOrgUnitId(any())).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(any())).thenReturn(List.of());
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
+        .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
 
@@ -270,12 +277,12 @@ class LeitungViewServiceTest {
         .thenReturn(false);
     when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
     UUID plainUser = UUID.randomUUID();
-    when(membershipRepository.findAllByIdOrgUnitId(squadronId))
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any()))
         .thenReturn(
             List.of(
                 member(plainUser, "zulu", MembershipRole.MEMBER),
                 member(callerId, "alpha", MembershipRole.STAFFELLEITER)));
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
         .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
@@ -304,8 +311,8 @@ class LeitungViewServiceTest {
     when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
         .thenReturn(false);
     when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
-    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
         .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
@@ -326,8 +333,8 @@ class LeitungViewServiceTest {
     when(roleSecurity.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, auth))
         .thenReturn(false);
     when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(true);
-    when(membershipRepository.findAllByIdOrgUnitId(squadronId)).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
         .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
@@ -364,8 +371,8 @@ class LeitungViewServiceTest {
     when(roleSecurity.canManageKommandoGroups(squadronId, auth)).thenReturn(false);
     when(roleSecurity.canAppointSkLead(skId, auth)).thenReturn(true);
     when(specialCommandSecurity.canManageMembers(skId, auth)).thenReturn(false);
-    when(membershipRepository.findAllByIdOrgUnitId(any())).thenReturn(List.of());
-    when(kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId))
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(any()))
         .thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
@@ -390,7 +397,7 @@ class LeitungViewServiceTest {
     callerHolds(Set.of(), seat(skId, MembershipRole.SK_LEAD));
     when(roleSecurity.canAppointSkLead(skId, auth)).thenReturn(false);
     when(specialCommandSecurity.canManageMembers(skId, auth)).thenReturn(true);
-    when(membershipRepository.findAllByIdOrgUnitId(skId)).thenReturn(List.of());
+    when(membershipRepository.findAllByIdOrgUnitIdIn(any())).thenReturn(List.of());
 
     LeitungViewDto view = service.buildView(auth);
 

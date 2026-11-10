@@ -102,6 +102,7 @@ public class PurchasingPageController {
   private final PurchasingFeatureState featureState;
   private final QualityTierCatalog qualityTierCatalog;
   private final LayoutContextLoader layoutContextLoader;
+  private final PurchasingRequestState requestState;
 
   /**
    * Reads what the caller may do in the purchasing module; a failed read answers nothing.
@@ -111,7 +112,7 @@ public class PurchasingPageController {
   @ModelAttribute("purchasingState")
   public @NotNull PurchasingStateDto purchasingState() {
     PurchasingStateDto state =
-        SectionFallback.load(log, "purchasing-state", purchasingClient::state, NO_STATE);
+        SectionFallback.load(log, "purchasing-state", requestState::read, NO_STATE);
     return state == null ? NO_STATE : state;
   }
 

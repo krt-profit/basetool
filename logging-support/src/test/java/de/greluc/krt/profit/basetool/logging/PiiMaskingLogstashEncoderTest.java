@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.logging;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +31,8 @@ import ch.qos.logback.classic.spi.LoggingEvent;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.event.KeyValuePair;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Tests that the prod JSON sink encoder scrubs e-mails, JWTs and bearer tokens before writing. */
 class PiiMaskingLogstashEncoderTest {
@@ -74,10 +77,7 @@ class PiiMaskingLogstashEncoderTest {
   @Test
   void shouldKeepJsonStructureIntact() {
     String json = encode("Email user@example.org used token=my-secret");
-    String trimmed = json.trim();
-    assertTrue(
-        trimmed.startsWith("{") && trimmed.endsWith("}"),
-        "encoded output must remain a JSON object: " + json);
+    assertTrue(JsonMapper.builder().build().readTree(json).isObject());
     assertFalse(json.contains("user@example.org"));
     assertFalse(json.contains("my-secret"));
   }
@@ -97,6 +97,57 @@ class PiiMaskingLogstashEncoderTest {
 
     assertTrue(json.contains("Staged REFINERY handoff (ttl=PT30M)"), "unchanged message: " + json);
     assertFalse(json.contains("***"), "nothing to mask, so no placeholder: " + json);
+  }
+
+  @Test
+  void shouldMaskEscapedStructuredValuesAndRetainValidJson() {
+    for (String secret :
+        new String[] {
+          "first\"secret-suffix",
+          "first\\secret-suffix",
+          "first\n\tsecret-suffix",
+          "first\u00fcsecret-suffix"
+        }) {
+      var event =
+          new LoggingEvent(
+              getClass().getName(),
+              logger,
+              Level.INFO,
+              "safe \"message\" \\ path\nUnicode \u00fc",
+              null,
+              null);
+      event.addKeyValuePair(new KeyValuePair("password", secret));
+      event.addKeyValuePair(new KeyValuePair("databasePassword", secret));
+      event.addKeyValuePair(new KeyValuePair("access_token", secret));
+      String json = new String(encoder.encode(event), StandardCharsets.UTF_8);
+      var parsed = JsonMapper.builder().build().readTree(json);
+      assertEquals("***", parsed.get("password").asString());
+      assertEquals("***", parsed.get("databasePassword").asString());
+      assertEquals("***", parsed.get("access_token").asString());
+      assertFalse(json.contains("secret-suffix"));
+      assertEquals("safe \"message\" \\ path\nUnicode \u00fc", parsed.get("message").asString());
+    }
+  }
+
+  @Test
+  void shouldMaskMessageValuesBeforeEscaping() {
+    var parsed =
+        JsonMapper.builder().build().readTree(encode("password=abc\\def Unicode \u00fc\n"));
+    assertEquals("password=***", parsed.get("message").asString());
+  }
+
+  @Test
+  void shouldRemoveCredentialSuffixesInEscapedMessages() {
+    for (String secret :
+        new String[] {
+          "abc\"secret-suffix", "abc\\secret-suffix", "abc\nsecret-suffix", "abc\u00fcsecret-suffix"
+        }) {
+      String json = encode("credential password=" + secret);
+      assertEquals(
+          "credential password=***",
+          JsonMapper.builder().build().readTree(json).get("message").asString());
+      assertFalse(json.contains("secret-suffix"));
+    }
   }
 
   private String encode(String message) {

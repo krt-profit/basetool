@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,4 +43,13 @@ public interface MoonRepository extends JpaRepository<Moon, UUID> {
    */
   @Query("SELECT e.idMoon AS uexId, e.id AS id FROM Moon e WHERE e.idMoon IS NOT NULL")
   List<UexKeyRef> findUexRefs();
+
+  /**
+   * Reads the identities and name fallbacks needed by one UEX synchronization chunk.
+   *
+   * @param ids incoming UEX identifiers
+   * @param names incoming display names
+   * @return matching rows in stable local-id order
+   */
+  List<Moon> findByIdMoonInOrNameInOrderByIdAsc(Collection<Integer> ids, Collection<String> names);
 }

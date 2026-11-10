@@ -28,6 +28,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.client.BlueprintBackendClient;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
@@ -43,6 +47,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -120,14 +126,30 @@ class PersonalInventoryBlueprintsControllerTest {
   }
 
   @Test
-  void addSelected_returnsZeroResult_whenBackendThrows() {
+  void addSelected_relaysBackendFailure_asProblemJson() throws Exception {
     when(backendApiClient.post(any(), any(), eq(PersonalBlueprintBatchResultDto.class)))
-        .thenThrow(new RuntimeException("boom"));
+        .thenThrow(
+            new BackendServiceException(
+                "unavailable",
+                null,
+                503,
+                "SERVICE_UNAVAILABLE",
+                "batch-correlation",
+                List.of(),
+                "Blueprint service unavailable"));
 
-    PersonalBlueprintBatchResultDto result = controller.addSelected(List.of("a"));
-
-    assertEquals(0, result.added());
-    assertEquals(0, result.skippedUnresolved());
+    MockMvcBuilders.standaloneSetup(controller)
+        .build()
+        .perform(
+            post("/personal-inventory/blueprints/add-selected")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[\"a\"]"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"))
+        .andExpect(jsonPath("$.correlationId").value("batch-correlation"))
+        .andExpect(jsonPath("$.detail").value("Blueprint service unavailable"));
   }
 
   @Test

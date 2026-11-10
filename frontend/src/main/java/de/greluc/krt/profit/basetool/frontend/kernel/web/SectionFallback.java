@@ -44,6 +44,16 @@ public final class SectionFallback {
   private SectionFallback() {}
 
   /**
+   * Propagates a direct or wrapped session-loss signal before a local fallback handles a failure.
+   *
+   * @param failure the caught failure
+   * @throws ReauthenticationRequiredException when the failure carries a reauthentication signal
+   */
+  public static void rethrowIfReauthenticationRequired(@NotNull Throwable failure) {
+    rethrowReauthSignal("backend-fallback", failure);
+  }
+
+  /**
    * Loads the value of one page section, or the fallback when the call fails, logging an unexpected
    * failure at {@code WARN}.
    *
@@ -166,8 +176,8 @@ public final class SectionFallback {
    * @throws ReauthenticationRequiredException when {@code failure}'s cause chain carries the signal
    */
   private static void rethrowReauthSignal(
-      @NotNull String section, @NotNull RuntimeException failure) {
-    Throwable current = failure.getCause();
+      @NotNull String section, @NotNull Throwable failure) {
+    Throwable current = failure;
     for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
       if (current instanceof ReauthenticationRequiredException reauth) {
         throw reauth;

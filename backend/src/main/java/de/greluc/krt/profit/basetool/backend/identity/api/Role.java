@@ -65,6 +65,14 @@ public class Role extends AbstractEntity<Long> {
   @Column(columnDefinition = "TEXT")
   private String description;
 
+  /** Expected-version counter for description edits, independent of permission edits. */
+  @Column(nullable = false)
+  private Long descriptionVersion = 0L;
+
+  /** Expected-version counter for permission edits, independent of description edits. */
+  @Column(nullable = false)
+  private Long permissionsVersion = 0L;
+
   @ElementCollection(fetch = FetchType.LAZY)
   @CollectionTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"))
   @Column(name = "permission")

@@ -10,13 +10,14 @@ COPY gradle/ gradle/
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY build-logic/ build-logic/
-COPY gradle.properties .
+COPY gradle.properties lombok.config ./
 COPY backend/build.gradle.kts backend/build-settings.properties backend/
 COPY frontend/build.gradle.kts frontend/build-settings.properties frontend/
 COPY ingest/build.gradle.kts ingest/build-settings.properties ingest/
 COPY keycloak-spi/build.gradle.kts keycloak-spi/build-settings.properties keycloak-spi/
 COPY test-support/build.gradle.kts test-support/build-settings.properties test-support/
 COPY logging-support/build.gradle.kts logging-support/build-settings.properties logging-support/
+COPY technical-support/build.gradle.kts technical-support/build-settings.properties technical-support/
 
 RUN case "$MODULE" in \
         backend|frontend|ingest) ;; \
@@ -26,6 +27,7 @@ RUN case "$MODULE" in \
 
 COPY ${MODULE}/src/main/ ${MODULE}/src/main/
 COPY logging-support/src/main/ logging-support/src/main/
+COPY technical-support/src/main/ technical-support/src/main/
 COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json
 
 RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon --no-configuration-cache
@@ -44,6 +46,11 @@ RUN set -eu; \
     cp "$1" /app/app.jar
 
 WORKDIR /app
+COPY scripts/VerifyExternalClientArtifact.java scripts/VerifyExternalClientArtifact.java
+RUN if [ "$MODULE" = backend ]; then \
+        java scripts/VerifyExternalClientArtifact.java --selftest \
+        && java scripts/VerifyExternalClientArtifact.java /app/app.jar; \
+    fi
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
 FROM eclipse-temurin:25-jre-alpine@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918 AS runtime

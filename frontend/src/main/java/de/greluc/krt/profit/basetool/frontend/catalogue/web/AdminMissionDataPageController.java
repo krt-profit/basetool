@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
@@ -160,6 +162,7 @@ public class AdminMissionDataPageController {
    * @param e the throwable handed to {@link CompletableFuture#exceptionally}
    */
   private static void logFragmentLoadFailure(String what, Throwable e) {
+    SectionFallback.rethrowIfReauthenticationRequired(e);
     Throwable cause = (e instanceof CompletionException && e.getCause() != null) ? e.getCause() : e;
     if (cause instanceof BackendServiceException) {
       log.debug("Error loading {}", what, cause);
@@ -259,6 +262,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=CreateJobTypeFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Create JobType failed", e);
       return "redirect:/admin/mission-data?error=CreateJobTypeFailed";
     }
@@ -316,6 +320,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=UpdateJobTypeFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update JobType failed", e);
       return "redirect:/admin/mission-data?error=UpdateJobTypeFailed";
     }
@@ -345,6 +350,7 @@ public class AdminMissionDataPageController {
       }
       return "redirect:/admin/mission-data?error=DeleteJobTypeFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete JobType failed", e);
       return "redirect:/admin/mission-data?error=DeleteJobTypeFailed";
     }
@@ -371,6 +377,7 @@ public class AdminMissionDataPageController {
       log.debug("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     }
@@ -404,6 +411,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Create FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -456,6 +464,7 @@ public class AdminMissionDataPageController {
         redirectAttributes.addFlashAttribute("errorToast", "error.general");
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -485,6 +494,7 @@ public class AdminMissionDataPageController {
       }
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }
@@ -508,6 +518,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Activate FrequencyType failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.general");
     }

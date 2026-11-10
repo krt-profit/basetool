@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.purchasing.web;
 
-import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingStateDto;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,7 +40,7 @@ public class PurchasingFeatureState {
   /** How long a successful answer is kept. */
   static final Duration TTL = Duration.ofSeconds(30);
 
-  private final PurchasingBackendClient purchasingClient;
+  private final PurchasingRequestState requestState;
 
   private volatile Remembered remembered;
 
@@ -54,20 +54,20 @@ public class PurchasingFeatureState {
     if (current != null && current.until().isAfter(Instant.now())) {
       return current.enabled();
     }
-    try {
-      PurchasingStateDto state = purchasingClient.state();
-      boolean enabled = state != null && state.enabled();
-      remembered = new Remembered(enabled, Instant.now().plus(TTL));
-      return enabled;
-    } catch (RuntimeException e) {
-      log.debug("Purchasing state unavailable: {}", e.getMessage());
+    PurchasingStateDto state =
+        SectionFallback.load(log, "purchasing-navigation", requestState::read, null);
+    if (state == null) {
       return false;
     }
+    boolean enabled = state != null && state.enabled();
+    remembered = new Remembered(enabled, Instant.now().plus(TTL));
+    return enabled;
   }
 
   /** Forgets the remembered answer, as an admin has just changed the switch. */
   public void evict() {
     remembered = null;
+    requestState.forget();
   }
 
   private record Remembered(boolean enabled, Instant until) {}

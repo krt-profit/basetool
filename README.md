@@ -324,7 +324,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 - **`monitoring`** — Prometheus, Alertmanager, Loki, Tempo, Alloy and Grafana configuration ([`monitoring/README.md`](monitoring/README.md)).
 - **`docs` / `config` / `docker` / `design`** — specs, ADRs & arc42, static-analysis config, the edge (nginx) and ACME configuration, the maintenance page, the one Dockerfile all three app images are built from (`docker/app/Dockerfile`), the `basetool-config` and `keycloak-spi` bundle Dockerfiles and the committed test TLS material, and brand font sources.
 
-The frontend hand-mirrors the backend's DTOs as its own records (no shared module). Two gates watch for drift: `FrontendDtoContractTest` diffs them against `openapi.json`, and since ADR-0161 §8.2 `GeneratedDtoAgreementTest` compares them field by field against every model `openapi-generator` emits from the same document into the test source set. Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic.
+The frontend's DTOs retain their OpenAPI parity gates. The `generateWireRecords` pilot derives `PurchasingVersionRequest` directly from the contract; the other models remain manual. `generateDefaultMessages` derives the packaged German fallback bundle from `messages_de.properties`. Complete backend operations and bounded Bank/audit downloads share the central resilience policy; see [ADR-0369](docs/adr/0369-frontend-operations-own-completion-and-wire-resources-are-derived.md).
 
 ### Configuration (common env vars)
 
@@ -372,6 +372,15 @@ The frontend hand-mirrors the backend's DTOs as its own records (no shared modul
 | `EDGE_GRAFANA_UPSTREAM_VERIFY` | `on` makes the edge verify Grafana's upstream certificate against Grafana's own `grafana.crt` (pinned) and the name `grafana` (REQ-OBS-008). `on` without the certificate, or any value but `on`/`off`, refuses to start. Runbook: [`deployment.md` → *The edge verifies Grafana*](docs/deployment.md#the-edge-verifies-grafana). | `off` |
 
 `.env.example` carries only the keys every stack needs. The complete set a host can set — Keycloak JWKS, Discord login/precheck, SMTP, the ingest and exchange switches, and the monitoring scrape/tracing gates — is the closed allow-list in `docker-compose.yml` and `quadlet/env.d/*.env.tmpl`, described in the specs under [`docs/specs/`](docs/specs/INDEX.md); a variable outside it never reaches a container. Type-safe settings live in `@ConfigurationProperties` classes with `@Validated`, so misconfiguration is caught at startup.
+
+### Bank export storage
+
+Bank statement and management exports use private request-lived snapshots in the JVM temporary
+directory. The canonical Spring property `app.bank.exports.directory` selects another absolute
+writable parent directory; it is not an additional compose/Quadlet host environment setting.
+Database snapshots close before PDF rendering, and response completion or failure removes the
+private files. Complete export history is retained in the PDF without buffering every posting or
+the entire PDF in application heap (REQ-BANK-014/015).
 
 ### Wiki sync policy
 
@@ -445,3 +454,10 @@ their respective owners. © 2025 Cloud Imperium Rights LLC and Cloud Imperium Ri
 Profit Basetool is released under the [GNU General Public License v3.0](LICENSE.md).
 
 Every third-party library a shipped module carries must be GPL-3.0-compatible: each of `backend`, `frontend`, `ingest` and `keycloak-spi` runs [Licensee](https://github.com/cashapp/licensee) against its runtime classpath in `check`, with one allow-list in `build-logic` (`OssLicensePolicy`) ([ADR-0197](docs/adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md)). The running app lists every shipped component and its licence on the public page `/licenses` („Open-Source-Lizenzen“, linked in the footer), generated from the same reports on every build (REQ-UI-021). Non-Maven components — the Lato font, the image base layers — are kept in `frontend/oss-bundled-components.json`.
+
+Operational script contracts and host companion drift are documented in
+[`docs/deployment.md`](docs/deployment.md#operational-source-and-drift-contracts); the role and release
+checks share the installed-file inventory.
+
+Shared normalization and observation privacy live in the narrow `technical-support` runtime library;
+application adapters keep their existing binding and component contracts (ADR-0366).

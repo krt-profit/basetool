@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.keycloak.spi.discord;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import de.greluc.krt.profit.basetool.keycloak.spi.http.BoundedResponseBodyHandlers;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -89,7 +90,7 @@ public class DiscordGuildNicknameReader {
     HttpResponse<String> response;
     try {
       response =
-          httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
+          httpClient.send(buildRequest(url, accessToken), BoundedResponseBodyHandlers.utf8(65_536));
     } catch (IOException e) {
       log.debugf(
           e,

@@ -567,9 +567,7 @@ public class JobOrderPageReader {
     try {
       CompletableFuture.allOf(futures).join();
     } catch (CompletionException e) {
-      if (e.getCause() instanceof ReauthenticationRequiredException reauth) {
-        throw reauth;
-      }
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       throw e;
     }
   }

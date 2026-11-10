@@ -230,7 +230,7 @@ started=$SECONDS
 got="$(detect_bridge 15)"
 elapsed=$(( SECONDS - started ))
 wait
-if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -ge 2 ]]; then
+if [[ "$got" == "podman|sudo -n -u svcuser podman" ]] && grep -q "runtime answered after" "${WORK}/detect.err"; then
   ok "a runtime that comes up late is waited for, and then found (${elapsed}s)"
 else
   bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
@@ -268,7 +268,9 @@ started=$SECONDS
 got="$(STUB_MANAGER_STATE=starting detect_bridge 15)"
 elapsed=$(( SECONDS - started ))
 wait
-if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -ge 2 && $elapsed -lt 10 ]]; then
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -lt 10 ]] \
+   && grep -q "runtime answered after" "${WORK}/detect.err" \
+   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -ge 2 ]]; then
   ok "a visible runtime that refuses while its manager is STARTING is waited out, and then found (${elapsed}s)"
 else
   bad "the 2026-09-25 boot shape is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"

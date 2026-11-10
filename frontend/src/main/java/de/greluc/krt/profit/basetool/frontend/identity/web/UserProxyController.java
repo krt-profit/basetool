@@ -24,10 +24,12 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
+@Slf4j
 public class UserProxyController {
 
   /** Runs the user searches and lookups on the backend. */
@@ -113,10 +116,6 @@ public class UserProxyController {
   @GetMapping("/{userId}")
   @PreAuthorize("isAuthenticated()")
   public UserDto getUser(@PathVariable UUID userId) {
-    try {
-      return identityClient.user(userId);
-    } catch (Exception _) {
-      return null;
-    }
+    return SectionFallback.load(log, "user-picker-seed", () -> identityClient.user(userId), null);
   }
 }

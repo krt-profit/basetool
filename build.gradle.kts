@@ -96,3 +96,28 @@ tasks.register<Exec>("testPrometheusRules") {
     "promtool check rules alerts/*.yml && promtool test rules tests/*_test.yml",
   )
 }
+
+val auditOperationsPython =
+  providers
+    .gradleProperty("auditOperationsPython")
+    .getOrElse(
+      if (System.getProperty("os.name").lowercase().contains("windows")) "python" else "python3",
+    )
+val auditOperationsScratch = providers.gradleProperty("auditOperationsScratch")
+
+tasks.register<Exec>("testAuditOperations") {
+  group = "verification"
+  description = "Exercises synthetic operational audit failure and recovery scenarios."
+  inputs.files(fileTree("scripts") { include("*.py", "*.sh", "lib/*.sh", "*.json") })
+  inputs.file(".github/scripts/create_signed_commit.py")
+  inputs.file("ansible/roles/basetool_host/tasks/23-admin-access.yml")
+  inputs.dir("keycloak-theme/krt-theme/login")
+  environment("PYTHONDONTWRITEBYTECODE", "1")
+  if (auditOperationsScratch.isPresent) {
+    val scratch = auditOperationsScratch.get()
+    environment("TMPDIR", scratch)
+    environment("TEMP", scratch)
+    environment("TMP", scratch)
+  }
+  commandLine(auditOperationsPython, "scripts/test_audit_operations.py")
+}

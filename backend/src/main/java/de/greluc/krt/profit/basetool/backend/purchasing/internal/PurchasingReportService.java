@@ -363,8 +363,14 @@ public class PurchasingReportService {
         : deal.getGameItem().getNameDe();
   }
 
-  private static @NotNull String csvCell(@NotNull String value) {
-    return value.replace(';', ',').replace('\n', ' ');
+  static @NotNull String csvCell(@NotNull String value) {
+    if (value.indexOf(';') >= 0
+        || value.indexOf('"') >= 0
+        || value.indexOf('\r') >= 0
+        || value.indexOf('\n') >= 0) {
+      return '"' + value.replace("\"", "\"\"") + '"';
+    }
+    return value;
   }
 
   private @NotNull String label(@NotNull String key, @NotNull Object... args) {

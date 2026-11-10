@@ -258,7 +258,9 @@ else
   else
     bad "readonly: the file was not updated: $(cat "${SC_DIR}/out/svc.env" 2>/dev/null)"
   fi
-  if [[ "$(stat -c '%a' "${SC_DIR}/out/svc.env")" == "640" ]]; then
+  if [[ "$(stat -c '%a' "$probe" 2>/dev/null)" != "640" ]]; then
+    say "  skip  readonly mode: this filesystem cannot express Unix modes"
+  elif [[ "$(stat -c '%a' "${SC_DIR}/out/svc.env")" == "640" ]]; then
     ok "readonly: the replacement carries the requested mode, not the old one"
   else
     bad "readonly: mode is $(stat -c '%a' "${SC_DIR}/out/svc.env"), expected 640"

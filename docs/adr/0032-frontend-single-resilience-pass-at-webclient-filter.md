@@ -1,5 +1,9 @@
 # ADR-0032 — Single frontend resilience pass at the WebClient filter
 
+**Placement amended by [ADR-0369](0369-frontend-operations-own-completion-and-wire-resources-are-derived.md).**
+The single resilience pass wraps the complete request/body/decode operation in `BackendCallPolicy`.
+The transport filter retains origin and context duties; response headers alone do not end protection.
+
 - **Status:** Accepted — amended 2026-10-02 (one filter chain under per-domain typed clients) and 2026-10-04 (the kernel extraction F1), see below
 - **Date:** 2026-06-21
 - **Deciders:** @greluc

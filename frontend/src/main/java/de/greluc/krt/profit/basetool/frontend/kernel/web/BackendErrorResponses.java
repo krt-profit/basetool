@@ -80,6 +80,7 @@ public final class BackendErrorResponses {
     } catch (ReauthenticationRequiredException e) {
       throw e;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("{} failed unexpectedly", operation, e);
       return ResponseEntity.internalServerError().build();
     }

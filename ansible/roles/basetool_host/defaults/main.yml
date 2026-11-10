@@ -11,6 +11,7 @@ basetool_host_deploy_account_units:
   - basetool-container-cleanup.service
 
 basetool_host_deploy_podman_subcommands:
+  - container prune
   - cp
   - create
   - exec

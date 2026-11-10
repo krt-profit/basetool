@@ -611,7 +611,8 @@ class CachedCatalogueEntityInvariantTest {
           String name = role();
           return new Case(
               () -> roleService.getAllRoles(ALL),
-              () -> roleService.updatePermissions(name, new HashSet<>(Set.of("g19.permission"))));
+              () ->
+                  roleService.updatePermissions(name, new HashSet<>(Set.of("g19.permission")), 0L));
         });
     cases.put(
         "RoleService#updateRoleDescription",
@@ -619,7 +620,7 @@ class CachedCatalogueEntityInvariantTest {
           String name = role();
           return new Case(
               () -> roleService.getAllRoles(ALL),
-              () -> roleService.updateRoleDescription(name, "changed"));
+              () -> roleService.updateRoleDescription(name, "changed", 0L));
         });
   }
 
@@ -648,7 +649,11 @@ class CachedCatalogueEntityInvariantTest {
                           "changed",
                           true,
                           false,
-                          versionOf(squadronService.getAllSquadrons(true), id))));
+                          squadronService.getAllSquadrons(true).stream()
+                              .filter(squadron -> id.equals(squadron.id()))
+                              .findFirst()
+                              .orElseThrow()
+                              .version())));
         });
     cases.put(
         "SquadronService#deleteSquadron",

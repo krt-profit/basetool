@@ -22,18 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelProperties;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.KeycloakBackchannelTls;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SingleFlightAuthorizedClientManager;
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.bulkhead.BulkheadRegistry;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.reactor.bulkhead.operator.BulkheadOperator;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.reactor.timelimiter.TimeLimiterOperator;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.github.resilience4j.timelimiter.TimeLimiter;
-import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
@@ -84,7 +72,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.Http2AllocationStrategy;
 import reactor.netty.http.client.HttpClient;
@@ -311,40 +298,6 @@ public class WebClientConfig {
     }
   }
 
-  private ExchangeFilterFunction resilienceFilter(
-      String instanceName,
-      @NotNull CircuitBreakerRegistry cbRegistry,
-      RetryRegistry retryRegistry,
-      TimeLimiterRegistry timeLimiterRegistry,
-      BulkheadRegistry bulkheadRegistry) {
-    CircuitBreaker cb = cbRegistry.circuitBreaker(instanceName);
-    Retry retry = retryRegistry.retry(instanceName);
-    TimeLimiter tl = timeLimiterRegistry.timeLimiter(instanceName);
-    Bulkhead bh = bulkheadRegistry.bulkhead(instanceName);
-
-    return (request, next) ->
-        next.exchange(request)
-            .flatMap(resp -> {
-              if (resp.statusCode().is5xxServerError()) {
-                return resp.createException().flatMap(Mono::error);
-              }
-              return Mono.just(resp);
-            })
-            .transformDeferred(BulkheadOperator.of(bh))
-            .transformDeferred(TimeLimiterOperator.of(tl))
-            .transformDeferred(mono -> {
-              String method = request.method().name();
-              if ("GET".equals(method)
-                  || "HEAD".equals(method)
-                  || "OPTIONS".equals(method)
-                  || "TRACE".equals(method)) {
-                return mono.transformDeferred(RetryOperator.of(retry));
-              }
-              return mono;
-            })
-            .transformDeferred(CircuitBreakerOperator.of(cb));
-  }
-
   /**
    * Builds the {@link RestClient} for the OAuth2 token endpoint: Spring Security's default
    * converters and error handler on a reactor-netty {@link HttpClient} bound to {@link
@@ -484,12 +437,7 @@ public class WebClientConfig {
    * (REQ-FE-029).
    */
   @Bean
-  public WebClient webClient(
-      OAuth2AuthorizedClientManager authorizedClientManager,
-      CircuitBreakerRegistry cbRegistry,
-      RetryRegistry retryRegistry,
-      TimeLimiterRegistry timeLimiterRegistry,
-      BulkheadRegistry bulkheadRegistry) {
+  public WebClient webClient(OAuth2AuthorizedClientManager authorizedClientManager) {
     ServletOAuth2AuthorizedClientExchangeFilterFunction oauth2Client =
         new ServletOAuth2AuthorizedClientExchangeFilterFunction(authorizedClientManager);
     oauth2Client.setDefaultOAuth2AuthorizedClient(true);
@@ -510,9 +458,7 @@ public class WebClientConfig {
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
         .filter(webClientLoggingFilter.callLogging())
-        .filter(
-            resilienceFilter(
-                "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
+        .filter(BackendResponseStatus.observer())
         .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
         .filters(this::guardOriginFirst)
@@ -550,11 +496,7 @@ public class WebClientConfig {
    * without the OAuth2 bearer relay.
    */
   @Bean
-  public WebClient termsDocumentClient(
-      CircuitBreakerRegistry cbRegistry,
-      RetryRegistry retryRegistry,
-      TimeLimiterRegistry timeLimiterRegistry,
-      BulkheadRegistry bulkheadRegistry) {
+  public WebClient termsDocumentClient() {
     ExchangeStrategies strategies =
         ExchangeStrategies.builder()
             .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_BYTES))
@@ -568,9 +510,7 @@ public class WebClientConfig {
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
         .filter(webClientLoggingFilter.callLogging())
-        .filter(
-            resilienceFilter(
-                "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
+        .filter(BackendResponseStatus.observer())
         .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
         .filters(this::guardOriginFirst)

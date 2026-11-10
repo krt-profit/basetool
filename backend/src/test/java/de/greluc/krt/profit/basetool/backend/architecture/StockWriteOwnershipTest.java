@@ -25,7 +25,6 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.StockWriteFixtures;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.AllocationReductions;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
@@ -50,10 +49,7 @@ import org.springframework.data.jpa.repository.Modifying;
  */
 class StockWriteOwnershipTest {
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackagesOf(StockWriteFixtures.class);

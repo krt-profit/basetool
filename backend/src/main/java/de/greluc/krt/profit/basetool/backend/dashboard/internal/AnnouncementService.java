@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.dashboard.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
-import java.util.Comparator;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,9 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Manages the single shared announcement row.
  *
- * <p>The table holds at most one logically active record — public callers see "the latest entry
- * with non-blank content"; admins see the same record so edits never accumulate duplicates. The
- * delete endpoint clears the whole table, which lets the next save start clean.
+ * <p>The database permits one current row; reads exclude retained non-current records.
  */
 @Service
 @Slf4j
@@ -53,28 +50,24 @@ public class AnnouncementService {
    * @return the active announcement, or empty
    */
   public Optional<Announcement> getPublicAnnouncement() {
-    return announcementRepository.findAll().stream()
-        .filter(a -> a.getContent() != null && !a.getContent().isBlank())
-        .max(
-            Comparator.comparing(
-                Announcement::getUpdatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
+    return announcementRepository
+        .findBySingletonTrue()
+        .filter(a -> a.getContent() != null && !a.getContent().isBlank());
   }
 
   /**
-   * Returns the announcement for the admin edit screen: the active record, else the latest record,
-   * else a newly created empty one.
+   * Returns the singleton for editing, or an unsaved empty view with initial version zero.
    *
    * @return the admin-view announcement record, never {@code null}
    */
   public Announcement getAdminAnnouncement() {
-    return getPublicAnnouncement()
-        .orElseGet(() ->
-            announcementRepository.findAll().stream()
-                .max(
-                    Comparator.comparing(
-                        Announcement::getUpdatedAt,
-                        Comparator.nullsFirst(Comparator.naturalOrder())))
-                .orElseGet(() -> announcementRepository.save(new Announcement())));
+    return announcementRepository
+        .findBySingletonTrue()
+        .orElseGet(() -> {
+          Announcement empty = new Announcement();
+          empty.setVersion(0L);
+          return empty;
+        });
   }
 
   /**
@@ -87,23 +80,20 @@ public class AnnouncementService {
    */
   @Transactional
   public Announcement updateAnnouncement(@NotNull String content, @Nullable Long version) {
-    Announcement announcement = getAdminAnnouncement();
+    announcementRepository.ensureSingleton();
+    Announcement announcement = announcementRepository.lockSingleton().orElseThrow();
     OptimisticLock.checkOptionalClient(
         announcement.getVersion(), version, Announcement.class, announcement.getId());
     announcement.setContent(content);
-    Announcement saved = announcementRepository.save(announcement);
+    Announcement saved = announcementRepository.saveAndFlush(announcement);
     log.info("Announcement updated id={} version={}", saved.getId(), saved.getVersion());
     return saved;
   }
 
-  /**
-   * Removes every announcement row. The next save creates a fresh row — no soft-delete needed
-   * because there is only ever one logical announcement.
-   */
+  /** Deletes the current row so a later banner receives a fresh dismissal identity. */
   @Transactional
   public void deleteAnnouncement() {
-    long removed = announcementRepository.count();
-    announcementRepository.deleteAll();
-    log.info("Announcement banner cleared ({} row(s) removed)", removed);
+    announcementRepository.lockSingleton().ifPresent(announcementRepository::delete);
+    log.info("Announcement banner cleared");
   }
 }

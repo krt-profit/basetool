@@ -57,6 +57,26 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   List<BankHolderBalance> holderTotals();
 
   /**
+   * Pages nonzero holder balances in management-report order.
+   *
+   * @param pageable bounded report page
+   * @return balances ordered by amount descending and live handle ascending
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderBalance(h.id,
+      CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''
+      THEN u.displayName ELSE COALESCE(u.username, h.handle) END, h.active, SUM(p.amount))
+      FROM BankHolderPosting p JOIN p.holder h LEFT JOIN h.user u
+      GROUP BY h.id, h.active, h.handle, u.displayName, u.username
+      HAVING SUM(p.amount) <> 0
+      ORDER BY SUM(p.amount) DESC,
+        CASE WHEN u.displayName IS NOT NULL AND TRIM(u.displayName) <> ''
+        THEN u.displayName ELSE COALESCE(u.username, h.handle) END ASC, h.id
+      """)
+  List<BankHolderBalance> reportHolderTotals(Pageable pageable);
+
+  /**
    * One holder's global custody across the whole bank — the targeted single-holder form of {@link
    * #holderTotals()} for the holder-update / holder-transfer responses.
    *

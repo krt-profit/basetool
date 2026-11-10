@@ -19,7 +19,7 @@
 
 /**
  * @typedef {object} KrtHooks
- * @property {((...args: any[]) => void) | undefined} [filterTable] filters a table by a search term (catalogue pages)
+ * @property {((tableId: string, query: string) => void) | undefined} [filterTable] filters a table by a search term (catalogue pages)
  * @property {KrtMaterialDialogApi | undefined} [materialRelease] the offer dialog (materialboerse-release.js)
  * @property {KrtMaterialDialogApi | undefined} [materialRequest] the request dialog (materialgesuch-modal.js)
  */

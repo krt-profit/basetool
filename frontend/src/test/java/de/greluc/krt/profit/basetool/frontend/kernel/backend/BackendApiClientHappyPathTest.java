@@ -68,7 +68,9 @@ class BackendApiClientHappyPathTest {
             webClient,
             termsDocumentClient,
             new SimpleMeterRegistry(),
-            new org.springframework.cache.support.NoOpCacheManager());
+            new org.springframework.cache.support.NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
   }
 
   @AfterEach

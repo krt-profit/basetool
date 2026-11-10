@@ -574,6 +574,12 @@ silent-SSO entry point logged the raw id at `INFO` in every profile, and `Sessio
 `DEBUG` in dev/test. **Enforced by:** `SessionIdFingerprintTest`, `SsoReAuthenticationEntryPointTest`
 and `SessionDebugFilterTest` (the raw id appears in no captured line).
 
+**Structured masking happens before JSON serialization.** The logging encoder uses the library's
+masking generator for complete credential fields and decoded string values, so quotes, backslashes,
+control escapes and Unicode cannot break the emitted JSON or leave an escaped credential suffix.
+Credential assignments in structured text redact the remaining value; plain-text sinks keep their
+existing text-masking contract. Encoder regressions parse the resulting JSON.
+
 ### REQ-OBS-005 — Prometheus metrics endpoint, fail-closed
 
 All three modules expose Micrometer metrics at `GET /actuator/prometheus` for the monitoring
@@ -2294,6 +2300,11 @@ already arrived, so a torn-down connection surfaces as a 200. Any such non-error
 transport fault and is classified with the connection failures (`timeout`, HTTP 504,
 `BACKEND_TIMEOUT`) — the same bucket as the sibling failure that dies *before* the response, which
 Spring reports as `WebClientRequestException`. Both halves of one lost connection count alike.
+
+`BackendCallPolicy` retains the `backendApi` resilience instances through body consumption and
+decoding (REQ-FE-029, ADR-0369). The binary transfer funnel uses the same bounded method/reason
+labels and ends on completion, cancellation or failure. Failed browser callbacks reach the existing
+`script_error` client-error counter with a fixed message; no callback data or stack enters labels.
 
 > [!warning] Corrected 2026-09-20
 > Until this date the classifier read the status line, so a connection lost mid-body was reported

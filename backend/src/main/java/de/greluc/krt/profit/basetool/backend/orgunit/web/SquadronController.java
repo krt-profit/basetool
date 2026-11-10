@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.orgunit.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronService;
@@ -32,7 +31,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -83,8 +81,7 @@ public class SquadronController {
       throw new AccessDeniedException("includeInactive=true requires ROLE_ADMIN");
     }
     Pageable pageable = PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "name");
-    Page<Squadron> p = squadronService.getAllSquadrons(pageable, includeInactive);
-    return PageResponse.of(p.map(squadronMapper::toDto));
+    return PageResponse.of(squadronService.getAllSquadrons(pageable, includeInactive));
   }
 
   /**

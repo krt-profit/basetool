@@ -57,12 +57,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
@@ -88,7 +86,7 @@ class InventoryItemServiceAllocationTest {
   @Mock private InventoryAggregationService inventoryAggregationService;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
 
-  @InjectMocks private InventoryItemService service;
+  private InventoryItemService service;
 
   /** Wires the job-order requirement lookup over the mocked order repository and item service. */
   @BeforeEach
@@ -96,10 +94,26 @@ class InventoryItemServiceAllocationTest {
     lenient()
         .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
         .thenReturn(true);
-    ReflectionTestUtils.setField(
-        service,
-        "jobOrders",
-        new JobOrderEarmarkTargets(jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy));
+    service =
+        new InventoryItemService(
+            inventoryItemRepository,
+            userRepository,
+            materialRepository,
+            null,
+            null,
+            locationRepository,
+            earmarkTargets,
+            inventoryItemMapper,
+            null,
+            null,
+            null,
+            null,
+            new JobOrderEarmarkTargets(
+                jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
+            auditService,
+            inventoryAggregationService,
+            inventoryCheckoutService,
+            null);
   }
 
   private final UUID itemId = UUID.randomUUID();

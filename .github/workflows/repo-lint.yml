@@ -375,6 +375,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Ensure PyYAML for operational regression fixtures
+        run: |
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check --require-hashes -r .github/requirements/pyyaml.txt
+          fi
+
+      - name: Set up Java and Gradle for the operational regression task
+        uses: ./.github/actions/setup-jdk-gradle
+        with:
+          cache-read-only: 'true'
+
+      - name: audit-operations / Exercise operational audit regression scenarios
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/basetool-audit-operations"
+          ./gradlew testAuditOperations -PauditOperationsScratch="${RUNNER_TEMP}/basetool-audit-operations"
+
       - name: conformance-selftest / Self-test the conformance suite
         if: ${{ !cancelled() }}
         run: bash scripts/check-conformance.test.sh

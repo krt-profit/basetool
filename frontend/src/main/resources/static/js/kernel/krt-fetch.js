@@ -4,6 +4,7 @@ import {
     showKrtConfirm,
 } from '/js/kernel/toast.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { safeSameOriginUrl } from '/js/kernel/safe-url.js';
 
 const fragmentPolicy =
     window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function'
@@ -162,7 +163,7 @@ const DEFAULT_REAUTH_PATH = '/oauth2/authorization/keycloak';
  * @returns {boolean} false when the guard suppressed the navigation, true when it started
  */
 function reauthRedirect(url) {
-    const target = typeof url === 'string' && url.charAt(0) === '/' ? url : DEFAULT_REAUTH_PATH;
+    const target = safeSameOriginUrl(url, DEFAULT_REAUTH_PATH);
     try {
         const last = Number(window.sessionStorage.getItem(REAUTH_GUARD_KEY) || 0);
         const now = Date.now();
@@ -220,10 +221,11 @@ function maybeTermsGate(response) {
  * @returns {boolean} true when the browser was sent to the consent page
  */
 function termsGateRedirect(url) {
-    if (typeof url !== 'string' || url.charAt(0) !== '/') {
+    const target = safeSameOriginUrl(url);
+    if (!target) {
         return false;
     }
-    window.location.assign(url);
+    window.location.assign(target);
     return true;
 }
 
@@ -438,26 +440,39 @@ function readError(url, status, reason, problem) {
  *     own error on a transport failure or an abort
  */
 async function getJson(url, opts) {
-    const response = await get(url, Object.assign({}, opts, { accept: 'application/json' }));
-    if (!response) {
-        throw readError(url, 0, 'refused', null);
-    }
-    if (!response.ok) {
-        let problem = null;
-        if (isJsonResponse(response)) {
-            try {
-                problem = await response.json();
-            } catch (_unparsable) {}
+    const options = opts || {};
+    const { signal, controller } = readSignal(options);
+    try {
+        const response = await get(
+            url,
+            Object.assign({}, options, { accept: 'application/json', key: undefined, signal }),
+        );
+        if (!response) {
+            throw readError(url, 0, 'refused', null);
         }
-        throw readError(url, response.status, 'status', problem);
+        if (!response.ok) {
+            let problem = null;
+            if (isJsonResponse(response)) {
+                try {
+                    problem = await response.json();
+                } catch (_unparsable) {}
+            }
+            throw readError(url, response.status, 'status', problem);
+        }
+        if (response.status === 204) {
+            return null;
+        }
+        if (!isJsonResponse(response)) {
+            throw readError(url, response.status, 'not-json', null);
+        }
+        const body = await response.json();
+        signal?.throwIfAborted();
+        return body;
+    } finally {
+        if (controller && options.key && readAborters.get(options.key) === controller) {
+            readAborters.delete(options.key);
+        }
     }
-    if (response.status === 204) {
-        return null;
-    }
-    if (!isJsonResponse(response)) {
-        throw readError(url, response.status, 'not-json', null);
-    }
-    return response.json();
 }
 
 /**
@@ -730,8 +745,10 @@ async function send(opts, buildInit, url) {
             let handled = false;
             if (typeof opts.onNetworkError === 'function') {
                 try {
-                    handled = opts.onNetworkError(networkError);
-                } catch (_callbackError) {}
+                    handled = await opts.onNetworkError(networkError);
+                } catch (callbackError) {
+                    reportCallbackFailure(callbackError);
+                }
             }
             if (!handled) {
                 errorToast(
@@ -756,8 +773,10 @@ async function send(opts, buildInit, url) {
                 /** @type {unknown} */
                 let handled = false;
                 try {
-                    handled = opts.onError(response.status, body, response);
-                } catch (_callbackError) {}
+                    handled = await opts.onError(response.status, body, response);
+                } catch (callbackError) {
+                    reportCallbackFailure(callbackError);
+                }
                 if (handled) {
                     return { ok: false, status: response.status, body };
                 }
@@ -769,29 +788,57 @@ async function send(opts, buildInit, url) {
         if (opts.containerSelector && body && body.version != null) {
             syncVersion(opts.containerSelector, body.version);
         }
-        if (opts.toast !== false) {
-            const label = opts.sectionLabel ? `${opts.sectionLabel}: ` : '';
-            successToast(label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'));
-        }
+        let refreshFailed = false;
         if (typeof opts.onSuccess === 'function') {
             try {
                 const outcome = opts.onSuccess(body);
                 if (outcome && typeof outcome.then === 'function') {
                     await outcome;
                 }
-            } catch (_callbackError) {}
+            } catch (callbackError) {
+                refreshFailed = true;
+                reportCallbackFailure(callbackError);
+                errorToast(
+                    text(
+                        opts.refreshFailedMessage,
+                        defaults().refreshFailed,
+                        'krtFetchI18n.refreshFailed',
+                    ),
+                );
+            }
+        }
+        if (!refreshFailed && opts.toast !== false) {
+            const label = opts.sectionLabel ? `${opts.sectionLabel}: ` : '';
+            successToast(label + text(opts.successMessage, defaults().saved, 'krtFetchI18n.saved'));
         }
         return {
             ok: true,
             status: response.status,
             body,
             redirected: !!response.redirected,
+            refreshFailed,
         };
     } finally {
         if (submitter) {
             submitter.disabled = false;
         }
     }
+}
+
+/**
+ * Reports a failed UI callback through the page's script-error listener.
+ *
+ * @param {unknown} error the callback failure
+ * @returns {void}
+ */
+function reportCallbackFailure(error) {
+    window.dispatchEvent(
+        new ErrorEvent('error', {
+            message: 'A request callback failed',
+            error,
+            filename: '/js/kernel/krt-fetch.js',
+        }),
+    );
 }
 
 /**

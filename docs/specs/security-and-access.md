@@ -786,6 +786,20 @@ DOS-1 collapse re-introduced on a code path the request-scoped filters do not re
 
 ### REQ-SEC-012 — Re-authentication on lost frontend OAuth2 token
 
+The approval/role refresh and consent filters preserve direct and wrapped session-loss signals
+before MVC. They share the login handoff: HTML navigation receives the context-relative login
+redirect, AJAX/JSON/fetch receives `401` with `X-Reauthenticate` and the mirrored JSON contract, and
+SSE receives one `reauth` event. A failed refresh writes no successful-sync timestamp. Authentication,
+logout, legal/error and other gate-exempt paths remain reachable; WebSocket upgrades retain their
+separate subscription authorization and reconnect policy.
+
+The frontend's login and consent navigation both use the strict shared same-origin path validator.
+Scheme-relative, slash/backslash and whitespace targets are rejected; invalid login targets use the
+fixed Keycloak login path, and invalid consent targets do not navigate. OAuth client freshness entries
+expire automatically at token freshness expiry or five minutes, whichever is earlier, and a destroyed
+Spring Session invalidates its entries. Capacity eviction removes individual entries; per-session
+single-flight refresh remains mandatory (`SingleFlightAuthorizedClientManagerTest`, ADR-0369).
+
 When a frontend &rarr; backend call fails with Spring Security's `ClientAuthorizationException`
 (`client_authorization_required`, or a refresh-grant `invalid_grant` after a revoked/rotated refresh
 token) the user MUST be bounced through a fresh Keycloak login rather than shown an empty page / 500
@@ -4726,6 +4740,10 @@ one event type.
 
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
+Preparing third-party name scrubbing reads only user identifiers and the four supported
+`HandleSpellings` name columns through an identity projection. It does not load complete user
+entities; the subject's protected spellings and all third-party redaction remain identical.
+
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.
 
@@ -6123,6 +6141,12 @@ stays an explicit loop, not an annotation.
 
 ---
 
+**The image artifact carries the same constructor selection.** The shared application Dockerfile
+copies root `lombok.config`; that file is a shared image-reuse input. The backend image build runs
+`VerifyExternalClientArtifact.java` against its actual boot jar and refuses either external client
+without the `externalRestClientBuilder` constructor qualifier. Internal-client routing, origin,
+TLS and timeouts retain their existing contracts.
+
 ### REQ-SEC-082 — Admin accounts need a second factor, and the realm's session windows are one reviewed file
 
 Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md)
@@ -6193,6 +6217,9 @@ dry run by default, with a rollback file, never deleting.
 [`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md)
 
 ---
+
+The OTP setup QR image gets its meaningful alternative text from the theme's DE/EN message bundles;
+assistive technology receives the selected language without changing the setup flow.
 
 ### REQ-SEC-083 — The generic settings key store is read by ADMIN only
 
@@ -6274,6 +6301,12 @@ surface.
 ---
 
 ### REQ-SEC-088 — The four application roles are assigned in the Basetool
+
+Administrator edits of role permissions and descriptions submit versioned request records.
+`permissionsVersion` and `descriptionVersion` are independent counters returned by the role DTO;
+the corresponding write echoes its counter as `version`. Each write locks the role, checks the
+expected section version through `OptimisticLock`, and increments only that section. A stale
+same-section save is HTTP 409; a completed edit of the other section does not invalidate it.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).

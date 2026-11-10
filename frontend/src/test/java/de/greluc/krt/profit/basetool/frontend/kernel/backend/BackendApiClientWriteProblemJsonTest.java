@@ -63,7 +63,13 @@ class BackendApiClientWriteProblemJsonTest {
     WebClient termsDocumentClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     meterRegistry = new SimpleMeterRegistry();
     client =
-        new BackendApiClient(webClient, termsDocumentClient, meterRegistry, new NoOpCacheManager());
+        new BackendApiClient(
+            webClient,
+            termsDocumentClient,
+            meterRegistry,
+            new NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
   }
 
   /**

@@ -786,6 +786,10 @@ public class IdentityBackendClient {
             webClient
                 .get()
                 .uri(uri, uriVariables)
+                .attribute(
+                    de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicy
+                        .RESPONSE_BUDGET,
+                    responseTimeout)
                 .httpRequest(request -> {
                   HttpClientRequest nativeRequest = request.getNativeRequest();
                   nativeRequest.responseTimeout(responseTimeout);

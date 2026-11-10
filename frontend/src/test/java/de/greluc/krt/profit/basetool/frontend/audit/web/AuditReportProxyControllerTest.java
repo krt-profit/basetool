@@ -52,7 +52,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("EVIL", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "EVIL",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }
 
@@ -61,7 +67,12 @@ class AuditReportProxyControllerTest {
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLogJson("../../etc", FROM, TO));
+            () ->
+                controller.downloadAuditLogJson(
+                    "../../etc",
+                    FROM,
+                    TO,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }
 
@@ -78,7 +89,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("MARKET", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "MARKET",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertNotEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }
 
@@ -94,7 +111,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException download =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("HANGAR", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "HANGAR",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertNotEquals(HttpStatus.BAD_REQUEST, download.getStatusCode());
     ResponseStatusException purge =
         assertThrows(ResponseStatusException.class, () -> controller.purgeAuditLog("HANGAR", FROM));
@@ -106,7 +129,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException download =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("BLUEPRINT", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "BLUEPRINT",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertNotEquals(HttpStatus.BAD_REQUEST, download.getStatusCode());
     ResponseStatusException purge =
         assertThrows(
@@ -119,7 +148,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException download =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("CONNECTED_APPS", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "CONNECTED_APPS",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertNotEquals(HttpStatus.BAD_REQUEST, download.getStatusCode());
     ResponseStatusException purge =
         assertThrows(
@@ -132,7 +167,13 @@ class AuditReportProxyControllerTest {
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
-            () -> controller.downloadAuditLog("BANK", FROM, TO, null));
+            () ->
+                controller.downloadAuditLog(
+                    "BANK",
+                    FROM,
+                    TO,
+                    null,
+                    new org.springframework.mock.web.MockHttpServletResponse()));
     assertNotEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
   }
 }

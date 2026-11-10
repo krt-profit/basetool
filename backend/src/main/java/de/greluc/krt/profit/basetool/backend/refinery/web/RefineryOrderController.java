@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
@@ -79,6 +80,21 @@ public class RefineryOrderController {
   private final UserService userService;
   private final RefineryOrderMapper mapper;
   private final RefineryAccessPolicy refineryAccessPolicy;
+
+  /**
+   * Returns the segment totals under the selected owner or tenant scope.
+   *
+   * @param jwt the calling member's token
+   * @param onlyMine whether only the caller's orders are counted
+   * @return the four segment totals
+   */
+  @GetMapping("/counts")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public RefineryOrderCountsDto counts(
+      @AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue = "false") boolean onlyMine) {
+    return refineryOrderQueryService.countSegments(userService.getUserIdFromJwt(jwt), onlyMine);
+  }
 
   /**
    * Lists the calling user's own refinery orders, one page under the list filters

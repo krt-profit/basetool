@@ -76,7 +76,9 @@ class BankReportServiceTest {
     withdraw("200");
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
-    byte[] pdf = statementService.generateStatement(account.getId(), before, after, null);
+    byte[] pdf =
+        BankExportTestSupport.read(
+            statementService.generateStatement(account.getId(), before, after, null));
 
     String text = extractText(pdf);
     assertTrue(text.contains("KONTOAUSZUG"), "title present");
@@ -108,9 +110,13 @@ class BankReportServiceTest {
     Instant end = Instant.now().plus(1, ChronoUnit.HOURS);
 
     String firstHalf =
-        extractText(statementService.generateStatement(account.getId(), start, mid, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), start, mid, null)));
     String secondHalf =
-        extractText(statementService.generateStatement(account.getId(), mid, end, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), mid, end, null)));
 
     assertTrue(firstHalf.contains("+500"), "deposit inside first period");
     assertFalse(firstHalf.contains("Auszahlung"), "withdrawal outside first period");
@@ -127,7 +133,9 @@ class BankReportServiceTest {
     Instant past = Instant.now().minus(24, ChronoUnit.HOURS);
 
     String text =
-        extractText(statementService.generateStatement(account.getId(), farPast, past, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), farPast, past, null)));
 
     assertTrue(text.contains("Keine Buchungen im Zeitraum."), "empty row present");
     assertFalse(text.contains("+500"), "no booking row leaks into the period");
@@ -138,11 +146,12 @@ class BankReportServiceTest {
     deposit("100");
     long before = auditEventRepository.count();
 
-    statementService.generateStatement(
-        account.getId(),
-        Instant.now().minus(1, ChronoUnit.HOURS),
-        Instant.now().plus(1, ChronoUnit.HOURS),
-        null);
+    BankExportTestSupport.read(
+        statementService.generateStatement(
+            account.getId(),
+            Instant.now().minus(1, ChronoUnit.HOURS),
+            Instant.now().plus(1, ChronoUnit.HOURS),
+            null));
 
     assertEquals(before + 1, auditEventRepository.count(), "exactly one STATEMENT_EXPORTED row");
   }
@@ -155,9 +164,13 @@ class BankReportServiceTest {
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
     String full =
-        extractText(statementService.generateStatement(account.getId(), before, after, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), before, after, null)));
     String redacted =
-        extractText(statementService.generateStatement(account.getId(), before, after, null, true));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), before, after, null, true)));
 
     assertTrue(full.contains(holderHandle), "full statement keeps the holder column");
     assertFalse(redacted.contains(holderHandle), "redacted statement hides the holder handle");
@@ -183,9 +196,13 @@ class BankReportServiceTest {
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
     String full =
-        extractText(statementService.generateStatement(account.getId(), before, after, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), before, after, null)));
     String redacted =
-        extractText(statementService.generateStatement(account.getId(), before, after, null, true));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), before, after, null, true)));
 
     assertTrue(
         full.contains("QUELL-/ZIELKONTO"),
@@ -220,7 +237,9 @@ class BankReportServiceTest {
     Instant after = Instant.now().plus(1, ChronoUnit.HOURS);
 
     String text =
-        extractText(statementService.generateStatement(account.getId(), before, after, null));
+        extractText(
+            BankExportTestSupport.read(
+                statementService.generateStatement(account.getId(), before, after, null)));
 
     assertTrue(text.contains(reason), "the Begründung renders in the sub-row");
     assertTrue(text.contains(note), "the Notiz renders in the sub-row");
@@ -237,13 +256,15 @@ class BankReportServiceTest {
     assertThrows(
         BadRequestException.class,
         () ->
-            statementService.generateStatement(
-                account.getId(), now, now.minus(1, ChronoUnit.HOURS), null));
+            BankExportTestSupport.read(
+                statementService.generateStatement(
+                    account.getId(), now, now.minus(1, ChronoUnit.HOURS), null)));
     assertThrows(
         NotFoundException.class,
         () ->
-            statementService.generateStatement(
-                UUID.randomUUID(), now.minus(1, ChronoUnit.HOURS), now, null));
+            BankExportTestSupport.read(
+                statementService.generateStatement(
+                    UUID.randomUUID(), now.minus(1, ChronoUnit.HOURS), now, null)));
   }
 
   @Test
@@ -251,7 +272,7 @@ class BankReportServiceTest {
     deposit("750");
     long auditBefore = auditEventRepository.count();
 
-    byte[] pdf = managementReportService.generateThreeMonthReport(null);
+    byte[] pdf = BankExportTestSupport.read(managementReportService.generateThreeMonthReport(null));
 
     String text = extractText(pdf);
     assertTrue(text.contains("3-MONATS-REPORT"), "title present");
@@ -275,7 +296,7 @@ class BankReportServiceTest {
         new BankDepositRequest(second.getId(), holder.getId(), new BigDecimal("321"), null));
     deposit("750");
 
-    byte[] pdf = managementReportService.generateThreeMonthReport(null);
+    byte[] pdf = BankExportTestSupport.read(managementReportService.generateThreeMonthReport(null));
 
     try (PdfReader reader = new PdfReader(pdf)) {
       PdfTextExtractor extractor = new PdfTextExtractor(reader);

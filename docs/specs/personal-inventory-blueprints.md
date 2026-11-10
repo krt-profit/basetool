@@ -55,6 +55,11 @@ the render because the heavy per-row work stays off the critical path: the recip
 selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-048) — so "all are listed
 and searchable, only what you open / what the craftability pass covers is computed".
 
+Manual acquisition and import construct owned rows through `PersonalBlueprintFactory`, stamping
+one resolved product, canonical lazy output-item reference, acquisition time, note and explicit
+source. Ownership, duplicate handling, source-client attribution and audit remain with each
+caller; construction itself writes nothing.
+
 ### REQ-INV-009 — Detail pane on the existing lazy recipe endpoint, calculation unchanged
 
 The detail pane shows the product name with two chips — „Erhalten <Datum>" (UTC → local date,

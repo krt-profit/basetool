@@ -68,6 +68,7 @@ function harness(script = []) {
     const calls = [];
     const navigations = [];
     const storage = new Map();
+    const errors = [];
     const context = {
         console: { warn() {}, log() {}, error() {} },
         Response,
@@ -78,6 +79,12 @@ function harness(script = []) {
         Promise,
         Map,
         Error,
+        ErrorEvent: class {
+            constructor(type, options) {
+                this.type = type;
+                Object.assign(this, options);
+            }
+        },
         CustomEvent: class {},
         document: {
             querySelector: () => null,
@@ -97,6 +104,9 @@ function harness(script = []) {
         },
     };
     context.window = context;
+    context.dispatchEvent = (event) => {
+        errors.push(event);
+    };
     context.location = {
         origin: 'https://example.test',
         assign(target) {
@@ -115,7 +125,14 @@ function harness(script = []) {
     };
     vm.createContext(context);
     vm.runInContext(SOURCE, context);
-    return { krtFetch: context.krtFetch, calls, navigations };
+    return {
+        krtFetch: context.krtFetch,
+        reauth: vm.runInContext('krtReauth', context),
+        terms: vm.runInContext('krtTermsGate', context),
+        calls,
+        navigations,
+        errors,
+    };
 }
 
 await test('get marks the read as background traffic and sends the caller headers', async () => {
@@ -252,6 +269,81 @@ await test('a retired-row refusal reads its page-wide wording and no other probl
     assert.equal(h.krtFetch.catalogueRetiredMessage({ code: 'VALIDATION_FAILED' }), null);
     assert.equal(h.krtFetch.catalogueRetiredMessage({ code: 'toString' }), null);
     assert.equal(h.krtFetch.catalogueRetiredMessage(null), null);
+});
+
+await test('unsafe login targets fall back and unsafe consent targets never navigate', async () => {
+    for (const target of [
+        '//outside.test/path',
+        '/\\outside.test/path',
+        '/\t/outside.test/path',
+        ' /terms',
+    ]) {
+        const login = harness();
+        login.reauth.redirect(target);
+        assert.deepEqual(login.navigations, ['/oauth2/authorization/keycloak']);
+        const consent = harness();
+        consent.terms.redirect(target);
+        assert.deepEqual(consent.navigations, []);
+    }
+});
+
+await test('a keyed JSON read remains supersedable while its body is pending', async () => {
+    let finishBody;
+    const delayed = reply(200, '{}', JSON_TYPE);
+    delayed.json = () =>
+        new Promise((resolve) => {
+            finishBody = resolve;
+        });
+    const h = harness([delayed, reply(200, '{"new":true}', JSON_TYPE)]);
+    const first = h.krtFetch.getJson('/old', { key: 'search' });
+    await Promise.resolve();
+    await Promise.resolve();
+    const rejected = assert.rejects(first, (error) => error.name === 'AbortError');
+    const newest = await h.krtFetch.getJson('/new', { key: 'search' });
+    finishBody({ old: true });
+    await rejected;
+    assert.deepEqual(newest, { new: true });
+});
+
+await test('failed success callbacks expose saved data and never resend the mutation', async () => {
+    for (const callback of [
+        () => {
+            throw new Error('sync');
+        },
+        async () => {
+            throw new Error('async');
+        },
+    ]) {
+        const h = harness([reply(200, '{"id":1}', JSON_TYPE)]);
+        const submitter = { disabled: false };
+        const result = await h.krtFetch.write({
+            url: '/save',
+            method: 'POST',
+            body: {},
+            onSuccess: callback,
+            submitter,
+        });
+        assert.equal(result.ok, true);
+        assert.equal(result.refreshFailed, true);
+        assert.equal(result.body.id, 1);
+        assert.equal(h.calls.length, 1);
+        assert.equal(h.errors.length, 1);
+        assert.equal(submitter.disabled, false);
+    }
+});
+
+await test('rejected error callbacks are reported and do not suppress default handling', async () => {
+    const h = harness([reply(400, '{}', JSON_TYPE)]);
+    const result = await h.krtFetch.write({
+        url: '/save',
+        body: {},
+        onError: async () => {
+            throw new Error('error callback');
+        },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(h.errors.length, 1);
+    assert.equal(h.calls.length, 1);
 });
 
 if (failures > 0) {

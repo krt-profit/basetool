@@ -88,8 +88,8 @@ class RoleDescriptionTest {
                             new SimpleGrantedAuthority("MISSION_MANAGE"),
                             new SimpleGrantedAuthority("HANGAR_MANAGE"),
                             new SimpleGrantedAuthority("REFINERY_MANAGE")))
-                .contentType(MediaType.TEXT_PLAIN)
-                .content(newDescription))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"description\":\"" + newDescription + "\",\"version\":0}"))
         .andExpect(status().isOk());
 
     Role updatedRole = roleRepository.findByName(testRole.getName()).orElseThrow();
@@ -112,8 +112,8 @@ class RoleDescriptionTest {
                     jwt()
                         .jwt(builder -> builder.subject(regularUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
-                .contentType(MediaType.TEXT_PLAIN)
-                .content(newDescription))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"description\":\"" + newDescription + "\",\"version\":0}"))
         .andExpect(status().isForbidden());
   }
 }

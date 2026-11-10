@@ -49,4 +49,8 @@ public class Announcement extends AbstractEntity<UUID> {
   @Getter
   @Column(columnDefinition = "TEXT")
   private String content;
+
+  @Getter
+  @Column(nullable = false)
+  private boolean singleton = true;
 }

@@ -22,6 +22,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+from http_budget import connection_timeout, read_before_deadline
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -88,7 +90,7 @@ class SandboxSession:
                  keycloak: str = "http://127.0.0.1:18080", ca: pathlib.Path = DEFAULT_CA,
                  client: str = "sandbox-client",
                  step: Callable[[str, bool, str], None] = raising_step,
-                 user_agent: str = USER_AGENT) -> None:
+                 user_agent: str = USER_AGENT, timeout: float = 120.0) -> None:
         """Keeps the settings and the installation key.
 
         Args:
@@ -100,6 +102,9 @@ class SandboxSession:
             step: receives each login check as label, outcome and detail.
             user_agent: the `User-Agent` of every gateway call.
         """
+        if timeout <= 0:
+            raise ValueError("HTTP timeout must be positive")
+        self.timeout = timeout
         self.key = key
         self.gateway = gateway.rstrip("/")
         self.local_keycloak = keycloak.rstrip("/")
@@ -148,8 +153,9 @@ class SandboxSession:
         self.unsecure_cookies()
         request = urllib.request.Request(
             self.local(url), data=body, headers={"Accept": "text/html,application/xhtml+xml"})
-        with self.browser.open(request) as answer:
-            return answer.geturl(), answer.read().decode("utf-8", "replace")
+        deadline = time.monotonic() + self.timeout
+        with self.browser.open(request, timeout=connection_timeout(self.timeout)) as answer:
+            return answer.geturl(), read_before_deadline(answer, deadline).decode("utf-8", "replace")
 
     @staticmethod
     def form(text: str) -> tuple[str | None, dict]:
@@ -172,11 +178,16 @@ class SandboxSession:
             headers["DPoP"] = dpop
         request = urllib.request.Request(
             self.local(url), data=urllib.parse.urlencode(data).encode(), headers=headers)
+        deadline = time.monotonic() + self.timeout
         try:
-            with urllib.request.urlopen(request) as answer:
-                return answer.status, json.load(answer)
+            with urllib.request.urlopen(request, timeout=connection_timeout(self.timeout)) as answer:
+                return answer.status, json.loads(read_before_deadline(answer, deadline))
         except urllib.error.HTTPError as error:
-            return error.code, json.load(error)
+            with error:
+                return error.code, json.loads(read_before_deadline(error, deadline))
+        except TimeoutError as error:
+            raise TimeoutError("Sandbox form request timed out; inspect authorization state before "
+                               "retrying because the server may have completed it.") from error
 
     def login(self, user: str, password: str, scopes: str = SCOPES) -> None:
         """Runs the device grant: authorise, sign in and consent, then poll for the token.
@@ -329,7 +340,7 @@ class SandboxSession:
         if self.connection is None:
             parts = urllib.parse.urlsplit(self.gateway)
             self.connection = http.client.HTTPSConnection(
-                parts.hostname, parts.port or 443, context=self.tls, timeout=120)
+                parts.hostname, parts.port or 443, context=self.tls, timeout=self.timeout)
         self.connection.request(method, path, body=data, headers=headers)
         response = self.connection.getresponse()
         raw = response.read()

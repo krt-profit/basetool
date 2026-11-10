@@ -60,6 +60,13 @@ generate() {
     digest="$(read_script "${rev}" "${rel}" | sha256sum)" || die "cannot read scripts/${rel}${rev:+ at ${rev}}"
     printf '%s  %s\n' "${digest%% *}" "${rel}"
   done <<< "${list}"
+  if [[ -f "${SCRIPT_DIR}/host_companions.py" ]]; then
+    if [[ -n "${rev}" ]]; then
+      python3 "${SCRIPT_DIR}/host_companions.py" --rev "${rev}"
+    else
+      python3 "${SCRIPT_DIR}/host_companions.py"
+    fi
+  fi
 }
 
 case "${1:-}" in

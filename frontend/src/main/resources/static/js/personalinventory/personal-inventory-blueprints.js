@@ -160,9 +160,10 @@ function runSearch() {
         )}</div>`,
     );
     krtFetch
-        .getJson(url)
+        .getJson(url, { key: 'personal-blueprint-search' })
         .then(renderResults)
-        .catch(() => {
+        .catch((error) => {
+            if (error instanceof Error && error.name === 'AbortError') return;
             renderResults([]);
         });
 }

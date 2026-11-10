@@ -129,6 +129,7 @@ public class MemberHangarPageController {
         parallelPageLoader
             .<UserDto>loadAsync(() -> hangarClient.member(userId))
             .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
               log.warn("Failed to read the member for the admin member hangar", e);
               return null;
             });
@@ -139,6 +140,7 @@ public class MemberHangarPageController {
               return units != null ? units : List.of();
             })
             .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
               log.warn("Failed to read the member's org units for the admin member hangar", e);
               return List.of();
             });

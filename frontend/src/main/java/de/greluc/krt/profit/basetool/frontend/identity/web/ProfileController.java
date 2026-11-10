@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.identity.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+
 import de.greluc.krt.profit.basetool.frontend.exchange.client.ExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingRequest;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.NameWithholdingResponse;
@@ -141,6 +143,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.warn(
           "Could not load the caller's user row for the profile page; showing token claims", e);
     }
@@ -156,6 +159,7 @@ public class ProfileController {
         payoutVersion = pref.version();
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug(
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
@@ -173,6 +177,7 @@ public class ProfileController {
         }
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug(
           "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
     }
@@ -187,6 +192,7 @@ public class ProfileController {
         withholdingVersion = withholding.version();
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Could not load the name withholding; defaulting the toggle to off", e);
     }
 
@@ -197,6 +203,7 @@ public class ProfileController {
         rsiHandle = handle.rsiHandle();
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Could not load the RSI handle; the field starts empty", e);
     }
 
@@ -207,6 +214,7 @@ public class ProfileController {
     try {
       deletionRequest = identityClient.myDeletionRequest();
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.debug("Could not load the member's deletion request; the card says so", e);
       deletionRequestUnavailable = true;
     }
@@ -297,6 +305,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -387,6 +396,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -477,6 +487,7 @@ public class ProfileController {
       }
       return "redirect:/profile";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       return "redirect:/profile";
@@ -562,6 +573,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Name-withholding update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -607,6 +619,7 @@ public class ProfileController {
         redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("RSI handle update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
     }
@@ -640,6 +653,7 @@ public class ProfileController {
         return me.version();
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.warn("Could not re-read the caller's user-row version; assuming the next one", e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;

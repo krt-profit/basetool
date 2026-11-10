@@ -495,9 +495,25 @@ distribution** is **removed** (ADR-0039: custody is no longer per-account); each
 keeps its holder annotation, derived from the transaction's holder leg. The PDF is generated backend-side with OpenPDF, follows
 the KRT design system (page background, KRT orange `#E77E23`, **embedded Lato** — the
 existing Helvetica-based reports predate the rule), and is delivered via the established
-`ResponseEntity<byte[]>` + frontend-proxy + fetch/blob download pattern with the
+streaming `ResponseEntity<Resource>` + frontend-proxy + fetch/blob download pattern with the
 `X-User-Time-Zone` header. Statement labels come from the backend message bundles
 (German default), not string literals. Every export is audited (REQ-BANK-012).
+
+The query snapshot and PDF rendering have separate lifetimes. One repeatable-read transaction
+captures immutable chronological chunks of at most 500 postings and only their relevant holder
+and transfer legs into a private per-export directory. The transaction ends before rendering.
+The renderer flushes tables by chunk and writes the finished PDF to disk; response conversion
+streams that file without a whole-PDF byte array. No period or posting-count cutoff is introduced.
+The org-unit authorization transaction also finishes before snapshot retrieval and rendering;
+export coordinators reject an enclosing transaction rather than suspending its connection.
+
+`app.bank.exports.directory` is an absolute-path Spring property defaulting to the JVM's writable
+temporary directory. Each export creates an owner-only child directory containing fixed,
+non-identifying filenames. Successful response completion, HEAD/zero-body responses, conversion
+errors and client disconnects release every export file. Snapshot/render failures release files
+and record no successful export; the success audit is recorded in a writable transaction only
+after rendering completes. Disk use follows the complete snapshot and PDF sizes; no artifact is
+retained as a permanent export.
 
 > **Amended (2026-07-03):** the "other side" column is renamed **GEGENSEITE → QUELL-/ZIELKONTO** (the
 > `pdf.bank.col.counterparty` label), and the **Begründung + Notiz** are carved out of their own
@@ -526,6 +542,14 @@ overall summary section up front. The per-account holder distribution is **remov
 (ADR-0039); instead the report closes with a single **global holder-balance section** — every
 holder's current global custody (which is bank-wide, not per-account). Same
 design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this export.
+
+Accounts and holder totals are paged into the same repeatable-read snapshot. Rendering reads
+one account section and one 500-row chunk at a time. The chart consumes every posting while
+retaining only each horizontal display column's chronological first, last, minimum and maximum
+points. Exact opening/closing balances and global extrema are preserved, with at most 1,782
+vector vertices for the 445-point plot; the itemized ledger remains complete. PDF-writer page
+metadata still grows with the number of output pages, while row, leg, table and chart working
+sets remain bounded by their chunk or viewport sizes.
 
 **Acceptance**
 
@@ -2254,6 +2278,12 @@ frontend `bank/web/BankPageController`, `bank/web/BankRequestQueuePageController
 `static/js/bank/bank.js` · **ADR:** [ADR-0054](../adr/0054-bank-transaction-counterparty.md) (amended by
 [#994](https://github.com/krt-profit/basetool/issues/994)) · **Issues:**
 [#994](https://github.com/krt-profit/basetool/issues/994)
+
+Registered counterparty identity and selected direct-membership snapshots are resolved by one
+`RegisteredCounterpartyResolver` shared by request and direct-ledger writes. Request-only
+withdrawal restrictions and direct-booking external-name validation remain at their callers.
+Statement and management PDFs use `BankPdfFormat.counterpartyCell` for deposits, withdrawals,
+transfers and anonymised identities; holder visibility and access gates remain unchanged.
 
 ### REQ-BANK-045 — Conditional Begründung (justification) on withdrawals & transfers
 

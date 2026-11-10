@@ -153,6 +153,7 @@ public class MemberManagementController {
             skMemberships.put(
                 u.id(), all.stream().filter(m -> "SPECIAL_COMMAND".equals(m.kind())).toList());
           } catch (Exception ex) {
+            SectionFallback.rethrowIfReauthenticationRequired(ex);
             log.debug("Failed to load SK memberships for member-list row userId={}", u.id(), ex);
             skMemberships.put(u.id(), Collections.emptyList());
           }
@@ -160,6 +161,7 @@ public class MemberManagementController {
       }
       model.addAttribute("userSkMemberships", skMemberships);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Could not fetch members", e);
       model.addAttribute("error", "error.members.load");
     }
@@ -273,6 +275,7 @@ public class MemberManagementController {
           memberRsiHandle = handle.rsiHandle();
         }
       } catch (Exception ex) {
+        SectionFallback.rethrowIfReauthenticationRequired(ex);
         log.debug("Failed to load the RSI handle for the member-edit page", ex);
       }
       model.addAttribute("memberRsiHandle", memberRsiHandle);
@@ -286,6 +289,7 @@ public class MemberManagementController {
                 ? memberships
                 : Collections.<OrgUnitMembershipOptionDto>emptyList());
       } catch (Exception ex) {
+        SectionFallback.rethrowIfReauthenticationRequired(ex);
         log.debug("Failed to load memberships for member-edit panel", ex);
         model.addAttribute(
             "memberMemberships", Collections.<OrgUnitMembershipOptionDto>emptyList());
@@ -301,6 +305,7 @@ public class MemberManagementController {
           staffelDetailLoaded = true;
         }
       } catch (Exception ex) {
+        SectionFallback.rethrowIfReauthenticationRequired(ex);
         log.debug("Failed to load membership detail for member-edit Staffel slots", ex);
       }
 
@@ -346,6 +351,7 @@ public class MemberManagementController {
       }
       return "identity/member-edit";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Could not fetch member details", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.details.load");
       return "redirect:/members";
@@ -391,6 +397,7 @@ public class MemberManagementController {
           + "/edit"
           + (form.source() != null ? "?source=" + form.source() : "");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
       return "redirect:/members/"
@@ -485,6 +492,7 @@ public class MemberManagementController {
         return user.version();
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.warn("Could not re-read the user-row version of user {}; assuming the next one", id, e);
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
@@ -538,6 +546,7 @@ public class MemberManagementController {
       BackendErrorLogging.warn(log, "deleteMember", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");
     }

@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import de.greluc.krt.profit.basetool.testsupport.logging.CredentialFieldRule;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -42,10 +41,7 @@ class CredentialFieldRatchetTest {
 
   @Test
   void everyCredentialBearingTypeIsReviewedAndRedacts() {
-    JavaClasses classes =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("de.greluc.krt.profit.basetool.backend");
+    JavaClasses classes = ModuleSubjects.importBackendMainClasses();
 
     assertThat(CredentialFieldRule.violations(classes, REVIEWED_REDACTING_TYPES)).isEmpty();
   }

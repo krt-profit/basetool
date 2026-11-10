@@ -169,6 +169,7 @@ public class HangarPageController {
                   : new PageResponse<>(List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
             })
             .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
               log.error("Failed to fetch my ships", e);
               shipsFailed.set(true);
               model.addAttribute("error", "error.hangar.ships.load");
@@ -181,6 +182,7 @@ public class HangarPageController {
             .<Long>loadAsync(
                 () -> totalOf(hangarClient.myShips(0, 1, counterpartFitted, effectiveSearch)))
             .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
               log.warn("Failed to count my ships for the readiness counter", e);
               return null;
             });
@@ -191,6 +193,7 @@ public class HangarPageController {
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.squadronOverview(0, 1, null)))
                 .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
                   log.warn("Failed to count the org-unit overview for the hangar tab", e);
                   return null;
                 });
@@ -217,6 +220,7 @@ public class HangarPageController {
               return hl != null ? new ArrayList<>(hl) : new ArrayList<>();
             })
             .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
               log.error("Failed to fetch home locations", e);
               return new ArrayList<>();
             });
@@ -450,6 +454,7 @@ public class HangarPageController {
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null)))
                 .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
                   log.warn("Failed to count my ships for the hangar tab", e);
                   return null;
                 });
@@ -534,6 +539,7 @@ public class HangarPageController {
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.add");
       redirectAttributes.addFlashAttribute("shipForm", form);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to add ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.add");
       redirectAttributes.addFlashAttribute("shipForm", form);
@@ -584,6 +590,7 @@ public class HangarPageController {
       BackendErrorLogging.warn(log, "PUT /api/v1/hangar/ships", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.update");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.update");
     }
@@ -607,6 +614,7 @@ public class HangarPageController {
       BackendErrorLogging.warn(log, "DELETE /api/v1/hangar/ships", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to delete ship", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.ship.delete");
     }
@@ -629,6 +637,7 @@ public class HangarPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "notification.success.home_location_set");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to set home location for ships", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.hangar.home_location.set");
     }

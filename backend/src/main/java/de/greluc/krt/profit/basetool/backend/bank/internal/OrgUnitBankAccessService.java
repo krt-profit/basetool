@@ -39,7 +39,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The org-unit side's adapter onto {@link BankAccessRules} (ADR-0020, ADR-0352): it reads who calls
@@ -70,6 +73,7 @@ public class OrgUnitBankAccessService {
   private final BankPostingRepository bankPostingRepository;
   private final BankAccountService bankAccountService;
   private final BankStatementReportService bankStatementReportService;
+  private final PlatformTransactionManager transactionManager;
 
   /**
    * Lists every active account the caller may view under the pin, with balance, 30-day trend,
@@ -191,17 +195,19 @@ public class OrgUnitBankAccessService {
    * @param from inclusive period start
    * @param to inclusive period end
    * @param userZone the zone to render timestamps in, or {@code null} for UTC
-   * @return the redacted PDF bytes
+   * @return the redacted file-backed PDF owned by the response lifecycle
    * @throws NotFoundException when the account does not exist or the caller may not view it
    */
   @NotNull
-  @Transactional
-  public byte[] exportViewableStatement(
+  @Transactional(propagation = Propagation.NEVER)
+  public BankPdfExport exportViewableStatement(
       @NotNull UUID accountId,
       @NotNull Instant from,
       @NotNull Instant to,
       @Nullable ZoneId userZone) {
-    requireViewable(accountId);
+    TransactionTemplate authorization = new TransactionTemplate(transactionManager);
+    authorization.setReadOnly(true);
+    authorization.executeWithoutResult(_ -> requireViewable(accountId));
     return bankStatementReportService.generateStatement(accountId, from, to, userZone, true);
   }
 

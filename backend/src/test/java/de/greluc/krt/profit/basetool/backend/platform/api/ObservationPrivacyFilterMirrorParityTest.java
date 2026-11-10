@@ -29,10 +29,10 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts that the {@code ObservationPrivacyFilter} copies in {@code backend}, {@code frontend} and
- * {@code ingest}, and the {@code ScrubbedClientRequestObservationConvention} copies in {@code
+ * Asserts that the {@code ObservationPrivacyFilter} adapters in {@code backend}, {@code frontend}
+ * and {@code ingest}, and the {@code ScrubbedClientRequestObservationConvention} copies in {@code
  * backend} and {@code ingest}, are identical apart from their {@code package} line (ADR-0072), so
- * an unpropagated edit fails the build.
+ * application registration remains consistent while shared algorithms have one runtime owner.
  */
 class ObservationPrivacyFilterMirrorParityTest {
 

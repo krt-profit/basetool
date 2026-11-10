@@ -91,7 +91,12 @@ class PurchasingPageControllerTest {
   void setUp() {
     controller =
         new PurchasingPageController(
-            purchasingClient, supplyClient, featureState, qualityTierCatalog, layoutContextLoader);
+            purchasingClient,
+            supplyClient,
+            featureState,
+            qualityTierCatalog,
+            layoutContextLoader,
+            new PurchasingRequestState(purchasingClient));
   }
 
   private void switchOn() {

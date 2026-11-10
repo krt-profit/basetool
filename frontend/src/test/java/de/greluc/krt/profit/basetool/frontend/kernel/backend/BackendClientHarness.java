@@ -80,7 +80,12 @@ public final class BackendClientHarness implements AutoCloseable {
             .build();
     BackendApiClient client =
         new BackendApiClient(
-            webClient, webClient, new SimpleMeterRegistry(), new NoOpCacheManager());
+            webClient,
+            webClient,
+            new SimpleMeterRegistry(),
+            new NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
     return new BackendClientHarness(server, client);
   }
 

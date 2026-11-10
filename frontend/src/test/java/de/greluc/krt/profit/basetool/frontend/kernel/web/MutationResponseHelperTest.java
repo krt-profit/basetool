@@ -20,19 +20,36 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
-/**
- * Unit tests for {@link MutationResponseHelper}, pinning the exact Post/Redirect/Get behaviour it
- * replaces: success flashes {@code successToast}, any failure (a {@link BackendServiceException} or
- * any other exception) flashes {@code errorToast}, and every path redirects to the given view.
- */
+/** Pins mutation feedback while session loss propagates without a misleading failure toast. */
 class MutationResponseHelperTest {
 
   private final MutationResponseHelper helper = new MutationResponseHelper();
+
+  @Test
+  void sessionLossEscapesBeforeAnyFlashAttributeIsPublished() {
+    for (boolean wrapped : new boolean[] {false, true}) {
+      ReauthenticationRequiredException reauth = expiredSession();
+      RuntimeException failure =
+          wrapped ? new CompletionException(new IllegalStateException(reauth)) : reauth;
+      RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
+
+      assertThatThrownBy(
+              () -> helper.mutate(attributes, "/orders", "success", "failure", () -> {
+                throw failure;
+              }))
+          .isSameAs(reauth);
+      assertThat(attributes.getFlashAttributes()).isEmpty();
+    }
+  }
 
   @Test
   void onSuccess_flashesSuccessToastAndRedirects() {
