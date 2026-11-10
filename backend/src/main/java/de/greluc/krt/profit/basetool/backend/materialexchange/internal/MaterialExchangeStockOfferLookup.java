@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -35,6 +37,14 @@ public class MaterialExchangeStockOfferLookup implements StockOfferLookup {
   @Override
   public boolean isOffered(@NotNull UUID inventoryItemId) {
     return offerRepository.existsByInventoryItemId(inventoryItemId);
+  }
+
+  @Override
+  public @NotNull Set<UUID> offeredRows(@NotNull Collection<UUID> inventoryItemIds) {
+    if (inventoryItemIds.isEmpty()) {
+      return Set.of();
+    }
+    return offerRepository.findOfferedInventoryItemIds(inventoryItemIds);
   }
 
   @Override

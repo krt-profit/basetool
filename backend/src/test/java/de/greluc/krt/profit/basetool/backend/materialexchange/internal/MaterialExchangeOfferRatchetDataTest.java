@@ -44,7 +44,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,9 +53,9 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies against PostgreSQL that the Lager's own book-outs audit the Materialbörse offers they
- * lower or remove, and that the wipe and account-erasure reads find the offers their bulk deletes
- * cascade away (REQ-MARKET-013, REQ-AUDIT-001).
+ * Verifies against PostgreSQL that the Lager's own book-outs and its wipe audit the Materialbörse
+ * offers they lower or remove, and that the account-erasure read finds the offers its bulk delete
+ * cascades away (REQ-MARKET-013, REQ-AUDIT-001).
  */
 @SpringBootTest
 @Transactional
@@ -128,21 +127,31 @@ class MaterialExchangeOfferRatchetDataTest {
   }
 
   @Test
-  void theWipeReadFindsOffersOnSharedRowsOnlyAndTheErasureReadFindsTheMembersOffers() {
+  void theWipeAuditsTheOfferOnASharedRowItDeletesAndLeavesAPersonalRowsOffer() {
     MaterialExchangeOffer shared = offer(20.0, 5.0, false);
+    MaterialExchangeOffer personal = offer(20.0, 5.0, true);
+    detach(shared);
+
+    checkoutService.deleteAllGlobalInventory();
+    entityManager.flush();
+
+    assertThat(details("MARKET_OFFER_REMOVED", shared.getId()))
+        .containsExactly("kind=MATERIAL reason=wipe");
+    assertThat(offerRepository.existsById(shared.getId())).isFalse();
+    assertThat(details("MARKET_OFFER_REMOVED", personal.getId())).isEmpty();
+    assertThat(offerRepository.existsById(personal.getId())).isTrue();
+  }
+
+  @Test
+  void theErasureReadFindsTheMembersOffers() {
     MaterialExchangeOffer personal = offer(20.0, 5.0, true);
     entityManager.flush();
 
-    List<UUID> wiped =
-        offerRepository.findActiveStockOnNonPersonalRows(true, null, Set.of()).stream()
-            .map(MaterialExchangeOfferRepository.OfferStock::getId)
-            .toList();
     List<UUID> erased =
         offerRepository.findActiveStockByRowOwner(personal.getOwner().getId()).stream()
             .map(MaterialExchangeOfferRepository.OfferStock::getId)
             .toList();
 
-    assertThat(wiped).contains(shared.getId()).doesNotContain(personal.getId());
     assertThat(erased).containsExactly(personal.getId());
   }
 

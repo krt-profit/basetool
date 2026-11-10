@@ -37,11 +37,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -138,19 +140,21 @@ class InventoryCheckoutServiceAuditTest {
   }
 
   @Test
-  void deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount() {
+  void deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit() {
     ScopePredicate scope = new ScopePredicate(true, null, Set.of());
+    List<UUID> locked = List.of(UUID.randomUUID(), UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate()).thenReturn(scope);
-    when(inventoryItemRepository.deleteAllNonPersonal(true, null, Set.of())).thenReturn(42);
+    when(inventoryItemRepository.lockNonPersonalIdsInScope(true, null, Set.of()))
+        .thenReturn(locked);
+    when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(42);
 
     int removed = service.deleteAllGlobalInventory();
 
     assertEquals(42, removed);
-    InOrder order = inOrder(offerRatchet, inventoryItemRepository);
-    order
-        .verify(offerRatchet)
-        .beforeWipe(scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
-    order.verify(inventoryItemRepository).deleteAllNonPersonal(true, null, Set.of());
+    InOrder order = inOrder(inventoryItemRepository, offerRatchet);
+    order.verify(inventoryItemRepository).lockNonPersonalIdsInScope(true, null, Set.of());
+    order.verify(offerRatchet).beforeDelete(locked, StockChangeReason.WIPE);
+    order.verify(inventoryItemRepository).deleteAllByIdIn(locked);
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(

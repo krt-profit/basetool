@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRowLocks;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +44,9 @@ public class MaterialExchangeOfferErasure implements UserErasureParticipant {
 
   private final MaterialExchangeOfferRatchet offerRatchet;
 
+  /** Locks the member's Lager rows, so no offer is released on them between the audit and purge. */
+  private final StockRowLocks stockRowLocks;
+
   @Override
   public @NotNull Phase phase() {
     return Phase.DELETE;
@@ -54,8 +58,8 @@ public class MaterialExchangeOfferErasure implements UserErasureParticipant {
   }
 
   /**
-   * Records {@code MARKET_OFFER_REMOVED} for each active offer on the member's Lager rows; the
-   * rows' own delete removes the offers.
+   * Locks the member's Lager rows and records {@code MARKET_OFFER_REMOVED} for each active offer on
+   * them; the rows' own delete removes the offers.
    *
    * @param userId the departing member's {@code app_user.id}
    * @param fallbackAdminId unused
@@ -63,6 +67,7 @@ public class MaterialExchangeOfferErasure implements UserErasureParticipant {
    */
   @Override
   public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
+    stockRowLocks.lockRowsOf(userId);
     offerRatchet.removeOffersOnRowsOf(userId);
     return Map.of();
   }

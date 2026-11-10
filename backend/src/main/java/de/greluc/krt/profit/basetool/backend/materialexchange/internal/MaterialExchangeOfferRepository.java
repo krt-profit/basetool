@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -232,47 +233,60 @@ public interface MaterialExchangeOfferRepository
   /**
    * Reads the active offers standing on the given Lager rows, before a book-out changes them.
    *
+   * @param inventoryItemIds the rows, a {@code uuid[]} literal ({@link UuidArrayLiteral})
+   * @return the offers with what they offer
+   */
+  @Query(
+      value =
+          """
+          SELECT o.id AS "id", o.offer_kind AS "kind", o.offered_amount AS "offeredAmount",
+                 o.item_quantity AS "itemQuantity", o.item_name AS "itemName",
+                 o.owner_id AS "ownerId", m.name AS "materialName"
+          FROM material_exchange_offer o JOIN inventory_item i ON i.id = o.inventory_item_id
+          LEFT JOIN material m ON m.id = i.material_id
+          WHERE o.inventory_item_id = ANY(CAST(:inventoryItemIds AS UUID[]))
+            AND o.status = 'ACTIVE'
+          """,
+      nativeQuery = true)
+  List<OfferStock> findActiveStockByInventoryItemIdArray(
+      @Param("inventoryItemIds") String inventoryItemIds);
+
+  /**
+   * Reads the active offers standing on the given Lager rows, before a book-out changes them,
+   * binding the rows as one array parameter however many there are.
+   *
    * @param inventoryItemIds the rows
    * @return the offers with what they offer
    */
-  @Query(
-      """
-      SELECT o.id AS id, o.kind AS kind, o.offeredAmount AS offeredAmount,
-             o.itemQuantity AS itemQuantity, o.itemName AS itemName, o.owner.id AS ownerId,
-             m.name AS materialName
-      FROM MaterialExchangeOffer o JOIN InventoryItem i ON i.id = o.inventoryItemId
-      LEFT JOIN i.material m
-      WHERE i.id IN :inventoryItemIds
-        AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
-      """)
-  List<OfferStock> findActiveStockByInventoryItemIds(
-      @Param("inventoryItemIds") Collection<UUID> inventoryItemIds);
+  default List<OfferStock> findActiveStockByInventoryItemIds(
+      @NotNull Collection<UUID> inventoryItemIds) {
+    return findActiveStockByInventoryItemIdArray(UuidArrayLiteral.of(inventoryItemIds));
+  }
 
   /**
-   * Reads the active offers standing on the non-personal rows the global wipe deletes in the given
-   * scope.
+   * Returns which of the given Lager rows back an offer of any status, read after the rows are
+   * locked so a release committed while the caller waited is seen (REQ-INV-026).
    *
-   * @param isAdminAllScope {@code true} for an admin without an active org unit
-   * @param activeOrgUnitId the single org unit the wipe is scoped to, or {@code null}
-   * @param memberOrgUnitIds the caller's org units on the non-admin path
-   * @return the offers with what they offer
+   * @param inventoryItemIds the rows; an empty collection yields an empty set
+   * @return the rows that back an offer
    */
   @Query(
       """
-      SELECT o.id AS id, o.kind AS kind, o.offeredAmount AS offeredAmount,
-             o.itemQuantity AS itemQuantity, o.itemName AS itemName, o.owner.id AS ownerId,
-             m.name AS materialName
-      FROM MaterialExchangeOffer o JOIN InventoryItem i ON i.id = o.inventoryItemId
-      LEFT JOIN i.material m
-      WHERE i.personal = false
-        AND o.status = de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferStatus.ACTIVE
-        AND
-      """
-          + InventoryScope.TRIPLE)
-  List<OfferStock> findActiveStockOnNonPersonalRows(
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      SELECT DISTINCT o.inventoryItemId FROM MaterialExchangeOffer o
+      WHERE o.inventoryItemId IN :inventoryItemIds
+      """)
+  Set<UUID> findOfferedInventoryItemIds(
+      @Param("inventoryItemIds") Collection<UUID> inventoryItemIds);
+
+  /**
+   * Returns the Lager row an offer stands on, so a write to the offer can lock the row before it
+   * loads the offer.
+   *
+   * @param offerId the offer
+   * @return the row, or empty when the offer is unknown or stands on no row
+   */
+  @Query("SELECT o.inventoryItemId FROM MaterialExchangeOffer o WHERE o.id = :offerId")
+  Optional<UUID> findInventoryItemIdById(@Param("offerId") UUID offerId);
 
   /**
    * Reads the active offers standing on the Lager rows of one member.

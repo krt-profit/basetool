@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemShopAvailabilityDto;
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;

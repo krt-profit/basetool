@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

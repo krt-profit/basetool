@@ -51,7 +51,9 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface InventoryItemRepository
-    extends JpaRepository<InventoryItem, UUID>, InventoryLotLockRepository {
+    extends JpaRepository<InventoryItem, UUID>,
+        InventoryLotLockRepository,
+        InventoryRowLockRepository {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.
@@ -980,23 +982,6 @@ public interface InventoryItemRepository
       @Param("personal") Boolean personal,
       @Param("stolen") Boolean stolen,
       @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId);
-
-  /**
-   * Bulk-deletes the non-personal inventory within the given org-unit scope; personal rows are
-   * never touched. Callers must enforce access first.
-   *
-   * @param isAdminAllScope {@code true} for an admin without an active org unit; wipes every
-   *     non-personal item
-   * @param activeOrgUnitId the single org unit to scope the wipe to, or {@code null}
-   * @param memberOrgUnitIds the caller's org units (non-admin path); empty for admins
-   * @return number of deleted rows
-   */
-  @Modifying
-  @Query("DELETE FROM InventoryItem i WHERE i.personal = false AND " + InventoryScope.TRIPLE)
-  int deleteAllNonPersonal(
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Deletes every inventory row of the given user, personal and shared, as part of the hard account

@@ -723,7 +723,9 @@ public class InventoryCheckoutService {
    *
    * <p>Always applies to {@code PIECE} materials and game items; for {@code SCU} only when {@code
    * clientRequestedMerge} is set. The group is locked {@code FOR UPDATE}, and rows backing a
-   * Materialbörse offer are never changed or folded. Must run inside the caller's transaction.
+   * Materialbörse offer are never changed or folded; the offers are checked again once the group is
+   * locked, since an offer released while the lock waited is not excluded by the locking read. Must
+   * run inside the caller's transaction.
    *
    * @param row the just-written target row (managed); the merge survivor
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
@@ -765,8 +767,12 @@ public class InventoryCheckoutService {
                 row.getStolen(),
                 row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
 
-    final List<InventoryItem> victims =
+    final List<InventoryItem> candidates =
         group.stream().filter(candidate -> !candidate.getId().equals(row.getId())).toList();
+    final Set<UUID> offered =
+        stockOfferLookup.offeredRows(candidates.stream().map(InventoryItem::getId).toList());
+    final List<InventoryItem> victims =
+        candidates.stream().filter(candidate -> !offered.contains(candidate.getId())).toList();
     if (victims.isEmpty()) {
       return row;
     }
@@ -831,8 +837,12 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Deletes every non-personal inventory item in one bulk statement (the admin "globales Lager
+   * Deletes every non-personal inventory item in the caller's scope (the admin "globales Lager
    * leeren" action). Personal rows are kept.
+   *
+   * <p>The rows are locked first, so no Materialbörse offer can be released on or withdrawn from
+   * them between the offer audit and the delete; exactly the locked rows are deleted, and a row
+   * booked into the scope meanwhile survives.
    *
    * @return number of inventory rows deleted (0 if the global inventory was already empty)
    */
@@ -844,11 +854,11 @@ public class InventoryCheckoutService {
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds().size());
-    stockChangeObserver.beforeWipe(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
-    int removed =
-        inventoryItemRepository.deleteAllNonPersonal(
+    List<UUID> wiped =
+        inventoryItemRepository.lockNonPersonalIdsInScope(
             scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
+    stockChangeObserver.beforeDelete(wiped, StockChangeReason.WIPE);
+    int removed = inventoryItemRepository.deleteAllByIdIn(wiped);
     log.info(
         "Bulk delete of global inventory completed: {} item(s) removed (adminAll={}, active={})",
         removed,
