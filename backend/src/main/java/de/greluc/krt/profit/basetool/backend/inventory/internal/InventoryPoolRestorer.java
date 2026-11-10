@@ -131,9 +131,9 @@ class InventoryPoolRestorer {
     Set<UUID> present = new TreeSet<>();
     List<OrderMaterialScope> requestedScopes = new ArrayList<>();
     Set<UUID> targetOrders = new TreeSet<>();
-    List<InventoryItemRepository.RowLot> rows =
+    List<InventoryOrderAllocationQueries.RowLot> rows =
         ids.isEmpty() ? List.of() : inventoryRepository.findRowLots(ids);
-    for (InventoryItemRepository.RowLot row : rows) {
+    for (InventoryOrderAllocationQueries.RowLot row : rows) {
       keys.add(
           InventoryStockCommands.lotLockKey(
               row.getHolderId(),

@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Maintains promises and affected live views atomically with organisational eligibility changes.
+ * Maintains support, promises and live views atomically with organisational eligibility changes.
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +44,7 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
   private static final int ORDER_BATCH_SIZE = 200;
 
   private final MaterialClaimService materialClaims;
+  private final JobOrderParticipationEligibility participationEligibility;
   private final JobOrderRepository orders;
   private final LiveSyncPublisher liveSyncPublisher;
 
@@ -62,7 +63,8 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
       }
     } while (batch.size() == ORDER_BATCH_SIZE);
     int ended = materialClaims.endIneligibleClaimsWithinTransaction(affectedUnitIds);
-    if (affected || ended > 0) {
+    int endedParticipations = participationEligibility.endForUnits(affectedUnitIds);
+    if (affected || ended > 0 || endedParticipations > 0) {
       publishQueueChanged();
     }
   }
@@ -74,7 +76,9 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void reconcileExistingPromises(@NotNull UUID orderId) {
-    if (materialClaims.endIneligibleClaimsForOrderWithinTransaction(orderId) > 0) {
+    int ended = materialClaims.endIneligibleClaimsForOrderWithinTransaction(orderId);
+    int endedParticipations = participationEligibility.endForOrder(orderId);
+    if (ended > 0 || endedParticipations > 0) {
       publishOrderChanged(orderId);
       publishQueueChanged();
     }

@@ -58,6 +58,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -73,7 +74,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryStockCommands implements StockCommands {
 
   /** The rest below which a taken row counts as depleted. */
-  private static final double QUANTITY_EPSILON = 1e-4;
+  private static final double QUANTITY_EPSILON = InventoryItemConsumptionPrefix.DEPLETION_EPSILON;
 
   private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryRepository;
@@ -184,7 +185,7 @@ public class InventoryStockCommands implements StockCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
     orderWrites.lockEligibility();
-    orderWrites.lockRows(List.of(rowId));
+    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
     Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(rowId);
     locked.ifPresent(_ -> orderWrites.validateRows(List.of(rowId)));
     return locked.map(StockRow.class::cast);
@@ -208,7 +209,7 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
+  public @NotNull UUID bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
     orderWrites.lockEligibility();
     orderWrites.lockBookIn(
         new StockBookInScope(
@@ -239,7 +240,7 @@ public class InventoryStockCommands implements StockCommands {
         AuditDetails.of("qty", saved.getAmount())
             .with("q", saved.getQuality())
             .with("personal", true));
-    checkoutService.mergeStockIfRequested(saved, false);
+    return checkoutService.mergeStockIfRequested(saved, false).getId();
   }
 
   @Override
@@ -267,15 +268,17 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void markStolen(
+  public @NotNull UUID markStolen(
       @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount) {
     orderWrites.lockEligibility();
     InventoryItem row = managedRow(rowId);
-    stolenMarkService.mark(
-        row.getId(),
-        new InventoryItemStolenMarkDto(row.getVersion(), stolen, amount),
-        member,
-        false);
+    return stolenMarkService
+        .mark(
+            row.getId(),
+            new InventoryItemStolenMarkDto(row.getVersion(), stolen, amount),
+            member,
+            false)
+        .id();
   }
 
   @Override
@@ -312,7 +315,7 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull StockChangeReason reason) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    orderWrites.lockRows(List.of(rowId));
+    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
     InventoryItem row = managedRow(rowId);
     orderWrites.validateRows(List.of(rowId));
     final double remainingAmount = row.getAmount() - amount;
@@ -344,22 +347,33 @@ public class InventoryStockCommands implements StockCommands {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
     final List<StockConsumption> consumed = new ArrayList<>();
-    double remainingToConsume = amount;
-    if (remainingToConsume <= QUANTITY_EPSILON) {
+    if (amount <= QUANTITY_EPSILON) {
       return consumed;
     }
-    for (InventoryItem row :
-        inventoryRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            jobOrderId, gameItemId)) {
-      if (remainingToConsume <= QUANTITY_EPSILON) {
-        break;
-      }
-      var slice = InventoryAllocations.jobOrderSlice(row, jobOrderId);
-      double sliceAmount = slice != null && slice.getAmount() != null ? slice.getAmount() : 0.0;
-      if (sliceAmount <= QUANTITY_EPSILON) {
-        continue;
-      }
-      double take = Math.min(remainingToConsume, sliceAmount);
+    Map<UUID, Double> requested = Map.of(gameItemId, amount);
+    var selected =
+        InventoryItemConsumptionPrefix.select(
+            inventoryRepository.findItemConsumptionFacts(jobOrderId, requested.keySet()),
+            requested);
+    if (selected.takes().isEmpty()) {
+      return consumed;
+    }
+    orderWrites.prepareWrites(selected.rowIds(), List.of(), List.of());
+    var locked =
+        InventoryItemConsumptionPrefix.select(
+            inventoryRepository.findItemConsumptionFacts(jobOrderId, requested.keySet()),
+            requested);
+    if (!selected.equals(locked)) {
+      throw new ObjectOptimisticLockingFailureException(InventoryItem.class, jobOrderId);
+    }
+    for (var planned : selected.takes()) {
+      InventoryItem row =
+          inventoryRepository
+              .findByIdForUpdate(planned.rowId())
+              .orElseThrow(() ->
+                  new ObjectOptimisticLockingFailureException(
+                      InventoryItem.class, planned.rowId()));
+      double take = planned.amount();
       double rowAmount = row.getAmount() != null ? row.getAmount() : 0.0;
       double rowRemaining = ScuAmounts.roundToScuScale(rowAmount - take);
       boolean depleted = rowRemaining <= QUANTITY_EPSILON;
@@ -385,7 +399,6 @@ public class InventoryStockCommands implements StockCommands {
         orderWrites.assertRow(row);
         inventoryRepository.save(row);
       }
-      remainingToConsume -= take;
     }
     return consumed;
   }
@@ -563,8 +576,17 @@ public class InventoryStockCommands implements StockCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public void releaseDonationEarmark(@NotNull UUID donationId) {
     orderWrites.lockEligibility();
+    List<UUID> rowIds = List.copyOf(inventoryRepository.findDonationAllocationRowIds(donationId));
+    if (rowIds.isEmpty()) {
+      return;
+    }
+    prepareWrites(rowIds, List.of(), List.of());
+    if (!rowIds.equals(inventoryRepository.findDonationAllocationRowIds(donationId))) {
+      throw new ObjectOptimisticLockingFailureException(
+          InventoryDonationAllocation.class, donationId);
+    }
     for (InventoryDonationAllocation slice :
-        donationAllocationRepository.findByDonationId(donationId)) {
+        donationAllocationRepository.findSlicesByDonationIdAndRowIds(donationId, rowIds)) {
       InventoryItem row = slice.getInventoryItem();
       final double released = slice.getAmount() == null ? 0.0 : slice.getAmount();
       row.removeDonationAllocation(slice);
@@ -591,7 +613,10 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderEarmarks(@NotNull UUID jobOrderId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    inventoryRepository.deleteJobOrderAllocationsByJobOrder(jobOrderId);
+    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, null, null);
+    if (!rowIds.isEmpty()) {
+      inventoryRepository.deleteJobOrderAllocationsByJobOrder(jobOrderId, rowIds);
+    }
   }
 
   @Override
@@ -599,7 +624,7 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderEarmark(@NotNull UUID rowId, @NotNull UUID jobOrderId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    orderWrites.lockRows(List.of(rowId));
+    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
     managedRow(rowId).getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
   }
 
@@ -608,8 +633,11 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderMaterialEarmarks(@NotNull UUID jobOrderId, @NotNull UUID materialId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    orderWrites.lockMaterialOrders(materialId, List.of(jobOrderId));
-    inventoryRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
+    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, materialId, null);
+    if (!rowIds.isEmpty()) {
+      inventoryRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
+          jobOrderId, materialId, rowIds);
+    }
   }
 
   @Override
@@ -617,7 +645,33 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderGameItemEarmarks(@NotNull UUID jobOrderId, @NotNull UUID gameItemId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    inventoryRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(jobOrderId, gameItemId);
+    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, null, gameItemId);
+    if (!rowIds.isEmpty()) {
+      inventoryRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(
+          jobOrderId, gameItemId, rowIds);
+    }
+  }
+
+  /** Plans the exact existing release sources and rejects a changed post-lock target set. */
+  private List<UUID> prepareAllocationRelease(
+      UUID orderId, @Nullable UUID materialId, @Nullable UUID gameItemId) {
+    boolean allRows = materialId == null && gameItemId == null;
+    List<UUID> materialIds = materialId == null ? List.of() : List.of(materialId);
+    List<UUID> gameItemIds = gameItemId == null ? List.of() : List.of(gameItemId);
+    List<UUID> ids =
+        inventoryRepository.findAllocationReleaseRowIds(orderId, allRows, materialIds, gameItemIds);
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    orderWrites.prepareWrites(ids, List.of(), List.of());
+    if (!Set.copyOf(ids)
+        .equals(
+            Set.copyOf(
+                inventoryRepository.findAllocationReleaseRowIds(
+                    orderId, allRows, materialIds, gameItemIds)))) {
+      throw new ObjectOptimisticLockingFailureException(InventoryItem.class, orderId);
+    }
+    return List.copyOf(ids);
   }
 
   @Override

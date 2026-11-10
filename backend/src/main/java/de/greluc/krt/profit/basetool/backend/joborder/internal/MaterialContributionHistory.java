@@ -103,7 +103,7 @@ public class MaterialContributionHistory {
           OrgUnit unit = Objects.requireNonNull(unitFacts.get(claim.getClaimingOrgUnit().getId()));
           JobOrderParticipation participation =
               Objects.requireNonNull(participationFacts.get(claim.getParticipation().getId()));
-          boolean canCorrect = valid && authority.canManage(order, unit.getId());
+          boolean canCorrect = valid && authority.canCorrect(order, unit.getId());
           return new MaterialContributionHistoryDto(
               claim.getId(),
               claim.getVersion(),

@@ -488,18 +488,12 @@ class SupplyDonationServiceTest {
     SupplyDonation donation = pledged(4.0);
     UUID rowId = UUID.randomUUID();
     donation.setSourceInventoryItemId(rowId);
-    StockRow row = org.mockito.Mockito.mock(StockRow.class);
-    when(row.getMaterial()).thenReturn(material);
-    when(row.getLocation()).thenReturn(location);
-    when(row.getQuality()).thenReturn(500);
-    when(row.getStolen()).thenReturn(false);
     callerIs(HOLDER);
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
     when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
-    when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
-    when(row.getId()).thenReturn(rowId);
+    when(stockReads.donationEarmarkedRowIds(donation.getId())).thenReturn(List.of(rowId));
     when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
 
     service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));
@@ -520,14 +514,9 @@ class SupplyDonationServiceTest {
   void aDeclineStoresTheReasonReleasesTheEarmarkAndAudits() {
     SupplyDonation donation = pledged(4.0);
     donation.setSourceInventoryItemId(UUID.randomUUID());
-    StockRow row = org.mockito.Mockito.mock(StockRow.class);
-    when(row.getUser()).thenReturn(donor);
-    when(row.getMaterial()).thenReturn(material);
-    when(row.getLocation()).thenReturn(location);
     callerIs(HOLDER);
     when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
     when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
-    when(stockReads.findRow(donation.getSourceInventoryItemId())).thenReturn(Optional.of(row));
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
     when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
 

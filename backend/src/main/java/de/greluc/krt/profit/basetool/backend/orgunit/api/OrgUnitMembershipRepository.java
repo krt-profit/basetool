@@ -265,12 +265,13 @@ public interface OrgUnitMembershipRepository
    * Resolves active direct or covering functional writers for affected units.
    *
    * @param unitIds the units requiring coordination
-   * @return current writer identities without unrelated administrators
+   * @return affected unit and current writer identities without unrelated administrators
    */
   @Query(
-      "SELECT DISTINCT m.id.userId FROM OrgUnitMembership m, OrgUnit grantUnit, OrgUnit target"
-          + " WHERE target.id IN :unitIds AND grantUnit.id = m.id.orgUnitId AND"
-          + " m.user.approvalStatus ="
+      "SELECT DISTINCT new"
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterRef(target.id,"
+          + " m.id.userId) FROM OrgUnitMembership m, OrgUnit grantUnit, OrgUnit target WHERE"
+          + " target.id IN :unitIds AND grantUnit.id = m.id.orgUnitId AND m.user.approvalStatus ="
           + " de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE AND"
           + " m.user.inKeycloak = true AND m.user.enabledInKeycloak = true AND (m.isLogistician ="
           + " true OR (m.role <>"
@@ -278,5 +279,5 @@ public interface OrgUnitMembershipRepository
           + " (SELECT r.id FROM User u JOIN u.roles r WHERE u = m.user AND r.code = 'KRT_MEMBER')))"
           + " AND (grantUnit.id = target.id OR TYPE(grantUnit) = Organisationsleitung OR"
           + " (TYPE(grantUnit) = Bereich AND target.parent.id = grantUnit.id))")
-  Set<UUID> findCurrentWriterUserIdsForUnits(@Param("unitIds") Collection<UUID> unitIds);
+  List<OrgUnitWriterRef> findCurrentWritersForUnits(@Param("unitIds") Collection<UUID> unitIds);
 }

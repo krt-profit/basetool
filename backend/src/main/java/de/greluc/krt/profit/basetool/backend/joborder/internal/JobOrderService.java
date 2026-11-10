@@ -22,10 +22,6 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
@@ -60,7 +56,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +90,7 @@ public class JobOrderService {
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
-  private final MaterialRepository materialRepository;
+  private final JobOrderMaterialLines materialLines;
   private final StockReads stockReads;
   private final StockCommands stockCommands;
   private final JobOrderAssigneeService jobOrderAssigneeService;
@@ -103,12 +98,12 @@ public class JobOrderService {
   private final JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
+  private final JobOrderChangeEffects effects;
   private final MaterialClaimService materialClaimService;
   private final AuditRecorder auditRecorder;
   private final JobOrderItemService jobOrderItemService;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderPriorityService jobOrderPriorityService;
-  private final QualityTierService qualityTierService;
 
   private final UserService userService;
 
@@ -152,7 +147,7 @@ public class JobOrderService {
             .requestingOrgUnit(requesting)
             .build();
 
-    for (JobOrderMaterial line : buildMaterialLines(createDto.materials(), Set.of())) {
+    for (JobOrderMaterial line : materialLines.build(createDto.materials(), Set.of())) {
       jobOrder.addMaterial(line);
     }
 
@@ -274,7 +269,7 @@ public class JobOrderService {
    * @param statusCode the order's final status code
    */
   private void publishJobOrderFinished(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
-    eventPublisher.publishEvent(finishedNotice(jobOrder, statusCode));
+    effects.publish(finishedNotice(jobOrder, statusCode));
   }
 
   private NoticeEvent finishedNotice(@NotNull JobOrder jobOrder, @NotNull String statusCode) {
@@ -290,7 +285,7 @@ public class JobOrderService {
   }
 
   private void publishJobOrderClosed(@NotNull UUID jobOrderId) {
-    eventPublisher.publishEvent(closedEvent(jobOrderId));
+    effects.publish(closedEvent(jobOrderId));
   }
 
   private JobOrderClosedEvent closedEvent(@NotNull UUID jobOrderId) {
@@ -313,22 +308,34 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
-    return jobOrderEditor.edit(
-        id, JobOrderGate.EDIT, dto.version(), jobOrder -> applyStatus(jobOrder, dto.status()));
+    return jobOrderEditor.editPlanned(
+        id, JobOrderGate.EDIT, dto.version(), jobOrder -> statusPlan(jobOrder, dto.status()));
+  }
+
+  private JobOrderEditPlan statusPlan(@NotNull JobOrder order, @NotNull JobOrderStatus status) {
+    boolean wasTerminal = terminal(order.getStatus());
+    boolean becomesTerminal = terminal(status);
+    return new JobOrderEditPlan(
+        Set.of(),
+        becomesTerminal && !wasTerminal
+            ? Set.copyOf(stockReads.earmarkedRowIds(order.getId()))
+            : Set.of(),
+        wasTerminal != becomesTerminal,
+        current -> applyStatus(current, status));
+  }
+
+  private static boolean terminal(JobOrderStatus status) {
+    return status == JobOrderStatus.COMPLETED || status == JobOrderStatus.REJECTED;
   }
 
   private JobOrderEdit applyStatus(@NotNull JobOrder jobOrder, @NotNull JobOrderStatus status) {
     final JobOrderStatus previousStatus = jobOrder.getStatus();
-    boolean isTerminal = (status == JobOrderStatus.COMPLETED || status == JobOrderStatus.REJECTED);
-    boolean wasTerminal =
-        (jobOrder.getStatus() == JobOrderStatus.COMPLETED
-            || jobOrder.getStatus() == JobOrderStatus.REJECTED);
+    boolean isTerminal = terminal(status);
+    boolean wasTerminal = terminal(jobOrder.getStatus());
 
     if (isTerminal && !wasTerminal && jobOrder.getPriority() != null) {
       jobOrder.setPriority(null);
     } else if (!isTerminal && wasTerminal) {
-      profitHierarchy.lockForOrderWrite();
-      jobOrderRepository.lockAllJobOrders();
       Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
       jobOrder.setPriority(newPriority);
     }
@@ -425,26 +432,52 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
-    return jobOrderEditor.edit(
+    List<CreateJobOrderMaterialDto> materials = List.copyOf(updateDto.materials());
+    return jobOrderEditor.editPlanned(
         id,
         JobOrderGate.EDIT,
         updateDto.version(),
-        jobOrder -> {
-          if (updateDto.requestingOrgUnitId() != null) {
-            jobOrder.setRequestingOrgUnit(
-                jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
-          }
-          jobOrder.setHandle(updateDto.handle());
-          jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
-          MaterialReplaceOutcome outcome =
-              replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-          return JobOrderEdit.audited(
-              outcome.order(),
-              AuditEventType.JOB_ORDER_UPDATED,
-              AuditDetails.of("materialsRemoved", outcome.removedCount())
-                  .with("materials", outcome.order().getMaterials().size())
-                  .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn()));
-        });
+        plannedOrder ->
+            materialReplacementPlan(
+                plannedOrder,
+                materials,
+                jobOrder -> {
+                  if (updateDto.requestingOrgUnitId() != null) {
+                    jobOrder.setRequestingOrgUnit(
+                        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(
+                            updateDto.requestingOrgUnitId()));
+                  }
+                  jobOrder.setHandle(updateDto.handle());
+                  jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+                  MaterialReplaceOutcome outcome =
+                      replaceMaterialsWithinTransaction(id, jobOrder, materials);
+                  return JobOrderEdit.audited(
+                      outcome.order(),
+                      AuditEventType.JOB_ORDER_UPDATED,
+                      AuditDetails.of("materialsRemoved", outcome.removedCount())
+                          .with("materials", outcome.order().getMaterials().size())
+                          .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn()));
+                }));
+  }
+
+  private JobOrderEditPlan materialReplacementPlan(
+      JobOrder order,
+      List<CreateJobOrderMaterialDto> materials,
+      java.util.function.Function<JobOrder, JobOrderEdit> mutation) {
+    Set<UUID> targets =
+        materials.stream()
+            .map(CreateJobOrderMaterialDto::materialId)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    Set<UUID> removed =
+        order.getMaterials().stream()
+            .map(line -> line.getMaterial().getId())
+            .filter(material -> !targets.contains(material))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    return new JobOrderEditPlan(
+        targets,
+        Set.copyOf(stockReads.earmarkedMaterialRowIds(order.getId(), removed)),
+        false,
+        mutation);
   }
 
   /**
@@ -477,7 +510,7 @@ public class JobOrderService {
     for (JobOrderMaterial mat : managed.getMaterials()) {
       keptTierIds.add(mat.getQualityTier().getId());
     }
-    List<JobOrderMaterial> lines = buildMaterialLines(materials, keptTierIds);
+    List<JobOrderMaterial> lines = materialLines.build(materials, keptTierIds);
     managed.getMaterials().clear();
     for (JobOrderMaterial line : lines) {
       managed.addMaterial(line);
@@ -494,46 +527,6 @@ public class JobOrderService {
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
     return new MaterialReplaceOutcome(
         refreshed, removedMaterialIds.size(), orphanedClaimsWithdrawn);
-  }
-
-  /**
-   * Builds the material lines of a {@code MATERIAL} order, resolving each line's quality tier and
-   * merging lines that name the same material at the same tier into one (REQ-ORDERS-036).
-   *
-   * @param materials the payload lines
-   * @param keptTierIds tiers the order already used, which stay allowed when inactive
-   * @return one detached line per {@code (material, tier)}, in payload order
-   * @throws NotFoundException when a material does not exist
-   * @throws BadRequestException when a tier is unknown, or inactive and not kept
-   */
-  @NotNull
-  private List<JobOrderMaterial> buildMaterialLines(
-      @NotNull List<CreateJobOrderMaterialDto> materials, @NotNull Set<UUID> keptTierIds) {
-    record LineKey(UUID materialId, UUID tierId) {}
-
-    Map<LineKey, JobOrderMaterial> lines = new LinkedHashMap<>();
-    for (CreateJobOrderMaterialDto matDto : materials) {
-      Material material =
-          Entities.require(
-              materialRepository.findById(matDto.materialId()),
-              () -> "Material not found: " + matDto.materialId());
-      QualityTier tier =
-          qualityTierService.resolveForRequirement(null, matDto.minQuality(), keptTierIds);
-      LineKey key = new LineKey(material.getId(), tier.getId());
-      JobOrderMaterial existing = lines.get(key);
-      if (existing == null) {
-        lines.put(
-            key,
-            JobOrderMaterial.builder()
-                .material(material)
-                .qualityTier(tier)
-                .amount(matDto.amount())
-                .build());
-      } else {
-        existing.setAmount(existing.getAmount() + matDto.amount());
-      }
-    }
-    return new ArrayList<>(lines.values());
   }
 
   /**
@@ -746,30 +739,35 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
-    return jobOrderEditor.edit(
+    List<CreateJobOrderMaterialDto> materials = List.copyOf(updateDto.materials());
+    return jobOrderEditor.editPlanned(
         id,
         JobOrderGate.REQUESTER,
         updateDto.version(),
-        jobOrder -> {
-          if (jobOrder.getType() != JobOrderType.MATERIAL) {
-            throw new BadRequestException(
-                "Order "
-                    + id
-                    + " is not a material order; use the requester item-update endpoint.");
-          }
-          assertRequesterEditable(jobOrder);
-          jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
-          MaterialReplaceOutcome outcome =
-              replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
-          return JobOrderEdit.audited(
-                  outcome.order(),
-                  AuditEventType.JOB_ORDER_UPDATED,
-                  AuditDetails.of("materialsRemoved", outcome.removedCount())
-                      .with("materials", outcome.order().getMaterials().size())
-                      .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
-                      .with("byRequester", true))
-              .notifying(List.of(updatedByRequesterEvent(outcome.order())));
-        });
+        plannedOrder ->
+            materialReplacementPlan(
+                plannedOrder,
+                materials,
+                jobOrder -> {
+                  if (jobOrder.getType() != JobOrderType.MATERIAL) {
+                    throw new BadRequestException(
+                        "Order "
+                            + id
+                            + " is not a material order; use the requester item-update endpoint.");
+                  }
+                  assertRequesterEditable(jobOrder);
+                  jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
+                  MaterialReplaceOutcome outcome =
+                      replaceMaterialsWithinTransaction(id, jobOrder, materials);
+                  return JobOrderEdit.audited(
+                          outcome.order(),
+                          AuditEventType.JOB_ORDER_UPDATED,
+                          AuditDetails.of("materialsRemoved", outcome.removedCount())
+                              .with("materials", outcome.order().getMaterials().size())
+                              .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
+                              .with("byRequester", true))
+                      .notifying(List.of(updatedByRequesterEvent(outcome.order())));
+                }));
   }
 
   /**
@@ -894,7 +892,7 @@ public class JobOrderService {
         null,
         AuditDetails.of("priorityWas", priority));
     publishJobOrderClosed(deletedId);
-    eventPublisher.publishEvent(deletedNotice);
+    effects.publish(deletedNotice);
   }
 
   /**
@@ -1025,9 +1023,7 @@ public class JobOrderService {
   @Transactional(propagation = Propagation.MANDATORY)
   public void completeJobOrderWithinTransaction(@NotNull JobOrder jobOrder) {
     responsibilityGuard.assertWritable(jobOrder);
-    boolean wasTerminal =
-        (jobOrder.getStatus() == JobOrderStatus.COMPLETED
-            || jobOrder.getStatus() == JobOrderStatus.REJECTED);
+    boolean wasTerminal = terminal(jobOrder.getStatus());
 
     if (!wasTerminal && jobOrder.getPriority() != null) {
       jobOrder.setPriority(null);

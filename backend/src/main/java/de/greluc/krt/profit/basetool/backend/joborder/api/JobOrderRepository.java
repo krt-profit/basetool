@@ -431,8 +431,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Query(
       "SELECT o.id FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :unitIds OR EXISTS (SELECT c.id"
-          + " FROM MaterialClaim c WHERE c.jobOrder = o AND c.claimingOrgUnit.id IN :unitIds) ORDER"
-          + " BY o.id")
+          + " FROM MaterialClaim c WHERE c.jobOrder = o AND c.claimingOrgUnit.id IN :unitIds) OR"
+          + " EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o AND"
+          + " p.claimingOrgUnit.id IN :unitIds) ORDER BY o.id")
   List<UUID> findIdsAffectedByUnits(@Param("unitIds") Collection<UUID> unitIds, Pageable pageable);
 
   /**

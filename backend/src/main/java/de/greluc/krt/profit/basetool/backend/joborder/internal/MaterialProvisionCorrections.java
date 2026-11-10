@@ -80,7 +80,7 @@ public class MaterialProvisionCorrections {
         Entities.require(orders.findById(orderId), () -> "JobOrder not found: " + orderId);
     responsibility.assertWritable(observedOrder);
     MaterialClaim observedOriginal = historicalClaim(credit.getClaimId());
-    authority.assertCanManage(observedOrder, observedOriginal.getClaimingOrgUnit().getId());
+    authority.assertCanCorrect(observedOrder, observedOriginal.getClaimingOrgUnit().getId());
     if (!Double.isFinite(correction.amount()) || correction.amount() < 0.0) {
       throw new BadRequestException("orders.claim.correction.amount_invalid");
     }
@@ -138,7 +138,7 @@ public class MaterialProvisionCorrections {
     entityManager.refresh(order);
     responsibility.assertWritable(order);
     MaterialClaim original = historicalClaim(credit.getClaimId());
-    authority.assertCanManage(order, original.getClaimingOrgUnit().getId());
+    authority.assertCanCorrect(order, original.getClaimingOrgUnit().getId());
     OptimisticLock.check(
         credit.getVersion(), correction.version(), MaterialProvisionCredit.class, provisionId);
     Long currentClaimVersion =
@@ -152,6 +152,9 @@ public class MaterialProvisionCorrections {
     OptimisticLock.check(
         currentClaimVersion, correction.claimVersion(), MaterialClaim.class, original.getId());
     if (correction.kind() == MaterialProvisionCorrectionDto.Kind.ATTRIBUTION) {
+      if (desired == 0L && correction.targetClaimId() == null && credit.getAmount() == 0.0) {
+        return history.read(orderId);
+      }
       correctAttribution(order, credit, original, correction);
     } else {
       if (connected != null) {

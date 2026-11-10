@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
@@ -75,6 +76,7 @@ public class JobOrderItemHandoverService {
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final StockCommands stockCommands;
+  private final StockReads stockReads;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -115,7 +117,6 @@ public class JobOrderItemHandoverService {
   @Transactional
   public JobOrderItemHandoverDto createItemHandover(
       UUID jobOrderId, JobOrderItemHandoverCreateDto dto) {
-    materialPromises.lockOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
@@ -125,25 +126,25 @@ public class JobOrderItemHandoverService {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");
     }
 
+    final Map<UUID, Double> handedByGameItem = new LinkedHashMap<>();
+    for (JobOrderItemHandoverEntryCreateDto entry : dto.entries()) {
+      JobOrderItem line = requireLine(jobOrder, entry.jobOrderItemId());
+      if (line.getGameItem() != null) {
+        handedByGameItem.merge(line.getGameItem().getId(), (double) entry.amount(), Double::sum);
+      }
+    }
+    stockCommands.prepareWrites(
+        stockReads.earmarkedItemConsumptionRowIds(jobOrderId, handedByGameItem),
+        List.of(),
+        materialPromises.materialScopesOfOrder(jobOrderId));
     JobOrderItemHandover handover = new JobOrderItemHandover();
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(dto.handoverTime());
     handover.setRecipientHandle(dto.recipientHandle());
     stampAuditTrail(handover);
 
-    final Map<UUID, Integer> handedByGameItem = new LinkedHashMap<>();
-
     for (JobOrderItemHandoverEntryCreateDto entryDto : dto.entries()) {
-      JobOrderItem line =
-          jobOrder.getItems().stream()
-              .filter(i -> i.getId().equals(entryDto.jobOrderItemId()))
-              .findFirst()
-              .orElseThrow(() ->
-                  new BadRequestException(
-                      "Item line "
-                          + entryDto.jobOrderItemId()
-                          + " does not belong to job order "
-                          + jobOrderId));
+      JobOrderItem line = requireLine(jobOrder, entryDto.jobOrderItemId());
 
       int outstanding = line.getManufacturedAmount() - line.getDeliveredAmount();
       if (entryDto.amount() > outstanding) {
@@ -152,10 +153,6 @@ public class JobOrderItemHandoverService {
                 + line.getId());
       }
       line.setDeliveredAmount(line.getDeliveredAmount() + entryDto.amount());
-
-      if (line.getGameItem() != null) {
-        handedByGameItem.merge(line.getGameItem().getId(), entryDto.amount(), Integer::sum);
-      }
 
       JobOrderItemHandoverEntry entry = new JobOrderItemHandoverEntry();
       entry.setJobOrderItem(line);
@@ -205,6 +202,16 @@ public class JobOrderItemHandoverService {
     return jobOrderItemHandoverMapper.toDto(saved);
   }
 
+  @NotNull
+  private static JobOrderItem requireLine(@NotNull JobOrder order, UUID lineId) {
+    return order.getItems().stream()
+        .filter(line -> line.getId().equals(lineId))
+        .findFirst()
+        .orElseThrow(() ->
+            new BadRequestException(
+                "Item line " + lineId + " does not belong to job order " + order.getId()));
+  }
+
   /**
    * Consumes the order's earmarked item stock for the delivered game items, best-effort
    * (REQ-ORDERS-030).
@@ -218,9 +225,9 @@ public class JobOrderItemHandoverService {
    */
   @NotNull
   private List<ConsumedItem> consumeEarmarkedItemStock(
-      UUID jobOrderId, Map<UUID, Integer> handedByGameItem) {
+      UUID jobOrderId, Map<UUID, Double> handedByGameItem) {
     final List<ConsumedItem> consumed = new ArrayList<>();
-    for (Map.Entry<UUID, Integer> handed : handedByGameItem.entrySet()) {
+    for (Map.Entry<UUID, Double> handed : handedByGameItem.entrySet()) {
       for (StockConsumption row :
           stockCommands.consumeEarmarkedItems(
               jobOrderId, handed.getKey(), handed.getValue(), StockChangeReason.HANDOVER)) {

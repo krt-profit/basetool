@@ -39,8 +39,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration test for the {@code materialClaims} export section: a claim names its bucket by the
- * code of the claim's quality tier (REQ-ORDERS-036, REQ-DATA-021).
+ * Verifies personal claim exports disclose only directly associated contribution facts.
+ *
+ * <p>Current and historical quality facts remain readable (REQ-SEC-058, REQ-DATA-021).
  */
 @SpringBootTest
 @Transactional
@@ -53,10 +54,11 @@ class DataExportMaterialClaimSectionIntegrationTest {
   @Autowired private DataExportService dataExportService;
   @Autowired private UserRepository userRepository;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private tools.jackson.databind.ObjectMapper json;
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void aClaimIncludesItsQualityAndOwnEndingHistory(boolean ended) {
+  void aClaimIncludesItsQualityAndDirectlyLinkedContributionFacts(boolean ended) throws Exception {
     User member = new User();
     member.setId(UUID.randomUUID());
     member.setUsername("ZzzClaimExportZzz");
@@ -82,19 +84,58 @@ class DataExportMaterialClaimSectionIntegrationTest {
         order,
         unit,
         unit);
+    UUID participation = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order_participation (id, job_order_id, claiming_org_unit_id, active)"
+            + " VALUES (?, ?, ?, false)",
+        participation,
+        order,
+        unit);
+    UUID claim = UUID.randomUUID();
     OffsetDateTime recordedAt = OffsetDateTime.parse("2026-05-05T12:00:00Z");
     jdbc.update(
         "INSERT INTO material_claim (id, job_order_id, material_id, quality_tier_id,"
-            + " claiming_org_unit_id, amount, claimed_by_user_id, created_at, ended_at)"
-            + " VALUES (?, ?, ?, ?, ?, 12, ?, ?, ?)",
-        UUID.randomUUID(),
+            + " claiming_org_unit_id, amount, claimed_by_user_id, created_at, ended_at,"
+            + " participation_id, credited_amount, changes) VALUES (?, ?, ?, ?, ?, 12, ?, ?, ?, ?,"
+            + " 2, CAST(? AS jsonb))",
+        claim,
         order,
         material,
         GOOD_TIER,
         unit,
         subject,
         recordedAt,
-        ended ? recordedAt : null);
+        ended ? recordedAt : null,
+        participation,
+        "[{\"reason\":\"PROVISION_CREDITED\",\"previousAmount\":14,\"amount\":12,"
+            + "\"creditDelta\":2,\"recordedAt\":\"2026-05-05T12:00:00Z\",\"creditId\":null}]");
+    UUID observed = UUID.randomUUID();
+    UUID subset = UUID.randomUUID();
+    provision(observed, order, claim, participation, unit, material, "OBSERVED", 2.0, 3.0, 780);
+    provision(
+        subset, order, claim, participation, unit, material, "CREDITED_SUBSET", 0.0, 1.0, 650);
+    provision(
+        UUID.randomUUID(),
+        order,
+        UUID.randomUUID(),
+        participation,
+        unit,
+        material,
+        "OBSERVED",
+        99.0,
+        99.0,
+        900);
+    provision(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        claim,
+        participation,
+        unit,
+        material,
+        "OBSERVED",
+        88.0,
+        88.0,
+        900);
 
     List<Map<String, Object>> rows = sectionRows(subject);
 
@@ -104,6 +145,71 @@ class DataExportMaterialClaimSectionIntegrationTest {
         .containsEntry("quality_requirement", "GOOD")
         .containsEntry("ended_at", ended ? rows.getFirst().get("created_at") : null);
     assertThat(rows.getFirst().get("created_at")).isNotNull();
+    assertThat(rows.getFirst()).containsEntry("credited_amount", 2.0);
+    var changes = json.readTree(rows.getFirst().get("changes").toString());
+    assertThat(changes.get(0).path("reason").asString()).isEqualTo("PROVISION_CREDITED");
+    assertThat(changes.get(0).path("previousAmount").asDouble()).isEqualTo(14.0);
+    assertThat(changes.get(0).path("amount").asDouble()).isEqualTo(12.0);
+    var provisions = json.readTree(rows.getFirst().get("provisions").toString());
+    assertThat(provisions.size()).isEqualTo(2);
+    for (var receipt : provisions) {
+      assertThat(receipt.propertyNames())
+          .containsExactlyInAnyOrder(
+              "id", "creditedAmount", "evidence", "quantityAmount", "suppliedQuality", "createdAt");
+      if (receipt.path("id").asString().equals(observed.toString())) {
+        assertThat(receipt.path("creditedAmount").asDouble()).isEqualTo(2.0);
+        assertThat(receipt.path("quantityAmount").asDouble()).isEqualTo(3.0);
+        assertThat(receipt.path("suppliedQuality").asInt()).isEqualTo(780);
+      } else {
+        assertThat(receipt.path("id").asString()).isEqualTo(subset.toString());
+        assertThat(receipt.path("quantityAmount").isNull()).isTrue();
+        assertThat(receipt.path("suppliedQuality").isNull()).isTrue();
+      }
+    }
+    assertThat(rows.getFirst().keySet())
+        .containsExactlyInAnyOrder(
+            "job_order",
+            "material",
+            "amount",
+            "quality_requirement",
+            "created_at",
+            "ended_at",
+            "credited_amount",
+            "changes",
+            "provisions");
+
+    jdbc.update("DELETE FROM material_claim WHERE id = ?", claim);
+    assertThat(sectionRows(subject)).isEmpty();
+  }
+
+  private void provision(
+      UUID id,
+      UUID order,
+      UUID claim,
+      UUID participation,
+      UUID unit,
+      UUID material,
+      String evidence,
+      double amount,
+      double quantity,
+      int quality) {
+    jdbc.update(
+        "INSERT INTO material_provision_credit (id, job_order_id, claim_id, participation_id,"
+            + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount,"
+            + " quantity_amount, supplied_quality, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+            + " ?, ?)",
+        id,
+        order,
+        claim,
+        participation,
+        unit,
+        material,
+        GOOD_TIER,
+        UUID.randomUUID(),
+        amount,
+        quantity,
+        quality,
+        evidence);
   }
 
   private @NotNull List<Map<String, Object>> sectionRows(@NotNull UUID subject) {

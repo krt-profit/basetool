@@ -69,8 +69,8 @@ class InventoryPoolLotLocks {
     relocations.forEach(relocation -> entries.add(relocation.entryId()));
     List<TargetLot> targets = new ArrayList<>();
     if (!entries.isEmpty()) {
-      Map<UUID, InventoryItemRepository.RowLot> byId = new HashMap<>();
-      for (InventoryItemRepository.RowLot row : inventoryRepository.findRowLots(entries)) {
+      Map<UUID, InventoryOrderAllocationQueries.RowLot> byId = new HashMap<>();
+      for (InventoryOrderAllocationQueries.RowLot row : inventoryRepository.findRowLots(entries)) {
         String lot =
             StockLot.key(
                 row.getMaterialId(),
@@ -91,7 +91,7 @@ class InventoryPoolLotLocks {
                 Boolean.TRUE.equals(row.getStolen())));
       }
       for (PoolRelocation relocation : relocations) {
-        InventoryItemRepository.RowLot row = byId.get(relocation.entryId());
+        InventoryOrderAllocationQueries.RowLot row = byId.get(relocation.entryId());
         if (row != null) {
           TargetLot target = TargetLot.of(row, relocation);
           keys.add(InventoryStockCommands.lotLockKey(target.holder(), target.key()));
@@ -154,7 +154,7 @@ class InventoryPoolLotLocks {
      * @return the target lot
      */
     static @NotNull TargetLot of(
-        @NotNull InventoryItemRepository.RowLot row, @NotNull PoolRelocation relocation) {
+        @NotNull InventoryOrderAllocationQueries.RowLot row, @NotNull PoolRelocation relocation) {
       return new TargetLot(
           relocation.holder() != null ? relocation.holder() : row.getHolderId(),
           row.getMaterialId(),

@@ -118,16 +118,18 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       Collection<UUID> unitIds, Pageable pageable);
 
   /**
-   * Lists a bounded keyset page of orders with active promises for initial reconciliation.
+   * Lists a bounded keyset page of orders with active support or promises for reconciliation.
    *
    * @param afterOrderId the last order inspected, or null for the first page
    * @param pageable the bounded page
    * @return distinct order identities in identity order
    */
   @Query(
-      "SELECT DISTINCT c.jobOrder.id FROM MaterialClaim c WHERE"
-          + " (:afterOrderId IS NULL OR c.jobOrder.id > :afterOrderId) ORDER BY c.jobOrder.id")
-  List<UUID> findActivePromiseOrderIdsAfter(
+      "SELECT o.id FROM JobOrder o WHERE (:afterOrderId IS NULL OR o.id > :afterOrderId)"
+          + " AND (EXISTS (SELECT c.id FROM MaterialClaim c WHERE c.jobOrder = o) OR EXISTS"
+          + " (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o AND p.active = true))"
+          + " ORDER BY o.id")
+  List<UUID> findContributionMaintenanceOrderIdsAfter(
       @Param("afterOrderId") @Nullable UUID afterOrderId, Pageable pageable);
 
   /**

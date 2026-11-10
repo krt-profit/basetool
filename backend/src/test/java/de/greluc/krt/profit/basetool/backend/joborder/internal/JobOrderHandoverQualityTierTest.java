@@ -240,8 +240,8 @@ class JobOrderHandoverQualityTierTest {
 
     assertThat(goodLine.getAmount()).isZero();
     assertThat(noneLine.getAmount()).isZero();
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, material.getId());
+
+    verify(inventoryItemRepository).delete(row);
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
   }
 
@@ -253,7 +253,8 @@ class JobOrderHandoverQualityTierTest {
 
     assertThat(goodLine.getAmount()).isZero();
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(
+            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 

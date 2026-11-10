@@ -208,6 +208,73 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
     assertThat(stockReads.findRow(privateId).orElseThrow().getAmount()).isEqualTo(3.0);
   }
 
+  @Test
+  void retainedOutsideProfitReadDoesNotOfferAnUnavailableLegacyCorrection() throws Exception {
+    Fixture fixture = seed();
+    ClaimDto original =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 4.0));
+    StockFixture stock = stock(fixture, 3.0);
+    provide(fixture, original, stock, 3.0);
+    UUID actor = writer(fixture.squadronAId());
+    Long unitVersion = orgUnitRepository.findById(fixture.squadronAId()).orElseThrow().getVersion();
+    mvc()
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/org-units/{unit}/parent", fixture.squadronAId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentOrgUnitId\":null,\"version\":" + unitVersion + "}"))
+        .andExpect(status().isOk());
+    var retained = contributionHistory(fixture.orderId(), original.id());
+    var receipt = retained.provisions().getFirst();
+
+    mvc()
+        .perform(
+            get("/api/v1/orders/{order}/claims/history", fixture.orderId())
+                .with(asWriter(actor, fixture.squadronAId()))
+                .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                    "$[0].provisions[0].canCorrect")
+                .value(false));
+    mvc()
+        .perform(
+            get(
+                    "/api/v1/orders/{order}/claims/provisions/{receipt}/attribution-options",
+                    fixture.orderId(),
+                    receipt.id())
+                .with(asWriter(actor, fixture.squadronAId()))
+                .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+        .andExpect(status().isForbidden());
+    var correction =
+        new MaterialProvisionCorrectionDto(
+            MaterialProvisionCorrectionDto.Kind.ATTRIBUTION,
+            receipt.version(),
+            retained.version(),
+            0.0,
+            null,
+            null,
+            List.of(),
+            null);
+    mvc()
+        .perform(
+            post(
+                    "/api/v1/orders/{order}/claims/provisions/{receipt}/correction",
+                    fixture.orderId(),
+                    receipt.id())
+                .with(asWriter(actor, fixture.squadronAId()))
+                .header("X-Active-Org-Unit-Id", fixture.squadronAId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(correction)))
+        .andExpect(status().isForbidden());
+    assertThat(contributionHistory(fixture.orderId(), original.id())).isEqualTo(retained);
+  }
+
   private UUID writer(UUID unitId) {
     return transactionTemplate.execute(_ -> {
       User user = new User();

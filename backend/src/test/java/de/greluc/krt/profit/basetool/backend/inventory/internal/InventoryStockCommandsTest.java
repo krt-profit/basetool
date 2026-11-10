@@ -128,7 +128,11 @@ class InventoryStockCommandsTest {
     location.setId(UUID.randomUUID());
     location.setName("Lorville");
 
-    commands.bookIn(MEMBER, new StockLot(material, null, location, null, false), 2.5);
+    when(checkoutService.mergeStockIfRequested(any(InventoryItem.class), eq(false)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    UUID survivor =
+        commands.bookIn(MEMBER, new StockLot(material, null, location, null, false), 2.5);
+    assertThat(survivor).isNotNull();
 
     verify(auditRecorder)
         .record(eq(AuditEventType.INVENTORY_ITEM_CREATED), any(), any(), eq(MEMBER), any());

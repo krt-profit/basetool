@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketSource;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
@@ -35,12 +34,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -65,7 +62,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -100,7 +96,6 @@ public class MaterialClaimService implements ClaimBucketSource {
   private final OrgUnitRepository orgUnitRepository;
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
-  private final JobOrderEligibilityNotices eligibilityNotices;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final RequestScopeResolver requestScopeResolver;
@@ -113,11 +108,6 @@ public class MaterialClaimService implements ClaimBucketSource {
    * #upsertClaimWithinTransaction} in its own {@code REQUIRES_NEW} transaction.
    */
   private final ObjectProvider<MaterialClaimService> self;
-
-  /** Publishes the withdrawal notices (REQ-ORDERS-044). */
-  private final ApplicationEventPublisher eventPublisher;
-
-  private final UserService userService;
 
   /**
    * Identity of one aggregated material bucket — a material at a single quality tier. Shared key
@@ -368,6 +358,12 @@ public class MaterialClaimService implements ClaimBucketSource {
               + " for this bucket.");
     }
 
+    if (existingClaim.isPresent()
+        && MaterialQuantityArithmetic.quanta(existingClaim.get().getAmount())
+            == MaterialQuantityArithmetic.quanta(amount)) {
+      return toClaimDto(existingClaim.get());
+    }
+
     MaterialClaim claim =
         existingClaim.orElseGet(() -> {
           MaterialClaim fresh = new MaterialClaim();
@@ -497,7 +493,6 @@ public class MaterialClaimService implements ClaimBucketSource {
 
   private int endIneligibleClaims(@NotNull Supplier<List<MaterialClaim>> nextBatch) {
     int endedCount = 0;
-    Map<JobOrder, Map<UUID, Set<String>>> affected = new LinkedHashMap<>();
     while (true) {
       List<MaterialClaim> batch = nextBatch.get();
       if (batch.isEmpty()) {
@@ -508,18 +503,10 @@ public class MaterialClaimService implements ClaimBucketSource {
             claim,
             de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
                 .UNIT_INELIGIBLE);
-        claim.getParticipation().setActive(false);
-        affected
-            .computeIfAbsent(claim.getJobOrder(), _ -> new LinkedHashMap<>())
-            .computeIfAbsent(
-                claim.getClaimingOrgUnit().getId(), _ -> new java.util.LinkedHashSet<>())
-            .add(claim.getMaterial().getName());
       }
       materialClaimRepository.flush();
       endedCount += batch.size();
     }
-    ActorRef actor = userService.currentActor();
-    affected.forEach((order, units) -> eligibilityNotices.promisesEnded(order, units, actor));
     return endedCount;
   }
 
@@ -575,39 +562,12 @@ public class MaterialClaimService implements ClaimBucketSource {
               claim,
               de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
                   .REQUIREMENT_ENDED));
-      announceWithdrawn(order, orphaned, "ORDER_CHANGED");
       log.info(
           "Withdrew {} orphaned material claim(s) on order {} after a bucket was removed",
           orphaned.size(),
           order.getId());
     }
     return orphaned.size();
-  }
-
-  /**
-   * Tells each member whose claim was withdrawn, once per claim (REQ-ORDERS-044).
-   *
-   * @param order the order the claims were on
-   * @param claims the withdrawn claims
-   * @param reasonCode {@code ORDER_CHANGED} or {@code DE_ESCALATED}
-   */
-  private void announceWithdrawn(
-      @NotNull JobOrder order, @NotNull List<MaterialClaim> claims, @NotNull String reasonCode) {
-    ActorRef actor = userService.currentActor();
-    for (MaterialClaim claim : claims) {
-      if (claim.getClaimedByUser() == null) {
-        continue;
-      }
-      eventPublisher.publishEvent(
-          JobOrderNotices.claimWithdrawn(
-              order.getId(),
-              order.getDisplayId(),
-              order.getHandle(),
-              claim.getClaimedByUser().getId(),
-              claim.getMaterial().getName(),
-              reasonCode,
-              actor));
-    }
   }
 
   /**

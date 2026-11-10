@@ -56,6 +56,14 @@ responsible coordination; Inventory grants apply when retained stock is actually
 Existing ended targets can receive historical correction without open-quantity revival.
 A physical inverse requiring fully consumed quantity or production reversal conflicts409 under
 the existing out-of-scope boundary. Known relocated/merged quantity remains correctable.
+The same correction action accepts a false original supplied quality, retaining the prior known
+value or unknown status and the corrected declaration. Historical credit and prescribed promise
+consequences use the corrected original fact; genuine later quality changes stay distinct.
+Current stock is not evidence of original quality. Connected retained stock may be changed only
+with its current Inventory authority, versions and sufficient known facts to preserve later
+changes. Historical quality/credit correction survives consumption without reversing production;
+unknown historical quantity/composition remains unknown. This decision adds no correction of
+original material or other provision fields.
 
 Planning declares the full sorted order/material set before any stock lot/row lock, then locks all
 physical resources in the common deterministic order. Post-lock changes to source placement,

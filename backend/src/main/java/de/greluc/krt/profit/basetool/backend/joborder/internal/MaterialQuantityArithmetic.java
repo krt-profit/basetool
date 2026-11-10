@@ -30,16 +30,17 @@ public final class MaterialQuantityArithmetic {
    *
    * @param amount the finite quantity
    * @return the nonnegative exact quantum count
+   * @throws IllegalArgumentException when the amount cannot be represented in exact quanta
    */
   public static long quanta(double amount) {
     try {
       long result = ScuAmounts.toQuanta(amount);
       if (result < 0L) {
-        throw new ArithmeticException("Material quantity is outside the exact quantum range");
+        throw new IllegalArgumentException("Material quantity cannot be represented exactly");
       }
       return result;
     } catch (ArithmeticException | NumberFormatException _) {
-      throw new ArithmeticException("Material quantity is outside the exact quantum range");
+      throw new IllegalArgumentException("Material quantity cannot be represented exactly");
     }
   }
 
@@ -49,12 +50,13 @@ public final class MaterialQuantityArithmetic {
    * @param left the first quantity
    * @param right the second quantity
    * @return their representable sum
+   * @throws IllegalArgumentException when the exact sum exceeds the numeric range
    */
   public static long add(long left, long right) {
     try {
       return Math.addExact(left, right);
     } catch (ArithmeticException _) {
-      throw new ArithmeticException("Material quantity is outside the exact quantum range");
+      throw new IllegalArgumentException("Material quantity cannot be represented exactly");
     }
   }
 
@@ -64,12 +66,13 @@ public final class MaterialQuantityArithmetic {
    * @param units the whole material units
    * @param quantum the material's quantum size
    * @return the representable exact amount
+   * @throws IllegalArgumentException when the exact product exceeds the numeric range
    */
   public static long multiply(long units, long quantum) {
     try {
       return Math.multiplyExact(units, quantum);
     } catch (ArithmeticException _) {
-      throw new ArithmeticException("Material quantity is outside the exact quantum range");
+      throw new IllegalArgumentException("Material quantity cannot be represented exactly");
     }
   }
 }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialHandoverFact;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import java.util.Collection;
 import java.util.List;
@@ -31,9 +32,240 @@ import org.springframework.data.repository.NoRepositoryBean;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** Reads inventory allocation identities and stock projections for job orders. */
+/** Reads scalar stock placement, allocation planning facts and job-order stock projections. */
 @NoRepositoryBean
 interface InventoryOrderAllocationQueries extends Repository<InventoryItem, UUID> {
+
+  /** The holder and lot of a Lager row, read without locking it (ADR-0229). */
+  interface RowLot {
+
+    /**
+     * The row id.
+     *
+     * @return the id of the {@code inventory_item} row
+     */
+    UUID getId();
+
+    /**
+     * The member who holds the row.
+     *
+     * @return the holder's user id
+     */
+    UUID getHolderId();
+
+    /**
+     * The row's material.
+     *
+     * @return the material id, or {@code null} on a game-item row
+     */
+    @Nullable
+    UUID getMaterialId();
+
+    /**
+     * The row's game item.
+     *
+     * @return the game item id, or {@code null} on a material row
+     */
+    @Nullable
+    UUID getGameItemId();
+
+    /**
+     * Where the row's stock lies.
+     *
+     * @return the location id
+     */
+    UUID getLocationId();
+
+    /**
+     * The row's quality.
+     *
+     * @return the quality, or {@code null} on a game-item row
+     */
+    @Nullable
+    Integer getQuality();
+
+    /**
+     * The row's stolen marker.
+     *
+     * @return whether the row is marked stolen
+     */
+    Boolean getStolen();
+
+    /**
+     * Returns the physical row personal marker.
+     *
+     * @return whether the stock is personal
+     */
+    Boolean getPersonal();
+
+    /**
+     * Returns the owning pool of the stock.
+     *
+     * @return the pool identity, or null for unassigned stock
+     */
+    @Nullable
+    UUID getOwningOrgUnitId();
+
+    /**
+     * Returns the physical stock quantity.
+     *
+     * @return the row amount
+     */
+    Double getAmount();
+
+    /**
+     * Returns the current physical row version.
+     *
+     * @return the row version
+     */
+    @Nullable
+    Long getVersion();
+
+    /**
+     * Returns the creation instant used to select stock oldest first.
+     *
+     * @return the creation instant, or null for an undated row
+     */
+    @Nullable
+    java.time.Instant getCreatedAt();
+  }
+
+  /**
+   * Reads the holder and lot of the given rows without locking them, so a writer can take the lots'
+   * advisory locks before it locks a row (ADR-0229).
+   *
+   * @param ids the rows
+   * @return one entry per existing row
+   */
+  @Query(
+      """
+      SELECT i.id AS id, u.id AS holderId, m.id AS materialId, g.id AS gameItemId,
+             l.id AS locationId, i.quality AS quality, i.stolen AS stolen,
+             i.personal AS personal, o.id AS owningOrgUnitId, i.amount AS amount, i.version AS version,
+             i.createdAt AS createdAt
+        FROM InventoryItem i JOIN i.user u JOIN i.location l
+        LEFT JOIN i.material m LEFT JOIN i.gameItem g LEFT JOIN i.owningOrgUnit o
+       WHERE i.id IN :ids ORDER BY i.id
+      """)
+  List<RowLot> findRowLots(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Resolves exact physical rows whose selected order allocation a release changes.
+   *
+   * @param orderId the allocation target
+   * @param allRows whether every allocated row is selected
+   * @param materialIds the selected materials
+   * @param gameItemIds the selected game items
+   * @return distinct source row identities in deterministic order
+   */
+  @Query(
+      """
+      SELECT DISTINCT a.inventoryItem.id FROM InventoryJobOrderAllocation a
+      WHERE a.jobOrderId = :orderId
+        AND (:allRows = true OR a.inventoryItem.material.id IN :materialIds
+             OR a.inventoryItem.gameItem.id IN :gameItemIds)
+      ORDER BY a.inventoryItem.id
+      """)
+  List<UUID> findAllocationReleaseRowIds(
+      @Param("orderId") UUID orderId,
+      @Param("allRows") boolean allRows,
+      @Param("materialIds") Collection<UUID> materialIds,
+      @Param("gameItemIds") Collection<UUID> gameItemIds);
+
+  /**
+   * Reads named physical rows and their selected order slice in one immutable projection.
+   *
+   * @param orderId the allocation target
+   * @param rowIds the nonempty physical row selection
+   * @return current physical facts without excluding wrong-kind or unallocated rows
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.MaterialHandoverFact(
+          i.id, i.version, m.id, m.quantityType, i.quality, i.amount, a.amount)
+      FROM InventoryItem i LEFT JOIN i.material m
+      LEFT JOIN i.jobOrderAllocations a ON a.jobOrderId = :orderId
+      WHERE i.id IN :rowIds ORDER BY i.id
+      """)
+  List<MaterialHandoverFact> findMaterialHandoverFacts(
+      @Param("orderId") UUID orderId, @Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Resolves the actual physical carriers of one donation allocation.
+   *
+   * @param donationId the allocation target
+   * @return current row identities in deterministic order
+   */
+  @Query(
+      """
+      SELECT a.inventoryItem.id FROM InventoryDonationAllocation a
+      WHERE a.donationId = :donationId ORDER BY a.inventoryItem.id
+      """)
+  List<UUID> findDonationAllocationRowIds(@Param("donationId") UUID donationId);
+
+  /**
+   * Reads every requested item's current earmarked source facts in one deterministic batch.
+   *
+   * @param orderId the allocation target
+   * @param gameItemIds the requested game items
+   * @return scalar facts ordered oldest first with physical identity breaking ties
+   */
+  @Query(
+      """
+      SELECT i.id AS rowId, i.gameItem.id AS gameItemId, i.amount AS amount,
+             COALESCE(a.amount, 0) AS sliceAmount, i.version AS version, i.createdAt AS createdAt
+      FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i
+      WHERE a.jobOrderId = :orderId AND i.gameItem.id IN :gameItemIds
+      ORDER BY i.createdAt ASC, i.id ASC
+      """)
+  List<InventoryItemConsumptionSource> findItemConsumptionFacts(
+      @Param("orderId") UUID orderId, @Param("gameItemIds") Collection<UUID> gameItemIds);
+
+  /** One physical row's reserved quantity in a single independent allocation dimension. */
+  interface ReservationFact {
+    /**
+     * Returns the physical row carrying the reservation.
+     *
+     * @return the stock row identity
+     */
+    UUID getRowId();
+
+    /**
+     * Returns the total reserved in this allocation dimension.
+     *
+     * @return the reserved stock amount
+     */
+    Double getAmount();
+  }
+
+  /**
+   * Reads mission reservations for all physical planning rows in one batch.
+   *
+   * @param rowIds the stock rows being observed
+   * @return the mission amount of every row with a reservation
+   */
+  @Query(
+      """
+      SELECT a.inventoryItem.id AS rowId, SUM(a.amount) AS amount
+      FROM InventoryMissionAllocation a WHERE a.inventoryItem.id IN :rowIds
+      GROUP BY a.inventoryItem.id
+      """)
+  List<ReservationFact> findPlanningMissionReservations(@Param("rowIds") Collection<UUID> rowIds);
+
+  /**
+   * Reads donation reservations for all physical planning rows in one batch.
+   *
+   * @param rowIds the stock rows being observed
+   * @return the donation amount of every row with a reservation
+   */
+  @Query(
+      """
+      SELECT a.inventoryItem.id AS rowId, SUM(a.amount) AS amount
+      FROM InventoryDonationAllocation a WHERE a.inventoryItem.id IN :rowIds
+      GROUP BY a.inventoryItem.id
+      """)
+  List<ReservationFact> findPlanningDonationReservations(@Param("rowIds") Collection<UUID> rowIds);
+
   /**
    * Reads the exact eligible merge destinations before any stock lock.
    *

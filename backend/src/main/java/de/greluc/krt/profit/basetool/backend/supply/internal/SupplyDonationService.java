@@ -58,7 +58,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.criteria.JoinType;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -71,6 +70,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -174,7 +174,7 @@ public class SupplyDonationService {
       material = row.getMaterial();
       item = row.getGameItem();
       quality = row.getQuality();
-      stockCommands.lockLots(donor, List.of(lotOf(row).key()));
+      stockCommands.prepareWrites(List.of(request.sourceInventoryItemId()), List.of(), List.of());
       row =
           Entities.require(
               stockCommands.lockRow(request.sourceInventoryItemId()), "Stock row not found");
@@ -279,7 +279,10 @@ public class SupplyDonationService {
         OfferedLocations.require(
             locationRepository.findById(request.locationId()), "Location not found");
     StockLot lot = new StockLot(material, item, location, quality, false);
-    stockCommands.lockLots(holder, List.of(lot.key()));
+    stockCommands.prepareWrites(
+        List.of(),
+        List.of(new StockCommands.StockBookInScope(holder, lot, List.of(), false, unitId, true)),
+        List.of());
     OrgUnit unit = requireUnit(unitId);
     stockCommands.bookIntoPool(holder, unit, lot, amount, StockBookingReason.DONATION);
 
@@ -344,25 +347,30 @@ public class SupplyDonationService {
             locationRepository.findById(request.locationId()), "Location not found");
     OrgUnit unit = requireUnit(unitId);
 
-    StockRow source =
-        donation.getSourceInventoryItemId() == null
-            ? null
-            : stockReads.findRow(donation.getSourceInventoryItemId()).orElse(null);
+    boolean sourceBacked = donation.getSourceInventoryItemId() != null;
+    List<UUID> sourceRows =
+        sourceBacked ? stockReads.donationEarmarkedRowIds(donation.getId()) : List.of();
+    if (sourceBacked && sourceRows.size() != 1) {
+      throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, donation.getId());
+    }
     StockLot targetLot =
         new StockLot(
             donation.getMaterial(), donation.getGameItem(), location, donation.getQuality(), false);
-    if (source != null) {
-      lockBoth(
-          donation.getDonorUserId() == null ? source.getUser().getId() : donation.getDonorUserId(),
-          lotOf(source),
-          holder,
-          targetLot);
-      stockCommands.lockRow(source.getId());
+    stockCommands.prepareWrites(
+        sourceRows,
+        List.of(
+            new StockCommands.StockBookInScope(holder, targetLot, List.of(), false, unitId, true)),
+        List.of());
+    if (sourceBacked) {
+      if (!sourceRows.equals(stockReads.donationEarmarkedRowIds(donation.getId()))) {
+        throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, donation.getId());
+      }
+      UUID sourceId = sourceRows.getFirst();
+      stockCommands.lockRow(sourceId);
       stockCommands.releaseDonationEarmark(donation.getId());
       stockCommands.transferToPool(
-          source.getId(), received, unit, holder, location, StockBookingReason.DONATION);
+          sourceId, received, unit, holder, location, StockBookingReason.DONATION);
     } else {
-      stockCommands.lockLots(holder, List.of(targetLot.key()));
       stockCommands.bookIntoPool(holder, unit, targetLot, received, StockBookingReason.DONATION);
     }
     boolean full = received >= donation.getPledgedAmount() - 5e-4;
@@ -461,33 +469,7 @@ public class SupplyDonationService {
   }
 
   private void release(@NotNull SupplyDonation donation) {
-    if (donation.getSourceInventoryItemId() != null) {
-      stockReads
-          .findRow(donation.getSourceInventoryItemId())
-          .ifPresent(
-              row -> stockCommands.lockLots(row.getUser().getId(), List.of(lotOf(row).key())));
-      stockCommands.releaseDonationEarmark(donation.getId());
-    }
-  }
-
-  private record Locked(UUID member, StockLot lot) {}
-
-  private void lockBoth(
-      @NotNull UUID firstMember,
-      @NotNull StockLot firstLot,
-      @NotNull UUID secondMember,
-      @NotNull StockLot secondLot) {
-    if (firstMember.equals(secondMember)) {
-      stockCommands.lockLots(firstMember, List.of(firstLot.key(), secondLot.key()));
-      return;
-    }
-    List<Locked> ordered =
-        List.of(new Locked(firstMember, firstLot), new Locked(secondMember, secondLot)).stream()
-            .sorted(Comparator.comparing(Locked::member))
-            .toList();
-    for (Locked locked : ordered) {
-      stockCommands.lockLots(locked.member(), List.of(locked.lot().key()));
-    }
+    stockCommands.releaseDonationEarmark(donation.getId());
   }
 
   private @NotNull SupplyDonation lockPledged(@NotNull UUID id, long version) {
@@ -665,15 +647,6 @@ public class SupplyDonationService {
       throw new BadRequestException("Stolen stock cannot be donated");
     }
     return row;
-  }
-
-  private static @NotNull StockLot lotOf(@NotNull StockRow row) {
-    return new StockLot(
-        row.getMaterial(),
-        row.getGameItem(),
-        row.getLocation(),
-        row.getQuality(),
-        Boolean.TRUE.equals(row.getStolen()));
   }
 
   private static double validAmount(

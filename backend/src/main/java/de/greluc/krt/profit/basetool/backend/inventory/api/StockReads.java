@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -33,6 +34,76 @@ import org.jetbrains.annotations.Nullable;
  * Every read joins the caller's transaction or runs in a read-only one of its own.
  */
 public interface StockReads {
+
+  /**
+   * Reads every existing physical row carrying an allocation to one order.
+   *
+   * @param orderId the allocation target
+   * @return immutable physical row identities without viewer metadata or a write grant
+   */
+  @NotNull
+  List<UUID> earmarkedRowIds(@NotNull UUID orderId);
+
+  /**
+   * Reads physical rows allocated to one order on the selected materials.
+   *
+   * @param orderId the allocation target
+   * @param materialIds the materials; an empty selection returns no rows
+   * @return immutable physical row identities
+   */
+  @NotNull
+  List<UUID> earmarkedMaterialRowIds(@NotNull UUID orderId, @NotNull Collection<UUID> materialIds);
+
+  /**
+   * Reads physical rows allocated to one order on the selected game items.
+   *
+   * @param orderId the allocation target
+   * @param gameItemIds the game items; an empty selection returns no rows
+   * @return immutable physical row identities
+   */
+  @NotNull
+  List<UUID> earmarkedGameItemRowIds(@NotNull UUID orderId, @NotNull Collection<UUID> gameItemIds);
+
+  /**
+   * Selects exact oldest-first stock prefixes of a complete earmarked game-item consumption.
+   *
+   * @param orderId the allocation target
+   * @param requestedAmounts total requested quantity per game item
+   * @return immutable selected physical row identities, granting no mutation authority
+   */
+  @NotNull
+  List<UUID> earmarkedItemConsumptionRowIds(
+      @NotNull UUID orderId, @NotNull Map<UUID, Double> requestedAmounts);
+
+  /**
+   * Reads named material-handover facts without managed rows, viewer metadata or stock locks.
+   *
+   * @param orderId the allocation target
+   * @param rowIds the named physical rows; an empty selection returns no facts
+   * @return immutable current facts, retaining wrong-kind rows and omitting unknown identities
+   */
+  @NotNull
+  List<MaterialHandoverFact> materialHandoverFacts(
+      @NotNull UUID orderId, @NotNull Collection<UUID> rowIds);
+
+  /**
+   * Reads the current physical rows carrying a pending donation's allocation.
+   *
+   * @param donationId the allocation target
+   * @return immutable current row identities in deterministic order without a write grant
+   */
+  @NotNull
+  List<UUID> donationEarmarkedRowIds(@NotNull UUID donationId);
+
+  /**
+   * Reads immutable physical snapshots of all declared holder lots without stock locks.
+   *
+   * @param holder the holder of every lot
+   * @param lots every lot the calling sequential policy reads
+   * @return immutable rows in ordinary book-out order, including empty declared lots
+   */
+  @NotNull
+  Map<String, List<StockRow>> lotRows(@NotNull UUID holder, @NotNull Collection<StockLot> lots);
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id (REQ-XCH-016).

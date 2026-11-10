@@ -20,21 +20,26 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -57,10 +62,12 @@ public class JobOrderEditor {
   private final JobOrderRepository jobOrderRepository;
   private final ProfitHierarchyService profitHierarchy;
   private final MaterialPromiseCoordinator materialPromises;
+  private final StockCommands stockCommands;
+  private final EntityManager entityManager;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final AuditRecorder auditRecorder;
-  private final ApplicationEventPublisher eventPublisher;
+  private final JobOrderChangeEffects effects;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderUnitHistory unitHistory;
 
@@ -85,7 +92,30 @@ public class JobOrderEditor {
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
     return jobOrderStockProjectionService.mapToDtoWithStock(
-        run(id, gate, true, expectedVersion, mutation));
+        run(id, gate, true, expectedVersion, _ -> JobOrderEditPlan.of(mutation)));
+  }
+
+  /**
+   * Plans a versioned edit before taking its complete material and physical resource set.
+   *
+   * @param id the order to edit
+   * @param gate the current authority required by the edit
+   * @param expectedVersion the observed order version
+   * @param planner immutable resource selection and mutation over the authorized order
+   * @return the current projected order
+   * @throws AccessDeniedException when current authority fails before or after resource locking
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the observed
+   *     version is absent or stale
+   * @throws BusinessConflictException when the complete resource plan changes while waiting
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public JobOrderDto editPlanned(
+      @NotNull UUID id,
+      @NotNull JobOrderGate gate,
+      @Nullable Long expectedVersion,
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    return jobOrderStockProjectionService.mapToDtoWithStock(
+        run(id, gate, true, expectedVersion, planner));
   }
 
   /**
@@ -104,7 +134,8 @@ public class JobOrderEditor {
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
-    return jobOrderStockProjectionService.mapToDtoWithStock(run(id, gate, false, null, mutation));
+    return jobOrderStockProjectionService.mapToDtoWithStock(
+        run(id, gate, false, null, _ -> JobOrderEditPlan.of(mutation)));
   }
 
   /**
@@ -122,7 +153,7 @@ public class JobOrderEditor {
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
-    run(id, gate, false, null, mutation);
+    run(id, gate, false, null, _ -> JobOrderEditPlan.of(mutation));
   }
 
   private JobOrder run(
@@ -130,22 +161,30 @@ public class JobOrderEditor {
       @NotNull JobOrderGate gate,
       boolean versioned,
       @Nullable Long expectedVersion,
-      @NotNull Function<JobOrder, JobOrderEdit> mutation) {
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
     profitHierarchy.lockForOrderWrite();
-    materialPromises.lockOrder(id);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    if (gate != JobOrderGate.TRANSFER) {
-      responsibilityGuard.assertWritable(order);
+    authorize(order, gate, versioned, expectedVersion);
+    JobOrderEditPlan planned = planner.apply(order);
+    List<OrderMaterialScope> scopes = scopesOf(id, planned.materialIds());
+    if (planned.stockRowIds().isEmpty()) {
+      materialPromises.lock(scopes);
+    } else {
+      stockCommands.prepareWrites(planned.stockRowIds(), List.of(), scopes);
     }
-    if (!jobOrderAccessPolicy.canEdit(order, gate)) {
-      throw new AccessDeniedException("Caller may not edit job order " + id);
+    if (planned.prioritySequence()) {
+      jobOrderRepository.lockAllJobOrders();
     }
-    if (versioned) {
-      OptimisticLock.check(order.getVersion(), expectedVersion, JobOrder.class, id);
+    entityManager.refresh(order);
+    authorize(order, gate, versioned, expectedVersion);
+    JobOrderEditPlan current = planner.apply(order);
+    if (!planned.sameResources(current)
+        || !Set.copyOf(scopes).equals(Set.copyOf(scopesOf(id, current.materialIds())))) {
+      throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
     }
     Set<UUID> previousParties = JobOrderUnitHistory.partyIds(order);
-    JobOrderEdit edit = mutation.apply(order);
+    JobOrderEdit edit = current.mutation().apply(order);
     JobOrder result = edit.order();
     materialPromises.reconcileOrder(id);
     unitHistory.retainObservedParties(result, previousParties);
@@ -153,7 +192,29 @@ public class JobOrderEditor {
       auditRecorder.record(
           edit.type(), result.getId(), JobOrderAuditLabel.of(result), null, edit.details());
     }
-    edit.notices().forEach(eventPublisher::publishEvent);
+    edit.notices().forEach(effects::publish);
     return result;
+  }
+
+  private List<OrderMaterialScope> scopesOf(@NotNull UUID id, @NotNull Set<UUID> materialIds) {
+    List<OrderMaterialScope> scopes = new ArrayList<>(materialPromises.materialScopesOfOrder(id));
+    materialIds.forEach(material -> scopes.add(new OrderMaterialScope(id, material)));
+    return scopes.stream().distinct().toList();
+  }
+
+  private void authorize(
+      @NotNull JobOrder order,
+      @NotNull JobOrderGate gate,
+      boolean versioned,
+      @Nullable Long expectedVersion) {
+    if (gate != JobOrderGate.TRANSFER) {
+      responsibilityGuard.assertWritable(order);
+    }
+    if (!jobOrderAccessPolicy.canEdit(order, gate)) {
+      throw new AccessDeniedException("Caller may not edit job order " + order.getId());
+    }
+    if (versioned) {
+      OptimisticLock.check(order.getVersion(), expectedVersion, JobOrder.class, order.getId());
+    }
   }
 }

@@ -58,6 +58,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class MaterialPromiseCoordinator {
+  private static final int MATERIAL_RECONCILIATION_ORDER = 100;
   private final EntityManager entityManager;
   private final MaterialPromiseScopeRepository resources;
   private final de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows
@@ -67,6 +68,7 @@ public class MaterialPromiseCoordinator {
   private final MaterialClaimRepository claims;
   private final MaterialPromiseCapacity capacity;
   private final AuditRecorder audit;
+  private final JobOrderChangeEffects effects;
 
   /**
    * Locks all named material scopes before Inventory lot and row locks.
@@ -157,6 +159,7 @@ public class MaterialPromiseCoordinator {
   }
 
   private Coordination coordination() {
+    effects.prepare();
     for (TransactionSynchronization synchronization :
         TransactionSynchronizationManager.getSynchronizations()) {
       if (synchronization instanceof Coordination current) {
@@ -342,6 +345,7 @@ public class MaterialPromiseCoordinator {
             .with("previousAmount", previous)
             .with("amount", claim.getAmount())
             .with("creditDelta", creditDelta));
+    effects.materialChanged(claim, reason, previous, creditDelta);
   }
 
   /** An exact proportional quota and its remainder. */
@@ -351,6 +355,12 @@ public class MaterialPromiseCoordinator {
   private final class Coordination implements TransactionSynchronization {
     private final Set<OrderMaterialScope> scopes = new LinkedHashSet<>();
     private boolean stockPhase;
+
+    /** Reconciles final material facts before the grouped notice collector runs. */
+    @Override
+    public int getOrder() {
+      return MATERIAL_RECONCILIATION_ORDER;
+    }
 
     @Override
     public void beforeCommit(boolean readOnly) {

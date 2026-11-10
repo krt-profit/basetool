@@ -19,10 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -44,8 +46,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -96,6 +100,8 @@ class ProfitHierarchyNoticeIntegrationTest {
           Audience.AFFECTED_LEADER,
           Audience.PREFERENCE_WRITER);
 
+  @Autowired private JobOrderParticipationRepository participations;
+
   @Autowired private WebApplicationContext context;
   @Autowired private TransactionTemplate transactions;
   @Autowired private OrgUnitRepository units;
@@ -108,6 +114,7 @@ class ProfitHierarchyNoticeIntegrationTest {
   @Autowired private QualityTierRepository tiers;
   @Autowired private DataExportService exports;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private NotificationService inbox;
 
   private MockMvc mvc;
   private Fixture fixture;
@@ -159,9 +166,24 @@ class ProfitHierarchyNoticeIntegrationTest {
 
     assertActivePromises(0.0, 0.0);
     List<Map<String, Object>> endedHistory = claimHistory();
-    assertThat(endedHistory).allSatisfy(row -> assertThat(row.get("ended_at")).isNotNull());
-    assertThat(withoutEndingTimestamps(endedHistory))
-        .containsExactlyInAnyOrderElementsOf(withoutEndingTimestamps(history));
+    assertThat(endedHistory)
+        .allSatisfy(row -> {
+          assertThat(row.get("ended_at")).isNotNull();
+          assertThat(row.get("amount")).isEqualTo(0.0);
+          List<Map<String, Object>> changes = JsonPath.read(row.get("changes").toString(), "$");
+          assertThat(changes)
+              .singleElement()
+              .satisfies(change -> {
+                assertThat(change)
+                    .containsEntry("reason", "UNIT_INELIGIBLE")
+                    .containsEntry("amount", 0.0)
+                    .containsEntry("creditDelta", 0.0);
+                assertThat(((Number) change.get("previousAmount")).doubleValue())
+                    .isEqualTo(row.get("material").equals("Notice copper") ? 4.0 : 7.0);
+              });
+        });
+    assertThat(stableContributionFacts(endedHistory))
+        .containsExactlyInAnyOrderElementsOf(stableContributionFacts(history));
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> {
@@ -173,6 +195,23 @@ class ProfitHierarchyNoticeIntegrationTest {
     as(Audience.RESPONSIBLE_WRITER, get("/api/v1/orders/" + fixture.order()), fixture.responsible())
         .andExpect(status().isOk());
     as(Audience.AFFECTED_LEADER, get("/api/v1/orders/" + fixture.order()), fixture.claiming())
+        .andExpect(status().isOk());
+    String readableHistory =
+        as(
+                Audience.AFFECTED_LEADER,
+                get("/api/v1/orders/" + fixture.order() + "/claims/history"),
+                fixture.claiming())
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String endedClaim = JsonPath.read(readableHistory, "$[0].id");
+    Number endedVersion = JsonPath.read(readableHistory, "$[0].version");
+    as(
+            Audience.AFFECTED_LEADER,
+            delete("/api/v1/orders/" + fixture.order() + "/claims/" + endedClaim)
+                .param("version", endedVersion.toString()),
+            fixture.claiming())
         .andExpect(status().isForbidden());
 
     moveClaimingUnit(fixture.profit());
@@ -218,6 +257,7 @@ class ProfitHierarchyNoticeIntegrationTest {
                           .material(material)
                           .qualityTier(quality)
                           .claimingOrgUnit(unit)
+                          .participation(persistedParticipation(participations, order, unit))
                           .amount(1.0)
                           .claimedByUser(recorder)
                           .build())
@@ -242,6 +282,7 @@ class ProfitHierarchyNoticeIntegrationTest {
       transactions.executeWithoutResult(_ -> {
         for (UUID unit : extraUnits) {
           jdbc.update("DELETE FROM material_claim WHERE claiming_org_unit_id = ?", unit);
+          jdbc.update("DELETE FROM job_order_participation WHERE claiming_org_unit_id = ?", unit);
         }
         units.deleteAllById(extraUnits);
       });
@@ -250,6 +291,14 @@ class ProfitHierarchyNoticeIntegrationTest {
 
   @Test
   void hierarchyActorReceivesNoDuplicateNoticeDespiteAnAffectedUnitWriteGrant() throws Exception {
+    String observed =
+        as(Audience.ACTOR, get("/api/v1/orders/" + fixture.order() + "/claims"), fixture.claiming())
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    List<Number> versions =
+        JsonPath.read(observed, "$[?(@.material.name == 'Notice copper')].claims[*].version");
     as(
             Audience.ACTOR,
             post("/api/v1/orders/" + fixture.order() + "/claims")
@@ -259,7 +308,9 @@ class ProfitHierarchyNoticeIntegrationTest {
                         + fixture.materials().getFirst()
                         + "\",\"qualityRequirement\":\"GOOD\",\"claimingOrgUnitId\":\""
                         + fixture.claiming()
-                        + "\",\"amount\":4.0}"),
+                        + "\",\"amount\":4.0,\"version\":"
+                        + versions.getFirst()
+                        + "}"),
             fixture.claiming())
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.amount").value(4.0));
@@ -298,6 +349,83 @@ class ProfitHierarchyNoticeIntegrationTest {
     assertThat(notices(Audience.PREFERENCE_WRITER)).isEmpty();
   }
 
+  @Test
+  void anEmptySupportEndingUsesExistingMuteAndCurrentWritersWithoutInventingMaterials()
+      throws Exception {
+    String current =
+        as(
+                Audience.ACTOR,
+                get("/api/v1/orders/" + fixture.order() + "/claims/history"),
+                fixture.claiming())
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    List<Map<String, Object>> observed = JsonPath.read(current, "$");
+    for (Map<String, Object> contribution : observed) {
+      as(
+              Audience.ACTOR,
+              delete("/api/v1/orders/" + fixture.order() + "/claims/" + contribution.get("id"))
+                  .param("version", contribution.get("version").toString()),
+              fixture.claiming())
+          .andExpect(status().isNoContent());
+    }
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertThat(orderNotices(Audience.AFFECTED_WRITER))
+                .hasSize(2)
+                .allSatisfy(notice ->
+                    assertThat(notice.get("type"))
+                        .isEqualTo("JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED")));
+    assertThat(orderNotices(Audience.RESPONSIBLE_WRITER)).hasSize(2);
+    assertExcludedAudiences();
+    for (Audience audience : RECIPIENTS) {
+      UUID person = fixture.people().get(audience);
+      inbox.markAllRead(person);
+      inbox.deleteAllRead(person);
+    }
+    setMuted(true);
+
+    moveClaimingUnit(fixture.outside());
+
+    Set<Audience> receiving =
+        Set.of(
+            Audience.AFFECTED_WRITER,
+            Audience.RESPONSIBLE_WRITER,
+            Audience.AREA_WRITER,
+            Audience.AREA_LEADER,
+            Audience.AFFECTED_LEADER);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          for (Audience recipient : receiving) {
+            assertThat(orderNotices(recipient))
+                .singleElement()
+                .satisfies(notice -> {
+                  assertThat(notice.get("type")).isEqualTo(NOTICE_TYPE);
+                  Map<String, Object> params = JsonPath.read(notice, "$.params");
+                  assertThat(params)
+                      .containsEntry("material", null)
+                      .containsEntry("reasonCode", "INELIGIBLE_UNIT");
+                });
+          }
+        });
+    await()
+        .during(Duration.ofMillis(400))
+        .atMost(Duration.ofSeconds(5))
+        .untilAsserted(() -> assertThat(orderNotices(Audience.PREFERENCE_WRITER)).isEmpty());
+    assertPreference(true);
+    assertExcludedAudiences();
+
+    moveClaimingUnit(fixture.outside());
+
+    for (Audience recipient : receiving) {
+      assertThat(orderNotices(recipient)).hasSize(1);
+    }
+    assertThat(orderNotices(Audience.PREFERENCE_WRITER)).isEmpty();
+  }
+
   private void assertPreference(boolean muted) throws Exception {
     String json =
         as(Audience.PREFERENCE_WRITER, get("/api/v1/notifications/preferences"), null)
@@ -328,7 +456,7 @@ class ProfitHierarchyNoticeIntegrationTest {
   private void assertExcludedAudiences() throws Exception {
     for (Audience recipient : Audience.values()) {
       if (!RECIPIENTS.contains(recipient)) {
-        assertThat(notices(recipient)).as("inbox of %s", recipient).isEmpty();
+        assertThat(orderNotices(recipient)).as("inbox of %s", recipient).isEmpty();
       }
     }
   }
@@ -357,11 +485,13 @@ class ProfitHierarchyNoticeIntegrationTest {
         .containsExactly(titanium);
   }
 
-  private static List<Map<String, Object>> withoutEndingTimestamps(List<Map<String, Object>> rows) {
+  private static List<Map<String, Object>> stableContributionFacts(List<Map<String, Object>> rows) {
     return rows.stream()
         .map(row -> {
           Map<String, Object> facts = new java.util.HashMap<>(row);
           facts.remove("ended_at");
+          facts.remove("amount");
+          facts.remove("changes");
           return facts;
         })
         .toList();
@@ -401,15 +531,19 @@ class ProfitHierarchyNoticeIntegrationTest {
   }
 
   private List<Map<String, Object>> notices(Audience recipient) throws Exception {
+    return orderNotices(recipient).stream()
+        .filter(notice -> NOTICE_TYPE.equals(notice.get("type")))
+        .toList();
+  }
+
+  private List<Map<String, Object>> orderNotices(Audience recipient) throws Exception {
     String json =
         as(recipient, get("/api/v1/notifications").param("size", "100"), null)
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
             .getContentAsString();
-    return JsonPath.read(
-        json,
-        "$.content[?(@.type == '" + NOTICE_TYPE + "' && @.entityId == '" + fixture.order() + "')]");
+    return JsonPath.read(json, "$.content[?(@.entityId == '" + fixture.order() + "')]");
   }
 
   private ResultActions as(Audience caller, MockHttpServletRequestBuilder request, UUID grant)
@@ -487,6 +621,7 @@ class ProfitHierarchyNoticeIntegrationTest {
                 .material(copper)
                 .qualityTier(good)
                 .claimingOrgUnit(claiming)
+                .participation(persistedParticipation(participations, order, claiming))
                 .amount(4.0)
                 .claimedByUser(recorder)
                 .build(),
@@ -495,6 +630,7 @@ class ProfitHierarchyNoticeIntegrationTest {
                 .material(titanium)
                 .qualityTier(good)
                 .claimingOrgUnit(claiming)
+                .participation(persistedParticipation(participations, order, claiming))
                 .amount(7.0)
                 .claimedByUser(recorder)
                 .build()));

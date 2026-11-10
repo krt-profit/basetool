@@ -107,6 +107,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private QualityTierService qualityTierService;
   @Mock private AuthHelperService authHelperService;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private JobOrderChangeEffects effects;
 
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
   private JobOrderPriorityService jobOrderPriorityService;
@@ -131,14 +132,17 @@ class JobOrderServicePriorityAndStatusTest {
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
-            materialRepository,
+            new JobOrderMaterialLines(materialRepository, qualityTierService),
             new InventoryStockReads(
                 inventoryItemRepository,
                 inventoryItemMapper,
                 null,
                 null,
                 org.mockito.Mockito.mock(
-                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     inventoryItemRepository,
@@ -156,21 +160,24 @@ class JobOrderServicePriorityAndStatusTest {
             null,
             authHelperService,
             eventPublisher,
+            effects,
             materialClaimService,
             auditService,
             null,
             jobOrderStockProjectionService,
             jobOrderPriorityService,
-            qualityTierService,
             actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
                 org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.class),
+                org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
-                eventPublisher,
+                effects,
                 jobOrderStockProjectionService,
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
@@ -241,11 +248,11 @@ class JobOrderServicePriorityAndStatusTest {
 
       assertNull(o.getPriority(), "terminal status (COMPLETED) must clear priority");
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
-      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
+
       verify(jobOrderRepository).save(o);
       verify(jobOrderRepository).flush();
-      verify(jobOrderRepository).lockAllJobOrders();
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(jobOrderRepository, times(2)).lockAllJobOrders();
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -260,14 +267,14 @@ class JobOrderServicePriorityAndStatusTest {
 
       assertNull(o.getPriority());
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
-      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     private de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent
         finishedNotice() {
       org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
-      verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+      verify(effects, org.mockito.Mockito.atLeastOnce()).publish(captor.capture());
       return captor.getAllValues().stream()
           .filter(
               de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent.class
@@ -320,8 +327,8 @@ class JobOrderServicePriorityAndStatusTest {
       service.updateJobOrderStatus(
           ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, 1L));
 
-      verify(eventPublisher, never())
-          .publishEvent(
+      verify(effects, never())
+          .publish(
               org.mockito.ArgumentMatchers.<Object>argThat(e ->
                   e
                       instanceof
@@ -344,9 +351,10 @@ class JobOrderServicePriorityAndStatusTest {
           o.getPriority(),
           "un-completion sets priority = findMaxPriority + 1 = 6; "
               + "normalize doesn't see this order in lockAllJobOrders stub");
-      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
+      verify(inventoryItemRepository, never())
+          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
-      verify(eventPublisher, never()).publishEvent(any(Object.class));
+      verify(effects, never()).publish(any(Object.class));
     }
 
     @Test
@@ -377,8 +385,9 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
       assertNull(o.getPriority());
       verify(jobOrderRepository, never()).lockAllJobOrders();
-      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
-      verify(eventPublisher, never()).publishEvent(any(Object.class));
+      verify(inventoryItemRepository, never())
+          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
+      verify(effects, never()).publish(any(Object.class));
     }
 
     @Test
@@ -489,7 +498,7 @@ class JobOrderServicePriorityAndStatusTest {
     }
 
     @Test
-    void removedMaterials_areUnlinkedFromInventory() {
+    void replacedMaterialsRetainOnlyTheRequestedDemand() {
       UUID xId = UUID.randomUUID();
       UUID yId = UUID.randomUUID();
 
@@ -513,8 +522,9 @@ class JobOrderServicePriorityAndStatusTest {
               null, null, "OP-1", null, List.of(new CreateJobOrderMaterialDto(yId, 650, 5.0)), 1L);
 
       service.updateJobOrder(ORDER_ID, dto);
-
-      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrderAndMaterial(ORDER_ID, xId);
+      assertEquals(
+          List.of(yId), o.getMaterials().stream().map(line -> line.getMaterial().getId()).toList());
+      assertEquals(5.0, o.getMaterials().iterator().next().getAmount());
     }
 
     @Test
@@ -558,7 +568,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -570,7 +580,7 @@ class JobOrderServicePriorityAndStatusTest {
 
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository, times(1)).lockAllJobOrders();
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
   }
 
@@ -610,8 +620,6 @@ class JobOrderServicePriorityAndStatusTest {
 
       service.unlinkMaterial(ORDER_ID, matId);
 
-      verify(inventoryItemRepository)
-          .deleteJobOrderAllocationsByJobOrderAndMaterial(ORDER_ID, matId);
       assertTrue(
           o.getMaterials().isEmpty(),
           "the JobOrderMaterial association must be removed from the in-memory set too");
@@ -639,8 +647,9 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
       verify(jobOrderRepository, never()).flush();
       verify(jobOrderRepository, never()).lockAllJobOrders();
-      verify(inventoryItemRepository, never()).deleteJobOrderAllocationsByJobOrder(any());
-      verify(eventPublisher, never()).publishEvent(any(Object.class));
+      verify(inventoryItemRepository, never())
+          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
+      verify(effects, never()).publish(any(Object.class));
     }
 
     @Test
@@ -654,8 +663,8 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority(), "priority must be cleared");
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
-      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
 
     @Test
@@ -668,8 +677,8 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
       assertNull(o.getPriority());
       verify(jobOrderRepository).flush();
-      verify(inventoryItemRepository).deleteJobOrderAllocationsByJobOrder(ORDER_ID);
-      verify(eventPublisher).publishEvent(new JobOrderClosedEvent(ORDER_ID, null));
+
+      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
   }
 

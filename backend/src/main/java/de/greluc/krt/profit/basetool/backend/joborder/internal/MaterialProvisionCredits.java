@@ -78,6 +78,9 @@ public class MaterialProvisionCredits {
     List<StockQuantityFragment> provided =
         takeUncredited(provision.quantity(), used, budget, quantum);
     long actualQuantity = StockQuantityFragments.total(provided);
+    if (actualQuantity > 0L && claim.getAmount() <= 0.0) {
+      throw new BadRequestException("orders.claim.provision.no_open_amount");
+    }
     List<StockQuantityFragment> selected =
         StockQuantityFragments.prefix(
             provided,

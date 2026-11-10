@@ -36,6 +36,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -154,15 +155,16 @@ public class InventoryOrderWrites {
       scopes.addAll(rows.findAllocatedMaterialScopes(rowIds));
     }
     if (!allocationTargets.isEmpty()) {
-      Map<UUID, InventoryItemRepository.RowLot> targets =
+      Map<UUID, InventoryOrderAllocationQueries.RowLot> targets =
           rows
               .findRowLots(
                   allocationTargets.stream().map(PoolAllocationTarget::entryId).distinct().toList())
               .stream()
               .collect(
-                  Collectors.toMap(InventoryItemRepository.RowLot::getId, Function.identity()));
+                  Collectors.toMap(
+                      InventoryOrderAllocationQueries.RowLot::getId, Function.identity()));
       for (PoolAllocationTarget target : allocationTargets) {
-        InventoryItemRepository.RowLot row = targets.get(target.entryId());
+        InventoryOrderAllocationQueries.RowLot row = targets.get(target.entryId());
         if (row != null && row.getMaterialId() != null) {
           scopes.add(new OrderMaterialScope(target.orderId(), row.getMaterialId()));
         }
@@ -179,6 +181,32 @@ public class InventoryOrderWrites {
    */
   public void lockBookIn(@NotNull StockBookInScope booking) {
     prepareWrites(List.of(), List.of(booking), List.of());
+  }
+
+  /**
+   * Locks a prospective action's complete material set without granting its preliminary mutations.
+   *
+   * @param rowIds the exact preliminary physical mutation resources
+   * @param lotKeys every declared read and mutation lot key
+   */
+  void prepareObservedAction(Collection<UUID> rowIds, Collection<Long> lotKeys) {
+    lockEligibility();
+    Planning plan = planning();
+    readSnapshots(rowIds).forEach(plan.rows::putIfAbsent);
+    observer.beforeOrderLinkedMaterialWrite(
+        rowIds.isEmpty() ? List.of() : rows.findAllocatedMaterialScopes(rowIds));
+    lockStockLots(lotKeys);
+  }
+
+  /**
+   * Locks read observations without treating them as actual order-linked mutations.
+   *
+   * @param rowIds every current physical row of the declared lots
+   */
+  void lockObservedRows(Collection<UUID> rowIds) {
+    if (!rowIds.isEmpty()) {
+      rows.lockAllByIdOrderById(rowIds);
+    }
   }
 
   /**
@@ -299,14 +327,16 @@ public class InventoryOrderWrites {
       @NotNull Collection<UUID> rowIds, @NotNull Collection<PoolRelocation> relocations) {
     lockEligibility();
     Map<UUID, Set<String>> holderLots = new HashMap<>();
-    Map<UUID, InventoryItemRepository.RowLot> sources =
+    Map<UUID, InventoryOrderAllocationQueries.RowLot> sources =
         rows.findRowLots(rowIds).stream()
-            .collect(Collectors.toMap(InventoryItemRepository.RowLot::getId, Function.identity()));
-    for (InventoryItemRepository.RowLot row : sources.values()) {
+            .collect(
+                Collectors.toMap(
+                    InventoryOrderAllocationQueries.RowLot::getId, Function.identity()));
+    for (InventoryOrderAllocationQueries.RowLot row : sources.values()) {
       addHolderLot(holderLots, row, null);
     }
     for (PoolRelocation relocation : relocations) {
-      InventoryItemRepository.RowLot row = sources.get(relocation.entryId());
+      InventoryOrderAllocationQueries.RowLot row = sources.get(relocation.entryId());
       if (row != null) {
         addHolderLot(holderLots, row, relocation);
       }
@@ -334,7 +364,7 @@ public class InventoryOrderWrites {
    */
   private static void addHolderLot(
       @NotNull Map<UUID, Set<String>> holderLots,
-      @NotNull InventoryItemRepository.RowLot row,
+      @NotNull InventoryOrderAllocationQueries.RowLot row,
       @Nullable PoolRelocation relocation) {
     UUID holder =
         relocation != null && relocation.holder() != null ? relocation.holder() : row.getHolderId();
@@ -393,6 +423,7 @@ public class InventoryOrderWrites {
       if (!Objects.equals(expected, current)) {
         throw new ObjectOptimisticLockingFailureException(InventoryItem.class, id);
       }
+      plan.mutationBaselines.putIfAbsent(id, Optional.ofNullable(current));
       plan.validated.add(id);
     }
     plan.stockPhase = true;
@@ -420,7 +451,7 @@ public class InventoryOrderWrites {
           .add(new AllocationSnapshot(fact.getOrderId(), ScuAmounts.toQuanta(fact.getAmount())));
     }
     Map<UUID, RowSnapshot> result = new HashMap<>();
-    for (InventoryItemRepository.RowLot row : rows.findRowLots(rowIds)) {
+    for (InventoryOrderAllocationQueries.RowLot row : rows.findRowLots(rowIds)) {
       result.put(
           row.getId(),
           new RowSnapshot(
@@ -439,14 +470,14 @@ public class InventoryOrderWrites {
     return result;
   }
 
-  private static Planning planning() {
+  private Planning planning() {
     for (TransactionSynchronization synchronization :
         TransactionSynchronizationManager.getSynchronizations()) {
       if (synchronization instanceof Planning current) {
         return current;
       }
     }
-    Planning current = new Planning();
+    Planning current = new Planning(this);
     TransactionSynchronizationManager.registerSynchronization(current);
     return current;
   }
@@ -469,12 +500,71 @@ public class InventoryOrderWrites {
       Set<AllocationSnapshot> allocations) {}
 
   /** The stock plan and revalidated rows owned exclusively by one transaction. */
+  @RequiredArgsConstructor
   private static final class Planning implements TransactionSynchronization {
+    private final InventoryOrderWrites owner;
     private final Map<UUID, RowSnapshot> rows = new HashMap<>();
+    private final Map<UUID, Optional<RowSnapshot>> mutationBaselines = new HashMap<>();
     private final Set<UUID> validated = new HashSet<>();
     private final Set<Long> lots = new HashSet<>();
     private final Set<InventoryItem> created = Collections.newSetFromMap(new IdentityHashMap<>());
     private boolean stockPhase;
+
+    @Override
+    public int getOrder() {
+      return 0;
+    }
+
+    @Override
+    public void beforeCommit(boolean readOnly) {
+      if (!readOnly) {
+        owner.publishLinkedStockChanges(this);
+      }
+    }
+  }
+
+  /**
+   * Publishes only this action's net row and allocation changes from post-lock mutation baselines.
+   */
+  private void publishLinkedStockChanges(Planning plan) {
+    Set<UUID> ids = new HashSet<>(plan.mutationBaselines.keySet());
+    plan.created.stream().map(InventoryItem::getId).filter(Objects::nonNull).forEach(ids::add);
+    if (ids.isEmpty()) {
+      return;
+    }
+    rows.flush();
+    Map<UUID, RowSnapshot> after = readSnapshots(ids);
+    Set<OrderMaterialScope> changed = new HashSet<>();
+    Set<UUID> orderIds = new HashSet<>();
+    for (UUID id : ids) {
+      RowSnapshot before = plan.mutationBaselines.getOrDefault(id, Optional.empty()).orElse(null);
+      RowSnapshot current = after.get(id);
+      if (!Objects.equals(before, current)) {
+        addMaterialScopes(changed, before);
+        addMaterialScopes(changed, current);
+        addOrderIds(orderIds, before);
+        addOrderIds(orderIds, current);
+      }
+    }
+    if (!orderIds.isEmpty()) {
+      observer.orderLinkedStockChanged(orderIds, changed);
+    }
+  }
+
+  /** Adds every allocation target of an initial or final material or game-item stock row. */
+  private static void addOrderIds(Set<UUID> orderIds, @Nullable RowSnapshot row) {
+    if (row != null) {
+      row.allocations().forEach(allocation -> orderIds.add(allocation.order()));
+    }
+  }
+
+  /** Adds every material scope attached to one initial or final physical row snapshot. */
+  private static void addMaterialScopes(Set<OrderMaterialScope> scopes, @Nullable RowSnapshot row) {
+    if (row != null && row.material() != null) {
+      UUID material = Objects.requireNonNull(row.material());
+      row.allocations()
+          .forEach(allocation -> scopes.add(new OrderMaterialScope(allocation.order(), material)));
+    }
   }
 
   /**

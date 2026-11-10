@@ -91,7 +91,7 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
       UUID factId) {
     orderWrites.lockEligibility();
     Set<UUID> ids = new TreeSet<>(rowIds(removed));
-    List<InventoryItemRepository.RowLot> placements = rows.findRowLots(ids);
+    List<InventoryOrderAllocationQueries.RowLot> placements = rows.findRowLots(ids);
     orderWrites.lockRowsAndTargets(ids, requestedScopes, List.of());
     Set<Long> lotKeys =
         placements.stream()
@@ -169,7 +169,7 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
       throw new BusinessConflictException("orders.claim.correction.connected_stock_required");
     }
     List<UUID> selected = List.of(selectedRowId);
-    List<InventoryItemRepository.RowLot> placements = rows.findRowLots(selected);
+    List<InventoryOrderAllocationQueries.RowLot> placements = rows.findRowLots(selected);
     orderWrites.lockRowsAndTargets(selected, List.of(provisionScope), List.of());
     orderWrites.lockStockLots(
         placements.stream()

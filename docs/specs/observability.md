@@ -1846,6 +1846,21 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
   `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
   counts (REQ-ORDERS-025).
+  Material promises, explicit provision credit, connected correction and participation ending
+  likewise use the existing `JOB_ORDER` audit domain; their physical Inventory effects use
+  `INVENTORY` (REQ-ORDERS-024). `JOB_ORDER_PARTICIPATION_ENDED` therefore appears in the same
+  domain-wide operations panels and silence rule without a new label or exception. The audit
+  counter counts calls to `AuditService.record`, including attempts whose surrounding transaction
+  later rolls back; persisted audit rows remain transactional. It is not a committed quantity or
+  performance meter. HTTP authorization/version refusals retain the existing bounded error
+  counters. Committed peer invalidations and grouped material notices use the existing Live and
+  notification meters; cause replay, rollback and true no-ops create no extra notice or refresh.
+  `NotificationFlood` already includes every notification type, including
+  `MATERIAL_CONTRIBUTIONS_CHANGED`. No order, unit, material, receipt identity or quantity becomes
+  a metric label. Public `NotificationCauseIntegrationTest`,
+  `MaterialContributionEffectsIntegrationTest`, `MaterialClaimNoOpIntegrationTest` and
+  `JobOrderProductionResourcePlanningIntegrationTest` establish the corresponding committed,
+  replay/no-op and stock-only effects.
 - **`client_id` on the two exchange request counters** (`refused_total`, `relay_total`): the
   registry client id when the registry lists the token's `azp`, otherwise `unregistered`,
   `unknown` while the registry cannot be read, and `none` before a token names a client (and on

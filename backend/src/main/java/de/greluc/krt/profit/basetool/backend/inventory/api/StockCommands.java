@@ -128,8 +128,10 @@ public interface StockCommands {
    * @param member the member, owner and actor
    * @param lot the lot
    * @param amount the amount
+   * @return the row that holds the new quantity after the owning merge
    */
-  void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount);
+  @NotNull
+  UUID bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount);
 
   /**
    * Books an amount out of one locked row through the Lager's own book-out, which audits it and
@@ -151,8 +153,10 @@ public interface StockCommands {
    * @param rowId the row
    * @param stolen the marker to set
    * @param amount the part to mark, or {@code null} for the whole row
+   * @return the marked or split row after its owning merge
    */
-  void markStolen(
+  @NotNull
+  UUID markStolen(
       @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount);
 
   /**

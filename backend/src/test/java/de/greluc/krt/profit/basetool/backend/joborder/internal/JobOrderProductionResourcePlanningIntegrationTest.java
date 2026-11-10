@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
@@ -52,9 +53,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,6 +76,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -80,6 +86,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Verifies complete production resource planning through real PostgreSQL and the public API. */
 @SpringBootTest
+@WithMockUser(roles = "ADMIN")
 class JobOrderProductionResourcePlanningIntegrationTest {
   @Autowired private WebApplicationContext context;
   @Autowired private TransactionTemplate transactions;
@@ -95,6 +102,8 @@ class JobOrderProductionResourcePlanningIntegrationTest {
   @Autowired private InventoryItemRepository inventory;
   @Autowired private StockReads stock;
   @Autowired private StockCommands commands;
+  @Autowired private StockLotWritePlans lotPlans;
+  @Autowired private MeterRegistry meterRegistry;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper json;
   private MockMvc mvc;
@@ -112,6 +121,199 @@ class JobOrderProductionResourcePlanningIntegrationTest {
   @BeforeEach
   void setUp() {
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  void aLinkedStockChangeWithoutAnyClaimPublishesTheCommittedOrderRefresh() {
+    Fixture fixture = seed();
+    Source source = fixture.sources().getFirst();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM material_claim WHERE job_order_id = ?",
+                Integer.class,
+                fixture.orderId()))
+        .isZero();
+    double before = orderFrames();
+
+    transactions.executeWithoutResult(
+        _ -> commands.bookOutRow(fixture.holderId(), source.rowId(), 1.0));
+
+    transactions.executeWithoutResult(_ -> {
+      var remaining = stock.findRow(source.rowId()).orElseThrow();
+      assertThat(remaining.getAmount()).isEqualTo(2.0);
+      assertThat(remaining.jobOrderSliceAmount(fixture.orderId())).isEqualTo(2.0);
+    });
+    assertThat(orderFrames()).isGreaterThan(before);
+  }
+
+  @Test
+  void aLinkedGameItemChangeWithoutAnyClaimPublishesTheCommittedOrderRefresh() {
+    Fixture fixture = seed();
+    UUID finished =
+        transactions.execute(_ -> {
+          var order = orders.findById(fixture.orderId()).orElseThrow();
+          InventoryItem row = new InventoryItem();
+          row.setUser(users.findById(fixture.holderId()).orElseThrow());
+          row.setGameItem(order.getItems().iterator().next().getGameItem());
+          row.setLocation(locations.findById(fixture.locationId()).orElseThrow());
+          row.setAmount(2.0);
+          row.setPersonal(false);
+          InventoryAllocations.addJobOrder(row, fixture.orderId(), 2.0, false);
+          return inventory.saveAndFlush(row).getId();
+        });
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM material_claim WHERE job_order_id = ?",
+                Integer.class,
+                fixture.orderId()))
+        .isZero();
+    double before = orderFrames();
+
+    transactions.executeWithoutResult(_ -> commands.bookOutRow(fixture.holderId(), finished, 1.0));
+
+    transactions.executeWithoutResult(_ -> {
+      var remaining = stock.findRow(finished).orElseThrow();
+      assertThat(remaining.getAmount()).isEqualTo(1.0);
+      assertThat(remaining.jobOrderSliceAmount(fixture.orderId())).isEqualTo(1.0);
+    });
+    assertThat(orderFrames()).isGreaterThan(before);
+  }
+
+  @Test
+  void preparedDeclinedUnchangedAndDryActionsPublishNoOrderRefresh() {
+    Fixture fixture = seed();
+    Source source = fixture.sources().getFirst();
+    jdbc.update(
+        "UPDATE inventory_item_job_order_allocation SET amount = 2 WHERE inventory_item_id = ?",
+        source.rowId());
+    double before = orderFrames();
+    transactions.executeWithoutResult(_ -> {
+      commands.prepareWrites(List.of(source.rowId()), List.of(), List.of());
+    });
+    transactions.executeWithoutResult(_ -> {
+      StockLot lot = sourceLot(fixture, source);
+      List<StockLotWritePlans.Intent> intents =
+          List.of(
+              new StockLotWritePlans.SetLotAmount(
+                  0, lot, new BigDecimal("3"), new BigDecimal("2")));
+      var prepared = lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
+      lotPlans.confirmLotBatch(prepared, List.of(), false);
+    });
+    transactions.executeWithoutResult(_ -> {
+      StockLot lot = sourceLot(fixture, source);
+      List<StockLotWritePlans.Intent> intents =
+          List.of(
+              new StockLotWritePlans.SetLotAmount(
+                  0, lot, new BigDecimal("3"), new BigDecimal("4")));
+      var prepared = lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
+      var confirmed = lotPlans.confirmLotBatch(prepared, intents, true);
+      lotPlans.executePreparedLot(confirmed, 0, true);
+    });
+
+    assertThat(orderFrames()).isEqualTo(before);
+    transactions.executeWithoutResult(_ -> {
+      var unchanged = stock.findRow(source.rowId()).orElseThrow();
+      assertThat(unchanged.getAmount()).isEqualTo(3.0);
+      assertThat(unchanged.jobOrderSliceAmount(fixture.orderId())).isEqualTo(2.0);
+      assertThat(unchanged.getVersion()).isEqualTo(source.version());
+    });
+  }
+
+  @Test
+  void aFlushedMarkerRoundTripPublishesItsChangedExposedRowVersion() {
+    Fixture fixture = seed();
+    Source source = fixture.sources().getFirst();
+    double before = orderFrames();
+
+    transactions.executeWithoutResult(_ -> {
+      StockLot ordinary = sourceLot(fixture, source);
+      StockLot stolen =
+          new StockLot(ordinary.material(), null, ordinary.location(), ordinary.quality(), true);
+      commands.prepareWrites(
+          List.of(source.rowId()),
+          List.of(
+              new StockCommands.StockBookInScope(
+                  fixture.holderId(), stolen, List.of(fixture.orderId()), false, null, false)),
+          List.of());
+      commands.markStolen(fixture.holderId(), source.rowId(), true, null);
+      assertThat(stock.lotRows(fixture.holderId(), List.of(stolen)).get(stolen.key()))
+          .singleElement()
+          .satisfies(row -> assertThat(row.getStolen()).isTrue());
+      commands.markStolen(fixture.holderId(), source.rowId(), false, null);
+    });
+
+    assertThat(orderFrames()).isGreaterThan(before);
+    transactions.executeWithoutResult(_ -> {
+      var unchanged = stock.findRow(source.rowId()).orElseThrow();
+      assertThat(unchanged.getAmount()).isEqualTo(3.0);
+      assertThat(unchanged.jobOrderSliceAmount(fixture.orderId())).isEqualTo(3.0);
+      assertThat(unchanged.getStolen()).isFalse();
+      assertThat(unchanged.getVersion()).isGreaterThan(source.version());
+    });
+  }
+
+  @Test
+  void aDeclinedWaiterDoesNotPublishAnotherTransactionsStockChangeAgain() throws Exception {
+    Fixture fixture = seed();
+    Source source = fixture.sources().getFirst();
+    jdbc.update(
+        "UPDATE inventory_item_job_order_allocation SET amount = 2 WHERE inventory_item_id = ?",
+        source.rowId());
+    double before = orderFrames();
+    String waiter = "declined-live-plan-" + UUID.randomUUID();
+    AtomicReference<Future<Throwable>> contender = new AtomicReference<>();
+    try (var workers = Executors.newSingleThreadExecutor()) {
+      transactions.executeWithoutResult(_ -> {
+        commands.prepareWrites(List.of(source.rowId()), List.of(), List.of());
+        contender.set(
+            workers.submit(() -> {
+              try {
+                transactions.executeWithoutResult(_ -> {
+                  nameConnection(waiter);
+                  StockLot lot = sourceLot(fixture, source);
+                  List<StockLotWritePlans.Intent> intents =
+                      List.of(
+                          new StockLotWritePlans.SetLotAmount(
+                              0, lot, new BigDecimal("3"), new BigDecimal("2")));
+                  var prepared =
+                      lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
+                  assertThat(prepared.lockedRows().get(lot.key()))
+                      .singleElement()
+                      .satisfies(row -> assertThat(row.getAmount()).isEqualTo(2.0));
+                  lotPlans.confirmLotBatch(prepared, List.of(), false);
+                });
+                return null;
+              } catch (RuntimeException conflict) {
+                return conflict;
+              }
+            }));
+        awaitGuardWait(waiter);
+        commands.bookOutRow(fixture.holderId(), source.rowId(), 1.0);
+      });
+      assertThat(contender.get().get(15, TimeUnit.SECONDS)).isNull();
+    }
+    assertThat(orderFrames()).isEqualTo(before + 1);
+    assertThat(stock.findRow(source.rowId()).orElseThrow().getAmount()).isEqualTo(2.0);
+  }
+
+  /** Reads the public committed order-frame acceptance metric. */
+  private double orderFrames() {
+    return meterRegistry
+        .counter(
+            LivesyncMetricNames.LIVESYNC_PUBLISH_ACCEPTED,
+            LivesyncMetricNames.TAG_TOPIC_CLASS,
+            LiveSyncTopicClass.ORDER.metricLabel())
+        .count();
+  }
+
+  /** Returns one seeded source's exact physical lot without granting write authority. */
+  private StockLot sourceLot(Fixture fixture, Source source) {
+    return new StockLot(
+        materials.findById(source.materialId()).orElseThrow(),
+        null,
+        locations.findById(fixture.locationId()).orElseThrow(),
+        100,
+        false);
   }
 
   @Test

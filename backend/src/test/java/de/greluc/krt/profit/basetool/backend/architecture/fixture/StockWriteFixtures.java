@@ -82,7 +82,7 @@ public final class StockWriteFixtures {
      * @param jobOrderId the order
      */
     public void releasesInBulk(UUID jobOrderId) {
-      repository.deleteJobOrderAllocationsByJobOrder(jobOrderId);
+      repository.deleteJobOrderAllocationsByJobOrder(jobOrderId, java.util.List.of());
     }
 
     /**

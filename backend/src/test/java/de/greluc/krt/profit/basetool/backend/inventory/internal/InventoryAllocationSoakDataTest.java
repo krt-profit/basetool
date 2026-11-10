@@ -73,7 +73,8 @@ class InventoryAllocationSoakDataTest {
     Fixture f = seedLinkedItem(75.0);
     entityManager.flush();
 
-    inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(f.orderId);
+    inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(
+        f.orderId, java.util.List.of(f.itemId));
     entityManager.clear();
 
     assertThat(jobOrderAllocationRepository.findAll())
@@ -93,7 +94,8 @@ class InventoryAllocationSoakDataTest {
     Fixture f = seedLinkedItem(50.0);
     entityManager.flush();
 
-    inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(f.orderId, f.materialId);
+    inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
+        f.orderId, f.materialId, java.util.List.of(f.itemId));
     entityManager.clear();
 
     assertThat(jobOrderAllocationRepository.findAll())

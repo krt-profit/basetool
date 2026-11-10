@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
@@ -64,6 +65,7 @@ public class ExchangeStockShares {
   static final String STOCK_OFFERED = "STOCK_OFFERED";
 
   private final RebookCommands rebookCommands;
+  private final StockLotWritePlans lotWritePlans;
   private final ExchangeJournalService journalService;
 
   /**
@@ -118,18 +120,12 @@ public class ExchangeStockShares {
    * @return the Lager's refusal as a per-op reason, or {@code null} when the move ran or would run
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public @Nullable String run(
-      @NotNull ExchangeCaller caller, @NotNull UUID batch, @NotNull Move move, boolean dryRun) {
-    RebookCommands.RebookOutcome outcome =
-        rebookCommands.rebook(
-            new RebookCommands.Rebook(
-                caller.member(),
-                move.lot(),
-                move.orgUnitId(),
-                move.direction(),
-                move.amount().doubleValue()),
-            dryRun);
-    RebookCommands.RebookRefusal refusal = outcome.refusal();
+  public @Nullable String record(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      @NotNull Move move,
+      boolean dryRun,
+      @Nullable RebookCommands.RebookRefusal refusal) {
     if (refusal != null) {
       return reason(refusal);
     }
@@ -185,13 +181,19 @@ public class ExchangeStockShares {
     });
     List<RebookCommands.Rebook> rebooks = new ArrayList<>(toPersonal);
     rebooks.addAll(toPool);
+    List<StockLotWritePlans.Intent> intents = new ArrayList<>();
+    for (int step = 0; step < rebooks.size(); step++) {
+      intents.add(new StockLotWritePlans.RebookLot(step, rebooks.get(step)));
+    }
+    var prepared = lotWritePlans.prepareLotBatch(member, List.of(lot), intents);
     for (RebookCommands.Rebook rebook : rebooks) {
       if (rebookCommands.rebook(rebook, true).refusal() != null) {
         return false;
       }
     }
-    for (RebookCommands.Rebook rebook : rebooks) {
-      if (rebookCommands.rebook(rebook, false).refusal() != null) {
+    var confirmed = lotWritePlans.confirmLotBatch(prepared, intents, false);
+    for (int step = 0; step < rebooks.size(); step++) {
+      if (lotWritePlans.executePreparedLot(confirmed, step, false).refusal() != null) {
         throw new IllegalStateException("The Lager refused a take-back it had accepted");
       }
     }

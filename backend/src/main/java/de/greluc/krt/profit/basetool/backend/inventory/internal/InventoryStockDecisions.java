@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookRefusal;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,9 @@ final class InventoryStockDecisions {
 
   /** The tolerance of an amount comparison, which only absorbs floating-point noise. */
   private static final double EPSILON = AllocationReductions.REDUCTION_EPSILON;
+
+  /** Decimal places carried by the SCU stock format. */
+  private static final int SCU_SCALE = 3;
 
   /** Why an amount cannot be booked out of a row. */
   enum BookOutRefusal {
@@ -104,6 +109,148 @@ final class InventoryStockDecisions {
    * @param amount the amount to move off it, positive
    */
   record Take(@NotNull InventoryItem row, double amount) {}
+
+  /**
+   * The quantity facts used by both actual and prospective lot rebooking selection.
+   *
+   * @param <K> the caller's real or prospective row identity type
+   * @param key the source identity
+   * @param amount the current source amount
+   * @param jobOrders the job-order reservation
+   * @param missions the mission reservation
+   * @param donations the donation reservation
+   * @param personalEligible whether the source carries no job-order or mission slices
+   * @param offered the active offer quantity
+   */
+  record RebookSource<K>(
+      @NotNull K key,
+      double amount,
+      double jobOrders,
+      double missions,
+      double donations,
+      boolean personalEligible,
+      double offered) {}
+
+  /**
+   * One canonical rebooking take independent of managed entity state.
+   *
+   * @param <K> the caller's source identity type
+   * @param key the selected source
+   * @param amount the selected positive amount
+   */
+  record RebookTake<K>(@NotNull K key, double amount) {}
+
+  /**
+   * The canonical rebooking refusal or ordered source takes.
+   *
+   * @param <K> the caller's source identity type
+   * @param refusal the ordinary refusal, or null when the move is allowed
+   * @param takes the immutable ordered source selection
+   */
+  record RebookSelection<K>(@Nullable RebookRefusal refusal, @NotNull List<RebookTake<K>> takes) {
+    RebookSelection {
+      takes = List.copyOf(takes);
+    }
+  }
+
+  /**
+   * The ordered quantity facts used by free-stock book-out and stolen marking.
+   *
+   * @param <K> the caller's source identity type
+   * @param key the source identity
+   * @param amount its physical amount
+   * @param jobOrders its job-order reservations
+   * @param missions its mission reservations
+   * @param donations its donation reservations
+   * @param stolen its current stolen marker
+   * @param offered whether any offer references the source
+   */
+  record DrawSource<K>(
+      @NotNull K key,
+      @NotNull BigDecimal amount,
+      @NotNull BigDecimal jobOrders,
+      @NotNull BigDecimal missions,
+      @NotNull BigDecimal donations,
+      boolean stolen,
+      boolean offered) {}
+
+  /**
+   * One exact positive take selected from ordered stock facts.
+   *
+   * @param <K> the caller's source identity type
+   * @param key the source identity
+   * @param amount the amount selected
+   * @param whole whether the take covers the source's whole physical amount
+   */
+  record Draw<K>(@NotNull K key, @NotNull BigDecimal amount, boolean whole) {}
+
+  /**
+   * Selects the free prefix used by ordinary lot book-out.
+   *
+   * @param <K> the caller's source identity type
+   * @param sources the sources in owning book-out order
+   * @param amount the exact amount to take
+   * @param wholeUnits whether the lot counts only whole units
+   * @return immutable ordered positive takes
+   */
+  static <K> List<Draw<K>> freeDraws(
+      List<DrawSource<K>> sources, BigDecimal amount, boolean wholeUnits) {
+    List<Draw<K>> selected = new ArrayList<>();
+    BigDecimal left = amount;
+    for (DrawSource<K> source : sources) {
+      if (left.signum() <= 0) {
+        break;
+      }
+      BigDecimal reserved = source.jobOrders().max(source.missions()).max(source.donations());
+      BigDecimal free =
+          roundStock(source.amount().subtract(reserved).max(BigDecimal.ZERO), wholeUnits);
+      BigDecimal take = free.min(left);
+      if (take.signum() > 0) {
+        selected.add(new Draw<>(source.key(), take, take.compareTo(source.amount()) == 0));
+        left = left.subtract(take);
+      }
+    }
+    return List.copyOf(selected);
+  }
+
+  /**
+   * Selects the unoffered prefix marked into a stolen twin before ordinary quantity changes.
+   *
+   * @param <K> the caller's source identity type
+   * @param sources the initial lot sources in owning book-out order
+   * @param stolen the requested marker
+   * @param amount the maximum amount to mark
+   * @param wholeUnits whether the lot counts only whole units
+   * @return immutable ordered takes, possibly short when offers or reservations prevent marking
+   */
+  static <K> List<Draw<K>> stolenDraws(
+      List<DrawSource<K>> sources, boolean stolen, BigDecimal amount, boolean wholeUnits) {
+    List<Draw<K>> selected = new ArrayList<>();
+    BigDecimal left = amount;
+    for (DrawSource<K> source : sources) {
+      if (left.signum() <= 0) {
+        break;
+      }
+      if (source.stolen() == stolen || source.offered() || source.amount().signum() <= 0) {
+        continue;
+      }
+      BigDecimal held = roundStock(source.amount(), wholeUnits);
+      BigDecimal take = held.min(left);
+      if (take.compareTo(held) < 0) {
+        BigDecimal reserved = source.jobOrders().add(source.missions()).add(source.donations());
+        take = take.min(roundStock(held.subtract(reserved).max(BigDecimal.ZERO), wholeUnits));
+      }
+      if (take.signum() > 0) {
+        selected.add(new Draw<>(source.key(), take, take.compareTo(held) == 0));
+        left = left.subtract(take);
+      }
+    }
+    return List.copyOf(selected);
+  }
+
+  private static BigDecimal roundStock(BigDecimal amount, boolean wholeUnits) {
+    return amount.setScale(wholeUnits ? 0 : SCU_SCALE, RoundingMode.HALF_UP);
+  }
 
   /**
    * Decides a book-out, sale or transfer of an amount of a row.
@@ -212,36 +359,69 @@ final class InventoryStockDecisions {
       double amount,
       boolean toPool,
       boolean wholeUnits) {
+    RebookSelection<InventoryItem> selected =
+        selectRebookSources(
+            sources.stream()
+                .map(source ->
+                    new RebookSource<>(
+                        source,
+                        amountOf(source),
+                        source.jobOrderReserved(),
+                        source.missionReserved(),
+                        source.donationReserved(),
+                        mayBecomePersonal(source),
+                        offeredOf(offered, source)))
+                .toList(),
+            amount,
+            toPool,
+            wholeUnits);
+    return new LotRebook(
+        selected.refusal(),
+        selected.takes().stream().map(take -> new Take(take.key(), take.amount())).toList());
+  }
+
+  /**
+   * Selects rebooking sources from the common owning quantity rules in their supplied order.
+   *
+   * @param <K> the caller's source identity type
+   * @param sources the already ordered real or prospective source facts
+   * @param amount the quantity to move
+   * @param toPool whether the move enters the pool
+   * @param wholeUnits whether the lot counts only whole units
+   * @return the ordinary refusal or exact ordered source takes
+   */
+  static <K> @NotNull RebookSelection<K> selectRebookSources(
+      @NotNull List<RebookSource<K>> sources, double amount, boolean toPool, boolean wholeUnits) {
     double held = 0.0;
     double unreserved = 0.0;
     double movable = 0.0;
-    for (InventoryItem source : sources) {
-      held += amountOf(source);
+    for (RebookSource<K> source : sources) {
+      held += source.amount();
       unreserved += unreserved(source, toPool, wholeUnits);
-      movable += movable(source, offeredOf(offered, source), toPool, wholeUnits);
+      movable += movable(source, toPool, wholeUnits);
     }
     if (amount > held + EPSILON) {
-      return new LotRebook(RebookRefusal.INSUFFICIENT_STOCK, List.of());
+      return new RebookSelection<>(RebookRefusal.INSUFFICIENT_STOCK, List.of());
     }
     if (amount > unreserved + EPSILON) {
-      return new LotRebook(RebookRefusal.STOCK_EARMARKED, List.of());
+      return new RebookSelection<>(RebookRefusal.STOCK_EARMARKED, List.of());
     }
     if (amount > movable + EPSILON) {
-      return new LotRebook(RebookRefusal.STOCK_OFFERED, List.of());
+      return new RebookSelection<>(RebookRefusal.STOCK_OFFERED, List.of());
     }
-    List<Take> takes = new ArrayList<>();
+    List<RebookTake<K>> takes = new ArrayList<>();
     double left = amount;
-    for (InventoryItem source : sources) {
+    for (RebookSource<K> source : sources) {
       if (left <= EPSILON) {
         break;
       }
-      double take = Math.min(left, movable(source, offeredOf(offered, source), toPool, wholeUnits));
+      double take = Math.min(left, movable(source, toPool, wholeUnits));
       if (take > EPSILON) {
-        takes.add(new Take(source, take));
+        takes.add(new RebookTake<>(source.key(), take));
         left = ScuAmounts.roundToScuScale(left - take);
       }
     }
-    return new LotRebook(null, takes);
+    return new RebookSelection<>(null, takes);
   }
 
   /**
@@ -253,31 +433,31 @@ final class InventoryStockDecisions {
    * @param wholeUnits whether the lot counts whole units
    * @return the unreserved amount, never negative
    */
-  private static double unreserved(@NotNull InventoryItem row, boolean toPool, boolean wholeUnits) {
+  private static <K> double unreserved(
+      @NotNull RebookSource<K> row, boolean toPool, boolean wholeUnits) {
     double reserved;
     if (toPool) {
-      reserved =
-          Math.max(Math.max(row.jobOrderReserved(), row.missionReserved()), row.donationReserved());
-    } else if (!mayBecomePersonal(row)) {
+      reserved = Math.max(Math.max(row.jobOrders(), row.missions()), row.donations());
+    } else if (!row.personalEligible()) {
       return 0.0;
     } else {
-      reserved = row.donationReserved();
+      reserved = row.donations();
     }
-    return free(amountOf(row), reserved, wholeUnits);
+    return free(row.amount(), reserved, wholeUnits);
   }
 
   /**
    * Returns the part of a row a rebooking may take: unreserved and above its Materialbörse offer.
    *
    * @param row the row
-   * @param offered the amount the row offers on the Materialbörse
    * @param toPool whether the stock moves into the pool
    * @param wholeUnits whether the lot counts whole units
    * @return the movable amount, never negative
    */
-  private static double movable(
-      @NotNull InventoryItem row, double offered, boolean toPool, boolean wholeUnits) {
-    return Math.min(unreserved(row, toPool, wholeUnits), free(amountOf(row), offered, wholeUnits));
+  private static <K> double movable(
+      @NotNull RebookSource<K> row, boolean toPool, boolean wholeUnits) {
+    return Math.min(
+        unreserved(row, toPool, wholeUnits), free(row.amount(), row.offered(), wholeUnits));
   }
 
   /**

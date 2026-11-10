@@ -173,7 +173,8 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(
+            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     verify(jobOrderRepository, times(2)).findById(orderId);
@@ -317,8 +318,7 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository, never()).save(any());
     verify(offerRatchet).beforeDelete(List.of(inventoryItem.getId()), StockChangeReason.HANDOVER);
     verify(offerRatchet, never()).lower(any(), anyDouble(), any());
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
+
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
     verify(jobOrderRepository, times(2)).findById(orderId);
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
@@ -429,8 +429,7 @@ class JobOrderHandoverServiceTest {
         0.0001,
         "Second material's open amount must be reduced from 8.0 to 0.0");
     verify(inventoryItemRepository).delete(inventoryItem2);
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId2);
+
     verify(inventoryItemRepository).save(inventoryItem);
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
@@ -485,8 +484,7 @@ class JobOrderHandoverServiceTest {
     assertDoesNotThrow(() -> service.createHandover(orderId, createDto));
 
     verify(inventoryItemRepository).delete(inventoryItem);
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
+
     assertEquals(2.0, inventoryItem2.getAmount());
     verify(inventoryItemRepository).save(inventoryItem2);
   }
@@ -536,7 +534,8 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(
+            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 
@@ -837,8 +836,7 @@ class JobOrderHandoverServiceTest {
 
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(any());
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, materialId);
+
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_HANDED_OVER),
@@ -879,7 +877,8 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+        .deleteJobOrderAllocationsByJobOrderAndMaterial(
+            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_HANDED_OVER),

@@ -917,7 +917,11 @@ copied into details. Unchanged rows and rolled-back attempts emit no mutation ev
 owner-domain events do not implement or replace the planned catalogue-admin audit domain.
 
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
-as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `INELIGIBLE_UNIT`.
+as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.
+An actual active-to-ended Staffel participation is recorded once as
+`JOB_ORDER_PARTICIPATION_ENDED`, including when it has no open promise. Details contain only the
+participation/unit identities and bounded reason `UNIT_INELIGIBLE`; existing contribution facts
+remain unchanged. Replayed maintenance does not add a second participation-ending event.
 Responsibility transfer uses `JOB_ORDER_REASSIGNED`, preserving from/to identities and whether the
 original Profit boundary remains unknown, plus the observed valid `profitOrgUnit` identity.
 New creation records the verified root too; an unknown legacy original is never filled from it.

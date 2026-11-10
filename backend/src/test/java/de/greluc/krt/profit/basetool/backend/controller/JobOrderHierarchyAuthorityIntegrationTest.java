@@ -824,7 +824,10 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     as(delete(path + "/claims/" + foreignClaim.getId()), responsible.getId())
         .andExpect(status().isForbidden());
     as(delete(path + "/claims/" + ownClaim.getId()), null).andExpect(status().isForbidden());
-    as(delete(path + "/claims/" + ownClaim.getId()), responsible.getId())
+    as(
+            delete(path + "/claims/" + ownClaim.getId())
+                .param("version", ownClaim.getVersion().toString()),
+            responsible.getId())
         .andExpect(status().isNoContent());
     claims.flush();
     assertThat(
@@ -911,8 +914,8 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     UUID creditId = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO material_provision_credit (id, job_order_id, claim_id, participation_id,"
-            + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount)"
-            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount,"
+            + " quantity_amount, supplied_quality) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 3, 650)",
         creditId,
         order.getId(),
         archived.getId(),

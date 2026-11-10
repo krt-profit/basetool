@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemConsumptionSource;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
@@ -55,9 +56,12 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,6 +94,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
   private JobOrderItemHandoverService service;
+  private final Map<UUID, InventoryItem> sourceRows = new HashMap<>();
 
   private UUID orderId;
   private UUID lineId;
@@ -120,6 +125,8 @@ class JobOrderItemHandoverServiceTest {
                 null,
                 offerRatchet,
                 null),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.inventory.api.StockReads.class),
             jobOrderService,
             userService,
             null,
@@ -153,9 +160,14 @@ class JobOrderItemHandoverServiceTest {
         .thenAnswer(inv -> inv.getArgument(0));
     lenient()
         .when(
-            inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-                any(UUID.class), any(UUID.class)))
+            inventoryItemRepository.findItemConsumptionFacts(
+                any(UUID.class), org.mockito.ArgumentMatchers.anyCollection()))
         .thenReturn(List.of());
+    lenient()
+        .when(inventoryItemRepository.findByIdForUpdate(any(UUID.class)))
+        .thenAnswer(invocation ->
+            Optional.ofNullable(sourceRows.get(invocation.getArgument(0, UUID.class))));
+
     lenient()
         .when(jobOrderItemHandoverMapper.toDto(any(JobOrderItemHandover.class)))
         .thenReturn(
@@ -255,9 +267,7 @@ class JobOrderItemHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 5.0);
     UUID rowId = row.getId();
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
@@ -272,9 +282,7 @@ class JobOrderItemHandoverServiceTest {
   void createItemHandoverPartiallyConsumesLeavingRemainderEarmarked() {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 5.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 3));
 
@@ -303,9 +311,7 @@ class JobOrderItemHandoverServiceTest {
   void createItemHandoverBestEffortConsumesPartialStockAndStillDeliversTheRest() {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(2.0, 2.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
@@ -318,9 +324,7 @@ class JobOrderItemHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem older = itemRow(3.0, 3.0);
     InventoryItem newer = itemRow(3.0, 3.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(older, newer));
+    stockRows(older, newer);
 
     service.createItemHandover(orderId, payload(lineId, 4));
 
@@ -335,9 +339,7 @@ class JobOrderItemHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem r1 = itemRow(3.0, 3.0);
     InventoryItem r2 = itemRow(2.0, 2.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(r1, r2));
+    stockRows(r1, r2);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
@@ -352,9 +354,7 @@ class JobOrderItemHandoverServiceTest {
   void createItemHandoverDrawsOnlyThisOrdersSliceLeavingTheFreeRest() {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 3.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
@@ -372,9 +372,7 @@ class JobOrderItemHandoverServiceTest {
     JobOrder siblingOrder = JobOrder.builder().id(siblingOrderId).type(JobOrderType.ITEM).build();
     InventoryItem row = itemRow(5.0, 3.0);
     InventoryAllocations.addJobOrder(row, siblingOrder.getId(), 2.0, false);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
@@ -401,9 +399,7 @@ class JobOrderItemHandoverServiceTest {
     order.addItem(secondLine);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 5.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(
         orderId,
@@ -416,8 +412,6 @@ class JobOrderItemHandoverServiceTest {
 
     assertThat(line.getDeliveredAmount()).isEqualTo(3);
     assertThat(secondLine.getDeliveredAmount()).isEqualTo(2);
-    verify(inventoryItemRepository, times(1))
-        .findGameItemRowsByJobOrderAndGameItemForUpdate(orderId, gameItemId);
     verify(inventoryItemRepository).delete(row);
   }
 
@@ -426,9 +420,7 @@ class JobOrderItemHandoverServiceTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 5.0);
     UUID rowId = row.getId();
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 3));
 
@@ -439,15 +431,75 @@ class JobOrderItemHandoverServiceTest {
   void createItemHandoverDoesNotClampAnItemOfferForADepletedRow() {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     InventoryItem row = itemRow(5.0, 5.0);
-    when(inventoryItemRepository.findGameItemRowsByJobOrderAndGameItemForUpdate(
-            orderId, gameItemId))
-        .thenReturn(List.of(row));
+    stockRows(row);
 
     service.createItemHandover(orderId, payload(lineId, 5));
 
     verify(inventoryItemRepository).delete(row);
     verify(offerRatchet).beforeDelete(List.of(row.getId()), StockChangeReason.HANDOVER);
     verify(offerRatchet, never()).lower(any(UUID.class), anyDouble(), any());
+  }
+
+  /** Adapts the existing real stock fixtures to scalar source facts and named-row lookups. */
+  private void stockRows(InventoryItem... rows) {
+    for (InventoryItem row : rows) {
+      sourceRows.put(row.getId(), row);
+    }
+    when(inventoryItemRepository.findItemConsumptionFacts(
+            org.mockito.ArgumentMatchers.eq(orderId), org.mockito.ArgumentMatchers.anyCollection()))
+        .thenAnswer(_ ->
+            List.of(rows).stream()
+                .map(row -> {
+                  var slice = InventoryAllocations.jobOrderSlice(row, orderId);
+                  return new ConsumptionFact(
+                      row.getId(),
+                      row.getGameItem().getId(),
+                      row.getAmount(),
+                      slice == null || slice.getAmount() == null ? 0.0 : slice.getAmount(),
+                      row.getVersion(),
+                      row.getCreatedAt());
+                })
+                .toList());
+  }
+
+  /** Scalar facts adapted from a real existing fixture row without invented stock identities. */
+  private record ConsumptionFact(
+      UUID rowId,
+      UUID gameItemId,
+      Double amount,
+      Double sliceAmount,
+      @Nullable Long version,
+      @Nullable Instant createdAt)
+      implements InventoryItemConsumptionSource {
+    @Override
+    public UUID getRowId() {
+      return rowId;
+    }
+
+    @Override
+    public UUID getGameItemId() {
+      return gameItemId;
+    }
+
+    @Override
+    public Double getAmount() {
+      return amount;
+    }
+
+    @Override
+    public Double getSliceAmount() {
+      return sliceAmount;
+    }
+
+    @Override
+    public @Nullable Long getVersion() {
+      return version;
+    }
+
+    @Override
+    public @Nullable Instant getCreatedAt() {
+      return createdAt;
+    }
   }
 
   private static JobOrderItemHandoverCreateDto payload(UUID jobOrderItemId, int amount) {

@@ -73,6 +73,17 @@ facts together. Restore the wrongly removed amount only for a still-running prom
 current capacity; no negative quantity or ended-promise revival is allowed. Connected later
 records may require the agreed connected correction rather than an isolated inverse. A true
 stock loss is not a correction of a truthful historic contribution.
+The same ordinary correction action also corrects a falsely recorded original supplied quality.
+Retain its prior observed value, or its explicit unknown status, and the corrected declared value
+in history. Apply the resulting truthful historical credit and prescribed promise/capacity
+consequences together under current affected-data authority and scoped versions. A genuine later
+quality change is a separate fact and must be preserved. Current stock quality alone neither
+proves the original quality nor authorizes blindly resetting retained stock. Change retained
+physical quality only through its known connected facts and current Inventory rights/versions.
+Consumption does not by itself prevent correction of the historical quality/credit fact and does
+not authorize production reversal. Correcting quality does not turn an unknown historical total
+or composition into observed quantity evidence. This adds no material substitution or correction
+of other original provision fields.
 
 **Correction ownership and known quantity.** A provision's actual declared quantity is distinct
 from its credit clipped to an open promise. Retain the actual known composition, including any
@@ -108,7 +119,12 @@ boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. A 
 one active promise per bucket; repeated editing addresses that same promise with the required
 scoped version. Meaningful concurrent amount edits must not be silently retried as last-writer-wins.
 Terminal rejection/completion/cancellation, support withdrawal and ineligibility end open promises
-without deleting past contributions. Reopening does not revive them.
+without deleting past contributions. Ineligibility also ends active Staffel participation even when
+it has no open promises or only retained ended contributions; this mandatory prerequisite is part
+of the current material workflow. Historical read remains concrete and current-unit scoped. Neither
+returning eligibility nor reopening revives support or promises. Terminal completion alone does not
+end an otherwise eligible participation. Explicit support enrollment/withdrawal remains the shared
+workflow defined in REQ-ORDERS-051. Reopening does not revive ended promises.
 
 **Concurrency and boundaries.** Guard capacity at order-plus-material scope spanning all of that
 material's quality buckets; overlapping quality stock makes a single bucket or Staffel row too
@@ -159,6 +175,9 @@ case rather than accumulating every alternative.
 - [ ] Requester need changes cause only prescribed derived cuts, without extra Staffel approval.
 - [ ] Removing/changing a bucket preserves credit/history without duplicate participation.
 - [ ] False-fact correction differs from genuine later loss and never revives an ended promise.
+- [ ] The same correction action fixes false original supplied quality, preserves genuine later
+  quality changes and unknown quantity evidence, and retains prior/corrected history without
+  production reversal or ended-promise revival.
 - [ ] Ineligible/terminal/reopened cases obey shared write and participation boundaries.
 - [ ] Legacy stock covers demand without fabricated contribution attribution.
 
@@ -199,10 +218,21 @@ The current implementation groups all material-quality promises of one order/Sta
 uses unmanufactured ITEM demand and the canonical once-only quality coverage. The material guard
 spans every quality tier; Inventory plans actual source/destination scopes before lot/row locks
 and rejects a changed plan instead of acquiring another guard after stock locks.
+MATERIAL demand replacement uses the same planned editor for responsible-side and requester
+edits. It captures immutable requested material lines, includes newly requested materials and
+exact removed-material stock rows in its initial plan, and rechecks current authority, order
+version and resource identities after locking. A changed plan conflicts before the mutation.
+`MaterialOrderResourcePlanningIntegrationTest` observes a real new-material allocation waiting
+for the demand transaction, then checks both committed operations and retained old promise
+history through public boundaries.
 
 `CreateClaimDto.version` is absent for a first promise and mandatory for an existing quantity edit.
-Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. The returned
-claim version includes its flushed history change. An explicit `provision` selection in the ordinary
+Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. A repeated
+current-version save of the same canonical amount is a true no-op: it preserves the contribution
+version, history and existing personal association. Stale versions still conflict before that
+no-op decision. A repeated already-cleared historical attribution also preserves its contribution
+and receipt facts after current authority and scoped-version checks. The returned claim version
+includes its flushed history change. An explicit `provision` selection in the ordinary
 Inventory allocation/check-in payload identifies a matching permitted promise and its version.
 Only the action's genuinely new quantity budget can create credit; unchanged allocation relabelling
 has no new budget. Inventory carries exact known physical origin intervals through transforms;

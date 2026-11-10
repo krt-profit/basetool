@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -157,10 +158,16 @@ class JobOrderNoticeIntegrationTest {
   }
 
   @Test
-  void aWithdrawnClaimTellsTheMemberWhoMadeIt() {
+  void anAutomaticPromiseEndingRetainsItsExistingNoticePolicy() {
     creationService.createFromEvent(
-        JobOrderNotices.claimWithdrawn(
-            orderId, 12, "Ada", ASSIGNEE, "Quantanium", "ORDER_CHANGED", ACTING));
+        JobOrderNotices.promisesEnded(
+            orderId,
+            12,
+            "Ada",
+            Set.of(ASSIGNEE),
+            "Quantanium",
+            JobOrderNotices.AutomaticEndingReason.ORDER_CHANGED,
+            ACTING));
 
     assertThat(inbox(ASSIGNEE)).containsExactly(NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
     assertThat(inbox(LOGISTICIAN)).isEmpty();

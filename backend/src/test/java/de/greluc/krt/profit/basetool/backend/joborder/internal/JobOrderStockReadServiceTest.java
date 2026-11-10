@@ -69,7 +69,10 @@ class JobOrderStockReadServiceTest {
                 null,
                 null,
                 org.mockito.Mockito.mock(
-                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             jobOrderRepository);
   }
 

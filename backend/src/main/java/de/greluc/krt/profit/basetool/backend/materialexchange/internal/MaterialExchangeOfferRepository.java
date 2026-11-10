@@ -167,6 +167,54 @@ public interface MaterialExchangeOfferRepository
    */
   boolean existsByInventoryItemId(UUID inventoryItemId);
 
+  /** The scalar presence and active-quantity facts used by owning Inventory planning. */
+  interface StockPlanningFact {
+    /**
+     * Returns the referenced physical stock row.
+     *
+     * @return the stock row identity
+     */
+    UUID getInventoryItemId();
+
+    /**
+     * Returns whether the offer is active or historical.
+     *
+     * @return the current offer status
+     */
+    MaterialExchangeOfferStatus getStatus();
+
+    /**
+     * Returns the offered material amount.
+     *
+     * @return the amount, or null for an item offer
+     */
+    @Nullable
+    Double getOfferedAmount();
+
+    /**
+     * Returns the offered whole-item count.
+     *
+     * @return the count, or null for a material offer
+     */
+    @Nullable
+    Integer getItemQuantity();
+  }
+
+  /**
+   * Reads offer presence and active quantities without loading offer entities.
+   *
+   * @param inventoryItemIds the stock rows being planned
+   * @return scalar facts for every referencing offer
+   */
+  @Query(
+      """
+      SELECT o.inventoryItemId AS inventoryItemId, o.status AS status,
+             o.offeredAmount AS offeredAmount, o.itemQuantity AS itemQuantity
+      FROM MaterialExchangeOffer o WHERE o.inventoryItemId IN :inventoryItemIds
+      """)
+  List<StockPlanningFact> findStockPlanningFacts(
+      @Param("inventoryItemIds") Collection<UUID> inventoryItemIds);
+
   /**
    * Lowers the stored {@code offeredAmount} of the {@code ACTIVE} material offer on a Lager row to
    * the row's new stock when the stock falls below it (REQ-MARKET-013); a stock increase is a

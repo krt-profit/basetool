@@ -74,7 +74,9 @@ public class MaterialContributionController {
    * @return refreshed contribution history
    */
   @PostMapping("/provisions/{provisionId}/correction")
-  @Operation(summary = "Correct a false material provision fact")
+  @Operation(
+      operationId = "correctMaterialProvision",
+      summary = "Correct a false material provision fact")
   @PreAuthorize("hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders()")
   public List<MaterialContributionHistoryDto> correct(
       @PathVariable UUID jobOrderId,

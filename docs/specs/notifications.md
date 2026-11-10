@@ -983,7 +983,7 @@ them, and the bank staff keep theirs untouched.
 `NotificationRepositoryIntegrationTest` (`supersedeForRecipients…`),
 `NotificationLifecycleEventsTest`, `OrgUnitBankResponsibilityServiceTest` · **Code:**
 `notification/api/events/NotificationEvent#reconcileRecipients`,
-`notification/internal/NotificationCreationService#reconcile`,
+`notification/internal/NotificationEventPreparation#removeStaleReconciliation`,
 `notification/api/NotificationRepository#deleteByTypeInAndEntityForRecipients`,
 `bank/api/events/BankBookingRequestNoticesReconciledEvent` · **Decision:**
 [ADR-0244](../adr/0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) ·
@@ -1064,7 +1064,7 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 
 **Enforced by:** `NotificationCreationServiceTest` (`perRecipientSupersede…`) · **Code:**
 `notification/api/events/NotificationEvent#supersedeRecipients`,
-`notification/internal/NotificationCreationService#removeForRecipients` · **Decision:**
+`notification/internal/NotificationEventPreparation#removeForRecipients` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
@@ -1212,7 +1212,8 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 **Enforced by:** `NotificationBurstIntegrationTest`, `BackpressureRejectedExecutionHandlerTest`,
 `NotificationCreationServiceTest`, `notification_delivery_alerts_test.yml` · **Code:**
 `platform/api/AsyncConfig#notificationExecutor`, `platform/api/BackpressureRejectedExecutionHandler`,
-`notification/internal/NotificationCreationService#recordCreated`
+`notification/internal/NotificationCreationService#recordCreated`, `#recordAfterCommit`
+(cause creation records only committed inbox inserts; duplicate cause receipts add no count)
 
 ### REQ-NOTIF-030 — A minimum stock level that falls low tells the unit's Logisticians
 

@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reconciles unchanged legacy promises before application readiness under hierarchy coordination.
+ * Reconciles active support and promises before readiness under exclusive hierarchy coordination.
  */
 @Component
 @RequiredArgsConstructor
@@ -44,7 +44,7 @@ public class JobOrderEligibilityStartup implements ApplicationRunner {
   private final JobOrderEligibilityMaintenance maintenance;
 
   /**
-   * Ends ineligible active promises through normal audited maintenance without changing provenance.
+   * Ends ineligible support and promises through audited maintenance without changing provenance.
    *
    * @param arguments unused startup arguments
    */
@@ -56,7 +56,8 @@ public class JobOrderEligibilityStartup implements ApplicationRunner {
     List<UUID> batch;
     do {
       batch =
-          claims.findActivePromiseOrderIdsAfter(afterOrderId, PageRequest.of(0, ORDER_BATCH_SIZE));
+          claims.findContributionMaintenanceOrderIdsAfter(
+              afterOrderId, PageRequest.of(0, ORDER_BATCH_SIZE));
       for (UUID orderId : batch) {
         materialPromises.lockOrder(orderId);
         maintenance.reconcileExistingPromises(orderId);

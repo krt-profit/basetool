@@ -73,7 +73,7 @@ public class MaterialProvisionOptions {
             !target.id().equals(credit.getClaimId())
                 && target.materialId().equals(credit.getMaterialId())
                 && target.minQuality() <= credit.getSuppliedQuality()
-                && authority.canManage(order, target.claimingOrgUnit().id()))
+                && authority.canCorrect(order, target.claimingOrgUnit().id()))
         .map(target ->
             new MaterialAttributionTargetDto(
                 target.id(),
@@ -119,7 +119,7 @@ public class MaterialProvisionOptions {
         Entities.require(
             contributions.findHistoricalById(credit.getClaimId()),
             () -> "Material contribution not found");
-    authority.assertCanManage(order, original.getClaimingOrgUnit().getId());
+    authority.assertCanCorrect(order, original.getClaimingOrgUnit().getId());
     return credit;
   }
 }

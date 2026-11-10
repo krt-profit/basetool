@@ -225,7 +225,10 @@ public class JobOrderHandoverService {
    */
   @Transactional
   public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
-    materialPromises.lockOrder(jobOrderId);
+    stockCommands.prepareWrites(
+        dto.items().stream().map(JobOrderHandoverItemCreateDto::inventoryItemId).toList(),
+        List.of(),
+        materialPromises.materialScopesOfOrder(jobOrderId));
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
     responsibilityGuard.assertWritable(jobOrder);

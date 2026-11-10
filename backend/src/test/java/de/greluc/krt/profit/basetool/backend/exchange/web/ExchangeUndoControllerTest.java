@@ -101,6 +101,7 @@ class ExchangeUndoControllerTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> shipTypes = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
+  private final List<UUID> linkedOrders = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -148,6 +149,7 @@ class ExchangeUndoControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
+    linkedOrders.forEach(id -> jdbc.update("DELETE FROM job_order WHERE id = ?", id));
     for (UUID id : List.of(member, other)) {
       jdbc.update("DELETE FROM ship WHERE owner_id = ?", id);
       jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
@@ -163,6 +165,67 @@ class ExchangeUndoControllerTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
     settingsRepository.saveAndFlush(settings);
+  }
+
+  @Test
+  void anIndependentScuUndoLeavesAnUnmutatedInvalidOrdersStockAlone() throws Exception {
+    UUID material = material("Independent undo");
+    UUID place = location();
+    UUID unit = orgUnit("SPECIAL_COMMAND");
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, version, status, requesting_org_unit_id,"
+            + " responsible_org_unit_id, type, created_at, updated_at)"
+            + " VALUES (?, 1, 0, 'OPEN', ?, ?, 'MATERIAL', now(), now())",
+        order,
+        unit,
+        unit);
+    linkedOrders.add(order);
+    UUID unrelated = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality,"
+            + " amount, personal, stolen, owning_org_unit_id, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, 500, 2, false, false, ?, 0, now(), now())",
+        unrelated,
+        member,
+        material,
+        place,
+        unit);
+    jdbc.update(
+        "INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id, job_order_id,"
+            + " amount, delivered, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, 2, false, 0, now(), now())",
+        UUID.randomUUID(),
+        unrelated,
+        order);
+    String rise = lot(material, locationName(place), "5", "2");
+    write("stock", "{\"ops\":[" + rise + "]}").andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(material)).isEqualTo(2.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT amount FROM inventory_item WHERE id = ?", Double.class, unrelated))
+        .isEqualTo(2.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT version FROM inventory_item WHERE id = ?", Long.class, unrelated))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT amount FROM inventory_item_job_order_allocation"
+                    + " WHERE inventory_item_id = ? AND job_order_id = ?",
+                Double.class,
+                unrelated,
+                order))
+        .isEqualTo(2.0);
   }
 
   @Test

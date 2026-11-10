@@ -25,7 +25,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Loads the single participation of a Staffel on an order. */
 public interface JobOrderParticipationRepository
@@ -57,6 +60,34 @@ public interface JobOrderParticipationRepository
    * @return whether an active support context exists
    */
   boolean existsByClaimingOrgUnitIdInAndActiveTrue(Collection<UUID> claimingOrgUnitIds);
+
+  /**
+   * Loads a bounded batch of current participations in ineligible units.
+   *
+   * @param unitIds units whose current eligibility was removed
+   * @param pageable the batch bound
+   * @return active participations with their order and unit
+   */
+  @EntityGraph(attributePaths = {"jobOrder", "claimingOrgUnit"})
+  List<JobOrderParticipation> findByActiveTrueAndClaimingOrgUnitIdInOrderById(
+      Collection<UUID> unitIds, Pageable pageable);
+
+  /**
+   * Loads one order's active participations outside the current eligible unit set.
+   *
+   * @param orderId the order inspected during maintenance
+   * @param eligibleIds the current eligible units
+   * @param pageable the batch bound
+   * @return ineligible active participations with their order and unit
+   */
+  @EntityGraph(attributePaths = {"jobOrder", "claimingOrgUnit"})
+  @Query(
+      "SELECT p FROM JobOrderParticipation p WHERE p.active = true AND p.jobOrder.id = :orderId"
+          + " AND p.claimingOrgUnit.id NOT IN :eligibleIds ORDER BY p.id")
+  List<JobOrderParticipation> findIneligibleActiveByOrder(
+      @Param("orderId") UUID orderId,
+      @Param("eligibleIds") Collection<UUID> eligibleIds,
+      Pageable pageable);
 
   /**
    * Loads a bounded stable batch of managed dependents for order deletion.

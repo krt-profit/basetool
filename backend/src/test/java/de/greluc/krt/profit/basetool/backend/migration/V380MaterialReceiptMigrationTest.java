@@ -38,6 +38,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -69,29 +70,31 @@ class V380MaterialReceiptMigrationTest {
   @TempDir Path directory;
 
   @Test
-  void restrictedOwnerMigratesThrough380AndFlywayValidatesCanonicalLineEndings() throws Exception {
+  void restrictedOwnerMigratesThrough381AndFlywayValidatesCanonicalLineEndings() throws Exception {
     OwnerDatabase database = ownerDatabase();
     Path raw = Files.createDirectory(directory.resolve("raw"));
     Path canonical = Files.createDirectory(directory.resolve("canonical-lf"));
     copyMigrations(raw, canonical);
-    Flyway original = flyway(database, "filesystem:" + raw.toString().replace('\\', '/'), "380");
+    Flyway original = flyway(database, "filesystem:" + raw.toString().replace('\\', '/'), "381");
     original.migrate();
-    assertThat(original.info().current().getVersion().getVersion()).isEqualTo("380");
+    assertThat(original.info().current().getVersion().getVersion()).isEqualTo("381");
     assertRestrictedOwnerAndInstalledGuard(database);
     Map<String, Integer> applied = checksums(database);
 
     Flyway normalized =
-        flyway(database, "filesystem:" + canonical.toString().replace('\\', '/'), "380");
+        flyway(database, "filesystem:" + canonical.toString().replace('\\', '/'), "381");
     var validation = normalized.validateWithResult();
     assertThat(validation.validationSuccessful).isTrue();
     assertThat(validation.invalidMigrations).isEmpty();
     assertThat(checksums(database)).isEqualTo(applied);
     StringBuilder evidence = new StringBuilder();
-    for (String version : new String[] {"379", "380"}) {
-      String name =
-          version.equals("379")
-              ? "V379__material_provision_truthful_quantity.sql"
-              : "V380__material_receipt_quantity_provenance.sql";
+    for (var migration :
+        List.of(
+            Map.entry("379", "V379__material_provision_truthful_quantity.sql"),
+            Map.entry("380", "V380__material_receipt_quantity_provenance.sql"),
+            Map.entry("381", "V381__material_contribution_notification_causes.sql"))) {
+      String version = migration.getKey();
+      String name = migration.getValue();
       evidence
           .append("V")
           .append(version)
@@ -306,12 +309,12 @@ class V380MaterialReceiptMigrationTest {
         ResultSet row =
             sql.executeQuery(
                 "SELECT version, checksum FROM flyway_schema_history WHERE version IN ('379',"
-                    + " '380') AND success ORDER BY version")) {
+                    + " '380', '381') AND success ORDER BY version")) {
       while (row.next()) {
         values.put(row.getString(1), row.getInt(2));
       }
     }
-    assertThat(values).containsOnlyKeys("379", "380");
+    assertThat(values).containsOnlyKeys("379", "380", "381");
     return values;
   }
 

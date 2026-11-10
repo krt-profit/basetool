@@ -19,58 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import java.util.Set;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 /** Offers the shared order workspace and unit-work views without conferring command authority. */
-@Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
-public class JobOrderWorkspaceAccess {
-
-  private final RequestScopeResolver scopeResolver;
-  private final AuthHelperService authHelper;
-  private final JobOrderRepository orders;
-  private final OrgUnitRepository orgUnits;
-  private final JobOrderParticipationRepository participations;
-
+public interface JobOrderWorkspaceAccess {
   /**
    * Tests whether the current caller has an order-reading context.
    *
    * @return whether the shared workspace may be offered, including an empty permitted result
    */
-  public boolean canViewWorkspace() {
-    return scopeResolver.canViewJobOrders()
-        || scopeResolver.canViewOwnJobOrders()
-        || authHelper.currentUserId().map(orders::existsByAssigneesUserId).orElse(false);
-  }
+  boolean canViewWorkspace();
 
   /**
    * Tests whether current units have a responsible or supporting work context.
    *
    * @return whether the unit-work view may be offered, independently of write authority
    */
-  public boolean canViewUnitWork() {
-    ScopePredicate scope = scopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    if (scope.adminAllScope()) {
-      return true;
-    }
-    Set<UUID> unitIds =
-        scope.activeOrgUnitId() == null
-            ? scope.memberOrgUnitIds()
-            : Set.of(scope.activeOrgUnitId());
-    return !unitIds.isEmpty()
-        && (orgUnits.countInActiveProfitHierarchyByIdIn(unitIds) > 0
-            || orders.existsByResponsibleOrgUnitIdIn(unitIds)
-            || participations.existsByClaimingOrgUnitIdInAndActiveTrue(unitIds));
-  }
+  boolean canViewUnitWork();
 }

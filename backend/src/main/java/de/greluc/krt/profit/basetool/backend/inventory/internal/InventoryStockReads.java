@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialHandoverFact;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
@@ -73,6 +74,65 @@ public class InventoryStockReads
   private final InventoryStockSplitRepository splitRepository;
   private final InventoryDonationSourceRepository donationSourceRepository;
   private final StockViewerAccess stockViewerAccess;
+  private final InventoryStockPlanningReads planningReads;
+
+  @Override
+  public @NotNull List<UUID> earmarkedRowIds(@NotNull UUID orderId) {
+    return List.copyOf(
+        inventoryRepository.findAllocationReleaseRowIds(orderId, true, List.of(), List.of()));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedMaterialRowIds(
+      @NotNull UUID orderId, @NotNull Collection<UUID> materialIds) {
+    return materialIds.isEmpty()
+        ? List.of()
+        : List.copyOf(
+            inventoryRepository.findAllocationReleaseRowIds(
+                orderId, false, materialIds, List.of()));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedGameItemRowIds(
+      @NotNull UUID orderId, @NotNull Collection<UUID> gameItemIds) {
+    return gameItemIds.isEmpty()
+        ? List.of()
+        : List.copyOf(
+            inventoryRepository.findAllocationReleaseRowIds(
+                orderId, false, List.of(), gameItemIds));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedItemConsumptionRowIds(
+      @NotNull UUID orderId, @NotNull Map<UUID, Double> requestedAmounts) {
+    if (requestedAmounts.isEmpty()) {
+      return List.of();
+    }
+    return InventoryItemConsumptionPrefix.select(
+            inventoryRepository.findItemConsumptionFacts(orderId, requestedAmounts.keySet()),
+            requestedAmounts)
+        .rowIds();
+  }
+
+  @Override
+  public @NotNull List<MaterialHandoverFact> materialHandoverFacts(
+      @NotNull UUID orderId, @NotNull Collection<UUID> rowIds) {
+    return rowIds.isEmpty()
+        ? List.of()
+        : List.copyOf(inventoryRepository.findMaterialHandoverFacts(orderId, rowIds));
+  }
+
+  @Override
+  public @NotNull List<UUID> donationEarmarkedRowIds(@NotNull UUID donationId) {
+    return List.copyOf(inventoryRepository.findDonationAllocationRowIds(donationId));
+  }
+
+  @Override
+  public @NotNull Map<String, List<StockRow>> lotRows(
+      @NotNull UUID holder,
+      @NotNull Collection<de.greluc.krt.profit.basetool.backend.inventory.api.StockLot> lots) {
+    return planningReads.read(holder, lots).views();
+  }
 
   @Override
   public @NotNull List<StockQuantityFragment> quantityOf(@NotNull UUID rowId) {

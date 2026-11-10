@@ -869,10 +869,10 @@ public class InventoryCheckoutService {
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
-    orderWrites.lockRows(request.itemIds());
+    orderWrites.prepareWrites(request.itemIds(), List.of(), List.of());
     List<UUID> toDelete = new ArrayList<>();
 
-    for (UUID itemId : request.itemIds()) {
+    for (UUID itemId : request.itemIds().stream().distinct().sorted().toList()) {
       InventoryItem item =
           Entities.require(
               inventoryItemRepository.findByIdForUpdate(itemId),

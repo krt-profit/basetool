@@ -33,6 +33,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreationOptions;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWorkspaceAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -72,6 +74,10 @@ class MeControllerTest {
   @Mock private InventoryProperties inventoryProperties;
 
   @Mock private JobOrderAssigneeLookup jobOrderAssigneeLookup;
+
+  @Mock private JobOrderWorkspaceAccess jobOrderWorkspaceAccess;
+
+  @Mock private JobOrderCreationOptions jobOrderCreationOptions;
 
   @Mock private SupplyTabAccess supplyTabAccess;
 

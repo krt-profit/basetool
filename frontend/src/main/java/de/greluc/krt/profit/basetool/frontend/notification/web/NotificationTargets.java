@@ -93,6 +93,9 @@ final class NotificationTargets {
           Map.entry("JOB_ORDER_FINISHED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_ASSIGNED", detailTab(JOB_ORDER, ORDERS, "assignees")),
           Map.entry("JOB_ORDER_CLAIM_WITHDRAWN", detailTab(JOB_ORDER, ORDERS, "materials")),
+          Map.entry(
+              "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+              detailTab(JOB_ORDER, ORDERS, "materials")),
           Map.entry("BANK_BOOKING_REQUEST_CREATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_UPDATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", bankRequest(TAB_OWN_REQUESTS)),

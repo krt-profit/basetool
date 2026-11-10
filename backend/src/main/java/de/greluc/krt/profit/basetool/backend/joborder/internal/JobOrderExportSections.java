@@ -51,10 +51,21 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 300,
                 "materialClaims",
                 ART_15_20,
-                "Signed up for by the member.",
+                "Promises last recorded by the member, with directly linked contribution facts.",
                 """
                 SELECT o.display_id AS job_order, m.name AS material, c.amount,
-                       t.code AS quality_requirement, c.created_at, c.ended_at
+                       t.code AS quality_requirement, c.created_at, c.ended_at,
+                       c.credited_amount, c.changes,
+                       COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                         'id', p.id, 'creditedAmount', p.amount, 'evidence', p.evidence,
+                         'quantityAmount', CASE WHEN p.evidence = 'OBSERVED'
+                           THEN p.quantity_amount END,
+                         'suppliedQuality', CASE WHEN p.evidence = 'OBSERVED'
+                           THEN p.supplied_quality END,
+                         'createdAt', p.created_at) ORDER BY p.created_at, p.id)
+                         FROM material_provision_credit p
+                         WHERE p.job_order_id = c.job_order_id AND p.claim_id = c.id),
+                         '[]'::jsonb) AS provisions
                 FROM material_claim c
                   LEFT JOIN job_order o ON o.id = c.job_order_id
                   LEFT JOIN material m ON m.id = c.material_id

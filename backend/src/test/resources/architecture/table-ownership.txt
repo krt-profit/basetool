@@ -102,6 +102,7 @@ navigation_order navigation
 navigation_preferences navigation
 navigation_tab_bar navigation
 notification notification
+notification_cause_receipt notification
 notification_mute notification
 notification_rule notification
 notification_rule_selector notification
