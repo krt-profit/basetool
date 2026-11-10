@@ -43,6 +43,14 @@ public final class JobOrderNotices {
 
   private static final String UNKNOWN = ActorRef.UNKNOWN_NAME;
 
+  /** Bounded reasons for automatic support or promise endings. */
+  public enum AutomaticEndingReason {
+    /** The order's requirements or lifecycle ended its material promises. */
+    ORDER_CHANGED,
+    /** The supporting unit no longer qualifies for the order. */
+    INELIGIBLE_UNIT
+  }
+
   private JobOrderNotices() {}
 
   private static String text(@Nullable String value) {
@@ -188,49 +196,16 @@ public final class JobOrderNotices {
   }
 
   /**
-   * A material claim was withdrawn by an order edit or a de-escalation.
-   *
-   * @param jobOrderId the order
-   * @param displayId its display id
-   * @param handle its contact handle
-   * @param claimantId the member who made the claim, the single recipient
-   * @param material the claimed material's name
-   * @param reasonCode {@code ORDER_CHANGED} or {@code DE_ESCALATED}
-   * @param actor who changed the order
-   * @return the event
-   */
-  @NotNull
-  public static NoticeEvent claimWithdrawn(
-      @NotNull UUID jobOrderId,
-      @Nullable Integer displayId,
-      @Nullable String handle,
-      @NotNull UUID claimantId,
-      @Nullable String material,
-      @NotNull String reasonCode,
-      @NotNull ActorRef actor) {
-    Map<String, String> params = params(displayId, handle);
-    params.put("material", text(material));
-    params.put("reasonCode", reasonCode);
-    return NoticeEvent.builder()
-        .eventType(NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN)
-        .actorSub(actor.id())
-        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
-        .entityId(jobOrderId)
-        .contextRecipientUserId(claimantId)
-        .renderParams(params)
-        .build();
-  }
-
-  /**
-   * Groups eligibility-driven promise endings for the concretely affected unit writers.
+   * Groups automatic support or promise endings for current affected and responsible writers.
    *
    * @param jobOrderId the order
    * @param displayId its display number
    * @param handle its contact handle
-   * @param recipients current affected unit writers, already deduplicated
-   * @param materials the combined affected material names
-   * @param actor the hierarchy change actor
-   * @return the grouped cause under the existing automatic-promise preference
+   * @param recipients current affected and responsible unit writers, already deduplicated
+   * @param materials the combined affected material names, empty when only support ends
+   * @param reason the automatic ending reason
+   * @param actor the change actor
+   * @return the grouped cause under the automatic ending preference
    */
   @NotNull
   public static NoticeEvent promisesEnded(
@@ -239,12 +214,43 @@ public final class JobOrderNotices {
       @Nullable String handle,
       @NotNull Set<UUID> recipients,
       @NotNull String materials,
+      @NotNull AutomaticEndingReason reason,
       @NotNull ActorRef actor) {
     Map<String, String> params = params(displayId, handle);
     params.put("material", materials);
-    params.put("reasonCode", "INELIGIBLE_UNIT");
+    params.put("reasonCode", reason.name());
     return NoticeEvent.builder()
         .eventType(NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN)
+        .actorSub(actor.id())
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(jobOrderId)
+        .contextRecipientUserIds(recipients)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * Groups changed material promises and provision facts for the affected current unit writers.
+   *
+   * @param jobOrderId the order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param recipients the affected Staffel and responsible writers
+   * @param materials the combined material names
+   * @param actor the actor of the actual change
+   * @return the original event under its own material-change preference
+   */
+  public static @NotNull NoticeEvent materialContributionsChanged(
+      @NotNull UUID jobOrderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Set<UUID> recipients,
+      @NotNull String materials,
+      @NotNull ActorRef actor) {
+    Map<String, String> params = params(displayId, handle);
+    params.put("material", materials);
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED)
         .actorSub(actor.id())
         .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
         .entityId(jobOrderId)

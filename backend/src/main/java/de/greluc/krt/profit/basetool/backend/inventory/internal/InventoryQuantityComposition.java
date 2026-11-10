@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.LegacyJournalQuantityReference;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityEvidence;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityEvidence.KnownPhysical;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,119 +31,233 @@ import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
-/** Maintains disjoint durable quantity intervals through stock transformations. */
+/** Maintains disjoint complete quantity evidence through stock transformations. */
 public final class InventoryQuantityComposition {
+
+  private static final Comparator<StockQuantityEvidence> PROOF_ORDER =
+      Comparator.comparing(InventoryQuantityComposition::kind)
+          .thenComparing(InventoryQuantityComposition::reference)
+          .thenComparingLong(InventoryQuantityComposition::from);
 
   private InventoryQuantityComposition() {}
 
   /**
-   * Sums a physical composition without losing precision.
+   * Validates disjoint proof without changing its observed order.
    *
-   * @param fragments the composition
-   * @return its total integral quantity
+   * @param quantity the complete ordered physical quantity
+   * @return the same immutable composition
    */
-  static long total(@NotNull Collection<StockQuantityFragment> fragments) {
-    long total = 0;
-    for (StockQuantityFragment fragment : fragments) {
-      total = Math.addExact(total, fragment.quanta());
+  static @NotNull StockQuantityComposition validated(@NotNull StockQuantityComposition quantity) {
+    StockQuantityEvidence previous = null;
+    for (StockQuantityEvidence part : quantity.parts().stream().sorted(PROOF_ORDER).toList()) {
+      if (previous != null && sameProof(previous, part) && from(part) < to(previous)) {
+        throw new IllegalArgumentException("Physical quantity evidence must not overlap");
+      }
+      previous = part;
     }
-    return total;
+    return quantity;
   }
 
   /**
-   * Sorts intervals, coalesces adjacent parts and rejects overlapping identity.
+   * Coalesces adjacent evidence, retaining mixed order and the established known-only order.
    *
-   * @param fragments the intervals to combine
-   * @return the immutable canonical composition
+   * @param parts complete intervals to combine
+   * @return immutable disjoint composition
    */
-  static @NotNull List<StockQuantityFragment> canonical(
-      @NotNull Collection<StockQuantityFragment> fragments) {
-    List<StockQuantityFragment> sorted =
-        fragments.stream()
-            .sorted(
-                Comparator.comparing(StockQuantityFragment::origin)
-                    .thenComparingLong(StockQuantityFragment::fromQuanta))
-            .toList();
-    List<StockQuantityFragment> result = new ArrayList<>();
-    for (StockQuantityFragment fragment : sorted) {
+  static @NotNull StockQuantityComposition canonical(
+      @NotNull Collection<StockQuantityEvidence> parts) {
+    List<StockQuantityEvidence> ordered =
+        parts.stream().allMatch(KnownPhysical.class::isInstance)
+            ? parts.stream().sorted(PROOF_ORDER).toList()
+            : List.copyOf(parts);
+    validated(new StockQuantityComposition(ordered));
+    List<StockQuantityEvidence> result = new ArrayList<>();
+    for (StockQuantityEvidence part : ordered) {
       if (!result.isEmpty()) {
-        StockQuantityFragment previous = result.getLast();
-        if (previous.origin().equals(fragment.origin())) {
-          if (fragment.fromQuanta() < previous.toQuanta()) {
-            throw new IllegalArgumentException("Physical quantity intervals must not overlap");
-          }
-          if (fragment.fromQuanta() == previous.toQuanta()) {
-            result.set(
-                result.size() - 1,
-                new StockQuantityFragment(
-                    previous.origin(), previous.fromQuanta(), fragment.toQuanta()));
-            continue;
-          }
+        StockQuantityEvidence previous = result.getLast();
+        if (sameProof(previous, part) && to(previous) == from(part)) {
+          result.set(result.size() - 1, slice(previous, from(previous), to(part)));
+          continue;
         }
       }
-      result.add(fragment);
+      result.add(part);
     }
-    return List.copyOf(result);
+    return new StockQuantityComposition(result);
   }
 
   /**
-   * Divides a composition by its deterministic leading quantity.
+   * Divides complete quantity in its actual observed order without changing either proof kind.
    *
-   * @param fragments the composition
-   * @param amount the leading integral quantity
-   * @return disjoint leading and remaining intervals
+   * @param quantity the complete composition
+   * @param amount leading integral quantity
+   * @return disjoint leading and remaining compositions
    */
-  static @NotNull Partition partition(
-      @NotNull Collection<StockQuantityFragment> fragments, long amount) {
-    if (amount < 0 || amount > total(fragments)) {
+  static @NotNull Partition partition(@NotNull StockQuantityComposition quantity, long amount) {
+    if (amount < 0L || amount > quantity.totalQuanta()) {
       throw new IllegalArgumentException("A quantity part must fit its physical stock");
     }
-    List<StockQuantityFragment> taken = new ArrayList<>();
-    List<StockQuantityFragment> remaining = new ArrayList<>();
+    validated(quantity);
+    List<StockQuantityEvidence> taken = new ArrayList<>();
+    List<StockQuantityEvidence> remaining = new ArrayList<>();
     long needed = amount;
-    for (StockQuantityFragment fragment : canonical(fragments)) {
-      long take = Math.min(needed, fragment.quanta());
-      if (take > 0) {
-        taken.add(
-            new StockQuantityFragment(
-                fragment.origin(), fragment.fromQuanta(), fragment.fromQuanta() + take));
+    for (StockQuantityEvidence part : quantity.parts()) {
+      long take = Math.min(needed, part.quanta());
+      if (take > 0L) {
+        taken.add(slice(part, from(part), Math.addExact(from(part), take)));
       }
-      if (take < fragment.quanta()) {
-        remaining.add(
-            new StockQuantityFragment(
-                fragment.origin(), fragment.fromQuanta() + take, fragment.toQuanta()));
+      if (take < part.quanta()) {
+        remaining.add(slice(part, Math.addExact(from(part), take), to(part)));
       }
       needed -= take;
     }
-    return new Partition(List.copyOf(taken), List.copyOf(remaining));
+    return new Partition(
+        new StockQuantityComposition(taken), new StockQuantityComposition(remaining));
   }
 
   /**
-   * Retains truthful identity after a loss or adds an independent genuine new quantity.
+   * Retains complete evidence after a loss or adds only genuine new physical quantity.
    *
-   * @param fragments the existing composition
-   * @param amount the resulting integral amount
-   * @return the resulting immutable composition
+   * @param quantity existing complete composition
+   * @param amount resulting integral physical amount
+   * @return resulting complete composition
    */
-  static @NotNull List<StockQuantityFragment> resized(
-      @NotNull Collection<StockQuantityFragment> fragments, long amount) {
-    if (amount < 0) {
+  static @NotNull StockQuantityComposition resized(
+      @NotNull StockQuantityComposition quantity, long amount) {
+    if (amount < 0L) {
       throw new IllegalArgumentException("Physical stock cannot be negative");
     }
-    long previous = total(fragments);
+    long previous = quantity.totalQuanta();
     if (amount <= previous) {
-      return partition(fragments, previous - amount).remaining();
+      return partition(quantity, previous - amount).remaining();
     }
-    List<StockQuantityFragment> expanded = new ArrayList<>(fragments);
-    expanded.add(new StockQuantityFragment(UUID.randomUUID(), 0, amount - previous));
+    List<StockQuantityEvidence> expanded = new ArrayList<>(quantity.parts());
+    expanded.add(
+        new KnownPhysical(new StockQuantityFragment(UUID.randomUUID(), 0L, amount - previous)));
     return canonical(expanded);
   }
 
   /**
-   * One exact division of physical identity.
+   * Preserves surviving current proof and references only the unproved positive restoration delta.
    *
-   * @param taken the leading quantity
+   * @param current the actual surviving or journal-proved boundary composition
+   * @param amount the old absolute integral quantity target
+   * @param journalReference the real oldest journal entry requiring the restoration
+   * @return complete quantity evidence without a new physical origin
+   */
+  static @NotNull StockQuantityComposition restoredLegacy(
+      @NotNull StockQuantityComposition current, long amount, @NotNull UUID journalReference) {
+    if (amount < 0L) {
+      throw new IllegalArgumentException("Restored stock cannot be negative");
+    }
+    long previous = current.totalQuanta();
+    if (amount <= previous) {
+      return partition(current, previous - amount).remaining();
+    }
+    long offset =
+        current.legacyReferences().stream()
+            .filter(reference -> reference.journalReference().equals(journalReference))
+            .mapToLong(LegacyJournalQuantityReference::toQuanta)
+            .max()
+            .orElse(0L);
+    List<StockQuantityEvidence> restored = new ArrayList<>(current.parts());
+    restored.add(
+        new LegacyJournalQuantityReference(
+            journalReference, offset, Math.addExact(offset, amount - previous)));
+    return canonical(restored);
+  }
+
+  /**
+   * Subtracts exact proved parts while retaining unrelated physical and journal-reference evidence.
+   *
+   * @param quantity complete current composition
+   * @param removed complete exact intervals to remove
+   * @return surviving quantity in the original observed order
+   */
+  static @NotNull StockQuantityComposition subtract(
+      @NotNull StockQuantityComposition quantity, @NotNull StockQuantityComposition removed) {
+    validated(quantity);
+    List<StockQuantityEvidence> blocked =
+        validated(removed).parts().stream().sorted(PROOF_ORDER).toList();
+    List<StockQuantityEvidence> result = new ArrayList<>();
+    for (StockQuantityEvidence candidate : quantity.parts()) {
+      long cursor = from(candidate);
+      for (StockQuantityEvidence used : blocked) {
+        if (!sameProof(candidate, used) || to(used) <= cursor) {
+          continue;
+        }
+        if (from(used) >= to(candidate)) {
+          break;
+        }
+        if (from(used) > cursor) {
+          result.add(slice(candidate, cursor, from(used)));
+        }
+        cursor = Math.max(cursor, to(used));
+        if (cursor >= to(candidate)) {
+          break;
+        }
+      }
+      if (cursor < to(candidate)) {
+        result.add(slice(candidate, cursor, to(candidate)));
+      }
+    }
+    return new StockQuantityComposition(result);
+  }
+
+  private static boolean sameProof(StockQuantityEvidence left, StockQuantityEvidence right) {
+    return kind(left) == kind(right) && reference(left).equals(reference(right));
+  }
+
+  private static Kind kind(StockQuantityEvidence part) {
+    return switch (part) {
+      case KnownPhysical _ -> Kind.PHYSICAL;
+      case LegacyJournalQuantityReference _ -> Kind.JOURNAL;
+    };
+  }
+
+  private static UUID reference(StockQuantityEvidence part) {
+    return switch (part) {
+      case KnownPhysical known -> known.quantity().origin();
+      case LegacyJournalQuantityReference legacy -> legacy.journalReference();
+    };
+  }
+
+  private static long from(StockQuantityEvidence part) {
+    return switch (part) {
+      case KnownPhysical known -> known.quantity().fromQuanta();
+      case LegacyJournalQuantityReference legacy -> legacy.fromQuanta();
+    };
+  }
+
+  private static long to(StockQuantityEvidence part) {
+    return switch (part) {
+      case KnownPhysical known -> known.quantity().toQuanta();
+      case LegacyJournalQuantityReference legacy -> legacy.toQuanta();
+    };
+  }
+
+  private static StockQuantityEvidence slice(StockQuantityEvidence part, long from, long to) {
+    return switch (part) {
+      case KnownPhysical known ->
+          new KnownPhysical(new StockQuantityFragment(known.quantity().origin(), from, to));
+      case LegacyJournalQuantityReference legacy ->
+          new LegacyJournalQuantityReference(legacy.journalReference(), from, to);
+    };
+  }
+
+  /** Disjoint physical origin and journal-reference identity domains. */
+  private enum Kind {
+    /** A proved durable physical origin. */
+    PHYSICAL,
+    /** A real journal action with unverifiable original quantity. */
+    JOURNAL
+  }
+
+  /**
+   * One exact division retaining the evidence of every physical part.
+   *
+   * @param taken leading quantity
    * @param remaining the rest
    */
-  record Partition(List<StockQuantityFragment> taken, List<StockQuantityFragment> remaining) {}
+  record Partition(
+      @NotNull StockQuantityComposition taken, @NotNull StockQuantityComposition remaining) {}
 }

@@ -52,6 +52,22 @@ an OS notification for each one.
    rules resolve and never clears notices already stored. The profile page and the Android app edit
    the list through `/api/v1/notifications/preferences`.
 
+6. **One logical revision may group original events.** A data-only cause carries a stable opaque
+   revision UUID and an explicitly prioritized immutable list of ordinary notification events.
+   Each original event retains its actor, selectors, type preferences and supersession contract.
+   The notification owner resolves and mutes original candidates before choosing at most one
+   ordinary notice for each recipient. Distinct necessary Bank approval tasks must not be
+   discarded as another success notice. The domain that owns the cause declares its priority;
+   the notification engine does not import JobOrder or Bank policy.
+7. **Cause replay is independent of Inbox retention.** Notification creation first atomically
+   inserts an opaque cause receipt with `ON CONFLICT DO NOTHING`, before clearing superseded
+   notices or creating any rows. The receipt and all resulting Inbox changes commit together;
+   failure rolls both back and permits a retry. A repeated or concurrently delivered receipt
+   changes nothing, even when the first delivery was fully muted or its Inbox rows were cleared.
+   Receipts retain only the random UUID and creation time, with no actor, recipient, entity,
+   message, render parameters or link back to a personal fact. They preserve processed-once
+   evidence independently of normal Inbox retention and erasure. This adds no outbox, durable
+   delivery workflow or user action; the existing after-commit asynchronous delivery remains.
 ## Consequences
 
 - A rule written for the new kinds on an event that carries no mission, client or user set resolves

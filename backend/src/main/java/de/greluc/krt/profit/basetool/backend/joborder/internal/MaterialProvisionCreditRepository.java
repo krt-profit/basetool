@@ -51,4 +51,65 @@ public interface MaterialProvisionCreditRepository
    */
   @EntityGraph(attributePaths = "fragments")
   List<MaterialProvisionCredit> findByOrderIdOrderByCreatedAtDesc(UUID orderId);
+
+  /**
+   * Reads other receipts' immutable once-credit evidence for a truthful historical relabel.
+   *
+   * @param origins physical origins of this receipt
+   * @param excluded the receipt whose own retained evidence may be deliberately corrected
+   * @return processed intervals unavailable to a second receipt
+   */
+  @Query(
+      "SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment("
+          + "f.origin, f.fromQuanta, f.toQuanta) FROM MaterialProvisionCredit c JOIN c.fragments f"
+          + " WHERE f.origin IN :origins AND c.id <> :excluded")
+  List<StockQuantityFragment> processedQuantityExcept(
+      @Param("origins") Collection<UUID> origins, @Param("excluded") UUID excluded);
+
+  /**
+   * Locates every retained receipt intersecting a false physical quantity.
+   *
+   * @param quantity exact removed physical intervals as JSON
+   * @return affected receipt identities without disclosing their facts
+   */
+  @Query(
+      value =
+          "SELECT DISTINCT c.id FROM material_provision_credit c CROSS JOIN"
+              + " jsonb_array_elements(CAST(:quantity AS jsonb)) wanted WHERE c.quantity_fragments"
+              + " @> jsonb_build_array(jsonb_build_object('origin', wanted->>'origin')) AND EXISTS"
+              + " (SELECT 1 FROM jsonb_array_elements(c.quantity_fragments) actual WHERE"
+              + " actual->>'origin' = wanted->>'origin' AND (actual->>'fromQuanta')::bigint <"
+              + " (wanted->>'toQuanta')::bigint AND (wanted->>'fromQuanta')::bigint <"
+              + " (actual->>'toQuanta')::bigint)",
+      nativeQuery = true)
+  List<UUID> findIntersectingReceiptIds(@Param("quantity") String quantity);
+
+  /**
+   * Batch-loads the preplanned receipt facts and once-only evidence.
+   *
+   * @param ids affected receipts
+   * @return receipts in deterministic identity order
+   */
+  @EntityGraph(attributePaths = "fragments")
+  List<MaterialProvisionCredit> findByIdInOrderById(Collection<UUID> ids);
+
+  /**
+   * Reads the database version independently of a preplanned managed instance.
+   *
+   * @param id receipt identity
+   * @return current version, if retained
+   */
+  @Query(value = "SELECT version FROM material_provision_credit WHERE id = :id", nativeQuery = true)
+  java.util.Optional<Long> currentVersion(@Param("id") UUID id);
+
+  /**
+   * Batch-reads current versions without resolving managed entity prereads.
+   *
+   * @param ids retained fact identities
+   * @return current database identities and versions
+   */
+  @Query(
+      value = "SELECT id, version FROM material_provision_credit WHERE id IN :ids",
+      nativeQuery = true)
+  List<MaterialFactVersion> currentVersions(@Param("ids") Collection<UUID> ids);
 }

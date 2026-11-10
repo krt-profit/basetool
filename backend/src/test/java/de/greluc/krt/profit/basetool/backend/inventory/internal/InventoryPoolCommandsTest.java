@@ -308,7 +308,11 @@ class InventoryPoolCommandsTest {
     InventoryItem row = donorRow(10.0);
     UUID donationId = UUID.randomUUID();
     InventoryDonationAllocation slice = InventoryAllocations.addDonation(row, donationId, 6.0);
-    when(donationAllocationRepository.findByDonationId(donationId)).thenReturn(List.of(slice));
+    when(inventoryRepository.findDonationAllocationRowIds(donationId))
+        .thenReturn(List.of(row.getId()));
+    when(donationAllocationRepository.findSlicesByDonationIdAndRowIds(
+            donationId, List.of(row.getId())))
+        .thenReturn(List.of(slice));
 
     commands.releaseDonationEarmark(donationId);
 

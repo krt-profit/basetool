@@ -27,6 +27,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.GateReport;
 import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.HandlerKey;
+import de.greluc.krt.profit.basetool.backend.architecture.TenancyGuardRules.ScopeGateway;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankTransaction;
@@ -40,8 +41,13 @@ import de.greluc.krt.profit.basetool.backend.inventory.web.InventoryItemControll
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderUnitReadHistory;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGate;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCredit;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderMaterialController;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
@@ -79,9 +85,13 @@ import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyUnitSetting;
 import de.greluc.krt.profit.basetool.backend.supply.web.SupplyDonationController;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregate;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregateController;
+import de.greluc.krt.profit.basetool.guardfixture.tenancy.FixtureAggregateWriter;
 import de.greluc.krt.profit.basetool.guardfixture.tenancy.UnclassifiedOwnedEntity;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -119,6 +129,25 @@ class TenancyGuardTest {
           SupplyAccessPolicy.class,
           PurchasingAccessPolicy.class);
 
+  /** The exact versioned editor mutation signature. */
+  private static final List<Class<?>> VERSIONED_EDIT_PARAMETERS =
+      List.of(UUID.class, JobOrderGate.class, Long.class, Function.class);
+
+  /** The exact unversioned editor mutation signature. */
+  private static final List<Class<?>> UNVERSIONED_EDIT_PARAMETERS =
+      List.of(UUID.class, JobOrderGate.class, Function.class);
+
+  /**
+   * Public mutation contracts whose own bounded bodies must independently reach the scope policy.
+   */
+  private static final Set<ScopeGateway> AUTHORITATIVE_SCOPE_GATEWAYS =
+      Set.of(
+          new ScopeGateway(JobOrderEditor.class, "edit", VERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(JobOrderEditor.class, "editPlanned", VERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(JobOrderEditor.class, "editUnversioned", UNVERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(
+              JobOrderEditor.class, "editWithoutProjection", UNVERSIONED_EDIT_PARAMETERS));
+
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
       Map.ofEntries(
@@ -128,8 +157,8 @@ class TenancyGuardTest {
                   + " apply the unit's own scope"),
           Map.entry(
               key(JobOrder.class, "requestingOrgUnit"),
-              "the customer unit; it grants no queue visibility, the responsible unit scopes the"
-                  + " order (REQ-ORG-003)"),
+              "the customer unit participates in concrete order reading; the responsible unit"
+                  + " owns the aggregate and each write follows its action-specific policy"),
           Map.entry(
               key(JobOrder.class, "originalProfitOrgUnitId"),
               "verified original Profit boundary provenance, independent of current tenancy"),
@@ -143,6 +172,18 @@ class TenancyGuardTest {
               key(MaterialClaim.class, "claimingOrgUnit"),
               "a part of its JobOrder, read inside the order; MaterialClaimService authorises the"
                   + " claiming unit on every write"),
+          Map.entry(
+              key(JobOrderUnitReadHistory.class, "orgUnit"),
+              "a retained party of its JobOrder; the current order read policy and original Profit"
+                  + " boundary govern visibility, not an independently readable tenant aggregate"),
+          Map.entry(
+              key(JobOrderParticipation.class, "claimingOrgUnit"),
+              "a part of its JobOrder, read through the order; contribution writes recheck the"
+                  + " current claiming-unit authority"),
+          Map.entry(
+              key(MaterialProvisionCredit.class, "claimingOrgUnitId"),
+              "a historical attribution snapshot read through its JobOrder; it grants no current"
+                  + " authority independently of the owning order and contribution"),
           Map.entry(
               key(MissionParticipant.class, "orgUnits"),
               "the participant's declared affiliation; the mission scopes the row"),
@@ -395,7 +436,8 @@ class TenancyGuardTest {
             TenancyGuardRules.tenantData(PRODUCTION),
             SCOPE_GATE_TYPES,
             SERVICE_GATED,
-            NOT_TENANT_WRITES);
+            NOT_TENANT_WRITES,
+            AUTHORITATIVE_SCOPE_GATEWAYS);
 
     assertThat(report.violations()).isEmpty();
     assertThat(report.selectedControllers()).containsAll(LEGACY_WHITELIST);
@@ -449,7 +491,7 @@ class TenancyGuardTest {
     assertThat(report.selectedControllers()).containsExactly(FixtureAggregateController.class);
     assertThat(report.selectedHandlers()).hasSize(6);
     assertThat(report.violations())
-        .hasSize(4)
+        .hasSize(5)
         .anySatisfy(v -> assertThat(v).startsWith("FixtureAggregateController#openBranch writes"))
         .anySatisfy(
             v -> assertThat(v).startsWith("FixtureAggregateController#classGateOnly writes"))
@@ -462,6 +504,49 @@ class TenancyGuardTest {
                 .isEqualTo(
                     "FixtureAggregateController#read is listed as an exception but is no"
                         + " selected write handler"));
+  }
+
+  @Test
+  void namedGatewaysRequireTheirOwnExactReachableScopeCheck() {
+    GateReport report =
+        TenancyGuardRules.writeGateReport(
+            FIXTURES,
+            TenancyGuardRules.tenantData(FIXTURES),
+            SCOPE_GATE_TYPES,
+            Map.of(
+                new HandlerKey(FixtureAggregateController.class, "serviceChecked"), "fixture",
+                new HandlerKey(FixtureAggregateController.class, "serviceUnchecked"), "fixture"),
+            Map.of(new HandlerKey(FixtureAggregateController.class, "read"), "fixture"),
+            Set.of(
+                new ScopeGateway(
+                    FixtureAggregateWriter.class, "touchViaGateway", List.of(UUID.class)),
+                new ScopeGateway(FixtureAggregateWriter.class, "touch", List.of(UUID.class)),
+                new ScopeGateway(
+                    FixtureAggregateWriter.class, "touchViaGateway", List.of(String.class)),
+                new ScopeGateway(FixtureAggregateWriter.class, "cycleOne", List.of(UUID.class))));
+    assertThat(report.violations())
+        .hasSize(7)
+        .anySatisfy(v ->
+            assertThat(v)
+                .contains(
+                    "Scope gateway FixtureAggregateWriter#touch(UUID)", "no reachable scope check"))
+        .anySatisfy(v ->
+            assertThat(v)
+                .contains(
+                    "Scope gateway FixtureAggregateWriter#touchViaGateway(String)", "unresolved"))
+        .anySatisfy(v ->
+            assertThat(v)
+                .contains(
+                    "Scope gateway FixtureAggregateWriter#cycleOne(UUID)",
+                    "no reachable scope check"))
+        .anySatisfy(v ->
+            assertThat(v)
+                .startsWith(
+                    "FixtureAggregateController#serviceUnchecked is listed as service-gated"))
+        .noneSatisfy(v ->
+            assertThat(v)
+                .startsWith(
+                    "FixtureAggregateController#serviceChecked is listed as service-gated"));
   }
 
   @Test

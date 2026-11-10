@@ -32,5 +32,8 @@ public enum JobOrderGate {
   REQUESTER,
 
   /** Current responsible-unit authority permits recovery despite ineligible responsibility. */
-  TRANSFER
+  TRANSFER,
+
+  /** The caller is an administrator independently of the queue-reading capability. */
+  ADMIN_DELETE
 }

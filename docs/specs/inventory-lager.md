@@ -559,6 +559,22 @@ its localized problem `detail` is shown to the user (the throw sites carry
 `GlobalExceptionHandler#resolveDetail`), not swallowed into a generic failure toast. Each mutation is audited
 (`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
 single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
+Single and bulk releases, including releases caused by job-order state changes or deletion,
+retain the physical stock and advance only entries whose slices actually change. Each removed
+slice receives its Inventory removal audit in the same transaction. Repeating a release with
+nothing left to remove changes neither the entry version nor its removal audit. Releasing
+slices must keep unrelated managed aggregates usable for the rest of the surrounding transaction.
+
+Server-derived default reduction plans take the unassigned remainder first. For `PIECE`, the
+remaining deduction is apportioned in whole units: floor the exact proportional quotas, then
+assign residual units by descending fractional remainder, with immutable target identity as the
+tie break. Each deduction stays within its slice and the sum equals the required tagged deduction.
+The `SCU` default retains its three-decimal shares and final-tag rounding. A rounded share may
+not exceed the required tagged deduction still outstanding. If the final tag cannot absorb a
+rounding shortfall, only that residual is redistributed within the existing slices' remaining
+capacities. The resulting tagged sum equals the required deduction, and a physical split preserves
+every target's total allocation while keeping both portions within R5. Valid rounded plans retain
+their existing shares. Explicit deduct-from plans retain their ordinary validation and choice.
 
 **Game-item rows (REQ-INV-031).** A **game-item** stock row
 ([`inventory-items.md`](inventory-items.md)) allocates only to qualifying `ITEM` orders whose

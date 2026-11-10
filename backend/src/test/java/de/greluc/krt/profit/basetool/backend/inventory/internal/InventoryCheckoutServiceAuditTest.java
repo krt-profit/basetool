@@ -85,6 +85,7 @@ class InventoryCheckoutServiceAuditTest {
             requestScopeResolver,
             null,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 

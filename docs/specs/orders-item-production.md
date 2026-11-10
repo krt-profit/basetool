@@ -94,6 +94,12 @@ that no manufactured items are available for handover and points the operator at
 is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`). Both empty states leave
 `hasOutstandingItemLines` false, so that flag plus `isFullyDelivered` disambiguate them.
 
+**Recipe preparation.** ITEM creation, responsible-side edits, requester edits and the derivation preview use the same owning material derivation. Preparation captures an immutable ordered batch of submitted line identities, client and parent provenance, canonical outputs, explicit recipes, selected material quantities and quality identities. Quality choices change only a derived material's tier; they never select optional or otherwise uncounted costs. The complete resource plan includes current material requirements and the exact newly derived materials, including resolved zero-quantity snapshot lines.
+
+Before mutation after a resource wait, the action re-reads current scalar recipe, group, ingredient, output, redirect, bridge name, unit, quality and kept snapshot facts from PostgreSQL, including kept identities, progress and versions. Relevant drift returns HTTP 409 even when material and recipe identities stay the same. The action applies its original validated preparation; a second resource calculation cannot silently replace its quantities or quality choices. Reading distinct recipes, groups, ingredients, bridges and kept material collections uses bounded batches rather than one query per cost or ordered line.
+
+A scaled material requirement must be finite and representable in the existing exact thousandths representation. SCU rounding preserves its exact rounded source quanta; PIECE retains its ordinary whole-unit rounding. A subassembly suggestion must fit its integer unit count. Checked arithmetic returns HTTP 400 `ILLEGAL_ARGUMENT` for an unrepresentable requirement or count instead of zero, saturation or wraparound, without a separate business quantity cap.
+
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
 (`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or

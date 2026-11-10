@@ -140,6 +140,7 @@ class InventoryItemServiceBookOutTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     owner = new User();
     owner.setId(OWNER_ID);

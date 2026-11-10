@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvision;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvisionSelection;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import java.util.List;
@@ -43,17 +45,23 @@ public class InventoryProvisionRecorder {
    *
    * @param item the assembled new stock row
    * @param allocations the initial order allocations
+   * @param merge actual per-action merge policy of this incoming row
    */
-  public void prepareInitial(InventoryItem item, List<InventoryAllocationInput> allocations) {
+  public void prepareInitial(
+      InventoryItem item, List<InventoryAllocationInput> allocations, boolean merge) {
     orderWrites.lockBookIn(
-        item.getUser().getId(),
-        new de.greluc.krt.profit.basetool.backend.inventory.api.StockLot(
-            item.getMaterial(),
-            item.getGameItem(),
-            item.getLocation(),
-            item.getQuality(),
-            item.getStolen()),
-        allocations.stream().map(InventoryAllocationInput::targetId).toList());
+        new StockCommands.StockBookInScope(
+            item.getUser().getId(),
+            new StockLot(
+                item.getMaterial(),
+                item.getGameItem(),
+                item.getLocation(),
+                item.getQuality(),
+                item.getStolen()),
+            allocations.stream().map(InventoryAllocationInput::targetId).toList(),
+            Boolean.TRUE.equals(item.getPersonal()),
+            item.getOwningOrgUnit() == null ? null : item.getOwningOrgUnit().getId(),
+            merge));
   }
 
   /**

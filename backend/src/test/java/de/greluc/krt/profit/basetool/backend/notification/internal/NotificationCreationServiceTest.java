@@ -52,11 +52,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * Checks original notification policy, cleanup and stored fields through owning creation fixtures.
+ */
 @ExtendWith(MockitoExtension.class)
 class NotificationCreationServiceTest {
 
@@ -68,10 +70,19 @@ class NotificationCreationServiceTest {
   @Mock private NotificationParamsCodec notificationParamsCodec;
   @Mock private NotificationMuteService notificationMuteService;
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
-  @InjectMocks private NotificationCreationService service;
+  private NotificationCreationService service;
 
   @BeforeEach
   void muteNobody() {
+    service =
+        new NotificationCreationService(
+            new NotificationEventPreparation(
+                ruleEvaluationService,
+                notificationRepository,
+                notificationParamsCodec,
+                notificationMuteService),
+            notificationRepository,
+            meterRegistry);
     lenient()
         .when(notificationMuteService.withoutMuted(any()))
         .thenAnswer(invocation -> invocation.getArgument(0));

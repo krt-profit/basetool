@@ -93,6 +93,7 @@ class ExchangeStockWriteControllerTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private KnownExchangeClients knownClients;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private de.greluc.krt.profit.basetool.backend.inventory.api.StockReads stockReads;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -103,6 +104,8 @@ class ExchangeStockWriteControllerTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> cities = new ArrayList<>();
   private final List<UUID> missions = new ArrayList<>();
+  private final List<UUID> linkedOrders = new ArrayList<>();
+  private final List<UUID> linkedUnits = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -138,6 +141,8 @@ class ExchangeStockWriteControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     jdbc.update("DELETE FROM material_exchange_offer WHERE owner_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
+    linkedOrders.forEach(id -> jdbc.update("DELETE FROM job_order WHERE id = ?", id));
+    linkedUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     missions.forEach(id -> jdbc.update("DELETE FROM mission WHERE id = ?", id));
     jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
     jdbc.update("DELETE FROM app_user WHERE id = ?", member);
@@ -149,6 +154,55 @@ class ExchangeStockWriteControllerTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
     settingsRepository.saveAndFlush(settings);
+  }
+
+  @Test
+  void aFreshScuRiseLeavesAnInvalidOrdersUntouchedHeldStockAlone() throws Exception {
+    UUID material = material("SCU", null);
+    UUID location = location(null);
+    UUID unit = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active, is_profit_eligible)"
+            + " VALUES (?, 'SPECIAL_COMMAND', ?, ?, true, false)",
+        unit,
+        "Untouched pool " + unit,
+        "UP" + unit.toString().substring(0, 6));
+    linkedUnits.add(unit);
+    UUID unrelated = sharedRow(material, location, 500, 2.0, unit);
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, version, status, requesting_org_unit_id,"
+            + " responsible_org_unit_id, type, created_at, updated_at)"
+            + " VALUES (?, 1, 0, 'OPEN', ?, ?, 'MATERIAL', now(), now())",
+        order,
+        unit,
+        unit);
+    linkedOrders.add(order);
+    jdbc.update(
+        "INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id, job_order_id,"
+            + " amount, delivered, version, created_at, updated_at) VALUES (?, ?, ?, 2, false, 0,"
+            + " now(), now())",
+        UUID.randomUUID(),
+        unrelated,
+        order);
+
+    set(material, locationName(location), 500, "5", "2", "SCU")
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(_ -> {
+          var untouched = stockReads.findRow(unrelated).orElseThrow();
+          assertThat(untouched.getAmount()).isEqualTo(2.0);
+          assertThat(untouched.jobOrderSliceAmount(order)).isEqualTo(2.0);
+          assertThat(untouched.getVersion()).isZero();
+        });
+    assertThat(stockReads.exchangeLots(member, new UUID(0L, 0L), 10))
+        .singleElement()
+        .satisfies(row -> assertThat(row.getAmount()).isEqualTo(5.0));
   }
 
   @Test

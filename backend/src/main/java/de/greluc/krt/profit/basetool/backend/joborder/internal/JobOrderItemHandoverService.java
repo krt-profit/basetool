@@ -43,7 +43,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryS
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -70,11 +69,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderItemHandoverService {
 
   private final JobOrderRepository jobOrderRepository;
+  private final JobOrderItemFulfillmentGuard itemFulfillment;
   private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final StockCommands stockCommands;
+  private final ItemHandoverPlanner handoverPlanner;
   private final JobOrderService jobOrderService;
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
@@ -115,47 +116,27 @@ public class JobOrderItemHandoverService {
   @Transactional
   public JobOrderItemHandoverDto createItemHandover(
       UUID jobOrderId, JobOrderItemHandoverCreateDto dto) {
-    materialPromises.lockOrder(jobOrderId);
+    itemFulfillment.lock(jobOrderId);
+    var scopes = materialPromises.materialScopesOfOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     responsibilityGuard.assertWritable(jobOrder);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
-      throw new BadRequestException("Job order " + jobOrderId + " is not an item order");
+      throw new BadRequestException(JobOrderStockErrors.ITEM_ORDER_REQUIRED);
     }
 
+    final ItemHandoverPlanner.Booked booked =
+        handoverPlanner.prepare(jobOrder, dto.entries(), scopes);
     JobOrderItemHandover handover = new JobOrderItemHandover();
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(dto.handoverTime());
     handover.setRecipientHandle(dto.recipientHandle());
     stampAuditTrail(handover);
 
-    final Map<UUID, Integer> handedByGameItem = new LinkedHashMap<>();
-
-    for (JobOrderItemHandoverEntryCreateDto entryDto : dto.entries()) {
-      JobOrderItem line =
-          jobOrder.getItems().stream()
-              .filter(i -> i.getId().equals(entryDto.jobOrderItemId()))
-              .findFirst()
-              .orElseThrow(() ->
-                  new BadRequestException(
-                      "Item line "
-                          + entryDto.jobOrderItemId()
-                          + " does not belong to job order "
-                          + jobOrderId));
-
-      int outstanding = line.getManufacturedAmount() - line.getDeliveredAmount();
-      if (entryDto.amount() > outstanding) {
-        throw new BadRequestException(
-            "Cannot hand over more than the manufactured-but-undelivered amount for item line "
-                + line.getId());
-      }
-      line.setDeliveredAmount(line.getDeliveredAmount() + entryDto.amount());
-
-      if (line.getGameItem() != null) {
-        handedByGameItem.merge(line.getGameItem().getId(), entryDto.amount(), Integer::sum);
-      }
+    for (JobOrderItemHandoverEntryCreateDto entryDto : booked.entries()) {
+      JobOrderItem line = requireLine(jobOrder, entryDto.jobOrderItemId());
 
       JobOrderItemHandoverEntry entry = new JobOrderItemHandoverEntry();
       entry.setJobOrderItem(line);
@@ -163,14 +144,20 @@ public class JobOrderItemHandoverService {
       handover.addEntry(entry);
     }
 
+    jobOrder
+        .getItems()
+        .forEach(line -> {
+          Integer delivered = booked.delivered().get(line.getId());
+          if (delivered != null) {
+            line.setDeliveredAmount(delivered);
+          }
+        });
     final List<ConsumedItem> consumedItems =
-        consumeEarmarkedItemStock(jobOrderId, handedByGameItem);
+        consumeEarmarkedItemStock(jobOrderId, booked.handedByGameItem());
 
     JobOrderItemHandover saved = jobOrderItemHandoverRepository.save(handover);
 
-    boolean allDelivered =
-        jobOrder.getItems().stream()
-            .allMatch(line -> line.getDeliveredAmount() >= line.getAmount());
+    boolean allDelivered = booked.allDelivered();
     if (allDelivered) {
       jobOrderService.completeJobOrderWithinTransaction(jobOrder);
     }
@@ -199,10 +186,18 @@ public class JobOrderItemHandoverService {
         JobOrderAuditLabel.of(jobOrder.getDisplayId()),
         null,
         AuditDetails.of("handover", saved.getId())
-            .with("entries", dto.entries().size())
+            .with("entries", booked.entries().size())
             .with("autoCompleted", allDelivered));
 
     return jobOrderItemHandoverMapper.toDto(saved);
+  }
+
+  @NotNull
+  private static JobOrderItem requireLine(@NotNull JobOrder order, UUID lineId) {
+    return order.getItems().stream()
+        .filter(line -> line.getId().equals(lineId))
+        .findFirst()
+        .orElseThrow(() -> new BadRequestException(JobOrderStockErrors.FOREIGN_ITEM_LINE));
   }
 
   /**
@@ -218,9 +213,9 @@ public class JobOrderItemHandoverService {
    */
   @NotNull
   private List<ConsumedItem> consumeEarmarkedItemStock(
-      UUID jobOrderId, Map<UUID, Integer> handedByGameItem) {
+      UUID jobOrderId, Map<UUID, Double> handedByGameItem) {
     final List<ConsumedItem> consumed = new ArrayList<>();
-    for (Map.Entry<UUID, Integer> handed : handedByGameItem.entrySet()) {
+    for (Map.Entry<UUID, Double> handed : handedByGameItem.entrySet()) {
       for (StockConsumption row :
           stockCommands.consumeEarmarkedItems(
               jobOrderId, handed.getKey(), handed.getValue(), StockChangeReason.HANDOVER)) {

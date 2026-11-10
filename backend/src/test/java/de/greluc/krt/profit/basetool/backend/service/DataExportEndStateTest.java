@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
@@ -54,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -122,6 +124,7 @@ class DataExportEndStateTest {
   @Autowired private PersonalBlueprintRepository personalBlueprintRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
+  @Autowired private JobOrderParticipationRepository participations;
   @Autowired private MaterialClaimRepository materialClaimRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private AuditEventRepository auditEventRepository;
@@ -553,6 +556,7 @@ class DataExportEndStateTest {
             .material(material)
             .qualityTier(good)
             .claimingOrgUnit(squadron)
+            .participation(persistedParticipation(participations, jobOrder, squadron))
             .amount(5.0)
             .claimedByUser(subject)
             .build());

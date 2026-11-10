@@ -107,6 +107,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
@@ -119,6 +120,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private MaterialClaimService materialClaimService;
+  @Mock private JobOrderChangeEffects effects;
 
   @Mock private AuditService auditService;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -149,17 +151,21 @@ class JobOrderServiceAssigneeAndListTest {
     service =
         new JobOrderService(
             jobOrderRepository,
+            itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
-            materialRepository,
+            new JobOrderMaterialLines(materialRepository, null),
             new InventoryStockReads(
                 inventoryItemRepository,
                 inventoryItemMapper,
                 null,
                 null,
                 org.mockito.Mockito.mock(
-                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     inventoryItemRepository,
@@ -177,22 +183,25 @@ class JobOrderServiceAssigneeAndListTest {
             null,
             null,
             null,
+            effects,
             materialClaimService,
             auditService,
             jobOrderItemService,
+            new JobOrderItemReconciliation(jobOrderItemService),
             jobOrderStockProjectionService,
-            null,
             null,
             actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
                 org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.class),
+                org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
-                org.mockito.Mockito.mock(
-                    org.springframework.context.ApplicationEventPublisher.class),
+                effects,
                 jobOrderStockProjectionService,
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
@@ -211,7 +220,10 @@ class JobOrderServiceAssigneeAndListTest {
                 null,
                 null,
                 org.mockito.Mockito.mock(
-                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             requestScopeResolver,
             jobOrderMapper,
             squadronMapper,

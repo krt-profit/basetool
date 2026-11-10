@@ -275,10 +275,13 @@ public enum NotificationEventType {
   JOB_ORDER_ASSIGNEE_REMOVED,
 
   /**
-   * A material claim was withdrawn by an order edit or a de-escalation (REQ-ORDERS-044). The
-   * default rule notifies the member who made the claim.
+   * Order support or material promises ended automatically (REQ-ORDERS-044). The default rule
+   * notifies current writers of the affected and responsible units.
    */
   JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /** Material promises or credited contributions changed for the affected unit writers. */
+  JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
 
   /**
    * A refinery order's run has ended and the output can be collected (REQ-REFINERY-023). Published

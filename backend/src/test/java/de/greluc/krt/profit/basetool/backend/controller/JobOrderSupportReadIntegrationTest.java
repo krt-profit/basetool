@@ -77,6 +77,10 @@ class JobOrderSupportReadIntegrationTest {
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
   @Autowired private JobOrderParticipationRepository participations;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository claims;
+
   @Autowired private MaterialRepository materials;
   @Autowired private QualityTierRepository tiers;
 
@@ -257,6 +261,96 @@ class JobOrderSupportReadIntegrationTest {
     as(get("/api/v1/orders/" + unrelated.getId()), false, true).andExpect(status().isForbidden());
     as(post("/api/v1/orders/" + order.getId() + "/assignees/" + caller.getId()), false, true)
         .andExpect(status().isForbidden());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void ineligibleEmptySupportEndsUnitWorkAndPreservesItsConcreteHistory(boolean retainedClaim)
+      throws Exception {
+    JobOrder order = supported(JobOrderType.MATERIAL, true);
+    if (retainedClaim) {
+      var historical = new de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim();
+      historical.setJobOrder(order);
+      historical.setMaterial(material);
+      historical.setQualityTier(tiers.findByMinQuality(0).orElseThrow());
+      historical.setClaimingOrgUnit(support);
+      historical.setParticipation(
+          participations
+              .findByJobOrderIdAndClaimingOrgUnitId(order.getId(), support.getId())
+              .orElseThrow());
+      historical.setAmount(0.0);
+      historical.setEndedAt(Instant.now());
+      historical.setChanges(
+          List.of(
+              new de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange(
+                  de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange
+                      .Reason.REQUIREMENT_ENDED,
+                  2.0,
+                  0.0,
+                  0.0,
+                  Instant.now(),
+                  null)));
+      claims.saveAndFlush(historical);
+    }
+    as(get("/api/v1/orders").param("toProcess", "true"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/org-units/{unit}/parent", support.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentOrgUnitId\":null,\"version\":" + support.getVersion() + "}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get("/api/v1/orders").param("toProcess", "true"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/me/capabilities"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(false));
+    as(get("/api/v1/orders/" + order.getId()), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canEdit").value(false));
+    var history =
+        as(get("/api/v1/orders/" + order.getId() + "/claims/history"), false, false)
+            .andExpect(status().isOk());
+    if (retainedClaim) {
+      history
+          .andExpect(jsonPath("$[0].endedAt").isNotEmpty())
+          .andExpect(jsonPath("$[0].changes[0].reason").value("REQUIREMENT_ENDED"))
+          .andExpect(jsonPath("$[0].changes.length()").value(1));
+    } else {
+      history.andExpect(jsonPath("$.length()").value(0));
+    }
+    as(
+            get("/api/v1/audit/JOB_ORDER").param("eventType", "JOB_ORDER_PARTICIPATION_ENDED"),
+            true,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].subjectId").value(order.getId().toString()))
+        .andExpect(
+            jsonPath("$.content[0].details")
+                .value(org.hamcrest.Matchers.containsString("reason=UNIT_INELIGIBLE")))
+        .andExpect(
+            jsonPath("$.content[0].details")
+                .value(org.hamcrest.Matchers.containsString("claimingOrgUnit=" + support.getId())));
+    as(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/org-units/{unit}/parent", support.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentOrgUnitId\":null,\"version\":" + support.getVersion() + "}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(
+            get("/api/v1/audit/JOB_ORDER").param("eventType", "JOB_ORDER_PARTICIPATION_ENDED"),
+            true,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
   }
 
   private JobOrder supported(JobOrderType type, boolean active) {

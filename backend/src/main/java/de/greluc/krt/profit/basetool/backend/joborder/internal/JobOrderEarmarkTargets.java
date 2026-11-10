@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import java.util.Collection;
@@ -28,6 +29,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -61,20 +64,51 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .filter(jobOrderAccessPolicy::canSeeJobOrder)
-        .map(jobOrderItemService::requiredMaterialIds)
-        .orElse(null);
+    return requirementsOf(
+        jobOrderId, jobOrderAccessPolicy::canSeeJobOrder, jobOrderItemService::requiredMaterialIds);
   }
 
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId, jobOrderAccessPolicy::canSeeJobOrder, jobOrderItemService::requiredGameItemIds);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @Nullable Set<UUID> requiredMaterialIdsInScope(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId,
+        jobOrderAccessPolicy::canSeeJobOrderInScope,
+        jobOrderItemService::requiredMaterialIds);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @Nullable Set<UUID> requiredGameItemIdsInScope(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId,
+        jobOrderAccessPolicy::canSeeJobOrderInScope,
+        jobOrderItemService::requiredGameItemIds);
+  }
+
+  /**
+   * Reads requirements only after the target passes the selected order-read contract.
+   *
+   * @param jobOrderId the job order
+   * @param visibility the caller's required read contract
+   * @param requirements the material or item requirements
+   * @return the requirements, or {@code null} for an unknown or unreadable order
+   */
+  private @Nullable Set<UUID> requirementsOf(
+      @NotNull UUID jobOrderId,
+      @NotNull Predicate<JobOrder> visibility,
+      @NotNull Function<JobOrder, Set<UUID>> requirements) {
     return jobOrderRepository
         .findById(jobOrderId)
-        .filter(jobOrderAccessPolicy::canSeeJobOrder)
-        .map(jobOrderItemService::requiredGameItemIds)
+        .filter(visibility)
+        .map(requirements)
         .orElse(null);
   }
 }

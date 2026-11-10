@@ -46,6 +46,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class MaterialPromiseCoordinator {
+  private static final int MATERIAL_RECONCILIATION_ORDER = 100;
   private final EntityManager entityManager;
   private final MaterialPromiseScopeRepository resources;
   private final de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows
@@ -66,6 +68,7 @@ public class MaterialPromiseCoordinator {
   private final MaterialClaimRepository claims;
   private final MaterialPromiseCapacity capacity;
   private final AuditRecorder audit;
+  private final JobOrderChangeEffects effects;
 
   /**
    * Locks all named material scopes before Inventory lot and row locks.
@@ -81,7 +84,9 @@ public class MaterialPromiseCoordinator {
             .filter(scope -> !coordination.scopes.contains(scope))
             .sorted(Comparator.comparingLong(MaterialPromiseCoordinator::lockKey))
             .toList();
-    if (coordination.stockPhase && !added.isEmpty()) {
+    if (!added.isEmpty()
+        && (coordination.stockPhase || !coordination.scopes.isEmpty())
+        && !profitHierarchy.holdsInitialExclusiveLock()) {
       throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
           "error.inventory.concurrent_scope_changed");
     }
@@ -97,12 +102,22 @@ public class MaterialPromiseCoordinator {
    * @param orderId the order
    */
   public void lockOrder(@NotNull UUID orderId) {
+    lock(materialScopesOfOrder(orderId));
+  }
+
+  /**
+   * Resolves all existing demand, history and shared-row material scopes before physical planning.
+   *
+   * @param orderId the order whose write resources are being planned
+   * @return complete known scopes with the shared hierarchy stabilized, without material locks
+   */
+  public List<OrderMaterialScope> materialScopesOfOrder(@NotNull UUID orderId) {
     profitHierarchy.lockForOrderWrite();
     List<UUID> materialIds = resources.materialIdsOf(orderId);
     List<OrderMaterialScope> scopes =
         new ArrayList<>(stockScopes.materialScopesSharingRowsWithOrders(List.of(orderId)));
     materialIds.forEach(id -> scopes.add(new OrderMaterialScope(orderId, id)));
-    lock(scopes);
+    return scopes.stream().distinct().toList();
   }
 
   /**
@@ -146,6 +161,7 @@ public class MaterialPromiseCoordinator {
   }
 
   private Coordination coordination() {
+    effects.prepare();
     for (TransactionSynchronization synchronization :
         TransactionSynchronizationManager.getSynchronizations()) {
       if (synchronization instanceof Coordination current) {
@@ -200,16 +216,11 @@ public class MaterialPromiseCoordinator {
                     == de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus.REJECTED;
         if (bucket == null || terminal) {
           for (MaterialClaim claim : entry.getValue()) {
-            double previous = claim.getAmount();
-            claim.setAmount(0.0);
-            claim.setEndedAt(Instant.now());
-            record(
+            end(
                 claim,
                 terminal
-                    ? MaterialContributionChange.Reason.PROMISE_ENDED
-                    : MaterialContributionChange.Reason.REQUIREMENT_ENDED,
-                previous,
-                0.0);
+                    ? MaterialContributionChange.Reason.ORDER_ENDED
+                    : MaterialContributionChange.Reason.REQUIREMENT_ENDED);
           }
         } else {
           reduce(
@@ -250,15 +261,31 @@ public class MaterialPromiseCoordinator {
     for (int i = 0; i < shares.size(); i++) {
       Share share = shares.get(i);
       double amount =
-          MaterialQuantityArithmetic.multiply(
-                  MaterialQuantityArithmetic.add(share.units(), i < left ? 1L : 0L), quantum)
-              / 1000.0;
+          de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts.fromQuanta(
+              MaterialQuantityArithmetic.multiply(
+                  MaterialQuantityArithmetic.add(share.units(), i < left ? 1L : 0L), quantum));
       if (Double.compare(amount, share.claim().getAmount()) != 0) {
         double previous = share.claim().getAmount();
         share.claim().setAmount(amount);
         record(share.claim(), MaterialContributionChange.Reason.CAPACITY_REDUCED, previous, 0.0);
       }
     }
+  }
+
+  /**
+   * Ends one open promise without ending the Staffel's participation.
+   *
+   * @param claim the managed contribution
+   * @param reason the bounded ending cause
+   */
+  public void end(MaterialClaim claim, MaterialContributionChange.Reason reason) {
+    if (claim.getEndedAt() != null) {
+      return;
+    }
+    double previous = claim.getAmount();
+    claim.setAmount(0.0);
+    claim.setEndedAt(Instant.now());
+    record(claim, reason, previous, 0.0, null, AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN);
   }
 
   /**
@@ -274,13 +301,41 @@ public class MaterialPromiseCoordinator {
       MaterialContributionChange.Reason reason,
       double previous,
       double creditDelta) {
+    record(claim, reason, previous, creditDelta, null);
+  }
+
+  /**
+   * Records one quantity change with its connected historical provision identity.
+   *
+   * @param claim the managed contribution
+   * @param reason bounded business reason
+   * @param previous preceding open quantity
+   * @param creditDelta historical fulfillment change
+   * @param creditId connected provision, if any
+   */
+  public void record(
+      MaterialClaim claim,
+      MaterialContributionChange.Reason reason,
+      double previous,
+      double creditDelta,
+      @Nullable UUID creditId) {
+    record(claim, reason, previous, creditDelta, creditId, AuditEventType.JOB_ORDER_CLAIM_UPSERTED);
+  }
+
+  private void record(
+      MaterialClaim claim,
+      MaterialContributionChange.Reason reason,
+      double previous,
+      double creditDelta,
+      @Nullable UUID creditId,
+      AuditEventType auditType) {
     List<MaterialContributionChange> history = new ArrayList<>(claim.getChanges());
     history.add(
         new MaterialContributionChange(
-            reason, previous, claim.getAmount(), creditDelta, Instant.now()));
+            reason, previous, claim.getAmount(), creditDelta, Instant.now(), creditId));
     claim.setChanges(List.copyOf(history));
     audit.record(
-        AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
+        auditType,
         claim.getJobOrder().getId(),
         JobOrderAuditLabel.of(claim.getJobOrder()),
         null,
@@ -292,6 +347,7 @@ public class MaterialPromiseCoordinator {
             .with("previousAmount", previous)
             .with("amount", claim.getAmount())
             .with("creditDelta", creditDelta));
+    effects.materialChanged(claim, reason, previous, creditDelta);
   }
 
   /** An exact proportional quota and its remainder. */
@@ -301,6 +357,12 @@ public class MaterialPromiseCoordinator {
   private final class Coordination implements TransactionSynchronization {
     private final Set<OrderMaterialScope> scopes = new LinkedHashSet<>();
     private boolean stockPhase;
+
+    /** Reconciles final material facts before the grouped notice collector runs. */
+    @Override
+    public int getOrder() {
+      return MATERIAL_RECONCILIATION_ORDER;
+    }
 
     @Override
     public void beforeCommit(boolean readOnly) {

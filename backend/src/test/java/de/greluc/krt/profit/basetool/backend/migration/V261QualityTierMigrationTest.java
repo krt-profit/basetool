@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,9 +33,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Migration test for V261–V265: the quality-tier catalogue and its seed (REQ-ORDERS-036), the tier
- * references on requirements and claims, and the 0–1000 bound on every quality column
- * (REQ-DATA-023).
+ * Verifies the quality-tier seed, mandatory references, quality bounds and active promise
+ * uniqueness (REQ-ORDERS-036, REQ-DATA-023).
  */
 @SpringBootTest
 @Transactional
@@ -141,5 +141,73 @@ class V261QualityTierMigrationTest {
             "CREATE UNIQUE INDEX",
             "(job_order_id, material_id, quality_tier_id, claiming_org_unit_id)")
         .contains("WHERE (ended_at IS NULL)");
+  }
+
+  @Test
+  void currentTierUniquenessRetainsEndedContributionsInTheSameParticipation() {
+    UUID unit = UUID.randomUUID();
+    UUID order = UUID.randomUUID();
+    UUID material = UUID.randomUUID();
+    UUID participation = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO org_unit (id, kind, name, shorthand, active)"
+            + " VALUES (?, 'SQUADRON', ?, ?, true)",
+        unit,
+        "Tier " + unit,
+        "T" + unit);
+    jdbcTemplate.update(
+        "INSERT INTO material (id, name, type, quantity_type,"
+            + " is_manual_raw_material, is_job_order, is_visible, source_systems)"
+            + " VALUES (?, ?, 'REFINED', 'SCU', false, false, true, 'UEX_ONLY')",
+        material,
+        "Tier " + material);
+    jdbcTemplate.update(
+        "INSERT INTO job_order (id, priority, created_at, updated_at, version, status,"
+            + " requesting_org_unit_id, responsible_org_unit_id, type) VALUES (?, 2, now(), now(),"
+            + " 0, 'OPEN', ?, ?, 'MATERIAL')",
+        order,
+        unit,
+        unit);
+    jdbcTemplate.update(
+        "INSERT INTO job_order_participation"
+            + " (id, job_order_id, claiming_org_unit_id, active) VALUES (?, ?, ?, false)",
+        participation,
+        order,
+        unit);
+    String insert =
+        "INSERT INTO material_claim (id, job_order_id, material_id, quality_tier_id,"
+            + " claiming_org_unit_id, participation_id, amount, ended_at)"
+            + " VALUES (?, ?, ?, '6b1f2e0a-3c1d-4f5e-9a10-000000000650', ?, ?, ?, ?)";
+    jdbcTemplate.update(
+        insert,
+        UUID.randomUUID(),
+        order,
+        material,
+        unit,
+        participation,
+        0.0,
+        java.time.OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+    jdbcTemplate.update(insert, UUID.randomUUID(), order, material, unit, participation, 4.0, null);
+
+    assertThat(
+            jdbcTemplate.queryForList(
+                "SELECT amount, ended_at, participation_id"
+                    + " FROM material_claim WHERE job_order_id = ? ORDER BY amount",
+                order))
+        .hasSize(2)
+        .satisfies(rows -> {
+          assertThat(rows.getFirst())
+              .containsEntry("amount", 0.0)
+              .containsEntry("participation_id", participation);
+          assertThat(rows.getFirst().get("ended_at")).isNotNull();
+          assertThat(rows.getLast())
+              .containsEntry("amount", 4.0)
+              .containsEntry("ended_at", null)
+              .containsEntry("participation_id", participation);
+        });
+    assertThatThrownBy(() ->
+            jdbcTemplate.update(
+                insert, UUID.randomUUID(), order, material, unit, participation, 2.0, null))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

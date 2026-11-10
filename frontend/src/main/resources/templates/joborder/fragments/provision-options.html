@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"><body>
+<th:block th:fragment="options">
+<option value="" th:text="#{orders.claim.provision.none}"></option>
+<option th:each="target : ${provisionTargets}"
+        th:value="${target.claimId}" th:data-provision-version="${target.claimVersion}"
+        th:text="#{orders.claim.provision.option(${target.claimingOrgUnit.name}, ${#numbers.formatDecimal(target.openAmount, 1, 'DEFAULT', target.wholePieces ? 0 : 3, 'DEFAULT')}, ${target.minQuality})}"></option>
+</th:block>
+</body></html>

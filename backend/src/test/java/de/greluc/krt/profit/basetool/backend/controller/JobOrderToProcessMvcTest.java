@@ -95,11 +95,10 @@ class JobOrderToProcessMvcTest {
   }
 
   @Test
-  void pinnedToSquadronA_withoutToProcess_listsItsQueueAndThePublicSkOrders() throws Exception {
+  void pinnedToSquadronA_withoutToProcess_listsResponsibleAndRequestedOrders() throws Exception {
     List<String> ids = listIds(squadronAId, false);
 
-    assertThat(ids).contains(orderRespA.toString(), orderRespSk.toString());
-    assertThat(ids).doesNotContain(orderRespB.toString());
+    assertThat(ids).contains(orderRespA.toString(), orderRespB.toString(), orderRespSk.toString());
   }
 
   @Test

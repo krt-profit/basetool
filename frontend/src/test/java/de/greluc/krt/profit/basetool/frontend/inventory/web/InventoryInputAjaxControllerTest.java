@@ -425,4 +425,30 @@ class InventoryInputAjaxControllerTest {
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/inventory?storage=my"));
   }
+
+  @Test
+  @WithMockUser
+  void ordinaryCheckInRetainsTheExplicitProvisionSelectionAndObservedVersion() throws Exception {
+    UUID order = UUID.randomUUID();
+    UUID claim = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "3")
+                .param("jobOrderAllocations[0].targetId", order.toString())
+                .param("jobOrderAllocations[0].provisionClaimId", claim.toString())
+                .param("jobOrderAllocations[0].provisionClaimVersion", "6"))
+        .andExpect(status().isOk());
+    var allocation = captureCreateRequest().jobOrderAllocations().getFirst();
+    org.assertj.core.api.Assertions.assertThat(allocation.amount()).isEqualTo(3d);
+    org.assertj.core.api.Assertions.assertThat(allocation.provision())
+        .isEqualTo(
+            new de.greluc.krt.profit.basetool.frontend.inventory.model.MaterialProvisionSelection(
+                claim, 6L));
+  }
 }

@@ -228,6 +228,10 @@ events and its conflict exception expose, and the bank access policy (ADR-0352):
 `bank.internal`.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
 
+The application reads order workspace capabilities through `joborder.api.JobOrderWorkspaceAccess`;
+its repository-backed implementation stays in `joborder.internal`, keeping the API independent
+of internal persistence and the module's layers acyclic.
+
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay
 acyclic (ADR-0047) until the module API returns its own records (plan §5.2). `leadership`, `admin`,

@@ -316,6 +316,23 @@ bundles.
 frontend `notification/web/AdminNotificationRulePageController`,
 `templates/notification/admin/notification-rules.html`, `static/js/notification/notification-rules.js`
 
+**Logical revision grouping (S04 implementation under verification).** A domain cause carries a
+stable opaque revision identity and its original notification events in explicit priority order.
+Resolve rules, actor exclusions and type mutes for those original events before choosing at most
+one resulting notice per recipient. A wrapper cannot change an original actor or recreate a
+muted Bank outcome; distinct necessary approval tasks retain their own cause. Material changes
+collect affected Staffel and current responsible-unit writers through the owning writer directory,
+without broadening the audience to all readers or administrators.
+
+The notification owner atomically records the opaque cause before superseding or creating any
+Inbox rows. A duplicate cause performs no cleanup and creates no notice; concurrent delivery,
+fully muted first delivery, clear-read, erasure and retention do not reopen that same revision.
+The receipt and Inbox effects share one transaction, so rollback allows a coherent retry. A
+receipt contains only its random UUID and creation time, no actor, recipient, order or content;
+its nonidentifying once-only evidence is independent of Inbox retention. Notification production
+and fan-out remain asynchronous after the business commit, without a new durable messaging
+workflow. A genuine later business revision has a different cause identity. ADR-0245 owns this
+technical contract; the full Bank/order journey remains subject to its separate implementation.
 ### REQ-NOTIF-008 — UC1: notify on job-order creation
 
 > **Approved planned JobOrder amendment (not implemented):** Replace the global-Admin creation default with actually affected responsible/requesting unit writers under [the approved shared JobOrder contract](orders-core.md). A global Admin role alone is not an order-notice audience; an affected functional role may still qualify. This is an approved future change to the seeded default, not current runtime behavior.
@@ -966,7 +983,7 @@ them, and the bank staff keep theirs untouched.
 `NotificationRepositoryIntegrationTest` (`supersedeForRecipients…`),
 `NotificationLifecycleEventsTest`, `OrgUnitBankResponsibilityServiceTest` · **Code:**
 `notification/api/events/NotificationEvent#reconcileRecipients`,
-`notification/internal/NotificationCreationService#reconcile`,
+`notification/internal/NotificationEventPreparation#removeStaleReconciliation`,
 `notification/api/NotificationRepository#deleteByTypeInAndEntityForRecipients`,
 `bank/api/events/BankBookingRequestNoticesReconciledEvent` · **Decision:**
 [ADR-0244](../adr/0244-a-notification-event-can-reconcile-a-notice-for-named-members.md) ·
@@ -1047,7 +1064,7 @@ stays. With either set empty nothing is deleted. An event may combine this with 
 
 **Enforced by:** `NotificationCreationServiceTest` (`perRecipientSupersede…`) · **Code:**
 `notification/api/events/NotificationEvent#supersedeRecipients`,
-`notification/internal/NotificationCreationService#removeForRecipients` · **Decision:**
+`notification/internal/NotificationEventPreparation#removeForRecipients` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
 **Issues:** #2414
 
@@ -1195,7 +1212,8 @@ that outlasts the limit (a stalled database) rejects the task; that is a lost no
 **Enforced by:** `NotificationBurstIntegrationTest`, `BackpressureRejectedExecutionHandlerTest`,
 `NotificationCreationServiceTest`, `notification_delivery_alerts_test.yml` · **Code:**
 `platform/api/AsyncConfig#notificationExecutor`, `platform/api/BackpressureRejectedExecutionHandler`,
-`notification/internal/NotificationCreationService#recordCreated`
+`notification/internal/NotificationCreationService#recordCreated`, `#recordAfterCommit`
+(cause creation records only committed inbox inserts; duplicate cause receipts add no count)
 
 ### REQ-NOTIF-030 — A minimum stock level that falls low tells the unit's Logisticians
 

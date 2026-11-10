@@ -20,11 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.AppExceptionKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.Collection;
 import java.util.List;
@@ -43,6 +47,7 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
 
   private final JobOrderRepository orders;
   private final MaterialPromiseCoordinator materialPromises;
+  private final LiveSyncPublisher live;
   private final MaterialProvisionCredits provisionCredits;
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
@@ -80,6 +85,35 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
             .map(de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope::orderId)
             .toList());
     materialPromises.requireLocked(scopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void orderLinkedStockChanged(
+      @NotNull Collection<UUID> orderIds, @NotNull Collection<OrderMaterialScope> materialScopes) {
+    materialPromises.requireLocked(materialScopes);
+    if (orderIds.isEmpty()) {
+      return;
+    }
+    orderIds.stream()
+        .distinct()
+        .forEach(order ->
+            live.publishAfterCommit(
+                LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order),
+                List.of(
+                    "header",
+                    "actions",
+                    "dialogs",
+                    "kpi",
+                    "materials",
+                    "aggregated",
+                    "items",
+                    "item-stock",
+                    "handovers",
+                    "item-handovers",
+                    "item-handover-lines")));
+    live.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
   }
 
   @Override

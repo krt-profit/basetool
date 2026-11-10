@@ -44,6 +44,10 @@ public enum AuditEventType {
   PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
+  /** A false original physical quantity and its connected retained stock facts were corrected. */
+  INVENTORY_QUANTITY_CORRECTED(AuditDomain.INVENTORY),
+  /** An explicitly selected connected stock portion's false current quality was corrected. */
+  INVENTORY_QUALITY_CORRECTED(AuditDomain.INVENTORY),
   /**
    * A warehouse inventory row's associations / quality / amount were edited.
    *
@@ -213,6 +217,8 @@ public enum AuditEventType {
   JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
+  /** An active supporting participation ended when its Staffel became ineligible. */
+  JOB_ORDER_PARTICIPATION_ENDED(AuditDomain.JOB_ORDER),
   /** A quality tier was added to the catalogue (REQ-ORDERS-036). */
   QUALITY_TIER_CREATED(AuditDomain.JOB_ORDER),
   /** A quality tier's code, labels, order or floor was changed. */

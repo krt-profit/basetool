@@ -19,19 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts.fromQuanta;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvision;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,8 +70,7 @@ public class MaterialProvisionCredits {
         MaterialClaim.class,
         claim.getId());
     long quantum = claim.getMaterial().getQuantityType() == QuantityType.PIECE ? 1000L : 1L;
-    long budget =
-        Math.min(provision.budgetQuanta(), MaterialQuantityArithmetic.quanta(claim.getAmount()));
+    long budget = provision.budgetQuanta();
     budget = budget / quantum * quantum;
     if (budget == 0L || provision.quantity().isEmpty()) {
       return;
@@ -77,8 +78,18 @@ public class MaterialProvisionCredits {
     List<StockQuantityFragment> used =
         credits.processedQuantity(
             provision.quantity().stream().map(StockQuantityFragment::origin).distinct().toList());
-    List<StockQuantityFragment> selected =
+    List<StockQuantityFragment> provided =
         takeUncredited(provision.quantity(), used, budget, quantum);
+    long actualQuantity = StockQuantityFragments.total(provided);
+    if (actualQuantity > 0L && claim.getAmount() <= 0.0) {
+      throw new BadRequestException("orders.claim.provision.no_open_amount");
+    }
+    List<StockQuantityFragment> selected =
+        StockQuantityFragments.prefix(
+            provided,
+            Math.min(actualQuantity, MaterialQuantityArithmetic.quanta(claim.getAmount()))
+                / quantum
+                * quantum);
     long selectedQuanta =
         selected.stream().mapToLong(StockQuantityFragment::quanta).reduce(0L, Math::addExact);
     if (selectedQuanta == 0L) {
@@ -92,26 +103,56 @@ public class MaterialProvisionCredits {
     credit.setMaterialId(provision.materialId());
     credit.setQualityTierId(claim.getQualityTier().getId());
     credit.setSourceRowId(provision.rowId());
-    credit.setAmount(selectedQuanta / 1000.0);
+    credit.setAmount(fromQuanta(selectedQuanta));
+    credit.setQuantityAmount(fromQuanta(actualQuantity));
+    credit.setQuantityFragments(provided);
+    credit.setEvidence(
+        de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionEvidence.OBSERVED);
+    credit.setAttributedFragments(selected);
+    credit.setSuppliedQuality(Quality.orMin(provision.quality()));
+    credit.setSuppliedQualityKnown(true);
     credit.setFragments(
         selected.stream()
             .map(fragment ->
                 new MaterialProvisionFragment(
                     fragment.origin(), fragment.fromQuanta(), fragment.toQuanta()))
             .toList());
+    credit.recordInitialFact();
     credits.save(credit);
     double previous = claim.getAmount();
     claim.setAmount(
-        Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), selectedQuanta) / 1000.0);
+        fromQuanta(
+            Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), selectedQuanta)));
     claim.setCreditedAmount(
-        MaterialQuantityArithmetic.add(
-                MaterialQuantityArithmetic.quanta(claim.getCreditedAmount()), selectedQuanta)
-            / 1000.0);
+        fromQuanta(
+            MaterialQuantityArithmetic.add(
+                MaterialQuantityArithmetic.quanta(claim.getCreditedAmount()), selectedQuanta)));
     coordinator.record(
         claim,
         MaterialContributionChange.Reason.PROVISION_CREDITED,
         previous,
-        selectedQuanta / 1000.0);
+        fromQuanta(selectedQuanta),
+        credit.getId());
+  }
+
+  /**
+   * Reads this receipt's known quantity after excluding intervals processed by other receipts.
+   *
+   * @param credit the retained provision whose own processed intervals remain eligible
+   * @return exact known intervals available to its corrected historical attribution
+   */
+  @Transactional(readOnly = true, propagation = Propagation.MANDATORY)
+  @NotNull
+  public List<StockQuantityFragment> availableForAttribution(
+      @NotNull MaterialProvisionCredit credit) {
+    List<StockQuantityFragment> foreign =
+        credits.processedQuantityExcept(
+            credit.getQuantityFragments().stream()
+                .map(StockQuantityFragment::origin)
+                .distinct()
+                .toList(),
+            credit.getId());
+    return StockQuantityFragments.subtract(credit.getQuantityFragments(), foreign);
   }
 
   private static List<StockQuantityFragment> takeUncredited(
@@ -119,46 +160,8 @@ public class MaterialProvisionCredits {
       List<StockQuantityFragment> processed,
       long budget,
       long quantum) {
-    Comparator<StockQuantityFragment> byOrigin =
-        Comparator.comparing(StockQuantityFragment::origin)
-            .thenComparingLong(StockQuantityFragment::fromQuanta);
-    List<StockQuantityFragment> blocked = processed.stream().sorted(byOrigin).toList();
-    List<StockQuantityFragment> result = new ArrayList<>();
-    long remaining = budget;
-    for (StockQuantityFragment candidate : quantity.stream().sorted(byOrigin).toList()) {
-      long cursor = candidate.fromQuanta();
-      for (StockQuantityFragment used : blocked) {
-        if (!used.origin().equals(candidate.origin()) || used.toQuanta() <= cursor) {
-          continue;
-        }
-        if (used.fromQuanta() >= candidate.toQuanta()) {
-          break;
-        }
-        long take =
-            Math.min(Math.max(0L, used.fromQuanta() - cursor), remaining) / quantum * quantum;
-        if (take > 0L) {
-          result.add(
-              new StockQuantityFragment(
-                  candidate.origin(), cursor, MaterialQuantityArithmetic.add(cursor, take)));
-          remaining -= take;
-        }
-        cursor = Math.max(cursor, used.toQuanta());
-        if (cursor >= candidate.toQuanta() || remaining == 0L) {
-          break;
-        }
-      }
-      long take =
-          Math.min(Math.max(0L, candidate.toQuanta() - cursor), remaining) / quantum * quantum;
-      if (take > 0L) {
-        result.add(
-            new StockQuantityFragment(
-                candidate.origin(), cursor, MaterialQuantityArithmetic.add(cursor, take)));
-        remaining -= take;
-      }
-      if (remaining == 0L) {
-        break;
-      }
-    }
-    return List.copyOf(result);
+    List<StockQuantityFragment> available = StockQuantityFragments.subtract(quantity, processed);
+    return StockQuantityFragments.prefix(
+        available, Math.min(budget, StockQuantityFragments.total(available)) / quantum * quantum);
   }
 }

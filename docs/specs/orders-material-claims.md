@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — accepted/planned, not implemented. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec - accepted contract; S04 implementation under review. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0360 (amends ADR-0092)
 
 # Material promises within Staffel participation
@@ -10,7 +10,8 @@ MATERIAL or ITEM order's material/quality requirement. It belongs to the single 
 of [REQ-ORDERS-051](orders-core.md); there is no second support registration. Support can exist
 without a quantity, and one participation may carry promises for several requirements.
 This accepted target replaces the signal-only, SK-only claim model and the original-total ITEM
-claim denominator. Runtime behavior has not yet been implemented or verified.
+claim denominator. The material foundation below has focused local verification; complete S04
+acceptance and the shared writer conversion remain pending.
 The owner-approved decisions are [material quantities](https://github.com/krt-profit/basetool/issues/3207)
 and [technical contracts](https://github.com/krt-profit/basetool/issues/3202).
 
@@ -39,10 +40,25 @@ this with the required inventory rights. The recorder, stock owner, recipient, m
 executing-Staffel snapshot do not infer the credited Staffel. Excess/unattributed stock is allowed
 under inventory rules; it creates no fictitious promise or fulfillment of a foreign promise.
 
+The ordinary stock action's optional promise picker reads backend-authorized open targets from
+`GET /api/v1/orders/{jobOrderId}/claims/provision-options`, using the declared material and
+supplied quality even before a stock row exists. The backend checks the concrete order read and
+current claim-workflow grants, valid responsibility, lifecycle and eligible claiming Staffel;
+only matching quality floors and positive active promises are offered with their independent
+versions. The frontend renders these typed choices. Selecting one grants no write permission:
+the final stock action revalidates current Inventory and contribution authority, suitability,
+open quantity, once-only physical evidence and observed versions within its transaction.
+
 The same physical quantity cannot be credited again through relocation, release/relinking,
 row merge/removal, dynamic quality redistribution, manufacture or final handover. Genuine new
 provision is a new fact. A promise itself creates or moves no inventory. Historical contribution
 credit is durable evidence separate from the current coverage projection.
+
+An ordinary undo of an older journal remains available under REQ-XCH-022 even when that journal
+cannot prove the restored quantity's physical identity. The restored stock covers current demand,
+but an unproven restored portion is ineligible for any new Staffel contribution credit. Do not
+invent a fresh provision identity or ask for an extra member action. Preserve exact known
+composition when available; ordinary new manual provision remains a distinct new fact.
 
 **One coherent adjustment.** Apply the stock provision, allowed explicit credit, capacity
 calculation and necessary proportional reductions atomically. Credit the selected promise
@@ -57,6 +73,11 @@ then give remaining quanta by descending fractional remainder, breaking ties by 
 participation identity. The resulting sum equals the reduced capacity in valid quanta, never
 exceeds it and never increases an individual promise. Repeated inputs give the same result.
 Zero open quantity does not withdraw the Staffel's whole participation.
+
+Exact quantum calculations must also preserve those quanta when stored in an amount field. If the
+numeric representation cannot express the required result, reject the whole mutation through
+ordinary numeric validation and retain the current facts and versions. Do not round a calculated
+promise above capacity or introduce an additional business quantity limit.
 
 If a bucket disappears, its capacity becomes zero and its open promises end while history remains.
 Do not silently move an old quality promise to a new bucket. Increasing need/capacity never grows
@@ -73,13 +94,74 @@ facts together. Restore the wrongly removed amount only for a still-running prom
 current capacity; no negative quantity or ended-promise revival is allowed. Connected later
 records may require the agreed connected correction rather than an isolated inverse. A true
 stock loss is not a correction of a truthful historic contribution.
+The same ordinary correction action also corrects a falsely recorded original supplied quality.
+Retain its prior observed value, or its explicit unknown status, and the corrected declared value
+in history. Apply the resulting truthful historical credit and prescribed promise/capacity
+consequences together under current affected-data authority and scoped versions. A genuine later
+quality change is a separate fact and must be preserved. Current stock quality alone neither
+proves the original quality nor authorizes blindly resetting retained stock. Change retained
+physical quality only through its known connected facts and current Inventory rights/versions.
+Consumption does not by itself prevent correction of the historical quality/credit fact and does
+not authorize production reversal. Correcting quality does not turn an unknown historical total
+or composition into observed quantity evidence. This adds no material substitution or correction
+of other original provision fields.
+
+Historical original-quality correction leaves current physical quality unchanged unless the
+actor explicitly selects a currently editable retained portion in the same action and declares
+that its current quality is also false. The server shows the known receipt intersection, such as
+3 within a merged row of 7, and changes only those intervals under current Inventory rights and
+selected row versions. It preserves unrelated physical evidence, other receipts and current
+allocation, donation and merge rules. Empty selection keeps the historical correction available
+after consumption or without Inventory access. Equality with today's quality or another receipt's
+historical quality does not establish a quality timeline or cause automatic propagation.
+
+Original-quality inputs follow the standard localized integer control (REQ-UI-037). Their
+canonical numeric declaration is used by choice queries, correction payloads and asynchronous
+response guards; formatting the same value on blur leaves the current choice refresh usable.
+
+**Correction ownership and known quantity.** A provision's actual declared quantity is distinct
+from its credit clipped to an open promise. Retain the actual known composition, including any
+uncredited excess, separately from current truthful attribution and immutable processed-once
+quantity. Correcting actual provision 4 to 3 when only 3 were credited removes the uncredited
+quantity first. If that quantity was later truthfully credited through another receipt, correct
+every known intersecting credit in the same transaction, including credits on another order.
+Every affected order must have valid current responsibility and the actor must currently be
+allowed to correct its affected contribution. Inaccessible or changed connected facts fail
+atomically; no extra manual approval or client version is required for prescribed consequences.
+
+A historical attribution-only correction changes JobOrder facts. A responsible-unit writer may
+coordinate it; otherwise current grants for both the original and selected target Staffel are
+required. The original Staffel's writer may remove its own false attribution. No obsolete
+Inventory authority snapshot is reconstructed when stock is untouched. An existing ended matching
+target may receive corrected historical credit while both promises remain ended; this neither
+creates support nor restores open quantity. A writer for only the new target cannot relabel
+another Staffel's historical contribution.
+
+A physical correction additionally requires current Inventory authority and observed row versions
+for the retained connected stock it changes. Correction options check that authority before
+returning any row identity, version or label. Apply the full ordinary Inventory action predicate;
+order correction authority, stock read access or ordinary membership alone grants no stock write.
+`InventoryMaterialQualityCorrectionIntegrationTest` proves a readable but noneditable stock row
+and correctable receipt still deny physical quantity correction atomically. A relocated or merged retained quantity remains
+correctable through its known origins. An explicitly declared upward correction from recorded 3
+to actual original 4 uses the same correction action and a selected retained connected row: admit
+only the additional 1 as a new known physical quantity and apply once-only credit to that delta.
+This does not turn a genuinely later provision into a correction or revive an ended promise.
+If an exact downward inverse requires fully consumed quantity or production reversal, reject
+that isolated physical correction with 409; attribution-only correction remains available. This
+is the existing production-reversal boundary, not a general prohibition on historical correction.
 
 **Authority and lifecycle.** The shared contextual writers, single participation, fixed Profit
 boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. A Staffel has at most
 one active promise per bucket; repeated editing addresses that same promise with the required
 scoped version. Meaningful concurrent amount edits must not be silently retried as last-writer-wins.
 Terminal rejection/completion/cancellation, support withdrawal and ineligibility end open promises
-without deleting past contributions. Reopening does not revive them.
+without deleting past contributions. Ineligibility also ends active Staffel participation even when
+it has no open promises or only retained ended contributions; this mandatory prerequisite is part
+of the current material workflow. Historical read remains concrete and current-unit scoped. Neither
+returning eligibility nor reopening revives support or promises. Terminal completion alone does not
+end an otherwise eligible participation. Explicit support enrollment/withdrawal remains the shared
+workflow defined in REQ-ORDERS-051. Reopening does not revive ended promises.
 
 **Concurrency and boundaries.** Guard capacity at order-plus-material scope spanning all of that
 material's quality buckets; overlapping quality stock makes a single bucket or Staffel row too
@@ -90,6 +172,30 @@ as the new default. Inventory owns stock and its grants, JobOrder owns promise/c
 synchronous narrow APIs keep their shared invariants in the same transaction. Exact SQL and
 implementation classes remain implementation choices under ADR-0360 and REQ-ORDERS-046.
 
+ITEM fulfillment uses a separate per-order section guard before requested/manufactured/delivered
+snapshots and before material, physical and queue resources. Handover, item replacement and ITEM
+deletion share that completion boundary; unrelated editable sections keep their own versions.
+Ordinary writers declare their first nonempty complete material set once. Hierarchy maintenance
+may process independent order sets sequentially only while its owning transaction holds an
+exclusive hierarchy lock acquired first. A later shared-to-exclusive upgrade grants no such
+ordering exemption; ordinary writers, including unlinked stock writers, wait before physical locks.
+
+Historical quantity restoration additionally serializes its complete initially possible added
+evidence set after material guards and before physical lots. Known origins and real legacy journal
+references are distinct typed identities; deduplicate and order their advisory keys consistently.
+Re-read global quantity presence and placement after those guards and after lot locking, and
+validate final interval uniqueness before restoring anything. Read-only calling-policy checks may
+narrow unchanged declarations in order before each resimulation; later checks cannot reintroduce
+dropped operations, and the complete original plan and final proofs still apply. A newly required
+identity or physical resource conflicts instead of extending the plan late. Refused observations and
+genuine new manual provision acquire no fictitious restoration identity. This narrow transaction-owned protocol
+prevents two complete undo actions from both recreating the same temporarily absent quantity.
+
+Reading a persisted stock row's unstamped complete quantity composition derives its deterministic
+row-based origin without changing stored JSON or the row version. Only an actual stock write
+persists that composition; read projections and journal snapshots preserve the caller's observed
+version.
+
 **Migration and history.** Migrate only verifiable historical unit credit. Existing stock without
 such evidence reduces capacity as unattributed coverage and may cause proportional reduction.
 Do not reconstruct contribution from today's ownership, membership, intent or executing Staffel.
@@ -97,6 +203,13 @@ Missing history remains missing. Distinguish real credit, derived reduction/requ
 false-fact correction, later true stock changes and manual promise changes in readable history
 and privacy-safe audit. In-place and peer updates refresh affected stock/capacity/promise views.
 Audit, notices and bounded monitoring follow their canonical contracts.
+
+Legacy records that prove only a credited subset remain explicitly marked as such. Their credited
+quantity and requirement quality floor are lower-bound facts, not proof of the full actual
+provision or its original quality. Do not present these as observed truth or permit a physical
+quantity correction that relies on those unknown facts. New ordinary provision captures the
+actual declared quantity, quality and known composition; historical label corrections retain the
+legacy evidence distinction.
 
 **Acceptance**
 
@@ -123,6 +236,9 @@ case rather than accumulating every alternative.
 - [ ] Requester need changes cause only prescribed derived cuts, without extra Staffel approval.
 - [ ] Removing/changing a bucket preserves credit/history without duplicate participation.
 - [ ] False-fact correction differs from genuine later loss and never revives an ended promise.
+- [ ] The same correction action fixes false original supplied quality, preserves genuine later
+  quality changes and unknown quantity evidence, and retains prior/corrected history without
+  production reversal or ended-promise revival.
 - [ ] Ineligible/terminal/reopened cases obey shared write and participation boundaries.
 - [ ] Legacy stock covers demand without fabricated contribution attribution.
 
@@ -138,7 +254,8 @@ implementation. Actual inventory ownership and ordinary stock permissions stay w
 
 ## Open questions
 
-None for the approved quantity contract. Runtime checks remain pending implementation.
+None for the approved quantity and original-quality contracts. Complete runtime acceptance remains
+pending; explicit support and responsibility writes follow the shared workflow.
 
 The existing explicit administrator hard-delete of a MATERIAL/ITEM order (REQ-ORDERS-042) removes
 its dependent active and ended claim rows in the same transaction after the responsibility guard.
@@ -163,17 +280,33 @@ The current implementation groups all material-quality promises of one order/Sta
 uses unmanufactured ITEM demand and the canonical once-only quality coverage. The material guard
 spans every quality tier; Inventory plans actual source/destination scopes before lot/row locks
 and rejects a changed plan instead of acquiring another guard after stock locks.
+MATERIAL demand replacement uses the same planned editor for responsible-side and requester
+edits. It captures immutable requested material lines, includes newly requested materials and
+exact removed-material stock rows in its initial plan, and rechecks current authority, order
+version and resource identities after locking. A changed plan conflicts before the mutation.
+`MaterialOrderResourcePlanningIntegrationTest` observes a real new-material allocation waiting
+for the demand transaction, then checks both committed operations and retained old promise
+history through public boundaries.
 
 `CreateClaimDto.version` is absent for a first promise and mandatory for an existing quantity edit.
-Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. The returned
-claim version includes its flushed history change. An explicit `provision` selection in the ordinary
+Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. A repeated
+current-version save of the same canonical amount is a true no-op: it preserves the contribution
+version, history and existing personal association. Stale versions still conflict before that
+no-op decision. A repeated already-cleared historical attribution also preserves its contribution
+and receipt facts after current authority and scoped-version checks. The returned claim version
+includes its flushed history change. An explicit `provision` selection in the ordinary
 Inventory allocation/check-in payload identifies a matching permitted promise and its version.
 Only the action's genuinely new quantity budget can create credit; unchanged allocation relabelling
 has no new budget. Inventory carries exact known physical origin intervals through transforms;
 JobOrder keeps processed intervals independently of deletable stock, allocation and order rows.
 No legacy stock creates inferred Staffel performance.
 
-The focused implementation checks currently establish version conflicts, SCU proportional demand
-reduction, selected provision before cuts, and known split/merge/loss/restore identity. The complete
-correction, public history/UI, grouped notices and cross-path race acceptance above remains pending;
-this foundation is not evidence that the complete shared workflow has shipped.
+Focused checks establish independent version conflicts/no-ops, exact SCU/PIECE proportional cuts,
+credit before necessary cuts, connected quantity/attribution corrections, retained receipt history,
+historical original-quality correction and corrected-quality attribution choices. Public tests also
+cover current Inventory write authority, terminal preparation, simultaneous ITEM completion,
+administrative stock release/relink without repeat credit and transaction-owned exclusive startup
+maintenance. Immutable migration validation, privacy export, history rendering and grouped notice
+proofs accompany those paths. Complete Undo composition, physical quality correction, remaining
+cross-path/browser acceptance and the shared writer conversion are still under review; these local
+checks do not claim the complete shared workflow has shipped.

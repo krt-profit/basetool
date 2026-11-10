@@ -32,7 +32,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -119,25 +119,32 @@ public class QualityTierService {
   @NotNull
   public QualityTier resolveForRequirement(
       @Nullable String code, @Nullable Integer minQuality, @NotNull Collection<UUID> keptTierIds) {
-    QualityTier tier;
-    if (code != null && !code.isBlank()) {
-      tier =
-          qualityTierRepository
-              .findByCode(code.trim().toUpperCase(Locale.ROOT))
-              .orElseThrow(() -> new BadRequestException("Unknown quality tier code: " + code));
-    } else if (minQuality != null) {
-      tier =
-          qualityTierRepository
-              .findByMinQuality(minQuality)
-              .orElseThrow(
-                  () -> new BadRequestException("No quality tier has the floor " + minQuality));
-    } else {
-      tier = baseTier();
+    QualityTierSelection.Tier tier =
+        resolveForRequirement(selection(), code, minQuality, keptTierIds);
+    return qualityTierRepository.getReferenceById(tier.id());
+  }
+
+  /**
+   * Resolves a requirement against the already frozen catalogue of its action.
+   *
+   * @param selection the action's frozen catalogue
+   * @param code the optional tier code
+   * @param minQuality the optional exact floor
+   * @param keptTierIds inactive tiers already used by the edited line
+   * @return the exact selected quality facts
+   * @throws BadRequestException when the tier is unknown or inactive and not kept
+   */
+  @NotNull
+  public QualityTierSelection.Tier resolveForRequirement(
+      @NotNull QualityTierSelection selection,
+      @Nullable String code,
+      @Nullable Integer minQuality,
+      @NotNull Collection<UUID> keptTierIds) {
+    try {
+      return selection.requirement(code, minQuality, keptTierIds);
+    } catch (IllegalArgumentException failure) {
+      throw new BadRequestException(Objects.requireNonNull(failure.getMessage()));
     }
-    if (!tier.isActive() && !keptTierIds.contains(tier.getId())) {
-      throw new BadRequestException("Quality tier " + tier.getCode() + " is inactive");
-    }
-    return tier;
   }
 
   /**
@@ -149,12 +156,8 @@ public class QualityTierService {
    */
   @NotNull
   public QualityTier defaultForIngredient(@Nullable Integer ingredientMinQuality) {
-    int quality = Quality.orMin(ingredientMinQuality);
-    return qualityTierRepository.findAllByOrderByMinQualityAsc().stream()
-        .filter(QualityTier::isActive)
-        .filter(t -> t.getMinQuality() <= quality)
-        .max(Comparator.comparingInt(QualityTier::getMinQuality))
-        .orElseGet(this::baseTier);
+    QualityTierSelection.Tier tier = selection().defaultForIngredient(ingredientMinQuality);
+    return qualityTierRepository.getReferenceById(tier.id());
   }
 
   /**
@@ -315,5 +318,15 @@ public class QualityTierService {
     if (dto.minQuality() == Quality.MIN && !dto.active()) {
       throw new BadRequestException("The base tier with floor 0 stays active");
     }
+  }
+
+  /**
+   * Freezes current catalogue facts for every requirement in one ordinary action.
+   *
+   * @return the complete immutable quality selection
+   */
+  @NotNull
+  public QualityTierSelection selection() {
+    return new QualityTierSelection(qualityTierRepository.findSelectionFacts());
   }
 }

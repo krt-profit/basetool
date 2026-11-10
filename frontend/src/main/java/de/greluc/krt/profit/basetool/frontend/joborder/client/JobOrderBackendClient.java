@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
@@ -126,6 +127,21 @@ public class JobOrderBackendClient {
 
   private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
       new ParameterizedTypeReference<>() {};
+
+  /** Current promise buckets used by the ordinary Inventory provision picker. */
+  private static final ParameterizedTypeReference<List<ClaimBucketDto>> LIST_OF_CLAIM_BUCKET =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Reads current open promise buckets for a concrete readable order.
+   *
+   * @param id the order
+   * @return current buckets, or null when no response body was sent
+   */
+  @Nullable
+  public List<ClaimBucketDto> claimBuckets(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/orders/{id}/claims", LIST_OF_CLAIM_BUCKET, id);
+  }
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -634,13 +650,15 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Withdraws a material claim.
+   * Withdraws a versioned material promise while retaining its contribution history.
    *
    * @param id the order
    * @param claimId the claim
+   * @param version the observed contribution version; absence relays the backend conflict
    */
-  public void withdrawClaim(@NotNull UUID id, @NotNull UUID claimId) {
-    backendApiClient.delete("/api/v1/orders/{id}/claims/{claimId}", Void.class, id, claimId);
+  public void withdrawClaim(@NotNull UUID id, @NotNull UUID claimId, @Nullable Long version) {
+    backendApiClient.delete(
+        "/api/v1/orders/{id}/claims/{claimId}?version={version}", Void.class, id, claimId, version);
   }
 
   /**

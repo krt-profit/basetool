@@ -42,6 +42,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -138,20 +139,26 @@ public class MaterialClaimController {
    *
    * @param jobOrderId the order id.
    * @param claimId the claim to withdraw.
+   * @param version the observed contribution version; missing or stale values conflict.
    */
   @DeleteMapping("/{claimId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
       summary = "Withdraw a material claim",
-      description = "Removes a squadron's claim from a bucket.")
+      description =
+          "Ends one versioned material promise while preserving support and contribution history.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Claim withdrawn"),
     @ApiResponse(responseCode = "400", description = "Order is terminal or no longer an SK order"),
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
-    @ApiResponse(responseCode = "404", description = "Order or claim not found")
+    @ApiResponse(responseCode = "404", description = "Order or claim not found"),
+    @ApiResponse(responseCode = "409", description = "Missing or stale contribution version")
   })
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
-  public void withdrawClaim(@PathVariable UUID jobOrderId, @PathVariable UUID claimId) {
-    materialClaimService.withdrawClaim(jobOrderId, claimId);
+  public void withdrawClaim(
+      @PathVariable UUID jobOrderId,
+      @PathVariable UUID claimId,
+      @RequestParam(required = false) Long version) {
+    materialClaimService.withdrawClaim(jobOrderId, claimId, version);
   }
 }

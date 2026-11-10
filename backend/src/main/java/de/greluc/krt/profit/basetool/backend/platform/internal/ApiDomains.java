@@ -117,6 +117,7 @@ public final class ApiDomains {
           Map.entry("MaterialCategoryController", "catalogue"),
           Map.entry("MaterialClaimController", "joborder"),
           Map.entry("MaterialCollectionController", "joborder"),
+          Map.entry("MaterialContributionController", "joborder"),
           Map.entry("MaterialController", "catalogue"),
           Map.entry("MaterialExchangeController", "materialexchange"),
           Map.entry("MaterialExternalAliasController", "catalogue"),

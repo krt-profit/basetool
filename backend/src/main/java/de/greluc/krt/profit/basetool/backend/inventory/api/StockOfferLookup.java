@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
@@ -27,6 +29,26 @@ import org.jetbrains.annotations.NotNull;
  * by the Materialbörse. Each read joins the caller's transaction.
  */
 public interface StockOfferLookup {
+
+  /**
+   * The offer facts used by physical stock selection and merge planning.
+   *
+   * @param offered whether an offer of any status references the row
+   * @param activeAmount the active offered stock, or zero without an active offer
+   */
+  record StockOfferFact(boolean offered, double activeAmount) {
+    /** No offer references the physical stock row. */
+    public static final StockOfferFact NONE = new StockOfferFact(false, 0.0);
+  }
+
+  /**
+   * Reads offer presence and active quantity for a complete stock-planning row set in one batch.
+   *
+   * @param inventoryItemIds every stock row being observed
+   * @return facts for rows referenced by an offer; absent rows have no offer
+   */
+  @NotNull
+  Map<UUID, StockOfferFact> offerFacts(@NotNull Collection<UUID> inventoryItemIds);
 
   /**
    * Tells whether any offer, of any status, stands on the row.

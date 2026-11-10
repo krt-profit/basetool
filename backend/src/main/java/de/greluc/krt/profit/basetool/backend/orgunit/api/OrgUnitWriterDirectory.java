@@ -20,8 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,25 @@ public class OrgUnitWriterDirectory {
    * @return current writer account identities, deduplicated across units and roles
    */
   public Set<UUID> writerUserIds(@NotNull Collection<UUID> unitIds) {
-    return unitIds.isEmpty() ? Set.of() : memberships.findCurrentWriterUserIdsForUnits(unitIds);
+    return writerUserIdsByUnit(unitIds).values().stream()
+        .flatMap(Set::stream)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
+  /**
+   * Resolves several concrete unit audiences in one query without conflating their writers.
+   *
+   * @param unitIds all affected units of the logical batch
+   * @return current writer accounts by affected unit, excluding empty audiences
+   */
+  public @NotNull Map<UUID, Set<UUID>> writerUserIdsByUnit(@NotNull Collection<UUID> unitIds) {
+    if (unitIds.isEmpty()) {
+      return Map.of();
+    }
+    return memberships.findCurrentWritersForUnits(unitIds).stream()
+        .collect(
+            Collectors.groupingBy(
+                OrgUnitWriterRef::orgUnitId,
+                Collectors.mapping(OrgUnitWriterRef::userId, Collectors.toUnmodifiableSet())));
   }
 }

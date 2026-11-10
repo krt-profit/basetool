@@ -362,7 +362,10 @@
       "amount" : 5.0,
       "quality_requirement" : "GOOD",
       "created_at" : "<instant>",
-      "ended_at" : null
+      "ended_at" : null,
+      "credited_amount" : 0.0,
+      "changes" : "[]",
+      "provisions" : "[]"
     } ],
     "truncated" : false
   }, {

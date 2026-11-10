@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferKind;
@@ -118,6 +120,7 @@ class UserDeletionEndStateTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
+  @Autowired private JobOrderParticipationRepository participations;
   @Autowired private MaterialClaimRepository materialClaimRepository;
   @Autowired private PersonalBlueprintRepository personalBlueprintRepository;
   @Autowired private PersonalInventoryItemRepository personalInventoryItemRepository;
@@ -505,6 +508,7 @@ class UserDeletionEndStateTest {
                 .material(material)
                 .qualityTier(good)
                 .claimingOrgUnit(squadron)
+                .participation(persistedParticipation(participations, order, squadron))
                 .amount(5.0)
                 .claimedByUser(leaver)
                 .build())

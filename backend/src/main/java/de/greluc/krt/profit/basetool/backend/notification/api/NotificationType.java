@@ -227,10 +227,13 @@ public enum NotificationType {
   JOB_ORDER_ASSIGNED,
 
   /**
-   * The recipient's material claim on a job order was withdrawn (REQ-ORDERS-044), rendered with
-   * {@code displayId}, {@code handle}, {@code material} and the {@code reason} word.
+   * Order support or material promises ended automatically (REQ-ORDERS-044), rendered with {@code
+   * displayId}, {@code handle}, optional {@code material} and the {@code reason} word.
    */
   JOB_ORDER_CLAIM_WITHDRAWN,
+
+  /** Material promises or credited contributions changed for the affected unit writers. */
+  JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
 
   /**
    * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
@@ -542,6 +545,7 @@ public enum NotificationType {
           JOB_ORDER_FINISHED,
           JOB_ORDER_ASSIGNED,
           JOB_ORDER_CLAIM_WITHDRAWN,
+          JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
           REFINERY_ORDER_READY,
           REFINERY_ORDER_CHANGED_BY_OTHER,
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,

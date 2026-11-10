@@ -1,6 +1,6 @@
 # 10. Quality requirements
 
-> **Approved planned acceptance, not implemented:** The [shared JobOrder](../specs/orders-core.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) acceptance criteria cover concurrent scoped writes, exact monetary conservation, safe replay/unknown results, material credit-before-reduction, privacy and live/draft/notice behavior. They require future database, security, contract and browser evidence; existing scenarios/tests below are not evidence that the planned feature has shipped.
+> **JobOrder acceptance boundary:** [Shared JobOrder](../specs/orders-core.md), [material contributions](../specs/orders-material-claims.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) own their acceptance and evidence status. Current hierarchy/read or material tests are not proof of the remaining writer/lifecycle, monetary replay or Bank workflows. New acceptance stays unchecked until the relevant database, security, contract and browser evidence is recorded there.
 
 ## 10.1 The quality tree
 
@@ -35,6 +35,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q12 | A backend call hangs and the page blanks instead of degrading. | Resilience4j Timeout/CircuitBreaker with logged transitions; `REQ-FE-*` |
 | Q13 | A read's statement count starts growing with its row count, or a new foreign key ships without an index. | Hibernate `Statistics` statement-count tests (`BankReadNoNPlusOneTest`, `UserMappingNoNPlusOneTest`); `fail_on_pagination_over_collection_fetch`; `ForeignKeyIndexCoverageTest` over the live catalogue (`REQ-DATA-003`, `REQ-DATA-017`) |
 | Q14 | A release is applied by older host scripts than it was built with (the 2026-10-10 v1.14.0 outage). | The bundle's `host-scripts.sha256` against the host every tick (`HostScriptDrift`, `HostScriptsCheckStale`); `deploy.sh` refuses a release whose apply-path scripts differ; the mandatory pre-promotion comparison (`REQ-OPS-045`) |
+| Q15 | A material quantity receives credit twice after relocation/relinking, a connected correction leaves false credit, or concurrent demand/stock/promise writes exceed uncovered demand. | Public PostgreSQL integration and race checks against [REQ-ORDERS-024](../specs/orders-material-claims.md), quantity provenance tests and shared-view browser checks; the canonical requirement records actual acceptance. |
 
 ## 10.3 What operationalises them
 

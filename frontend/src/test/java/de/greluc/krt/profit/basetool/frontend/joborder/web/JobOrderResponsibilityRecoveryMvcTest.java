@@ -208,7 +208,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
 
     if (mayEdit) {
       assertThat(html)
-          .contains("id=\"edit-order-form\"", "data-requester-view=\"true\"", "/requested-update")
+          .contains("id=\"edit-order-form\"", "data-requester-edit=\"true\"", "/requested-update")
           .doesNotContain("id=\"status-select\"");
     } else {
       assertThat(html).doesNotContain("id=\"edit-order-form\"", "data-modal-id=\"edit-modal\"");

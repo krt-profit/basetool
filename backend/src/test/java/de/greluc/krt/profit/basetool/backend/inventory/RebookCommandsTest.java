@@ -34,8 +34,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.Rebook
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookOutcome;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookRefusal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookedRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -68,7 +68,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class RebookCommandsTest {
 
   @Autowired private RebookCommands rebookCommands;
-  @Autowired private StockCommands stockCommands;
+  @Autowired private StockLotWritePlans stockPlans;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private GameItemRepository gameItemRepository;
   @Autowired private LocationRepository locationRepository;
@@ -260,8 +260,7 @@ class RebookCommandsTest {
     RebookOutcome outcome =
         transaction(() -> {
           StockLot lot = lot(material, 600, true);
-          stockCommands.lockLots(member, List.of(lot.key()));
-          return rebookCommands.rebook(
+          return preparedRebook(
               new Rebook(member, lot, target, RebookDirection.TO_POOL, 5.5), false);
         });
 
@@ -322,8 +321,7 @@ class RebookCommandsTest {
     RebookOutcome outcome =
         transaction(() -> {
           StockLot lot = lot(material, 500, false);
-          stockCommands.lockLots(member, List.of(lot.key()));
-          return rebookCommands.rebook(
+          return preparedRebook(
               new Rebook(member, lot, foreignUnit, RebookDirection.TO_POOL, 1.0), false);
         });
 
@@ -398,8 +396,7 @@ class RebookCommandsTest {
                   locationRepository.findById(location).orElseThrow(),
                   null,
                   false);
-          stockCommands.lockLots(member, List.of(lot.key()));
-          return rebookCommands.rebook(
+          return preparedRebook(
               new Rebook(member, lot, target, RebookDirection.TO_POOL, 1.5), false);
         });
 
@@ -452,9 +449,18 @@ class RebookCommandsTest {
   private RebookOutcome rebook(RebookDirection direction, double amount, boolean dryRun) {
     return transaction(() -> {
       StockLot lot = lot(material, 500, false);
-      stockCommands.lockLots(member, List.of(lot.key()));
-      return rebookCommands.rebook(new Rebook(member, lot, target, direction, amount), dryRun);
+      return preparedRebook(new Rebook(member, lot, target, direction, amount), dryRun);
     });
+  }
+
+  /** Prepares the exact request before its single ordinary owning rebooking call. */
+  private @NotNull RebookOutcome preparedRebook(@NotNull Rebook request, boolean dryRun) {
+    List<StockLotWritePlans.Intent> intents = List.of(new StockLotWritePlans.RebookLot(0, request));
+    var prepared =
+        stockPlans.prepareLotBatch(
+            request.member(), List.of(request.lot()), List.of(), List.of(), intents);
+    stockPlans.confirmLotBatch(prepared, List.of(), intents, dryRun);
+    return rebookCommands.rebook(request, dryRun);
   }
 
   private <T> T transaction(@NotNull Supplier<T> work) {

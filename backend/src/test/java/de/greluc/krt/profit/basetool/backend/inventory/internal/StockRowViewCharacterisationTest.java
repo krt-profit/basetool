@@ -47,21 +47,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Characterises what the foreign modules see of a Lager row through the published stock API (plan
- * section 7.6, P4-1 part 3): every entry the exchange, the job order and the Materialbörse use
- * returns the managed row, and the values they read from it are those the row was stored with.
- *
- * <p>The values are read with the getters the foreign classes call, so the test describes the rows
- * independently of the Java type that carries them; only the reservation sums go through the helper
- * methods at the bottom, which are the one place that names how reservations are read.
- */
+/** Verifies published stock facts, immutable lot snapshots and held live row identity. */
 @SpringBootTest
 @Transactional
 class StockRowViewCharacterisationTest {
@@ -133,33 +126,23 @@ class StockRowViewCharacterisationTest {
     var locked = stockCommands.lockRow(row.getId()).orElseThrow();
     var found = stockReads.findRow(row.getId()).orElseThrow();
     var withMaterial = stockReads.findRowsWithMaterial(List.of(row.getId())).getFirst();
-    var lotRows =
-        stockCommands.lockLotRows(owner.getId(), new StockLot(material, null, location, 612, true));
+    StockLot lot = new StockLot(material, null, location, 612, true);
+    var lotRows = stockReads.lotRows(owner.getId(), List.of(lot)).get(lot.key());
     var releasable = stockReads.releasableRows(owner.getId(), null, true, false, 10);
 
     assertThat(lotRows).hasSize(1);
     assertThat(releasable).extracting(r -> r.getId()).contains(row.getId());
 
-    assertThat(locked).isSameAs(found).isSameAs(withMaterial).isSameAs(lotRows.getFirst());
-    assertThat(locked.getId()).isEqualTo(row.getId());
-    assertThat(locked.getVersion()).isEqualTo(row.getVersion());
-    assertThat(locked.getUser().getId()).isEqualTo(owner.getId());
-    assertThat(locked.getOwningOrgUnit().getId()).isEqualTo(unit.getId());
-    assertThat(locked.getMaterial().getId()).isEqualTo(material.getId());
-    assertThat(locked.getGameItem()).isNull();
-    assertThat(locked.getLocation().getId()).isEqualTo(location.getId());
-    assertThat(locked.getQuality()).isEqualTo(612);
-    assertThat(locked.getAmount()).isEqualTo(7.5);
-    assertThat(locked.getStolen()).isTrue();
-    assertThat(jobOrderReserved(locked)).isEqualTo(2.5);
-    assertThat(missionReserved(locked)).isEqualTo(1.25);
-    assertThat(jobOrderSliceAmount(locked, orderId)).isEqualTo(2.5);
-    assertThat(jobOrderSliceAmount(locked, UUID.randomUUID())).isNull();
+    assertThat(locked).isSameAs(found).isSameAs(withMaterial);
+    assertStoredFacts(locked);
+    assertStoredFacts(lotRows.getFirst());
   }
 
   @Test
   void aCommandIsSeenOnTheSameRowInstanceTheCallerAlreadyHolds() {
     var held = stockCommands.lockRow(row.getId()).orElseThrow();
+    StockLot lot = new StockLot(material, null, location, 612, true);
+    StockRow snapshot = stockReads.lotRows(owner.getId(), List.of(lot)).get(lot.key()).getFirst();
 
     stockCommands.releaseJobOrderEarmark(held.getId(), orderId);
 
@@ -167,6 +150,26 @@ class StockRowViewCharacterisationTest {
     assertThat(jobOrderSliceAmount(held, orderId)).isNull();
     assertThat(missionReserved(held)).isEqualTo(1.25);
     assertThat(stockReads.findRow(row.getId()).orElseThrow()).isSameAs(held);
+    assertStoredFacts(snapshot);
+  }
+
+  /** Checks every persisted physical and allocation fact used by foreign modules. */
+  private void assertStoredFacts(@NotNull StockRow item) {
+    assertThat(item.getId()).isEqualTo(row.getId());
+    assertThat(item.getVersion()).isEqualTo(row.getVersion());
+    assertThat(item.getUser().getId()).isEqualTo(owner.getId());
+    assertThat(item.getOwningOrgUnit().getId()).isEqualTo(unit.getId());
+    assertThat(item.getMaterial().getId()).isEqualTo(material.getId());
+    assertThat(item.getGameItem()).isNull();
+    assertThat(item.getLocation().getId()).isEqualTo(location.getId());
+    assertThat(item.getQuality()).isEqualTo(612);
+    assertThat(item.getAmount()).isEqualTo(7.5);
+    assertThat(item.getPersonal()).isFalse();
+    assertThat(item.getStolen()).isTrue();
+    assertThat(jobOrderReserved(item)).isEqualTo(2.5);
+    assertThat(missionReserved(item)).isEqualTo(1.25);
+    assertThat(jobOrderSliceAmount(item, orderId)).isEqualTo(2.5);
+    assertThat(jobOrderSliceAmount(item, UUID.randomUUID())).isNull();
   }
 
   private static double jobOrderReserved(StockRow item) {

@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -42,8 +43,10 @@ public class StockViewerAccessService implements StockViewerAccess {
   @Override
   public boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId) {
     return inventoryItemId != null
-        && inventoryAccessPolicy.canEditInventoryItem(inventoryItemId)
-        && (isCaller(ownerId) || inventoryAccessPolicy.isLogisticianOfItem(inventoryItemId));
+        && mayEdit(
+            inventoryAccessPolicy.canEditInventoryItem(inventoryItemId),
+            ownerId,
+            () -> inventoryAccessPolicy.isLogisticianOfItem(inventoryItemId));
   }
 
   /**
@@ -54,5 +57,19 @@ public class StockViewerAccessService implements StockViewerAccess {
    */
   private boolean isCaller(@Nullable UUID userId) {
     return userId != null && authHelperService.currentUserId().filter(userId::equals).isPresent();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean mayEditInventoryIdentity(@Nullable UUID ownerId, @Nullable UUID owningOrgUnitId) {
+    return mayEdit(
+        inventoryAccessPolicy.canEditInventoryIdentity(ownerId, owningOrgUnitId),
+        ownerId,
+        () -> inventoryAccessPolicy.isLogisticianOfOwner(owningOrgUnitId));
+  }
+
+  /** Applies the full Inventory action predicate while retaining its short-circuiting gates. */
+  private boolean mayEdit(boolean inScope, @Nullable UUID ownerId, BooleanSupplier logistician) {
+    return inScope && (isCaller(ownerId) || logistician.getAsBoolean());
   }
 }

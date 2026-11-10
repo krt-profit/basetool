@@ -23,7 +23,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDt
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,9 @@ public final class AllocationReductions {
    */
   public static final double REDUCTION_EPSILON = 1e-6;
 
+  /** The storage quanta in one whole material or game-item unit. */
+  private static final long QUANTA_PER_UNIT = ScuAmounts.toQuanta(1.0);
+
   /** Non-instantiable static helper. */
   private AllocationReductions() {}
 
@@ -51,8 +56,9 @@ public final class AllocationReductions {
    * Resolves and validates one dimension's "deduct from" plan for deducting {@code totalX} from
    * {@code item}.
    *
-   * <p>A {@code null} list derives the default plan (unassigned rest first, then proportionally
-   * across the tags), which never fails.
+   * <p>A {@code null} list takes unassigned rest first, then uses exact whole-unit largest
+   * remainders for PIECE and game-item stock or three-decimal proportional shares for SCU. Complete
+   * row deductions retain every actual slice.
    *
    * @param item the entry whose slices back the plan, loaded within the transaction; never {@code
    *     null}
@@ -70,6 +76,9 @@ public final class AllocationReductions {
       @Nullable List<AllocationReductionDto> reductions,
       double totalX,
       boolean jobOrderDimension) {
+    if (reductions == null && item.countsWholeUnits()) {
+      return defaultWholeReductionPlan(item, totalX, jobOrderDimension);
+    }
     double amount = item.getAmount() != null ? item.getAmount() : 0.0;
     double sumSlices =
         jobOrderDimension
@@ -124,8 +133,8 @@ public final class AllocationReductions {
   }
 
   /**
-   * Derives the default plan: {@code totalX} from the unassigned rest first, the remainder spread
-   * across the tags in proportion to their amount, with the last tag absorbing rounding.
+   * Derives the SCU default: unassigned rest first, then proportional three-decimal shares with the
+   * final tag absorbing rounding within its slice and residuals bounded by the required deduction.
    *
    * @param item the entry whose slices to spend against; never {@code null}
    * @param totalX the total quantity being deducted
@@ -170,14 +179,116 @@ public final class AllocationReductions {
       } else {
         share = ScuAmounts.roundToScuScale(forced * (sliceAmounts.get(i) / totalSlice));
       }
-      share = Math.min(share, sliceAmounts.get(i));
+      share =
+          Math.min(
+              share, Math.min(sliceAmounts.get(i), ScuAmounts.roundToScuScale(forced - assigned)));
       if (share > 0.0) {
         plan.put(targets.get(i), share);
         assigned = ScuAmounts.roundToScuScale(assigned + share);
       }
     }
+    completeScuRoundingResidual(
+        plan, targets, sliceAmounts, ScuAmounts.roundToScuScale(forced - assigned));
     return plan;
   }
+
+  /** Fills only a clipped final-tag residual without exceeding any existing slice. */
+  private static void completeScuRoundingResidual(
+      Map<UUID, Double> plan, List<UUID> targets, List<Double> sliceAmounts, double remaining) {
+    for (int index = 0; index < targets.size() && remaining > REDUCTION_EPSILON; index++) {
+      UUID target = targets.get(index);
+      double assigned = plan.getOrDefault(target, 0.0);
+      double available = ScuAmounts.roundToScuScale(sliceAmounts.get(index) - assigned);
+      double share = Math.min(available, remaining);
+      if (share > 0.0) {
+        plan.put(target, ScuAmounts.roundToScuScale(assigned + share));
+        remaining = ScuAmounts.roundToScuScale(remaining - share);
+      }
+    }
+    if (remaining > REDUCTION_EPSILON) {
+      throw new OverAllocationException();
+    }
+  }
+
+  /**
+   * Retains complete row deductions and apportions partial whole-unit shares by exact largest
+   * remainders with target UUID ties.
+   */
+  private static Map<UUID, Double> defaultWholeReductionPlan(
+      InventoryItem item, double totalX, boolean jobOrderDimension) {
+    final Map<UUID, Double> earmarks =
+        jobOrderDimension
+            ? InventoryAllocations.jobOrderEarmarks(item)
+            : InventoryAllocations.missionEarmarks(item);
+    final double physicalAmount = item.getAmount() != null ? item.getAmount() : 0.0;
+    if (Double.compare(totalX, physicalAmount) == 0) {
+      return earmarks;
+    }
+    final long physicalQuanta = ScuAmounts.toQuanta(physicalAmount);
+    if (physicalQuanta % QUANTA_PER_UNIT != 0L) {
+      final long requestedQuanta = Math.multiplyExact(wholeUnits(item, totalX), QUANTA_PER_UNIT);
+      final long taggedQuanta =
+          earmarks.values().stream().mapToLong(ScuAmounts::toQuanta).reduce(0L, Math::addExact);
+      if (requestedQuanta <= Math.subtractExact(physicalQuanta, taggedQuanta)) {
+        return new LinkedHashMap<>();
+      }
+    }
+    final Map<UUID, Long> quantities = new LinkedHashMap<>();
+    earmarks.forEach((target, amount) -> quantities.put(target, wholeUnits(item, amount)));
+    final long total =
+        quantities.values().stream().mapToLong(Long::longValue).reduce(0L, Math::addExact);
+    final long free =
+        Math.subtractExact(
+            wholeUnits(item, item.getAmount() != null ? item.getAmount() : 0.0), total);
+    final long forced = Math.max(0L, Math.subtractExact(wholeUnits(item, totalX), free));
+    if (free < 0L || forced > total) {
+      throw new OverAllocationException();
+    }
+    final Map<UUID, Double> plan = new LinkedHashMap<>();
+    if (forced == 0L) {
+      return plan;
+    }
+    final BigInteger divisor = BigInteger.valueOf(total);
+    final Map<UUID, Long> deductions = new LinkedHashMap<>();
+    final List<WholeQuota> quotas = new ArrayList<>();
+    quantities.forEach((target, amount) -> {
+      BigInteger[] quota =
+          BigInteger.valueOf(forced)
+              .multiply(BigInteger.valueOf(amount))
+              .divideAndRemainder(divisor);
+      deductions.put(target, quota[0].longValueExact());
+      quotas.add(new WholeQuota(target, quota[1].longValueExact()));
+    });
+    quotas.sort(
+        Comparator.comparingLong(WholeQuota::remainder)
+            .reversed()
+            .thenComparing(WholeQuota::target));
+    final long residual =
+        Math.subtractExact(
+            forced,
+            deductions.values().stream().mapToLong(Long::longValue).reduce(0L, Math::addExact));
+    for (int index = 0; index < residual; index++) {
+      deductions.merge(quotas.get(index).target(), 1L, Math::addExact);
+    }
+    deductions.forEach((target, amount) -> {
+      if (amount > 0L) {
+        plan.put(target, ScuAmounts.fromQuanta(Math.multiplyExact(amount, QUANTA_PER_UNIT)));
+      }
+    });
+    return plan;
+  }
+
+  /** Converts storage precision to exact integral units for a whole-unit row. */
+  private static long wholeUnits(InventoryItem item, double amount) {
+    long quanta = ScuAmounts.toQuanta(amount);
+    if (quanta % QUANTA_PER_UNIT != 0L) {
+      throw new BadRequestException(item.wholeUnitAmountDetail());
+    }
+    return quanta / QUANTA_PER_UNIT;
+  }
+
+  /** The exact fractional priority of one whole-unit proportional quota. */
+  private record WholeQuota(UUID target, long remainder) {}
 
   /**
    * The pre-decrement slice amount of {@code targetId} in the given dimension, or {@code 0.0} when

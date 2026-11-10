@@ -119,10 +119,11 @@ class MaterialClaimControllerSecurityTest {
     mockMvc
         .perform(
             delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
+                .param("version", "7")
                 .with(jwt().authorities(logistician())))
         .andExpect(status().isForbidden());
 
-    verify(materialClaimService, never()).withdrawClaim(any(), any());
+    verify(materialClaimService, never()).withdrawClaim(any(), any(), any());
   }
 
   @Test
@@ -132,9 +133,10 @@ class MaterialClaimControllerSecurityTest {
     mockMvc
         .perform(
             delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
+                .param("version", "7")
                 .with(jwt().authorities(logistician())))
         .andExpect(status().isNoContent());
 
-    verify(materialClaimService).withdrawClaim(ORDER_ID, CLAIM_ID);
+    verify(materialClaimService).withdrawClaim(ORDER_ID, CLAIM_ID, 7L);
   }
 }

@@ -29,8 +29,8 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The rebooking of a member's own stock of one lot between personal and one org unit's pool, the
  * Lager's Umbuchung of REQ-INV-007 addressed by lot (REQ-INV-060). The command joins the caller's
- * transaction ({@code MANDATORY}); the caller has taken the member's lot lock with {@link
- * StockCommands#lockLots} first.
+ * transaction ({@code MANDATORY}); the caller has prepared every actual source and destination
+ * through {@link StockCommands#prepareWrites} or a confirmed {@link StockLotWritePlans} action.
  *
  * <p>A refusal is answered instead of thrown, so the caller can report it per op and go on.
  */
@@ -106,9 +106,18 @@ public interface RebookCommands {
    *
    * @param refusal why it was refused, or {@code null} when it was applied or would be
    * @param changes every row it changed; empty for a refusal or a dry run
+   * @param targetRows the actual owning destinations, in source-take order
    */
   record RebookOutcome(
-      @Nullable RebookRefusal refusal, @NotNull @Unmodifiable List<RebookedRow> changes) {
+      @Nullable RebookRefusal refusal,
+      @NotNull @Unmodifiable List<RebookedRow> changes,
+      @NotNull @Unmodifiable List<UUID> targetRows) {
+
+    /** Retains immutable change facts and actual destination identities. */
+    public RebookOutcome {
+      changes = List.copyOf(changes);
+      targetRows = List.copyOf(targetRows);
+    }
 
     /**
      * A refused rebooking.
@@ -117,7 +126,7 @@ public interface RebookCommands {
      * @return the outcome
      */
     public static @NotNull RebookOutcome refused(@NotNull RebookRefusal refusal) {
-      return new RebookOutcome(refusal, List.of());
+      return new RebookOutcome(refusal, List.of(), List.of());
     }
 
     /**
@@ -126,17 +135,19 @@ public interface RebookCommands {
      * @return the outcome
      */
     public static @NotNull RebookOutcome checked() {
-      return new RebookOutcome(null, List.of());
+      return new RebookOutcome(null, List.of(), List.of());
     }
 
     /**
      * An applied rebooking.
      *
      * @param changes every row it changed
+     * @param targetRows the actual owning destinations, in source-take order
      * @return the outcome
      */
-    public static @NotNull RebookOutcome applied(@NotNull List<RebookedRow> changes) {
-      return new RebookOutcome(null, List.copyOf(changes));
+    public static @NotNull RebookOutcome applied(
+        @NotNull List<RebookedRow> changes, @NotNull List<UUID> targetRows) {
+      return new RebookOutcome(null, changes, targetRows);
     }
   }
 

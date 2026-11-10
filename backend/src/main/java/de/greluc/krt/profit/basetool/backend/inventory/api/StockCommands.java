@@ -32,12 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The writes another module may ask of the Lager for a member's lots (plan §5.3, ADR-0229). Every
- * command joins the caller's transaction ({@code MANDATORY}).
+ * The writes another module may ask of the Lager for a member's lots (ADR-0229). Every command
+ * joins the caller's transaction ({@code MANDATORY}).
  *
- * <p>The lot-lock protocol is the Lager's: a writer takes the advisory lock of every lot it will
- * touch with {@link #lockLots} before it reads any row, then each lot's rows with {@link
- * #lockLotRows} in the order of the lots' keys, and only then books.
+ * <p>A multi-row writer declares every actual source and destination with {@link #prepareWrites}
+ * before it locks a row or mutates stock. Historical lot programs use {@link StockLotWritePlans}.
  */
 public interface StockCommands {
   /**
@@ -46,9 +45,17 @@ public interface StockCommands {
    * @param holder the stock holder
    * @param lot the physical destination lot
    * @param orderIds every initial job-order allocation target
+   * @param personal whether the new stock is personal
+   * @param owningOrgUnitId the exact owning pool, or null for unassigned stock
+   * @param merge whether the action actually merges matching stock rows
    */
   record StockBookInScope(
-      @NotNull UUID holder, @NotNull StockLot lot, @NotNull List<UUID> orderIds) {
+      @NotNull UUID holder,
+      @NotNull StockLot lot,
+      @NotNull List<UUID> orderIds,
+      boolean personal,
+      @Nullable UUID owningOrgUnitId,
+      boolean merge) {
     /** Retains an immutable copy of the requested target set. */
     public StockBookInScope {
       orderIds = List.copyOf(orderIds);
@@ -63,24 +70,16 @@ public interface StockCommands {
   void lockBookInScopes(@NotNull Collection<StockBookInScope> bookings);
 
   /**
-   * Takes the transaction-scoped advisory lock of each of a member's lots, in ascending order of
-   * the lock keys, before any of their rows is read.
+   * Prepares every source row, exact destination and material scope before an action writes stock.
    *
-   * @param member the member
-   * @param lotKeys the lots' keys as the change feed records them
+   * @param sourceRowIds every existing row the action consumes or changes
+   * @param bookings every new destination with its actual merge policy
+   * @param requiredScopes additional material scopes owned by the calling domain
    */
-  void lockLots(@NotNull UUID member, @NotNull Collection<String> lotKeys);
-
-  /**
-   * Locks the member's rows of a lot, personal and shared, in the order a book-out takes them: the
-   * personal rows first, then the rows without an org unit, then the oldest.
-   *
-   * @param member the member
-   * @param lot the lot
-   * @return the rows, locked for this transaction
-   */
-  @NotNull
-  List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
+  void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes);
 
   /**
    * Locks one row for a write that follows (a handover or a production consumption), with its
@@ -108,8 +107,10 @@ public interface StockCommands {
    * @param member the member, owner and actor
    * @param lot the lot
    * @param amount the amount
+   * @return the row that holds the new quantity after the owning merge
    */
-  void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount);
+  @NotNull
+  UUID bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount);
 
   /**
    * Books an amount out of one locked row through the Lager's own book-out, which audits it and
@@ -131,8 +132,10 @@ public interface StockCommands {
    * @param rowId the row
    * @param stolen the marker to set
    * @param amount the part to mark, or {@code null} for the whole row
+   * @return the marked or split row after its owning merge
    */
-  void markStolen(
+  @NotNull
+  UUID markStolen(
       @NotNull UUID member, @NotNull UUID rowId, boolean stolen, @Nullable Double amount);
 
   /**
@@ -194,8 +197,8 @@ public interface StockCommands {
   /**
    * Books stock in as a shared row of an org unit's pool, held by {@code holder}, and merges it
    * into the holder's existing pool row of the same lot (REQ-INV-057). Records {@code
-   * INVENTORY_ITEM_CREATED} with the booking reason. The caller has taken the holder's lot lock
-   * ({@link #lockLots}, {@link StockLot#key}) first.
+   * INVENTORY_ITEM_CREATED} with the booking reason. A multi-row caller has prepared every source
+   * and destination through {@link #prepareWrites} first.
    *
    * @param holder the member who holds the pool row, recorded as the actor
    * @param poolUnit the org unit whose pool receives the stock

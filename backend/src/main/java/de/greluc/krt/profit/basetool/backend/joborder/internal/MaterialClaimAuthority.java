@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +41,7 @@ import org.springframework.stereotype.Service;
 public class MaterialClaimAuthority {
   private final AuthHelperService actor;
   private final AccessGateService access;
+  private final RequestScopeResolver scope;
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibility;
 
@@ -64,6 +66,29 @@ public class MaterialClaimAuthority {
    */
   public void assertCanManage(JobOrder order, UUID unitId) {
     if (!canManage(order, unitId)) {
+      throw new AccessDeniedException("orders.claim.provision.forbidden");
+    }
+  }
+
+  /**
+   * Checks the current historical correction grant within the existing claim-workflow entry.
+   *
+   * @param order the concrete order
+   * @param unitId the affected contribution's Staffel
+   * @return whether this caller may correct that contribution under the current write predicate
+   */
+  public boolean canCorrect(@NotNull JobOrder order, @NotNull UUID unitId) {
+    return scope.canViewJobOrders() && canManage(order, unitId);
+  }
+
+  /**
+   * Rejects historical correction without the existing entry and affected unit writer grant.
+   *
+   * @param order the concrete order
+   * @param unitId the affected contribution's Staffel
+   */
+  public void assertCanCorrect(@NotNull JobOrder order, @NotNull UUID unitId) {
+    if (!canCorrect(order, unitId)) {
       throw new AccessDeniedException("orders.claim.provision.forbidden");
     }
   }

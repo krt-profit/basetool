@@ -515,6 +515,13 @@
 /orders/{id}/assignees/{userId}/note PUT -> JobOrderWriteController#setAssigneeNote gate=class:isAuthenticated() layout=yes
 /orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/claims/history GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#history gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims/provision-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#provisionOptions gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims/provisions/{creditId}/attribution-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#attributionOptions gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims/provisions/{creditId}/correction POST -> MaterialProvisionCorrectionController#correct gate=class:isAuthenticated() layout=no
+/orders/{id}/claims/provisions/{creditId}/editor GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#editor gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims/provisions/{creditId}/quality-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#qualityOptions gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims/provisions/{creditId}/quantity-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#quantityOptions gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
 /orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:@logisticianGate.isGranted() layout=yes

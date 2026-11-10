@@ -1,4 +1,4 @@
-> **Doc type:** Living spec - approved target. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec - approved target. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS / BANK
 > **Status:** Accepted / planned; not implemented. All acceptance criteria below are pending.
 > **Related ADRs:** [ADR-0357](../adr/0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md),
@@ -23,14 +23,19 @@ schema or production data and authorises no implementation. The connected-client
 
 ### REQ-ORDERS-069 - Optional Bank use preserves the complete independent order flow
 
-Every aUEC order can be created, supplied, held, collected, handed over, corrected and closed without
-Bank accounts, roles, custodians, requests or transactions. Choosing Bank use for one operation
-creates only that operation's explicit coupling; order progress, responsibility and completion do
-not automatically post to the Bank.
+Bank handling is preselected for every new monetary operation, so the standard journey uses the
+Bank throughout. The complete Bank-free journey remains available through an explicit selection
+for each operation, without Bank accounts, roles, custodians, requests or transactions. Creation
+still needs only the minimal order fields; no Bank setup is a creation prerequisite. This is a
+per-operation choice, not an order-wide operating mode. The selected Bank handling creates only
+that operation's coupling; order progress, responsibility and completion do not automatically post
+to the Bank. No missing configuration, denied request or unavailable Bank service silently turns
+a Bank-enabled operation into a Bank-free one.
 
 Bank use may accompany new provision during procurement, use of existing Bank funds, internal
 collection, requester handover and returns. The user selects it in the corresponding ordinary order
-action. Reuse its amount, actual parties and purpose without a second entry workflow. Bank staff
+action; Bank handling starts enabled, and Bank-free handling must be deliberately chosen.
+Reuse its amount, actual parties and purpose without a second entry workflow. Bank staff
 book directly only under the applicable Bank authority; other actors raise a permitted request.
 There is no required retrospective-linking workflow for arbitrary old transactions.
 
@@ -43,7 +48,7 @@ The actual economic boundary selects the representation:
 | Organisational account ownership changes | TRANSFER between the selected accounts with actual custodians | Reallocation or designated requester handover/return; no repeat procurement |
 | Custody changes between Bank custodians, principal account ownership unchanged | HOLDER_TRANSFER under REQ-BANK-031 | Collection/holder change; no repeat provision or fulfilment |
 | Existing Bank funds are authorised for this order without an account/custody movement | Successful authorisation under REQ-BANK-022/-023/-024, without a ledger transaction | First authorised order provision once |
-| Both sides remain outside Bank custody | No Bank posting | The independent order action |
+| Both sides remain outside Bank custody | No Bank posting; explicitly select Bank-free handling | The independent order action under that explicit choice |
 
 Entering or leaving the Bank does not repeat an already recorded provision or unit contribution.
 Four million newly contributed and six million first provided from existing Bank funds is ten
@@ -51,10 +56,12 @@ million provision, regardless of how many related Bank records explain it.
 
 **Acceptance**
 
-- [ ] A complete independent journey, including accountless holders and split handovers, needs no Bank object or right.
+- [ ] A complete explicitly selected Bank-free journey, including accountless holders and split handovers, needs no Bank object or right.
 - [ ] Early deposit, existing-fund provision, collection, delivery and return each have an explicit ordinary-action Bank choice.
 - [ ] The same provision is not counted again when later deposited, withdrawn or transferred in the Bank.
 - [ ] Ordinary progress/completion creates no implicit Bank transaction.
+- [ ] Each new operation preselects Bank handling; an earlier Bank-free choice does not silently carry forward.
+- [ ] A denied, incomplete or unavailable Bank path produces no automatic Bank-free effect and does not bypass existing-fund approvals.
 
 ### REQ-ORDERS-070 - Existing Bank funds require debit-equivalent authority before availability
 

@@ -19,807 +19,177 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.profitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapperImpl;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
-import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionHistoryDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Spy;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Mockito unit tests for {@link MaterialClaimService}: open-remaining math for both order kinds,
- * the SK-only / terminal-freeze / overclaim / unknown-bucket guards, the upsert (insert vs.
- * update), the permission matrix, and the reconciliation hooks.
- */
-@ExtendWith(MockitoExtension.class)
+/** Exercises versioned material-promise endings through the public HTTP and domain APIs. */
+@SpringBootTest
+@WithMockUser(roles = {"ADMIN"})
 class MaterialClaimServiceTest {
+  @Autowired private WebApplicationContext context;
+  @Autowired private TransactionTemplate transactions;
+  @Autowired private JdbcTemplate jdbc;
+  @Autowired private OrgUnitRepository units;
+  @Autowired private MaterialRepository materials;
+  @Autowired private QualityTierRepository tiers;
+  @Autowired private JobOrderRepository orders;
+  @Autowired private MaterialClaimService claims;
+  @Autowired private JobOrderQueryService query;
+  @Autowired private tools.jackson.databind.ObjectMapper json;
+  private MockMvc mvc;
+  private Fixture fixture;
 
-  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
-  @Mock private JobOrderEligibilityNotices eligibilityNotices;
-  @Mock private ProfitHierarchyService profitHierarchy;
-
-  private final Bereich profitArea = profitArea();
-
-  @Mock private MaterialClaimRepository materialClaimRepository;
-  @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private OrgUnitRepository orgUnitRepository;
-  @Mock private UserRepository userRepository;
-  @Mock private AuthHelperService authHelperService;
-  @Mock private AccessGateService accessGateService;
-  @Mock private MaterialMapper materialMapper;
-  @Mock private SquadronMapper squadronMapper;
-  @Spy private QualityTierMapper qualityTierMapper = new QualityTierMapperImpl();
-
-  @Mock private AuditService auditService;
-
-  /**
-   * Deferred self-reference the {@link MaterialClaimService#upsertClaim} orchestrator uses to open
-   * a fresh {@code REQUIRES_NEW} transaction per attempt. In-process there is no Spring proxy, so
-   * tests point {@code self.getObject()} at the service under test (or a spy) so the orchestrator
-   * invokes the real within-transaction body.
-   */
-  @Mock private ObjectProvider<MaterialClaimService> self;
-
-  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
-  @Mock private UserService userService;
-
-  @InjectMocks private MaterialClaimService service;
-
-  private static final UUID ORDER_ID = UUID.randomUUID();
-  private static final UUID MATERIAL_ID = UUID.randomUUID();
-  private static final UUID SK_ID = UUID.randomUUID();
-  private static final UUID SQUADRON_A = UUID.randomUUID();
-  private static final UUID SQUADRON_B = UUID.randomUUID();
-  private static final QualityTier GOOD = QualityTierFixtures.good();
-  private static final QualityTier NONE = QualityTierFixtures.none();
-
-  private Material material;
-  private SpecialCommand responsibleSk;
-  private Squadron squadronA;
-  private Squadron squadronB;
+  private record Fixture(UUID order, UUID material, UUID unit, UUID responsible) {}
 
   @BeforeEach
-  void setUp() {
-    material = new Material();
-    material.setId(MATERIAL_ID);
-    material.setName("Aslarite");
-
-    responsibleSk = new SpecialCommand();
-    responsibleSk.setId(SK_ID);
-    responsibleSk.setShorthand("SKX");
-    withinProfit(responsibleSk, profitArea);
-
-    squadronA = new Squadron();
-    squadronA.setId(SQUADRON_A);
-    squadronA.setShorthand("ALF");
-    withinProfit(squadronA, profitArea);
-
-    squadronB = new Squadron();
-    squadronB.setId(SQUADRON_B);
-    squadronB.setShorthand("BRV");
-    withinProfit(squadronB, profitArea);
+  void prepare() {
+    mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    fixture =
+        transactions.execute(_ -> {
+          String tag = UUID.randomUUID().toString();
+          SpecialCommand responsible = new SpecialCommand();
+          responsible.setName("Lifecycle SK " + tag);
+          responsible.setShorthand("L" + tag);
+          withinProfit(responsible, persistedProfitArea(units));
+          responsible = units.saveAndFlush(responsible);
+          Squadron unit = new Squadron();
+          unit.setName("Lifecycle Staffel " + tag);
+          unit.setShorthand("S" + tag);
+          withinProfit(unit, persistedProfitArea(units));
+          unit = units.saveAndFlush(unit);
+          Material material = new Material();
+          material.setName("Lifecycle material " + tag);
+          material.setType(MaterialType.RAW);
+          material = materials.saveAndFlush(material);
+          JobOrder order =
+              JobOrder.builder()
+                  .responsibleOrgUnit(responsible)
+                  .requestingOrgUnit(unit)
+                  .handle("Lifecycle fixture")
+                  .build();
+          order.addMaterial(
+              JobOrderMaterial.builder()
+                  .material(material)
+                  .qualityTier(tiers.findByCode("GOOD").orElseThrow())
+                  .amount(10.0)
+                  .build());
+          order = orders.saveAndFlush(order);
+          return new Fixture(order.getId(), material.getId(), unit.getId(), responsible.getId());
+        });
   }
 
-  @Nested
-  class GetClaimBucketsTests {
-
-    @Test
-    void materialOrder_computesRequiredClaimedOpenRemaining() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(
-              List.of(claim(order, GOOD, squadronA, 3.0), claim(order, GOOD, squadronB, 2.0)));
-
-      List<ClaimBucketDto> buckets = service.getClaimBuckets(ORDER_ID);
-
-      assertEquals(1, buckets.size());
-      ClaimBucketDto bucket = buckets.get(0);
-      assertEquals("GOOD", bucket.qualityRequirement());
-      assertEquals(QualityTierFixtures.GOOD_ID, bucket.qualityTier().id());
-      assertEquals(10.0, bucket.requiredAmount());
-      assertEquals(5.0, bucket.claimedAmount());
-      assertEquals(5.0, bucket.openRemaining());
-      assertEquals(2, bucket.claims().size());
+  @AfterEach
+  void removeOwnFixture() {
+    if (fixture == null) {
+      return;
     }
-
-    @Test
-    void itemOrder_sumsRequiredPerQualityBucket() {
-      JobOrder order = new JobOrder();
-      order.setId(ORDER_ID);
-      order.setType(JobOrderType.ITEM);
-      order.setResponsibleOrgUnit(responsibleSk);
-      order.setStatus(JobOrderStatus.OPEN);
-      JobOrderItem item = new JobOrderItem();
-      item.setMaterials(
-          new HashSet<>(
-              Set.of(itemMaterial(material, GOOD, 4.0), itemMaterial(material, GOOD, 6.0))));
-      order.setItems(new HashSet<>(Set.of(item)));
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(List.of());
-
-      List<ClaimBucketDto> buckets = service.getClaimBuckets(ORDER_ID);
-
-      assertEquals(1, buckets.size());
-      assertEquals(10.0, buckets.get(0).requiredAmount());
-      assertEquals(0.0, buckets.get(0).claimedAmount());
-      assertEquals(10.0, buckets.get(0).openRemaining());
-    }
-
-    @Test
-    void unknownOrder_throwsNotFound() {
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(NotFoundException.class, () -> service.getClaimBuckets(ORDER_ID));
-    }
+    transactions.executeWithoutResult(_ -> {
+      jdbc.update("DELETE FROM material_claim WHERE job_order_id = ?", fixture.order());
+      jdbc.update("DELETE FROM job_order_participation WHERE job_order_id = ?", fixture.order());
+      orders.deleteById(fixture.order());
+      orders.flush();
+      materials.deleteById(fixture.material());
+      units.deleteById(fixture.unit());
+      units.deleteById(fixture.responsible());
+    });
   }
 
-  @Nested
-  class UpsertGuardTests {
+  @Test
+  void withdrawalWithoutObservedVersionConflicts() throws Exception {
+    ClaimDto observed = promise(4.0, null);
 
-    @BeforeEach
-    void delegateSelfToRealService() {
-      when(self.getObject()).thenReturn(service);
-    }
-
-    @Test
-    void nonSkOrder_rejected() {
-      JobOrder order = materialOrder(squadronA, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-
-      assertThrows(
-          BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 5.0)));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void terminalOrder_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.COMPLETED, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-
-      assertThrows(
-          BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 5.0)));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void unknownBucket_rejected() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-
-      CreateClaimDto dto = new CreateClaimDto(UUID.randomUUID(), "GOOD", SQUADRON_A, 5.0, null);
-      assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void tierCodeNotUsedByOrder_rejected() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-
-      CreateClaimDto dto = new CreateClaimDto(MATERIAL_ID, "NONE", SQUADRON_A, 5.0, null);
-      assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
-
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void lowerCaseTierCode_resolvesToGoodBucket() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, new CreateClaimDto(MATERIAL_ID, "good", SQUADRON_A, 4.0, null));
-
-      ArgumentCaptor<MaterialClaim> saved = ArgumentCaptor.forClass(MaterialClaim.class);
-      verify(materialClaimRepository).save(saved.capture());
-      assertEquals(QualityTierFixtures.GOOD_ID, saved.getValue().getQualityTier().getId());
-    }
-
-    @Test
-    void overclaim_rejected() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of(claim(order, GOOD, squadronB, 8.0)));
-
-      assertThrows(
-          BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 5.0)));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void exactlyFillingRemaining_isAccepted() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of(claim(order, GOOD, squadronB, 8.0)));
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 2.0));
-
-      verify(materialClaimRepository).save(any(MaterialClaim.class));
-    }
-
-    @Test
-    void nonProfitEligibleSquadron_rejected() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      Squadron nonProfit = new Squadron();
-      nonProfit.setId(SQUADRON_A);
-      nonProfit.setShorthand("NPF");
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(nonProfit));
-
-      assertThrows(
-          BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0)));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void editOwnClaimUpwardExcludesOwnAmountFromCeiling() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim ownExisting = claim(order, GOOD, squadronA, 8.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of(ownExisting));
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.of(ownExisting));
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 10.0));
-
-      assertEquals(
-          10.0,
-          ownExisting.getAmount(),
-          "a squadron raising its own claim to fill the bucket must not be blocked by its own"
-              + " amount");
-      verify(materialClaimRepository).save(ownExisting);
-    }
+    mvc.perform(
+            delete("/api/v1/orders/{order}/claims/{claim}", fixture.order(), observed.id())
+                .with(user("lifecycle-admin").roles("ADMIN")))
+        .andExpect(status().isConflict());
+    assertThat(history(observed.id()).openAmount()).isEqualTo(4.0);
   }
 
-  @Nested
-  class UpsertInsertUpdateTests {
+  @Test
+  void withdrawingOnePromiseRetainsHistoryAndSupportUnderItsOwnVersion() throws Exception {
+    ClaimDto observed = promise(4.0, null);
+    Long orderVersion = query.getJobOrderById(fixture.order()).version();
 
-    @BeforeEach
-    void delegateSelfToRealService() {
-      when(self.getObject()).thenReturn(service);
-    }
+    mvc.perform(
+            delete("/api/v1/orders/{order}/claims/{claim}", fixture.order(), observed.id())
+                .param("version", observed.version().toString())
+                .with(user("lifecycle-admin").roles("ADMIN")))
+        .andExpect(status().isNoContent());
 
-    @Test
-    void noExistingClaim_returnsTheRequestedQuantity() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
+    var ended = history(observed.id());
+    assertThat(ended.openAmount()).isZero();
+    assertThat(ended.endedAt()).isNotNull();
+    assertThat(ended.supporting()).isTrue();
+    assertThat(ended.changes()).hasSize(2);
+    var ending = ended.changes().getLast();
+    assertThat(ending.reason().name()).isEqualTo("PROMISE_WITHDRAWN");
+    assertThat(ending.previousAmount()).isEqualTo(4.0);
+    assertThat(ending.amount()).isZero();
+    assertThat(ending.creditDelta()).isZero();
+    assertThat(ended.version()).isGreaterThan(observed.version());
+    assertThat(query.getJobOrderById(fixture.order()).version()).isEqualTo(orderVersion);
 
-      ClaimDto created = service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
-
-      assertEquals(4.0, created.amount());
-      assertNull(created.claimedByUserId());
-
-      verify(materialClaimRepository).save(any(MaterialClaim.class));
-    }
-
-    @Test
-    void existingClaim_updatesAmountInPlace() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of(existing));
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.of(existing));
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 6.0));
-
-      assertEquals(6.0, existing.getAmount(), "existing claim's amount is updated in place");
-      verify(materialClaimRepository).save(existing);
-    }
+    mvc.perform(
+            delete("/api/v1/orders/{order}/claims/{claim}", fixture.order(), observed.id())
+                .param("version", observed.version().toString())
+                .with(user("lifecycle-admin").roles("ADMIN")))
+        .andExpect(status().isConflict());
+    mvc.perform(
+            delete("/api/v1/orders/{order}/claims/{claim}", fixture.order(), observed.id())
+                .param("version", ended.version().toString())
+                .with(user("lifecycle-admin").roles("ADMIN")))
+        .andExpect(status().isNoContent());
+    assertThat(history(observed.id())).isEqualTo(ended);
   }
 
-  @Nested
-  class ClaimUpsertAuditTests {
-
-    @BeforeEach
-    void delegateSelfToRealService() {
-      when(self.getObject()).thenReturn(service);
-    }
-
-    @Test
-    void insert_recordsUpsertEvent_withModeCreated() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
-
-      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
-      verify(auditService)
-          .record(
-              eq(AuditEventType.JOB_ORDER_CLAIM_UPSERTED),
-              eq(ORDER_ID),
-              any(),
-              isNull(),
-              details.capture());
-      String payload = details.getValue().toString();
-      assertTrue(payload.contains("mode=created"), "a fresh claim audits as mode=created");
-      assertTrue(
-          payload.contains("claimingOrgUnit=" + SQUADRON_A),
-          "the audit detail carries the squadron id, never its name");
-    }
-
-    @Test
-    void update_recordsUpsertEvent_withModeUpdated() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim existing = claim(order, GOOD, squadronA, 3.0);
-      existing.setId(UUID.randomUUID());
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      adminCaller();
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of(existing));
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.of(existing));
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 6.0));
-
-      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
-      verify(auditService)
-          .record(
-              eq(AuditEventType.JOB_ORDER_CLAIM_UPSERTED),
-              eq(ORDER_ID),
-              any(),
-              isNull(),
-              details.capture());
-      assertTrue(
-          details.getValue().toString().contains("mode=updated"),
-          "a repeat post on an existing claim audits as mode=updated");
-    }
+  private MaterialContributionHistoryDto history(UUID claimId) throws Exception {
+    String body =
+        mvc.perform(
+                get("/api/v1/orders/{order}/claims/history", fixture.order())
+                    .with(user("lifecycle-admin").roles("ADMIN")))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    java.util.List<MaterialContributionHistoryDto> records =
+        json.readValue(body, new tools.jackson.core.type.TypeReference<>() {});
+    return records.stream().filter(row -> row.id().equals(claimId)).findFirst().orElseThrow();
   }
 
-  @Nested
-  class PermissionTests {
-
-    @BeforeEach
-    void delegateSelfToRealService() {
-      when(self.getObject()).thenReturn(service);
-    }
-
-    @Test
-    void neitherOwnSquadronNorSkAuthority_forbidden() {
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
-      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(false);
-
-      assertThrows(
-          org.springframework.security.access.AccessDeniedException.class,
-          () -> service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0)));
-      verify(materialClaimRepository, never()).save(any());
-    }
-
-    @Test
-    void ownSquadronLogistician_allowed() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
-      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
-      when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(true);
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
-
-      verify(materialClaimRepository).save(any(MaterialClaim.class));
-    }
-
-    @Test
-    void responsibleSkLogisticianOrLead_mayManageForeignSquadronClaim() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
-      when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
-      when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
-              ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
-          .thenReturn(List.of());
-      when(materialClaimRepository
-              .findByJobOrderIdAndMaterialIdAndQualityTierIdAndClaimingOrgUnitId(
-                  ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID, SQUADRON_A))
-          .thenReturn(Optional.empty());
-      when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(squadronA));
-      when(profitHierarchy.isEligible(SQUADRON_A)).thenReturn(true);
-      when(authHelperService.currentUserId()).thenReturn(Optional.empty());
-      when(materialClaimRepository.save(any(MaterialClaim.class)))
-          .thenAnswer(inv -> inv.getArgument(0));
-
-      service.upsertClaim(ORDER_ID, dto(SQUADRON_A, 4.0));
-
-      verify(materialClaimRepository).save(any(MaterialClaim.class));
-    }
-  }
-
-  /**
-   * Tests that the loser of a same-squadron first-claim race in {@link
-   * MaterialClaimService#upsertClaim} retries in a fresh transaction, simulated with a spied
-   * transaction body.
-   */
-  @Nested
-  class UpsertClaimConcurrencyTests {
-
-    private final CreateClaimDto payload = dto(SQUADRON_A, 4.0);
-
-    @Test
-    void retriesInAFreshTransaction_whenTheInsertRaceLoses() {
-      MaterialClaimService spied = spy(service);
-      when(self.getObject()).thenReturn(spied);
-      ClaimDto expected = sampleClaimDto();
-      doThrow(new DataIntegrityViolationException("uq_material_claim_bucket_org_unit"))
-          .doReturn(expected)
-          .when(spied)
-          .upsertClaimWithinTransaction(ORDER_ID, payload);
-
-      ClaimDto result = service.upsertClaim(ORDER_ID, payload);
-
-      assertEquals(expected, result, "the winning retry's claim must be returned");
-      verify(spied, times(2)).upsertClaimWithinTransaction(ORDER_ID, payload);
-    }
-
-    @Test
-    void retriesInAFreshTransaction_whenTheUpdateRaceLoses() {
-      MaterialClaimService spied = spy(service);
-      when(self.getObject()).thenReturn(spied);
-      ClaimDto expected = sampleClaimDto();
-      doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
-          .doReturn(expected)
-          .when(spied)
-          .upsertClaimWithinTransaction(ORDER_ID, payload);
-
-      ClaimDto result = service.upsertClaim(ORDER_ID, payload);
-
-      assertEquals(expected, result);
-      verify(spied, times(2)).upsertClaimWithinTransaction(ORDER_ID, payload);
-    }
-
-    @Test
-    void propagatesConflict_whenEveryAttemptLosesTheRace() {
-      MaterialClaimService spied = spy(service);
-      when(self.getObject()).thenReturn(spied);
-      doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
-          .when(spied)
-          .upsertClaimWithinTransaction(ORDER_ID, payload);
-
-      assertThrows(
-          ObjectOptimisticLockingFailureException.class,
-          () -> service.upsertClaim(ORDER_ID, payload));
-      verify(spied, times(5)).upsertClaimWithinTransaction(ORDER_ID, payload);
-    }
-
-    private ClaimDto sampleClaimDto() {
-      return new ClaimDto(UUID.randomUUID(), null, 4.0, null, null, 0L);
-    }
-  }
-
-  @Nested
-  class WithdrawAndReconciliationTests {
-
-    @Test
-    void withdrawClaim_foreignOrder_throwsNotFound() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      JobOrder otherOrder = new JobOrder();
-      otherOrder.setId(UUID.randomUUID());
-      MaterialClaim claim = claim(otherOrder, GOOD, squadronA, 3.0);
-      UUID claimId = UUID.randomUUID();
-      claim.setId(claimId);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-
-      assertThrows(NotFoundException.class, () -> service.withdrawClaim(ORDER_ID, claimId));
-      verify(materialClaimRepository, never()).delete(any());
-    }
-
-    @Test
-    void withdrawClaim_happyPath_preservesEndedHistory() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim claim = claim(order, GOOD, squadronA, 3.0);
-      UUID claimId = UUID.randomUUID();
-      claim.setId(claimId);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-      when(authHelperService.isAdmin()).thenReturn(true);
-
-      service.withdrawClaim(ORDER_ID, claimId);
-
-      assertNotNull(claim.getEndedAt());
-    }
-
-    @Test
-    void withdrawClaim_recordsWithdrawnAuditEvent() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim claim = claim(order, GOOD, squadronA, 3.0);
-      UUID claimId = UUID.randomUUID();
-      claim.setId(claimId);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-      when(authHelperService.isAdmin()).thenReturn(true);
-
-      service.withdrawClaim(ORDER_ID, claimId);
-
-      ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
-      verify(auditService)
-          .record(
-              eq(AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN),
-              eq(ORDER_ID),
-              any(),
-              isNull(),
-              details.capture());
-      String payload = details.getValue().toString();
-      assertTrue(payload.contains("claim=" + claimId), "the withdrawal audit carries the claim id");
-      assertTrue(
-          payload.contains("claimingOrgUnit=" + SQUADRON_A),
-          "the withdrawal audit carries the squadron id, never its name");
-    }
-
-    private de.greluc.krt.profit.basetool.backend.identity.api.User member(String name) {
-      de.greluc.krt.profit.basetool.backend.identity.api.User member =
-          new de.greluc.krt.profit.basetool.backend.identity.api.User();
-      member.setId(UUID.randomUUID());
-      member.setUsername(name);
-      return member;
-    }
-
-    @Test
-    void withdrawOrphanedClaims_tellsTheClaimantThatTheOrderWasChanged() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
-      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
-      de.greluc.krt.profit.basetool.backend.identity.api.User bob = member("bob");
-      orphan.setClaimedByUser(bob);
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(List.of(live, orphan));
-      when(userService.currentActor())
-          .thenReturn(
-              new de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef(
-                  UUID.randomUUID(), "Officer"));
-
-      service.withdrawOrphanedClaimsWithinTransaction(order);
-
-      org.mockito.ArgumentCaptor<Object> captor = org.mockito.ArgumentCaptor.forClass(Object.class);
-      verify(eventPublisher).publishEvent(captor.capture());
-      var event =
-          (de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent)
-              captor.getValue();
-      assertEquals(bob.getId(), event.contextRecipientUserId());
-      assertEquals("ORDER_CHANGED", event.renderParams().get("reasonCode"));
-    }
-
-    @Test
-    void withdrawOrphanedClaims_endsOnlyClaimsWhoseBucketIsGone() {
-      JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
-      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
-      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(List.of(live, orphan));
-
-      service.withdrawOrphanedClaimsWithinTransaction(order);
-
-      assertNotNull(orphan.getEndedAt());
-      assertNull(live.getEndedAt());
-    }
-
-    @Test
-    void withdrawOrphanedClaims_itemOrder_usesItemDerivedBuckets() {
-      JobOrder order = new JobOrder();
-      order.setId(ORDER_ID);
-      order.setType(JobOrderType.ITEM);
-      order.setResponsibleOrgUnit(responsibleSk);
-      order.setStatus(JobOrderStatus.OPEN);
-      JobOrderItem item = new JobOrderItem();
-      item.setMaterials(new HashSet<>(Set.of(itemMaterial(material, GOOD, 10.0))));
-      order.setItems(new HashSet<>(Set.of(item)));
-      MaterialClaim live = claim(order, GOOD, squadronA, 3.0);
-      MaterialClaim orphan = claim(order, NONE, squadronB, 2.0);
-      when(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(ORDER_ID))
-          .thenReturn(List.of(live, orphan));
-
-      service.withdrawOrphanedClaimsWithinTransaction(order);
-
-      assertNotNull(orphan.getEndedAt());
-      assertNull(live.getEndedAt());
-    }
-  }
-
-  private void adminCaller() {
-    when(authHelperService.isAdmin()).thenReturn(true);
-  }
-
-  private CreateClaimDto dto(UUID claimingOrgUnitId, double amount) {
-    return new CreateClaimDto(MATERIAL_ID, "GOOD", claimingOrgUnitId, amount, null);
-  }
-
-  private JobOrder materialOrder(
-      OrgUnit responsible, JobOrderStatus status, QualityTier tier, double amount) {
-    JobOrder order = new JobOrder();
-    order.setId(ORDER_ID);
-    order.setType(JobOrderType.MATERIAL);
-    order.setResponsibleOrgUnit(responsible);
-    order.setStatus(status);
-    JobOrderMaterial jm = new JobOrderMaterial();
-    jm.setMaterial(material);
-    jm.setQualityTier(tier);
-    jm.setAmount(amount);
-    order.setMaterials(new HashSet<>(Set.of(jm)));
-    return order;
-  }
-
-  private JobOrderItemMaterial itemMaterial(
-      Material mat, QualityTier quality, double requiredQuantity) {
-    JobOrderItemMaterial im = new JobOrderItemMaterial();
-    im.setMaterial(mat);
-    im.setQualityTier(quality);
-    im.setRequiredQuantity(requiredQuantity);
-    return im;
-  }
-
-  private MaterialClaim claim(
-      JobOrder order, QualityTier quality, OrgUnit claimingOrgUnit, double amount) {
-    MaterialClaim claim = new MaterialClaim();
-    claim.setJobOrder(order);
-    claim.setMaterial(material);
-    claim.setQualityTier(quality);
-    claim.setClaimingOrgUnit(claimingOrgUnit);
-    claim.setAmount(amount);
-    return claim;
+  private ClaimDto promise(double amount, Long version) {
+    return claims.upsertClaim(
+        fixture.order(),
+        new CreateClaimDto(fixture.material(), "GOOD", fixture.unit(), amount, version));
   }
 }

@@ -90,24 +90,34 @@ class JobOrderHandoverQualityTierTest {
 
   @BeforeEach
   void setUp() {
+    var promises = org.mockito.Mockito.mock(MaterialPromiseCoordinator.class);
+    var stockCommands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            null,
+            null,
+            null,
+            auditService,
+            null,
+            offerRatchet,
+            null);
     service =
         new JobOrderHandoverService(
             jobOrderRepository,
-            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+            promises,
             responsibilityGuard,
-            jobOrderHandoverRepository,
-            new InventoryStockCommands(
-                new InventoryOrderWrites(
-                    inventoryItemRepository,
-                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            MaterialHandoverPlannerFixtures.planner(
+                () -> order,
                 inventoryItemRepository,
-                null,
-                null,
-                null,
-                auditService,
-                null,
-                offerRatchet,
-                null),
+                stockCommands,
+                jobOrderRepository,
+                responsibilityGuard,
+                promises),
+            jobOrderHandoverRepository,
+            stockCommands,
             jobOrderHandoverMapper,
             jobOrderService,
             userService,
@@ -206,7 +216,7 @@ class JobOrderHandoverQualityTierTest {
     assertThatThrownBy(
             () -> handOver(new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, "GOOD")))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+        .hasMessage(JobOrderStockErrors.QUALITY_BELOW_FLOOR);
   }
 
   @Test
@@ -216,7 +226,7 @@ class JobOrderHandoverQualityTierTest {
     assertThatThrownBy(
             () -> handOver(new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, "EXCELLENT")))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_TIER_NOT_ON_ORDER);
+        .hasMessage(JobOrderStockErrors.QUALITY_TIER_NOT_ON_ORDER);
   }
 
   @Test
@@ -227,7 +237,7 @@ class JobOrderHandoverQualityTierTest {
     assertThatThrownBy(
             () -> handOver(new JobOrderHandoverItemCreateDto(row.getId(), 0.1, null, null)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+        .hasMessage(JobOrderStockErrors.QUALITY_BELOW_FLOOR);
   }
 
   @Test
@@ -240,8 +250,8 @@ class JobOrderHandoverQualityTierTest {
 
     assertThat(goodLine.getAmount()).isZero();
     assertThat(noneLine.getAmount()).isZero();
-    verify(inventoryItemRepository)
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(orderId, material.getId());
+
+    verify(inventoryItemRepository).delete(row);
     verify(jobOrderService).completeJobOrderWithinTransaction(order);
   }
 
@@ -253,7 +263,7 @@ class JobOrderHandoverQualityTierTest {
 
     assertThat(goodLine.getAmount()).isZero();
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(any(), any());
+        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 

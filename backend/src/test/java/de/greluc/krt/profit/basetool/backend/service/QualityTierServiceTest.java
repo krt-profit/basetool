@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierWriteDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -39,7 +41,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.EntityInUseException;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -61,6 +65,7 @@ class QualityTierServiceTest {
   private QualityTierService service;
   private QualityTier none;
   private QualityTier good;
+  private final Map<UUID, QualityTier> selectionTiers = new LinkedHashMap<>();
 
   @BeforeEach
   void setUp() {
@@ -69,33 +74,48 @@ class QualityTierServiceTest {
             repository, Mappers.getMapper(QualityTierMapper.class), auditService);
     none = QualityTierFixtures.none();
     good = QualityTierFixtures.good();
+    selectionTiers.put(none.getId(), none);
+    selectionTiers.put(good.getId(), good);
+    lenient()
+        .when(repository.findSelectionFacts())
+        .thenAnswer(_ ->
+            selectionTiers.values().stream()
+                .map(tier ->
+                    new QualityTierSelection.Tier(
+                        tier.getId(),
+                        tier.getCode(),
+                        tier.getMinQuality(),
+                        tier.getLabelDe(),
+                        tier.getLabelEn(),
+                        tier.getSortOrder(),
+                        tier.isActive(),
+                        tier.getVersion()))
+                .toList());
+    lenient()
+        .when(repository.getReferenceById(any()))
+        .thenAnswer(inv -> selectionTiers.get(inv.getArgument(0)));
   }
 
   @Test
   void resolve_byCode_isCaseInsensitive() {
-    when(repository.findByCode("GOOD")).thenReturn(Optional.of(good));
 
     assertThat(service.resolveForRequirement("good", null, Set.of())).isSameAs(good);
   }
 
   @Test
   void resolve_byFloor_whenNoCode() {
-    when(repository.findByMinQuality(650)).thenReturn(Optional.of(good));
 
     assertThat(service.resolveForRequirement(null, 650, Set.of())).isSameAs(good);
   }
 
   @Test
   void resolve_withNothing_isTheBaseTier() {
-    when(repository.findByMinQuality(0)).thenReturn(Optional.of(none));
 
     assertThat(service.resolveForRequirement(null, null, Set.of())).isSameAs(none);
   }
 
   @Test
   void resolve_unknownCodeOrFloor_isABadRequest() {
-    when(repository.findByCode("MYTHIC")).thenReturn(Optional.empty());
-    when(repository.findByMinQuality(777)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveForRequirement("MYTHIC", null, Set.of()))
         .isInstanceOf(BadRequestException.class);
@@ -107,7 +127,7 @@ class QualityTierServiceTest {
   void resolve_inactiveTier_isRefusedUnlessKept() {
     QualityTier legacy = QualityTierFixtures.tier("Q800", 800);
     legacy.setActive(false);
-    when(repository.findByMinQuality(800)).thenReturn(Optional.of(legacy));
+    selectionTiers.put(legacy.getId(), legacy);
 
     assertThatThrownBy(() -> service.resolveForRequirement(null, 800, Set.of()))
         .isInstanceOf(BadRequestException.class);
@@ -119,8 +139,8 @@ class QualityTierServiceTest {
     QualityTier excellent = QualityTierFixtures.tier("EXCELLENT", 900);
     QualityTier retired = QualityTierFixtures.tier("Q800", 800);
     retired.setActive(false);
-    when(repository.findAllByOrderByMinQualityAsc())
-        .thenReturn(List.of(none, good, retired, excellent));
+    selectionTiers.put(retired.getId(), retired);
+    selectionTiers.put(excellent.getId(), excellent);
 
     assertThat(service.defaultForIngredient(850)).isSameAs(good);
     assertThat(service.defaultForIngredient(950)).isSameAs(excellent);

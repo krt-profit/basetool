@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -268,4 +269,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
    */
   @Query(value = "SELECT pg_try_advisory_xact_lock(:key)", nativeQuery = true)
   boolean tryTimedProducerLock(@Param("key") long key);
+
+  /**
+   * Claims one logical cause before any Inbox effect in the current transaction.
+   *
+   * @param causeId the stable logical revision identity
+   * @return one for the winner, zero for an already processed cause
+   */
+  @Modifying
+  @Query(
+      value =
+          "INSERT INTO notification_cause_receipt (id) VALUES (:causeId) ON CONFLICT (id) DO"
+              + " NOTHING",
+      nativeQuery = true)
+  int claimCause(@Param("causeId") @NotNull UUID causeId);
 }

@@ -21,7 +21,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Mission planning** — plan, brief and review squadron missions with role-aware access, a live procedure-step checklist and per-mission radio frequencies. Non-internal missions are visible to every member of the organisation, not only to the owning unit.
 - **Operations & payouts** — group missions under an *Operation*, track per-participant finances and confirm payouts behind an asymmetric mark/clear gate.
 - **Members only** — the landing page and the legal pages are the whole public surface (ADR-0159). Everything else needs a login, and every account holds at least member rights. A person without an account can still take part in an Einsatz: the mission leadership records them as an external participant.
-- **Job orders & cross-order material demand** — a prioritised queue of material and item orders, plus a *Materialbedarf* overview that folds every open / in-progress order into what each responsible unit still has to gather per material, showing booked stock and signed-up claims side by side. A Logistician of an order may enter any active account as an editor (Bearbeiter), who then reads that one order in full even outside their unit (ADR-0301) and finds it under „Ich bearbeite“ in the order overview — without profit access that segment is the whole list.
+- **Job orders & cross-order material demand** — a prioritised queue of material and item orders with one complete permitted workspace and remembered filters. The *Materialbedarf* overview shows remaining material need, earmarked stock and outstanding Staffel promises separately. Explicitly attributed provision credits a promise once; its contribution history remains distinct from current stock coverage. An authorised editor (Bearbeiter) can read their concrete order and maintain their own note outside their unit, without general Profit access (ADR-0301).
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and craftable game items. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.
@@ -100,7 +100,18 @@ former unit relationships retain concrete reading through current unit reach; th
 processing or enrollment. The named producer panel, unreadable missions, unrelated stock, Bank
 and reduced Exchange keep their independent gates.
 
-> **Remaining approved design, implementation pending:** [Shared JobOrder behavior](docs/specs/orders-core.md), [aUEC procurement](docs/specs/orders-auec.md) and [optional bank coupling](docs/specs/orders-auec-bank.md) specify the next JobOrder contract. These documents are not a release announcement; the application overview and operating instructions describe the currently implemented system. The hierarchy foundation above is implemented; runtime acceptance of the remaining planned workflows stays unchecked.
+Material promises and explicit provision credit use the [material contribution contract](docs/specs/orders-material-claims.md).
+Outstanding promises follow uncovered demand; capacity reductions are not fulfilled contributions.
+The ordinary provision picker renders backend-authorized matching open promises with their current versions.
+Connected quantity, attribution and original-quality corrections retain their recorded facts.
+A quality correction changes current stock only for explicitly selected retained portions, with
+current Inventory write rights and row versions. Historical-only correction remains available
+after stock consumption. Legacy history states only its verifiable credited subset rather than
+inventing full original quantities or quality.
+The claim entry remains the existing SK workflow; the broader all-kind writer and lifecycle
+conversion is part of the remaining shared workflow below.
+
+> **Implementation and acceptance scope:** The hierarchy and shared MATERIAL/ITEM reader foundations are implemented. Material-contribution implementation and verification are under review against its owning requirement. The remaining shared writer/lifecycle conversion, [aUEC procurement](docs/specs/orders-auec.md) and [Bank handling selected by default with an explicit choice per operation to work without Bank](docs/specs/orders-auec-bank.md) remain accepted/planned. These records are not a release announcement, and acceptance stays unchecked until its evidence is produced.
 
 The README is the overview; everything else lives in dedicated, versioned docs:
 

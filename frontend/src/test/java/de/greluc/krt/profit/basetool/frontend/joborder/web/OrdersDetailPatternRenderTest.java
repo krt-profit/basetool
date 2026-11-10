@@ -171,7 +171,7 @@ class OrdersDetailPatternRenderTest {
             List.of(),
             false,
             1L);
-    stubOrder(order(orderId, "ITEM", "OPEN", List.of(), List.of(line), List.of(), false));
+    stubOrder(order(orderId, "ITEM", "OPEN", List.of(), List.of(line), List.of(), true));
 
     String html = render(orderId, "ROLE_KRT_MEMBER");
 

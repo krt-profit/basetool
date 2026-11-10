@@ -42,6 +42,8 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -401,86 +403,79 @@ class ExchangeJournalStateTest {
   @Nested
   class Stock {
 
-    private final ExchangeStockWriteService writer = mock(ExchangeStockWriteService.class);
-    private final ExchangeStockJournal journal =
-        new ExchangeStockJournal(writer, changeRepository, mapper);
-    private static final String LOT =
-        "m:" + UUID.randomUUID() + "|l:" + UUID.randomUUID() + "|q:0|s:0";
+    private final ExchangeStockJournal journal = new ExchangeStockJournal(mapper);
+    private final UUID origin = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Test
-    void theStatesAreWrittenInTheJournalsExistingShape() {
+    void theStatesKeepTheirExistingFieldsAndRecordExactQuantityAndOperationStep() {
       UUID pool = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-      assertThat(json(ExchangeStockJournal.State.of(new BigDecimal("12.500"), "SCU").toJournal()))
-          .isEqualTo("{\"quantity\":12.500,\"unit\":\"SCU\"}");
+      assertThat(
+              json(
+                  ExchangeStockJournal.State.of(
+                          new BigDecimal("12.500"), "SCU", quantity(12500L), 2)
+                      .toJournal()))
+          .isEqualTo(
+              "{\"quantity\":12.500,\"unit\":\"SCU\",\"completeQuantity\":{\"parts\":[{\"origin\":\""
+                  + origin
+                  + "\",\"fromQuanta\":0,\"toQuanta\":12500}]},\"operationStep\":2}");
       assertThat(
               json(
                   ExchangeStockJournal.State.moved(
-                          BigDecimal.TEN, "PIECE", pool, true, BigDecimal.ONE)
+                          BigDecimal.TEN, "PIECE", pool, true, BigDecimal.ONE, quantity(10000L), 3)
                       .toJournal()))
           .isEqualTo(
-              "{\"quantity\":10,\"unit\":\"PIECE\",\"orgUnit\":\"" + pool + "\",\"shared\":1}");
+              "{\"quantity\":10,\"unit\":\"PIECE\",\"orgUnit\":\""
+                  + pool
+                  + "\",\"shared\":1,\"completeQuantity\":{\"parts\":[{\"origin\":\""
+                  + origin
+                  + "\",\"fromQuanta\":0,\"toQuanta\":10000}]},\"operationStep\":3}");
     }
 
     @Test
     void aSnapshotReadsBackAsTheSameState() {
       ExchangeStockJournal.State state =
           ExchangeStockJournal.State.moved(
-              new BigDecimal("3.25"), "SCU", UUID.randomUUID(), false, new BigDecimal("1.5"));
+              new BigDecimal("3.25"),
+              "SCU",
+              UUID.randomUUID(),
+              false,
+              new BigDecimal("1.5"),
+              quantity(3250L),
+              5);
 
       assertThat(journal.read(json(state.toJournal()))).isEqualTo(state);
     }
 
     @Test
-    void anOlderShareAndSetQuantityRestoreThePoolsAndTheQuantity() {
-      latestChangeIsTheClients(ExchangeResource.STOCK);
+    void olderLiteralQuantityAndMovementStatesRetainAbsentProofAndOperationStep() {
       UUID pool = UUID.randomUUID();
-      when(writer.restorePools(eq(MEMBER), eq(LOT), eq("SCU"), any())).thenReturn(true);
-      when(writer.restoreLot(eq(MEMBER), eq(LOT), any(), eq("SCU"))).thenReturn(true);
-      ExchangeJournalEntry share =
-          entry(
-              ExchangeJournalAction.STOCK_SHARE,
-              LOT,
-              "{\"quantity\":5,\"unit\":\"SCU\"}",
+      var quantity = journal.read("{\"quantity\":3,\"unit\":\"SCU\"}");
+      assertThat(quantity.quantity()).isEqualByComparingTo("3");
+      assertThat(quantity.unit()).isEqualTo("SCU");
+      assertThat(quantity.completeQuantity()).isNull();
+      assertThat(quantity.operationStep()).isNull();
+      var movement =
+          journal.read(
               "{\"quantity\":5,\"unit\":\"SCU\",\"orgUnit\":\"" + pool + "\",\"shared\":2}");
-      ExchangeJournalEntry set =
-          entry(
-              ExchangeJournalAction.STOCK_SET_QUANTITY,
-              LOT,
-              "{\"quantity\":3,\"unit\":\"SCU\"}",
-              "{\"quantity\":5,\"unit\":\"SCU\"}");
-
-      String reason = journal.restore(scope(Set.of()), List.of(share, set));
-
-      assertThat(reason).isNull();
-      verify(writer).restorePools(MEMBER, LOT, "SCU", Map.of(pool, new BigDecimal("2")));
-      verify(writer).restoreLot(MEMBER, LOT, new BigDecimal("3"), "SCU");
+      assertThat(movement.quantity()).isEqualByComparingTo("5");
+      assertThat(movement.unit()).isEqualTo("SCU");
+      assertThat(movement.orgUnit()).isEqualTo(pool);
+      assertThat(movement.shared()).isEqualByComparingTo("2");
+      assertThat(movement.completeQuantity()).isNull();
+      assertThat(movement.operationStep()).isNull();
     }
 
-    @Test
-    void aShareWithoutItsPoolIsGone() {
-      latestChangeIsTheClients(ExchangeResource.STOCK);
-      ExchangeJournalEntry share =
-          entry(
-              ExchangeJournalAction.STOCK_SHARE,
-              LOT,
-              "{\"quantity\":5,\"unit\":\"SCU\"}",
-              "{\"quantity\":5,\"unit\":\"SCU\",\"shared\":2}");
-
-      assertThat(journal.restore(scope(Set.of()), List.of(share)))
-          .isEqualTo(ExchangeUndoService.GONE);
-      verify(writer, never()).restoreLot(any(), any(), any(), any());
+    /** Describes an actual quantity without changing its established fragment wire shape. */
+    private StockQuantityComposition quantity(long quanta) {
+      return StockQuantityComposition.known(List.of(new StockQuantityFragment(origin, 0L, quanta)));
     }
   }
 
   @Nested
   class OrgStock {
 
-    private final ExchangeOrgStockJournal journal =
-        new ExchangeOrgStockJournal(
-            mock(PoolEntryCommands.class),
-            mock(de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.class),
-            mapper);
+    private final ExchangeOrgStockJournal journal = new ExchangeOrgStockJournal(mapper);
 
     @Test
     void aSnapshotReadsBackAsTheSameState() {
@@ -494,7 +489,9 @@ class ExchangeJournalStateTest {
               7L,
               Map.of(UUID.randomUUID(), 1.0),
               Map.of(),
-              null);
+              null,
+              StockQuantityComposition.known(
+                  List.of(new StockQuantityFragment(UUID.randomUUID(), 0L, 4000L))));
 
       assertThat(journal.read(mapper.writeValueAsString(state))).isEqualTo(state);
       assertThat(journal.read(null)).isNull();
@@ -529,7 +526,10 @@ class ExchangeJournalStateTest {
                   3L,
                   Map.of(jobOrder, 1.0),
                   Map.of(),
+                  null,
                   null));
+      assertThat(journal.read(stored).quantityProvenance()).isEmpty();
+      assertThat(journal.read(stored).completeQuantity()).isNull();
     }
   }
 }

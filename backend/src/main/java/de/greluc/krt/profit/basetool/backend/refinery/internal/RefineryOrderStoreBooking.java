@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
@@ -91,9 +92,11 @@ class RefineryOrderStoreBooking {
               JobOrder linkedOrder = line.jobOrder();
               return new StockCommands.StockBookInScope(
                   line.receiver().getId(),
-                  new de.greluc.krt.profit.basetool.backend.inventory.api.StockLot(
-                      line.material(), null, line.location(), line.quality(), false),
-                  linkedOrder == null ? List.of() : List.of(linkedOrder.getId()));
+                  new StockLot(line.material(), null, line.location(), line.quality(), false),
+                  linkedOrder == null ? List.of() : List.of(linkedOrder.getId()),
+                  line.personal(),
+                  line.orgUnit() == null ? null : line.orgUnit().getId(),
+                  false);
             })
             .toList());
     final Set<UUID> bookedOnto = new LinkedHashSet<>();

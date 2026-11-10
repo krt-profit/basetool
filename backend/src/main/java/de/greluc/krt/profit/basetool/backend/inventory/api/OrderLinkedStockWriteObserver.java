@@ -50,6 +50,16 @@ public interface OrderLinkedStockWriteObserver {
   void assertOrderLinkedMaterialWrite(@NotNull Collection<OrderMaterialScope> scopes);
 
   /**
+   * Announces actual final changes to linked stock after the complete physical action. Every scope
+   * must already be held; deleted target identities remain valid invalidation keys.
+   *
+   * @param orderIds the changed rows' previous and final order targets
+   * @param materialScopes the changed material rows' previous and final capacity scopes
+   */
+  void orderLinkedStockChanged(
+      @NotNull Collection<UUID> orderIds, @NotNull Collection<OrderMaterialScope> materialScopes);
+
+  /**
    * Credits a writer-selected promise from this action's genuinely new suitable provision.
    *
    * @param provision the actual stock facts and explicit selection before any merge

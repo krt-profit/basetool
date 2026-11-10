@@ -96,17 +96,24 @@ client-side: each order option carries a `data-materials` CSV built from `requir
 (the item-mode sibling `data-game-items` from `requiredGameItemIds`), and `inventory-input.js`
 filters the rows to the option whose CSV contains the picked material/game item.
 
-**Tenancy scope (REQ-ORG-003).** Every one of these write seams — the check-in allocations of
-`POST /api/v1/inventory`, `POST /api/v1/inventory/{id}/allocation`, and the pool earmarks the
-exchange writes — MUST accept only a job order the caller sees within the tenancy scope, by the
-same rule `GET /api/v1/orders/lookup` lists orders with (`JobOrderAccessPolicy.canSeeJobOrderInScope`:
-the caller reaches the queue, and the order has no responsible unit, a Spezialkommando's, or one
-in the caller's read scope). An order outside that scope MUST be refused with the same `404` as
-an unknown id, so the answer does not reveal that it exists. The requirement reads of
-`EarmarkTargets.JobOrders` (implemented by `JobOrderEarmarkTargets`) answer only for such an order,
-which puts the rule on every seam at once. The rule keys on the order, not on the stock: a member
-of two units earmarks stock owned by one of them to an order of the other, and the stock keeps its
-owning unit — that is how a cross-Staffel supply reaches an order („A bestellt, B liefert",
+**Order-link scope (REQ-ORDERS-052, REQ-ORG-003).** Check-in allocations at
+`POST /api/v1/inventory`, allocations at `POST /api/v1/inventory/{id}/allocation`, and the web
+refinery store use the common current order readership in [orders-core.md](orders-core.md), as
+`GET /api/v1/orders/lookup` does. The ordinary `requiredMaterialIds` and `requiredGameItemIds`
+reads of `EarmarkTargets.JobOrders` enforce that readership. The stock's independent write gate
+still applies. An unknown or unreadable target answers the same `404`.
+
+External exchange pool earmarks retain reduced tenancy scope through the explicit
+`requiredMaterialIdsInScope` and `requiredGameItemIdsInScope` reads, enforced by
+`InventoryPoolEntryCommands` for allocation additions and book-in earmarks. The caller must
+reach the queue, and the order must have no responsible unit, a Spezialkommando's, or one in the
+caller's reduced read scope (`JobOrderAccessPolicy.canSeeJobOrderInScope`). An unknown or
+out-of-scope target receives the same per-op `EARMARK_TARGET_INVALID` refusal. Common web
+readership does not widen this external contract.
+
+The target scope keys on the order, not on the stock: a member of two units may earmark stock
+owned by one to an order of the other, and the stock keeps its owning unit. Cross-Staffel supply
+remains permitted within the applicable target scope ("A bestellt, B liefert",
 `InventoryJobOrderScopeIntegrationTest`, e2e UC-08/UC-09).
 
 The lookup projection (`/api/v1/orders/lookup`; with `withNeeds=true` it also carries each order's

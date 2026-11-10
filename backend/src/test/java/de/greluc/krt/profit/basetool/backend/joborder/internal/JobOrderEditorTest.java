@@ -52,7 +52,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
@@ -67,7 +66,7 @@ class JobOrderEditorTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private AuditRecorder auditRecorder;
-  @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private JobOrderChangeEffects effects;
   @Mock private JobOrderStockProjectionService jobOrderStockProjectionService;
   @Mock private JobOrderDto projected;
 
@@ -85,10 +84,13 @@ class JobOrderEditorTest {
             jobOrderRepository,
             profitHierarchy,
             org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.class),
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             responsibilityGuard,
             jobOrderAccessPolicy,
             auditRecorder,
-            eventPublisher,
+            effects,
             jobOrderStockProjectionService,
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
@@ -123,7 +125,7 @@ class JobOrderEditorTest {
 
     assertThat(result).isSameAs(projected);
     assertThat(mutations).hasValue(1);
-    InOrder sequence = inOrder(auditRecorder, eventPublisher, jobOrderStockProjectionService);
+    InOrder sequence = inOrder(auditRecorder, effects, jobOrderStockProjectionService);
     sequence
         .verify(auditRecorder)
         .record(
@@ -132,8 +134,8 @@ class JobOrderEditorTest {
             eq("#42"),
             isNull(),
             sameDetails(AuditDetails.of("to", "IN_PROGRESS")));
-    sequence.verify(eventPublisher).publishEvent(firstNotice);
-    sequence.verify(eventPublisher).publishEvent(secondNotice);
+    sequence.verify(effects).publish(firstNotice);
+    sequence.verify(effects).publish(secondNotice);
     sequence.verify(jobOrderStockProjectionService).mapToDtoWithStock(order);
     sequence.verifyNoMoreInteractions();
   }
@@ -149,7 +151,7 @@ class JobOrderEditorTest {
     assertThat(mutations).hasValue(0);
     verify(jobOrderRepository, never()).save(any());
     verify(jobOrderRepository, never()).saveAndFlush(any());
-    verifyNoInteractions(auditRecorder, eventPublisher, jobOrderStockProjectionService);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
   }
 
   @Test
@@ -161,7 +163,7 @@ class JobOrderEditorTest {
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
     assertThat(mutations).hasValue(0);
-    verifyNoInteractions(auditRecorder, eventPublisher);
+    verifyNoInteractions(auditRecorder, effects);
   }
 
   @Test
@@ -173,7 +175,7 @@ class JobOrderEditorTest {
         .isInstanceOf(AccessDeniedException.class);
 
     assertThat(mutations).hasValue(0);
-    verifyNoInteractions(auditRecorder, eventPublisher, jobOrderStockProjectionService);
+    verifyNoInteractions(auditRecorder, effects, jobOrderStockProjectionService);
   }
 
   @Test
@@ -183,7 +185,7 @@ class JobOrderEditorTest {
     assertThatThrownBy(() -> editor.editUnversioned(id, JobOrderGate.EDIT, statusChanged()))
         .isInstanceOf(NotFoundException.class);
 
-    verifyNoInteractions(jobOrderAccessPolicy, auditRecorder, eventPublisher);
+    verifyNoInteractions(jobOrderAccessPolicy, auditRecorder, effects);
   }
 
   @Test
@@ -213,7 +215,7 @@ class JobOrderEditorTest {
     JobOrderDto result = editor.edit(id, JobOrderGate.EDIT, 5L, JobOrderEdit::unchanged);
 
     assertThat(result).isSameAs(projected);
-    verifyNoInteractions(auditRecorder, eventPublisher);
+    verifyNoInteractions(auditRecorder, effects);
   }
 
   @Test

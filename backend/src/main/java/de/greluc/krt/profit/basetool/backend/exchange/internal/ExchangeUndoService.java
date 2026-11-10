@@ -79,9 +79,8 @@ public class ExchangeUndoService {
   private final ExchangeJournalRepository journalRepository;
   private final ExchangeClientRepository clientRepository;
   private final ExchangeBlueprintJournal blueprintJournal;
-  private final ExchangeStockJournal stockJournal;
   private final ExchangeShipJournal shipJournal;
-  private final ExchangeOrgStockJournal orgStockJournal;
+  private final ExchangeStockRestoration stockRestoration;
   private final ExchangeRefineryOrderJournal refineryOrderJournal;
   private final ExchangeOrgUnitService orgUnitService;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -194,18 +193,7 @@ public class ExchangeUndoService {
               entry.getResource().name() + ':' + entry.getEntityKey(), _ -> new ArrayList<>())
           .add(entry);
     }
-    List<String> lots =
-        groups.values().stream()
-            .map(List::getFirst)
-            .filter(entry -> entry.getResource() == ExchangeResource.STOCK)
-            .map(ExchangeJournalEntry::getEntityKey)
-            .toList();
-    List<List<ExchangeJournalEntry>> orgGroups =
-        groups.values().stream()
-            .filter(group -> group.getFirst().getResource() == ExchangeResource.ORG_STOCK)
-            .toList();
-    Map<List<ExchangeJournalEntry>, String> orgStock =
-        orgStockJournal.lockAndRestore(member, lots, orgGroups, pools);
+    var stock = stockRestoration.prepare(member, groups.values(), pools);
     int restored = 0;
     List<ExchangeJournalEntry> skippedEntries = new ArrayList<>();
     List<Skipped> skipped = new ArrayList<>();
@@ -222,8 +210,8 @@ public class ExchangeUndoService {
       ExchangeJournalEntry newest = group.getFirst();
       ExchangeResource entryResource = newest.getResource();
       String reason =
-          entryResource == ExchangeResource.ORG_STOCK
-              ? orgStock.get(group)
+          (entryResource == ExchangeResource.STOCK || entryResource == ExchangeResource.ORG_STOCK)
+              ? stockRestoration.restore(stock, group)
               : restorer(entryResource).restore(scope, group);
       if (reason != null) {
         skippedEntries.add(newest);
@@ -251,14 +239,14 @@ public class ExchangeUndoService {
    *
    * @param resource the resource
    * @return its restorer
-   * @throws IllegalStateException for the org stock, whose entries are restored together
+   * @throws IllegalStateException for stock resources, whose entries are prepared together
    */
   private @NotNull ExchangeEntryRestorer restorer(@NotNull ExchangeResource resource) {
     return switch (resource) {
       case BLUEPRINT -> blueprintJournal;
-      case STOCK -> stockJournal;
       case SHIP -> shipJournal;
-      case ORG_STOCK -> throw new IllegalStateException("Org-stock entries are restored together");
+      case STOCK, ORG_STOCK ->
+          throw new IllegalStateException("Stock entries are restored together");
       case REFINERY_ORDER -> refineryOrderJournal;
     };
   }

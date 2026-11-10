@@ -90,9 +90,14 @@ public class InventoryRebookCommands implements RebookCommands {
             : unshareSources(lotRows, rebook.poolUnitId());
     double amount = ScuAmounts.roundToScuScale(rebook.amount());
     Map<UUID, Double> offered = new LinkedHashMap<>();
-    for (InventoryItem source : sources) {
-      offered.put(source.getId(), stockOfferLookup.activeOfferedAmount(source.getId()));
-    }
+    var offerFacts =
+        stockOfferLookup.offerFacts(sources.stream().map(InventoryItem::getId).toList());
+    sources.forEach(source ->
+        offered.put(
+            source.getId(),
+            offerFacts
+                .getOrDefault(source.getId(), StockOfferLookup.StockOfferFact.NONE)
+                .activeAmount()));
     InventoryStockDecisions.LotRebook decision =
         InventoryStockDecisions.rebookLot(sources, offered, amount, toPool, wholeUnits);
     if (decision.refusal() != null) {
@@ -102,18 +107,23 @@ public class InventoryRebookCommands implements RebookCommands {
       return RebookOutcome.checked();
     }
     Map<UUID, RebookRowState> before = states(lotRows);
+    List<UUID> targetRows = new ArrayList<>();
     for (InventoryStockDecisions.Take take : decision.takes()) {
       InventoryItem source = take.row();
+      InventoryItem target;
       if (toPool && !Boolean.TRUE.equals(source.getPersonal())) {
-        poolChangeService.moveUnitlessRowIntoPool(
-            source, take.amount(), Objects.requireNonNull(pool));
+        target =
+            poolChangeService.moveUnitlessRowIntoPool(
+                source, take.amount(), Objects.requireNonNull(pool));
       } else {
-        checkoutService.rebookRow(
-            source, take.amount(), !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
+        target =
+            checkoutService.rebookRow(
+                source, take.amount(), !toPool, toPool ? pool : source.getOwningOrgUnit(), false);
       }
+      targetRows.add(target.getId());
     }
     Map<UUID, RebookRowState> after = states(lockLotRows(rebook.member(), lot));
-    return RebookOutcome.applied(changes(before, after));
+    return RebookOutcome.applied(changes(before, after), targetRows);
   }
 
   /**

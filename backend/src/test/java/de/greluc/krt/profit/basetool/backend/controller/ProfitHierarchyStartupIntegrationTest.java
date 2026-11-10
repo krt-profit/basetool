@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jayway.jsonpath.JsonPath;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
@@ -29,15 +31,18 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,9 +53,11 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Exercises the public startup lifecycle against unchanged synthetic legacy promises. */
+/** Checks startup ending and replay against synthetic historical material promises. */
 @SpringBootTest
 class ProfitHierarchyStartupIntegrationTest {
+
+  @Autowired private JobOrderParticipationRepository participations;
 
   @Autowired private ApplicationContext context;
   @Autowired private TransactionTemplate transactions;
@@ -73,7 +80,30 @@ class ProfitHierarchyStartupIntegrationTest {
 
       startup.run(new DefaultApplicationArguments());
 
-      assertThat(claimFacts(fixture.order())).containsExactlyInAnyOrderElementsOf(facts);
+      List<Map<String, Object>> ended = claimFacts(fixture.order());
+      Map<String, Object> validBefore =
+          facts.stream()
+              .filter(row -> row.get("id").equals(fixture.validClaim()))
+              .findFirst()
+              .orElseThrow();
+      assertThat(ended)
+          .filteredOn(row -> row.get("id").equals(fixture.validClaim()))
+          .containsExactly(validBefore);
+      assertThat(stableFacts(ended)).containsExactlyInAnyOrderElementsOf(stableFacts(facts));
+      assertThat(ended)
+          .filteredOn(row -> row.get("id").equals(fixture.invalidClaim()))
+          .singleElement()
+          .satisfies(row -> {
+            assertThat(row).containsEntry("amount", 0.0);
+            List<Map<String, Object>> changes = JsonPath.read(row.get("changes").toString(), "$");
+            assertThat(changes)
+                .singleElement()
+                .satisfies(change -> {
+                  assertThat(change).containsEntry("reason", "UNIT_INELIGIBLE");
+                  assertThat(((Number) change.get("previousAmount")).doubleValue()).isEqualTo(5.0);
+                  assertThat(((Number) change.get("amount")).doubleValue()).isEqualTo(0.0);
+                });
+          });
       assertThat(
               jdbc.queryForObject(
                   "SELECT ended_at IS NOT NULL FROM material_claim WHERE id = ?",
@@ -95,7 +125,7 @@ class ProfitHierarchyStartupIntegrationTest {
       assertThat(
               jdbc.queryForObject(
                   "SELECT count(*) FROM audit_event WHERE subject_id = ? AND event_type ="
-                      + " 'JOB_ORDER_CLAIM_WITHDRAWN' AND details LIKE '%INELIGIBLE_UNIT%'",
+                      + " 'JOB_ORDER_CLAIM_WITHDRAWN' AND details LIKE '%UNIT_INELIGIBLE%'",
                   Integer.class, fixture.order()))
           .isEqualTo(1);
       assertThat(claims.findByJobOrderIdOrderByCreatedAtDesc(fixture.order()))
@@ -111,7 +141,7 @@ class ProfitHierarchyStartupIntegrationTest {
                   Integer.class,
                   fixture.order()))
           .isEqualTo(1);
-      assertThat(claimFacts(fixture.order())).containsExactlyInAnyOrderElementsOf(facts);
+      assertThat(claimFacts(fixture.order())).containsExactlyInAnyOrderElementsOf(ended);
     } finally {
       transactions.executeWithoutResult(_ -> {
         jdbc.update("DELETE FROM notification WHERE entity_id = ?", fixture.order());
@@ -160,6 +190,7 @@ class ProfitHierarchyStartupIntegrationTest {
                 .material(material)
                 .qualityTier(quality)
                 .claimingOrgUnit(valid)
+                .participation(persistedParticipation(participations, order, valid))
                 .amount(3.0)
                 .build());
     MaterialClaim illegal =
@@ -169,6 +200,7 @@ class ProfitHierarchyStartupIntegrationTest {
                 .material(material)
                 .qualityTier(quality)
                 .claimingOrgUnit(invalid)
+                .participation(persistedParticipation(participations, order, invalid))
                 .amount(5.0)
                 .build());
     return new Fixture(
@@ -187,11 +219,23 @@ class ProfitHierarchyStartupIntegrationTest {
     return units.saveAndFlush(unit);
   }
 
+  private static @NotNull List<Map<String, Object>> stableFacts(
+      @NotNull List<Map<String, Object>> rows) {
+    return rows.stream()
+        .map(row -> {
+          Map<String, Object> stable = new HashMap<>(row);
+          stable.remove("amount");
+          stable.remove("changes");
+          return stable;
+        })
+        .toList();
+  }
+
   private List<Map<String, Object>> claimFacts(UUID order) {
     return jdbc.queryForList(
         "SELECT id, job_order_id, material_id, quality_tier_id, claiming_org_unit_id, amount,"
-            + " claimed_by_user_id, created_at FROM material_claim WHERE job_order_id = ? ORDER BY"
-            + " id",
+            + " claimed_by_user_id, created_at, changes FROM material_claim WHERE job_order_id = ?"
+            + " ORDER BY id",
         order);
   }
 

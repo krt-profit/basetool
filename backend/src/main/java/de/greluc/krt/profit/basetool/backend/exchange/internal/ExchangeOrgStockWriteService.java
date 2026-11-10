@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
@@ -33,7 +34,6 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgSt
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgStockUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkDimension;
@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.Poo
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolSale;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolStolen;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -972,20 +973,21 @@ public class ExchangeOrgStockWriteService
 
     @Override
     public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
+      StockLot lot = request.lot();
+      boolean merges =
+          request.mergeStock()
+              || lot.gameItem() != null
+              || (lot.material() != null && lot.material().getQuantityType() == QuantityType.PIECE);
       locks
-          .holderLots()
-          .computeIfAbsent(request.holder(), _ -> new ArrayList<>())
-          .add(request.lot());
-      if (request.lot().material() != null) {
-        request
-            .jobOrders()
-            .forEach(target ->
-                locks
-                    .requestedScopes()
-                    .add(
-                        new OrderMaterialScope(
-                            target.targetId(), request.lot().material().getId())));
-      }
+          .bookings()
+          .add(
+              new StockBookInScope(
+                  request.holder(),
+                  lot,
+                  request.jobOrders().stream().map(PoolEarmark::targetId).toList(),
+                  false,
+                  request.poolUnitId(),
+                  merges));
     }
 
     @Override

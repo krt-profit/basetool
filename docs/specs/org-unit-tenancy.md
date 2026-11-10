@@ -909,8 +909,10 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
 - **Every org-unit reference is classified.** Every persistent field of an entity that refers to an
   org unit — an association to `OrgUnit` or a subtype, a collection of them, or a `UUID` column
   named `…org_unit_id` / `…squadron_id`, embedded keys included — is either named by the entity's
-  marker or listed, with its reason, as no tenancy boundary. The list holds fourteen references
-  today: the job order's customer unit, the executing unit of the two handovers, the material
+  marker or listed, with its reason, as no tenancy boundary. Order-scoped participation units,
+  observed unit-read history and retained provision-credit units are relationships within the order,
+  not aggregate ownership; reads still follow the order's current access policy.
+  Other examples include the job order's customer unit, the executing unit of the two handovers, the material
   claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
   attribution (the board is organisation-wide), the bank account holder and the two bank
   counterparties, the Kommandogruppe's Staffel, the hierarchy parent

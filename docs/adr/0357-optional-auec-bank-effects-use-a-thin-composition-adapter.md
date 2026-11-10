@@ -24,6 +24,13 @@ a ledger transaction. It has no outcome for authorisation without a posting or l
 
 ## Decision
 
+Bank handling is enabled by default for each new monetary operation. The owner retains the
+existing per-operation choice: Bank-free handling requires an explicit selection for that
+operation, without a persistent order mode or extra switching workflow. No unavailable or refused
+Bank path silently falls back to Bank-free posting. This presentation default neither changes
+Bank authority nor introduces a JobOrder-to-Bank dependency; the complete independent path stays
+usable under REQ-ORDERS-067/-069. Existing submitted terms and recovery remain authoritative.
+
 Use a thin adapter in the existing application composition. It consumes only the public JobOrder
 and Bank APIs for this integration and owns neither aggregate nor monetary policy. JobOrder owns
 logical operations, submitted attempts and financial order effects. Bank owns admission, approvals,

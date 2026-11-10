@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockSoldForTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryNotices;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredFromUserEvent;
@@ -107,6 +108,7 @@ public class InventoryCheckoutService {
   private final RequestScopeResolver requestScopeResolver;
   private final OrgUnitStampingService orgUnitStampingService;
   private final AuditRecorder auditRecorder;
+  private final InventoryCheckoutAudits checkoutAudits;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
@@ -127,7 +129,7 @@ public class InventoryCheckoutService {
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
     orderWrites.lockEligibility();
-    return bookOut(id, dto, currentUserId, isAdmin, null, null).item();
+    return bookOut(id, dto, currentUserId, isAdmin, null, null, null).item();
   }
 
   /**
@@ -138,15 +140,21 @@ public class InventoryCheckoutService {
    * @param id the row
    * @param dto the book-out
    * @param memberId the member who owns the row
+   * @param exactRemaining exact surviving evidence, or null for the ordinary quantity prefix
    * @return the offers the book-out lowered and removed
    * @throws NotFoundException when the row is unknown
    * @throws BadRequestException when the book-out is invalid for the row
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  public StockChangeEffects bookOutForClient(UUID id, InventoryItemBookOutDto dto, UUID memberId) {
+  public StockChangeEffects bookOutForClient(
+      UUID id,
+      InventoryItemBookOutDto dto,
+      UUID memberId,
+      @Nullable StockQuantityComposition exactRemaining) {
     orderWrites.lockEligibility();
-    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK, null).offers();
+    return bookOut(id, dto, memberId, false, StockChangeReason.STOCK, null, exactRemaining)
+        .offers();
   }
 
   /**
@@ -162,7 +170,7 @@ public class InventoryCheckoutService {
   @Transactional(propagation = Propagation.MANDATORY)
   StockChangeEffects bookOutForPool(UUID id, InventoryItemBookOutDto dto, UUID actorId) {
     orderWrites.lockEligibility();
-    return bookOut(id, dto, actorId, true, null, null).offers();
+    return bookOut(id, dto, actorId, true, null, null, null).offers();
   }
 
   /**
@@ -181,7 +189,7 @@ public class InventoryCheckoutService {
   PoolTransfer transferForPool(
       UUID id, InventoryItemBookOutDto dto, UUID actorId, @NotNull OrgUnit targetPool) {
     orderWrites.lockEligibility();
-    BookOut done = bookOut(id, dto, actorId, true, null, targetPool);
+    BookOut done = bookOut(id, dto, actorId, true, null, targetPool, null);
     return new PoolTransfer(Objects.requireNonNull(done.item()).id(), done.offers());
   }
 
@@ -195,6 +203,7 @@ public class InventoryCheckoutService {
    * @param offerReason the audit reason of the offer effects, or {@code null} for the checkout
    *     type's
    * @param targetPool the pool a transfer moves into, or {@code null} for the org-unit pick
+   * @param exactRemaining exact surviving discard evidence, or null for ordinary quantity selection
    * @return the remaining row, or {@code null} for a depleted discard or sale, and the offer
    *     effects
    */
@@ -205,7 +214,8 @@ public class InventoryCheckoutService {
       UUID currentUserId,
       boolean isAdmin,
       @Nullable StockChangeReason offerReason,
-      @Nullable OrgUnit targetPool) {
+      @Nullable OrgUnit targetPool,
+      @Nullable StockQuantityComposition exactRemaining) {
     orderWrites.lockTransformRows(
         List.of(id),
         List.of(new PoolRelocation(id, dto.targetUserId(), dto.targetLocationId(), null)));
@@ -237,6 +247,10 @@ public class InventoryCheckoutService {
               : CheckoutType.DISCARD;
     }
 
+    if (exactRemaining != null && checkoutType != CheckoutType.DISCARD) {
+      throw new IllegalArgumentException("Exact remaining quantity requires an owning discard");
+    }
+
     if (checkoutType == CheckoutType.SELL) {
       if (dto.terminal() == null || dto.terminal().isBlank()) {
         throw new BadRequestException("Terminal is required for selling");
@@ -252,7 +266,10 @@ public class InventoryCheckoutService {
       throw new BadRequestException("Transfer requires a target user or location");
     }
 
-    double remainingAmount = ScuAmounts.roundToScuScale(item.getAmount() - dto.amount());
+    double remainingAmount =
+        exactRemaining == null
+            ? ScuAmounts.roundToScuScale(item.getAmount() - dto.amount())
+            : ScuAmounts.fromQuanta(exactRemaining.totalQuanta());
 
     final UUID sourceId = item.getId();
     final String sourceLabel = InventoryAuditLabels.label(item);
@@ -297,8 +314,17 @@ public class InventoryCheckoutService {
     AllocationReductions.applyPlan(item, missionReductions, false);
 
     LotRows.Lowered lowered =
-        LotRows.lower(inventoryItemRepository, stockChangeObserver, item, remainingAmount, reason);
-    recordBookOutTail(
+        exactRemaining == null
+            ? LotRows.lower(
+                inventoryItemRepository, stockChangeObserver, item, remainingAmount, reason)
+            : LotRows.lowerExactQuantity(
+                inventoryItemRepository,
+                stockChangeObserver,
+                item,
+                remainingAmount,
+                exactRemaining,
+                reason);
+    checkoutAudits.recordBookOutTail(
         checkoutType,
         sourceId,
         sourceLabel,
@@ -549,61 +575,6 @@ public class InventoryCheckoutService {
             new ActorRef(actorId, actorName(actorId, List.of())),
             type == CheckoutType.SELL ? "SOLD" : "DISCARDED",
             List.of(lot)));
-  }
-
-  /**
-   * Records the audit event of a {@code DISCARD} or {@code SELL} book-out; a sale carries terminal,
-   * amount and finance entries, a discard the consumed and remaining amounts.
-   *
-   * @param type the resolved checkout type (never {@code TRANSFER} here)
-   * @param sourceId the source row id (snapshotted before a possible delete)
-   * @param sourceLabel the source row's {@code material @ location} label snapshot
-   * @param materialName the material name snapshot
-   * @param ownerId the source row owner's id
-   * @param dto the book-out request (read for terminal/sell amount)
-   * @param remaining the post-decrement amount (0 when the row was depleted)
-   * @param financeEntryIds the finance entry ids created for a sale (empty otherwise)
-   */
-  private void recordBookOutTail(
-      CheckoutType type,
-      UUID sourceId,
-      String sourceLabel,
-      String materialName,
-      UUID ownerId,
-      InventoryItemBookOutDto dto,
-      double remaining,
-      List<UUID> financeEntryIds) {
-    boolean rowDepleted = remaining <= QUANTITY_EPSILON;
-    if (type == CheckoutType.SELL) {
-      auditRecorder.record(
-          AuditEventType.INVENTORY_ITEM_SOLD,
-          sourceId,
-          sourceLabel,
-          ownerId,
-          AuditDetails.of("material", materialName)
-              .with("amount", dto.amount())
-              .with("terminalLength", dto.terminal() == null ? 0 : dto.terminal().trim().length())
-              .with("sellAmount", dto.sellAmount())
-              .with(
-                  "financeEntries",
-                  financeEntryIds.stream()
-                      .filter(Objects::nonNull)
-                      .map(UUID::toString)
-                      .reduce((a, b) -> a + "," + b)
-                      .orElse("-"))
-              .with("depleted", rowDepleted));
-    } else {
-      auditRecorder.record(
-          AuditEventType.INVENTORY_ITEM_CONSUMED,
-          sourceId,
-          sourceLabel,
-          ownerId,
-          AuditDetails.of("type", type)
-              .with("material", materialName)
-              .with("amount", dto.amount())
-              .with("remaining", remaining)
-              .with("depleted", rowDepleted));
-    }
   }
 
   /**
@@ -869,10 +840,10 @@ public class InventoryCheckoutService {
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
-    orderWrites.lockRows(request.itemIds());
+    orderWrites.prepareWrites(request.itemIds(), List.of(), List.of());
     List<UUID> toDelete = new ArrayList<>();
 
-    for (UUID itemId : request.itemIds()) {
+    for (UUID itemId : request.itemIds().stream().distinct().sorted().toList()) {
       InventoryItem item =
           Entities.require(
               inventoryItemRepository.findByIdForUpdate(itemId),
@@ -1265,11 +1236,10 @@ public class InventoryCheckoutService {
     newItem.setGameItem(source.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(source.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(amount));
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(source.getStolen());
     newItem.setNote(source.getNote());
-    newItem.replaceQuantityProvenance(source.getQuantityProvenance());
+    newItem.replaceQuantity(amount, source.getQuantityComposition());
 
     Map<UUID, Double> orderReductions =
         AllocationReductions.resolveReductionPlan(source, null, amount, true);
