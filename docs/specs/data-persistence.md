@@ -1132,7 +1132,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 52 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
+| `catalogue` | 53 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1631,8 +1631,23 @@ Original UEX and Wiki names are retained separately from the canonical item name
 
 A Wiki manufacturer name or code that several census rows share is ambiguous only while an
 unclaimed local row carries it. A local row whose P4K or Wiki UUID names another row of the same
-census belongs to that sibling, and a key no local row carries leaves the Wiki row unmatched; neither
-case blocks the manufacturer census (`ScWikiManufacturerSyncServiceTest`).
+census belongs to that sibling, whichever key matched it: the Wiki row becomes an alias of the
+local row (`MANUFACTURER_DUPLICATE` on first sight). A key no local row carries leaves the Wiki row
+unmatched; neither case blocks the manufacturer census. Every Wiki row that resolves to a
+manufacturer is kept in `manufacturer_scwiki_identity`; the one named by `scwiki_uuid` is the
+primary link, the others are aliases, and the Wiki item sync resolves an item's manufacturer
+through all of them. An admin chooses the primary link on `/admin/sync-reports/scwiki`; the choice
+is versioned by the manufacturer's `@Version`, audited and kept by later runs. A row linked to a
+Wiki UUID that a complete census no longer carries moves to a known alias, or to the Wiki row whose
+name equals its name and whose code equals its stored `scwiki_code`, both unique in the census
+(`MANUFACTURER_RELINKED`); any other differing link stays a `MANUFACTURER_MISMATCH` and blocks the
+census. A complete census deletes the identities it no longer carries
+([ADR-0356](../adr/0356-a-wiki-manufacturer-follows-its-uuid-change-and-a-wiki-duplicate-becomes-an-alias.md),
+`ScWikiManufacturerSyncServiceTest`, `ManufacturerWikiIdentityServiceTest`,
+`AdminSyncReportsPageControllerMvcTest`).
+
+A Wiki blueprint aspect's `selection_group` is a group key or a reference object to its
+`aspect_groups` entry; both store the key (`ScWikiClientTest`).
 
 UEX gives an item and a commodity terminal of one location the same name. The terminal sync adopts
 a row by name only while no UEX terminal claims it, so each UEX terminal keeps a row of its own and

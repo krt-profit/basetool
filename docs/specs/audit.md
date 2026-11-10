@@ -525,7 +525,9 @@ The coverage list holds the **Katalog** area
     refined material (`CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field` and `valueId` when an
     edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
     back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
-    (`*_VISIBILITY_CHANGED`, `hidden=`); locations (`CATALOGUE_LOCATION_*`); the loading-dock
+    (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
+    among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
+    the Wiki UUIDs, ADR-0356); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,
     `CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDE_CLEARED`) and the terminal auto-load override
@@ -559,7 +561,7 @@ counts them (REQ-OBS-011).
 - [x] For a representative mutation of each built activity above a test asserts exactly one
   `CATALOGUE` event (type, subject, label, details); an update names changed fields only
   (`CatalogueAuditTest`, `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
-  `SyncRunServiceTest`).
+  `SyncRunServiceTest`, `ManufacturerWikiIdentityServiceTest`).
 - [x] Every `CATALOGUE` event type is offered by the Katalog tab and carries a label
   (`AdminAuditLogPageControllerTest`).
 - [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with

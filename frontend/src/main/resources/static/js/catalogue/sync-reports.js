@@ -38,6 +38,36 @@ document.addEventListener('DOMContentLoaded', () => {
         receiver: { coalesceMs: 1500 },
     });
 
+    const results = document.getElementById('sync-results');
+    if (results) {
+        results.addEventListener('click', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            const button = /** @type {HTMLButtonElement | null} */ (
+                target ? target.closest('button[data-wiki-primary]') : null
+            );
+            if (!button) {
+                return;
+            }
+            const params = new URLSearchParams({
+                manufacturerId: button.dataset.manufacturerId || '',
+                scwikiUuid: button.dataset.scwikiUuid || '',
+                version: button.dataset.version || '',
+            });
+            button.disabled = true;
+            reports
+                .write({
+                    method: 'POST',
+                    url: `/admin/sync-reports/manufacturer-wiki-primary?${params.toString()}`,
+                    successMessage: SYNC_MSG.primarySuccess,
+                    errorMessage: SYNC_MSG.primaryError,
+                    refresh: ['sync-status'],
+                })
+                .finally(() => {
+                    button.disabled = false;
+                });
+        });
+    }
+
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('purge-form'));
     const daysInput = /** @type {HTMLInputElement | null} */ (
         document.getElementById('purge-days')

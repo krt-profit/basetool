@@ -23,8 +23,11 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -34,6 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiDuplicateDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiIdentityDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiPrimaryRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunDto;
@@ -259,6 +265,99 @@ class AdminSyncReportsPageControllerMvcTest {
                 .with(csrf())
                 .param("days", "0"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void scwikiTab_listsTheWikiDuplicatesWithAChoiceForEachAlias() throws Exception {
+    UUID manufacturerId = UUID.randomUUID();
+    UUID primary = UUID.randomUUID();
+    UUID alias = UUID.randomUUID();
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 100, 0L, 0, List.of()));
+    when(backendApiClient.get(
+            eq("/api/v1/catalog/admin/manufacturer-wiki-duplicates"), anyTypeRef()))
+        .thenReturn(
+            List.of(
+                new ManufacturerWikiDuplicateDto(
+                    manufacturerId,
+                    "Banu",
+                    "BANU",
+                    7L,
+                    List.of(
+                        new ManufacturerWikiIdentityDto(primary, "Banu", null, true, Instant.EPOCH),
+                        new ManufacturerWikiIdentityDto(
+                            alias, "Banu Souli", "BANU", false, Instant.EPOCH)))));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/admin/sync-reports/scwiki")
+                    .param("fragment", "results")
+                    .locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html)
+        .contains(
+            "data-testid=\"sync-wiki-duplicates\"", "Hersteller doppelt im Wiki", "Banu Souli")
+        .contains("data-scwiki-uuid=\"" + alias + "\"")
+        .doesNotContain("data-scwiki-uuid=\"" + primary + "\"")
+        .contains("data-version=\"7\"")
+        .contains("Hauptverknüpfung");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void otherTabs_doNotShowTheWikiDuplicates() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/catalog/admin/sync-reports"), anyTypeRef()))
+        .thenReturn(new PageResponse<>(List.of(), 0, 100, 0L, 0, List.of()));
+
+    mockMvc
+        .perform(get("/admin/sync-reports/uex").param("fragment", "results"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("sync-wiki-duplicates"))));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void chooseWikiPrimary_relaysTheChoiceAndAnswers204() throws Exception {
+    UUID manufacturerId = UUID.randomUUID();
+    UUID alias = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            post("/admin/sync-reports/manufacturer-wiki-primary")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("manufacturerId", manufacturerId.toString())
+                .param("scwikiUuid", alias.toString())
+                .param("version", "7"))
+        .andExpect(status().isNoContent());
+
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/catalog/admin/manufacturer-wiki-duplicates/{manufacturerId}/primary"),
+            eq(new ManufacturerWikiPrimaryRequest(alias, 7L)),
+            eq(ManufacturerWikiDuplicateDto.class),
+            eq(manufacturerId));
+  }
+
+  @Test
+  @WithMockUser(roles = "USER")
+  void chooseWikiPrimary_isAdminOnly() throws Exception {
+    mockMvc
+        .perform(
+            post("/admin/sync-reports/manufacturer-wiki-primary")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("manufacturerId", UUID.randomUUID().toString())
+                .param("scwikiUuid", UUID.randomUUID().toString())
+                .param("version", "1"))
+        .andExpect(status().isForbidden());
+    verify(backendApiClient, never()).put(any(String.class), any(), any(), any(Object[].class));
   }
 
   @Test

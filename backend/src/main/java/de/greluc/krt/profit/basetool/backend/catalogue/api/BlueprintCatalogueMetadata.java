@@ -30,6 +30,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 /**
  * Retains optional Wiki recipe evidence separately from the canonical crafting recipe.
@@ -313,7 +318,7 @@ public record BlueprintCatalogueMetadata(
    * @param key source aspect key
    * @param name source aspect label
    * @param requiredCount number required within its group
-   * @param selectionGroup source choice-group identifier
+   * @param selectionGroup source choice-group key, read from a plain key or a group reference
    * @param input selected input
    * @param modifiers quality effects of this aspect
    * @param initialQuality source default ingredient quality
@@ -328,7 +333,8 @@ public record BlueprintCatalogueMetadata(
       @Nullable String key,
       @Nullable String name,
       @Nullable @JsonAlias("required_count") Integer requiredCount,
-      @Nullable @JsonAlias("selection_group") String selectionGroup,
+      @Nullable @JsonAlias("selection_group") @JsonDeserialize(using = SelectionGroupKey.class)
+          String selectionGroup,
       @Nullable AspectInput input,
       List<Modifier> modifiers,
       @Nullable @JsonAlias("initial_quality") Integer initialQuality,
@@ -390,6 +396,25 @@ public record BlueprintCatalogueMetadata(
     public Aspects {
       aspects = immutable(aspects);
       aspectGroups = immutable(aspectGroups);
+    }
+  }
+
+  /**
+   * Reads an aspect's choice-group key from either a plain key or a group reference object.
+   *
+   * <p>The Wiki sends {@code "selection_group": "ASPECTS"} or {@code "selection_group": {"key":
+   * "ASPECTS", "name": …, "required_count": …}}; the group's full definition lives in {@code
+   * aspect_groups}, so only its key is kept.
+   */
+  public static final class SelectionGroupKey extends ValueDeserializer<String> {
+
+    @Nullable
+    @Override
+    public String deserialize(JsonParser p, DeserializationContext ctxt) {
+      if (p.currentToken() == JsonToken.START_OBJECT) {
+        return ctxt.readTree(p).path("key").asString(null);
+      }
+      return p.getValueAsString();
     }
   }
 

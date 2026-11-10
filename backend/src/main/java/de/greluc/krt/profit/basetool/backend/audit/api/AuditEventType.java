@@ -737,6 +737,8 @@ public enum AuditEventType {
   CATALOGUE_MATERIAL_ALIAS_DELETED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a manufacturer. */
   CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
+  /** An admin chose which SC Wiki entry of a manufacturer listed twice in the Wiki is primary. */
+  CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a ship type. */
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin created a location. */

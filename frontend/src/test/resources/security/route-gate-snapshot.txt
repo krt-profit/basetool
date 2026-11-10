@@ -162,6 +162,7 @@
 /admin/sync-reports GET -> AdminSyncReportsPageController#combined gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST -> AdminSyncReportsPageController#deleteOld gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/delete-old POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSyncReportsPageController#deleteOldAjax gate=class:hasRole('ADMIN') layout=yes
+/admin/sync-reports/manufacturer-wiki-primary POST headers=[X-Requested-With=XMLHttpRequest] -> AdminManufacturerWikiPrimaryController#choosePrimary gate=class:hasRole('ADMIN') layout=no
 /admin/sync-reports/scwiki GET -> AdminSyncReportsPageController#scwiki gate=class:hasRole('ADMIN') layout=yes
 /admin/sync-reports/uex GET -> AdminSyncReportsPageController#uex gate=class:hasRole('ADMIN') layout=yes
 /admin/terms GET -> AdminTermsPageController#showOverview gate=class:hasRole('ADMIN') layout=yes

@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.client;
 
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiDuplicateDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiPrimaryRequest;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeResultDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
@@ -48,6 +51,12 @@ public class SyncReportBackendClient {
 
   private static final ParameterizedTypeReference<List<SyncRunSummaryDto>> SYNC_RUN_SUMMARIES =
       new ParameterizedTypeReference<>() {};
+
+  private static final String WIKI_DUPLICATES_URI =
+      "/api/v1/catalog/admin/manufacturer-wiki-duplicates";
+
+  private static final ParameterizedTypeReference<List<ManufacturerWikiDuplicateDto>>
+      WIKI_DUPLICATES = new ParameterizedTypeReference<>() {};
 
   /** The backend seam every sync-report call goes through. */
   private final BackendApiClient backendApiClient;
@@ -98,5 +107,32 @@ public class SyncReportBackendClient {
       uri.queryParam("source", source);
     }
     return backendApiClient.delete(uri.toUriString(), SyncReportPurgeResultDto.class);
+  }
+
+  /**
+   * Reads every manufacturer the SC Wiki lists more than once (ADR-0356).
+   *
+   * @return the duplicated manufacturers, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public List<ManufacturerWikiDuplicateDto> manufacturerWikiDuplicates() {
+    return backendApiClient.get(WIKI_DUPLICATES_URI, WIKI_DUPLICATES);
+  }
+
+  /**
+   * Makes one SC Wiki entry the manufacturer's primary link; the others stay aliases.
+   *
+   * @param manufacturerId the local manufacturer id
+   * @param request the chosen Wiki entry and the version the admin last saw
+   * @return the manufacturer after the choice, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ManufacturerWikiDuplicateDto chooseManufacturerWikiPrimary(
+      UUID manufacturerId, ManufacturerWikiPrimaryRequest request) {
+    return backendApiClient.put(
+        WIKI_DUPLICATES_URI + "/{manufacturerId}/primary",
+        request,
+        ManufacturerWikiDuplicateDto.class,
+        manufacturerId);
   }
 }

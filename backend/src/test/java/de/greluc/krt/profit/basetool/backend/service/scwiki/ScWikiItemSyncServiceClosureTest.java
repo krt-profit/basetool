@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWrit
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemClassResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerScwikiIdentityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemFieldWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
@@ -80,6 +81,7 @@ class ScWikiItemSyncServiceClosureTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
+  @Mock private ManufacturerScwikiIdentityRepository manufacturerIdentityRepository;
   @Mock private SyncReportService syncReportService;
   @Mock private ItemReconciliationService itemReconciliationService;
   @Mock private GameItemStatRepository gameItemStatRepository;
@@ -119,6 +121,7 @@ class ScWikiItemSyncServiceClosureTest {
             gameItemRepository,
             blueprintRepository,
             manufacturerRepository,
+            manufacturerIdentityRepository,
             syncReportService,
             new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
