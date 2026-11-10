@@ -482,6 +482,48 @@ q 'up == 0'
 
 For anything longer than a one-liner, use Grafana → Explore.
 
+### Read-only API access through a Grafana service account
+
+To query Prometheus or Loki from a workstation, for example as an agent analysing an alert, use a
+**Grafana service account with the role Viewer**. Do not use a second Prometheus user:
+
+- Prometheus' basic auth has no roles, and the unit starts it with `--web.enable-admin-api`. Every
+  Prometheus user can therefore also delete series, so a "read-only" Prometheus user is read-only by
+  convention only.
+- Prometheus publishes no host port, and entering the rootless network as `greluc` needs sudo
+  (see above), so a Prometheus user is not reachable from a workstation anyway.
+- A Viewer service account can query every provisioned datasource through Grafana's datasource
+  proxy and cannot change anything. Grafana's login runs through Keycloak, but service accounts are
+  Grafana's own: they need no Keycloak account and authenticate with a bearer token.
+
+**Create it** (once, as a Grafana server admin: a Keycloak user with the `grafana-admin` role):
+
+1. Sign in at `https://grafana.profit-base.online` with **Sign in with Keycloak**.
+2. **Administration → Users and access → Service accounts → Add service account**: display name
+   `claude-readonly` (or the agent's name), role **Viewer**, **Create**.
+3. **Add service account token**: a name for the purpose, an **expiration** (a few days for one
+   analysis), **Generate token**. Grafana shows the `glsa_…` token once.
+4. Paste it into a file on the workstation, never into a chat, an issue or a shell command line,
+   for example `D:\Coding\Agents\Temp\<agent>\grafana-ro\token.txt`. Clear the clipboard afterwards.
+
+**Use it.** The token goes into a request header read from that file, so it never appears on a
+command line or in output. The datasource uids are `prometheus`, `loki` and `tempo`
+(`grafana/provisioning/datasources/datasources.yaml`):
+
+```powershell
+$token = (Get-Content -Raw D:\Coding\Agents\Temp\claude\grafana-ro\token.txt).Trim()
+$query = [uri]::EscapeDataString('sum by (directive, code_origin) (increase(basetool_client_csp_violation_total[2h]))')
+Invoke-RestMethod -Headers @{ Authorization = "Bearer $token" } `
+  -Uri "https://grafana.profit-base.online/api/datasources/proxy/uid/prometheus/api/v1/query?query=$query&time=2026-11-09T22:30:00Z"
+Remove-Variable token
+```
+
+`query_range` works the same way (`start`, `end`, `step`). Loki is reached at
+`/api/datasources/proxy/uid/loki/loki/api/v1/query_range`.
+
+**Remove it** when the analysis is done: delete the token (or the whole service account) under
+**Service accounts**, and delete the token file. An expired token stops working on its own.
+
 ### Rebuilding the monitoring plane on a new host
 
 The Ansible role and the first deploy do most of it; four things stay manual because they are
