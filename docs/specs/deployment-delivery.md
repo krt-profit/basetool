@@ -2569,6 +2569,9 @@ that has no entry at all, before it is used.
   resolution, detached ones included, so a plugin probe that resolves without the Boot BOM reports
   versions nothing uses. PIT's `addJUnitPlatformLauncher` probe is switched off for that reason; the
   launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
+- **The Gradle Wrapper pins Gradle 9.9.1.** Its `distributionSha256Sum` verifies the binary
+  distribution against Gradle's published SHA-256 before extraction; wrapper upgrades regenerate
+  the wrapper JAR and launch scripts with the pinned release.
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
 - **The CI tools outside Gradle are pinned the same way** (CI-SEC-12): pip installs read
   `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli is installed
