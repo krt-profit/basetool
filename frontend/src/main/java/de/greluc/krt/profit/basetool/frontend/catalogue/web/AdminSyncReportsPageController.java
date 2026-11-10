@@ -229,6 +229,11 @@ public class AdminSyncReportsPageController {
     model.addAttribute("attemptsAvailable", data.attemptsAvailable());
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("basePath", basePath);
+    if ("SCWIKI".equals(source)) {
+      SyncReportPageReader.WikiDuplicates duplicates = pageReader.readWikiDuplicates();
+      model.addAttribute("wikiDuplicates", duplicates.manufacturers());
+      model.addAttribute("wikiDuplicatesAvailable", duplicates.available());
+    }
     return "results".equals(fragment)
         ? "catalogue/admin/sync-reports :: results"
         : "catalogue/admin/sync-reports";

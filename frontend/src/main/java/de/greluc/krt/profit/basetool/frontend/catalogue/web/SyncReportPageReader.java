@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.SyncReportBackendClient;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerWikiDuplicateDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncRunSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -86,6 +87,39 @@ public class SyncReportPageReader {
             },
             new AttemptSection(List.of(), false));
     return new Data(events.page(), attempts.summaries(), events.available(), attempts.available());
+  }
+
+  /**
+   * Reads the manufacturers the SC Wiki lists more than once, for the SC Wiki tab.
+   *
+   * @return the duplicates and whether they were read successfully
+   */
+  @NotNull
+  public WikiDuplicates readWikiDuplicates() {
+    WikiDuplicates unavailable = new WikiDuplicates(List.of(), false);
+    return SectionFallback.load(
+        log,
+        "sync-report-wiki-duplicates",
+        () -> {
+          List<ManufacturerWikiDuplicateDto> response = client.manufacturerWikiDuplicates();
+          return response == null ? unavailable : new WikiDuplicates(response, true);
+        },
+        unavailable);
+  }
+
+  /**
+   * The manufacturers the SC Wiki lists more than once.
+   *
+   * @param manufacturers the duplicated manufacturers with their Wiki entries
+   * @param available whether they were read successfully
+   */
+  public record WikiDuplicates(
+      List<ManufacturerWikiDuplicateDto> manufacturers, boolean available) {
+
+    /** Copies the duplicated manufacturers. */
+    public WikiDuplicates {
+      manufacturers = List.copyOf(manufacturers);
+    }
   }
 
   /**

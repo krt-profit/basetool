@@ -94,6 +94,49 @@
             <p th:if="${#lists.isEmpty(summary.attempts)}" class="cell-sub" th:text="#{admin.syncReports.attempts.empty}">No recorded attempts.</p>
         </section>
     </section>
+    <section th:if="${activeTab == 'SCWIKI'}" class="sync-history" aria-labelledby="sync-wiki-duplicates-title"
+             data-testid="sync-wiki-duplicates">
+        <h2 id="sync-wiki-duplicates-title" class="section-title" th:text="#{admin.syncReports.wikiDuplicates.title}">Manufacturers listed twice in the Wiki</h2>
+        <p class="cell-sub" th:text="#{admin.syncReports.wikiDuplicates.help}">Choose the primary entry.</p>
+        <p th:unless="${wikiDuplicatesAvailable}" class="alert alert-danger" role="alert"
+           th:text="#{admin.syncReports.wikiDuplicates.unavailable}">Unavailable.</p>
+        <p th:if="${wikiDuplicatesAvailable and #lists.isEmpty(wikiDuplicates)}" class="cell-sub"
+           th:text="#{admin.syncReports.wikiDuplicates.empty}">No duplicates.</p>
+        <div class="table-responsive" th:if="${!#lists.isEmpty(wikiDuplicates)}">
+            <table class="data-table data-table--stack sync-wiki-duplicates-table">
+                <thead><tr>
+                    <th th:text="#{admin.syncReports.wikiDuplicates.col.manufacturer}">Manufacturer</th>
+                    <th th:text="#{admin.syncReports.wikiDuplicates.col.wikiName}">Wiki entry</th>
+                    <th th:text="#{admin.syncReports.wikiDuplicates.col.wikiCode}">Wiki code</th>
+                    <th th:text="#{admin.syncReports.wikiDuplicates.col.uuid}">Wiki UUID</th>
+                    <th th:text="#{admin.syncReports.wikiDuplicates.col.role}">Role</th>
+                </tr></thead>
+                <tbody>
+                <th:block th:each="dup : ${wikiDuplicates}">
+                    <tr th:each="entry : ${dup.identities}" th:data-manufacturer-id="${dup.manufacturerId}">
+                        <td th:attr="data-label=#{admin.syncReports.wikiDuplicates.col.manufacturer}">
+                            <span class="cell-title" th:text="${dup.name}">Banu</span>
+                            <span class="cell-sub" th:text="${dup.abbreviation}">BANU</span>
+                        </td>
+                        <td th:attr="data-label=#{admin.syncReports.wikiDuplicates.col.wikiName}" th:text="${entry.wikiName}">Banu Souli</td>
+                        <td th:attr="data-label=#{admin.syncReports.wikiDuplicates.col.wikiCode}" th:text="${entry.wikiCode ?: '—'}">BANU</td>
+                        <td th:attr="data-label=#{admin.syncReports.wikiDuplicates.col.uuid}"><code th:text="${entry.scwikiUuid}">uuid</code></td>
+                        <td th:attr="data-label=#{admin.syncReports.wikiDuplicates.col.role}">
+                            <span th:if="${entry.primary}" class="chip chip--success"
+                                  th:text="#{admin.syncReports.wikiDuplicates.primary}">Primary</span>
+                            <button th:unless="${entry.primary}" type="button" class="btn btn-ghost btn-sm"
+                                    data-wiki-primary data-testid="wiki-primary-choose"
+                                    th:data-manufacturer-id="${dup.manufacturerId}"
+                                    th:data-scwiki-uuid="${entry.scwikiUuid}"
+                                    th:data-version="${dup.version}"
+                                    th:text="#{admin.syncReports.wikiDuplicates.makePrimary}">Make primary</button>
+                        </td>
+                    </tr>
+                </th:block>
+                </tbody>
+            </table>
+        </div>
+    </section>
     <h2 class="section-title sync-events-title" th:text="#{admin.syncReports.events.title}">Events</h2>
     <div class="table-responsive" th:if="${!#lists.isEmpty(events)}">
         <table id="syncReportsTable" class="data-table data-table--stack">
@@ -157,7 +200,9 @@
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const SYNC_MSG = {
         successTemplate: /*[[#{admin.syncReports.delete.success}]]*/ '{0} Berichte gelöscht.',
-        deleteError:     /*[[#{error.admin.syncReports.delete}]]*/ 'Löschen fehlgeschlagen.'
+        deleteError:     /*[[#{error.admin.syncReports.delete}]]*/ 'Löschen fehlgeschlagen.',
+        primarySuccess:  /*[[#{admin.syncReports.wikiDuplicates.success}]]*/ 'Hauptverknüpfung gesetzt.',
+        primaryError:    /*[[#{error.admin.syncReports.wikiDuplicates}]]*/ 'Hauptverknüpfung nicht gesetzt.'
     };
 </script>
 <script type="module" th:src="@{/js/catalogue/sync-reports.js}" th:attr="nonce=${cspNonce}"></script>

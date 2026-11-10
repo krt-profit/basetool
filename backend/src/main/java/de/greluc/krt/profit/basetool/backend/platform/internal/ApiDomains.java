@@ -113,6 +113,7 @@ public final class ApiDomains {
           Map.entry("LeitungController", "leadership"),
           Map.entry("LocationController", "catalogue"),
           Map.entry("ManufacturerController", "catalogue"),
+          Map.entry("ManufacturerWikiIdentityController", "catalogue"),
           Map.entry("MaterialCategoryController", "catalogue"),
           Map.entry("MaterialClaimController", "joborder"),
           Map.entry("MaterialCollectionController", "joborder"),

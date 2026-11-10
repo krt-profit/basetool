@@ -466,6 +466,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_MATERIAL_ALIAS_UPDATED",
                   "CATALOGUE_MATERIAL_ALIAS_DELETED",
                   "CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED",
+                  "CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED",
                   "CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED",
                   "CATALOGUE_LOCATION_CREATED",
                   "CATALOGUE_LOCATION_UPDATED",

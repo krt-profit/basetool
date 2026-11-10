@@ -832,6 +832,42 @@ class ScWikiClientTest {
   }
 
   @Test
+  void aBlueprintAspectWithAGroupReferenceKeepsTheGroupKey() throws Exception {
+    String captured;
+    try (InputStream input =
+        getClass().getResourceAsStream("/catalogue/scwiki-blueprint-detail.json")) {
+      assertNotNull(input);
+      captured = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    String withGroupReference =
+        captured
+            .replaceFirst(
+                "\"selection_group\": null",
+                "\"selection_group\": {\"key\": \"ASPECTS\", \"name\": \"A S P E C T S\","
+                    + " \"required_count\": 2, \"option_count\": 3}")
+            .replaceFirst("\"selection_group\": null", "\"selection_group\": \"LINERS\"");
+    assertNotEquals(captured, withGroupReference, "the fixture must carry a selection group");
+    server.enqueue(jsonOk(withGroupReference));
+
+    var result =
+        client.fetchOneResult(
+            "/api/blueprints",
+            UUID.fromString("280f47b7-8434-410c-b854-380768fdccec"),
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertEquals(ScWikiClient.DetailOutcome.FOUND, result.outcome());
+    ScWikiBlueprintDto detail = result.data();
+    assertNotNull(detail);
+    assertNotNull(detail.aspects());
+    var aspects = detail.aspects().aspects();
+    assertEquals("ASPECTS", aspects.getFirst().selectionGroup());
+    assertEquals("LINERS", aspects.get(1).selectionGroup());
+    assertNull(aspects.get(2).selectionGroup());
+    assertEquals(0.0, fetchErrorCount());
+  }
+
+  @Test
   void aDetailFromAnotherPatchIsRejected() {
     server.enqueue(jsonOk("{\"data\":{\"game_version\":\"4.11.0-LIVE.1\"}}"));
 

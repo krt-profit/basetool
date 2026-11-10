@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -33,6 +34,8 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerScwikiIdentity;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerScwikiIdentityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiManufacturerSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
@@ -68,6 +71,7 @@ class ScWikiManufacturerSyncServiceTest {
 
   @Mock private ScWikiClient scWikiClient;
   @Mock private ManufacturerRepository manufacturerRepository;
+  @Mock private ManufacturerScwikiIdentityRepository identityRepository;
   @Mock private SyncReportService syncReportService;
 
   private ScWikiProperties properties;
@@ -95,6 +99,7 @@ class ScWikiManufacturerSyncServiceTest {
             scWikiClient,
             properties,
             manufacturerRepository,
+            identityRepository,
             syncReportService,
             new SyncChunkWriter(new RecordingTransactionManager(), new SyncRunProgress()));
   }
@@ -392,6 +397,201 @@ class ScWikiManufacturerSyncServiceTest {
     assertEquals(curelife, linked.getScwikiUuid());
     verify(syncReportService, never()).recordIncomplete();
     verify(syncReportService).recordSweep(true);
+  }
+
+  @Test
+  void aUniqueKeyHittingARowHeldBySiblingIsADuplicateThatLeavesTheCensusComplete() {
+    UUID cureLife = UUID.randomUUID();
+    UUID curelifeDuplicate = UUID.randomUUID();
+    Manufacturer linked = manufacturer("Curelife", "CUR");
+    linked.setScwikiUuid(cureLife);
+    linked.setP4kUuid(cureLife);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(
+                    dto(cureLife, "CureLife", "CRLF"), dto(curelifeDuplicate, "Curelife", "CUR"))));
+    when(manufacturerRepository.findByP4kUuid(cureLife)).thenReturn(Optional.of(linked));
+    when(manufacturerRepository.findByAbbreviationIgnoreCase("CUR")).thenReturn(List.of(linked));
+
+    assertEquals(2, service.syncManufacturers(), "the primary and its alias are both applied");
+
+    assertEquals(cureLife, linked.getScwikiUuid());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MANUFACTURER_DUPLICATE),
+            eq("manufacturer"),
+            eq(curelifeDuplicate),
+            any(),
+            any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.MANUFACTURER_MISMATCH), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(syncReportService).recordSweep(true);
+    verify(identityRepository)
+        .save(
+            argThat(identity ->
+                curelifeDuplicate.equals(identity.getScwikiUuid())
+                    && identity.getManufacturer() == linked
+                    && "CUR".equals(identity.getWikiCode())));
+    verify(identityRepository).deleteAbsentFrom(any());
+  }
+
+  @Test
+  void aKnownAliasIsRefreshedWithoutAnotherDuplicateEvent() {
+    UUID primary = UUID.randomUUID();
+    UUID alias = UUID.randomUUID();
+    Manufacturer linked = manufacturer("Banu", "BANU");
+    linked.setScwikiUuid(primary);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(dto(primary, "Banu", "BANU"), dto(alias, "Banu Souli", "BNU"))));
+    lenient()
+        .when(manufacturerRepository.findByScwikiUuid(primary))
+        .thenReturn(Optional.of(linked));
+    when(identityRepository.findManufacturerByScwikiUuid(alias)).thenReturn(Optional.of(linked));
+    when(identityRepository.existsById(alias)).thenReturn(true);
+    ManufacturerScwikiIdentity stored = new ManufacturerScwikiIdentity();
+    lenient().when(identityRepository.findById(alias)).thenReturn(Optional.of(stored));
+
+    assertEquals(2, service.syncManufacturers());
+
+    assertEquals(primary, linked.getScwikiUuid());
+    assertEquals("Banu Souli", stored.getWikiName());
+    verify(syncReportService, never())
+        .logScwikiEvent(
+            any(), eq(SyncEventType.MANUFACTURER_DUPLICATE), any(), any(), any(), any());
+    verify(syncReportService).recordSweep(true);
+  }
+
+  @Test
+  void aKnownAliasBecomesThePrimaryWhenTheCompleteCensusLostThePrimary() {
+    UUID vanished = UUID.randomUUID();
+    UUID alias = UUID.randomUUID();
+    Manufacturer linked = manufacturer("Banu", "BANU");
+    linked.setScwikiUuid(vanished);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(alias, "Banu Souli", "BNU"))));
+    when(identityRepository.findManufacturerByScwikiUuid(alias)).thenReturn(Optional.of(linked));
+    when(identityRepository.existsById(alias)).thenReturn(true);
+
+    assertEquals(1, service.syncManufacturers());
+
+    assertEquals(alias, linked.getScwikiUuid());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MANUFACTURER_RELINKED),
+            eq("manufacturer"),
+            eq(alias),
+            any(),
+            any());
+  }
+
+  @Test
+  void aP4kMatchOnARowHeldBySiblingIsADuplicate() {
+    UUID banu = UUID.randomUUID();
+    UUID banuSouli = UUID.randomUUID();
+    Manufacturer linked = manufacturer("Banu", "BANU");
+    linked.setScwikiUuid(banu);
+    linked.setP4kUuid(banuSouli);
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(
+            ScWikiClient.FetchResult.of(
+                List.of(dto(banu, "Banu", null), dto(banuSouli, "Banu Souli", "BANU"))));
+    when(manufacturerRepository.findByP4kUuid(banuSouli)).thenReturn(Optional.of(linked));
+    when(manufacturerRepository.findByP4kUuid(banu)).thenReturn(Optional.empty());
+    when(manufacturerRepository.findByScwikiUuid(banu)).thenReturn(Optional.of(linked));
+
+    assertEquals(2, service.syncManufacturers(), "the primary and its alias are both applied");
+
+    assertEquals(banu, linked.getScwikiUuid());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MANUFACTURER_DUPLICATE),
+            eq("manufacturer"),
+            eq(banuSouli),
+            any(),
+            any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(syncReportService).recordSweep(true);
+  }
+
+  @Test
+  void aCompleteCensusWithoutTheLinkedUuidMovesTheLinkToTheSameNameAndCode() {
+    UUID vanished = UUID.randomUUID();
+    UUID current = UUID.randomUUID();
+    Manufacturer local = manufacturer("Esperia", "ESPR");
+    local.setScwikiUuid(vanished);
+    local.setScwikiCode("ESPR");
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(current, "Esperia", "ESPR"))));
+    when(manufacturerRepository.findByNameIgnoreCase("Esperia")).thenReturn(Optional.of(local));
+
+    assertEquals(1, service.syncManufacturers());
+
+    assertEquals(current, local.getScwikiUuid());
+    assertNotNull(local.getScwikiSyncedAt());
+    verify(manufacturerRepository).save(local);
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MANUFACTURER_RELINKED),
+            eq("manufacturer"),
+            eq(current),
+            any(),
+            any());
+    verify(syncReportService, never())
+        .logScwikiEvent(any(), eq(SyncEventType.MANUFACTURER_LINKED), any(), any(), any(), any());
+    verify(syncReportService, never()).recordIncomplete();
+    verify(syncReportService).recordSweep(true);
+  }
+
+  @Test
+  void aPartialCensusNeverMovesALink() {
+    UUID vanished = UUID.randomUUID();
+    UUID current = UUID.randomUUID();
+    Manufacturer local = manufacturer("Esperia", "ESPR");
+    local.setScwikiUuid(vanished);
+    local.setScwikiCode("ESPR");
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.partial(List.of(dto(current, "Esperia", "ESPR"))));
+    when(manufacturerRepository.findByNameIgnoreCase("Esperia")).thenReturn(Optional.of(local));
+
+    service.syncManufacturers();
+
+    assertEquals(vanished, local.getScwikiUuid());
+    verify(manufacturerRepository, never()).save(any());
+    verify(syncReportService)
+        .logScwikiEvent(
+            any(),
+            eq(SyncEventType.MANUFACTURER_MISMATCH),
+            eq("manufacturer"),
+            eq(current),
+            any(),
+            any());
+  }
+
+  @Test
+  void aDifferentStoredWikiCodeKeepsTheLinkAndReportsAMismatch() {
+    UUID vanished = UUID.randomUUID();
+    UUID current = UUID.randomUUID();
+    Manufacturer local = manufacturer("Esperia", "ESPR");
+    local.setScwikiUuid(vanished);
+    local.setScwikiCode("ESP");
+    when(scWikiClient.fetchAllPagesResult(eq(ENDPOINT), any(), any()))
+        .thenReturn(ScWikiClient.FetchResult.of(List.of(dto(current, "Esperia", "ESPR"))));
+    when(manufacturerRepository.findByNameIgnoreCase("Esperia")).thenReturn(Optional.of(local));
+
+    service.syncManufacturers();
+
+    assertEquals(vanished, local.getScwikiUuid());
+    verify(manufacturerRepository, never()).save(any());
+    verify(syncReportService).recordIncomplete();
+    verify(syncReportService).recordSweep(false);
   }
 
   @Test

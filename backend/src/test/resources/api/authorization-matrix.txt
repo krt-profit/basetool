@@ -98,6 +98,8 @@ GET /api/v1/catalog/admin/import/p4k/review-cases | AdminP4kImportReportControll
 POST /api/v1/catalog/admin/import/p4k/review-cases/{id}/resolve | AdminP4kImportReportController#resolve | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/runs | AdminP4kImportReportController#runs | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/import/p4k/runs/{id}/changes | AdminP4kImportReportController#runChanges | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/catalog/admin/manufacturer-wiki-duplicates | ManufacturerWikiIdentityController#listManufacturerWikiDuplicates | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+PUT /api/v1/catalog/admin/manufacturer-wiki-duplicates/{manufacturerId}/primary | ManufacturerWikiIdentityController#chooseManufacturerWikiPrimary | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/catalog/admin/quality-tiers | AdminQualityTierController#listAllQualityTiers | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/catalog/admin/quality-tiers | AdminQualityTierController#createQualityTier | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/catalog/admin/quality-tiers/{id} | AdminQualityTierController#deleteQualityTier | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
