@@ -35,14 +35,13 @@ RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --n
 
 WORKDIR /app/${MODULE}/build/libs
 RUN set -eu; \
-    matches=""; \
+    set --; \
     for f in "${MODULE}"-*.jar; do \
         case "$f" in \
             *-plain.jar|*-sources.jar) continue ;; \
-            *.jar) matches="$matches $f" ;; \
+            *.jar) set -- "$@" "$f" ;; \
         esac; \
     done; \
-    set -- $matches; \
     [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "Expected exactly one bootable ${MODULE}-*.jar, got $# match(es): '$*'" >&2; ls -la >&2; exit 1; }; \
     cp "$1" /app/app.jar
 
