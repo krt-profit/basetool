@@ -565,6 +565,7 @@ touch ergonomics above the width breakpoint. The remaining browser lanes retain 
 flow viewport. `-Pe2e.layoutAllDevices=true` requests the complete layout sweep explicitly.
 Each viewport has its own E2E test deadline. The sweep still compares route coverage across
 the selected viewports and reports their measured detail views.
+The repository gate compares the typed viewport declaration with the full workflow matrix.
 
 **Page widths follow the page type** (owner decision 2026-10-19). Every page starts at the same
 left edge — `main`'s horizontal padding is `--page-gutter` (32px, 24px up to 1024px, 16px up to
