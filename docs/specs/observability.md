@@ -3889,16 +3889,20 @@ stricter `http_401` module (`blackbox-http-401`, REQ-XCH-028): a `200` there wou
 exchange answers without a token. It adds about 0.03/s of `no_credentials` in the `exchange`
 scope and of `unauthenticated` with `client_id="none"` to the exchange refusals, far below
 `IngestUnauthenticatedFlood`'s 1/s. Of 601 401s sampled at the edge in one hour, **600 carried `Blackbox-Exporter/0.28.0`** and
-one was an outside scanner. The floor this puts under the backend's 401 rate is **~0.1/s**, and it
-rises with every probe target added.
+one was an outside scanner. With the API host probes the floor under the backend's 401 rate was
+**~0.1/s**. Re-measured without them (#2675), over the 21 days to 2026-11-10, the backend's
+`no_credentials` rate is a flat **0.0333/s** (maximum 0.035, p99 0.0333): exactly the internal TLS
+probe of `https://backend:11261` at its 30 s interval, the only probe the backend answers with a
+`401`. The floor rises with every probe target added.
 
 That floor is why `BackendAuthFailureSpike` no longer watches 401 volume. It watches
 `reason="invalid_token"` — a token that *was* presented and rejected, which a probe, a scanner and a
 pre-login navigation can never produce — so the series is a true zero and a `> 0.05/s` threshold is
 meaningful rather than a fraction of the monitoring plane's own traffic. `IngestAuthFailureSpike`
 does the same on `basetool_ingest_auth_failures_total`. The volume half lives on separately as
-`BackendUnauthenticatedFlood` (`reason="no_credentials"`, `> 1/s for 15m`), an order of magnitude
-above the floor, with `IngestUnauthenticatedFlood` its twin on the gateway. **Adding a blackbox target changes that floor and the number above must be
+`BackendUnauthenticatedFlood` (`reason="no_credentials"`, `> 0.3/s for 15m`, nine times the
+backend's floor), with `IngestUnauthenticatedFlood` (`> 1/s for 15m`) its twin on the gateway, each
+about an order of magnitude above its own floor (`backend_unauthenticated_flood_floor_test.yml`). **Adding a blackbox target changes that floor and the number above must be
 re-measured in the same PR** (ADR-0173).
 
 > [!note] `uri="UNKNOWN"` on a rejected request is a known, open gap
