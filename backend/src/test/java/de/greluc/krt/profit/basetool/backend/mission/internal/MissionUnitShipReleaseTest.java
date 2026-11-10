@@ -21,8 +21,10 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -44,12 +46,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
-/** Pins that a deleted ship leaves every mission unit and that each unit records its change. */
+/**
+ * Pins that a deleted ship leaves every mission unit and that each unit records its change, for a
+ * single delete and for the account deletion's set-based release.
+ */
 @ExtendWith(MockitoExtension.class)
 class MissionUnitShipReleaseTest {
 
@@ -73,6 +79,7 @@ class MissionUnitShipReleaseTest {
     unit.setShip(ship);
     unit.setMission(mission);
     when(missionUnitRepository.findByShipId(shipId)).thenReturn(List.of(unit));
+    when(userService.currentActor()).thenReturn(ACTOR);
 
     assertThat(release.beforeShipDelete(shipId)).isEqualTo(1);
 
@@ -165,5 +172,97 @@ class MissionUnitShipReleaseTest {
 
     verify(eventPublisher, never()).publishEvent(any(Object.class));
     verifyNoInteractions(userService);
+  }
+
+  private static UnitShipRelease erasedRelease(String missionStatus, UUID responsibleId) {
+    return new UnitShipRelease(
+        UUID.randomUUID(),
+        "Alpha",
+        UUID.randomUUID(),
+        "Op Aurora",
+        missionStatus,
+        responsibleId,
+        UUID.randomUUID(),
+        "Cutlass Black");
+  }
+
+  @Test
+  void anAccountDeletionReleasesTheUnitsInBulkAndRecordsEachUnit() {
+    UUID ownerId = UUID.randomUUID();
+    UnitShipRelease open = erasedRelease("PLANNED", null);
+    UnitShipRelease finished = erasedRelease("COMPLETED", null);
+    when(missionUnitRepository.findShipReleasesByShipOwnerId(ownerId))
+        .thenReturn(List.of(open, finished));
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    assertThat(release.beforeOwnerShipsDelete(ownerId)).isEqualTo(2);
+
+    InOrder order = inOrder(missionUnitRepository);
+    order.verify(missionUnitRepository).findShipReleasesByShipOwnerId(ownerId);
+    order.verify(missionUnitRepository).releaseShipsOfOwner(eq(ownerId), any());
+    verify(missionUnitRepository, never()).findByShipId(any());
+    verify(missionUnitRepository, never()).save(any());
+    for (UnitShipRelease each : List.of(open, finished)) {
+      String details = "unit=" + each.unitId() + " shipDetached=" + each.shipId();
+      verify(auditRecorder)
+          .record(
+              eq(AuditEventType.MISSION_UNIT_UPDATED),
+              eq(each.missionId()),
+              eq("Op Aurora"),
+              isNull(),
+              argThat(text -> text != null && details.contentEquals(text)));
+    }
+  }
+
+  @Test
+  void anAccountDeletionAnnouncesOnlyTheUnfinishedMissionsGap() {
+    UUID ownerId = UUID.randomUUID();
+    UUID responsible = UUID.randomUUID();
+    UnitShipRelease open = erasedRelease("ACTIVE", responsible);
+    when(missionUnitRepository.findShipReleasesByShipOwnerId(ownerId))
+        .thenReturn(List.of(open, erasedRelease("CANCELLED", responsible)));
+    when(userService.currentActor()).thenReturn(ACTOR);
+
+    release.beforeOwnerShipsDelete(ownerId);
+
+    ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(captured.capture());
+    NoticeEvent notice = (NoticeEvent) captured.getValue();
+    assertThat(notice.eventType())
+        .isEqualTo(NotificationEventType.HANGAR_SHIP_DELETED_FROM_MISSION);
+    assertThat(notice.contextMissionId()).isEqualTo(open.missionId());
+    assertThat(notice.contextRecipientUserId()).isEqualTo(responsible);
+    assertThat(notice.actorSub()).isEqualTo(ACTOR.id());
+    assertThat(notice.renderParams())
+        .containsEntry("shipType", "Cutlass Black")
+        .containsEntry("unit", "Alpha")
+        .containsEntry("mission", "Op Aurora");
+  }
+
+  @Test
+  void anAccountDeletionNeverNamesTheDepartingMemberAsTheNoticesRecipient() {
+    UUID ownerId = UUID.randomUUID();
+    when(missionUnitRepository.findShipReleasesByShipOwnerId(ownerId))
+        .thenReturn(List.of(erasedRelease("PLANNED", ownerId)));
+    when(userService.currentActor()).thenReturn(ActorRef.system());
+
+    release.beforeOwnerShipsDelete(ownerId);
+
+    ArgumentCaptor<Object> captured = ArgumentCaptor.forClass(Object.class);
+    verify(eventPublisher).publishEvent(captured.capture());
+    NoticeEvent notice = (NoticeEvent) captured.getValue();
+    assertThat(notice.contextRecipientUserId()).isNull();
+    assertThat(notice.actorSub()).isNull();
+  }
+
+  @Test
+  void anAccountDeletionOfAMemberWhoseShipsAreInNoUnitTouchesNothing() {
+    UUID ownerId = UUID.randomUUID();
+    when(missionUnitRepository.findShipReleasesByShipOwnerId(ownerId)).thenReturn(List.of());
+
+    assertThat(release.beforeOwnerShipsDelete(ownerId)).isZero();
+
+    verify(missionUnitRepository, never()).releaseShipsOfOwner(any(), any());
+    verifyNoInteractions(auditRecorder, eventPublisher, userService);
   }
 }

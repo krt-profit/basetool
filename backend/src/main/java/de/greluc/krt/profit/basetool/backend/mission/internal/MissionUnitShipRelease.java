@@ -23,16 +23,15 @@ import de.greluc.krt.profit.basetool.backend.admin.api.events.HangarNotices;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -57,41 +56,62 @@ public class MissionUnitShipRelease implements ShipDeletionObserver {
   @Transactional(propagation = Propagation.MANDATORY)
   public int beforeShipDelete(@NotNull UUID shipId) {
     List<MissionUnit> units = missionUnitRepository.findByShipId(shipId);
-    ActorRef actor = units.isEmpty() ? null : userService.currentActor();
+    if (units.isEmpty()) {
+      return 0;
+    }
+    ActorRef actor = userService.currentActor();
     for (MissionUnit unit : units) {
-      announceLostShip(unit, actor);
+      UnitShipRelease release = UnitShipRelease.of(unit, shipId);
       unit.setShip(null);
       missionUnitRepository.save(unit);
-      auditRecorder.record(
-          AuditEventType.MISSION_UNIT_UPDATED,
-          unit.getMission().getId(),
-          unit.getMission().getName(),
-          null,
-          AuditDetails.of("unit", unit.getId()).with("shipDetached", shipId));
+      report(release, actor);
     }
     return units.size();
   }
 
   /**
-   * Tells the mission leadership and the unit's responsible member that a ship assigned to the unit
-   * of a mission that is not finished is gone (REQ-HANGAR-006).
-   *
-   * @param unit the unit the ship is about to leave
-   * @param actor who deletes the ship, or {@code null} when no unit carries it
+   * Releases the units through one projection and one bulk update, so neither a unit nor a ship of
+   * the departing member enters the persistence context; the member is never the notice's
+   * recipient.
    */
-  private void announceLostShip(@NotNull MissionUnit unit, @Nullable ActorRef actor) {
-    String status = unit.getMission().getStatus();
-    if (actor == null || "COMPLETED".equals(status) || "CANCELLED".equals(status)) {
-      return;
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public int beforeOwnerShipsDelete(@NotNull UUID ownerId) {
+    List<UnitShipRelease> releases = missionUnitRepository.findShipReleasesByShipOwnerId(ownerId);
+    if (releases.isEmpty()) {
+      return 0;
     }
-    Ship ship = unit.getShip();
-    eventPublisher.publishEvent(
-        HangarNotices.shipDeleted(
-            unit.getMission().getId(),
-            unit.getResponsibleUser() == null ? null : unit.getResponsibleUser().getId(),
-            ship == null || ship.getShipType() == null ? null : ship.getShipType().getName(),
-            unit.getMission().getName(),
-            unit.getName(),
-            actor));
+    missionUnitRepository.releaseShipsOfOwner(ownerId, Instant.now());
+    ActorRef actor = userService.currentActor();
+    for (UnitShipRelease release : releases) {
+      report(release.withoutResponsible(ownerId), actor);
+    }
+    return releases.size();
+  }
+
+  /**
+   * Records the unit's change on the mission trail and announces the gap unless the mission is
+   * finished.
+   *
+   * @param release the unit that lost its ship
+   * @param actor who deletes the ship
+   */
+  private void report(@NotNull UnitShipRelease release, @NotNull ActorRef actor) {
+    if (!release.missionFinished()) {
+      eventPublisher.publishEvent(
+          HangarNotices.shipDeleted(
+              release.missionId(),
+              release.responsibleUserId(),
+              release.shipTypeName(),
+              release.missionName(),
+              release.unitName(),
+              actor));
+    }
+    auditRecorder.record(
+        AuditEventType.MISSION_UNIT_UPDATED,
+        release.missionId(),
+        release.missionName(),
+        null,
+        AuditDetails.of("unit", release.unitId()).with("shipDetached", release.shipId()));
   }
 }

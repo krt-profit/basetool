@@ -38,4 +38,16 @@ public interface ShipDeletionObserver {
    * @return the number of references released
    */
   int beforeShipDelete(@NotNull UUID shipId);
+
+  /**
+   * Every ship of a departing member is about to be removed by the one set-based delete of the
+   * account deletion (REQ-DATA-008); whatever references them lets go of them first.
+   *
+   * <p>Works through set-based statements and projections only: a managed entity that references
+   * the member, a ship included, aborts the deletion's flush.
+   *
+   * @param ownerId the departing member whose ships are deleted
+   * @return the number of references released
+   */
+  int beforeOwnerShipsDelete(@NotNull UUID ownerId);
 }

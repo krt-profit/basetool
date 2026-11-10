@@ -528,9 +528,14 @@ Concrete handling, in order:
   `inventory_item` (`inventory_job_order_allocation`, `inventory_mission_allocation`,
   `material_exchange_offer`) declare `ON DELETE CASCADE`, so the job-order and mission links and any
   open Materialbörse offer go with the row; `job_order_handover_item.inventory_item_id` is
-  `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot, and
-  `mission_unit.ship_id` is likewise `ON DELETE SET NULL` (V51) so mission units survive without
-  their ship. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
+  `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot. Mission units
+  survive without their ship: before the ships go, `HangarUserErasure` calls
+  `ShipDeletionObserver#beforeOwnerShipsDelete`, and the mission module clears `mission_unit.ship_id`
+  on every unit that carries one of them in one statement that bumps the unit's `version`, records
+  `MISSION_UNIT_UPDATED` per unit and tells an unfinished mission's leadership (REQ-HANGAR-006). It
+  reads the units as a projection and loads no ship or unit, because a managed entity that references
+  the member aborts the deletion's flush. The column's `ON DELETE SET NULL` (V51) stays as the
+  database's own guarantee. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
@@ -653,7 +658,12 @@ and the claim survives with a null stamp. The same class additionally deletes a 
 an org-unit membership and asserts the flush raises no `TransientPropertyValueException` and that the
 DB cascade removed the membership row. `UserDeletionEndStateTest` (real Postgres) deletes a member
 who owns rows in every store next to a second member whose rows must stay, and pins the end state
-of every table and the audit rows with their order and exact details; `UserErasureOrderTest` pins
+of every table and the audit rows with their order and exact details;
+`UserDeletionShipReleaseIntegrationTest` (real Postgres) deletes a member who owns a mission and
+whose ships sit in units of an open and a completed mission, and asserts the flush succeeds, every
+such unit loses its ship with a `version` bump and a `MISSION_UNIT_UPDATED` row, another member's
+unit is untouched, and only the open mission's units are announced, never to the member;
+`UserErasureOrderTest` pins
 the participants' run order and the uniqueness of the positions; `UserDeletionServiceTest` runs
 fake participants through the orchestrator (phase and position order, summed counts, audit
 details, refusals run none); each participant has a unit test.
@@ -663,6 +673,8 @@ the `UserErasureParticipant` implementations (`platform.api`),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
 `OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam),
+`ShipDeletionObserver#beforeOwnerShipsDelete` with `MissionUnitRepository.findShipReleasesByShipOwnerId`
+(projection) and `#releaseShipsOfOwner` (set-based release of the member's ships),
 `GdprParticipantCoverageTest` (every non-cascading foreign key to `app_user` is a step the
 deletion is checked to call, REQ-DATA-021).
 

@@ -20,10 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
@@ -32,6 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,6 +46,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class HangarUserErasureTest {
 
   @Mock private ShipRepository shipRepository;
+  @Mock private ShipDeletionObserver shipDeletionObserver;
   @Mock private HangarUnitLiveSync unitLiveSync;
 
   @InjectMocks private HangarUserErasure participant;
@@ -63,6 +69,18 @@ class HangarUserErasureTest {
     assertThat(participant.erase(userId, adminId)).isEqualTo(Map.of(Erased.SHIPS, 7));
     verify(shipRepository).deleteByOwnerId(userId);
     verify(unitLiveSync).unitsChanged(List.of(unit));
+  }
+
+  @Test
+  void releasesTheShipsFromTheirMissionUnitsBeforeDeletingThem() {
+    when(shipRepository.deleteByOwnerId(userId)).thenReturn(2);
+
+    participant.erase(userId, adminId);
+
+    InOrder order = inOrder(shipDeletionObserver, shipRepository);
+    order.verify(shipDeletionObserver).beforeOwnerShipsDelete(userId);
+    order.verify(shipRepository).deleteByOwnerId(userId);
+    verify(shipDeletionObserver, never()).beforeShipDelete(any());
   }
 
   @Test

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
 > **Owner area:** HANGAR · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
 
 # Hangar and blueprint notifications
@@ -32,6 +32,14 @@ rule notifies the mission leadership (`MISSION_LEADERSHIP`) and the unit's respo
 (`EVENT_RECIPIENT`), names the ship **type** (never the ship's own name), the mission and the unit, and
 excludes the actor.
 
+The account deletion (REQ-DATA-008) does the same for every ship of the departing member:
+`HangarUserErasure` calls `ShipDeletionObserver#beforeOwnerShipsDelete` before its bulk delete, and
+`MissionUnitShipRelease` reads the affected units as a projection and releases them with one
+set-based update, so no ship or unit enters the deletion's persistence context. The notice is the
+same, because its text names no actor; the actor is the deleting admin, or the system actor when no
+member is signed in (the scheduled execution of a deletion request), and the departing member is
+never its `EVENT_RECIPIENT`.
+
 ### REQ-HANGAR-007 — A bulk reset of the fitted marks tells each owner
 
 `HangarService#resetAllFittedStatus` counts the fitted ships per owner in the caller's scope before it
@@ -58,17 +66,21 @@ own data hears nothing.
 - [x] Each event reaches the member its seeded rule names and never the actor.
 - [x] Unassigning or swapping a ship clears the former owner's notice; keeping it announces nothing.
 - [x] A ship of a finished mission, a ship in no unit and an admin's own data announce nothing.
+- [x] Deleting a member's account announces the gaps its ships leave in unfinished missions, never to
+  that member.
 - [x] One notice per member per reset or purge, with that member's count.
 - [x] An admin's unit change of one or several ships tells the member once per action.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
 **Enforced by:** `HangarNoticeIntegrationTest`, `MissionStructureShipNoticeTest`, `MissionUnitShipReleaseTest`,
-`HangarServiceTest`, `HangarShipAdminOrgUnitChangeIntegrationTest`,
+`HangarServiceTest`, `HangarUserErasureTest`, `UserDeletionShipReleaseIntegrationTest`,
+`HangarShipAdminOrgUnitChangeIntegrationTest`,
 `PersonalBlueprintServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `mission/api/events/MissionNotices`,
 `admin/api/events/HangarNotices`, `mission/internal/MissionNotificationPublisher`,
-`mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`, `service/HangarService`, `blueprint/internal/PersonalBlueprintService`,
+`mission/internal/MissionStructureService`, `mission/internal/MissionUnitShipRelease`,
+`hangar/internal/HangarService`, `hangar/internal/HangarUserErasure`, `blueprint/internal/PersonalBlueprintService`,
 `hangar/api/ShipRepository#countFittedByOwnerScoped`,
 `blueprint/api/PersonalBlueprintRepository#countRemovableByOwner`,
 `V280__seed_hangar_and_blueprint_notification_rules.sql`,
-`V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2414, #2601
+`V291__seed_admin_ship_org_unit_notification_rule.sql` · **Issues:** #2414, #2601, #3260
