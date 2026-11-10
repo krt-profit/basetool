@@ -517,6 +517,7 @@ val playwrightSuiteConfig: Test.() -> Unit = {
       "e2e.baseUrl",
       "e2e.browser",
       "e2e.device",
+      "e2e.layoutAllDevices",
       "e2e.username",
       "e2e.password",
       "e2e.hostResolverRules",

@@ -8001,10 +8001,6 @@
     }
 
     @media (width <= 1024px), (pointer: coarse) {
-        .overflow-menu__item,
-        .filter-chip,
-        .filter-add,
-        .filter-chips__reset,
         .toolbar__search input {
             min-height: var(--touch-target);
         }

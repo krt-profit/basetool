@@ -558,6 +558,12 @@ Every layout change and new component works on **four** classes:
   auto-fit card/dashboard grids) but cap long-form text at `max-width: 80ch` on `<p>`. From
   1440px `main` widens to `--content-max-data` (1600px).
 
+The PR's Chromium desktop lane runs the responsive layout guard across all six reference
+viewports (375x812, 810x1080, 1024x768, 1180x820, 1280x800 and 1600x900), independently of the
+full-flow viewport filter. This exercises all four device classes, both tablet orientations and
+touch ergonomics above the width breakpoint. The remaining browser lanes retain their selected
+flow viewport. `-Pe2e.layoutAllDevices=true` requests the complete layout sweep explicitly.
+
 **Page widths follow the page type** (owner decision 2026-10-19). Every page starts at the same
 left edge — `main`'s horizontal padding is `--page-gutter` (32px, 24px up to 1024px, 16px up to
 768px), and the mission page's full-bleed head, tabs and panes inset by the same token — and the

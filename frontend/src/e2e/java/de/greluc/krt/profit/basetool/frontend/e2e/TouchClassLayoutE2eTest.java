@@ -218,12 +218,9 @@ class TouchClassLayoutE2eTest {
    */
   private static final int MAX_REASON_CHARS = 600;
 
-  /**
-   * Restricts the sweep to one device class ({@code WxH}); unset runs all classes. With a single
-   * class, {@link #reportCoverage}'s cross-class comparison is vacuous and only the absolute floor
-   * applies.
-   */
-  private static final String DEVICE_FILTER = System.getProperty("e2e.device", "").trim();
+  /** Selects one viewport unless the complete device-class sweep is requested. */
+  private static final String DEVICE_FILTER =
+      Boolean.getBoolean("e2e.layoutAllDevices") ? "" : System.getProperty("e2e.device", "").trim();
 
   /**
    * The device classes of REQ-UI-009, ordered narrow to wide: the phone (375×812), the tablet in

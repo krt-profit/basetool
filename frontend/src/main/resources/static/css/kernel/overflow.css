@@ -69,4 +69,10 @@
         outline: 2px solid var(--color-primary);
         outline-offset: -2px;
     }
+
+    @media (width <= 1024px), (pointer: coarse) {
+        .overflow-menu__item {
+            min-height: var(--touch-target);
+        }
+    }
 }

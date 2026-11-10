@@ -2729,6 +2729,11 @@ module imports, CSP nonces and hashed import maps stay binding. The capability i
 literal fragments, static imports and the domain fragments a scripted page can insert; it rejects
 disabling a component used in those trees (`:frontend:testPageCapabilitiesJs`). Picker, filter and
 overflow styles retain their existing layers and declarations in separate selectively linked files.
+Each extracted component keeps its responsive overrides beside its base rules, preserving cascade
+precedence and touch-target sizes when the stylesheets are delivered independently. The isolated
+`FilterResetTouchTargetE2eTest` checks the actual component assets and filter fragment at all six
+supported viewport sizes, including coarse-pointer touch above the width breakpoint and compact
+mouse controls.
 Known hook collaborators use concrete shared JSDoc function contracts.
 
 Since 2026-10-12 (plan §8.2, F5, ADR-0250) every script under `static/js` is an ES module except the

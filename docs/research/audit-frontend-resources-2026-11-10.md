@@ -75,6 +75,12 @@ git show 5f0a2d0f1:frontend/src/main/resources/static/css/kernel/styles.css |
 .\gradlew.bat :frontend:assetProfileTest '-Pe2e.browser=chromium' '-PresourceProfileOutput=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile' '-PassetProfileBaselineCss=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile/styles-baseline.css'
 ```
 
+The captured asset snapshot matches the static assets and layout of candidate
+`bd4dd1eba8e5eca7352d9d9c5275efa08b97c720`, before the component-owned filter/overflow touch-rule
+correction. Reproduce these exact byte counts from that asset revision. The later responsive
+correction is covered by the isolated component regression and the all-device layout sweep;
+these recorded timings and byte counts are not relabelled as measurements of a newer revision.
+
 The isolated Chromium characterization passed. Every trial of a variant recorded the same bytes
 and asset-request count in `frontend-assets.json`:
 

@@ -51,3 +51,22 @@ This follow-up ran no Gradle task, build, gate or production command. The succes
 Docker AOT build, overall check and generator runs are separate executable evidence in the
 [implementation validation record](audit-3267.md#validation-record); they were not repeated by
 this reviewer.
+
+## Executable responsive-layout follow-up
+
+The full CI check on `bd4dd1e` passed 16,233 tests without failures. Its three desktop browser
+lanes passed; all three phone lanes found one shared touch-target defect. Extracting component
+styles changed the source order of equally specific rules: compact filter and overflow actions
+overrode the generic touch floor. An isolated browser regression using the production fragment,
+script and styles reproduced the failure repeatedly. Swapping only the style order or restoring
+the pinned original stylesheet restored the expected height; the touch media query was active.
+
+The component stylesheets own their responsive rules after their compact base declarations.
+The six-case regression checks four touch viewports, two mouse viewports and actual filter reset.
+The whole-page guard also runs all six reference sizes in the Chromium desktop CI lane; its
+existing thresholds and findings remain intact. The implementation record links the current
+PR checks, which must pass before review readiness.
+
+Two focused read-only reviewers re-examined the final component-rule ownership, production-asset
+fixture, responsive coverage selection and requirement changes. Standards and Spec each reported
+zero additional actionable findings; their static checks did not repeat the browser executions.

@@ -137,4 +137,12 @@
     .filter-popover__panel .form-group {
         margin: 0;
     }
+
+    @media (width <= 1024px), (pointer: coarse) {
+        .filter-chip,
+        .filter-add,
+        .filter-chips__reset {
+            min-height: var(--touch-target);
+        }
+    }
 }
