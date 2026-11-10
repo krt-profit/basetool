@@ -963,19 +963,19 @@ ingests the other categories but runs no sweep; a run in which a category answer
 zero rows still sweeps. (`StalePriceSweepTest`): the same rows are cleared as the `NOT IN` form
 cleared, no statement is issued when nothing is stale, and the ids arrive in bounded batches.
 
-**A feed that shifts under the walk is walked once more.** The Wiki re-paginates a large feed while
-it is read, so one walk can see a row twice and miss another. A walk that read every page but saw a
-repeated row, a shortfall against `meta.total` or a growing page count is repeated once, and the
-repeat alone decides the census; a repeat that shifts again stays `INCOMPLETE`. A walk without
-pagination metadata or with a failed page is not repeated. Both walks count as fetched deliveries
-(REQ-DATA-038) and share one fetch-error count.
+**Item and vehicle feeds are walked in `class_name` order.** The Wiki's default order has ties, so
+on `/api/items` and `/api/vehicle-items` the same rows land on both sides of a page boundary and as
+many never arrive, identically on every walk. Every endpoint in
+`ScWikiProperties.classNameSortedEndpoints()` (items, vehicles, the item-kind endpoints) is walked
+with `sort=class_name`, a key unique and non-null in those feeds. Blueprints, commodities and
+manufacturers carry no `class_name` and keep the source order, which enumerates them completely.
 
 **Acceptance** (`ScWikiClientTest`): a walk whose distinct rows exceed `meta.total` stays
 `complete`, does not `WARN` and does not count; a walk in which one row arrives on two pages is
 `INCOMPLETE` **even when the merged size matches `meta.total` exactly**; a distinct-row shortfall is
-`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; each of these is walked exactly
-twice, and a stable repeat is `complete`; id-less rows do not read as duplicates; and a walk
-exhibiting two symptoms of one break still increments the fetch-error counter once.
+`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; id-less rows do not read as
+duplicates; a walk exhibiting two symptoms of one break still increments the fetch-error counter
+once; and an item feed is requested with `sort=class_name` while a blueprint feed is not.
 
 **Acceptance** (`ScWikiItemSyncServiceBackfillTest`): a run in which one kind pass is INCOMPLETE but
 the residual `/api/items` pass returns a complete census containing every row that pass saw **does**

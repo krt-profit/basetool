@@ -345,9 +345,9 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   `meta.last_page`, when a page fails mid-walk, when the walk was served the same row twice, when
   the **distinct** row count falls short of `meta.total`, or when the feed announces more pages by
   the end of the walk than page 1 did; each also bumps the fetch-error counter and marks the walk
-  **incomplete**. The last three mean the feed shifted under a fully read walk: an `INFO` announces
-  one repeat walk, whose own verdict stands, and the counter moves at most once for both walks. A
-  genuinely short single page stays `complete` and silent, which is what keeps the
+  **incomplete**. Item and vehicle feeds are walked with `sort=class_name`, because the source
+  order has ties that repeat boundary rows on every walk (REQ-DATA-014). A genuinely short single
+  page stays `complete` and silent, which is what keeps the
   WARN off healthy runs. A **surplus** — more distinct rows than `meta.total` claims — is `INFO`,
   not `WARN`, and stays `complete`: it cannot hide a row from a sweep, and `/api/items` produces one
   on every run (12 331 distinct rows against a stated 12 283). Reading it as a census failure kept

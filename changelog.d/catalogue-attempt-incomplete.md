@@ -8,4 +8,5 @@
 - **SC-Wiki-Abgleich.** Rohstoffe, Baupläne, Hersteller und Gegenstände werden wieder vollständig
   übernommen: Die Rohstoff-Stufe kommt als Seltenheit (gewöhnlich bis legendär), leere Wiki-Felder
   brechen keine Bauplan-Details mehr ab, Hersteller mit geteiltem Namen oder Kürzel gelten nicht
-  mehr als mehrdeutig, und eine Liste, die sich beim Abruf verschiebt, wird einmal neu gelesen.
+  mehr als mehrdeutig, und die Gegenstandslisten werden in einer festen Reihenfolge abgerufen, sodass
+  keine Einträge mehr doppelt kommen oder fehlen.
