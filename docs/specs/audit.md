@@ -250,7 +250,8 @@ web, naming its client (REQ-AUDIT-005):
   write the same events. The subject is the ship, labelled by its **ship-type name** — never the
   ship's own name, which is free text — and the owner is the target. Detaching a deleted ship
   from a mission unit additionally writes `MISSION_UNIT_UPDATED` in the **Missionen** area, one
-  per unit, which closed a gap in that area's coverage.
+  per unit, which closed a gap in that area's coverage; the account deletion writes the same row
+  for every unit it releases from the departing member's ships (REQ-DATA-008).
 - **Blueprints** (`PersonalBlueprint`, `DefaultBlueprint`, `AuditDomain.BLUEPRINT`, every channel) —
   add (`BLUEPRINT_ADDED`), batch add (`BLUEPRINT_BATCH_ADDED`, only when it added one), edit of the
   acquisition date or note (`BLUEPRINT_UPDATED`, only when a field changed; the details name the
