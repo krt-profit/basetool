@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:fc0addef-604c-4803-b10f-9d7a28b1c0de" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:c7d61a84-50e8-4217-91ae-c8a8d3b889a9" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-11-09T19:46:29Z</timestamp>
+    <timestamp>2026-11-10T07:25:13Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -11,15 +11,15 @@
         </component>
       </components>
     </tools>
-    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.2?project_path=%3Aingest">
+    <component type="application" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.3?project_path=%3Aingest">
       <group>de.greluc.krt.profit.basetool</group>
       <name>ingest</name>
-      <version>1.23.2</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.2?project_path=%3Aingest</purl>
+      <version>1.23.3</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.3?project_path=%3Aingest</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/42686254695</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/42774819115</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -90,27 +90,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar">
       <group>com.bucket4j</group>
       <name>bucket4j_jdk17-core</name>
-      <version>8.21.0</version>
+      <version>8.22.0</version>
       <description>Bucket4j core library</description>
       <hashes>
-        <hash alg="MD5">47c797bf2923a9444b47ae5e6af4f754</hash>
-        <hash alg="SHA-1">a9feae7373b641c9db9a7222e373fca52cd2a819</hash>
-        <hash alg="SHA-256">ebc70ed3fd2b9b4a60a5a64553140afbea6d11118eed4b30cd473dbf779c2993</hash>
-        <hash alg="SHA-512">bf1a6b8d3d7378d3041f9f7236e57e13a1cc80d1a88415ae3bb5b0a79a947013fd7b37d08ce379ea09b4ec79318ff68f0cfb510a18bf3ca2e5bdc8cb724a1010</hash>
-        <hash alg="SHA3-256">23024d838b035944159a1c8a00b6e7057e0f9ac654080c21340e87640a5b8603</hash>
-        <hash alg="SHA3-512">2f3ebb6807ca4561e9c7f76154d62ad71cf4e36b4d05616b368ae6566f927017c40974317acdfd90b49d0a5944bbcee80a3e40fbe28429be378d2737aba042f5</hash>
-        <hash alg="SHA-384">442267ec666624409c2f259221122211b0398b802d4f9246b54bb30fcd920f66c30a382a4df58a1bd6828c3bf1742973</hash>
-        <hash alg="SHA3-384">a2446d2921d145c83375f5cb3dfb520ebddc73f351d4fa8cf9f4fc96a51ce0b7d1344e9dd6ccc4871d287667cb967e68</hash>
+        <hash alg="MD5">24fc5bff45fd40a7f2411a09061fab2f</hash>
+        <hash alg="SHA-1">b1b37663c8260799e0ab306a715c16a318c0c242</hash>
+        <hash alg="SHA-256">b52fcb9d7f05c6fa1155429eb6d069670d708bbefc26120deef9eb8dc348d5b9</hash>
+        <hash alg="SHA-512">70643b68e61c5be9620e866c69f249e13197c583a6fb5a255e2e2751c1582b71ad6fae448dfa6f6ea3ea4a5d2c50c8ea060b05e2ca806c16c1c33480c411190b</hash>
+        <hash alg="SHA3-256">7715e2b10b44364d2c60b08f6cce891ef1f0b572556277c664171a1762bb890c</hash>
+        <hash alg="SHA3-512">a72e33fa7b5eb425fade3ba71c4aba76bc2abdcb162f5fbbb1f0611d3d2a799d4bf466ba97c9b81375ced3c55e5107dfef56fd3170b622fc82980305bd9c336d</hash>
+        <hash alg="SHA-384">57397a7d3f00957e7ddfe04a8f2934b76a08f20b01288e0733f3e35dbe788789ac7fcca723d75f0f4799a674b48deb61</hash>
+        <hash alg="SHA3-384">76d5d932d239fa20a0f17ddf65eff9b487d96b70925dd276b6562d8e73aab1e70dba4ce71d9047a2ebe116a098df5490</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar</purl>
+      <purl>pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="distribution">
@@ -124,32 +124,29 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.ethlo.time/itu@1.14.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.ethlo.time/itu@1.17.0?type=jar">
       <group>com.ethlo.time</group>
       <name>itu</name>
-      <version>1.14.0</version>
+      <version>1.17.0</version>
       <description>Extremely fast date-time parser and formatter - RFC 3339 (ISO 8601 profile) and W3C format</description>
       <hashes>
-        <hash alg="MD5">e537d0a2bc8066726f7e4654c253cf84</hash>
-        <hash alg="SHA-1">c0f9f9d4f4404787e992ab3af5ae95f2fad79e47</hash>
-        <hash alg="SHA-256">5cf40ab0cc77828ab2b875b1f3ecd71c8295d7721933476abc2e08fddcea164a</hash>
-        <hash alg="SHA-512">aa69a6af3a7123eb41425bbaf6834e16dc3323172709e2338b8a21b970fd21333d996515f42da4aa0225251e30542ad7d9c8332bdf7d62ed96b42fadc8a1520d</hash>
-        <hash alg="SHA3-256">f18d275dd2a0038a82432e06bb9f396151310136e3a316a869ef54d7fae834c5</hash>
-        <hash alg="SHA3-512">8a51b3c6144eb2e363f8804da316d9e3dc246be07af4c0bb55e9540c2a0deb5eb9beb825120d3d203e3a561fd8a605ad64f3af5d233725e1b9c7e06232deaea9</hash>
-        <hash alg="SHA-384">8d201334c39b68d13d66fc9df2440fa848b055a9b901e1c630ff66a47e70c8816484d106ae18c642d4257034f33e55f2</hash>
-        <hash alg="SHA3-384">033715e1422cb3f22c1073bc7b058fd16d1436c6314f49f13480d81c86b656cb77a4d852cbba35542bc8f2ce49244ba6</hash>
+        <hash alg="MD5">71dd238d658bf951c09cf5f2fa8ba9cc</hash>
+        <hash alg="SHA-1">28bc18213ef82e03d6ecfa48a679a36e69021b8a</hash>
+        <hash alg="SHA-256">91415a465dd039adaf98af7a4c04c9fe0d7de1457f8c80ed8d86e53740f32ad2</hash>
+        <hash alg="SHA-512">8c6440d3579fb8d693cdd8d8c06f797408725308272307c2da925310ed4ac8633032d9e2ae7d0c92fe50c80d9e120ee88d7c9caacd9a28f500097c91ccaf7804</hash>
+        <hash alg="SHA3-256">27fa62d3005734c3a3cabbceb3f7c9f1c372a36356381021af953ebac52bd472</hash>
+        <hash alg="SHA3-512">76120cd9583691321d3b4eb7c4a992bef6d207c57071caecd2ac4603e4c5b1e455bdfa076d305448e923f4a20c40b6296cf421ad51d6730e82df8fe0d1d06b0a</hash>
+        <hash alg="SHA-384">6a81c1f07ee378904fdd3c8dac10b66a9704e1a19951483397912999d6321d944d22f0d003cb5b701597a9db730b5349</hash>
+        <hash alg="SHA3-384">0244dc22f3bd997b246331eea3e63388ec7ba2d01605008fdae771d18621f689e77253af3f3a62b9970f3e9c0f89d17b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.ethlo.time/itu@1.14.0?type=jar</purl>
+      <purl>pkg:maven/com.ethlo.time/itu@1.17.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
-        <reference type="distribution">
-          <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </reference>
         <reference type="vcs">
           <url>https://github.com/ethlo/itu</url>
         </reference>
@@ -158,27 +155,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar">
       <group>com.fasterxml.jackson.core</group>
       <name>jackson-annotations</name>
-      <version>2.22</version>
+      <version>2.23</version>
       <description>Core annotations used for value types, used by Jackson data binding package.</description>
       <hashes>
-        <hash alg="MD5">04c11c456fd1e21b9a21c25c665109cc</hash>
-        <hash alg="SHA-1">15c67f9498d6934cff9510fc70c5a12e52290457</hash>
-        <hash alg="SHA-256">21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0</hash>
-        <hash alg="SHA-512">63b597ec02b4e31c57266d9b96f05f301f217bc12ffb7ba046a5658d2829728930a559947b98eb6c3cc448413a96b4939427aa669ae1e2dc3597ab5d5d287f9f</hash>
-        <hash alg="SHA3-256">6bfc7b4ba70779fe5f0b1e2af585abab982f7929a68beb2c0e62ea2e2a321de0</hash>
-        <hash alg="SHA3-512">3f1bdfa32f7df76ac14cd2a3e689b65066fa0a6a760a9b8b1121773bb1b043a44587d4148c67f361dc6c630e6b31f29b2691a57d47caabea5ca23ae44af34a5e</hash>
-        <hash alg="SHA-384">35b6fe651afeed54d1e6f7a39ac6cf6fdbafacdf2e3bdff7b29b965ccb79a0c53342a56bf0ecea4d6c4c4651b1d6aa19</hash>
-        <hash alg="SHA3-384">72267dc54c4175c42ca0dd430a87b12cc68619a8777be2048e1d2f0747db884a568b5c346c77c9c8c0714ab96018f5f7</hash>
+        <hash alg="MD5">78850750b7547966b8257217f9bd163d</hash>
+        <hash alg="SHA-1">cce49304a57c900364a727847c98993ca332b7d5</hash>
+        <hash alg="SHA-256">e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c</hash>
+        <hash alg="SHA-512">7c804e37df49c6485e84b5887d1a3173a11db53267aa29668b07537a901cc86882047552350e2e3457baf096783501bbd15ea4ffdab13cf57396d6f6d14d0d98</hash>
+        <hash alg="SHA3-256">89e30ffbe2ffac2f3bb874eee515acfdfe132f553a728b57952bd6e4fb943d1c</hash>
+        <hash alg="SHA3-512">b37733585b940b93806105598f7e4c613c9a0c534c5c38c47f4e45624a30f7803c9c5116405ff8a845bcacda1b5a2f44a4fde8441c03c001bc36b842f9e0601c</hash>
+        <hash alg="SHA-384">5df8857d35b2453f46662ed43b18967fb19f6d98ba6c8877b1ccc031fd5fac223f086bdf4e855ab1d42bd1176a1ae8e0</hash>
+        <hash alg="SHA3-384">a0ee4a4b27433b7d55064f8f249ddbd5fd9cfddfdec37b3b54476925472107dd20bd0bf3d2beaf23c4226be63f40ae46</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar</purl>
+      <purl>pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -224,27 +221,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.networknt/json-schema-validator@3.0.8?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar">
       <group>com.networknt</group>
       <name>json-schema-validator</name>
-      <version>3.0.8</version>
+      <version>3.0.9</version>
       <description>A json schema validator that supports draft v4, v6, v7, v2019-09 and v2020-12</description>
       <hashes>
-        <hash alg="MD5">0d3c9dcf38dbc710a57a419c65265812</hash>
-        <hash alg="SHA-1">89981e0d1f6798f6c2a64c399b377f18102c4ad1</hash>
-        <hash alg="SHA-256">d3f4c61ba35c3543bdf1ab42462bf89721542f4adea5b092ee7b430dfd467181</hash>
-        <hash alg="SHA-512">6af48f54074995e83f116e7fb43ca89f01ab65d7c23c9976deb2a05d2b3be9e2f3256c97b6c486f1a71baaac4d3d5ae553efb7f2f22f11235a9943ec200fe9d5</hash>
-        <hash alg="SHA3-256">8c52c2fa0a8254333221903d98b70ea5acbf0bdcf7552efd28b778fd016eea6f</hash>
-        <hash alg="SHA3-512">f681bc5ca65983f7c2e4beac954eac6b79bc88866fde6d3bc26cb5d7e522e9311f87d71d4284b5505a38cf87811c187b70061c96a885e5f8a000b41851a69538</hash>
-        <hash alg="SHA-384">45c84641e8b476ebaf7727bd8754dd3a3aede2b1ab5be97348dc0a6375c3d23816e053238b40680e8967b243f753e0e3</hash>
-        <hash alg="SHA3-384">dbfdfcf7aad2cb0bb6b8413a692833e24e24c226946ca8da9e07bd169e95d0e374106d20ece16ab759387f14444fee00</hash>
+        <hash alg="MD5">d779347b8a7c1caa1f1f88fc5b4b85a9</hash>
+        <hash alg="SHA-1">eb5d42e6a39d526403a84aab3894ac2e3a91bee0</hash>
+        <hash alg="SHA-256">6a2aab21c6b64f4ff8acc63a0745d7103e2248b7385ca8cd1a95bccd0e7fd61d</hash>
+        <hash alg="SHA-512">1fe09fe0809e8d91dd9fdbd13a418d87b2e35945127b04f7b953061702b3c52bd2f40846349ec7cbb20b616fde38db7cd5a2d9aa60728aa463724accb9c1066e</hash>
+        <hash alg="SHA3-256">a5c08e5b1ad82d140193183a1c4e06cde0080406a81159e19ce565500206e613</hash>
+        <hash alg="SHA3-512">14ca4ef7549ad363f4f822dc6d8cf549fff70aafce8b19f09eea5a88c9685d0b454ace73fb97adf7cf28f9b129ec5b0dcfee1cb3582ed5b79d79fcd6135e0cc6</hash>
+        <hash alg="SHA-384">9e39ab10e8254badc1f4277245b17f597b76fa90219519ef407ea03fefbbc66f80bfa6c2c2a2c2f2eb283b3b67feaaf4</hash>
+        <hash alg="SHA3-384">391dc5c7a014aa41ae3b2c032d324a80d8115f16c0cfc435525b43e2ff3b149d5b65b575d4e446ffb51b4f4f5cd98e61</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.networknt/json-schema-validator@3.0.8?type=jar</purl>
+      <purl>pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="distribution">
@@ -299,27 +296,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar">
       <group>com.squareup.okhttp3</group>
       <name>okhttp-jvm</name>
-      <version>5.5.0</version>
+      <version>5.5.1</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <hashes>
-        <hash alg="MD5">a9506ae9545544d219c6775bce435349</hash>
-        <hash alg="SHA-1">cefe1eb26408176d30511420b7e36b065e38bca0</hash>
-        <hash alg="SHA-256">234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52</hash>
-        <hash alg="SHA-512">f05cc85dc48556c120b69497722d1ed5db08007445b30ba1901c24cc3496a913b34cc0b3b0866c41206624e90f230ec23bbacfcac532590321bcb2ff261333ac</hash>
-        <hash alg="SHA3-256">eeb80a1af674f4066f9640a6399aa4e869deaa35369444cdb311684c557ee2c6</hash>
-        <hash alg="SHA3-512">0341c39261a731a4d4aac03557ad4d3235d68cebed2462f5d450e432018382407ba10a5afe23fc9ca4071419accc3630bf0d61ed2dc552b829c0378668651c7b</hash>
-        <hash alg="SHA-384">9c97973f9e4bcf5fb0777f3b0977d5e8907609d45962df9b091f53fcda9e68199a85cdf1c6bf7a2df28d71a45ca23b48</hash>
-        <hash alg="SHA3-384">3371409f0357b640ca68c63f06c8c16a09d2e2de85fc11516ee04d348b5745758752c39905a21320ca0ad422cdeb8a88</hash>
+        <hash alg="MD5">d34672bd0b04a600c37fc4173b982d67</hash>
+        <hash alg="SHA-1">1df922f9db18f897722b7e566c21bcaf0a73d484</hash>
+        <hash alg="SHA-256">4039527bd1f2e40b66e20b0e52c689cf56074b938ea02678141495f5160f1047</hash>
+        <hash alg="SHA-512">155bc9f40c3667ccb4be16f93ba5ed92b1cf8b76688e12bd553fa71945a64fe250674a53a6555c07ace949b46278b9acb6c9b38db3bf135d8a538858dd628901</hash>
+        <hash alg="SHA3-256">696fb05376f082d3b03a4925a748b5d1e0491cf8ff4dc47050ad05912916407e</hash>
+        <hash alg="SHA3-512">eec5f403f195ac6f045e598cfef4e564d7f482ae08b626dbc56dc9de0ff7f314edd1310b912e77f94b359a2f077e45194cb065d2e8e1c9b0ab16b9b2ff260fba</hash>
+        <hash alg="SHA-384">00a63aaadb0d1d3a420e78ddd918ebbd6c8a3aa9f8577e0ddcbf9b3ccd7ebf5490b5d37474d6ff844c539c3a53280ec9</hash>
+        <hash alg="SHA3-384">67085a986c31cd155a22a591bfe7c422d540e073c2caded17218571f4648b4407ba953caeec87e94573df218f652d62b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -330,17 +327,17 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom">
+    <component type="library" bom-ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom">
       <group>com.squareup.okhttp3</group>
       <name>okhttp</name>
-      <version>5.5.0</version>
+      <version>5.5.1</version>
       <description>Square’s meticulous HTTP client for Java and Kotlin.</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom</purl>
+      <purl>pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -441,11 +438,11 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support">
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support">
       <group>de.greluc.krt.profit.basetool</group>
       <name>logging-support</name>
-      <version>1.23.2</version>
-      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support</purl>
+      <version>1.23.3</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -1366,339 +1363,339 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-api</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry API</description>
       <hashes>
-        <hash alg="MD5">d6f000325d6d96972a81a882dee61a05</hash>
-        <hash alg="SHA-1">069f15f38424287af33eda1ed782b440029710a0</hash>
-        <hash alg="SHA-256">538d1dff2f9a37aecbc0ef98fd17273a3affb058e734e6763a3a07a38a5fdc59</hash>
-        <hash alg="SHA-512">c80458ba4567002027f44fcb8c11c01942191a1d59a27c360acc552f586fc563e9e31732b5f3cf05c7e6da20b4965de0bf836989d781881b02053e97e62206af</hash>
-        <hash alg="SHA3-256">45e318745fe6c7f874de2162eee3a0ddd5e5d52eef2b15612f625b9cc175c38a</hash>
-        <hash alg="SHA3-512">8555d05a3dba846cbb83953abc3e543c3931536fd6adad523acf4e35b17cc4f2dac5b569819135e6e522ab0f67ed0603b1d0d9f7814c6f3e106c822695e67ab8</hash>
-        <hash alg="SHA-384">828a339de3eae5332f9bff2d4169848b4b0f55e57758d5073e4a00a1e175654ecae6c24214a1448614be73ee78ae8fc0</hash>
-        <hash alg="SHA3-384">a0d7e660549657ddd15d31c8334f31f16dd3a4c0aafc481d06ea5330478b5ac48d8fb0b35338cc57decc5e5abeda5982</hash>
+        <hash alg="MD5">ddd9cf7d8ed351871ef0c6ec31b5ceeb</hash>
+        <hash alg="SHA-1">04630cfcddffdb3c1521320005da4d089a170747</hash>
+        <hash alg="SHA-256">921398d19e2723a356a4e86442daa8e7cb3d8edd84e97e44f5e34807e9b46c2a</hash>
+        <hash alg="SHA-512">9df0645ba2c2a45da39999b897da709a78e46e3ac334cc43e9b1097c68d53f2f212683e967c37cd580725917ff69e9163e7c8cee913d0ed705fd59fd030f0649</hash>
+        <hash alg="SHA3-256">aae0df92b58f21176d35e434f9350aca6f3c4ed16da8ae8f82fb7b42587e8972</hash>
+        <hash alg="SHA3-512">b135d966125634f845612b3856ddd47610d406819047347408cc6d19e68f7628697c304b6f34fc627d40ba96bf3d3f2ed573998b888d7e3a2c6877b6addd7849</hash>
+        <hash alg="SHA-384">df194e59f8e764e2a07344c3daad2124caca957e2f14d44f6e891dfc10ea2c6c66876509cad663b0a6196d3a5b891939</hash>
+        <hash alg="SHA3-384">a0f2ae5e3e1ea2cf9ba018112e093b235674cab21ea055f2a72e29ad5da177c97a5cf9a486d4ec75f9b13a07e6bd78f9</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-common</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry API Common</description>
       <hashes>
-        <hash alg="MD5">7c598a21baa1e0b23307a332400679f0</hash>
-        <hash alg="SHA-1">3f6ecafdf85070807d9111b5027557eefdedfebf</hash>
-        <hash alg="SHA-256">da97bdb395418e16ecdcbe7ad3497f45b9e767ceda4ae7e86133e7a757ac377f</hash>
-        <hash alg="SHA-512">2997effeb87b6dfbbee40e46d6610abb5cce2e3ce5a347cbd336502e47eecc5688f4c49155aae004940730eb4c8c4e5c9e6aac6af4a29172a9363d5e4fea1f29</hash>
-        <hash alg="SHA3-256">2fdde7b3a570a0f532f0c4ae0abadfb652b848dcc60761c58b2a1ad826faddfd</hash>
-        <hash alg="SHA3-512">daabb9b3d130327d1f211e94bc2e886ff741d5f901cd82f99cbf4651f1396e3bb1cf7054904463cbda7df3837966e37d91d8ebc293a6305cce7ff3a6b4c7e48e</hash>
-        <hash alg="SHA-384">46d06a771540b9cc0a293663e1964bf96d2f8a9348a5182f2b11cc81d89ffa75eb4d40daa5188c42cc4a5d91f71e3456</hash>
-        <hash alg="SHA3-384">e9c922fac9fe59f2d8fdeb43f120c1048b3e38f99ee7fca7eecc9efb68d6982675e18b46890e6acda933ae1a8fbf308e</hash>
+        <hash alg="MD5">61a0969b7ddfbe2b4527f01b9ed102cf</hash>
+        <hash alg="SHA-1">9d7b1f57f5a590f8eb412606c8bddf084ccae79d</hash>
+        <hash alg="SHA-256">c69addeb5de9c96c4ca036ed6935f21c12949032d2798698d76c5931f2b4bc2a</hash>
+        <hash alg="SHA-512">e8856fbf78d985a353a8e2915dca127fd6354a51dea501c2bf26a06609c033af9749eafb3f4425f3f014f94013a5513207adfc7a4c97b5b6c1093575faf48fdb</hash>
+        <hash alg="SHA3-256">9970a414111fc2796c43ef2939413c772ee120be97da7b0e43500a74b1f272ba</hash>
+        <hash alg="SHA3-512">6e7d73033ae850535c08ad08321e78fb3510282ccc67ed8f8e0cfabd36b20ed6aa2c33ee81a4bc314be58543c389e8803a9bacc280ebe06983b1f67567da8285</hash>
+        <hash alg="SHA-384">d3b1977ac8c01fd11a2186d32ad703396d595e592f5ca47696b6b5d10031d348d10db01d7307c82f73020f597d70fb37</hash>
+        <hash alg="SHA3-384">f80d1fbbd97e0048ca29c9e5a01d38cdd7eeb3eb639078b3cefcbf264e7664257a43ca8cabfcbce6c7f3129d924d6430</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-context</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Context (Incubator)</description>
       <hashes>
-        <hash alg="MD5">4eb1684aa24d6cba8f739d635726e9cf</hash>
-        <hash alg="SHA-1">1c669bff2a92842a625ce2e2e200d2f2277cc7e2</hash>
-        <hash alg="SHA-256">40fb813fb5e27ec2691daa29c81b572b5b1541ef9b41e62490c3ee3e6407c55e</hash>
-        <hash alg="SHA-512">85cfb4ceb653fd8be0f4095086c8df0e0bcc0f49c3c224757f8ef5a8ea69f64da514217cbb4c473baf2f5c39b9953c348d2a0d63208277ab611b0d87434be97f</hash>
-        <hash alg="SHA3-256">0d42d98a13b73c25e01e0695ac123697624c17f6a671605ce72097201408a110</hash>
-        <hash alg="SHA3-512">ecc66eefc6147e3cb296e69dcd544d0ce18f1b85fc6b52070f3ebb29bfea415cc8fb09bc0a9287309f8e298d06780fc25af0c71a5f708a3009df397eec26a883</hash>
-        <hash alg="SHA-384">f420b1445f27c070ece3b791f43dfc317ebaee6937fad1b1b847da4631c4bc91ff2274e7cf97a9aa3ac585e0501edfb2</hash>
-        <hash alg="SHA3-384">9a374fe712eaf8f67d244303acb906335112670a2ebc744d266de5b55e159fe483b478703f6ee77d633d854c68d0b121</hash>
+        <hash alg="MD5">9d4a9c4cfd0f9c65f7009be5b3387831</hash>
+        <hash alg="SHA-1">108c5053b685890ea3a672d704f24e248f948b21</hash>
+        <hash alg="SHA-256">9ca2a322fbe6736c610086e2fecec8d292daca6fd755bd5670f751bb373c2b70</hash>
+        <hash alg="SHA-512">bca13d5bf0d4e6e64cbba262942f7b8dc3f79addddcf4945be6aa423e6796333e9ca05985284bb741ea0786cad0ae0049cf2ccbb989036a6a49ea9e1e4609a28</hash>
+        <hash alg="SHA3-256">a0adf89449e9cdd14e0eee165bda9e0f029b3c832f4fface7681a69a84ed6752</hash>
+        <hash alg="SHA3-512">6ba4e4a6facf1f47f2b2575ccfd0ea1ba263660ddb4cbfcc1deab836fd452caec22fba1e384638b8d5f8f59c640f956aa9f0eb153651790d0c4a86ecab5728cc</hash>
+        <hash alg="SHA-384">36cbf682170427d1c6c96f998435819d57800f212b7a3c22e15601308e0d65422d16b54672b5e6a54394d4015404ff3c</hash>
+        <hash alg="SHA3-384">5b01871dc13d441f520878333bb164a850975c989a30cb3ca6f3a4ab4c3541078945809a28047e044c3d08be3c53407e</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-exporter-common</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Exporter Common</description>
       <hashes>
-        <hash alg="MD5">879a6f36b8d5ad9f61ff47717744a1cb</hash>
-        <hash alg="SHA-1">f9606857ffc08215b0a400f820be2dcbf6662c57</hash>
-        <hash alg="SHA-256">eb61aab6d20bf105102dfa061b478b659cec17e82a50969898046456768ba09b</hash>
-        <hash alg="SHA-512">792d31a6b66ffafe47ea373c6bb304b8e3d8bb51cc23c433a585634edaf0a3566f9397e389b264ac0baf35082e3756ccf2a69da76ca17d1c47e19bfdea4a30b6</hash>
-        <hash alg="SHA3-256">af99aeb8298da3d346b0566f51d5ab14d8412a31275a6f0a7a984800ecde209b</hash>
-        <hash alg="SHA3-512">aa1816202b837f43e7d0844ef5ec076a7a371a3f3f61e38bc52509f702e5f62b2ba11b7bfed8452cf5382259ed44e04e2b03aabb09ad7440d6d0599444e6d646</hash>
-        <hash alg="SHA-384">443b72949b8894915bed87def659d8f72ea0f52d5090f2c964d4d6d5a8285c7a74b608d42a9270cc0b0148a529858736</hash>
-        <hash alg="SHA3-384">584a85c7fe51d0cf85e4dfba2a156408555e0d510b2f4c9c05d1c661ff74e55fe237930a3b45ea499e98609fed834862</hash>
+        <hash alg="MD5">dece9af910565354d215c592ca187bb3</hash>
+        <hash alg="SHA-1">d306fd6f437da0e2d445fc30a19dcdf46e004359</hash>
+        <hash alg="SHA-256">9cbfd22a19bea6e75cf88ba680340b06c267b073ee16e1d57effd1bbdd2dd406</hash>
+        <hash alg="SHA-512">1a5ac5a99696900ac2cc1b9a7f2561ab5766c0f005486484f71778d02420a94c2ec9c561e41fad54a7877a21a33e6c405a2c33031311b1132bd1a00aeb3a201f</hash>
+        <hash alg="SHA3-256">d06073ad0bae337efa83f9966bfe4cf883a5550f6f36e299e7aebc07820db2c0</hash>
+        <hash alg="SHA3-512">cd6db7935f4b0dbb074720c899b4606ebe70a7025b1ca33bf5a62b9ba4e2a807b37b90b6d3419bc146c572d519be852952973be3b715bf1897c1fd9485a66d76</hash>
+        <hash alg="SHA-384">14217293e2438c95a078b550eb6aafe7b48ed7b5f851166d52948c39634d75b99a58295e6bc5dfeb5bd090263916c517</hash>
+        <hash alg="SHA3-384">8ed602cad44b64a4fc6cb7d3d56580b0b7c7a904099f34546403ce7325392b4808193972d27e6c83d90aa4f51b8ce26b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-exporter-otlp-common</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Protocol Exporter</description>
       <hashes>
-        <hash alg="MD5">4385a6b29e8d886882170108d16c11da</hash>
-        <hash alg="SHA-1">b167688121d874cbd0cb8497821735c8df5474ec</hash>
-        <hash alg="SHA-256">75530ab4d93e6fdef478d3e112713337625e70a63df357e6e7b9060c13788015</hash>
-        <hash alg="SHA-512">2e9883d0a60c03833e96b8d2fada125130528c983ff69080189bbbca36698e267c9fc6afcec7a394b73b756373a3e0f0e16998c14fa5fb07d4e83f0e01c04fb5</hash>
-        <hash alg="SHA3-256">9be97e595e84d08c4cef44dd4e5eeb853b1be4b1ee0e0875dacfb3cc2264b1ba</hash>
-        <hash alg="SHA3-512">24020911b1bd64cc2dbd8a431cfe1ef6f37d17675762e4776a70fd0efdd26e7b05049d1f7c4878234312f0d5c67ee7afc5b349cfcdd9d31bdc7ef70c8800e02c</hash>
-        <hash alg="SHA-384">f78487810f3a69d0656a020989580be59e4b27a409cbf1776ebff39301c1ccaa3b9ba720c0c801ed395eb37aeb471dd6</hash>
-        <hash alg="SHA3-384">7fcdafabcca22f2343ba26c575462fb0db110f46c5e5bd667ad7360be236c98532afa280d7cafb589e155e46659fb517</hash>
+        <hash alg="MD5">13894b120d3dca952585bebf351798b5</hash>
+        <hash alg="SHA-1">2e0ce2448d5b20bbd8f5ece651413a623df7c979</hash>
+        <hash alg="SHA-256">0503fe2df299e0623c102a451da95efed3b82e86076b58bae46c2d7120f9abf6</hash>
+        <hash alg="SHA-512">9e42cfef78a49f5dc2a5e9b334e2778d53a12a0f95a55454c0d7e338456a746571450317c0537da95e98c39ede1aa26191c0f77c6eedffc342abe0d8e0486873</hash>
+        <hash alg="SHA3-256">165a9066243ecc95523e973619496a07baf532d2296ced2f6ffb726a3d0990b1</hash>
+        <hash alg="SHA3-512">cba8d2c9639934df47c97b38377701c445ef500317904f11aab937662e53f67fb5e630c936cb64552ca47bf938ccfdfe8da916a129b5e6eee5936b7d222e1bb8</hash>
+        <hash alg="SHA-384">1a3be57ed8bef90ca7958fb5c44fdd7c0ca0854a66a8ac5bfbb82aebb42bbf15e3e7fa0db802e69047642ee32f701b07</hash>
+        <hash alg="SHA3-384">4f4f91bccf8e6cdbcef9f58dbcb95e30a242abfb5431b704c61c8bb676a9fb031c2df73b30124d6432d3a842d2340879</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-exporter-otlp</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Protocol (OTLP) Exporters</description>
       <hashes>
-        <hash alg="MD5">2efd017f75b5560f5b638198e7633395</hash>
-        <hash alg="SHA-1">10368b2ce5db80b03ab73804eb9fd305c56d38c3</hash>
-        <hash alg="SHA-256">6724a9c8f9f42de757682c6194c48d9fee4670cd19a85c37954eba526c58b836</hash>
-        <hash alg="SHA-512">0caa9955a5e82851471bd1863a52c916669701498833ab7a6abd9dab156e2955aa0529a9ac9f28185cc6b93924c134f76ef24467560f673c614f36888219dd45</hash>
-        <hash alg="SHA3-256">aabd6286d06a4020fe643964829c6eda2c8e792f8cd9636ba620b13e52fa3074</hash>
-        <hash alg="SHA3-512">a0eedb843d927721268229f8259e9b60b257de079e234adf565ae79efd31cd3b2a31ef4c6cf6561bcfb2de9e5438b6f95e8b9a813a02204d1a02b3edcee18ee2</hash>
-        <hash alg="SHA-384">d3feb93eab2f2ba299e4967f9f9023c51089619e0062f53cdcf70a539cc56eb2b9b4301993ff6fa47036f8b50912973e</hash>
-        <hash alg="SHA3-384">978f4ebd9ac6c50594db1c990d8459ef9508be06ecf3155e385e6aab90011198c5108c5f5f3118303c4d3022c28b27ae</hash>
+        <hash alg="MD5">8666476cfd05f202af8557412823fb51</hash>
+        <hash alg="SHA-1">8c6cca536d8250e32069ff0397dbb5dd998cafbc</hash>
+        <hash alg="SHA-256">a4344bb7341317cfb239356b20fa836926c8c96531df2e90ab029e04b2204f9e</hash>
+        <hash alg="SHA-512">92d37cb9dd46918df35244ed02fa9ea1e3aa85bc082ea891761148b2b26a3223289dcbaba5435eac89f23fa263758fa8615a961a0c2d0db7ff297f379873e449</hash>
+        <hash alg="SHA3-256">560de628a8c25cb13db34c145180c7765c2c5d306c5fe6b34feece399b20cf28</hash>
+        <hash alg="SHA3-512">f01d5063d0cad76de45fa743a156e33473fbf1187a51920857c7026e828cb07e7f5f668bc6700a9d5728b5cce3d33dc56e892f87f352b4b59ed7a2d8c51e5a53</hash>
+        <hash alg="SHA-384">7f958c67e58c7b86fcec0f507909c03aea7880fc8136069f5a507176fe80137952cf097e8c61d4587bdbce702e11f86c</hash>
+        <hash alg="SHA3-384">ba794d8899bd27654393ea1e0a2f80aa44a0cc59f7030886bdef6ead1c936fb6f1d2230dd99c32beb597f42c27375b3d</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-exporter-sender-okhttp</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry OkHttp Senders</description>
       <hashes>
-        <hash alg="MD5">228a38b4295c29afabc6c2c09f8ab524</hash>
-        <hash alg="SHA-1">488bf3121d06e787b2a5f2655eb92bef457f7ce9</hash>
-        <hash alg="SHA-256">0ccb54e5e1db24680b0b7b818299552477dcc7114de7ca0f7b054e6e20958b83</hash>
-        <hash alg="SHA-512">355ab20604efb89eff3663d14db270ac401597104361c59e57c5690506d8d76f5df52bc218739a1adb3ef2165f65d222120eabd242995fb614883583446608aa</hash>
-        <hash alg="SHA3-256">17156257909c135798fea0ac9fa33878d766918a94bf5a609e8580a750f0758e</hash>
-        <hash alg="SHA3-512">55a2ffeef0db69b365021be677023c4c5344b5a22d4ced3132ea8343abaae67fa9a49aada55ef2e8e689397c71f13ed056158f4ce45a847f1cd70956486de904</hash>
-        <hash alg="SHA-384">cfca1eb4d545a62d396b1347630515e5a6b84eafbb310608add6011742ef1ce2f120dfb89cef9571ab0683b89dbe9d16</hash>
-        <hash alg="SHA3-384">14fb5dc0a5a0280ab39da7d3cee0315db8ccf9e8e2b9b0d01392e4ca0ec606e0f1b4bb97804ce6a054a2c6fb60d42e47</hash>
+        <hash alg="MD5">13c92f34b2071d8038801adfb79abca3</hash>
+        <hash alg="SHA-1">14413920537489375f903c1b47335e1545e8f50b</hash>
+        <hash alg="SHA-256">69f4735527c2fe5afffce96f1f32375ad0485ef07c10deeec9b3211e4399ca0d</hash>
+        <hash alg="SHA-512">0eb12fa9729610f566b192b6fe0ddc006a147f7b58b3be7c4d90f7e3ebaea87fa45d88cb1785086b9b299dc520ee473409b3b6c956c1985cde5871dc7edc84d2</hash>
+        <hash alg="SHA3-256">1dd0e7130efb15e3ca94fc45298c9f09ecc2feedc4374bfc00006c5d9a633585</hash>
+        <hash alg="SHA3-512">8e97133cf82e2c8a210777fc5855a3fdf0236c86a3bf724227e1b5136626bf73d3c71abf9b13fca9ccc87517eb81787cb1e987393bf896b0be12ee99d484eba9</hash>
+        <hash alg="SHA-384">9149a8899226fa41c1afbe7ada7fb83cf439038df406d59eef76fda7583d0e38ec245e66824058c7306f74367fa1d4e8</hash>
+        <hash alg="SHA3-384">e3ba162ca99474422f6fa6a0d7a5ffd632193cab4bf9d0d0db3355260fc8bb5716582abd4ab7374a01486762481662ca</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-extension-trace-propagators</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Extension : Trace Propagators</description>
       <hashes>
-        <hash alg="MD5">a7dbc65593573107d96bd789de236342</hash>
-        <hash alg="SHA-1">5628acdd5366820fcfd67a34c54fb4addb2c558d</hash>
-        <hash alg="SHA-256">6f3f0b5f6a7aa80e8efbaba50b2202b5de64cf670e7bf2b47834c4a708cac74e</hash>
-        <hash alg="SHA-512">5f80f5a2022f0a50a97a626f7ea3736a076293d2d8e08a1c7b65294b8391be2a681cf450445978d5def4c0129b833cab49821f29a9239bed6f1fad6bee87c31c</hash>
-        <hash alg="SHA3-256">5a1d17f313c1376fb904e73c92ca5f3fc4f90175a86f6cfb4fad1f11a2083a97</hash>
-        <hash alg="SHA3-512">061c40a982b2a30154173b1cd3a05caebab8b1d15213d333dfc5b3cc56fdc446b18d9c588771ed1ac96a96cf5b6cd86b1d07a5a6e1bfcbc2293e9147e9467270</hash>
-        <hash alg="SHA-384">1387b0832ccc40b64f576d8417dc6296e2a4a632a585181d428a281a3ec1927121a9ed2c135d18c71a0f763b3a0ec095</hash>
-        <hash alg="SHA3-384">1a76da0c0174b839347f187ea770d92fe557a6ddb804b22ea9449c274b0ad70ed1050819ae998bb42509d68d2c7d6449</hash>
+        <hash alg="MD5">7a33bca7246483ff80fd18ace514f31a</hash>
+        <hash alg="SHA-1">ee2df65dd5a734b6b5d6b72e3edba35e7ed81b02</hash>
+        <hash alg="SHA-256">a80ae72a3b4ca0bfd61c86d8b7202ae78f2856fc2ac8c4b6c07ca14ef10c0b67</hash>
+        <hash alg="SHA-512">1efa5d6268a6fc05364f465c048f991a80103652414d6e99064ac7dbf01968d07530aaa36f842c68f0af0a2a7de4d065e5fac35e76988e488fc07ffb46408fb7</hash>
+        <hash alg="SHA3-256">be2fedc1dc8f36b4da6f8d36f5816fe0e4c99e53ccbe4e315027496062ade05c</hash>
+        <hash alg="SHA3-512">8e26d841e22dd51101fc0c271fcade9a8da896ff371755cb8e089a2de60ef2107d7f06143f073b16abd4155457a03d3d808fb9bc29e2e9c87b191bf651bb3370</hash>
+        <hash alg="SHA-384">d108e72f6655c63c07bfe709c5048eca5be0c2a435cddf59435b912ba10bc0429c825c59220bcbe8763628a802a8bfb9</hash>
+        <hash alg="SHA3-384">5d9bf4279a9ab2733c2033547f3a28327c9b5929f096cba0e8a2c4bc39be69e79cb0279ed53481bfd1f18aee13da09dd</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-sdk-common</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry SDK Common</description>
       <hashes>
-        <hash alg="MD5">296e1f6805cbce4ddfe4949bcdc1aaf7</hash>
-        <hash alg="SHA-1">1698ded941dc41e3b26db47377f40ae528469a52</hash>
-        <hash alg="SHA-256">628a4c00db9561ff4c608a650d5e7fd66a1e153ccdf1ba3cdc5ac0b7c6518fea</hash>
-        <hash alg="SHA-512">7180a22255ff6cce7f46d427f3fcd0db14eca2a5a06975c6d917230426dd899b61ec5cb9923b954319b710e206cf5108e15d23933e1b33d0ed2a9cc53c2cfd55</hash>
-        <hash alg="SHA3-256">cf4c510f7400f43841121c4a8ab58d4f9bd99c6880dd8dfb1234c342bc651677</hash>
-        <hash alg="SHA3-512">0f763d84238daef64e8ecd777e6860884d11eec69be82cbb6ecadeff4cc7838cb3f362976225be6f0a6ff9e5f10f85ef5897236f1313ee574f5ef42f08c52a5a</hash>
-        <hash alg="SHA-384">3fc8238dbb31605300cf03c1ea91ac9b8f78ff856b484e92b2d231faa81ec1c9d576f2f5c7727e843482eb3da6328d1f</hash>
-        <hash alg="SHA3-384">b1c4310707b704eeba73a98a8b2ac351bd5ebefde26d03fb0a2e22c50d0e9ee20313ed6b79defb4d7fed5d7cc7a1be8f</hash>
+        <hash alg="MD5">474f8357e51416f43405de56b378b607</hash>
+        <hash alg="SHA-1">0cc2819f4b7a0a2fc5304a6e66228e65731e5473</hash>
+        <hash alg="SHA-256">430c03d5c19d025209856bbb5492aa45db617625df32f0adcb5cc0d3e5f80be6</hash>
+        <hash alg="SHA-512">15ac31c0425075a60c9dc61e425f457e27609629a96109c4de637bab2763cb25390f36f1fcbfcb69e5d974b3f88922585f8148bf04c2a9d42708fb86a674f00d</hash>
+        <hash alg="SHA3-256">07e58af97a9a0265ff4fc6d35790f6b639cfc2b9c7b3063972aa82a16520298f</hash>
+        <hash alg="SHA3-512">6a40baab5a52bbda24d1e54a14ecc25d2e7977931aaa6354761dee18f554a4c5079df4d112139ff85600e111a938e90bf5ce775c1c3cb90a8bf5da93602b8188</hash>
+        <hash alg="SHA-384">5eb09cd90d39130e20a33f37d7c6f45335095e8bbdf48fc18fe8c9f5077b0537a2951356d423c7decc3cb1b48f95e1e4</hash>
+        <hash alg="SHA3-384">ab870589972749e2d7104838854ea329a2e9e30dcf5b51c2170cc0171c455c0f6dfc4ba72dd8c5ee5ab110e518611e08</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-sdk-logs</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry Log SDK</description>
       <hashes>
-        <hash alg="MD5">c25bced949401c517073e1fa666dabbd</hash>
-        <hash alg="SHA-1">a2c93744e7a7c48d7cb919e8993d365cb312d597</hash>
-        <hash alg="SHA-256">dd0f0b625e08787af49d7e270abc6def4c2eabc2f18f5f145b7924024a3311e3</hash>
-        <hash alg="SHA-512">48f9c2bd8999420ac4001513972ba0b99ec108ce0f91f33e8c2d6c6db29ba258e5bf15380c0d02dd1fa66a716b7461950ea0102df1ca8431b178d72fdb4994db</hash>
-        <hash alg="SHA3-256">256b7ce39ab3be54a5ccac7f618603665245c8ad091aae3791d0510748e7a246</hash>
-        <hash alg="SHA3-512">b51cf8bf5aadc7e46c67dc062c049dd660a6e66c7184647fdbbfe08b354fd1faf2d3f49df52767745fd2e5f70c32cccba9917640e7c8826834a4868ad25118ae</hash>
-        <hash alg="SHA-384">bb6e80e04eef1264043e1e0a07dd61f35b3c792603fa7ad52ef9d0d811edbcf9a887146919c30eeec0dfc0cfd7c421b5</hash>
-        <hash alg="SHA3-384">477aa153d2cd88f9e170809729d6e9e8bdb010257714a0551e1145fe8124e005d8b2950c2a4c529feb2e98075ef054a4</hash>
+        <hash alg="MD5">e81bf2ee022bcea7efd144546fe7b433</hash>
+        <hash alg="SHA-1">91fa0fba8b1be114086bf67efbb19fcdc261a775</hash>
+        <hash alg="SHA-256">dab55661dd2bc3c2bae39f5b6c505c1508602975ec1f7d0d05600f2723eefc18</hash>
+        <hash alg="SHA-512">4d00fbba2e37a6a3c632058e4b21ffab7e2bc15762122702221e02ced262c907f2232f9f34c55b76552913e35cbb98c4299146a88b537ee70b9c59aa257d33c8</hash>
+        <hash alg="SHA3-256">8174a73636e766a9e85270f5b12fea752075cbc46d0f96a92d6474104f0ec8d5</hash>
+        <hash alg="SHA3-512">eebb2705bc32271279a7995bda36b8820c59845ddb32ac2f5f613aa3166bacaec73475d4d5c397a831df320fc8a629217d807aee96ab0f1f8baa2bcea85b4288</hash>
+        <hash alg="SHA-384">cfcfaae1487338a50441c83d44f3a29421ea21425ef1a8818e458a985a7bcbb5c0cd1b2e628bba4ed502e45161b964c3</hash>
+        <hash alg="SHA3-384">14f8002fec3dbdb3c465d14143cccad390159a94a3c58c5cdcd3d44c62e06002fdec2863204b2cc3237779aebd3afe3d</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-sdk-metrics</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry SDK Metrics</description>
       <hashes>
-        <hash alg="MD5">ecc042da84a52ba2fb906f933fb7f262</hash>
-        <hash alg="SHA-1">dcc20dfc0a976b93e58d7eff8a17c1278d83fb31</hash>
-        <hash alg="SHA-256">c157ff10da59a87a57e5236d9f3290792d9b749433be5e5b449a7d1604c320a9</hash>
-        <hash alg="SHA-512">13ffa713dfa41c4b47fc20b5bf0ca779907efee040fb9ace01d76553bcf6b1da71e948e201f1f50fb548e7dfcf74b8f3d3341517e9df86b1357c856f728fb439</hash>
-        <hash alg="SHA3-256">c339b27e3bdea0a0c40e0bb0b66932d14c1e768d184f537953001657506eb4f5</hash>
-        <hash alg="SHA3-512">631142cb7af715dc12bd2a774357ca05e3fcbc5e3f800c0fc2685319b7800a6f1f7247a14f91fa4ab8a5c42435347a9653e2ca3f678fd016b175189d60964ce9</hash>
-        <hash alg="SHA-384">3cafeca7ab23b8eab3d357914c358d41ba539dda27f2e1798d6d31b22e54859f7b48cd6e9d6237c208743571ff3fc09b</hash>
-        <hash alg="SHA3-384">f8d42f4f1f75557f99602a0020cbd1160fb096359daae05a36fe21b2a1a3acb357db8fb5a47e7ba36002a2d350cb2c95</hash>
+        <hash alg="MD5">045f140231136d77ff6484a741443895</hash>
+        <hash alg="SHA-1">ac64546abe37d7b20e4f00f6c1ed3121a287678d</hash>
+        <hash alg="SHA-256">c9ff85bd4ba89e0431bd39d8b6ad5d409f9351881abff87e3002a7ee0e890787</hash>
+        <hash alg="SHA-512">60c0b3f40c5614f67ae86636339839744e705c1e6ffbf746ad69c81239acc2956378339608b86bdc6679fa8e87e7462b1ee0f5c70c9dfc58af826083163e5030</hash>
+        <hash alg="SHA3-256">73b8838ca3f42f92af04cf32fddeec6ed89efd0cae2a774b5e7a0041f0b108de</hash>
+        <hash alg="SHA3-512">efc6e7df5ee8b8a5595b885fe42bbfccb11da7d74478946ee6a3f2d9f106855d7c8283e97ea1a889f4c5ca8321e0924ef3e693efcec41d51b2034b8894fb0051</hash>
+        <hash alg="SHA-384">e4d0f249313daa4146d80bb32977b34037dacbcfa5191657a21a1078d8c0289b41f07c104cf9c12e949806018d048da3</hash>
+        <hash alg="SHA3-384">c6edf98d13d05299ea99f75efdb1eff075fe75b4a76a4ae80991595c6f5e260def12ec1271a2f76f1d6e91cdf826f491</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-sdk-trace</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry SDK For Tracing</description>
       <hashes>
-        <hash alg="MD5">d1b05357efd51bf666330ab95863eb55</hash>
-        <hash alg="SHA-1">5c10c9d7c99e0cb2b2049522adf31c86a2d3446a</hash>
-        <hash alg="SHA-256">14d9615c8a5dcf471dcbb74902b771dcfa8656b755ac38dce904042289ccd198</hash>
-        <hash alg="SHA-512">4210601d7ae576901b74682858a5a88c706398861a08ef889ec050a420615fa3d225d5075d758f9c63d1eb8e4d8b85dd382c5aa746f416f7e2bb3335fdbe39f3</hash>
-        <hash alg="SHA3-256">e46d195c62893fd539d497f89b3c7018c633474954f1dfaaef50c0d648746d83</hash>
-        <hash alg="SHA3-512">5167b81813e6b9fbc71cc50ebd47c659d851f8cfb2dab36908396a3f3e12d32bec924f27c52251b7d84e92ddded35af9ae106ff515d516b12ff9ff10ee4f34c6</hash>
-        <hash alg="SHA-384">4a60d78828c18c7f2b422a04509f796aab0f15320a5e2122bc0bf0bc7b151d4ce286ad705107cc1be771428b26f6bd67</hash>
-        <hash alg="SHA3-384">e480649c653bbe0452b5ba6b9eb6e16f2998705ee734732cc979ca4b259a7b208ebf887b093ffe03bc51f4ee288bc7c2</hash>
+        <hash alg="MD5">0ce4d9673f342cfb05922c96e3ab637a</hash>
+        <hash alg="SHA-1">89a08368cb6712db9db00cf9189c969461922a18</hash>
+        <hash alg="SHA-256">101b87e9a95838e75771d4f07c4f04eacd9b95612de3ebaf744b3642404764e8</hash>
+        <hash alg="SHA-512">d5d4e162931c3b9e12203a8f5a352d352bcb279f448133a292e78f0eebd5ff64434ad3214fb82ad68035f8a21e64335a7b50ab0c2afc0c08355fd352e447bc2e</hash>
+        <hash alg="SHA3-256">798f2a8ff8ba3dd62ecef650d75861aa6f36973bb5cc9dbbc16ab4d1b6f717b5</hash>
+        <hash alg="SHA3-512">71e1abb076e079f8c87fe337916f9d4d3a18ff4071c671be11038d1ad692e896ce24f1ce34d6a4fb85ac5b1bcc0fee6f7f21a5feedf2ecfd975110dbe5a5acd5</hash>
+        <hash alg="SHA-384">fa075994652a63f4c676d0077b78aff48bf9b53eeedd421bf0bf85bc50ff8233f2210959cb0903d67b83d49906d10a83</hash>
+        <hash alg="SHA3-384">1b122c0787f0a8711bd35abd3d39651f6fe65ac1c7e21409ebc8f60e6575af217c99f36cd15195842b17e32ae8a8561b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar">
       <group>io.opentelemetry</group>
       <name>opentelemetry-sdk</name>
-      <version>1.67.0</version>
+      <version>1.68.0</version>
       <description>OpenTelemetry SDK</description>
       <hashes>
-        <hash alg="MD5">e3e4065b0142e1e04f9a27d12adc65cd</hash>
-        <hash alg="SHA-1">89543f9c3bb485528bd89f8849c7ff41d94c90e4</hash>
-        <hash alg="SHA-256">52a8f599a368a3d62185e37053f6a53175d6fbe3ecc1d565baba13b1a854267f</hash>
-        <hash alg="SHA-512">74c2ac9e27643135e6188fad726e409fa2f8d88e1efa82cb4e4591ae3c7c06c3b59d83f8deb48b31935e9f1db2480a934b1e497c432955af17142381d07a8fab</hash>
-        <hash alg="SHA3-256">fcef90ff9c3435c9797230ed204440daf79fee1b5f3feb42930331fc7694313a</hash>
-        <hash alg="SHA3-512">b5811147822d8aaa7363111830d2c96c1dd28172a7a2a91486cf334f8fb7a07b18d2de2f4b9643e1fb9902a04d7b9c60ea9f6d5bfbb65a6399bdc63b83252a4e</hash>
-        <hash alg="SHA-384">c3d93bab74ef1440c4062d2f9cdd6a79e689b07978e2714a5f56f72815a5d9a09d4cd0639e7c6f7f38b3a2c918b32916</hash>
-        <hash alg="SHA3-384">db9c892efc16184fd4f51a2e2e7a38e87e2bf490839dadd7700f91d38cdf5bb87c33dda39dd4f8eddeb280a8e1fa388a</hash>
+        <hash alg="MD5">58f90656083a960c5404f742f66ab8c0</hash>
+        <hash alg="SHA-1">5ee154be7d636d9981e8bbf75d1520a0cabdaca0</hash>
+        <hash alg="SHA-256">49a59f222fa2c676e5868a67077ce06fc30f428de6e0eb542691c7b555f6cd33</hash>
+        <hash alg="SHA-512">3eefdd2a34c175b3b1c9780499959eab7a9d4ef321fecb4c7e6e396acf592db30886997e023266e82f5e301412837ebde7fe3459c35ef9368d47c04a2b61f0f1</hash>
+        <hash alg="SHA3-256">52ac29e7b025bb286bd2b4ff89180ca8db41486eab6cddde227d148db1e03952</hash>
+        <hash alg="SHA3-512">b94691816374d0aa95ae34bb8675c7c5e1faa47e9e3c9dc94f9bed1523f645c2b9a5dd5c512c433b43db3077655c3e5e7bb6182ed551a8ebf17be57895b5610f</hash>
+        <hash alg="SHA-384">116ecb038692ce59a23b3d71a7819026385c06c81a554f7042256b5be8091d54876f29061cd6f4b6d190029dc5f6c3b8</hash>
+        <hash alg="SHA3-384">a90c65870a06f70c003cf314ce87ef12e17057659595add2c715f25cbfafae3a1236d5778fe24cfaa6446315a2e7927b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar</purl>
+      <purl>pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -4775,27 +4772,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar">
       <group>tools.jackson.core</group>
       <name>jackson-core</name>
-      <version>3.2.4</version>
+      <version>3.3.0</version>
       <description>Core Jackson processing abstractions (aka Streaming API), implementation for JSON</description>
       <hashes>
-        <hash alg="MD5">024e68187ce475a2a668cb5944e71d88</hash>
-        <hash alg="SHA-1">025beaee139ae32025c5f189e4fb39c5b1f78653</hash>
-        <hash alg="SHA-256">494b9f5fccf008042d5a72c5bf00629b144c0ba7362a9864cbb02234c9772651</hash>
-        <hash alg="SHA-512">7322b44920244c1b799c4952d3472eb9dc86836a3264a517bc74be81c8f38baaff6d805e237bc52b04a51f91fc40b2222ada4cda9906e1d1b43753f8d5661841</hash>
-        <hash alg="SHA3-256">7624e27628d60e029c51fe65f82ef86773af00dfed24f6785c42ef4a6c5dfb82</hash>
-        <hash alg="SHA3-512">865947e2983856165fca5ad74077c6d66f73cc17e5ca02c65fdeaed437f4f95b1a9fba550737b343a96a7b819a813c2fecf13155366a5415794e37b7ac108086</hash>
-        <hash alg="SHA-384">91b62f9b11b7801835e5f9a41036114877f5592efb0b6ca6a5b9328efe10f9a1b3c1247ef4e13dd1785881a7b4b08250</hash>
-        <hash alg="SHA3-384">b59c067f42f8ac3dec34589b78290ad2ed0ca94c9cfa42d285c9f6095f707c6558a735ac75ce8b13148368bac9d049d1</hash>
+        <hash alg="MD5">53850566791686fc3c6c5b1e6476b812</hash>
+        <hash alg="SHA-1">f5be074915f20d6ba1f25a7cc1ce9d24595720f4</hash>
+        <hash alg="SHA-256">1496eda4c353276416bd4f672fb3f98be95fb4c86707e8ffcebe04425d63aa63</hash>
+        <hash alg="SHA-512">a11be3ca10043c9470381bd5800c11d21fd6c90942f2ebf27c128088bd3e4d4546bec51c3c6e67c1a4805dccccf20b0d18daf3381266ce7ebc18889821caed9d</hash>
+        <hash alg="SHA3-256">0e5e80bb52176dd9f33052ae69c00e740b8bb3063dbfeeddb85503c667ea86c9</hash>
+        <hash alg="SHA3-512">551d93f34ecb29f504b368e132a9dfb49ead4be5a94e2ba45c49dd25dca7060703a831a57c78b259875156df47e850cb064f27a067b95728a6387196e814ab7e</hash>
+        <hash alg="SHA-384">36b58a7988f4aa64f66ebf88bbe209b34c882d9bdef26b9f9ba6db646c1597556921e10c7ad0591a2ddfc21a09ec63d2</hash>
+        <hash alg="SHA3-384">4f4a3d1b667e0855ce6a627451903b3b5f24b6cecb232aa15069afa2becb28ba9ccba770f27b8638bc07b9a89fdd591e</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar</purl>
+      <purl>pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -4806,27 +4803,27 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar">
+    <component type="library" bom-ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar">
       <group>tools.jackson.core</group>
       <name>jackson-databind</name>
-      <version>3.2.4</version>
+      <version>3.3.0</version>
       <description>General data-binding functionality for Jackson: works on core streaming API</description>
       <hashes>
-        <hash alg="MD5">63eae1d7fa8d26621ef938d7267c2722</hash>
-        <hash alg="SHA-1">73cd5c393378036c5b556355e5257128796b9a9a</hash>
-        <hash alg="SHA-256">c4af37223d5024f1294a5450598b01b65f30c53d9e906f02c3955ba1fb14a67d</hash>
-        <hash alg="SHA-512">3b879f3f270ca12ce1b89f67898655dcefe3673cc36f598fbbe91fddef6f5bed59d15902ac7de79f23ebc0f72c8d27189f0bef2b3b9c90006a27328b98a101e8</hash>
-        <hash alg="SHA3-256">cd14fcd2ecb0cd6bbebec5721d9c6532d5160c68f495a24eb2cc86dc9ac15b4f</hash>
-        <hash alg="SHA3-512">441135c725515017b6493d0e36fc88000a976713506924f30a7be38d570073c7d64ff88e60cc5d0abbb6704ccfc943d39271704efd064feed91ee2ce1eb81675</hash>
-        <hash alg="SHA-384">5dbdf4e1282de8135b5290ac71e26966921d3379af8c475baf222a0afab0daede2c0f59f0f3e314e4d9292f43547a4ac</hash>
-        <hash alg="SHA3-384">9c4578d09a927dbc9c81daea466521ac22342568c2e350f6ba1107451a2354e2ae80a57fb0d72019f9725caada62177a</hash>
+        <hash alg="MD5">bb4fc49acb822827f3ded051f7f1e6da</hash>
+        <hash alg="SHA-1">03adf043af5f653a88e92473895771e0d701d982</hash>
+        <hash alg="SHA-256">856b7348bd08efe5791cf617cc3bed21f5f4a02569507c61e946666d13c33ba4</hash>
+        <hash alg="SHA-512">212b06338a352fd11cc226aff03cb9fc2fc131c1652343d7089af7db7432258c4242221858d28a8ac661026b148d31367ed858f14e19f85daf07eb9b41d78609</hash>
+        <hash alg="SHA3-256">8556b7d4146197ad850b987abd688c3bfbffab813adee8f6fd656950ec25a589</hash>
+        <hash alg="SHA3-512">0bdac4872de74802afb7209340dde3579b984cfa7113ab591837ae9d94fad8b8f915a6cbc97fada1ec9f1adda8dc52f2534eb149c8db8064e8eec1323ccf6413</hash>
+        <hash alg="SHA-384">f44b20547faa17f499508fc8bae97baa18c726c6d677cb1632d35edd33b473a7dd7ea6aae404d96f650d0d1694a8aefc</hash>
+        <hash alg="SHA3-384">b4b6ee6f9940bd8ee238a63d29f5c7c25269a464dcd3c85ef7919c5e651d3b5593dc02ee6fc3217672ffc9f97c0e6390</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar</purl>
+      <purl>pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -4837,18 +4834,18 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom">
+    <component type="library" bom-ref="pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom">
       <publisher>FasterXML</publisher>
       <group>tools.jackson</group>
       <name>jackson-bom</name>
-      <version>3.2.4</version>
+      <version>3.3.0</version>
       <description>Bill of Materials pom for getting full, complete set of compatible versions of Jackson 3.x components maintained by FasterXML.com</description>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom</purl>
+      <purl>pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="website">
@@ -4872,22 +4869,22 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/ch.qos.logback/logback-core@1.5.38?type=jar"/>
-    <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar"/>
-    <dependency ref="pkg:maven/com.ethlo.time/itu@1.14.0?type=jar"/>
-    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar"/>
+    <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
+    <dependency ref="pkg:maven/com.ethlo.time/itu@1.17.0?type=jar"/>
+    <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar"/>
     <dependency ref="pkg:maven/com.fasterxml/classmate@1.7.3?type=jar"/>
-    <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.8?type=jar">
-      <dependency ref="pkg:maven/com.ethlo.time/itu@1.14.0?type=jar"/>
+    <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar">
+      <dependency ref="pkg:maven/com.ethlo.time/itu@1.17.0?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.nimbusds/nimbus-jose-jwt@10.9.1?type=jar"/>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar">
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar">
       <dependency ref="pkg:maven/com.squareup.okio/okio@3.18.1?type=pom"/>
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom">
-      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar"/>
+    <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.18.1?type=jar">
       <dependency ref="pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"/>
@@ -4896,10 +4893,10 @@
       <dependency ref="pkg:maven/com.squareup.okio/okio-jvm@3.18.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/commons-logging/commons-logging@1.3.6?type=jar"/>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.2?project_path=%3Aingest">
-      <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar"/>
-      <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.8?type=jar"/>
-      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support"/>
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/ingest@1.23.3?project_path=%3Aingest">
+      <dependency ref="pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar"/>
+      <dependency ref="pkg:maven/com.networknt/json-schema-validator@3.0.9?type=jar"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
@@ -4912,7 +4909,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support">
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support">
       <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
       <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
@@ -5021,11 +5018,11 @@
       <dependency ref="pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/micrometer-tracing@1.7.2?type=jar"/>
       <dependency ref="pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar"/>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
@@ -5080,55 +5077,55 @@
       <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.19.Final?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar"/>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar"/>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar">
-      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar">
+      <dependency ref="pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar"/>
+    <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar">
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.projectreactor/reactor-core@3.8.8?type=jar">
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
@@ -5157,7 +5154,7 @@
       <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar">
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-api@2.25.5?type=jar"/>
     <dependency ref="pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.25.5?type=jar">
@@ -5222,7 +5219,7 @@
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.2?type=jar">
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-metrics@4.1.2?type=jar">
       <dependency ref="pkg:maven/io.micrometer/micrometer-core@1.17.2?type=jar"/>
@@ -5250,8 +5247,8 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.2?type=jar">
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-persistence@4.1.2?type=jar">
@@ -5306,7 +5303,7 @@
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.2?type=jar">
       <dependency ref="pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.2?type=jar"/>
-      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar"/>
+      <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.2?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-starter-micrometer-metrics@4.1.2?type=jar"/>
@@ -5493,14 +5490,14 @@
     <dependency ref="pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar">
-      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar">
+      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar">
-      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar"/>
-      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar">
+      <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar"/>
+      <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"/>
     </dependency>
-    <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"/>
+    <dependency ref="pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"/>
   </dependencies>
 </bom>
