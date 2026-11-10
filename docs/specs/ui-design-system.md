@@ -563,6 +563,8 @@ viewports (375x812, 810x1080, 1024x768, 1180x820, 1280x800 and 1600x900), indepe
 full-flow viewport filter. This exercises all four device classes, both tablet orientations and
 touch ergonomics above the width breakpoint. The remaining browser lanes retain their selected
 flow viewport. `-Pe2e.layoutAllDevices=true` requests the complete layout sweep explicitly.
+Each viewport has its own E2E test deadline. The sweep still compares route coverage across
+the selected viewports and reports their measured detail views.
 
 **Page widths follow the page type** (owner decision 2026-10-19). Every page starts at the same
 left edge — `main`'s horizontal padding is `--page-gutter` (32px, 24px up to 1024px, 16px up to

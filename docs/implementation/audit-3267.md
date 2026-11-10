@@ -155,7 +155,10 @@ It detects the extraction-order defect across all touch reference sizes and chec
 mouse geometry and working filter reset. Component-owned touch rules follow their compact base
 rules in the selectively loaded stylesheets. The Chromium desktop CI lane additionally runs the
 whole-page layout guard across all six reference sizes, independently of its full-flow viewport.
-No layout threshold or finding is waived. The six-case component regression passed locally with
+No layout threshold or finding is waived. The first hosted six-viewport sweep exceeded the
+three-minute budget for one E2E method; the interrupted sweep also missed one route at 1180x820.
+The guard runs each viewport as an individually timed test and compares route coverage at the end.
+The six-case component regression passed locally with
 Chromium, Firefox and WebKit. The complete frontend check passed 5,356 tests with zero failures,
 all strict asset/script/type gates, E2E compilation and source checks. Configuration-cache help
 was reused and the build dry run passed after the additional layout property was wired.

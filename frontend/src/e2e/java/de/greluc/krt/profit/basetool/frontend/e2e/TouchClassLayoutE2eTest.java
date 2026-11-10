@@ -34,12 +34,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Layout guard for the touch device classes of REQ-UI-009 (Smartphone and Tablet), plus desktop and
@@ -77,6 +83,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  */
 @Order(Integer.MAX_VALUE)
 @Tag("e2e")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
 class TouchClassLayoutE2eTest {
 
   /** Provisions (or, in staging mode, targets) the stack for the whole run. */
@@ -227,14 +235,14 @@ class TouchClassLayoutE2eTest {
    * both orientations (810×1080, 1024×768) plus a landscape tablet above the touch breakpoint
    * (1180×820), desktop (1280×800) and ultra-wide (1600×900).
    */
-  private static final List<int[]> DEVICE_CLASSES =
+  private static final List<Viewport> DEVICE_CLASSES =
       List.of(
-          new int[] {375, 812},
-          new int[] {810, 1080},
-          new int[] {1024, 768},
-          new int[] {1180, 820},
-          new int[] {1280, 800},
-          new int[] {1600, 900});
+          new Viewport(375, 812),
+          new Viewport(810, 1080),
+          new Viewport(1024, 768),
+          new Viewport(1180, 820),
+          new Viewport(1280, 800),
+          new Viewport(1600, 900));
 
   /** Upper bound of the width-based touch block; mirrors {@code width <= 1024px} in the app. */
   private static final int TOUCH_BREAKPOINT = 1024;
@@ -243,93 +251,124 @@ class TouchClassLayoutE2eTest {
   private static final Set<String> TOUCH_DEVICES =
       Set.of("375x812", "810x1080", "1024x768", "1180x820");
 
-  private static Playwright playwright;
-  private static Browser browser;
-  private static Path storageState;
+  private final Map<String, Set<String>> measuredByDevice = new LinkedHashMap<>();
+  private final Map<String, Set<String>> detailsByDevice = new LinkedHashMap<>();
+  private final List<String> uncoveredLists = new ArrayList<>();
+
+  private Playwright playwright;
+  private Browser browser;
+  private Path storageState;
+
+  /**
+   * A browser viewport in CSS pixels.
+   *
+   * @param width the viewport width
+   * @param height the viewport height
+   */
+  private record Viewport(int width, int height) {
+    /**
+     * Returns the width and height as a device label.
+     *
+     * @return the label in WxH format
+     */
+    @Override
+    public String toString() {
+      return width + "x" + height;
+    }
+  }
+
+  /**
+   * Returns the reference viewports selected for this run.
+   *
+   * @return the selected viewports
+   */
+  private static Stream<Viewport> selectedViewports() {
+    return DEVICE_CLASSES.stream()
+        .filter(viewport -> DEVICE_FILTER.isEmpty() || DEVICE_FILTER.equals(viewport.toString()));
+  }
 
   /**
    * Launches the browser and captures one authenticated session reused across every measurement.
    */
   @BeforeAll
-  static void setUp() {
+  void setUp() {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }
 
-  /** Releases the browser and the Playwright driver process. */
+  /** Verifies sweep coverage and releases the browser and driver. */
   @AfterAll
-  static void tearDown() {
-    if (browser != null) {
-      browser.close();
-    }
-    if (playwright != null) {
-      playwright.close();
+  void tearDown() {
+    try (Playwright driver = playwright;
+        Browser session = browser) {
+      List<String> findings = new ArrayList<>();
+      reportCoverage(measuredByDevice, detailsByDevice, uncoveredLists, findings);
+      assertNoFindings(findings);
     }
   }
 
   /**
-   * Sweeps every page at every device class, collects every finding, then fails once. Each device
-   * class gets its own browser context.
+   * Sweeps the pages in an isolated context and reports every layout finding at this viewport.
+   *
+   * @param viewport the viewport under test
    */
-  @Test
-  void touchClassesRenderWithoutOverflowOrOverlap() {
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("selectedViewports")
+  void touchClassesRenderWithoutOverflowOrOverlap(@NotNull Viewport viewport) {
     List<String> findings = new ArrayList<>();
     String baseUrl = STACK.baseUrl();
+    int width = viewport.width();
+    int height = viewport.height();
+    String deviceLabel = viewport.toString();
 
-    Map<String, Set<String>> measuredByDevice = new LinkedHashMap<>();
-    Map<String, Set<String>> detailsByDevice = new LinkedHashMap<>();
-    List<String> uncoveredLists = new ArrayList<>();
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState)
+                .setViewportSize(width, height)
+                .setHasTouch(TOUCH_DEVICES.contains(deviceLabel))
+                .setIsMobile(width <= PHONE_MAX_WIDTH && ENGINE_SUPPORTS_IS_MOBILE))) {
+      Page page = context.newPage();
+      Set<String> measured = new LinkedHashSet<>();
+      Set<String> measuredDetails = new LinkedHashSet<>();
+      measuredByDevice.put(deviceLabel, measured);
+      detailsByDevice.put(deviceLabel, measuredDetails);
+      for (String path : FrontendPageRoutes.PAGES) {
+        findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height, measured));
 
-    for (int[] device : DEVICE_CLASSES) {
-      int width = device[0];
-      int height = device[1];
-      String deviceLabel = width + "x" + height;
-      if (!DEVICE_FILTER.isEmpty() && !DEVICE_FILTER.equals(deviceLabel)) {
-        continue;
-      }
-
-      try (BrowserContext context =
-          browser.newContext(
-              new Browser.NewContextOptions()
-                  .setIgnoreHTTPSErrors(true)
-                  .setStorageStatePath(storageState)
-                  .setViewportSize(width, height)
-                  .setHasTouch(TOUCH_DEVICES.contains(deviceLabel))
-                  .setIsMobile(width <= PHONE_MAX_WIDTH && ENGINE_SUPPORTS_IS_MOBILE))) {
-        Page page = context.newPage();
-        Set<String> measured = new LinkedHashSet<>();
-        Set<String> measuredDetails = new LinkedHashSet<>();
-        measuredByDevice.put(deviceLabel, measured);
-        detailsByDevice.put(deviceLabel, measuredDetails);
-        for (String path : FrontendPageRoutes.PAGES) {
-          findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height, measured));
-
-          String detail = firstDetailLink(page, FrontendPageRoutes.detailPrefixOf(path));
-          if (detail != null) {
-            findings.addAll(
-                measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
-          } else if (FrontendPageRoutes.DETAIL_LIST_PAGES.contains(path)) {
-            uncoveredLists.add(
-                deviceLabel
-                    + " "
-                    + path
-                    + ": no row, so its detail view was not"
-                    + " measured at this class");
-          }
+        String detail = firstDetailLink(page, FrontendPageRoutes.detailPrefixOf(path));
+        if (detail != null) {
+          findings.addAll(
+              measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
+        } else if (FrontendPageRoutes.DETAIL_LIST_PAGES.contains(path)) {
+          uncoveredLists.add(
+              deviceLabel
+                  + " "
+                  + path
+                  + ": no row, so its detail view was not measured at this class");
         }
       }
     }
 
-    reportCoverage(measuredByDevice, detailsByDevice, uncoveredLists, findings);
+    assertNoFindings(findings);
+  }
 
+  /**
+   * Fails with the complete list of findings and the screenshot directory.
+   *
+   * @param findings layout or coverage findings
+   */
+  private static void assertNoFindings(@NotNull List<String> findings) {
     assertTrue(
         findings.isEmpty(),
-        "Touch-class layout findings (REQ-UI-009). Screenshots: "
-            + ARTIFACTS.toAbsolutePath()
-            + System.lineSeparator()
-            + String.join(System.lineSeparator(), findings));
+        () ->
+            "Touch-class layout findings (REQ-UI-009). Screenshots: "
+                + ARTIFACTS.toAbsolutePath()
+                + System.lineSeparator()
+                + String.join(System.lineSeparator(), findings));
   }
 
   /**
