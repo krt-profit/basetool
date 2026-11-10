@@ -1274,7 +1274,16 @@ a policy value still works and the browser reports it, through the client-error 
 `basetool_client_error_total{kind="csp_violation"}`. **`enforce`** moves them into the enforced
 `Content-Security-Policy`, where such a write throws. The switch is `APP_SECURITY_TRUSTED_TYPES` in
 `basetool.env` (`report` when unset, blank or mistyped) plus a frontend restart: a production write, so it
-waits for the owner's yes. **This switch is the only step of ADR-0239 still open.**
+waits for the owner's yes.
+
+> [!note] Applied on production 2026-11-10 (~07:00 UTC, #2568)
+> The precondition held except for 13 `trusted-types` reports in seven days, all with
+> `code_origin="other"`. That is foreign code creating a policy under another name. There were no
+> `require-trusted-types-for` reports, so no sink of ours was unconverted. The owner decided to
+> enforce anyway (recorded on #2568). The apply steps below ran unchanged. Afterwards the
+> directives ended the enforced `Content-Security-Policy`, the report-only header was gone,
+> `basetool_trusted_types_mode{mode="enforce"}` read 1, the frontend was healthy in 5.7 s, and
+> no CSP report followed.
 
 **Precondition** — over at least a week of ordinary use since the release carrying the report-only
 policy went live, no CSP violation was reported, and the dialog page walk of the E2E suite
