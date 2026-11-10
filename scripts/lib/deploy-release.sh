@@ -114,4 +114,3 @@ check_only_verify_one() {
   log "  ${label}: SIGNATURE VERIFICATION FAILED (${ref}) — last cosign error: ${VERIFY_LAST_ERROR:-<none>}"
   return 1
 }
-

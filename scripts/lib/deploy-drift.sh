@@ -133,4 +133,3 @@ assert_host_scripts_current_or_die() {
   write_deploy_metric failure
   fail "HOST SCRIPTS: [${apply}] on this host are not the ones this release was built with, and they are what applies it. Nothing was changed. Install that release's scripts first: run the role from its tag with --tags deploy,scripts (docs/deployment.md, Before a promotion: the host scripts); the next tick then applies the release. Break-glass: deploy.sh --force, or BASETOOL_REQUIRE_CURRENT_SCRIPTS=false"
 }
-

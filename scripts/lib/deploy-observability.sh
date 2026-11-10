@@ -196,4 +196,3 @@ write_stack_health_metric() {
     echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
   } | write_textfile "$(basename "${f}")" || true
 }
-

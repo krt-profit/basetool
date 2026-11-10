@@ -293,4 +293,3 @@ restore_previous_keycloak_spi_jar() {
   fi
   return 0
 }
-
