@@ -126,17 +126,18 @@ public final class OwnedProcessTree {
     long deadline = System.nanoTime() + budget.toNanos();
     SequencedSet<ProcessHandle> owned = new LinkedHashSet<>();
     owned.add(root);
-    List<ProcessHandle> alive;
-    do {
+    while (true) {
       collectDescendants(owned);
       owned.reversed().forEach(ProcessHandle::destroyForcibly);
       interrupted |= awaitExit(owned, deadline);
-      alive = owned.stream().filter(ProcessHandle::isAlive).toList();
-    } while (!alive.isEmpty() && System.nanoTime() < deadline);
-    if (interrupted) {
-      Thread.currentThread().interrupt();
+      List<ProcessHandle> alive = owned.stream().filter(ProcessHandle::isAlive).toList();
+      if (alive.isEmpty() || System.nanoTime() >= deadline) {
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+        return alive;
+      }
     }
-    return alive;
   }
 
   /**
