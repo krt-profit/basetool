@@ -113,8 +113,7 @@ public class InventoryPoolChangeService {
       @NotNull UUID itemId, @NotNull InventoryItemPoolChangeDto dto, @NotNull UUID callerId) {
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findByIdForRebook(itemId),
-            () -> "Inventory item not found: " + itemId);
+            inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     OrgUnit source = requireSharedRow(item);

@@ -351,18 +351,20 @@ public class SupplyDonationService {
     StockLot targetLot =
         new StockLot(
             donation.getMaterial(), donation.getGameItem(), location, donation.getQuality(), false);
-    if (source != null) {
+    if (source == null) {
+      stockCommands.lockLots(holder, List.of(targetLot.key()));
+    } else {
       lockBoth(
           donation.getDonorUserId() == null ? source.getUser().getId() : donation.getDonorUserId(),
           lotOf(source),
           holder,
           targetLot);
-      stockCommands.lockRow(source.getId());
+    }
+    if (source != null && stockCommands.lockRow(source.getId()).isPresent()) {
       stockCommands.releaseDonationEarmark(donation.getId());
       stockCommands.transferToPool(
           source.getId(), received, unit, holder, location, StockBookingReason.DONATION);
     } else {
-      stockCommands.lockLots(holder, List.of(targetLot.key()));
       stockCommands.bookIntoPool(holder, unit, targetLot, received, StockBookingReason.DONATION);
     }
     boolean full = received >= donation.getPledgedAmount() - 5e-4;

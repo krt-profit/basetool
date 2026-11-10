@@ -235,7 +235,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @NotNull CheckoutType type,
       @Nullable String terminal,
       @Nullable BigDecimal proceeds) {
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -279,7 +279,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome move(@NotNull PoolMove move, boolean dryRun) {
     PoolBookOut take = move.take();
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -347,7 +347,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun) {
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(move.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(move.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -402,7 +402,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome setNote(@NotNull PoolNote note, boolean dryRun) {
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(note.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(note.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -435,7 +435,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     if (!inventoryProperties.stolenMarkingEnabled()) {
       return PoolOutcome.refused(PoolRefusal.STOLEN_MARKING_DISABLED);
     }
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(stolen.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(stolen.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -489,7 +489,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun) {
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(allocation.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(allocation.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }

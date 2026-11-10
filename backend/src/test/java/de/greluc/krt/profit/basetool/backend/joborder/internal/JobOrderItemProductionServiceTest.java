@@ -171,7 +171,7 @@ class JobOrderItemProductionServiceTest {
 
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     lenient()
-        .when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .when(inventoryItemRepository.lockById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
@@ -525,7 +525,7 @@ class JobOrderItemProductionServiceTest {
     service.bookProduction(orderId, lineId, dto);
 
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
-    verify(inventoryItemRepository, never()).findByIdForUpdate(any());
+    verify(inventoryItemRepository, never()).lockById(any());
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
@@ -545,7 +545,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(100.0);
     assertThat(inventoryItem.getJobOrderAllocations().get(0).getAmount()).isEqualTo(100.0);
-    verify(inventoryItemRepository, never()).findByIdForUpdate(any());
+    verify(inventoryItemRepository, never()).lockById(any());
     verify(inventoryItemRepository, never()).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))

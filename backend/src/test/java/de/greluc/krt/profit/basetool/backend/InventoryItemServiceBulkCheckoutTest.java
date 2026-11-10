@@ -104,8 +104,8 @@ class InventoryItemServiceBulkCheckoutTest {
     InventoryItem item1 = itemOwnedBy(itemId1, userId);
     InventoryItem item2 = itemOwnedBy(itemId2, userId);
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId1)).thenReturn(Optional.of(item1));
-    when(inventoryItemRepository.findByIdForUpdate(itemId2)).thenReturn(Optional.of(item2));
+    when(inventoryItemRepository.lockById(itemId1)).thenReturn(Optional.of(item1));
+    when(inventoryItemRepository.lockById(itemId2)).thenReturn(Optional.of(item2));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
@@ -124,9 +124,9 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID itemId1 = UUID.randomUUID();
     UUID itemId2 = UUID.randomUUID();
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId1))
+    when(inventoryItemRepository.lockById(itemId1))
         .thenReturn(Optional.of(itemOwnedBy(itemId1, userId)));
-    when(inventoryItemRepository.findByIdForUpdate(itemId2))
+    when(inventoryItemRepository.lockById(itemId2))
         .thenReturn(Optional.of(itemOwnedBy(itemId2, userId)));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
@@ -160,7 +160,7 @@ class InventoryItemServiceBulkCheckoutTest {
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), false);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(itemId)).thenReturn(Optional.of(item));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
@@ -180,9 +180,8 @@ class InventoryItemServiceBulkCheckoutTest {
     pledgedItem.setAmount(10.0);
     InventoryAllocations.addDonation(pledgedItem, UUID.randomUUID(), 2.0);
 
-    when(inventoryItemRepository.findByIdForUpdate(freeItemId)).thenReturn(Optional.of(freeItem));
-    when(inventoryItemRepository.findByIdForUpdate(pledgedItemId))
-        .thenReturn(Optional.of(pledgedItem));
+    when(inventoryItemRepository.lockById(freeItemId)).thenReturn(Optional.of(freeItem));
+    when(inventoryItemRepository.lockById(pledgedItemId)).thenReturn(Optional.of(pledgedItem));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(freeItemId, pledgedItemId));
 
@@ -201,7 +200,7 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID itemId = UUID.randomUUID();
 
     InventoryItem item = itemOwnedBy(itemId, otherUserId);
-    when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(itemId)).thenReturn(Optional.of(item));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
@@ -217,7 +216,7 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID userId = UUID.randomUUID();
     UUID missingItemId = UUID.randomUUID();
 
-    when(inventoryItemRepository.findByIdForUpdate(missingItemId)).thenReturn(Optional.empty());
+    when(inventoryItemRepository.lockById(missingItemId)).thenReturn(Optional.empty());
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(missingItemId));
 
@@ -254,7 +253,7 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID itemId2 = UUID.randomUUID();
 
     InventoryItem foreignItem = itemOwnedBy(itemId1, otherUserId);
-    when(inventoryItemRepository.findByIdForUpdate(itemId1)).thenReturn(Optional.of(foreignItem));
+    when(inventoryItemRepository.lockById(itemId1)).thenReturn(Optional.of(foreignItem));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
@@ -262,7 +261,7 @@ class InventoryItemServiceBulkCheckoutTest {
         AccessDeniedException.class,
         () -> inventoryItemService.bulkCheckout(request, currentUserId));
 
-    verify(inventoryItemRepository, never()).findByIdForUpdate(itemId2);
+    verify(inventoryItemRepository, never()).lockById(itemId2);
     verify(inventoryItemRepository, never()).deleteAllById(any());
   }
 }
