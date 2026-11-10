@@ -5580,6 +5580,11 @@ set is shaped by what the module serves.
   includeSubDomains; preload` with `always` (`$hsts_header` in `docker/edge/conf.d/00-maps.conf`),
   so an error page the edge produces itself carries it too.
 
+`img-src` stays `'self' data:`, so a page never makes a reader's browser contact a third-party
+image host. User-supplied Markdown (`MarkdownRenderer`, the `@markdown` bean) therefore renders an
+image as a link to it (`<a href="…" rel="noopener noreferrer nofollow">alt text</a>`,
+`MarkdownImageLinkRenderer`) instead of an `<img>` the policy would block and show broken.
+
 A new inline script or style in a template MUST carry the request nonce rather than widening the
 policy; `'unsafe-inline'` and `'unsafe-eval'` are never added. Widening any directive is a change to
 this requirement first. An inline script is only ever a data bootstrap (REQ-FE-023,
@@ -5595,6 +5600,8 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
   `form-action` origin, and every static header above.
 - [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
   policy with `app.security.trusted-types=enforce`.
+- [x] A Markdown image renders as a link, never as an `<img>`, with its URL sanitised like a link
+  (`MarkdownRendererTest`).
 - [ ] Production runs `enforce`. _(Pending the owner's approval after a quiet period with no
   `csp_violation` report; see `deployment.md`.)_
 - [x] An API response carries the `default-src 'none'` policy and the static headers.
