@@ -127,17 +127,14 @@ public final class OwnedProcessTree {
     SequencedSet<ProcessHandle> owned = new LinkedHashSet<>();
     owned.add(root);
     List<ProcessHandle> alive;
-    try {
-      do {
-        collectDescendants(owned);
-        owned.reversed().forEach(ProcessHandle::destroyForcibly);
-        interrupted |= awaitExit(owned, deadline);
-        alive = owned.stream().filter(ProcessHandle::isAlive).toList();
-      } while (!alive.isEmpty() && System.nanoTime() < deadline);
-    } finally {
-      if (interrupted) {
-        Thread.currentThread().interrupt();
-      }
+    do {
+      collectDescendants(owned);
+      owned.reversed().forEach(ProcessHandle::destroyForcibly);
+      interrupted |= awaitExit(owned, deadline);
+      alive = owned.stream().filter(ProcessHandle::isAlive).toList();
+    } while (!alive.isEmpty() && System.nanoTime() < deadline);
+    if (interrupted) {
+      Thread.currentThread().interrupt();
     }
     return alive;
   }
