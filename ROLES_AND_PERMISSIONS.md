@@ -501,20 +501,22 @@ linked specifications. The following table and footnotes are the **current imple
 | Change the org unit of your **own personal** Lager rows — to one of your direct memberships or to „Keine Einheit", singly or for a selection (REQ-INV-052) (`isAuthenticated()` + `canEditInventoryItem`; the service refuses a shared or a foreign row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Move a **shared** Lager row, whole or a part of its free stock, into the pool of another org unit its holder directly belongs to — „Pool wechseln" in the Globales Lager (REQ-INV-059) (`isAuthenticated()` + `canEditInventoryItem`; the service requires the contextual Logistician authority of **both** units, `hasRoleInOrgUnit`, so the flat role alone is not enough; the holder is notified) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | **Create** MATERIAL/ITEM through a current contextual writer of either proposed unit | ❌ | ✅ | ❌ | ✅ | ✅ |
-| Read job-order list / detail (`isAuthenticated()` + `canViewJobOrders` + `canSeeJobOrder`)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
-| Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + `canViewJobOrders`)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
-| Add/remove **yourself** as an editor, maintain your own editor note (`canSeeJobOrder` + self-or-Logistician)                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
+| Read permitted job-order list / count / lookup / detail (`isAuthenticated()` + common `canSeeJobOrder`; REQ-ORDERS-052)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
+| Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + the common order read predicate)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
+| Maintain your **existing own** editor note or remove yourself (`canSeeJobOrder` + own entry); enrolling any account requires `canManageAssignees`                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |
 | Enter **any active account** as an editor through the picker (members of the processing unit first, every other account marked with its unit), remove other editors, change their notes (`canManageAssignees`: the Logistician grant of the order's unit + `canEditJobOrder`; a Logistician of another unit who is a member of the order's unit does not qualify, REQ-ORDERS-014/047) |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Read a job order you are an **editor** of — in full, also outside your unit and without profit access; on it only your own note and removing yourself (the assignee grant of `canSeeJobOrder`, REQ-ORDERS-047) |   ✅⁶   |  ✅⁶  | ✅⁶  |   ✅⁶    |   ✅   |
-| List the orders you are an **editor** of — the „Ich bearbeite“ segment (`GET /orders?assignedToMe=true`, REQ-ORDERS-040), also without profit access, where the „Aufträge“ link then shows only that segment (`canViewAssignedJobOrders`: at least one editor entry) |   ✅⁶   |  ✅⁶  | ✅⁶  |   ✅⁶    |   ✅   |
+| List the orders you are an **editor** of — the „Ich bearbeite“ segment (`GET /orders?assignedToMe=true`, REQ-ORDERS-040), also without profit access, alongside Alle in the shared workspace (`canViewAssignedJobOrders`: at least one editor entry) |   ✅⁶   |  ✅⁶  | ✅⁶  |   ✅⁶    |   ✅   |
 | Read the **blueprint coverage** of an item order (`canSeeJobOrderBlueprintOwners`)                                                                                                                                                                                                                                                                                       |   ✅⁴   |  ✅⁴  | ✅⁴  |   ✅⁴    |   ✅   |
 | Material overview / material collection / item stock / claim buckets of a job order (`isAuthenticated()` + `canSeeJobOrder`)                                                                                                                                                                                                                                             |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
-| View and — while fully undelivered — limitedly edit an order **your own org unit requested** (`GET /orders/requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`; `canViewOwnJobOrders` / `canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester`, REQ-ORDERS-023)                                                                                         |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
+| View and — while fully undelivered — limitedly edit an order **your own org unit requested** (`GET /orders/requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`; `canViewOwnJobOrders` / common `canSeeJobOrder` / `canEditJobOrderAsRequester`, REQ-ORDERS-023)                                                                                         |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
 | **Edit** job order (status, priority, materials, handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)                                                                                                                                                                                                                                                                |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | **Record production** (Herstellung) of an item order — incl. booking the produced units into the Lager for a chosen owner/location (REQ-INV-032) (Logistician+ + `canEditJobOrder`; an owner other than yourself additionally needs `canManageUserInventory(<owner>)`, and never into their personal pool — see ² in 3.4) |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| Record a (material or item) **handover**, preview its report, unlink a material / inventory item (Logistician+ + `canEditJobOrder`); download a handover report PDF (Logistician+ + `canSeeJobOrder`)                                                                                                                                                                    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Record a (material or item) **handover**, preview its report, unlink a material / inventory item (Logistician+ + `canEditJobOrder`); download an existing handover report PDF (authenticated + common `canSeeJobOrder`)                                                                                                                                                                    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                                                                                                                                                                                                                                                                                       |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
-| Add/withdraw material claims on SK job orders (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                                                                                                                                                                                                                                            |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Maintain outstanding material promises on SK orders (observed version required) (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                                                                                                                                                                                                                                            |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| Read material contribution and provision history (`GET /api/v1/orders/{id}/claims/history`; common concrete-order read gate) | ✅³ | ✅³ | ✅³ | ✅³ | ✅ |
+| Correct recorded material provision quantity or attribution (current claim-management gate; connected Inventory grants for quantity changes) | ❌ | ✅³ | ❌ | ✅³ | ✅ |
 | **Delete** job order (`hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 | Wipe the whole Lager (`DELETE /api/v1/inventory/all`, `hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 
@@ -526,7 +528,7 @@ the object is still booked to an OrgUnit (REQ-ORG-011). A **non-**owner stays bo
 strict OrgUnit scope.
 ² Current responsible-unit writers transfer immediately to any eligible Profit target, including
 recovery when the current unit is no longer eligible.
-³ General Profit access follows membership/reach in the unique active `Department.PROFIT`
+³ General Profit access follows actual membership in the unique active `Department.PROFIT`
 area or its active Staffel/SK children, independent of retired flags. Creating MATERIAL/ITEM
 requires a current contextual writer of the requesting **or** responsible unit. Responsible writers
 process and immediately transfer responsibility to any eligible target in the verified original
@@ -535,10 +537,12 @@ survives loss of the general Profit capability. Invalid responsibility blocks ev
 mutation and coupled linked-stock write in every status, including own assignee notes/removal;
 automatic eligibility maintenance ends ineligible promises with history retained. `canEditAsRequester` separately
 exposes current requester-writer permission under the existing delivery freeze; `canEdit` always
-means responsible processing, including in redacted responses. Unknown original
-legacy provenance alone does not invalidate a currently eligible responsible unit. Requester
-reading retains its existing view; requester edits require its current writer and the existing
-undelivered prerequisite until the full shared-workflow change.
+means responsible processing. No requester-specific order redaction is applied. Unknown original
+legacy provenance alone does not invalidate a currently eligible responsible unit. Current Profit members, concrete current units, personal assignees and current legitimate
+unit members or leadership reading verifiable historical relations share the complete permitted
+order facts. Former individual membership confers no access. Requester edits still require the
+current requester writer and the existing undelivered prerequisite until the requester-workflow
+conversion. Shared read grants no Blueprint, Mission, unrelated Inventory, Bank or gateway right.
 ⁴ Stricter than `canSeeJobOrder` — **no** SK-public escape: the coverage view
 names members by name together with their blueprints and is therefore limited to members
 of the **responsible** org unit. Anyone who sees the SK job order only
@@ -553,9 +557,24 @@ Notes are visible to everyone who sees the job order.
 the responsible unit, the profit gate, their memberships or the pin, for as long as the entry
 exists — a status change or leaving the unit does not end it. It shows the order in its detail and
 in „Alle" and „Ich bearbeite", never in „Zu bearbeiten", and widens no other list. Every other write — status, lines,
-claims, handovers, production, someone else's entry — answers `403`; the owner panels stay
-redacted. Adding or removing an editor who is not a direct member of the processing unit is
+claims, handovers, production, someone else's entry — answers `403`; the producer-owner panel retains its independent gate. Adding or removing an editor who is not a direct member of the processing unit is
 audited as `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`.
+
+**Material contribution rights in the current SK workflow.** A current claim-management grant
+permits the matching Staffel's promises, with its observed version; it does not confer general
+order processing. Explicit provision attribution additionally needs the actual stock action's
+Inventory rights. Read access alone does not permit attribution or correction.
+
+A false attribution may be corrected through the current original and target Staffel grants or
+responsible-unit coordination, even after the original stock row was consumed. A quantity
+correction also requires current rights over every actually affected stock row and the connected
+orders/contributions; it cannot use a former stock permission as authority. Historical records
+that prove only a credited subset do not establish an original full quantity for a physical
+quantity correction. The invalid-responsibility gate applies throughout.
+
+The full common support/lifecycle and contextual-writer conversion remains the accepted target
+of [REQ-ORDERS-050/-051/-053/-054](docs/specs/orders-core.md). This material workflow does not yet
+remove the existing SK-only entry or widen unrelated Inventory, blueprint, mission or Bank rights.
 
 ### 3.4 Refinery
 

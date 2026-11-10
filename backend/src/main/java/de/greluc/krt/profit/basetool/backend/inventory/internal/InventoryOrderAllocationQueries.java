@@ -35,6 +35,41 @@ import org.springframework.data.repository.query.Param;
 @NoRepositoryBean
 interface InventoryOrderAllocationQueries extends Repository<InventoryItem, UUID> {
   /**
+   * Reads the exact eligible merge destinations before any stock lock.
+   *
+   * @param userId the destination holder
+   * @param materialId the material, or null for game-item stock
+   * @param gameItemId the game item, or null for material stock
+   * @param locationId the storage location
+   * @param quality the material quality, or null for game-item stock
+   * @param personal the destination personal marker
+   * @param stolen the destination stolen marker
+   * @param owningOrgUnitId the owning pool, or null for unassigned stock
+   * @return matching existing rows excluding offer-backed stock
+   */
+  @Query(
+      """
+      SELECT i.id FROM InventoryItem i WHERE i.user.id = :userId AND
+      ((:materialId IS NULL AND i.material IS NULL) OR i.material.id = :materialId) AND
+      ((:gameItemId IS NULL AND i.gameItem IS NULL) OR i.gameItem.id = :gameItemId) AND
+      i.location.id = :locationId AND
+      ((:quality IS NULL AND i.quality IS NULL) OR i.quality = :quality) AND
+      i.personal = :personal AND i.stolen = :stolen AND
+      ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
+      :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
+      o.inventoryItemId = i.id) ORDER BY i.id ASC
+      """)
+  List<UUID> findMergeCandidateIds(
+      @Param("userId") UUID userId,
+      @Param("materialId") @Nullable UUID materialId,
+      @Param("gameItemId") @Nullable UUID gameItemId,
+      @Param("locationId") UUID locationId,
+      @Param("quality") @Nullable Integer quality,
+      @Param("personal") boolean personal,
+      @Param("stolen") boolean stolen,
+      @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId);
+
+  /**
    * Resolves order slices before a stock-row write.
    *
    * @param rowIds the affected entries

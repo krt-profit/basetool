@@ -44,6 +44,8 @@ public enum AuditEventType {
   PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
+  /** A false original physical quantity and its connected retained stock facts were corrected. */
+  INVENTORY_QUANTITY_CORRECTED(AuditDomain.INVENTORY),
   /**
    * A warehouse inventory row's associations / quality / amount were edited.
    *

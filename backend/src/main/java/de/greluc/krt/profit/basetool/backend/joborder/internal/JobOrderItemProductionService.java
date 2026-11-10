@@ -32,8 +32,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
@@ -52,18 +54,21 @@ import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,6 +106,30 @@ public class JobOrderItemProductionService {
   private final LocationRepository locationRepository;
   private final OrgUnitStampingService orgUnitStampingService;
   private final AuthHelperService authHelperService;
+  private final EntityManager entityManager;
+
+  /** The resolved physical destination used by both planning and the final stock booking. */
+  private record ProductionDestination(
+      User owner,
+      @Nullable OrgUnit owningOrgUnit,
+      Location location,
+      boolean personal,
+      boolean allocateToOrder) {}
+
+  /** One snapshotted recipe row whose edits can leave the item-line version unchanged. */
+  private record RecipeFact(UUID id, UUID material, UUID tier, int floor, Double quantity) {}
+
+  /** The narrow production authority and recipe facts that must survive resource-lock waits. */
+  private record ProductionSnapshot(
+      JobOrderType type,
+      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus status,
+      @Nullable UUID responsible,
+      @Nullable UUID originalProfit,
+      @Nullable UUID gameItem,
+      Integer amount,
+      Integer manufactured,
+      Integer delivered,
+      Set<RecipeFact> recipe) {}
 
   /**
    * Snapshot of one consumed inventory row, captured before it is decremented or deleted so the
@@ -144,7 +173,8 @@ public class JobOrderItemProductionService {
       UUID jobOrderId, UUID jobOrderItemId, JobOrderItemProductionCreateDto dto) {
     assertMayBookInFor(dto.bookIn());
 
-    materialPromises.lockOrder(jobOrderId);
+    final List<OrderMaterialScope> materialScopes =
+        materialPromises.materialScopesOfOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
@@ -209,6 +239,9 @@ public class JobOrderItemProductionService {
             consumedEntry.getKey(), consumedEntry.getValue());
       }
     }
+
+    ProductionDestination destination = resolveDestination(line, dto.bookIn());
+    line = prepareProduction(jobOrder, line, dto, materialScopes, destination);
 
     final Integer orderDisplayId = jobOrder.getDisplayId();
     final List<ConsumedItem> consumedItems = new ArrayList<>();
@@ -288,7 +321,8 @@ public class JobOrderItemProductionService {
             .with("consumed", dto.consumption().size())
             .with("skipped", skippedRequiredMaterials.size()));
 
-    bookProducedStockIn(jobOrder, line, amount, dto.bookIn());
+    bookProducedStockIn(jobOrder, line, amount, destination);
+    materialPromises.reconcileOrder(jobOrderId);
 
     return Entities.require(
         jobOrderItemService.toItemDtos(jobOrder).stream()
@@ -345,28 +379,94 @@ public class JobOrderItemProductionService {
         BookInRule.production());
   }
 
+  private JobOrderItem prepareProduction(
+      JobOrder jobOrder,
+      JobOrderItem line,
+      JobOrderItemProductionCreateDto dto,
+      List<OrderMaterialScope> materialScopes,
+      ProductionDestination destination) {
+    UUID jobOrderId = jobOrder.getId();
+    UUID jobOrderItemId = line.getId();
+    final ProductionSnapshot planned = snapshot(jobOrder, line);
+    stockCommands.prepareWrites(
+        dto.consumption().stream()
+            .map(JobOrderItemProductionConsumptionDto::inventoryItemId)
+            .toList(),
+        List.of(
+            new StockCommands.StockBookInScope(
+                destination.owner().getId(),
+                new StockLot(null, line.getGameItem(), destination.location(), null, false),
+                destination.allocateToOrder() ? List.of(jobOrderId) : List.of(),
+                destination.personal(),
+                destination.owningOrgUnit() == null ? null : destination.owningOrgUnit().getId(),
+                true)),
+        materialScopes);
+    entityManager.refresh(jobOrder);
+    line =
+        Entities.require(
+            jobOrder.getItems().stream()
+                .filter(item -> item.getId().equals(jobOrderItemId))
+                .findFirst(),
+            () -> "Item line " + jobOrderItemId + " does not belong to job order " + jobOrderId);
+    entityManager.refresh(line);
+    OptimisticLock.checkRequired(
+        line.getVersion(), dto.version(), JobOrderItem.class, jobOrderItemId);
+    ProductionDestination currentDestination = resolveDestination(line, dto.bookIn());
+    if (!planned.equals(snapshot(jobOrder, line))
+        || !sameDestination(destination, currentDestination)
+        || !new HashSet<>(materialScopes)
+            .equals(new HashSet<>(materialPromises.materialScopesOfOrder(jobOrderId)))) {
+      throw new ObjectOptimisticLockingFailureException(JobOrderItem.class, jobOrderItemId);
+    }
+    responsibilityGuard.assertWritable(jobOrder);
+    assertMayBookInFor(dto.bookIn());
+
+    return line;
+  }
+
+  private static ProductionSnapshot snapshot(JobOrder order, JobOrderItem line) {
+    return new ProductionSnapshot(
+        order.getType(),
+        order.getStatus(),
+        order.getResponsibleOrgUnit() == null ? null : order.getResponsibleOrgUnit().getId(),
+        order.getOriginalProfitOrgUnitId(),
+        line.getGameItem() == null ? null : line.getGameItem().getId(),
+        line.getAmount(),
+        line.getManufacturedAmount(),
+        line.getDeliveredAmount(),
+        line.getMaterials().stream()
+            .map(requirement ->
+                new RecipeFact(
+                    requirement.getId(),
+                    requirement.getMaterial().getId(),
+                    requirement.getQualityTier().getId(),
+                    requirement.getQualityTier().getMinQuality(),
+                    requirement.getRequiredQuantity()))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+  }
+
+  private static boolean sameDestination(
+      ProductionDestination planned, ProductionDestination current) {
+    return planned.owner().getId().equals(current.owner().getId())
+        && planned.location().getId().equals(current.location().getId())
+        && Objects.equals(
+            planned.owningOrgUnit() == null ? null : planned.owningOrgUnit().getId(),
+            current.owningOrgUnit() == null ? null : current.owningOrgUnit().getId());
+  }
+
   /**
-   * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032).
+   * Resolves the physical finished-stock destination before material, lot or row locks.
    *
-   * <p>The owner defaults to the acting user and the owning org unit is resolved through {@link
-   * OrgUnitStampingService#resolveOrgUnitForPickerOutputNullable}. Unless {@code personal}, the row
-   * is earmarked to the producing order; it is then merged via the Lager's merge and audited as
-   * {@code INVENTORY_RECEIVED_FROM_PRODUCTION}.
-   *
-   * @param jobOrder the producing order, managed in the current transaction
    * @param line the produced item line supplying the stock row's game item
-   * @param amount the produced whole units
    * @param bookIn the book-in target; never {@code null}
+   * @return the exact holder, owning pool and location of the finished stock
    * @throws NotFoundException when the book-in owner or location is unknown
    * @throws BadRequestException when {@code personal} is combined with the order earmark, the
    *     acting user cannot be resolved, the line has no game item, or the org-unit picker output is
    *     invalid
    */
-  private void bookProducedStockIn(
-      JobOrder jobOrder,
-      JobOrderItem line,
-      int amount,
-      @NotNull JobOrderItemProductionCreateDto.BookInDto bookIn) {
+  private ProductionDestination resolveDestination(
+      JobOrderItem line, @NotNull JobOrderItemProductionCreateDto.BookInDto bookIn) {
     final boolean personal = Boolean.TRUE.equals(bookIn.personal());
     final boolean allocateToOrder = !Boolean.FALSE.equals(bookIn.allocateToOrder());
     if (personal && allocateToOrder) {
@@ -390,15 +490,20 @@ public class JobOrderItemProductionService {
         orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
             owner, bookIn.owningOrgUnitId());
 
+    return new ProductionDestination(owner, owningOrgUnit, location, personal, allocateToOrder);
+  }
+
+  private void bookProducedStockIn(
+      JobOrder jobOrder, JobOrderItem line, int amount, ProductionDestination destination) {
     stockCommands.bookInFromProduction(
         jobOrder.getId(),
         jobOrder.getDisplayId(),
         line.getGameItem(),
         amount,
-        owner,
-        owningOrgUnit,
-        location,
-        personal,
-        allocateToOrder);
+        destination.owner(),
+        destination.owningOrgUnit(),
+        destination.location(),
+        destination.personal(),
+        destination.allocateToOrder());
   }
 }

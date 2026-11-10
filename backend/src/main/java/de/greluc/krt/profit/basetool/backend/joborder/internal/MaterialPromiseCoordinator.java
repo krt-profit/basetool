@@ -46,6 +46,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,12 +98,22 @@ public class MaterialPromiseCoordinator {
    * @param orderId the order
    */
   public void lockOrder(@NotNull UUID orderId) {
+    lock(materialScopesOfOrder(orderId));
+  }
+
+  /**
+   * Resolves all existing demand, history and shared-row material scopes before physical planning.
+   *
+   * @param orderId the order whose write resources are being planned
+   * @return complete known scopes with the shared hierarchy stabilized, without material locks
+   */
+  public List<OrderMaterialScope> materialScopesOfOrder(@NotNull UUID orderId) {
     profitHierarchy.lockForOrderWrite();
     List<UUID> materialIds = resources.materialIdsOf(orderId);
     List<OrderMaterialScope> scopes =
         new ArrayList<>(stockScopes.materialScopesSharingRowsWithOrders(List.of(orderId)));
     materialIds.forEach(id -> scopes.add(new OrderMaterialScope(orderId, id)));
-    lock(scopes);
+    return scopes.stream().distinct().toList();
   }
 
   /**
@@ -200,16 +211,11 @@ public class MaterialPromiseCoordinator {
                     == de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus.REJECTED;
         if (bucket == null || terminal) {
           for (MaterialClaim claim : entry.getValue()) {
-            double previous = claim.getAmount();
-            claim.setAmount(0.0);
-            claim.setEndedAt(Instant.now());
-            record(
+            end(
                 claim,
                 terminal
-                    ? MaterialContributionChange.Reason.PROMISE_ENDED
-                    : MaterialContributionChange.Reason.REQUIREMENT_ENDED,
-                previous,
-                0.0);
+                    ? MaterialContributionChange.Reason.ORDER_ENDED
+                    : MaterialContributionChange.Reason.REQUIREMENT_ENDED);
           }
         } else {
           reduce(
@@ -262,6 +268,22 @@ public class MaterialPromiseCoordinator {
   }
 
   /**
+   * Ends one open promise without ending the Staffel's participation.
+   *
+   * @param claim the managed contribution
+   * @param reason the bounded ending cause
+   */
+  public void end(MaterialClaim claim, MaterialContributionChange.Reason reason) {
+    if (claim.getEndedAt() != null) {
+      return;
+    }
+    double previous = claim.getAmount();
+    claim.setAmount(0.0);
+    claim.setEndedAt(Instant.now());
+    record(claim, reason, previous, 0.0, null, AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN);
+  }
+
+  /**
    * Records a contribution change separately from current stock coverage.
    *
    * @param claim the managed contribution
@@ -274,13 +296,41 @@ public class MaterialPromiseCoordinator {
       MaterialContributionChange.Reason reason,
       double previous,
       double creditDelta) {
+    record(claim, reason, previous, creditDelta, null);
+  }
+
+  /**
+   * Records one quantity change with its connected historical provision identity.
+   *
+   * @param claim the managed contribution
+   * @param reason bounded business reason
+   * @param previous preceding open quantity
+   * @param creditDelta historical fulfillment change
+   * @param creditId connected provision, if any
+   */
+  public void record(
+      MaterialClaim claim,
+      MaterialContributionChange.Reason reason,
+      double previous,
+      double creditDelta,
+      @Nullable UUID creditId) {
+    record(claim, reason, previous, creditDelta, creditId, AuditEventType.JOB_ORDER_CLAIM_UPSERTED);
+  }
+
+  private void record(
+      MaterialClaim claim,
+      MaterialContributionChange.Reason reason,
+      double previous,
+      double creditDelta,
+      @Nullable UUID creditId,
+      AuditEventType auditType) {
     List<MaterialContributionChange> history = new ArrayList<>(claim.getChanges());
     history.add(
         new MaterialContributionChange(
-            reason, previous, claim.getAmount(), creditDelta, Instant.now()));
+            reason, previous, claim.getAmount(), creditDelta, Instant.now(), creditId));
     claim.setChanges(List.copyOf(history));
     audit.record(
-        AuditEventType.JOB_ORDER_CLAIM_UPSERTED,
+        auditType,
         claim.getJobOrder().getId(),
         JobOrderAuditLabel.of(claim.getJobOrder()),
         null,

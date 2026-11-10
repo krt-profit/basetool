@@ -74,6 +74,35 @@ current capacity; no negative quantity or ended-promise revival is allowed. Conn
 records may require the agreed connected correction rather than an isolated inverse. A true
 stock loss is not a correction of a truthful historic contribution.
 
+**Correction ownership and known quantity.** A provision's actual declared quantity is distinct
+from its credit clipped to an open promise. Retain the actual known composition, including any
+uncredited excess, separately from current truthful attribution and immutable processed-once
+quantity. Correcting actual provision 4 to 3 when only 3 were credited removes the uncredited
+quantity first. If that quantity was later truthfully credited through another receipt, correct
+every known intersecting credit in the same transaction, including credits on another order.
+Every affected order must have valid current responsibility and the actor must currently be
+allowed to correct its affected contribution. Inaccessible or changed connected facts fail
+atomically; no extra manual approval or client version is required for prescribed consequences.
+
+A historical attribution-only correction changes JobOrder facts. A responsible-unit writer may
+coordinate it; otherwise current grants for both the original and selected target Staffel are
+required. The original Staffel's writer may remove its own false attribution. No obsolete
+Inventory authority snapshot is reconstructed when stock is untouched. An existing ended matching
+target may receive corrected historical credit while both promises remain ended; this neither
+creates support nor restores open quantity. A writer for only the new target cannot relabel
+another Staffel's historical contribution.
+
+A physical correction additionally requires current Inventory authority and observed row versions
+for the retained connected stock it changes. Correction options check that authority before
+returning any row identity, version or label. A relocated or merged retained quantity remains
+correctable through its known origins. An explicitly declared upward correction from recorded 3
+to actual original 4 uses the same correction action and a selected retained connected row: admit
+only the additional 1 as a new known physical quantity and apply once-only credit to that delta.
+This does not turn a genuinely later provision into a correction or revive an ended promise.
+If an exact downward inverse requires fully consumed quantity or production reversal, reject
+that isolated physical correction with 409; attribution-only correction remains available. This
+is the existing production-reversal boundary, not a general prohibition on historical correction.
+
 **Authority and lifecycle.** The shared contextual writers, single participation, fixed Profit
 boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. A Staffel has at most
 one active promise per bucket; repeated editing addresses that same promise with the required
@@ -97,6 +126,13 @@ Missing history remains missing. Distinguish real credit, derived reduction/requ
 false-fact correction, later true stock changes and manual promise changes in readable history
 and privacy-safe audit. In-place and peer updates refresh affected stock/capacity/promise views.
 Audit, notices and bounded monitoring follow their canonical contracts.
+
+Legacy records that prove only a credited subset remain explicitly marked as such. Their credited
+quantity and requirement quality floor are lower-bound facts, not proof of the full actual
+provision or its original quality. Do not present these as observed truth or permit a physical
+quantity correction that relies on those unknown facts. New ordinary provision captures the
+actual declared quantity, quality and known composition; historical label corrections retain the
+legacy evidence distinction.
 
 **Acceptance**
 

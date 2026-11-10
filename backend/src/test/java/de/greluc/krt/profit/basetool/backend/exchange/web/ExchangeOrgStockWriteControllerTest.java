@@ -83,6 +83,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ExchangeOrgStockWriteControllerTest {
 
   @Autowired private OrgUnitRepository orgUnitRepository;
+  @Autowired private de.greluc.krt.profit.basetool.backend.inventory.api.StockReads stockReads;
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
   private static final String MEMBERS = "/api/v1/exchange/org-stock/members";
@@ -167,6 +168,76 @@ class ExchangeOrgStockWriteControllerTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
     settingsRepository.saveAndFlush(settings);
+  }
+
+  @Test
+  void anUnknownBookInOrderIsRefusedWithoutRollingBackAnIndependentOperation() throws Exception {
+    UUID pool = orgUnit();
+    joins(member, pool, true);
+    joins(holder, pool, false);
+    UUID material = material("SCU");
+    UUID location = location();
+    String good = bookIn(pool, ref(pool, holder), material, location, "3", "SCU");
+    String bad =
+        withSuffix(
+            bookIn(pool, ref(pool, holder), material, location, "2", "SCU"),
+            ",\"jobOrders\":[{\"jobOrder\":\""
+                + UUID.randomUUID()
+                + "\",\"quantity\":{\"amount\":1,\"unit\":\"SCU\"}}]}");
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(good, bad)))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200))
+        .andExpect(jsonPath("$.applied").value(1))
+        .andExpect(jsonPath("$.results[0].index").value(1))
+        .andExpect(jsonPath("$.results[0].reason").value("EARMARK_TARGET_INVALID"));
+
+    assertThat(stockReads.exchangeOrgLots(List.of(pool), new UUID(0L, 0L), 10))
+        .singleElement()
+        .satisfies(row -> assertThat(row.getAmount()).isEqualTo(3.0));
+  }
+
+  @Test
+  void aFreshUnmergedScuBookInLeavesAnInvalidOrdersOlderPoolRowAlone() throws Exception {
+    UUID pool = orgUnit();
+    joins(member, pool, true);
+    joins(holder, pool, false);
+    UUID material = material("SCU");
+    UUID location = location();
+    UUID unrelated = stock(holder, material, location, 2.0, pool, false);
+    jdbc.update("UPDATE inventory_item SET quality = 500 WHERE id = ?", unrelated);
+    UUID invalidOrder = earmarkToJobOrder(unrelated, 2.0, pool);
+
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), WRITE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(ops(bookIn(pool, ref(pool, holder), material, location, "3", "SCU"))))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200))
+        .andExpect(jsonPath("$.applied").value(1));
+
+    List<String> lots =
+        stockReads.exchangeOrgLots(List.of(pool), new UUID(0L, 0L), 10).stream()
+            .map(row -> row.getLotKey())
+            .toList();
+    assertThat(stockReads.exchangeOrgEntries(List.of(pool), lots))
+        .extracting(row -> row.amount())
+        .containsExactlyInAnyOrder(2.0, 3.0);
+    assertThat(stockReads.materialRowsOfOrder(invalidOrder))
+        .singleElement()
+        .satisfies(row -> {
+          assertThat(row.id()).isEqualTo(unrelated);
+          assertThat(row.amount()).isEqualTo(2.0);
+        });
   }
 
   @Test
@@ -1114,6 +1185,7 @@ class ExchangeOrgStockWriteControllerTest {
   @Test
   void aPartialStolenMarkingThatWouldLeaveEarmarksUncoveredIsRefused() throws Exception {
     UUID staffel = orgUnit();
+    reachesTheJobOrderQueue(staffel);
     joins(member, staffel, true);
     UUID entry = stock(holder, material("SCU"), location(), 10, staffel, false);
     earmarkToJobOrder(entry, 8, staffel);

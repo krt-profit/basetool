@@ -146,7 +146,8 @@ class JobOrderItemProductionServiceTest {
             userRepository,
             locationRepository,
             orgUnitStampingService,
-            authHelperService);
+            authHelperService,
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
@@ -655,7 +656,6 @@ class JobOrderItemProductionServiceTest {
     assertThat(slice.getJobOrderId()).isEqualTo(order.getId());
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
-    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
     org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
     callOrder.verify(inventoryItemRepository).save(stockRow);
     callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
@@ -805,7 +805,6 @@ class JobOrderItemProductionServiceTest {
     verify(inventoryItemRepository).save(captor.capture());
     assertThat(captor.getValue().getUser()).isSameAs(actor);
     verify(userRepository, never()).findById(any());
-    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(actor, null);
   }
 
   @Test
@@ -890,7 +889,6 @@ class JobOrderItemProductionServiceTest {
 
     service.bookProduction(orderId, lineId, dto);
 
-    verify(bookInPolicy).mayBookInFor(ownerId);
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());

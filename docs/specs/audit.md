@@ -96,6 +96,7 @@ web, naming its client (REQ-AUDIT-005):
   with the amount and whether it split; a selection writes one `INVENTORY_BULK_STOLEN_CHANGED`
   summary; an unchanged row records nothing, REQ-INV-053) /
   an exchange client's stock write (REQ-XCH-016: a book-in `INVENTORY_ITEM_CREATED`, a book-out the
+  Connected false original material quantity corrections emit `INVENTORY_QUANTITY_CORRECTED` with the provision identity, old/new quantity and bounded reason; ordinary true later loss remains distinct.
   Lager's own `DISCARD` book-out, `INVENTORY_ITEM_CONSUMED`, a stolen flip the marker events above, each under the client's id) /
   the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
   recreated or set back, with the amount afterwards and whether it was removed; an entry already as

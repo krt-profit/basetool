@@ -579,21 +579,25 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX withdrawal of a material claim, relaying the backend status (404, 400, 403).
+   * AJAX withdrawal of a material promise, relaying missing or stale version conflicts.
    *
    * @param id the order id
    * @param claimId the claim to withdraw
+   * @param version the observed contribution version
    * @return 204 on success, or the propagated backend error status
    */
   @PostMapping("/{id}/claims/{claimId}/withdraw")
   @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
-  public ResponseEntity<Object> withdrawClaim(@PathVariable UUID id, @PathVariable UUID claimId) {
+  public ResponseEntity<Object> withdrawClaim(
+      @PathVariable UUID id,
+      @PathVariable UUID claimId,
+      @RequestParam(required = false) Long version) {
     return relay(
         log,
         "withdraw claim " + claimId + " on order " + id,
         () -> {
-          jobOrderClient.withdrawClaim(id, claimId);
+          jobOrderClient.withdrawClaim(id, claimId, version);
           return ResponseEntity.noContent().build();
         });
   }

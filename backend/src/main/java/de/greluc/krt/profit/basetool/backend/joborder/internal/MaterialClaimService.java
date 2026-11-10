@@ -19,9 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
@@ -32,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketSource;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
@@ -51,9 +47,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -81,13 +75,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages material claims ("Eintragungen"): profit squadrons signing up for partial quantities of a
- * material bucket on a public Spezialkommando job order.
+ * Manages independently versioned material promises and their retained contribution history.
  *
- * <p>A claim is keyed on the bucket {@code (jobOrder, material, qualityTier)} and the claiming
- * squadron. Claims exist only on SK orders, never exceed the bucket's required amount in sum
- * (guarded by a pessimistic order lock, REQ-ORDERS-024, ADR-0092). Ending a claim retains its facts
- * without bumping the order's {@code @Version}.
+ * <p>The current SK workflow guards each order and material across every quality bucket; ending one
+ * promise preserves its participation and contribution facts (REQ-ORDERS-024).
  */
 @Service
 @RequiredArgsConstructor
@@ -112,9 +103,7 @@ public class MaterialClaimService implements ClaimBucketSource {
   private final JobOrderEligibilityNotices eligibilityNotices;
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
-  private final AccessGateService accessGateService;
   private final RequestScopeResolver requestScopeResolver;
-  private final AuditRecorder auditRecorder;
   private final MaterialMapper materialMapper;
   private final SquadronMapper squadronMapper;
   private final QualityTierMapper qualityTierMapper;
@@ -432,55 +421,50 @@ public class MaterialClaimService implements ClaimBucketSource {
   }
 
   /**
-   * Withdraws a single claim. Same gates as {@link #upsertClaim}: the order must be a non-terminal
-   * SK order and the caller must be allowed to act for the claim's squadron.
+   * Ends one material promise under its observed version and current SK or own-Staffel authority.
    *
-   * @param jobOrderId the order the claim belongs to.
-   * @param claimId the claim to withdraw.
-   * @throws NotFoundException when the order or claim is unknown, or the claim is on another order.
-   * @throws BadRequestException when the order is terminal or no longer an SK order.
-   * @throws AccessDeniedException when the caller may not act for the claim's squadron.
+   * @param jobOrderId the order whose contribution is being withdrawn
+   * @param claimId the retained contribution identity
+   * @param version the contribution version observed by the caller
+   * @throws NotFoundException when the order or its contribution is unknown
+   * @throws BadRequestException when the order is terminal or no longer an SK order
+   * @throws AccessDeniedException when the caller cannot manage this Staffel's promise
+   * @throws ObjectOptimisticLockingFailureException when the observed version is missing or stale
    */
   @Transactional
-  public void withdrawClaim(@NotNull UUID jobOrderId, @NotNull UUID claimId) {
+  public void withdrawClaim(
+      @NotNull UUID jobOrderId,
+      @NotNull UUID claimId,
+      @org.jetbrains.annotations.Nullable Long version) {
+    UUID materialId =
+        Entities.require(
+            materialClaimRepository.materialIdOf(jobOrderId, claimId),
+            () -> "MaterialClaim not found: " + claimId);
+    promiseCoordinator.lock(
+        List.of(
+            new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
+                jobOrderId, materialId)));
     JobOrder order = loadOrder(jobOrderId);
     responsibilityGuard.assertWritable(order);
     assertClaimable(order);
     MaterialClaim claim =
         Entities.require(
-            materialClaimRepository.findById(claimId), () -> "MaterialClaim not found: " + claimId);
-    if (!claim.getJobOrder().getId().equals(jobOrderId)) {
-      throw new NotFoundException(
-          "MaterialClaim " + claimId + " does not belong to order " + jobOrderId);
-    }
+            materialClaimRepository.findHistoricalById(claimId),
+            () -> "MaterialClaim not found: " + claimId);
     assertCanManage(order, claim.getClaimingOrgUnit().getId());
-    final UUID claimMaterialId = claim.getMaterial().getId();
-    final String claimQuality = claim.getQualityTier().getCode();
-    final UUID claimingOrgUnitId = claim.getClaimingOrgUnit().getId();
-    claim.setEndedAt(Instant.now());
-    auditRecorder.record(
-        AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN,
-        order.getId(),
-        JobOrderAuditLabel.of(order),
-        null,
-        AuditDetails.of("claim", claimId)
-            .with("material", claimMaterialId)
-            .with("quality", claimQuality)
-            .with("claimingOrgUnit", claimingOrgUnitId));
-    log.info(
-        "Material claim withdrawn: order={} claim={} material={} quality={} claimingOrgUnit={}",
-        jobOrderId,
-        claimId,
-        claimMaterialId,
-        claimQuality,
-        claimingOrgUnitId);
+    de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock.check(
+        claim.getVersion(), version, MaterialClaim.class, claimId);
+    promiseCoordinator.end(
+        claim,
+        de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
+            .PROMISE_WITHDRAWN);
   }
 
   /**
    * Ends active promises whose claiming Staffel no longer belongs to active Profit.
    *
    * @param affectedUnitIds the changed organisational units
-   * @return the number of promises ended with their historical quantity preserved
+   * @return the number of promises ended with their contribution history preserved
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public int endIneligibleClaimsWithinTransaction(@NotNull Set<UUID> affectedUnitIds) {
@@ -520,21 +504,16 @@ public class MaterialClaimService implements ClaimBucketSource {
         break;
       }
       for (MaterialClaim claim : batch) {
-        claim.setEndedAt(Instant.now());
+        promiseCoordinator.end(
+            claim,
+            de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
+                .UNIT_INELIGIBLE);
         claim.getParticipation().setActive(false);
         affected
             .computeIfAbsent(claim.getJobOrder(), _ -> new LinkedHashMap<>())
             .computeIfAbsent(
                 claim.getClaimingOrgUnit().getId(), _ -> new java.util.LinkedHashSet<>())
             .add(claim.getMaterial().getName());
-        auditRecorder.record(
-            AuditEventType.JOB_ORDER_CLAIM_WITHDRAWN,
-            claim.getJobOrder().getId(),
-            JobOrderAuditLabel.of(claim.getJobOrder()),
-            null,
-            AuditDetails.of("claim", claim.getId())
-                .with("claimingOrgUnit", claim.getClaimingOrgUnit().getId())
-                .with("reason", "INELIGIBLE_UNIT"));
       }
       materialClaimRepository.flush();
       endedCount += batch.size();
@@ -581,7 +560,11 @@ public class MaterialClaimService implements ClaimBucketSource {
                     new Bucket(c.getMaterial().getId(), c.getQualityTier().getId())))
             .toList();
     if (!orphaned.isEmpty()) {
-      orphaned.forEach(claim -> claim.setEndedAt(Instant.now()));
+      orphaned.forEach(claim ->
+          promiseCoordinator.end(
+              claim,
+              de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange.Reason
+                  .REQUIREMENT_ENDED));
       announceWithdrawn(order, orphaned, "ORDER_CHANGED");
       log.info(
           "Withdrew {} orphaned material claim(s) on order {} after a bucket was removed",

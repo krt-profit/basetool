@@ -349,6 +349,9 @@ const inventoryAll = krtPageSections.create({
     receiver: document.getElementById('tableContainer')
         ? {
               coalesceMs: 1500,
+              busyTest() {
+                  return !!document.querySelector('[data-assoc-pop]:not([hidden])');
+              },
               refresh() {
                   filterInventory();
               },
@@ -367,6 +370,9 @@ krtPageSections.create({
     receiver: document.getElementById('tableContainer')
         ? {
               coalesceMs: 1500,
+              busyTest() {
+                  return !!document.querySelector('[data-assoc-pop]:not([hidden])');
+              },
               refresh() {
                   filterInventory();
               },

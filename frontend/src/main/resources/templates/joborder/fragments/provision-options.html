@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"><body>
+<th:block th:fragment="options">
+<option value="" th:text="#{orders.claim.provision.none}"></option>
+<th:block th:each="bucket : ${provisionBuckets}">
+<option th:each="claim : ${bucket.claims}" th:if="${claim.amount > 0 and claim.claimingOrgUnit != null and provisionWritableIds.contains(claim.claimingOrgUnit.id)}"
+        th:value="${claim.id}" th:data-provision-version="${claim.version}"
+        th:text="#{orders.claim.provision.option(${claim.claimingOrgUnit.name}, ${#numbers.formatDecimal(claim.amount, 1, 'DEFAULT', bucket.material.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}, ${bucket.qualityTier != null ? bucket.qualityTier.minQuality : 0})}"></option>
+</th:block>
+</th:block>
+</body></html>

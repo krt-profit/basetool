@@ -1,6 +1,6 @@
 # 8. Cross-cutting concepts
 
-> **Approved planned JobOrder contracts, not implemented:** [Shared access/hierarchy](../specs/orders-core.md), [scoped monetary edits and history](../specs/orders-auec.md) and [synchronous bank coordination](../specs/orders-auec-bank.md) extend the existing edit/API/privacy boundaries. Data-only live/notice causes are registered in the business transaction and delivered after commit; monetary effects and audit stay synchronous. Current mechanisms below are not claimed to provide the new operation deduplication or draft recovery.
+> **JobOrder implementation scope:** [Shared access/hierarchy](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md) define the MATERIAL/ITEM foundation below. Broader shared writer/lifecycle changes, [monetary edits and history](../specs/orders-auec.md) and [synchronous bank coordination](../specs/orders-auec-bank.md) remain planned. Material coordination does not provide the future money-operation deduplication or submitted-operation recovery contract.
 
 These rules hold across modules. Each names its authority; this section exists to make them
 findable from one place, not to restate them.
@@ -35,8 +35,7 @@ Beyond roles there are three mechanisms that are easy to miss:
   subject, so it is invisible to everyone else regardless of role.
 - **Field redaction for partial viewers** — some surfaces return a reduced projection rather than
   refusing, so a page can exist for a caller who may see *some* of it: a member below Logistician
-  reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), a requester-only
-  viewer of a job order (`REQ-ORDERS-023`). There is no anonymous or guest tier any more — ADR-0159
+  reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), independently hidden mission facts inside an otherwise complete order view (`REQ-ORDERS-052`). There is no anonymous or guest tier any more — ADR-0159
   removed both audiences.
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
@@ -584,3 +583,25 @@ Enrichment records distinguish physical/cargo/UI geometry, micro-SCU/SCU, source
 requested relationship state. They remain game-source evidence under the area's decided P4K
 precedence. [REQ-DATA-032…038](../specs/data-persistence.md) and
 [ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) are canonical.
+
+The MATERIAL/ITEM workspace uses the shared reader contract of
+[orders-core.md](../specs/orders-core.md). Its paged query and counts, concrete reads and live-room
+probe use the same audience. Observed unit relationships retain concrete history reading through
+current legitimate unit reach; [ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md)
+owns that boundary. The producer panel and reduced external Exchange remain separate.
+
+## 8.15 Material contribution consistency
+
+Current stock coverage, outstanding promises and historical contribution credit are separate
+facts. Inventory owns the physical quantity and its current grants; JobOrder owns the explicit
+unit credit and capacity reconciliation. All affected material scopes are planned before
+physical lot/row locks, including initially empty sets and connected corrections. The normal
+stock or demand action applies credit before any necessary reduction and projects its final
+state. Independent materials and personal notes retain independent edit scopes.
+
+[REQ-ORDERS-024](../specs/orders-material-claims.md) and
+[ADR-0360](../adr/0360-material-promises-track-uncovered-demand-and-explicit-provision.md) own the
+rules; [data persistence](../specs/data-persistence.md), [audit](../specs/audit.md) and
+[observability](../specs/observability.md) own their respective contracts. Retained credited-subset
+history is not evidence of a complete original provision or its actual quality. The shared
+read gate and Inventory write gate stay independent; no money/Bank workflow is implied.

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="history">
+<section data-contribution-history th:data-order-id="${contributionOrderId}" th:data-error="#{orders.claim.history.error}">
+    <h3 th:text="#{orders.claim.history.title}"></h3>
+    <p class="text-muted" th:text="#{orders.claim.history.explanation}"></p>
+    <p class="text-muted" data-contribution-empty th:if="${contributionHistory.isEmpty()}" th:text="#{orders.claim.history.empty}"></p>
+    <article class="list-panel" th:each="contribution : ${contributionHistory}"
+             th:data-contribution-id="${contribution.id}"
+             th:data-claim-version="${contribution.version}"
+             th:data-open-amount="${contribution.openAmount}"
+             th:data-credited-amount="${contribution.creditedAmount}">
+        <h4><span th:text="${contribution.materialName}"></span> · <span th:text="${contribution.claimingOrgUnit.name}"></span></h4>
+        <p><span th:text="#{orders.claim.history.quality(${contribution.minQuality})}"></span>
+            <span class="chip chip--muted" data-contribution-ended th:if="${contribution.endedAt != null}" th:text="#{orders.claim.history.ended}"></span>
+            <span class="chip chip--muted" th:unless="${contribution.supporting}" th:text="#{orders.claim.history.supportEnded}"></span></p>
+        <dl>
+            <dt th:text="#{orders.claim.history.open}"></dt>
+            <dd th:text="|${#numbers.formatDecimal(contribution.openAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')} ${contribution.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu')}|"></dd>
+            <dt th:text="#{orders.claim.history.credited}"></dt>
+            <dd th:text="|${#numbers.formatDecimal(contribution.creditedAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')} ${contribution.quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu')}|"></dd>
+        </dl>
+        <details th:unless="${contribution.changes.isEmpty()}">
+            <summary th:text="#{orders.claim.history.changes}"></summary>
+            <div class="table-responsive"><table class="data-table">
+                <thead><tr><th th:text="#{orders.claim.history.when}"></th><th th:text="#{orders.claim.history.reason}"></th><th th:text="#{orders.claim.history.previous}"></th><th th:text="#{orders.claim.history.open}"></th><th th:text="#{orders.claim.history.creditDelta}"></th></tr></thead>
+                <tbody><tr th:each="change : ${contribution.changes}">
+                    <td><time th:datetime="${change.recordedAt}" th:text="${change.recordedAt}"></time></td>
+                    <td th:text="#{__${'orders.claim.history.reason.' + change.reason}__}"></td>
+                    <td th:text="${#numbers.formatDecimal(change.previousAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></td>
+                    <td th:text="${#numbers.formatDecimal(change.amount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></td>
+                    <td th:text="${#numbers.formatDecimal(change.creditDelta, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></td>
+                </tr></tbody>
+            </table></div>
+        </details>
+        <details th:each="provision : ${contribution.provisions}" th:data-provision-id="${provision.id}" th:with="observed=${provision.evidence != null and provision.evidence.name() == 'OBSERVED'}">
+            <summary><span th:text="#{orders.claim.history.provision}"></span> · <time th:datetime="${provision.providedAt}" th:text="${provision.providedAt}"></time></summary>
+            <p><span th:text="#{orders.claim.history.credited}"></span>: <span th:text="${#numbers.formatDecimal(provision.amount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></span></p>
+            <p><span th:text="${observed ? #messages.msg('orders.claim.history.physical') : #messages.msg('orders.claim.history.knownPortion')}"></span>: <span th:text="${#numbers.formatDecimal(provision.quantityAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></span></p>
+            <p class="text-muted" th:unless="${observed}" th:text="#{orders.claim.history.unknownPhysical}"></p>
+            <button th:if="${provision.canCorrect}" type="button" class="btn btn-ghost" data-open-contribution-correction th:data-credit-id="${provision.id}" th:text="#{orders.claim.correction.open}"></button>
+            <div data-correction-editor></div>
+        </details>
+    </article>
+</section>
+</th:block>
+<th:block th:fragment="editor">
+<form data-contribution-correction th:with="observed=${provision.evidence != null and provision.evidence.name() == 'OBSERVED'}" th:data-evidence="${provision.evidence}" th:data-order-id="${contributionOrderId}" th:data-credit-id="${provision.id}"
+      th:data-credit-version="${provision.version}" th:data-claim-version="${contribution.version}"
+      th:data-quantity-amount="${observed ? provision.quantityAmount : null}" th:data-credit-amount="${provision.amount}" th:data-piece="${contribution.quantityType == 'PIECE'}"
+      th:data-error="#{orders.claim.correction.error}" th:data-success="#{orders.claim.correction.success}"
+      th:data-conflict="#{orders.claim.correction.conflict}">
+    <p class="text-muted" th:text="#{orders.claim.correction.explanation}"></p>
+    <p class="text-muted" th:unless="${observed}" th:text="#{orders.claim.correction.attributionOnly}"></p>
+    <label class="form-group"><span th:text="#{orders.claim.correction.kind}"></span>
+        <select data-correction-kind><option value="ATTRIBUTION" th:text="#{orders.claim.correction.attribution}"></option><option th:if="${observed}" value="QUANTITY" th:text="#{orders.claim.correction.quantity}"></option></select>
+    </label>
+    <label class="form-group" data-correction-attribution><span th:text="#{orders.claim.correction.target}"></span>
+        <select data-correction-target>
+            <option value="" th:text="#{orders.claim.correction.remove}"></option>
+            <option th:each="target : ${attributionTargets}" th:value="${target.claimId}" th:data-version="${target.claimVersion}"
+                    th:data-ended="${target.ended}" th:data-max="${target.maxAmount}"
+                    th:text="|${target.claimingOrgUnit.name} · ${target.ended ? #messages.msg('orders.claim.history.ended') : #messages.msg('orders.claim.history.open')} · ${#messages.msg('orders.claim.correction.maximum', #numbers.formatDecimal(target.maxAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT'))}|"></option>
+        </select>
+    </label>
+    <div th:if="${observed}" data-correction-stock hidden></div>
+    <label class="form-group"><span th:text="#{orders.claim.correction.amount}"></span>
+        <input type="text" inputmode="decimal" data-number-input data-correction-amount required value="0" min="0" th:step="${contribution.quantityType == 'PIECE' ? '1' : '0.001'}">
+    </label>
+    <p class="text-muted" data-correction-message role="status"></p>
+    <button type="button" class="btn btn-ghost" data-correction-cancel th:text="#{general.cancel}"></button>
+    <button type="submit" class="btn btn--cta" th:text="#{orders.claim.correction.submit}"></button>
+</form>
+</th:block>
+<th:block th:fragment="quantityOptions">
+<div data-stock-version th:each="row : ${quantityOptions}" th:data-id="${row.id}" th:data-version="${row.version}"></div>
+<label class="form-group"><span th:text="#{orders.claim.correction.stockTarget}"></span>
+    <select data-correction-stock-target>
+        <option value="" th:text="#{orders.claim.correction.stockTarget.choose}"></option>
+        <option th:each="row : ${quantityOptions}" th:value="${row.id}"
+                th:text="|${row.locationName} · ${row.holderDisplayName} · ${row.owningOrgUnitName != null ? row.owningOrgUnitName : ''} · ${row.personal ? #messages.msg('orders.claim.correction.poolPersonal') : #messages.msg('orders.claim.correction.poolOrg')} · ${#numbers.formatDecimal(row.amount, 1, 'DEFAULT', 3, 'DEFAULT')} · ${row.quality != null ? #messages.msg('orders.claim.history.quality', row.quality) : ''}|"></option>
+    </select>
+</label>
+<p class="text-muted" th:text="#{orders.claim.correction.stockTarget.hint}"></p>
+</th:block>
+</body>
+</html>

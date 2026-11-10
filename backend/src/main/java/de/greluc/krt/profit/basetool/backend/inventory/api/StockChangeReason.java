@@ -45,6 +45,8 @@ public enum StockChangeReason {
   PRODUCTION("production"),
   /** An exchange stock change. */
   STOCK("stock"),
+  /** A connected correction of false retained physical quantity. */
+  CORRECTION("correction"),
   /** The erasure of the owning account. */
   USER_DELETION("user-deletion");
 

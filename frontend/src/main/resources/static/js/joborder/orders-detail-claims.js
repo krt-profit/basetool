@@ -156,7 +156,8 @@ export function submitClaim() {
             qualityRequirement: quality,
             claimingOrgUnitId: squadronId,
             version: _odControlById('claim-version').value
-                ? Number(_odControlById('claim-version').value) : null,
+                ? Number(_odControlById('claim-version').value)
+                : null,
             amount,
         },
         toast: false,
@@ -173,12 +174,14 @@ export function submitClaim() {
 export function withdrawClaimAction() {
     const orderId = _odControlById('claim-order-id').value;
     const claimId = _odControlById('claim-id').value;
+    /** @type {string} */
+    const version = _odControlById('claim-version').value;
     if (!claimId) {
         return;
     }
     krtOrderWrite({
         method: 'POST',
-        url: `/orders/${orderId}/claims/${claimId}/withdraw`,
+        url: `/orders/${orderId}/claims/${claimId}/withdraw?version=${encodeURIComponent(version)}`,
         toast: false,
         errorMessage: MSG_CLAIM_ERROR,
         onSuccess() {

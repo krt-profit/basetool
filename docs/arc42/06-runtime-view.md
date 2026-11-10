@@ -2,8 +2,8 @@
 
 > **Approved planned runtime, not implemented:** [aUEC procurement](../specs/orders-auec.md) defines immediate bank-free effects and persistent operation/outcome identity; [optional bank coupling](../specs/orders-auec-bank.md) defines atomic final bank/order effects, pending unavailability and the different reversal cases. The scenarios below remain the current runtime baseline, not verification of those planned flows.
 
-Eight scenarios. They were chosen because each one exercises a rule that is invisible in the static
-view, and because each one before the exchange's (§6.8) has burned somebody at least once.
+These scenarios exercise rules that are not visible in the static view. Their canonical
+requirements own behavior and verification status.
 
 ## 6.1 Sign-in
 
@@ -274,3 +274,23 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    (a resource group, or the material of a resource that joins no single commodity) is audited, and
    a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,
    REQ-P4K-016).
+
+## 6.12 Material provision and a connected correction
+
+1. Inventory resolves the complete set of actual source/destination rows, lots and affected
+   order/material scopes. The common lock protocol and revalidation reject a changed selection
+   instead of silently widening the action after locks.
+2. A normal stock provision may carry an explicit Staffel contribution selection. The Inventory-owned
+   observer lets JobOrder apply that credit and reconcile final uncovered demand in the same
+   transaction. Readable contribution history and privacy-safe audit accompany the effective facts.
+3. An explicit correction resolves the retained provision and all known intersecting later facts
+   before changing physical quantity. Current contribution and, where stock changes, Inventory
+   authority are rechecked for the connected action. A historical attribution-only correction
+   needs no nonexistent stock row; it does not reverse manufacture or invent a physical return.
+4. After a successful commit, affected shared views refresh through the existing live mechanisms.
+   A conflicting edit keeps its input and requires a deliberate retry. History explains the
+   correction independently of current stock placement and notification retention.
+
+The quantity/evidence contract and its acceptance status live in
+[REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
+record. The separate aUEC and optional Bank scenarios remain planned.

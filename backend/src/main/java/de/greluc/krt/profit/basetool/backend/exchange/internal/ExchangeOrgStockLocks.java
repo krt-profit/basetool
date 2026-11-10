@@ -19,17 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -37,18 +34,16 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Collects one org-stock batch's complete material, lot and row lock plan.
  *
- * @param holderLots current and destination holder lots
  * @param entries explicitly written stock entries
  * @param relocations requested physical placement changes
- * @param requestedScopes initial material allocation scopes
  * @param allocationTargets requested targets of current stock rows
+ * @param bookings exact initial stock destinations
  */
 record ExchangeOrgStockLocks(
-    Map<UUID, List<StockLot>> holderLots,
     Set<UUID> entries,
     List<PoolRelocation> relocations,
-    List<OrderMaterialScope> requestedScopes,
-    List<PoolAllocationTarget> allocationTargets) {
+    List<PoolAllocationTarget> allocationTargets,
+    List<StockBookInScope> bookings) {
 
   /** Supplies the stock resource scopes of one planned operation. */
   interface Contributor {
@@ -71,21 +66,13 @@ record ExchangeOrgStockLocks(
       @NotNull Collection<? extends Contributor> contributors) {
     ExchangeOrgStockLocks locks =
         new ExchangeOrgStockLocks(
-            new HashMap<>(),
-            new HashSet<>(),
-            new ArrayList<>(),
-            new ArrayList<>(),
-            new ArrayList<>());
+            new HashSet<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
     contributors.forEach(contributor -> contributor.lockInto(locks));
-    if (!locks.holderLots().isEmpty()
-        || !locks.entries().isEmpty()
-        || !locks.relocations().isEmpty()) {
+    if (!locks.entries().isEmpty()
+        || !locks.relocations().isEmpty()
+        || !locks.bookings().isEmpty()) {
       commands.lockLots(
-          locks.holderLots(),
-          locks.entries(),
-          locks.relocations(),
-          locks.requestedScopes(),
-          locks.allocationTargets());
+          locks.entries(), locks.relocations(), locks.allocationTargets(), locks.bookings());
     }
   }
 }

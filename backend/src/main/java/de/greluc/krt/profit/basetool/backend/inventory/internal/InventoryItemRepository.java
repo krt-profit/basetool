@@ -51,7 +51,8 @@ import org.springframework.stereotype.Repository;
 public interface InventoryItemRepository
     extends JpaRepository<InventoryItem, UUID>,
         InventoryLotLockRepository,
-        InventoryOrderAllocationQueries {
+        InventoryOrderAllocationQueries,
+        InventoryQuantityQueries {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.

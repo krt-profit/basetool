@@ -19,7 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.NoRepositoryBean;
 import org.springframework.data.repository.Repository;
@@ -28,6 +33,25 @@ import org.springframework.data.repository.query.Param;
 /** Supplies the transaction-scoped PostgreSQL stock-lot lock protocol. */
 @NoRepositoryBean
 interface InventoryLotLockRepository extends Repository<InventoryItem, UUID> {
+  /**
+   * Derives the existing stock-lot advisory key from the holder and physical lot.
+   *
+   * @param member the stock holder
+   * @param lotKey the physical lot key
+   * @return the first eight bytes of the namespaced SHA-256 digest
+   */
+  static long lotKey(@NotNull UUID member, @NotNull String lotKey) {
+    try {
+      byte[] digest =
+          MessageDigest.getInstance("SHA-256")
+              .digest(
+                  ("exchange-stock-lot|" + member + '|' + lotKey).getBytes(StandardCharsets.UTF_8));
+      return ByteBuffer.wrap(digest).getLong();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 is not available", e);
+    }
+  }
+
   /**
    * Waits for a lot lock that is released on transaction commit or rollback.
    *

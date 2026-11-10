@@ -235,15 +235,26 @@ class JobOrderPageControllerClaimMvcTest {
     doReturn(null)
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
+            eq("/api/v1/orders/{id}/claims/{claimId}?version={version}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(claimId),
+            eq(7L));
 
     mockMvc
-        .perform(post("/orders/" + orderId + "/claims/" + claimId + "/withdraw").with(csrf()))
+        .perform(
+            post("/orders/" + orderId + "/claims/" + claimId + "/withdraw")
+                .param("version", "7")
+                .with(csrf()))
         .andExpect(status().isNoContent());
 
     verify(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
+            eq("/api/v1/orders/{id}/claims/{claimId}?version={version}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(claimId),
+            eq(7L));
   }
 
   @Test
@@ -255,10 +266,17 @@ class JobOrderPageControllerClaimMvcTest {
     doThrow(new BackendServiceException("conflict", null, 409))
         .when(backendApiClient)
         .delete(
-            eq("/api/v1/orders/{id}/claims/{claimId}"), eq(Void.class), eq(orderId), eq(claimId));
+            eq("/api/v1/orders/{id}/claims/{claimId}?version={version}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(claimId),
+            eq(7L));
 
     mockMvc
-        .perform(post("/orders/" + orderId + "/claims/" + claimId + "/withdraw").with(csrf()))
+        .perform(
+            post("/orders/" + orderId + "/claims/" + claimId + "/withdraw")
+                .param("version", "7")
+                .with(csrf()))
         .andExpect(status().isConflict());
   }
 
@@ -269,7 +287,10 @@ class JobOrderPageControllerClaimMvcTest {
     UUID claimId = UUID.randomUUID();
 
     mockMvc
-        .perform(post("/orders/" + orderId + "/claims/" + claimId + "/withdraw").with(csrf()))
+        .perform(
+            post("/orders/" + orderId + "/claims/" + claimId + "/withdraw")
+                .param("version", "7")
+                .with(csrf()))
         .andExpect(status().isForbidden());
 
     verify(backendApiClient, never()).delete(any(String.class), eq(Void.class));

@@ -169,10 +169,32 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       @Param("orderId") UUID orderId, Pageable pageable);
 
   /**
-   * Clears the {@code claimedByUser} audit reference on every claim stamped by the given user, so
-   * the user can be deleted without an FK violation; the claims themselves remain.
+   * Reads a retained contribution's material without caching mutable contribution state.
    *
-   * @param userId the user whose audit stamp is cleared from every claim
+   * @param orderId the concrete order being written
+   * @param claimId the active or ended contribution
+   * @return its material identity, absent when the contribution is not on that order
+   */
+  @Query(
+      value =
+          "SELECT material_id FROM material_claim WHERE job_order_id = :orderId"
+              + " AND id = :claimId",
+      nativeQuery = true)
+  Optional<UUID> materialIdOf(@Param("orderId") UUID orderId, @Param("claimId") UUID claimId);
+
+  /**
+   * Reads one retained contribution even when its open promise ended.
+   *
+   * @param id the contribution identity
+   * @return the historical contribution, if retained
+   */
+  @Query(value = "SELECT c.* FROM material_claim c WHERE c.id = :id", nativeQuery = true)
+  Optional<MaterialClaim> findHistoricalById(@Param("id") UUID id);
+
+  /**
+   * Clears the audit-user reference so the user can be deleted while claims remain.
+   *
+   * @param userId the user whose claim audit reference is cleared
    */
   @Modifying
   @Query(
@@ -180,4 +202,31 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
           "UPDATE material_claim SET claimed_by_user_id = null WHERE claimed_by_user_id = :userId",
       nativeQuery = true)
   void unlinkClaimedByUser(@Param("userId") UUID userId);
+
+  /**
+   * Batch-reads active and ended connected contribution facts.
+   *
+   * @param ids affected contribution identities
+   * @return retained contribution rows
+   */
+  @Query(value = "SELECT c.* FROM material_claim c WHERE c.id IN :ids", nativeQuery = true)
+  List<MaterialClaim> findHistoricalByIdIn(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads a retained contribution's database version independently of a managed preread.
+   *
+   * @param id contribution identity
+   * @return current version, if retained
+   */
+  @Query(value = "SELECT version FROM material_claim WHERE id = :id", nativeQuery = true)
+  Optional<Long> currentHistoricalVersion(@Param("id") UUID id);
+
+  /**
+   * Batch-reads current versions without resolving managed entity prereads.
+   *
+   * @param ids retained fact identities
+   * @return current database identities and versions
+   */
+  @Query(value = "SELECT id, version FROM material_claim WHERE id IN :ids", nativeQuery = true)
+  List<MaterialFactVersion> currentVersions(@Param("ids") Collection<UUID> ids);
 }

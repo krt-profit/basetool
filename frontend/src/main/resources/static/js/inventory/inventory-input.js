@@ -24,6 +24,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+import { refreshProvisionPicker, provisionReady } from '/js/inventory/inventory-provision.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const matSelect = /** @type {HTMLSelectElement | null} */ (
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const qualityInput = document.getElementById('quality');
     if (qualityInput) {
         qualityInput.addEventListener('input', relabelOrderOptions);
+        qualityInput.addEventListener('input', () => refreshInputProvisions());
         qualityInput.addEventListener('input', scheduleMergeProbe);
     }
 
@@ -93,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = /** @type {Element} */ (event.target);
         if (target.matches('[data-alloc-target]')) {
             updateAllocOver();
+            refreshInputProvisions();
         } else if (target.matches('input[name="inventoryCatalogMode"]')) {
             applyCatalogMode();
         }
@@ -129,6 +132,7 @@ function refreshOrderNeeds() {
         .then((needs) => {
             if (!needs) return;
             orderNeeds = needs;
+            refreshInputProvisions();
             relabelOrderOptions();
         })
         .catch(() => {});
@@ -604,6 +608,12 @@ function reindexAllocRows(dimension) {
         );
         if (select) select.name = `${cfg.prefix}[${index}].targetId`;
         if (amount) amount.name = `${cfg.prefix}[${index}].amount`;
+        const claimId = row.querySelector('[data-provision-claim-id]');
+        const claimVersion = row.querySelector('[data-provision-claim-version]');
+        if (claimId instanceof HTMLInputElement)
+            claimId.name = `${cfg.prefix}[${index}].provisionClaimId`;
+        if (claimVersion instanceof HTMLInputElement)
+            claimVersion.name = `${cfg.prefix}[${index}].provisionClaimVersion`;
     });
 }
 
@@ -664,6 +674,7 @@ function filterOrderSelects(catalogId) {
         if (select.selectedIndex > 0 && !hasSelectedValid) select.value = '';
     });
     relabelOrderOptions();
+    refreshInputProvisions();
     updateAllocOver();
 }
 
@@ -906,6 +917,12 @@ function initInventoryInput() {
     if (!form) return;
     form.addEventListener('submit', (event) => {
         event.preventDefault();
+        if (
+            !Array.from(form.querySelectorAll('#jobOrderAllocRows [data-alloc-row]')).every(
+                provisionReady,
+            )
+        )
+            return;
         const blank = markBlankAllocationAmounts();
         if (blank.length) {
             showFrontendErrorToast(INV_ADD_MSG.allocAmountMissing);
@@ -918,6 +935,7 @@ function initInventoryInput() {
             toast: false,
             errorMessage: INV_ADD_MSG.failed,
             onError(status, problem) {
+                if (status === 409) refreshInputProvisions(true);
                 let msg = INV_ADD_MSG.failed;
                 const ownerRequired = krtFetch.ownerOrgUnitRequiredMessage(problem);
                 const retired = krtFetch.catalogueRetiredMessage(problem);
@@ -945,3 +963,22 @@ function initInventoryInput() {
 }
 
 initInventoryInput();
+
+/**
+ * Refreshes optional provision choices without changing the entered allocation amounts.
+ * @param {boolean} [refreshObserved] permits a deliberate post-conflict version refresh
+ */
+function refreshInputProvisions(refreshObserved = false) {
+    const material = currentCatalogMode() === 'material' ? activeCatalogId() : '';
+    const quality = /** @type {HTMLInputElement | null} */ (document.getElementById('quality'));
+    document.querySelectorAll('#jobOrderAllocRows [data-alloc-row]').forEach((row) => {
+        const order = row.querySelector('[data-alloc-target]');
+        refreshProvisionPicker(
+            row,
+            order instanceof HTMLSelectElement ? order.value : '',
+            material,
+            quality?.value || '',
+            refreshObserved,
+        );
+    });
+}

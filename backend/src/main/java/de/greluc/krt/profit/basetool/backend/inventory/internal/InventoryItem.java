@@ -161,10 +161,14 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
    */
   public @NotNull List<StockQuantityFragment> getQuantityProvenance() {
     if (quantityProvenance.isEmpty() && amount != null && ScuAmounts.toQuanta(amount) > 0) {
-      quantityProvenance =
+      List<StockQuantityFragment> normalized =
           List.of(
               new StockQuantityFragment(
                   id == null ? UUID.randomUUID() : id, 0, ScuAmounts.toQuanta(amount)));
+      if (id == null) {
+        quantityProvenance = normalized;
+      }
+      return normalized;
     }
     return List.copyOf(quantityProvenance);
   }

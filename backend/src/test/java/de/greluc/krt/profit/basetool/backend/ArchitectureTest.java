@@ -140,6 +140,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
@@ -424,6 +425,7 @@ class ArchitectureTest {
           InventoryStockMergeNotes.class,
           MaterialQuantityArithmetic.class,
           StockQuantityFragment.class,
+          StockQuantityFragments.class,
           InventoryAuditLabels.class,
           InventoryGameItemReferenceDto.class,
           InventoryItemDto.class,

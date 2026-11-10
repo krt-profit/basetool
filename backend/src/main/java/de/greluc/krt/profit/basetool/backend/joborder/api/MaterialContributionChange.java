@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import java.time.Instant;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * One truthful change of a contribution's outstanding quantity or historical credit.
@@ -29,9 +31,15 @@ import java.time.Instant;
  * @param amount the open promise after the change
  * @param creditDelta the change of truthful fulfilled contribution
  * @param recordedAt the change instant
+ * @param creditId connected provision identity for attribution and correction
  */
 public record MaterialContributionChange(
-    Reason reason, double previousAmount, double amount, double creditDelta, Instant recordedAt) {
+    Reason reason,
+    double previousAmount,
+    double amount,
+    double creditDelta,
+    Instant recordedAt,
+    @Nullable UUID creditId) {
   /** Distinguishes promised quantities, cancelled need, real provision and false facts. */
   public enum Reason {
     /** A permitted writer deliberately changed the outstanding promise. */
@@ -44,6 +52,12 @@ public record MaterialContributionChange(
     REQUIREMENT_ENDED,
     /** A false provision quantity or unit attribution was corrected. */
     FALSE_FACT_CORRECTED,
+    /** A permitted writer withdrew only this outstanding material promise. */
+    PROMISE_WITHDRAWN,
+    /** The contributing Staffel ceased to be eligible in the active Profit hierarchy. */
+    UNIT_INELIGIBLE,
+    /** The order's terminal lifecycle ended its outstanding material promises. */
+    ORDER_ENDED,
     /** The permitted promise lifecycle ended the outstanding contribution. */
     PROMISE_ENDED
   }

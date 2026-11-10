@@ -1,3 +1,3 @@
 ### Changed
 
-- Material promises follow currently uncovered demand, with explicit provision credit and retained contribution history. Concurrent amount edits require the observed promise version.
+- Material promises show the still-uncovered contribution and credit explicitly attributed provision once. Readable history distinguishes capacity reductions, corrections and later stock use or loss; concurrent edits preserve independently changed contributions.

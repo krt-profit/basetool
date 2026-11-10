@@ -80,6 +80,9 @@ public final class ProfitHierarchyFixtures {
     }
     Bereich root = profitArea();
     root.setId(null);
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    root.setName("Fixture Profit Area " + suffix);
+    root.setShorthand("FXP" + suffix);
     return repository.saveAndFlush(root);
   }
 }

@@ -441,7 +441,8 @@ public class InventoryItemService {
     item.setNote(StringNormalization.trimToNull(note));
     List<InventoryAllocationInput> jobAllocations =
         effectiveAllocations(dto.jobOrderAllocations(), dto.jobOrderId(), item.getAmount());
-    provisionRecorder.prepareInitial(item, jobAllocations);
+    provisionRecorder.prepareInitial(
+        item, jobAllocations, item.countsWholeUnits() || Boolean.TRUE.equals(dto.mergeStock()));
     List<InventoryAllocationInput> missionAllocations =
         effectiveAllocations(dto.missionAllocations(), dto.missionId(), item.getAmount());
     if (Boolean.TRUE.equals(isPersonal)

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationExcepti
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.util.List;
@@ -147,6 +148,35 @@ final class LotRows {
     }
     InventoryItem saved = repository.saveAndFlush(row);
     int reduced = observer.lower(row.getId(), remaining, reason);
+    return new Lowered(saved, false, new StockChangeEffects(reduced, 0));
+  }
+
+  /**
+   * Removes false exact physical intervals while keeping ordinary stock and offer effects coherent.
+   *
+   * @param repository owning stock repository
+   * @param observer owning stock-change observer
+   * @param row the locked row with its corrected slices
+   * @param remaining truthful remaining amount
+   * @param quantity exact surviving known physical intervals
+   * @return corrected retained or deleted row and offer effects
+   */
+  static Lowered lowerKnownQuantity(
+      InventoryItemRepository repository,
+      StockChangeObserver observer,
+      InventoryItem row,
+      double remaining,
+      List<StockQuantityFragment> quantity) {
+    if (remaining <= DEPLETED_BELOW) {
+      return lower(repository, observer, row, remaining, StockChangeReason.CORRECTION);
+    }
+    row.setAmount(remaining);
+    row.replaceQuantityProvenance(quantity);
+    if (!InventoryAllocations.fits(row)) {
+      throw new OverAllocationException();
+    }
+    InventoryItem saved = repository.saveAndFlush(row);
+    int reduced = observer.lower(row.getId(), remaining, StockChangeReason.CORRECTION);
     return new Lowered(saved, false, new StockChangeEffects(reduced, 0));
   }
 }

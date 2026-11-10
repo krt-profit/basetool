@@ -31,6 +31,11 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
+import {
+    refreshProvisionPicker,
+    selectedProvision,
+    provisionReady,
+} from '/js/inventory/inventory-provision.js';
 
 const ASSOC_EPS = 0.0005;
 
@@ -457,6 +462,7 @@ function createLager(cfg) {
             .then((html) => {
                 krtFetch.setTrustedHtml(content, html);
                 headerRow.setAttribute('data-stack-loaded', 'true');
+                content.dataset.page = String(page);
                 krtEnhanceComboboxes(content);
                 if (cfg.onStackEntriesLoaded) cfg.onStackEntriesLoaded(content);
             })
@@ -1546,12 +1552,68 @@ function createLager(cfg) {
     }
 
     /**
+     * Refreshes the optional matching promise selector for an ordinary Inventory allocation.
+     * @param {Element | null} split the owning allocation split
+     * @param {Element} pop its retained popover
+     * @param {boolean} [refreshObserved] permits a deliberate post-conflict version refresh
+     * @returns {Promise<void>} settles after current permitted choices are loaded
+     */
+    function refreshAllocationProvision(split, pop, refreshObserved = false) {
+        return refreshProvisionPicker(
+            pop,
+            split?.getAttribute('data-assoc-field') === 'JOB_ORDER'
+                ? pop.getAttribute('data-assoc-target') || ''
+                : '',
+            split?.getAttribute('data-provision-material-id') || '',
+            split?.getAttribute('data-provision-quality') || '',
+            refreshObserved,
+        );
+    }
+
+    /**
+     * Refreshes observed versions after a conflict without replacing the dirty allocation form.
+     * @param {Element} split the allocation split
+     * @param {Element} pop the retained popover
+     * @returns {Promise<void>} settles after current stock and promise snapshots are read
+     */
+    async function refreshAllocationSnapshot(split, pop) {
+        pop.setAttribute('data-refreshing', 'true');
+        const entries = split.closest('.tree-stack-entries');
+        const header = entries?.previousElementSibling;
+        const content = entries?.querySelector('.stack-entries-content');
+        try {
+            if (header) {
+                const page =
+                    content instanceof HTMLElement ? Number(content.dataset.page || '0') : 0;
+                const response = await krtFetch.get(buildStackEntriesUrl(header, page));
+                if (!response?.ok) throw new Error(assocI18n.failed);
+                const snapshot = krtFetch.parseTrustedDocument(await response.text());
+                const fresh = Array.from(snapshot.querySelectorAll('.assoc-split')).find(
+                    (row) =>
+                        row.getAttribute('data-entry-id') === split.getAttribute('data-entry-id'),
+                );
+                const version = fresh?.getAttribute('data-version');
+                const leaf = split.closest('.tree-row--leaf');
+                if (!version || !leaf) throw new Error(assocI18n.failed);
+                krtFetch.syncVersion(leaf, Number(version));
+            }
+            await refreshAllocationProvision(split, pop, true);
+            pop.removeAttribute('data-unavailable');
+        } catch (error) {
+            pop.setAttribute('data-unavailable', 'true');
+            console.error('Allocation snapshot refresh failed', error);
+            showFrontendErrorToast(assocI18n.failed);
+        } finally {
+            pop.removeAttribute('data-refreshing');
+        }
+    }
+    /**
      * Sends the allocation write through krtFetch; DELETE carries the body too. A 422
      * over-allocation toasts and keeps the popover open.
      *
      * @param {string | null} entryId the inventory entry id
      * @param {string} method POST, PATCH or DELETE
-     * @param {{ field: string | null, targetId: string | null, amount: number | null, version: number }} body the payload
+     * @param {{ field: string | null, targetId: string | null, amount: number | null, version: number, provision: ApiDto<'MaterialProvisionSelection'> | null }} body the payload
      * @param {Element} split the .assoc-split
      * @param {Element} pop the popover
      * @returns {Promise<void>} settles when the write finished
@@ -1576,6 +1638,16 @@ function createLager(cfg) {
                 }
             },
             onError(status) {
+                if (status === 409 && body.field === 'JOB_ORDER') {
+                    refreshAllocationSnapshot(split, pop);
+                    const picker = pop.querySelector('[data-provision-picker]');
+                    showFrontendErrorToast(
+                        picker instanceof HTMLElement
+                            ? picker.dataset.conflict || assocI18n.failed
+                            : assocI18n.failed,
+                    );
+                    return true;
+                }
                 if (status === 422) {
                     showFrontendErrorToast(assocI18n.overallocated);
                     return true;
@@ -1595,6 +1667,12 @@ function createLager(cfg) {
      * @returns {Promise<void> | undefined} the queued write, or undefined when refused
      */
     function assocSubmit(split, pop, method) {
+        if (pop.hasAttribute('data-refreshing')) return;
+        if (pop.hasAttribute('data-unavailable')) {
+            refreshAllocationSnapshot(split, pop);
+            return;
+        }
+        if (method !== 'DELETE' && !provisionReady(pop)) return;
         const entryId = split.getAttribute('data-entry-id');
         const field = split.getAttribute('data-assoc-field');
         const targetId = pop.getAttribute('data-assoc-target');
@@ -1623,7 +1701,14 @@ function createLager(cfg) {
         };
         const run = function () {
             const version = parseInt(split.getAttribute('data-version') ?? '', 10);
-            const body = { field, targetId, amount, version };
+            const body = {
+                field,
+                targetId,
+                amount,
+                version,
+                provision:
+                    field === 'JOB_ORDER' && method !== 'DELETE' ? selectedProvision(pop) : null,
+            };
             return assocSend(entryId, method, body, split, pop);
         };
         return krtFetch.serialize(`inv-assoc:${entryId}`, run).finally(release);
@@ -1687,6 +1772,7 @@ function createLager(cfg) {
             pop.setAttribute('data-assoc-target', value);
             pop.setAttribute('data-assoc-mode', existing ? 'edit' : 'add');
             assocShowAmountSection(pop, !!existing);
+            refreshAllocationProvision(pop.closest('.assoc-split'), pop);
             const amountInput = /** @type {HTMLInputElement | null} */ (
                 pop.querySelector('[data-assoc-amount-input]')
             );
@@ -1703,6 +1789,7 @@ function createLager(cfg) {
             pop.setAttribute('data-assoc-target', el.getAttribute('data-target-id') ?? '');
             pop.setAttribute('data-assoc-mode', 'edit');
             assocShowAmountSection(pop, true);
+            refreshAllocationProvision(ctx.split, pop);
             const amountInput = /** @type {HTMLInputElement | null} */ (
                 pop.querySelector('[data-assoc-amount-input]')
             );

@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,23 +52,19 @@ class InventoryPoolLotLocks {
    * Locks source and destination lots in key order, then their rows in id order (ADR-0229). The
    * caller holds the shared hierarchy lock before entering this protocol.
    *
-   * @param holderLots further lots the command changes
    * @param entryIds the named source entries
    * @param relocations the destination changes of named entries
-   * @param requestedScopes material scopes introduced by book-ins
    * @param allocationTargets new order allocations of current rows
+   * @param bookings exact initial stock destinations and actual merge policies
    */
   @Transactional(propagation = Propagation.MANDATORY)
   void lockLots(
-      @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
       @NotNull Collection<PoolRelocation> relocations,
-      @NotNull Collection<OrderMaterialScope> requestedScopes,
-      @NotNull Collection<PoolAllocationTarget> allocationTargets) {
+      @NotNull Collection<PoolAllocationTarget> allocationTargets,
+      @NotNull Collection<StockBookInScope> bookings) {
     Set<Long> keys = new TreeSet<>();
     Set<UUID> rows = new TreeSet<>();
-    holderLots.forEach((holder, lots) ->
-        lots.forEach(lot -> keys.add(InventoryStockCommands.lotLockKey(holder, lot.key()))));
     Set<UUID> entries = new HashSet<>(entryIds);
     relocations.forEach(relocation -> entries.add(relocation.entryId()));
     List<TargetLot> targets = new ArrayList<>();
@@ -103,34 +99,14 @@ class InventoryPoolLotLocks {
         }
       }
     }
-    holderLots.forEach((holder, lots) -> lots.forEach(lot -> rows.addAll(lotRowIds(holder, lot))));
     targets.forEach(target -> rows.addAll(lotRowIds(target)));
-    orderWrites.lockRowsAndTargets(rows, requestedScopes, allocationTargets);
-    InventoryStockCommands.lockInOrder(inventoryRepository, keys);
-    holderLots.forEach((holder, lots) -> lots.forEach(lot -> rows.addAll(lotRowIds(holder, lot))));
+    Set<UUID> planned = Set.copyOf(rows);
+    orderWrites.prepareWrites(rows, bookings, List.of(), allocationTargets, keys);
     targets.forEach(target -> rows.addAll(lotRowIds(target)));
-    if (!rows.isEmpty()) {
-      inventoryRepository.lockAllByIdOrderById(rows);
+    if (!planned.equals(rows)) {
+      throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
+          "error.inventory.concurrent_scope_changed");
     }
-    orderWrites.validateRows(rows);
-  }
-
-  /**
-   * Reads the ids of a holder's rows of a lot, personal and shared, without locking them.
-   *
-   * @param holder the holder
-   * @param lot the lot
-   * @return the row ids
-   */
-  private @NotNull List<UUID> lotRowIds(@NotNull UUID holder, @NotNull StockLot lot) {
-    return lotRowIds(
-        new TargetLot(
-            holder,
-            lot.material() != null ? lot.material().getId() : null,
-            lot.gameItem() != null ? lot.gameItem().getId() : null,
-            lot.location().getId(),
-            lot.quality(),
-            lot.stolen()));
   }
 
   /**

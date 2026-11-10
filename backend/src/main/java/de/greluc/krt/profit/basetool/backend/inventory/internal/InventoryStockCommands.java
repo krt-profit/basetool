@@ -45,15 +45,9 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,9 +72,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InventoryStockCommands implements StockCommands {
 
-  /** The prefix that keeps the lot locks apart from any other advisory lock (ADR-0229). */
-  private static final String LOT_LOCK_PREFIX = "exchange-stock-lot|";
-
   /** The rest below which a taken row counts as depleted. */
   private static final double QUANTITY_EPSILON = 1e-4;
 
@@ -97,22 +88,16 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void lockBookInScopes(@NotNull Collection<StockBookInScope> bookings) {
-    orderWrites.lockEligibility();
-    Map<UUID, Set<String>> holderLots = new HashMap<>();
-    List<OrderMaterialScope> scopes = new ArrayList<>();
-    for (StockBookInScope booking : bookings) {
-      holderLots.computeIfAbsent(booking.holder(), _ -> new HashSet<>()).add(booking.lot().key());
-      if (booking.lot().material() != null) {
-        booking
-            .orderIds()
-            .forEach(order ->
-                scopes.add(new OrderMaterialScope(order, booking.lot().material().getId())));
-      }
-    }
-    Set<UUID> rows = new HashSet<>();
-    holderLots.forEach(
-        (holder, lots) -> rows.addAll(inventoryRepository.findRowsInHolderLots(holder, lots)));
-    orderWrites.lockRowsAndTargets(rows, scopes, List.of());
+    prepareWrites(List.of(), bookings, List.of());
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes) {
+    orderWrites.prepareWrites(sourceRowIds, bookings, requiredScopes);
   }
 
   @Override
@@ -124,7 +109,7 @@ public class InventoryStockCommands implements StockCommands {
     for (String lotKey : lotKeys) {
       keys.add(lotLockKey(member, lotKey));
     }
-    lockInOrder(inventoryRepository, keys);
+    orderWrites.lockStockLots(keys);
   }
 
   /**
@@ -164,14 +149,7 @@ public class InventoryStockCommands implements StockCommands {
    * @return the lock key
    */
   static long lotLockKey(@NotNull UUID member, @NotNull String lotKey) {
-    try {
-      byte[] digest =
-          MessageDigest.getInstance("SHA-256")
-              .digest((LOT_LOCK_PREFIX + member + '|' + lotKey).getBytes(StandardCharsets.UTF_8));
-      return ByteBuffer.wrap(digest).getLong();
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 is not available", e);
-    }
+    return InventoryLotLockRepository.lotKey(member, lotKey);
   }
 
   @Override
@@ -232,7 +210,14 @@ public class InventoryStockCommands implements StockCommands {
   @Transactional(propagation = Propagation.MANDATORY)
   public void bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
     orderWrites.lockEligibility();
-    orderWrites.lockBookIn(member, lot, List.of());
+    orderWrites.lockBookIn(
+        new StockBookInScope(
+            member,
+            lot,
+            List.of(),
+            true,
+            null,
+            InventoryItem.countsWholeUnits(lot.material(), lot.gameItem())));
     User user = userRepository.findById(member).orElseThrow();
     InventoryItem item = new InventoryItem();
     item.setUser(user);
@@ -415,7 +400,8 @@ public class InventoryStockCommands implements StockCommands {
       @NotNull StockBookingReason reason) {
     orderWrites.lockEligibility();
     requirePositive(amount);
-    orderWrites.lockBookIn(holder, lot, List.of());
+    orderWrites.lockBookIn(
+        new StockBookInScope(holder, lot, List.of(), false, poolUnit.getId(), true));
     User user = userRepository.findById(holder).orElseThrow();
     InventoryItem item = poolRow(user, poolUnit, lot, amount);
     requireWholeUnits(item);
@@ -647,6 +633,14 @@ public class InventoryStockCommands implements StockCommands {
       boolean personal,
       boolean earmark) {
     orderWrites.lockEligibility();
+    orderWrites.lockBookIn(
+        new StockBookInScope(
+            owner.getId(),
+            new StockLot(null, gameItem, location, null, false),
+            earmark ? List.of(orderId) : List.of(),
+            personal,
+            owningOrgUnit == null ? null : owningOrgUnit.getId(),
+            true));
     InventoryItem stockRow = new InventoryItem();
     stockRow.setUser(owner);
     stockRow.setOwningOrgUnit(owningOrgUnit);
@@ -689,9 +683,13 @@ public class InventoryStockCommands implements StockCommands {
       @Nullable UUID missionId) {
     orderWrites.lockEligibility();
     orderWrites.lockBookIn(
-        assignee.getId(),
-        new StockLot(material, null, location, quality, false),
-        jobOrderId == null ? List.of() : List.of(jobOrderId));
+        new StockBookInScope(
+            assignee.getId(),
+            new StockLot(material, null, location, quality, false),
+            jobOrderId == null ? List.of() : List.of(jobOrderId),
+            personal,
+            owningOrgUnit == null ? null : owningOrgUnit.getId(),
+            false));
     InventoryItem item = new InventoryItem();
     item.setUser(assignee);
     item.setOwningOrgUnit(owningOrgUnit);

@@ -46,9 +46,17 @@ public interface StockCommands {
    * @param holder the stock holder
    * @param lot the physical destination lot
    * @param orderIds every initial job-order allocation target
+   * @param personal whether the new stock is personal
+   * @param owningOrgUnitId the exact owning pool, or null for unassigned stock
+   * @param merge whether the action actually merges matching stock rows
    */
   record StockBookInScope(
-      @NotNull UUID holder, @NotNull StockLot lot, @NotNull List<UUID> orderIds) {
+      @NotNull UUID holder,
+      @NotNull StockLot lot,
+      @NotNull List<UUID> orderIds,
+      boolean personal,
+      @Nullable UUID owningOrgUnitId,
+      boolean merge) {
     /** Retains an immutable copy of the requested target set. */
     public StockBookInScope {
       orderIds = List.copyOf(orderIds);
@@ -61,6 +69,18 @@ public interface StockCommands {
    * @param bookings every physical destination and initial allocation target of the action
    */
   void lockBookInScopes(@NotNull Collection<StockBookInScope> bookings);
+
+  /**
+   * Prepares every source row, exact destination and material scope before an action writes stock.
+   *
+   * @param sourceRowIds every existing row the action consumes or changes
+   * @param bookings every new destination with its actual merge policy
+   * @param requiredScopes additional material scopes owned by the calling domain
+   */
+  void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes);
 
   /**
    * Takes the transaction-scoped advisory lock of each of a member's lots, in ascending order of

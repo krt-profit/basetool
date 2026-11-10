@@ -38,6 +38,37 @@ Inventory/JobOrder ownership through narrow synchronous APIs and one determinist
 protocol. Exact SQL, tables and classes remain implementation choices, with real-database race
 evidence required. No implementation is authorized by this accepted planning record.
 
+### Durable quantity and connected correction
+
+Storage-row and allocation UUIDs do not identify physical quantity across split, merge, depletion
+or journal restore. Inventory retains exact origin intervals through those transforms; JobOrder
+retains globally processed intervals independently of deletable order/claim rows. A required
+PostgreSQL exclusion constraint prevents overlapping credit for the same origin, while adjacent
+or unrelated intervals remain independent. This is narrow known-quantity provenance, not a
+performance ledger or a workflow to verify quantities inside the game.
+
+A receipt separates its known actual composition from its clipped current attribution and its
+immutable processed-once evidence. Excess is not fictitious fulfillment. Connected downward
+correction adjusts every exact intersecting retained fact atomically under current authority;
+upward correction admits only the explicitly declared delta on the selected retained row.
+Attribution-only correction needs JobOrder grants for the affected original and target units or
+responsible coordination; Inventory grants apply when retained stock is actually changed.
+Existing ended targets can receive historical correction without open-quantity revival.
+A physical inverse requiring fully consumed quantity or production reversal conflicts409 under
+the existing out-of-scope boundary. Known relocated/merged quantity remains correctable.
+
+Planning declares the full sorted order/material set before any stock lot/row lock, then locks all
+physical resources in the common deterministic order. Post-lock changes to source placement,
+allocation targets, merge candidates or connected receipt intersections conflict rather than
+acquire a late guard. Every capacity calculation observes the completed demand/stock action;
+intermediate states cannot proportionally cancel promises. Independently scoped client versions
+remain meaningful for each deliberately edited contribution and current Inventory resource.
+
+Migration distinguishes observed actual receipt facts from a legacy credited subset and its
+known quality lower bound. Unknown total or original quality stays unknown. Immutable applied
+migrations and an additive follow-up preserve that evidence status; a fresh complete migration
+chain and partial-checkpoint upgrades are separate verification cases.
+
 ## Consequences
 
 Promise and stock views can explain actual progress without double credit. History must retain

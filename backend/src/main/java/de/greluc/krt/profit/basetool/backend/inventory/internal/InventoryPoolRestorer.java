@@ -168,7 +168,7 @@ class InventoryPoolRestorer {
     });
     orderWrites.assertOrders(targetOrders);
     orderWrites.lockRowsAndTargets(affected, requestedScopes, List.of());
-    InventoryStockCommands.lockInOrder(inventoryRepository, keys);
+    orderWrites.lockStockLots(keys);
     if (!present.isEmpty()) {
       inventoryRepository.lockAllByIdOrderById(present);
     }

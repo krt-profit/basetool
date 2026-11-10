@@ -44,22 +44,20 @@ public interface PoolEntryCommands {
 
   /**
    * Takes the advisory lot locks of every holder lot a batch touches, in ascending order of the
-   * lock keys, before any row is read (ADR-0229) — the given holder lots, the lot of each named
-   * entry as it is now and the lot each relocation moves it to — and then locks the rows of those
-   * lots and the named entries in ascending id order.
+   * lock keys, before row locks (ADR-0229), including each named entry's current lot, every
+   * relocation lot and each exact new booking destination, then locks affected rows in ascending id
+   * order.
    *
-   * @param holderLots the lots a batch books into, by holder
    * @param entryIds the entries a batch writes; an unknown id is left out
    * @param relocations the lots a batch moves entries into; one of an unknown entry is left out
-   * @param requestedScopes material scopes introduced by initial book-ins
    * @param allocationTargets job-order targets introduced by allocation writes
+   * @param bookings exact initial destinations and actual merge policies
    */
   void lockLots(
-      @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
       @NotNull Collection<PoolRelocation> relocations,
-      @NotNull Collection<OrderMaterialScope> requestedScopes,
-      @NotNull Collection<PoolAllocationTarget> allocationTargets);
+      @NotNull Collection<PoolAllocationTarget> allocationTargets,
+      @NotNull Collection<StockCommands.StockBookInScope> bookings);
 
   /**
    * Books stock in as a new shared entry of the pool held by {@code holder}, as the Lager's

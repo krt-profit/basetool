@@ -185,6 +185,7 @@
     <div class="tab-panes">
         <section th:if="${order.type != 'ITEM'}" id="pane-materials" class="tab-pane" role="tabpanel" aria-labelledby="tab-materials">
         <div id="order-materials-results"><th:block th:fragment="materialsSection">
+        <div data-contribution-history-slot th:data-order-id="${order.id}" th:data-error="#{orders.claim.history.error}"></div>
         <span hidden data-od-tab-count="materials" th:text="${order.materials != null ? order.materials.size() : 0}">0</span>
         <th:block th:if="${order.materials == null or order.materials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.materials.empty.text')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.materials == null or order.materials.isEmpty()}">
@@ -412,6 +413,7 @@
 
         <section th:if="${order.type == 'ITEM' and !requesterView}" id="pane-aggregated" class="tab-pane" role="tabpanel" aria-labelledby="tab-aggregated">
         <div id="order-aggregated-results" th:unless="${requesterView}"><th:block th:fragment="aggregatedSection">
+        <div data-contribution-history-slot th:data-order-id="${order.id}" th:data-error="#{orders.claim.history.error}"></div>
         <span hidden data-od-tab-count="aggregated" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span>
         <th:block th:if="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}"><th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='orders.detail.materials.empty.title', textKey='orders.detail.aggregated.empty')}"></th:block></th:block>
         <div class="table-responsive" th:unless="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}">

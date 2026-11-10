@@ -28,6 +28,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+import { initContributionHistory } from '/js/joborder/orders-contribution-history.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
 
 /** @type {any[]} */
@@ -100,6 +101,12 @@ function initOrdersDetail() {
             return window.orderId ? `order:${window.orderId}` : null;
         },
         receiver: {
+            busyTest(_section, container) {
+                return (
+                    container instanceof Element &&
+                    !!container.querySelector('[data-contribution-correction][data-dirty]')
+                );
+            },
             pill: {
                 label() {
                     return typeof KRT_ORDER_LIVESYNC_UPDATES !== 'undefined'
@@ -116,6 +123,7 @@ function initOrdersDetail() {
 }
 
 initOrdersDetail();
+initContributionHistory();
 
 export function _publishOrdersQueue() {
     krtPageSections.publish('orders', ['queue', 'demand']);
