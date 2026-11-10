@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:dcb375ea-f78b-4737-91c3-85312e2a72ba",
+  "serialNumber" : "urn:uuid:d2e1b8c2-60a6-4459-87c3-2d69b8fb941c",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-09T19:46:29Z",
+    "timestamp" : "2026-11-10T07:25:14Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "application",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.2?project_path=%3Abackend",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.3?project_path=%3Abackend",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "backend",
-      "version" : "1.23.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.2?project_path=%3Abackend",
+      "version" : "1.23.3",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.3?project_path=%3Abackend",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/42686254695"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/42774819115"
         },
         {
           "type" : "vcs",
@@ -280,43 +280,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar",
+      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
       "group" : "com.bucket4j",
       "name" : "bucket4j_jdk17-core",
-      "version" : "8.21.0",
+      "version" : "8.22.0",
       "description" : "Bucket4j core library",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "47c797bf2923a9444b47ae5e6af4f754"
+          "content" : "24fc5bff45fd40a7f2411a09061fab2f"
         },
         {
           "alg" : "SHA-1",
-          "content" : "a9feae7373b641c9db9a7222e373fca52cd2a819"
+          "content" : "b1b37663c8260799e0ab306a715c16a318c0c242"
         },
         {
           "alg" : "SHA-256",
-          "content" : "ebc70ed3fd2b9b4a60a5a64553140afbea6d11118eed4b30cd473dbf779c2993"
+          "content" : "b52fcb9d7f05c6fa1155429eb6d069670d708bbefc26120deef9eb8dc348d5b9"
         },
         {
           "alg" : "SHA-512",
-          "content" : "bf1a6b8d3d7378d3041f9f7236e57e13a1cc80d1a88415ae3bb5b0a79a947013fd7b37d08ce379ea09b4ec79318ff68f0cfb510a18bf3ca2e5bdc8cb724a1010"
+          "content" : "70643b68e61c5be9620e866c69f249e13197c583a6fb5a255e2e2751c1582b71ad6fae448dfa6f6ea3ea4a5d2c50c8ea060b05e2ca806c16c1c33480c411190b"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "23024d838b035944159a1c8a00b6e7057e0f9ac654080c21340e87640a5b8603"
+          "content" : "7715e2b10b44364d2c60b08f6cce891ef1f0b572556277c664171a1762bb890c"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2f3ebb6807ca4561e9c7f76154d62ad71cf4e36b4d05616b368ae6566f927017c40974317acdfd90b49d0a5944bbcee80a3e40fbe28429be378d2737aba042f5"
+          "content" : "a72e33fa7b5eb425fade3ba71c4aba76bc2abdcb162f5fbbb1f0611d3d2a799d4bf466ba97c9b81375ced3c55e5107dfef56fd3170b622fc82980305bd9c336d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "442267ec666624409c2f259221122211b0398b802d4f9246b54bb30fcd920f66c30a382a4df58a1bd6828c3bf1742973"
+          "content" : "57397a7d3f00957e7ddfe04a8f2934b76a08f20b01288e0733f3e35dbe788789ac7fcca723d75f0f4799a674b48deb61"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "a2446d2921d145c83375f5cb3dfb520ebddc73f351d4fa8cf9f4fc96a51ce0b7d1344e9dd6ccc4871d287667cb967e68"
+          "content" : "76d5d932d239fa20a0f17ddf65eff9b487d96b70925dd276b6562d8e73aab1e70dba4ce71d9047a2ebe116a098df5490"
         }
       ],
       "licenses" : [
@@ -326,7 +326,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar",
+      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -347,43 +347,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
       "group" : "com.fasterxml.jackson.core",
       "name" : "jackson-annotations",
-      "version" : "2.22",
+      "version" : "2.23",
       "description" : "Core annotations used for value types, used by Jackson data binding package.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "04c11c456fd1e21b9a21c25c665109cc"
+          "content" : "78850750b7547966b8257217f9bd163d"
         },
         {
           "alg" : "SHA-1",
-          "content" : "15c67f9498d6934cff9510fc70c5a12e52290457"
+          "content" : "cce49304a57c900364a727847c98993ca332b7d5"
         },
         {
           "alg" : "SHA-256",
-          "content" : "21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0"
+          "content" : "e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c"
         },
         {
           "alg" : "SHA-512",
-          "content" : "63b597ec02b4e31c57266d9b96f05f301f217bc12ffb7ba046a5658d2829728930a559947b98eb6c3cc448413a96b4939427aa669ae1e2dc3597ab5d5d287f9f"
+          "content" : "7c804e37df49c6485e84b5887d1a3173a11db53267aa29668b07537a901cc86882047552350e2e3457baf096783501bbd15ea4ffdab13cf57396d6f6d14d0d98"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "6bfc7b4ba70779fe5f0b1e2af585abab982f7929a68beb2c0e62ea2e2a321de0"
+          "content" : "89e30ffbe2ffac2f3bb874eee515acfdfe132f553a728b57952bd6e4fb943d1c"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "3f1bdfa32f7df76ac14cd2a3e689b65066fa0a6a760a9b8b1121773bb1b043a44587d4148c67f361dc6c630e6b31f29b2691a57d47caabea5ca23ae44af34a5e"
+          "content" : "b37733585b940b93806105598f7e4c613c9a0c534c5c38c47f4e45624a30f7803c9c5116405ff8a845bcacda1b5a2f44a4fde8441c03c001bc36b842f9e0601c"
         },
         {
           "alg" : "SHA-384",
-          "content" : "35b6fe651afeed54d1e6f7a39ac6cf6fdbafacdf2e3bdff7b29b965ccb79a0c53342a56bf0ecea4d6c4c4651b1d6aa19"
+          "content" : "5df8857d35b2453f46662ed43b18967fb19f6d98ba6c8877b1ccc031fd5fac223f086bdf4e855ab1d42bd1176a1ae8e0"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "72267dc54c4175c42ca0dd430a87b12cc68619a8777be2048e1d2f0747db884a568b5c346c77c9c8c0714ab96018f5f7"
+          "content" : "a0ee4a4b27433b7d55064f8f249ddbd5fd9cfddfdec37b3b54476925472107dd20bd0bf3d2beaf23c4226be63f40ae46"
         }
       ],
       "licenses" : [
@@ -393,7 +393,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
+      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -410,43 +410,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
       "group" : "com.fasterxml.jackson.core",
       "name" : "jackson-core",
-      "version" : "2.22.4",
+      "version" : "2.23.0",
       "description" : "Core Jackson processing abstractions (aka Streaming API), implementation for JSON",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "fa9ba32880026c653cc151bed0c28498"
+          "content" : "ac1ed6dcfa08b8e12969badbba07132f"
         },
         {
           "alg" : "SHA-1",
-          "content" : "d753ae59bae7dcb183f856da541c5b27272088ce"
+          "content" : "a9094d2712ae45481ea9152160a4fbdfdea20659"
         },
         {
           "alg" : "SHA-256",
-          "content" : "2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a"
+          "content" : "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9"
         },
         {
           "alg" : "SHA-512",
-          "content" : "3b0d500043699ce40fc6befc04c9dbf3e8067de453098fba53d1891793bd3da80955e44536d113fac6fc8fb58264e47b265ab3466b3c6fd4bca111487ac24700"
+          "content" : "1e47c2fa0cce27452162836f32d0abf69e21667c1c89c12ae2197f5dcfd826355fc7a3dad238dd8a062b1cf719a0803a56612e32e390a20dad30c5d393758ab2"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "edc5681da0d239439298ed33621f4aa1991aeca9a29be0c1d6ba76036dd8dfdc"
+          "content" : "ed01872fb1854941d09595599aebe8f409afd3483e5ebfffc27b2227c50872d8"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "9e9e02839c0cbe5c5aafb5af23d25db2bc71754a10c18998aee1fe7d216fdf7dd6602859480d5e76991f9393587ac215633f9a1740329715db40904532aaf483"
+          "content" : "105b8d6aea5e0cad7a984707877915d505102e4b1fb1efa14eb21341b81e01eb18ca6cecdf638ae97494d76976628c99dac0471380655f25eaf8c888d2cd0570"
         },
         {
           "alg" : "SHA-384",
-          "content" : "8b3beecfc5464c704601fe9cfe90ccabb7090381676da9d7514b27c979c4580baa1a343c9724146fc86c0568cad6d53c"
+          "content" : "7fd184c39e648599c653a14230137215305cd9545d394f856cf7743e49e9abccc723d5ee9cc8a0635d674cff405c5ab9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "30e3394466b713fa98b37e6d98948d38b26e2be090f35902f3416fa93c69c78d7d5e69d035a8403d720bb7106f29e716"
+          "content" : "a9fcd5202f23d260dfe48658d54caea5ce99b87cf37659632b5ba79399cd34d83337a901d91cae6f1b9edc2aeaa52ce2"
         }
       ],
       "licenses" : [
@@ -456,7 +456,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
+      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -473,43 +473,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
       "group" : "com.fasterxml.jackson.core",
       "name" : "jackson-databind",
-      "version" : "2.22.4",
+      "version" : "2.23.0",
       "description" : "General data-binding functionality for Jackson: works on core streaming API",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "e782b43929d9cb465924a105bdbf2db8"
+          "content" : "23bcc15788a045368dfa1b68230313d0"
         },
         {
           "alg" : "SHA-1",
-          "content" : "1ff5a55d62432f57e8044394976e598af0c5b3b8"
+          "content" : "01f6b378f93126e1212a9344717740e4fd21b28f"
         },
         {
           "alg" : "SHA-256",
-          "content" : "d4cbf8947087f305869826801913abdc50735a1fab2074a1993e7bc67ca974a3"
+          "content" : "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1"
         },
         {
           "alg" : "SHA-512",
-          "content" : "688ee3a248895070623288bbbd1050e1c14f54d24ddac9be1e624e264eed8d88a6ca07ae90af6056bed1e5f1d0c9ac9db503cbcaaa45db7ba8ca213d3387dde6"
+          "content" : "3369b5cf5693f19f885b96f4f02d26fe7640096809ca909886aa1ef8f5e9a0dba0cac53372129d813890d910701545e673692f5601b839988159099a619fce10"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "a7729d3990f1a7ca650383073604455f172d267b0152465880ad5bc0efa6741f"
+          "content" : "8a211a216f6eec5708741bbabe572d369aad6d9398522e13eb1785e21e201323"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "8f01016a09ec87f9d182f006026d3c14d7098b3548aa34501db40a3b823c933ac278b7148c96606c8c441a746ea63f0f8ceb6fa7067546649816c678ab4a5962"
+          "content" : "bd0b7dc2f81cfb1f98996af0e3a5580adeba50a536b319478aa11af04141ab3a1946c9cbdfafa9d2e745aa96a26215f195de16a0bd61c367c1a9a1499bd5a670"
         },
         {
           "alg" : "SHA-384",
-          "content" : "82b6ee17013047935bf6da141a1084a625200883c04984c6d07b65ea41925b7eeee1674aeffcef37d1e724e6727951a6"
+          "content" : "2e61d1e8072fcdb71474fd9a0752d6c00c1cb964353a95adb82853c8aefb9c96f452bbd211a3cde8cd5c921a89069854"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "39acae150a64e2fead35eecc17bd17f3fae8c003ff493899da4e540cd6af292e883b5d71102066efff91b83c256fcc27"
+          "content" : "63da5ef9734f5608c4f8d3c42f095158651156c90246519ccf2fb7a9f6ceee30dd356c72ae6bf40a9df2031fa4240d19"
         }
       ],
       "licenses" : [
@@ -519,7 +519,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
+      "purl" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -536,43 +536,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.22.4?type=jar",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.23.0?type=jar",
       "group" : "com.fasterxml.jackson.dataformat",
       "name" : "jackson-dataformat-yaml",
-      "version" : "2.22.4",
+      "version" : "2.23.0",
       "description" : "Support for reading and writing YAML-encoded data via Jackson abstractions.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ec05ad0e0416f0b380d75d84176f6f91"
+          "content" : "d56b979aee765ad78f3a4a31d9a20591"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ca03cc73f60b521973613e03acab671230e5802a"
+          "content" : "1763696914143f1baf11c283f3f89e850883cb54"
         },
         {
           "alg" : "SHA-256",
-          "content" : "2f55e2b864f6354b24d4bcccd488f7c4a3fce4977f8c8dbad07242a68e11dde9"
+          "content" : "971bce7e65b63c7f78965c29aa35370143f01e21a420d02bb3cde32069360689"
         },
         {
           "alg" : "SHA-512",
-          "content" : "310245b9f1a29ebcb18c46fee339c9c296a0b1d2c1bde6a862091ac195b3605a60cc6915af975475036fb4c52cbc9e1f47e2270b9c176f50c39d3bf267556148"
+          "content" : "c21c99742d488fb886a7cc58f66ea4eb1830835f35edf8107474cbefb3f7daaf761bd2704f3ab15692d344c1069e964433272e62ed78932e6209764f40bc96e2"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "67bcd45a6bbcdbe449935510a78ca9c82fc6b81c1c646d03c60c3c6ceccb293e"
+          "content" : "2340359c6ed8f60a09a36ca76b7f649a2f523b6310aa83a8f98f1d376b892c3d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2db23ea476f39c503887eb8277fb83f825b67629ab855fe1e3b7f63d846964401c14170e8ac1834b8837b9f128ef015ec6bf30ae4e2a601ffac2b03e082ef8ba"
+          "content" : "fd11591ffa51647735bc55aff847a3dae8a9b3e241eb79b9b751abe883104b597dafd77867f8bdea8a1130643c2505939dce1f1eeb48043b5045c91089316e4d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a0727abff1c4ed9be07a360e7ec8cde1d79aaa76edec38fffd28be95d12d56f7220cde168ceff3f9e2951a7ec93b795c"
+          "content" : "cdcaf2683a7aa43bde8caf0ae16c7cc68e8c4308de2e4bcadcc0290cb6ada581d29f5605a58c01c3e1cc58e38c416515"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "1035c0e7491756a79b4e4437b0d3c68346f6c6de2733bcec5212fa666d66349ee8ec732aff05b854499d4fa2b45601bf"
+          "content" : "3beed0b792cf79c6557eca6bbf1784a7638836a0e7267063186ae8b5809b40be6c7606b5fd4ec2ffd8d0d68b516153a5"
         }
       ],
       "licenses" : [
@@ -582,7 +582,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.22.4?type=jar",
+      "purl" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.23.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -593,43 +593,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.22.4?type=jar",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
       "group" : "com.fasterxml.jackson.datatype",
       "name" : "jackson-datatype-jsr310",
-      "version" : "2.22.4",
+      "version" : "2.23.0",
       "description" : "Add-on module to support JSR-310 (Java 8 Date & Time API) data types.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "018b80dead759e6648c1ab231ccdc55c"
+          "content" : "b62ba38693a0a11dc89a467bff26a821"
         },
         {
           "alg" : "SHA-1",
-          "content" : "28d6410e4fc5285752da6981fffa7fed845c0b43"
+          "content" : "f133f886c8b0794496ef666f3f505d0b77c9c1e0"
         },
         {
           "alg" : "SHA-256",
-          "content" : "ec961697cbd631935b6fb6f673406861c75243521fb67fec10b59f1412ac50f7"
+          "content" : "f348f4de49644afa0ccbff6b018709a5f0f1468c76852e4217051890a0b8528c"
         },
         {
           "alg" : "SHA-512",
-          "content" : "98a8f359e042528ee83157b4ce5139d066b3c393a5c9eb625a0ba4bb93a8f4acfb2312927c0f290b210ca7c34907ce437ee3f7b33dea2ab83182a8e71ac96087"
+          "content" : "c8cf2eb512a6d48593969ff3479531b5cfc5e4308a97e033df81ffd8a0e2157dab735935ccca2cd9d2d121102952dbf028f130ac022959cc105721ea676a08ef"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "d822e5eb74ea006f0bc9718bb2cf8997dc551fae3f3d86689e245f52033a483f"
+          "content" : "2962e33c37f994472b3d941b9f7a8ed8079e455f07aee5d56809af4de3849c68"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "7a9c6c06359f74ad2ac413000dcaa60aae210aac3664d9bbe6fe4d7e402ac72ec37af09386d08f568e4bfe55660f7dbf78e29327cc545a2c181a9184948eb3e9"
+          "content" : "e17fd2a72ce8cda65226225cefd41860c4b2a93fd4fa9ff79340a19d1c0edc42b857d504fadba30025efeaf4568710960b973d66c9d33605761786973d803bc0"
         },
         {
           "alg" : "SHA-384",
-          "content" : "22c2a5ccb2d1034da2b94f9d51602907f2d42cea2cb08a3b34b6807d25fc3fc0e15a93bff111da9725be45ecd02de115"
+          "content" : "b6d249eb8847f295292a088c6a0733d464c588ebb276d07c60d607e92fb2f32e65aa6429fffcba994ed9f271eb71521a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "c47f240073ac55ccf3f9ec7f7621d36d09368a14c23f830fad1e4665e0c2bc49777b866e8e3dc8888a17931cc30f3743"
+          "content" : "7e6e73a9aa16f349d0bf81409038db1f2e4a7596423d2d1d61ae649efc455312503999538cfc0c8558117ea2c0dcb89e"
         }
       ],
       "licenses" : [
@@ -639,7 +639,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.22.4?type=jar",
+      "purl" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -650,11 +650,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom",
+      "bom-ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
       "publisher" : "FasterXML",
       "group" : "com.fasterxml.jackson",
       "name" : "jackson-bom",
-      "version" : "2.22.4",
+      "version" : "2.23.0",
       "description" : "Bill of Materials pom for getting full, complete set of compatible versions of Jackson components maintained by FasterXML.com",
       "licenses" : [
         {
@@ -663,7 +663,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom",
+      "purl" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
       "modified" : false,
       "externalReferences" : [
         {
@@ -879,44 +879,44 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "bom-ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar",
       "publisher" : "com.github.luben",
       "group" : "com.github.luben",
       "name" : "zstd-jni",
-      "version" : "1.5.7-24",
+      "version" : "1.5.7-26",
       "description" : "JNI bindings for Zstd native library that provides fast and high compression lossless algorithm for Java and all JVM languages.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "5f828f8883aed5dea2464f3209dc02af"
+          "content" : "f74bbe6e358053c20b67c09f8a68c4ae"
         },
         {
           "alg" : "SHA-1",
-          "content" : "03db28b2a682184f5be41eb6774c8ec1a81683c2"
+          "content" : "43a27830588c690f1e09a3f30a524519cdaa65af"
         },
         {
           "alg" : "SHA-256",
-          "content" : "79f5e678ce437f09d5ab55df1c6e7fc8cf6a2eb8e73052f34b143464062fcb0b"
+          "content" : "2d03193dd02c4495be80b4aad571b78a9a21dd6e2cfeb63ae57451c53a9cd074"
         },
         {
           "alg" : "SHA-512",
-          "content" : "a8d42052fd2716091913cd4e6ea001b93bc5530145e7ed571423a2cd551071da21a7d99bee93778f60101829d27a0d4d27d0bc4edb2b933747784a4429ac0487"
+          "content" : "65a61d8c3c30c2d701f056374fd7ae4c1160628e46f085474fc7a4cd08bcdd34a352d8bb2953e358a24140c246040cff4ab91989c31752a8bf7bbfb91a966b52"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "e532465ed2e3ee1e48dd504f2f497b36f8d2c34e7f4815d7253348b4b1ba9599"
+          "content" : "008b6e107efb2b64269b7903c8c4ceac8b45c4da2e5f2523b5467e55297bd973"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "55e1d031c2da4688d9cef7281656e6eab50fac02b09baa2a998f44f544d617bb37a82d8ec9f52002295e08d315a6ed38f0324317d44caf8e1a5a4a164b9dc07e"
+          "content" : "0c5a4be5bacf62e94c4ca4ff89e193cb3169765199325614a7592a81d925e9792055e1afc223d7a6eede1385dc67fd0b8682c64f224920f6c4916f40cb8425af"
         },
         {
           "alg" : "SHA-384",
-          "content" : "1f9b0b1756a84f2b7103c1388e69e08d6c47c8fb30750f3f9a3e42113a897e4a03a08e0b144e9f4a4a2ad4cd0d336457"
+          "content" : "49c023051b85bfc20c8a1c78617da5fd9181f25b27b9acaef3457791ca3aad7e80499656f5cf59a740050a93916212d3"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "03f7543c473e2ba8157a25dcd1218cf49a5f9d120f4b8dc8ab30487515c49224aa3a630f8d5fbcf6a1cb58c98f090df5"
+          "content" : "8f223c324f14a22f1b575b421a5ca79ae01f2548d560ec6464a0f860649bdb3516224bc8018524f68549f29503a97923"
         }
       ],
       "licenses" : [
@@ -926,7 +926,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "purl" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -937,42 +937,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
+      "bom-ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar",
       "group" : "com.google.errorprone",
       "name" : "error_prone_annotations",
-      "version" : "2.50.0",
+      "version" : "2.52.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "1ded1848cfd4f5167e00824faf9c4d3b"
+          "content" : "cf0439bb26f5593a79ae144c3068fb3f"
         },
         {
           "alg" : "SHA-1",
-          "content" : "74ba43e49ab1184d41634af2ef0047e82c4064b0"
+          "content" : "83177bbb5db5bfe120666ae93fdaf44625ad7a7d"
         },
         {
           "alg" : "SHA-256",
-          "content" : "4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a"
+          "content" : "24822b246a2da324006fc5a1c940b1d2cf9cd716e530155c39fea695d5ab01c4"
         },
         {
           "alg" : "SHA-512",
-          "content" : "f867b1a1fbc057fcfc37c2fa86082f5965ad6a1c45373eac6cfa6ec058cedbf7b348ab4f3d4fea2d4d105ecc401c14f24d9b16f344507e126a221d50532cb8b2"
+          "content" : "43b7708a96b064d86eb41d52370152bd76dc090ec1e010cc1ef9e8f17280cc9116c228c4de2e3d02c3302b1e01e8fded6fcaf2e2c79e8c2131d5b9dd59c342e3"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "5447d9786f79d7dc20e8f75ac93f3a05181f3707faf6e91696dd326cdd5f5754"
+          "content" : "d7345c75e7c7b2af03a9f62fc432427ebed75f101e1a8f95289ca3f12019a8b4"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "b51065218c88f5ce0b94e6607dee42d6c01aeb69a87b6e1c656dd406f2196cc999150ce87f56fbeeecbed7e1e354ed285589fa560012e9fb5858a97dc17d2129"
+          "content" : "8b16f76b03cdc7512b56b67bde5ce9b5afa7c3b2d85635c761055eee3e91736bec100123d935343d8e0dc563bd97087bcd9760bb9fd627f2846bd11f10cb19bb"
         },
         {
           "alg" : "SHA-384",
-          "content" : "2986b161379c30e9805f3bcff197d7861b8c0690a021e2d7464707e57028b1953d24eefd1a36722f3c04665190b3cb48"
+          "content" : "c4ceb32d69f2efeb9de7a449dafd717ff142f2fa90211d4fe72d2432d925db383e2587443ce98143da59cbc32633d9f4"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "597fe452ff7e21149da3c537b61d8e1b17df792f67bcd80fbccd6647acca571a94fa8bbcf4840826a37814bb2ef0249a"
+          "content" : "1eb974e66e8d2385af077abc30b8ddd71b712876929caecdcb7d47bcd13d159762cd5f39d4beb5d920ad44e3af698e9c"
         }
       ],
       "licenses" : [
@@ -982,7 +982,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
+      "purl" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -1050,43 +1050,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar",
+      "bom-ref" : "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
       "group" : "com.google.guava",
       "name" : "guava",
-      "version" : "33.7.2-jre",
+      "version" : "33.8.0-jre",
       "description" : "Guava is a suite of core and expanded libraries that include utility classes, Google's collections, I/O classes, and much more.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "b07f61705f717d9ae7946c7fdb1efd7a"
+          "content" : "6cab07839b624bf0a3de7338c9bafcee"
         },
         {
           "alg" : "SHA-1",
-          "content" : "e70def5b06cfb109ea050de99870e79c8ce80dbc"
+          "content" : "bb3b79346325315062192205fa6636dd5873151f"
         },
         {
           "alg" : "SHA-256",
-          "content" : "b530942257fb935f8b2cfaa5f8eb5bd59c555fd8e8d01b8ce98912e077ea606c"
+          "content" : "97b79ec3f2c0a6313a0c2df51ce1abdf8907e6531803467b81efcaaf99b35161"
         },
         {
           "alg" : "SHA-512",
-          "content" : "bd663dc02f2293a552d82829518435b8cfcd77b7c73eeb638aef93918ef7613ad2a869003b09d1afb4446fa74308041daa7a6aea85c1bedb17db1f5f0c2c5c0b"
+          "content" : "ef92dc2efc21f7e6a453ca3a905e25853e1fc375a5ec51b375815f55ea72248a062534a8961d756ea1de7d95f1b8d0eca5a2dc32aeaebea6f0c808e00c476c82"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "adee2b0b99a4777a1fb04eb1a26d6b44aa47457c850dbf43d743d17801615c18"
+          "content" : "06a4042eb73c404e68e84706d79a0178b6fb50346f8008397055193a493bf256"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "5bff0e702aaa6bfbf3fdd8fb963b6242d5dbecd8b7601afc0bfe158314887352d48c79c4ef9e256a0510474ac39493c59ca277bd1989a04705a723c6045fe4b7"
+          "content" : "ac4a6c0ac067e73cf118611f45e646bc220b8b6edf04b5759bb8b5d2b5540196886d82f06261cc6c5e2e7f29f841f9c4e2d04ee4e6d6b34dd10974d11e2aa831"
         },
         {
           "alg" : "SHA-384",
-          "content" : "7c1d8db6504620e2feb70d56e4bffb479e5ba292c1d911da060cb66f2ac3d4050c718a72e6cfd6c82a36fd840c499942"
+          "content" : "fc47fdce7bd427580a31f350aa93fa3b4e35701f121af072159fd9fab3c3d1f978905e070bf268ff5aeff8a0d684633a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "13dcb7e8318a75368b33e1abc3a5b9b674bed950d6cfe1e7ca8be8f42f642816e69ae5d39d5ddbe998fe2c9acbf6ee28"
+          "content" : "ebee6b14c5914076220b507469f8a5a106c0ce6799f4384ba38e5b700af11df3f46a2fc8f0eecf2c5647f138f22ba95b"
         }
       ],
       "licenses" : [
@@ -1096,7 +1096,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar",
+      "purl" : "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -1303,43 +1303,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp-jvm",
-      "version" : "5.5.0",
+      "version" : "5.5.1",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a9506ae9545544d219c6775bce435349"
+          "content" : "d34672bd0b04a600c37fc4173b982d67"
         },
         {
           "alg" : "SHA-1",
-          "content" : "cefe1eb26408176d30511420b7e36b065e38bca0"
+          "content" : "1df922f9db18f897722b7e566c21bcaf0a73d484"
         },
         {
           "alg" : "SHA-256",
-          "content" : "234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52"
+          "content" : "4039527bd1f2e40b66e20b0e52c689cf56074b938ea02678141495f5160f1047"
         },
         {
           "alg" : "SHA-512",
-          "content" : "f05cc85dc48556c120b69497722d1ed5db08007445b30ba1901c24cc3496a913b34cc0b3b0866c41206624e90f230ec23bbacfcac532590321bcb2ff261333ac"
+          "content" : "155bc9f40c3667ccb4be16f93ba5ed92b1cf8b76688e12bd553fa71945a64fe250674a53a6555c07ace949b46278b9acb6c9b38db3bf135d8a538858dd628901"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "eeb80a1af674f4066f9640a6399aa4e869deaa35369444cdb311684c557ee2c6"
+          "content" : "696fb05376f082d3b03a4925a748b5d1e0491cf8ff4dc47050ad05912916407e"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "0341c39261a731a4d4aac03557ad4d3235d68cebed2462f5d450e432018382407ba10a5afe23fc9ca4071419accc3630bf0d61ed2dc552b829c0378668651c7b"
+          "content" : "eec5f403f195ac6f045e598cfef4e564d7f482ae08b626dbc56dc9de0ff7f314edd1310b912e77f94b359a2f077e45194cb065d2e8e1c9b0ab16b9b2ff260fba"
         },
         {
           "alg" : "SHA-384",
-          "content" : "9c97973f9e4bcf5fb0777f3b0977d5e8907609d45962df9b091f53fcda9e68199a85cdf1c6bf7a2df28d71a45ca23b48"
+          "content" : "00a63aaadb0d1d3a420e78ddd918ebbd6c8a3aa9f8577e0ddcbf9b3ccd7ebf5490b5d37474d6ff844c539c3a53280ec9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "3371409f0357b640ca68c63f06c8c16a09d2e2de85fc11516ee04d348b5745758752c39905a21320ca0ad422cdeb8a88"
+          "content" : "67085a986c31cd155a22a591bfe7c422d540e073c2caded17218571f4648b4407ba953caeec87e94573df218f652d62b"
         }
       ],
       "licenses" : [
@@ -1349,7 +1349,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar",
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -1366,10 +1366,10 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom",
+      "bom-ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom",
       "group" : "com.squareup.okhttp3",
       "name" : "okhttp",
-      "version" : "5.5.0",
+      "version" : "5.5.1",
       "description" : "Square’s meticulous HTTP client for Java and Kotlin.",
       "licenses" : [
         {
@@ -1378,7 +1378,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom",
+      "purl" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom",
       "modified" : false,
       "externalReferences" : [
         {
@@ -1687,11 +1687,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "logging-support",
-      "version" : "1.23.2",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support",
+      "version" : "1.23.3",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support",
       "modified" : false,
       "properties" : [
         {
@@ -2793,43 +2793,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-api",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry API",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "d6f000325d6d96972a81a882dee61a05"
+          "content" : "ddd9cf7d8ed351871ef0c6ec31b5ceeb"
         },
         {
           "alg" : "SHA-1",
-          "content" : "069f15f38424287af33eda1ed782b440029710a0"
+          "content" : "04630cfcddffdb3c1521320005da4d089a170747"
         },
         {
           "alg" : "SHA-256",
-          "content" : "538d1dff2f9a37aecbc0ef98fd17273a3affb058e734e6763a3a07a38a5fdc59"
+          "content" : "921398d19e2723a356a4e86442daa8e7cb3d8edd84e97e44f5e34807e9b46c2a"
         },
         {
           "alg" : "SHA-512",
-          "content" : "c80458ba4567002027f44fcb8c11c01942191a1d59a27c360acc552f586fc563e9e31732b5f3cf05c7e6da20b4965de0bf836989d781881b02053e97e62206af"
+          "content" : "9df0645ba2c2a45da39999b897da709a78e46e3ac334cc43e9b1097c68d53f2f212683e967c37cd580725917ff69e9163e7c8cee913d0ed705fd59fd030f0649"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "45e318745fe6c7f874de2162eee3a0ddd5e5d52eef2b15612f625b9cc175c38a"
+          "content" : "aae0df92b58f21176d35e434f9350aca6f3c4ed16da8ae8f82fb7b42587e8972"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "8555d05a3dba846cbb83953abc3e543c3931536fd6adad523acf4e35b17cc4f2dac5b569819135e6e522ab0f67ed0603b1d0d9f7814c6f3e106c822695e67ab8"
+          "content" : "b135d966125634f845612b3856ddd47610d406819047347408cc6d19e68f7628697c304b6f34fc627d40ba96bf3d3f2ed573998b888d7e3a2c6877b6addd7849"
         },
         {
           "alg" : "SHA-384",
-          "content" : "828a339de3eae5332f9bff2d4169848b4b0f55e57758d5073e4a00a1e175654ecae6c24214a1448614be73ee78ae8fc0"
+          "content" : "df194e59f8e764e2a07344c3daad2124caca957e2f14d44f6e891dfc10ea2c6c66876509cad663b0a6196d3a5b891939"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "a0d7e660549657ddd15d31c8334f31f16dd3a4c0aafc481d06ea5330478b5ac48d8fb0b35338cc57decc5e5abeda5982"
+          "content" : "a0f2ae5e3e1ea2cf9ba018112e093b235674cab21ea055f2a72e29ad5da177c97a5cf9a486d4ec75f9b13a07e6bd78f9"
         }
       ],
       "licenses" : [
@@ -2839,7 +2839,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -2850,43 +2850,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-common",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry API Common",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "7c598a21baa1e0b23307a332400679f0"
+          "content" : "61a0969b7ddfbe2b4527f01b9ed102cf"
         },
         {
           "alg" : "SHA-1",
-          "content" : "3f6ecafdf85070807d9111b5027557eefdedfebf"
+          "content" : "9d7b1f57f5a590f8eb412606c8bddf084ccae79d"
         },
         {
           "alg" : "SHA-256",
-          "content" : "da97bdb395418e16ecdcbe7ad3497f45b9e767ceda4ae7e86133e7a757ac377f"
+          "content" : "c69addeb5de9c96c4ca036ed6935f21c12949032d2798698d76c5931f2b4bc2a"
         },
         {
           "alg" : "SHA-512",
-          "content" : "2997effeb87b6dfbbee40e46d6610abb5cce2e3ce5a347cbd336502e47eecc5688f4c49155aae004940730eb4c8c4e5c9e6aac6af4a29172a9363d5e4fea1f29"
+          "content" : "e8856fbf78d985a353a8e2915dca127fd6354a51dea501c2bf26a06609c033af9749eafb3f4425f3f014f94013a5513207adfc7a4c97b5b6c1093575faf48fdb"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "2fdde7b3a570a0f532f0c4ae0abadfb652b848dcc60761c58b2a1ad826faddfd"
+          "content" : "9970a414111fc2796c43ef2939413c772ee120be97da7b0e43500a74b1f272ba"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "daabb9b3d130327d1f211e94bc2e886ff741d5f901cd82f99cbf4651f1396e3bb1cf7054904463cbda7df3837966e37d91d8ebc293a6305cce7ff3a6b4c7e48e"
+          "content" : "6e7d73033ae850535c08ad08321e78fb3510282ccc67ed8f8e0cfabd36b20ed6aa2c33ee81a4bc314be58543c389e8803a9bacc280ebe06983b1f67567da8285"
         },
         {
           "alg" : "SHA-384",
-          "content" : "46d06a771540b9cc0a293663e1964bf96d2f8a9348a5182f2b11cc81d89ffa75eb4d40daa5188c42cc4a5d91f71e3456"
+          "content" : "d3b1977ac8c01fd11a2186d32ad703396d595e592f5ca47696b6b5d10031d348d10db01d7307c82f73020f597d70fb37"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e9c922fac9fe59f2d8fdeb43f120c1048b3e38f99ee7fca7eecc9efb68d6982675e18b46890e6acda933ae1a8fbf308e"
+          "content" : "f80d1fbbd97e0048ca29c9e5a01d38cdd7eeb3eb639078b3cefcbf264e7664257a43ca8cabfcbce6c7f3129d924d6430"
         }
       ],
       "licenses" : [
@@ -2896,7 +2896,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -2907,43 +2907,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-context",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Context (Incubator)",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "4eb1684aa24d6cba8f739d635726e9cf"
+          "content" : "9d4a9c4cfd0f9c65f7009be5b3387831"
         },
         {
           "alg" : "SHA-1",
-          "content" : "1c669bff2a92842a625ce2e2e200d2f2277cc7e2"
+          "content" : "108c5053b685890ea3a672d704f24e248f948b21"
         },
         {
           "alg" : "SHA-256",
-          "content" : "40fb813fb5e27ec2691daa29c81b572b5b1541ef9b41e62490c3ee3e6407c55e"
+          "content" : "9ca2a322fbe6736c610086e2fecec8d292daca6fd755bd5670f751bb373c2b70"
         },
         {
           "alg" : "SHA-512",
-          "content" : "85cfb4ceb653fd8be0f4095086c8df0e0bcc0f49c3c224757f8ef5a8ea69f64da514217cbb4c473baf2f5c39b9953c348d2a0d63208277ab611b0d87434be97f"
+          "content" : "bca13d5bf0d4e6e64cbba262942f7b8dc3f79addddcf4945be6aa423e6796333e9ca05985284bb741ea0786cad0ae0049cf2ccbb989036a6a49ea9e1e4609a28"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "0d42d98a13b73c25e01e0695ac123697624c17f6a671605ce72097201408a110"
+          "content" : "a0adf89449e9cdd14e0eee165bda9e0f029b3c832f4fface7681a69a84ed6752"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "ecc66eefc6147e3cb296e69dcd544d0ce18f1b85fc6b52070f3ebb29bfea415cc8fb09bc0a9287309f8e298d06780fc25af0c71a5f708a3009df397eec26a883"
+          "content" : "6ba4e4a6facf1f47f2b2575ccfd0ea1ba263660ddb4cbfcc1deab836fd452caec22fba1e384638b8d5f8f59c640f956aa9f0eb153651790d0c4a86ecab5728cc"
         },
         {
           "alg" : "SHA-384",
-          "content" : "f420b1445f27c070ece3b791f43dfc317ebaee6937fad1b1b847da4631c4bc91ff2274e7cf97a9aa3ac585e0501edfb2"
+          "content" : "36cbf682170427d1c6c96f998435819d57800f212b7a3c22e15601308e0d65422d16b54672b5e6a54394d4015404ff3c"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "9a374fe712eaf8f67d244303acb906335112670a2ebc744d266de5b55e159fe483b478703f6ee77d633d854c68d0b121"
+          "content" : "5b01871dc13d441f520878333bb164a850975c989a30cb3ca6f3a4ab4c3541078945809a28047e044c3d08be3c53407e"
         }
       ],
       "licenses" : [
@@ -2953,7 +2953,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -2964,43 +2964,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-exporter-common",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Exporter Common",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "879a6f36b8d5ad9f61ff47717744a1cb"
+          "content" : "dece9af910565354d215c592ca187bb3"
         },
         {
           "alg" : "SHA-1",
-          "content" : "f9606857ffc08215b0a400f820be2dcbf6662c57"
+          "content" : "d306fd6f437da0e2d445fc30a19dcdf46e004359"
         },
         {
           "alg" : "SHA-256",
-          "content" : "eb61aab6d20bf105102dfa061b478b659cec17e82a50969898046456768ba09b"
+          "content" : "9cbfd22a19bea6e75cf88ba680340b06c267b073ee16e1d57effd1bbdd2dd406"
         },
         {
           "alg" : "SHA-512",
-          "content" : "792d31a6b66ffafe47ea373c6bb304b8e3d8bb51cc23c433a585634edaf0a3566f9397e389b264ac0baf35082e3756ccf2a69da76ca17d1c47e19bfdea4a30b6"
+          "content" : "1a5ac5a99696900ac2cc1b9a7f2561ab5766c0f005486484f71778d02420a94c2ec9c561e41fad54a7877a21a33e6c405a2c33031311b1132bd1a00aeb3a201f"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "af99aeb8298da3d346b0566f51d5ab14d8412a31275a6f0a7a984800ecde209b"
+          "content" : "d06073ad0bae337efa83f9966bfe4cf883a5550f6f36e299e7aebc07820db2c0"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "aa1816202b837f43e7d0844ef5ec076a7a371a3f3f61e38bc52509f702e5f62b2ba11b7bfed8452cf5382259ed44e04e2b03aabb09ad7440d6d0599444e6d646"
+          "content" : "cd6db7935f4b0dbb074720c899b4606ebe70a7025b1ca33bf5a62b9ba4e2a807b37b90b6d3419bc146c572d519be852952973be3b715bf1897c1fd9485a66d76"
         },
         {
           "alg" : "SHA-384",
-          "content" : "443b72949b8894915bed87def659d8f72ea0f52d5090f2c964d4d6d5a8285c7a74b608d42a9270cc0b0148a529858736"
+          "content" : "14217293e2438c95a078b550eb6aafe7b48ed7b5f851166d52948c39634d75b99a58295e6bc5dfeb5bd090263916c517"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "584a85c7fe51d0cf85e4dfba2a156408555e0d510b2f4c9c05d1c661ff74e55fe237930a3b45ea499e98609fed834862"
+          "content" : "8ed602cad44b64a4fc6cb7d3d56580b0b7c7a904099f34546403ce7325392b4808193972d27e6c83d90aa4f51b8ce26b"
         }
       ],
       "licenses" : [
@@ -3010,7 +3010,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3021,43 +3021,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-exporter-otlp-common",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Protocol Exporter",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "4385a6b29e8d886882170108d16c11da"
+          "content" : "13894b120d3dca952585bebf351798b5"
         },
         {
           "alg" : "SHA-1",
-          "content" : "b167688121d874cbd0cb8497821735c8df5474ec"
+          "content" : "2e0ce2448d5b20bbd8f5ece651413a623df7c979"
         },
         {
           "alg" : "SHA-256",
-          "content" : "75530ab4d93e6fdef478d3e112713337625e70a63df357e6e7b9060c13788015"
+          "content" : "0503fe2df299e0623c102a451da95efed3b82e86076b58bae46c2d7120f9abf6"
         },
         {
           "alg" : "SHA-512",
-          "content" : "2e9883d0a60c03833e96b8d2fada125130528c983ff69080189bbbca36698e267c9fc6afcec7a394b73b756373a3e0f0e16998c14fa5fb07d4e83f0e01c04fb5"
+          "content" : "9e42cfef78a49f5dc2a5e9b334e2778d53a12a0f95a55454c0d7e338456a746571450317c0537da95e98c39ede1aa26191c0f77c6eedffc342abe0d8e0486873"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "9be97e595e84d08c4cef44dd4e5eeb853b1be4b1ee0e0875dacfb3cc2264b1ba"
+          "content" : "165a9066243ecc95523e973619496a07baf532d2296ced2f6ffb726a3d0990b1"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "24020911b1bd64cc2dbd8a431cfe1ef6f37d17675762e4776a70fd0efdd26e7b05049d1f7c4878234312f0d5c67ee7afc5b349cfcdd9d31bdc7ef70c8800e02c"
+          "content" : "cba8d2c9639934df47c97b38377701c445ef500317904f11aab937662e53f67fb5e630c936cb64552ca47bf938ccfdfe8da916a129b5e6eee5936b7d222e1bb8"
         },
         {
           "alg" : "SHA-384",
-          "content" : "f78487810f3a69d0656a020989580be59e4b27a409cbf1776ebff39301c1ccaa3b9ba720c0c801ed395eb37aeb471dd6"
+          "content" : "1a3be57ed8bef90ca7958fb5c44fdd7c0ca0854a66a8ac5bfbb82aebb42bbf15e3e7fa0db802e69047642ee32f701b07"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "7fcdafabcca22f2343ba26c575462fb0db110f46c5e5bd667ad7360be236c98532afa280d7cafb589e155e46659fb517"
+          "content" : "4f4f91bccf8e6cdbcef9f58dbcb95e30a242abfb5431b704c61c8bb676a9fb031c2df73b30124d6432d3a842d2340879"
         }
       ],
       "licenses" : [
@@ -3067,7 +3067,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3078,43 +3078,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-exporter-otlp",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Protocol (OTLP) Exporters",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "2efd017f75b5560f5b638198e7633395"
+          "content" : "8666476cfd05f202af8557412823fb51"
         },
         {
           "alg" : "SHA-1",
-          "content" : "10368b2ce5db80b03ab73804eb9fd305c56d38c3"
+          "content" : "8c6cca536d8250e32069ff0397dbb5dd998cafbc"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6724a9c8f9f42de757682c6194c48d9fee4670cd19a85c37954eba526c58b836"
+          "content" : "a4344bb7341317cfb239356b20fa836926c8c96531df2e90ab029e04b2204f9e"
         },
         {
           "alg" : "SHA-512",
-          "content" : "0caa9955a5e82851471bd1863a52c916669701498833ab7a6abd9dab156e2955aa0529a9ac9f28185cc6b93924c134f76ef24467560f673c614f36888219dd45"
+          "content" : "92d37cb9dd46918df35244ed02fa9ea1e3aa85bc082ea891761148b2b26a3223289dcbaba5435eac89f23fa263758fa8615a961a0c2d0db7ff297f379873e449"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "aabd6286d06a4020fe643964829c6eda2c8e792f8cd9636ba620b13e52fa3074"
+          "content" : "560de628a8c25cb13db34c145180c7765c2c5d306c5fe6b34feece399b20cf28"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "a0eedb843d927721268229f8259e9b60b257de079e234adf565ae79efd31cd3b2a31ef4c6cf6561bcfb2de9e5438b6f95e8b9a813a02204d1a02b3edcee18ee2"
+          "content" : "f01d5063d0cad76de45fa743a156e33473fbf1187a51920857c7026e828cb07e7f5f668bc6700a9d5728b5cce3d33dc56e892f87f352b4b59ed7a2d8c51e5a53"
         },
         {
           "alg" : "SHA-384",
-          "content" : "d3feb93eab2f2ba299e4967f9f9023c51089619e0062f53cdcf70a539cc56eb2b9b4301993ff6fa47036f8b50912973e"
+          "content" : "7f958c67e58c7b86fcec0f507909c03aea7880fc8136069f5a507176fe80137952cf097e8c61d4587bdbce702e11f86c"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "978f4ebd9ac6c50594db1c990d8459ef9508be06ecf3155e385e6aab90011198c5108c5f5f3118303c4d3022c28b27ae"
+          "content" : "ba794d8899bd27654393ea1e0a2f80aa44a0cc59f7030886bdef6ead1c936fb6f1d2230dd99c32beb597f42c27375b3d"
         }
       ],
       "licenses" : [
@@ -3124,7 +3124,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3135,43 +3135,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-exporter-sender-okhttp",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry OkHttp Senders",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "228a38b4295c29afabc6c2c09f8ab524"
+          "content" : "13c92f34b2071d8038801adfb79abca3"
         },
         {
           "alg" : "SHA-1",
-          "content" : "488bf3121d06e787b2a5f2655eb92bef457f7ce9"
+          "content" : "14413920537489375f903c1b47335e1545e8f50b"
         },
         {
           "alg" : "SHA-256",
-          "content" : "0ccb54e5e1db24680b0b7b818299552477dcc7114de7ca0f7b054e6e20958b83"
+          "content" : "69f4735527c2fe5afffce96f1f32375ad0485ef07c10deeec9b3211e4399ca0d"
         },
         {
           "alg" : "SHA-512",
-          "content" : "355ab20604efb89eff3663d14db270ac401597104361c59e57c5690506d8d76f5df52bc218739a1adb3ef2165f65d222120eabd242995fb614883583446608aa"
+          "content" : "0eb12fa9729610f566b192b6fe0ddc006a147f7b58b3be7c4d90f7e3ebaea87fa45d88cb1785086b9b299dc520ee473409b3b6c956c1985cde5871dc7edc84d2"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "17156257909c135798fea0ac9fa33878d766918a94bf5a609e8580a750f0758e"
+          "content" : "1dd0e7130efb15e3ca94fc45298c9f09ecc2feedc4374bfc00006c5d9a633585"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "55a2ffeef0db69b365021be677023c4c5344b5a22d4ced3132ea8343abaae67fa9a49aada55ef2e8e689397c71f13ed056158f4ce45a847f1cd70956486de904"
+          "content" : "8e97133cf82e2c8a210777fc5855a3fdf0236c86a3bf724227e1b5136626bf73d3c71abf9b13fca9ccc87517eb81787cb1e987393bf896b0be12ee99d484eba9"
         },
         {
           "alg" : "SHA-384",
-          "content" : "cfca1eb4d545a62d396b1347630515e5a6b84eafbb310608add6011742ef1ce2f120dfb89cef9571ab0683b89dbe9d16"
+          "content" : "9149a8899226fa41c1afbe7ada7fb83cf439038df406d59eef76fda7583d0e38ec245e66824058c7306f74367fa1d4e8"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "14fb5dc0a5a0280ab39da7d3cee0315db8ccf9e8e2b9b0d01392e4ca0ec606e0f1b4bb97804ce6a054a2c6fb60d42e47"
+          "content" : "e3ba162ca99474422f6fa6a0d7a5ffd632193cab4bf9d0d0db3355260fc8bb5716582abd4ab7374a01486762481662ca"
         }
       ],
       "licenses" : [
@@ -3181,7 +3181,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3192,43 +3192,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-extension-trace-propagators",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Extension : Trace Propagators",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a7dbc65593573107d96bd789de236342"
+          "content" : "7a33bca7246483ff80fd18ace514f31a"
         },
         {
           "alg" : "SHA-1",
-          "content" : "5628acdd5366820fcfd67a34c54fb4addb2c558d"
+          "content" : "ee2df65dd5a734b6b5d6b72e3edba35e7ed81b02"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6f3f0b5f6a7aa80e8efbaba50b2202b5de64cf670e7bf2b47834c4a708cac74e"
+          "content" : "a80ae72a3b4ca0bfd61c86d8b7202ae78f2856fc2ac8c4b6c07ca14ef10c0b67"
         },
         {
           "alg" : "SHA-512",
-          "content" : "5f80f5a2022f0a50a97a626f7ea3736a076293d2d8e08a1c7b65294b8391be2a681cf450445978d5def4c0129b833cab49821f29a9239bed6f1fad6bee87c31c"
+          "content" : "1efa5d6268a6fc05364f465c048f991a80103652414d6e99064ac7dbf01968d07530aaa36f842c68f0af0a2a7de4d065e5fac35e76988e488fc07ffb46408fb7"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "5a1d17f313c1376fb904e73c92ca5f3fc4f90175a86f6cfb4fad1f11a2083a97"
+          "content" : "be2fedc1dc8f36b4da6f8d36f5816fe0e4c99e53ccbe4e315027496062ade05c"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "061c40a982b2a30154173b1cd3a05caebab8b1d15213d333dfc5b3cc56fdc446b18d9c588771ed1ac96a96cf5b6cd86b1d07a5a6e1bfcbc2293e9147e9467270"
+          "content" : "8e26d841e22dd51101fc0c271fcade9a8da896ff371755cb8e089a2de60ef2107d7f06143f073b16abd4155457a03d3d808fb9bc29e2e9c87b191bf651bb3370"
         },
         {
           "alg" : "SHA-384",
-          "content" : "1387b0832ccc40b64f576d8417dc6296e2a4a632a585181d428a281a3ec1927121a9ed2c135d18c71a0f763b3a0ec095"
+          "content" : "d108e72f6655c63c07bfe709c5048eca5be0c2a435cddf59435b912ba10bc0429c825c59220bcbe8763628a802a8bfb9"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "1a76da0c0174b839347f187ea770d92fe557a6ddb804b22ea9449c274b0ad70ed1050819ae998bb42509d68d2c7d6449"
+          "content" : "5d9bf4279a9ab2733c2033547f3a28327c9b5929f096cba0e8a2c4bc39be69e79cb0279ed53481bfd1f18aee13da09dd"
         }
       ],
       "licenses" : [
@@ -3238,7 +3238,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3249,43 +3249,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-sdk-common",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry SDK Common",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "296e1f6805cbce4ddfe4949bcdc1aaf7"
+          "content" : "474f8357e51416f43405de56b378b607"
         },
         {
           "alg" : "SHA-1",
-          "content" : "1698ded941dc41e3b26db47377f40ae528469a52"
+          "content" : "0cc2819f4b7a0a2fc5304a6e66228e65731e5473"
         },
         {
           "alg" : "SHA-256",
-          "content" : "628a4c00db9561ff4c608a650d5e7fd66a1e153ccdf1ba3cdc5ac0b7c6518fea"
+          "content" : "430c03d5c19d025209856bbb5492aa45db617625df32f0adcb5cc0d3e5f80be6"
         },
         {
           "alg" : "SHA-512",
-          "content" : "7180a22255ff6cce7f46d427f3fcd0db14eca2a5a06975c6d917230426dd899b61ec5cb9923b954319b710e206cf5108e15d23933e1b33d0ed2a9cc53c2cfd55"
+          "content" : "15ac31c0425075a60c9dc61e425f457e27609629a96109c4de637bab2763cb25390f36f1fcbfcb69e5d974b3f88922585f8148bf04c2a9d42708fb86a674f00d"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "cf4c510f7400f43841121c4a8ab58d4f9bd99c6880dd8dfb1234c342bc651677"
+          "content" : "07e58af97a9a0265ff4fc6d35790f6b639cfc2b9c7b3063972aa82a16520298f"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "0f763d84238daef64e8ecd777e6860884d11eec69be82cbb6ecadeff4cc7838cb3f362976225be6f0a6ff9e5f10f85ef5897236f1313ee574f5ef42f08c52a5a"
+          "content" : "6a40baab5a52bbda24d1e54a14ecc25d2e7977931aaa6354761dee18f554a4c5079df4d112139ff85600e111a938e90bf5ce775c1c3cb90a8bf5da93602b8188"
         },
         {
           "alg" : "SHA-384",
-          "content" : "3fc8238dbb31605300cf03c1ea91ac9b8f78ff856b484e92b2d231faa81ec1c9d576f2f5c7727e843482eb3da6328d1f"
+          "content" : "5eb09cd90d39130e20a33f37d7c6f45335095e8bbdf48fc18fe8c9f5077b0537a2951356d423c7decc3cb1b48f95e1e4"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "b1c4310707b704eeba73a98a8b2ac351bd5ebefde26d03fb0a2e22c50d0e9ee20313ed6b79defb4d7fed5d7cc7a1be8f"
+          "content" : "ab870589972749e2d7104838854ea329a2e9e30dcf5b51c2170cc0171c455c0f6dfc4ba72dd8c5ee5ab110e518611e08"
         }
       ],
       "licenses" : [
@@ -3295,7 +3295,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3306,43 +3306,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-sdk-logs",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry Log SDK",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "c25bced949401c517073e1fa666dabbd"
+          "content" : "e81bf2ee022bcea7efd144546fe7b433"
         },
         {
           "alg" : "SHA-1",
-          "content" : "a2c93744e7a7c48d7cb919e8993d365cb312d597"
+          "content" : "91fa0fba8b1be114086bf67efbb19fcdc261a775"
         },
         {
           "alg" : "SHA-256",
-          "content" : "dd0f0b625e08787af49d7e270abc6def4c2eabc2f18f5f145b7924024a3311e3"
+          "content" : "dab55661dd2bc3c2bae39f5b6c505c1508602975ec1f7d0d05600f2723eefc18"
         },
         {
           "alg" : "SHA-512",
-          "content" : "48f9c2bd8999420ac4001513972ba0b99ec108ce0f91f33e8c2d6c6db29ba258e5bf15380c0d02dd1fa66a716b7461950ea0102df1ca8431b178d72fdb4994db"
+          "content" : "4d00fbba2e37a6a3c632058e4b21ffab7e2bc15762122702221e02ced262c907f2232f9f34c55b76552913e35cbb98c4299146a88b537ee70b9c59aa257d33c8"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "256b7ce39ab3be54a5ccac7f618603665245c8ad091aae3791d0510748e7a246"
+          "content" : "8174a73636e766a9e85270f5b12fea752075cbc46d0f96a92d6474104f0ec8d5"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "b51cf8bf5aadc7e46c67dc062c049dd660a6e66c7184647fdbbfe08b354fd1faf2d3f49df52767745fd2e5f70c32cccba9917640e7c8826834a4868ad25118ae"
+          "content" : "eebb2705bc32271279a7995bda36b8820c59845ddb32ac2f5f613aa3166bacaec73475d4d5c397a831df320fc8a629217d807aee96ab0f1f8baa2bcea85b4288"
         },
         {
           "alg" : "SHA-384",
-          "content" : "bb6e80e04eef1264043e1e0a07dd61f35b3c792603fa7ad52ef9d0d811edbcf9a887146919c30eeec0dfc0cfd7c421b5"
+          "content" : "cfcfaae1487338a50441c83d44f3a29421ea21425ef1a8818e458a985a7bcbb5c0cd1b2e628bba4ed502e45161b964c3"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "477aa153d2cd88f9e170809729d6e9e8bdb010257714a0551e1145fe8124e005d8b2950c2a4c529feb2e98075ef054a4"
+          "content" : "14f8002fec3dbdb3c465d14143cccad390159a94a3c58c5cdcd3d44c62e06002fdec2863204b2cc3237779aebd3afe3d"
         }
       ],
       "licenses" : [
@@ -3352,7 +3352,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3363,43 +3363,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-sdk-metrics",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry SDK Metrics",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "ecc042da84a52ba2fb906f933fb7f262"
+          "content" : "045f140231136d77ff6484a741443895"
         },
         {
           "alg" : "SHA-1",
-          "content" : "dcc20dfc0a976b93e58d7eff8a17c1278d83fb31"
+          "content" : "ac64546abe37d7b20e4f00f6c1ed3121a287678d"
         },
         {
           "alg" : "SHA-256",
-          "content" : "c157ff10da59a87a57e5236d9f3290792d9b749433be5e5b449a7d1604c320a9"
+          "content" : "c9ff85bd4ba89e0431bd39d8b6ad5d409f9351881abff87e3002a7ee0e890787"
         },
         {
           "alg" : "SHA-512",
-          "content" : "13ffa713dfa41c4b47fc20b5bf0ca779907efee040fb9ace01d76553bcf6b1da71e948e201f1f50fb548e7dfcf74b8f3d3341517e9df86b1357c856f728fb439"
+          "content" : "60c0b3f40c5614f67ae86636339839744e705c1e6ffbf746ad69c81239acc2956378339608b86bdc6679fa8e87e7462b1ee0f5c70c9dfc58af826083163e5030"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "c339b27e3bdea0a0c40e0bb0b66932d14c1e768d184f537953001657506eb4f5"
+          "content" : "73b8838ca3f42f92af04cf32fddeec6ed89efd0cae2a774b5e7a0041f0b108de"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "631142cb7af715dc12bd2a774357ca05e3fcbc5e3f800c0fc2685319b7800a6f1f7247a14f91fa4ab8a5c42435347a9653e2ca3f678fd016b175189d60964ce9"
+          "content" : "efc6e7df5ee8b8a5595b885fe42bbfccb11da7d74478946ee6a3f2d9f106855d7c8283e97ea1a889f4c5ca8321e0924ef3e693efcec41d51b2034b8894fb0051"
         },
         {
           "alg" : "SHA-384",
-          "content" : "3cafeca7ab23b8eab3d357914c358d41ba539dda27f2e1798d6d31b22e54859f7b48cd6e9d6237c208743571ff3fc09b"
+          "content" : "e4d0f249313daa4146d80bb32977b34037dacbcfa5191657a21a1078d8c0289b41f07c104cf9c12e949806018d048da3"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "f8d42f4f1f75557f99602a0020cbd1160fb096359daae05a36fe21b2a1a3acb357db8fb5a47e7ba36002a2d350cb2c95"
+          "content" : "c6edf98d13d05299ea99f75efdb1eff075fe75b4a76a4ae80991595c6f5e260def12ec1271a2f76f1d6e91cdf826f491"
         }
       ],
       "licenses" : [
@@ -3409,7 +3409,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3420,43 +3420,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-sdk-trace",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry SDK For Tracing",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "d1b05357efd51bf666330ab95863eb55"
+          "content" : "0ce4d9673f342cfb05922c96e3ab637a"
         },
         {
           "alg" : "SHA-1",
-          "content" : "5c10c9d7c99e0cb2b2049522adf31c86a2d3446a"
+          "content" : "89a08368cb6712db9db00cf9189c969461922a18"
         },
         {
           "alg" : "SHA-256",
-          "content" : "14d9615c8a5dcf471dcbb74902b771dcfa8656b755ac38dce904042289ccd198"
+          "content" : "101b87e9a95838e75771d4f07c4f04eacd9b95612de3ebaf744b3642404764e8"
         },
         {
           "alg" : "SHA-512",
-          "content" : "4210601d7ae576901b74682858a5a88c706398861a08ef889ec050a420615fa3d225d5075d758f9c63d1eb8e4d8b85dd382c5aa746f416f7e2bb3335fdbe39f3"
+          "content" : "d5d4e162931c3b9e12203a8f5a352d352bcb279f448133a292e78f0eebd5ff64434ad3214fb82ad68035f8a21e64335a7b50ab0c2afc0c08355fd352e447bc2e"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "e46d195c62893fd539d497f89b3c7018c633474954f1dfaaef50c0d648746d83"
+          "content" : "798f2a8ff8ba3dd62ecef650d75861aa6f36973bb5cc9dbbc16ab4d1b6f717b5"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "5167b81813e6b9fbc71cc50ebd47c659d851f8cfb2dab36908396a3f3e12d32bec924f27c52251b7d84e92ddded35af9ae106ff515d516b12ff9ff10ee4f34c6"
+          "content" : "71e1abb076e079f8c87fe337916f9d4d3a18ff4071c671be11038d1ad692e896ce24f1ce34d6a4fb85ac5b1bcc0fee6f7f21a5feedf2ecfd975110dbe5a5acd5"
         },
         {
           "alg" : "SHA-384",
-          "content" : "4a60d78828c18c7f2b422a04509f796aab0f15320a5e2122bc0bf0bc7b151d4ce286ad705107cc1be771428b26f6bd67"
+          "content" : "fa075994652a63f4c676d0077b78aff48bf9b53eeedd421bf0bf85bc50ff8233f2210959cb0903d67b83d49906d10a83"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e480649c653bbe0452b5ba6b9eb6e16f2998705ee734732cc979ca4b259a7b208ebf887b093ffe03bc51f4ee288bc7c2"
+          "content" : "1b122c0787f0a8711bd35abd3d39651f6fe65ac1c7e21409ebc8f60e6575af217c99f36cd15195842b17e32ae8a8561b"
         }
       ],
       "licenses" : [
@@ -3466,7 +3466,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -3477,43 +3477,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar",
+      "bom-ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar",
       "group" : "io.opentelemetry",
       "name" : "opentelemetry-sdk",
-      "version" : "1.67.0",
+      "version" : "1.68.0",
       "description" : "OpenTelemetry SDK",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "e3e4065b0142e1e04f9a27d12adc65cd"
+          "content" : "58f90656083a960c5404f742f66ab8c0"
         },
         {
           "alg" : "SHA-1",
-          "content" : "89543f9c3bb485528bd89f8849c7ff41d94c90e4"
+          "content" : "5ee154be7d636d9981e8bbf75d1520a0cabdaca0"
         },
         {
           "alg" : "SHA-256",
-          "content" : "52a8f599a368a3d62185e37053f6a53175d6fbe3ecc1d565baba13b1a854267f"
+          "content" : "49a59f222fa2c676e5868a67077ce06fc30f428de6e0eb542691c7b555f6cd33"
         },
         {
           "alg" : "SHA-512",
-          "content" : "74c2ac9e27643135e6188fad726e409fa2f8d88e1efa82cb4e4591ae3c7c06c3b59d83f8deb48b31935e9f1db2480a934b1e497c432955af17142381d07a8fab"
+          "content" : "3eefdd2a34c175b3b1c9780499959eab7a9d4ef321fecb4c7e6e396acf592db30886997e023266e82f5e301412837ebde7fe3459c35ef9368d47c04a2b61f0f1"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "fcef90ff9c3435c9797230ed204440daf79fee1b5f3feb42930331fc7694313a"
+          "content" : "52ac29e7b025bb286bd2b4ff89180ca8db41486eab6cddde227d148db1e03952"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "b5811147822d8aaa7363111830d2c96c1dd28172a7a2a91486cf334f8fb7a07b18d2de2f4b9643e1fb9902a04d7b9c60ea9f6d5bfbb65a6399bdc63b83252a4e"
+          "content" : "b94691816374d0aa95ae34bb8675c7c5e1faa47e9e3c9dc94f9bed1523f645c2b9a5dd5c512c433b43db3077655c3e5e7bb6182ed551a8ebf17be57895b5610f"
         },
         {
           "alg" : "SHA-384",
-          "content" : "c3d93bab74ef1440c4062d2f9cdd6a79e689b07978e2714a5f56f72815a5d9a09d4cd0639e7c6f7f38b3a2c918b32916"
+          "content" : "116ecb038692ce59a23b3d71a7819026385c06c81a554f7042256b5be8091d54876f29061cd6f4b6d190029dc5f6c3b8"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "db9c892efc16184fd4f51a2e2e7a38e87e2bf490839dadd7700f91d38cdf5bb87c33dda39dd4f8eddeb280a8e1fa388a"
+          "content" : "a90c65870a06f70c003cf314ce87ef12e17057659595add2c715f25cbfafae3a1236d5778fe24cfaa6446315a2e7927b"
         }
       ],
       "licenses" : [
@@ -3523,7 +3523,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar",
+      "purl" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -5414,42 +5414,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "13.12.0",
+      "version" : "13.12.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "677d5be272fbaa6ae48f7a9e2e786be4"
+          "content" : "b89983ecf6a1bb0e149a707f27fbadca"
         },
         {
           "alg" : "SHA-1",
-          "content" : "eac36014b27905d62bc9a6abf6f59470b175731e"
+          "content" : "48cec5b95885aaef5454fe00e758bbed6fc3f528"
         },
         {
           "alg" : "SHA-256",
-          "content" : "88e8aac8a19fec1e768fb64b693611eb9e0770222079567b0d5cf8b11de5d362"
+          "content" : "77b263c78a71b6ca23c014048e975db4600d6c4a0d54790da18007a665af356d"
         },
         {
           "alg" : "SHA-512",
-          "content" : "8cfdfa88767023c6d7fc8616deb374affabf49e14aa606bd0a392fbc28bbf867a4f75be513ee9eb08916ffa3418ff7f7776d82b381b6606722bb77872f5f270a"
+          "content" : "9950a94f092e61c761ecbf36380382283bd9178a93eea06f2fc6286b16a56b933d3c99bdb20b535735cb29b94ff9207479fbb4c8202ff0e9433dd915d5695291"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "614c8a7d0023fa14a438711ae6251560afaa0553cf4dea3af8282c7a98ad04a2"
+          "content" : "bc2685040ed85ab8b743af80c03c290b75f8d7a6efc73d49b227f8703f57ca1d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "c8db2395a488d70af41d0dba56dd3e6604b2aca25aa7720706ac23eb2f8ad65712ac59684d60ae11ebb28b29da3428505e31364611224d21c013ebd89960f90b"
+          "content" : "5b33abde95ead93cd6ee5c07541ab2c513c1cb25f59f70e504359a45f34d05578ca9996000a4a41c304132b72ed27f1b06ac7275a5ab080aae5ff5c129a92aa9"
         },
         {
           "alg" : "SHA-384",
-          "content" : "b7481aee0b17da215f43c90d67fd32ec4887d0a75369bda313d74fd388969f162c57b2ca7f5bb91dd68608ed87e6e967"
+          "content" : "b6dad9e3649671bd0972762b9100c8310a8fd7eb33e4c774da62553447b8246902937414f85bc4dd1c137a026253dab6"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "8c50dec9aa2cb7eb16eddef965b2350766780c266bc9fa070ee840650a8dfe0dd2b0d16b75b9969d231832507b8d1b52"
+          "content" : "4630eedde447588dbd5cb1b423d6816a2010b92cd2e664e5882d3f3c7c2cfd425387cb5d29e7d8a22aed9c2c23086942"
         }
       ],
       "licenses" : [
@@ -5459,7 +5459,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -5470,42 +5470,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-cockroachdb",
-      "version" : "13.12.0",
+      "version" : "13.12.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "4352abc7f24daf9db01a56ce0cbfb94f"
+          "content" : "9d4b727b3bc5d5af9f44c4c5605297e7"
         },
         {
           "alg" : "SHA-1",
-          "content" : "5e8a931abfe630b2d058bfcb75fab7e89beedddd"
+          "content" : "d0b5cf410d858d6710f0226ae35051246e7558a9"
         },
         {
           "alg" : "SHA-256",
-          "content" : "d6a568084f1d58e2a7780d29f08629e7b717e0a1b643d31379f25242ea1c0a18"
+          "content" : "0fae3e3225df7b224fb09d0612679b451f77cdd111937b23554cf06a896e9dc5"
         },
         {
           "alg" : "SHA-512",
-          "content" : "573f75b7c0bbb3f7373b13487dcca553eda15abf5cd0f64d20ce7badf86bf0d101cd66ea58ff162fb817c90c38338ac82dbc5b4872253f5b29892c2e923c8e5e"
+          "content" : "6df30658939f3d8682fe43a34782521ee667c94607e2baa4611474a33f09582c394ef8842f46ddab8cdad6cb464c36fb7386628d250e421418b8d62aedd25a42"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "b1cd78dc559fc9ef40b45cd99504802ff612fb7a79429a02e994b78cffeda210"
+          "content" : "f18381b53e019c51df28c4f0c65757197995fca0bdfda69e87ab6b8f3fdefb42"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "d49e17cdde75da0d5b450918e07b4151c7e9cac5df2fa5800ecb976940c766575d6bd8fcea6786fa8c517f06822014c8878779c9947c87db7f98dc3ceddc073e"
+          "content" : "d1546a95660bdce36249c8c46cd8ba41ab4eaa763dd7f8a26a1629afba0ebd09cdb3092268c2341074ab1a30938be03ae2a3843967c74fce9a54f5ce05b9889a"
         },
         {
           "alg" : "SHA-384",
-          "content" : "5f281d46377b8fcb1c50e686a50d37f1e012c3b62d3d75d1b37627a2a6bdeee9df5aa4ae4f530dfe0a12da3ef5713196"
+          "content" : "1f58beec4a64bd2117068407fbe63ca2ab361db0cdce1c067c176763213e3ef13ca3742eb9dab925f368fcb300f550ce"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "568c7080b5dbcc9cb2561d08822b4879cca388a2c6573a11f505b86ea3d44d92bdcb78832ed6b8215009e48d683872a4"
+          "content" : "8acaf26861f9cd499d2a3f5062cf8156ac240cf0f7a45af98bd9bcc3e828d7f6001f2f43b0dcc667f31e66b231d9cbae"
         }
       ],
       "licenses" : [
@@ -5515,7 +5515,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -5526,42 +5526,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "13.12.0",
+      "version" : "13.12.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "561280d199aca7216f6cadb5791863b5"
+          "content" : "a6d76ec97b2f84f7c92a4e9bf116c53e"
         },
         {
           "alg" : "SHA-1",
-          "content" : "acc73d312d60a07557b1dd149162e10183ca0af8"
+          "content" : "89674fefba765330a7d6766a8e03b235270cee0c"
         },
         {
           "alg" : "SHA-256",
-          "content" : "ccacc5f2a4b7dc7c09cdc4d64b6f36ed434f06384490c2a33a20ad155def815a"
+          "content" : "79128190d08d23008c9d42c71720b4be9eb40026f518e379a11ffde7f5a60538"
         },
         {
           "alg" : "SHA-512",
-          "content" : "d7561e4a8e25010dc36432904f235b33cda29fb9e122a1e83f7b32eeb0ad4c936c66bd1e406eca89c000ee0c193f284a8b5930550153b1d1944aa15a91388739"
+          "content" : "b0e136c7b37e1b91aa2b88383832e8642d2a94a470128c0dcee9e5effb08f2abea638118c1f3b4904f1b4227800ef40b86a84e2e3b8e81be468bf31f307a7b57"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "6f94d0c29b8d9acab07ff32fd63e74b65c92642b81e25c38b5e283b2fb5eb305"
+          "content" : "8bba8cd3ff89903f8c5aaf27deb8917bb938cc2124be62c47a2e259d20f66e62"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "798a456b110c0c781a303e218190d3115e8079a1f57b7a7de4d945175fb7731bd3acbf78b926fd04a9e04533895ca12af7af06141e1cd9de591b9bc04fd45596"
+          "content" : "5d8a54fc2d90583b900bc73dc29d79c9601984d00e5ef245e22dccffe01c375219caf8eecc7a75c679f79c1992fe52ee36b11e4831e558f694f7d02a32091db9"
         },
         {
           "alg" : "SHA-384",
-          "content" : "2f218595c6f609ae6fb7c7d148f7410734861bcc366ee608f5dec0982c80b7ed4951458978a6fbfc6919400200a332aa"
+          "content" : "15dc8ad0a8de4502e9ede5f87b5c8c1ab74f73c019416ae8ece88b96e05f214b651db3761df54f41395e2ec8694f35ca"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "8a0be5d3db841546ac16b2fd0124df42f9918c2bc24655cee4611d1adedaf3a1c4bc89d6a6850a23af2f513a863877e2"
+          "content" : "163ea04fa31333ca177c1f3d748a35ca015496471eb4976943e900b6d0cffdcd0cc4008725e32c3bc99a5040c864e920"
         }
       ],
       "licenses" : [
@@ -5571,7 +5571,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12253,43 +12253,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar",
+      "bom-ref" : "pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar",
       "group" : "tools.jackson.core",
       "name" : "jackson-core",
-      "version" : "3.2.4",
+      "version" : "3.3.0",
       "description" : "Core Jackson processing abstractions (aka Streaming API), implementation for JSON",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "024e68187ce475a2a668cb5944e71d88"
+          "content" : "53850566791686fc3c6c5b1e6476b812"
         },
         {
           "alg" : "SHA-1",
-          "content" : "025beaee139ae32025c5f189e4fb39c5b1f78653"
+          "content" : "f5be074915f20d6ba1f25a7cc1ce9d24595720f4"
         },
         {
           "alg" : "SHA-256",
-          "content" : "494b9f5fccf008042d5a72c5bf00629b144c0ba7362a9864cbb02234c9772651"
+          "content" : "1496eda4c353276416bd4f672fb3f98be95fb4c86707e8ffcebe04425d63aa63"
         },
         {
           "alg" : "SHA-512",
-          "content" : "7322b44920244c1b799c4952d3472eb9dc86836a3264a517bc74be81c8f38baaff6d805e237bc52b04a51f91fc40b2222ada4cda9906e1d1b43753f8d5661841"
+          "content" : "a11be3ca10043c9470381bd5800c11d21fd6c90942f2ebf27c128088bd3e4d4546bec51c3c6e67c1a4805dccccf20b0d18daf3381266ce7ebc18889821caed9d"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "7624e27628d60e029c51fe65f82ef86773af00dfed24f6785c42ef4a6c5dfb82"
+          "content" : "0e5e80bb52176dd9f33052ae69c00e740b8bb3063dbfeeddb85503c667ea86c9"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "865947e2983856165fca5ad74077c6d66f73cc17e5ca02c65fdeaed437f4f95b1a9fba550737b343a96a7b819a813c2fecf13155366a5415794e37b7ac108086"
+          "content" : "551d93f34ecb29f504b368e132a9dfb49ead4be5a94e2ba45c49dd25dca7060703a831a57c78b259875156df47e850cb064f27a067b95728a6387196e814ab7e"
         },
         {
           "alg" : "SHA-384",
-          "content" : "91b62f9b11b7801835e5f9a41036114877f5592efb0b6ca6a5b9328efe10f9a1b3c1247ef4e13dd1785881a7b4b08250"
+          "content" : "36b58a7988f4aa64f66ebf88bbe209b34c882d9bdef26b9f9ba6db646c1597556921e10c7ad0591a2ddfc21a09ec63d2"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "b59c067f42f8ac3dec34589b78290ad2ed0ca94c9cfa42d285c9f6095f707c6558a735ac75ce8b13148368bac9d049d1"
+          "content" : "4f4a3d1b667e0855ce6a627451903b3b5f24b6cecb232aa15069afa2becb28ba9ccba770f27b8638bc07b9a89fdd591e"
         }
       ],
       "licenses" : [
@@ -12299,7 +12299,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar",
+      "purl" : "pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12316,43 +12316,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar",
+      "bom-ref" : "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar",
       "group" : "tools.jackson.core",
       "name" : "jackson-databind",
-      "version" : "3.2.4",
+      "version" : "3.3.0",
       "description" : "General data-binding functionality for Jackson: works on core streaming API",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "63eae1d7fa8d26621ef938d7267c2722"
+          "content" : "bb4fc49acb822827f3ded051f7f1e6da"
         },
         {
           "alg" : "SHA-1",
-          "content" : "73cd5c393378036c5b556355e5257128796b9a9a"
+          "content" : "03adf043af5f653a88e92473895771e0d701d982"
         },
         {
           "alg" : "SHA-256",
-          "content" : "c4af37223d5024f1294a5450598b01b65f30c53d9e906f02c3955ba1fb14a67d"
+          "content" : "856b7348bd08efe5791cf617cc3bed21f5f4a02569507c61e946666d13c33ba4"
         },
         {
           "alg" : "SHA-512",
-          "content" : "3b879f3f270ca12ce1b89f67898655dcefe3673cc36f598fbbe91fddef6f5bed59d15902ac7de79f23ebc0f72c8d27189f0bef2b3b9c90006a27328b98a101e8"
+          "content" : "212b06338a352fd11cc226aff03cb9fc2fc131c1652343d7089af7db7432258c4242221858d28a8ac661026b148d31367ed858f14e19f85daf07eb9b41d78609"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "cd14fcd2ecb0cd6bbebec5721d9c6532d5160c68f495a24eb2cc86dc9ac15b4f"
+          "content" : "8556b7d4146197ad850b987abd688c3bfbffab813adee8f6fd656950ec25a589"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "441135c725515017b6493d0e36fc88000a976713506924f30a7be38d570073c7d64ff88e60cc5d0abbb6704ccfc943d39271704efd064feed91ee2ce1eb81675"
+          "content" : "0bdac4872de74802afb7209340dde3579b984cfa7113ab591837ae9d94fad8b8f915a6cbc97fada1ec9f1adda8dc52f2534eb149c8db8064e8eec1323ccf6413"
         },
         {
           "alg" : "SHA-384",
-          "content" : "5dbdf4e1282de8135b5290ac71e26966921d3379af8c475baf222a0afab0daede2c0f59f0f3e314e4d9292f43547a4ac"
+          "content" : "f44b20547faa17f499508fc8bae97baa18c726c6d677cb1632d35edd33b473a7dd7ea6aae404d96f650d0d1694a8aefc"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "9c4578d09a927dbc9c81daea466521ac22342568c2e350f6ba1107451a2354e2ae80a57fb0d72019f9725caada62177a"
+          "content" : "b4b6ee6f9940bd8ee238a63d29f5c7c25269a464dcd3c85ef7919c5e651d3b5593dc02ee6fc3217672ffc9f97c0e6390"
         }
       ],
       "licenses" : [
@@ -12362,7 +12362,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar",
+      "purl" : "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12379,43 +12379,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar",
+      "bom-ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar",
       "group" : "tools.jackson.dataformat",
       "name" : "jackson-dataformat-cbor",
-      "version" : "3.2.4",
+      "version" : "3.3.0",
       "description" : "Support for reading and writing Concise Binary Object Representation ([CBOR](https://www.rfc-editor.org/info/rfc7049) encoded data using Jackson abstractions (streaming API, data binding, tree model)",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "43730267597618763083291ed18322dd"
+          "content" : "68a7135dfa8521bf0f43b2c58a8c8978"
         },
         {
           "alg" : "SHA-1",
-          "content" : "e3daa9d76705a0724f8b3c9bf872823ceb598eac"
+          "content" : "2efde6c184e19a944e59d46311accf65987affff"
         },
         {
           "alg" : "SHA-256",
-          "content" : "52b392e464e4bfb9c4a109c86fb5721ba0cdece95b74da4f487b16c7c28f2f32"
+          "content" : "148040821b940de6824fff34ee2637334370f5c977c1db58c750bd40a05e0ac1"
         },
         {
           "alg" : "SHA-512",
-          "content" : "1734d3b8b9e7cf796b6bb41c9de45163f0e3718ac64650a21767ad4ab6a99f62e08df256444c500f62eef6e49e6ca27a5b755653b9e67147a3f061668c9f5bb0"
+          "content" : "ecaf347a26d4ed1d025d5d8073b39013c1217ff20ae205e4e50dd360521187f39897497de17ff7482d3c792f16737466ee508b79d2d20c4e630168b7a095ebab"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "cee9e6af0b3521160a91907b7571d81e174f8044328b4c4d577dbd4e4873ab1e"
+          "content" : "091a5f49db99b7e57268bdc3f425de847c3805ca9f589eca5307e2dabee58bc1"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "4407ea2e6641a9e74023951b5a983fac2d0edd07a90953f790286f287bd9156c17fa48452b9711221f8f208ddb4eb40ee66c4195e795c65b0742cfb9f39ee22d"
+          "content" : "e5b74fc725096691a7639948f07a3c6b9f1b1041105a3c75356f09ca7411073dd4e3e7885795c8b22066a6f724f9015282082a7ec738efd614926f1b1d4b32b0"
         },
         {
           "alg" : "SHA-384",
-          "content" : "a0ebfce5cb419c0d4c643b418e27d6303d798ec909ae4374bdc4906018476b04f73e41a1f73eb0069a50d4d0e9ee8a5f"
+          "content" : "92d0d260397a089f5253a29cc7766d5325658faf6acb73175e4334c027593af47ab8cef352e6064adda1acfec1179cb6"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e9dc38ca91e74e3ee3fe13e15a645c5a366c2cc204429c3df268b9da39a740d2b05b507c82fa387eb2b62c5964cf9650"
+          "content" : "df8bd6117399c4ba97360e222404afeab0f1722ebb9b0386b9db0be0bbbd248913e2511aab94d891668903b6dc1f2cdc"
         }
       ],
       "licenses" : [
@@ -12425,7 +12425,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar",
+      "purl" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -12436,11 +12436,11 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom",
+      "bom-ref" : "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom",
       "publisher" : "FasterXML",
       "group" : "tools.jackson",
       "name" : "jackson-bom",
-      "version" : "3.2.4",
+      "version" : "3.3.0",
       "description" : "Bill of Materials pom for getting full, complete set of compatible versions of Jackson 3.x components maintained by FasterXML.com",
       "licenses" : [
         {
@@ -12449,7 +12449,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom",
+      "purl" : "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom",
       "modified" : false,
       "externalReferences" : [
         {
@@ -12496,47 +12496,47 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar",
+      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
+      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
+      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom"
+        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
+      "ref" : "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom"
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.22.4?type=jar",
+      "ref" : "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.23.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
         "pkg:maven/org.yaml/snakeyaml@2.6?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.22.4?type=jar",
+      "ref" : "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom"
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.22.4?type=pom",
+      "ref" : "pkg:maven/com.fasterxml.jackson/jackson-bom@2.23.0?type=pom",
       "dependsOn" : [ ]
     },
     {
@@ -12546,7 +12546,7 @@
     {
       "ref" : "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
+        "pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar",
         "pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"
       ]
     },
@@ -12557,11 +12557,11 @@
       ]
     },
     {
-      "ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
+      "ref" : "pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
+      "ref" : "pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -12569,9 +12569,9 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar",
+      "ref" : "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.google.errorprone/error_prone_annotations@2.50.0?type=jar",
+        "pkg:maven/com.google.errorprone/error_prone_annotations@2.52.0?type=jar",
         "pkg:maven/com.google.guava/failureaccess@1.0.3?type=jar",
         "pkg:maven/com.google.guava/listenablefuture@9999.0-empty-to-avoid-conflict-with-guava?type=jar",
         "pkg:maven/com.google.j2objc/j2objc-annotations@3.1?type=jar",
@@ -12591,16 +12591,16 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar",
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar",
       "dependsOn" : [
         "pkg:maven/com.squareup.okio/okio@3.18.1?type=pom",
         "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib@2.3.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom",
+      "ref" : "pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.0?type=jar"
+        "pkg:maven/com.squareup.okhttp3/okhttp-jvm@5.5.1?type=jar"
       ]
     },
     {
@@ -12630,18 +12630,18 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.2?project_path=%3Abackend",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/backend@1.23.3?project_path=%3Abackend",
       "dependsOn" : [
-        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.21.0?type=jar",
+        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.22.0?type=jar",
         "pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar",
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
-        "pkg:maven/com.github.luben/zstd-jni@1.5.7-24?type=jar",
-        "pkg:maven/com.google.guava/guava@33.7.2-jre?type=jar",
-        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support",
+        "pkg:maven/com.github.luben/zstd-jni@1.5.7-26?type=jar",
+        "pkg:maven/com.google.guava/guava@33.8.0-jre?type=jar",
+        "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.2?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar",
         "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
         "pkg:maven/org.postgresql/postgresql@42.7.14?type=jar",
         "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
@@ -12658,11 +12658,11 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.2?type=jar",
-        "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar"
+        "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.2?project_path=%3Alogging-support",
+      "ref" : "pkg:maven/de.greluc.krt.profit.basetool/logging-support@1.23.3?project_path=%3Alogging-support",
       "dependsOn" : [
         "pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"
@@ -12732,11 +12732,11 @@
         "pkg:maven/io.micrometer/micrometer-observation@1.17.2?type=jar",
         "pkg:maven/io.micrometer/micrometer-tracing@1.7.2?type=jar",
         "pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar",
         "pkg:maven/org.jspecify/jspecify@1.0.1?type=jar",
         "pkg:maven/org.slf4j/slf4j-api@2.0.20?type=jar"
       ]
@@ -12826,92 +12826,92 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-context@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-common@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp-common@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-exporter-sender-okhttp@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.squareup.okhttp3/okhttp@5.5.0?type=pom",
-        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"
+        "pkg:maven/com.squareup.okhttp3/okhttp@5.5.1?type=pom",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-common@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-extension-trace-propagators@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar",
+      "ref" : "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.67.0?type=jar"
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-common@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-logs@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-metrics@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.68.0?type=jar"
       ]
     },
     {
@@ -13018,7 +13018,7 @@
     {
       "ref" : "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar"
+        "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"
       ]
     },
     {
@@ -13073,20 +13073,20 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.12.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@13.12.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@13.12.1?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.12.1?type=jar"
       ]
     },
     {
@@ -13197,9 +13197,9 @@
     {
       "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.2.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.22.4?type=jar",
-        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.22.4?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.23.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.23.0?type=jar",
         "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.2?type=jar",
@@ -13308,7 +13308,7 @@
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.2?type=jar",
       "dependsOn" : [
         "pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar",
-        "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar"
+        "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar"
       ]
     },
     {
@@ -13381,8 +13381,8 @@
     {
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.2?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.opentelemetry/opentelemetry-api@1.67.0?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.67.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-api@1.68.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-sdk@1.68.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot@4.1.2?type=jar"
       ]
     },
@@ -13507,7 +13507,7 @@
       "ref" : "pkg:maven/org.springframework.boot/spring-boot-starter-opentelemetry@4.1.2?type=jar",
       "dependsOn" : [
         "pkg:maven/io.micrometer/micrometer-tracing-bridge-otel@1.7.2?type=jar",
-        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.67.0?type=jar",
+        "pkg:maven/io.opentelemetry/opentelemetry-exporter-otlp@1.68.0?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-micrometer-tracing-opentelemetry@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.2?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-micrometer-metrics@4.1.2?type=jar",
@@ -13833,29 +13833,29 @@
       ]
     },
     {
-      "ref" : "pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar",
+      "ref" : "pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"
+        "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar",
+      "ref" : "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.22?type=jar",
-        "pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar",
-        "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.23?type=jar",
+        "pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar",
+        "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.2.4?type=jar",
+      "ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.3.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/tools.jackson.core/jackson-core@3.2.4?type=jar",
-        "pkg:maven/tools.jackson.core/jackson-databind@3.2.4?type=jar",
-        "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom"
+        "pkg:maven/tools.jackson.core/jackson-core@3.3.0?type=jar",
+        "pkg:maven/tools.jackson.core/jackson-databind@3.3.0?type=jar",
+        "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom"
       ]
     },
     {
-      "ref" : "pkg:maven/tools.jackson/jackson-bom@3.2.4?type=pom",
+      "ref" : "pkg:maven/tools.jackson/jackson-bom@3.3.0?type=pom",
       "dependsOn" : [ ]
     }
   ]
