@@ -39,6 +39,7 @@ import lombok.Builder;
  * @param densityGramPerCc physical density in g/cc (Wiki only)
  * @param isMineable whether the Wiki flags the commodity as mineable
  * @param hasHarvestables whether the Wiki flags the commodity as a harvestable source
+ * @param tier rarity label, stored as tier 1 ({@code common}) to 5 ({@code legendary})
  */
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -51,7 +52,7 @@ public record ScWikiCommodityDto(
     @JsonProperty("density_g_per_cc") Double densityGramPerCc,
     @JsonProperty("is_mineable") Boolean isMineable,
     @JsonProperty("has_harvestables") Boolean hasHarvestables,
-    Integer tier,
+    ScWikiCommodityRarity tier,
     Double instability,
     Double resistance,
     Double volatility,
@@ -75,7 +76,7 @@ public record ScWikiCommodityDto(
    */
   public CommodityMiningData miningData() {
     return new CommodityMiningData(
-        tier,
+        tier == null ? null : tier.getTier(),
         instability,
         resistance,
         volatility,

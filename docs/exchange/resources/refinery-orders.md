@@ -30,8 +30,9 @@ The owner is never carried: it is always the member.
 
 A good refines a raw `input` material into a refined `output` material, both `{bt, name}` as in the
 [catalogue](catalog.md). `inputQuantity` and `outputQuantity` are whole units, 100 to the SCU, as
-the refinery terminal shows them; `quality` runs from 0 to 1000. A good's `id` stays the same while
-the good exists.
+the refinery terminal shows them; `quality` runs from 0 to 1000. An `inputQuantity` of `0` means the
+input amount is not known: no run refines 0 units, so `0` is never a real amount. `outputQuantity`
+is at least 1. A good's `id` stays the same while the good exists.
 
 ### Section counters
 
@@ -154,7 +155,10 @@ an op is ignored: the server reports it as an `UNKNOWN_FIELD` warning and the op
 - **Goods.** A good is `{input, inputQuantity, outputQuantity, quality}`. `input` is an
   [item reference](../formats.md#item-reference--item-ref) to a raw material, resolved exactly:
   one that is not raw is `MATERIAL_NOT_RAW`. The output material follows from the input as in the
-  web. Quantities are whole units, 100 to the SCU. `good-update` and `good-remove` name a row by
+  web. Quantities are whole units, 100 to the SCU. `inputQuantity` is required and at least 0:
+  send `0` when you know only the yield, as the web stores an input amount left empty.
+  `outputQuantity` is at least 1; a smaller one is `400 SCHEMA_INVALID`. `good-update` and
+  `good-remove` name a row by
   its `goodId` from the feed or a result; a row of another order is `GOOD_UNKNOWN`. A good the
   order holds stays writable while you leave its `input` as it is, also when that material is no
   longer raw. An order always keeps at least one good: a `create` without goods and a

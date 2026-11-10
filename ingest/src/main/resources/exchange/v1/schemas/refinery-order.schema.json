@@ -157,7 +157,8 @@
           },
           "inputQuantity": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Whole units, 100 to the SCU; 0 when the input amount is not known."
           },
           "output": {
             "$ref": "item-ref.schema.json",
