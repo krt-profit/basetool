@@ -30,7 +30,8 @@ import org.jetbrains.annotations.Nullable;
  * amount are required, everything else the bank checks by the web's rules.
  *
  * @param type deposit, withdrawal or transfer
- * @param sourceAccountId the (source) account
+ * @param sourceAccountId the request's account: a deposit's target, a withdrawal's or transfer's
+ *     source
  * @param targetAccountId the destination of a transfer, else {@code null}
  * @param amount the whole-aUEC amount
  * @param note the member's note, or {@code null}

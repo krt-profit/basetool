@@ -208,6 +208,9 @@ body, and you get the request it raised, with `201` and its current state, never
 ```
 
 - `type` is `DEPOSIT`, `WITHDRAWAL` or `TRANSFER`; `amount` is whole aUEC, 1 to 10¹².
+- `sourceAccountId` names the request's account, whatever the type: the account a deposit is paid
+  **into**, the account a withdrawal or transfer is paid **from**. It is the request's `account` in
+  the [own requests](#own-requests). There is no other field for a deposit's target.
 - A deposit may go to any active account, also one the member does not view; it carries no
   justification and may be split with `splitEnabled` and `splitPercent` (1 to 100).
 - A withdrawal or transfer needs an account the member views and a `justification` where the
@@ -215,6 +218,17 @@ body, and you get the request it raised, with `201` and its current state, never
   source.
 - `note` and `justification` are plain text of at most 500 characters. Bank staff see them as text,
   links are not clickable, and the request carries a badge with your application's name.
+
+A deposit of 250 000 aUEC into the account `11111111-…`:
+
+```json
+{
+  "type": "DEPOSIT",
+  "sourceAccountId": "11111111-2222-4333-8444-555555555555",
+  "amount": 250000,
+  "note": "Mining haul"
+}
+```
 
 The answer is `201` with only the request's id, status, version and amount:
 
