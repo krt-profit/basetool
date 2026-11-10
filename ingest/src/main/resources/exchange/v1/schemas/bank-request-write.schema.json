@@ -18,7 +18,8 @@
           ]
         },
         "sourceAccountId": {
-          "$ref": "#/$defs/accountId"
+          "$ref": "#/$defs/accountId",
+          "description": "The request's account: the account a deposit is paid into, the account a withdrawal or transfer is paid from."
         },
         "targetAccountId": {
           "description": "The destination of a transfer; absent or null otherwise.",

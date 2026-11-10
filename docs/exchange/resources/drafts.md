@@ -33,7 +33,10 @@ blueprint taken over from the review is recorded with the source `import`.
 Scope `exchange.drafts.refinery`. The body is a [`refinery-draft`](../schemas/), the SC Extractor's
 refinery extract: `schemaVersion` 1 and one to five `orders`. Only the first order becomes the draft,
 and it must be a `SETUP` panel; further orders are reported in the review. The review is the web's
-refinery-order form, filled in.
+refinery-order form, filled in. A row with an `inputQuantity` or `outputQuantity` of `0` is left out
+of the draft and reported in the review, since on a `SETUP` panel it is a row the member does not
+refine. A good whose input amount is not known goes through a change set with `inputQuantity: 0`
+instead.
 
 The draft stays for an order the member reviews in the browser first. To write the member's orders
 directly — create, update, pick up and store them — send a change set to
